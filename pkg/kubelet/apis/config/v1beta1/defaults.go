@@ -23,7 +23,6 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	// TODO: Cut references to k8s.io/kubernetes, eventually there should be none from this package
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -108,6 +107,16 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.StreamingConnectionIdleTimeout == zeroDuration {
 		obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
 	}
+	if obj.NodeStatusReportFrequency == zeroDuration {
+		// For backward compatibility, NodeStatusReportFrequency's default value is
+		// set to NodeStatusUpdateFrequency if NodeStatusUpdateFrequency is set
+		// explicitly.
+		if obj.NodeStatusUpdateFrequency == zeroDuration {
+			obj.NodeStatusReportFrequency = metav1.Duration{Duration: time.Minute}
+		} else {
+			obj.NodeStatusReportFrequency = obj.NodeStatusUpdateFrequency
+		}
+	}
 	if obj.NodeStatusUpdateFrequency == zeroDuration {
 		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 	}
@@ -149,7 +158,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.MaxPods == 0 {
 		obj.MaxPods = 110
 	}
-	if obj.PodPidsLimit == nil {
+	// default nil or negative value to -1 (implies node allocatable pid limit)
+	if obj.PodPidsLimit == nil || *obj.PodPidsLimit < int64(0) {
 		temp := int64(-1)
 		obj.PodPidsLimit = &temp
 	}
@@ -159,7 +169,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.CPUCFSQuota == nil {
 		obj.CPUCFSQuota = utilpointer.BoolPtr(true)
 	}
-	if obj.CPUCFSQuotaPeriod == nil && obj.FeatureGates[string(features.CPUCFSQuotaPeriod)] {
+	if obj.CPUCFSQuotaPeriod == nil {
 		obj.CPUCFSQuotaPeriod = &metav1.Duration{Duration: 100 * time.Millisecond}
 	}
 	if obj.MaxOpenFiles == 0 {
@@ -178,12 +188,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.SerializeImagePulls = utilpointer.BoolPtr(true)
 	}
 	if obj.EvictionHard == nil {
-		obj.EvictionHard = map[string]string{
-			"memory.available":  "100Mi",
-			"nodefs.available":  "10%",
-			"nodefs.inodesFree": "5%",
-			"imagefs.available": "15%",
-		}
+		obj.EvictionHard = DefaultEvictionHard
 	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
@@ -210,7 +215,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.ContainerLogMaxFiles = utilpointer.Int32Ptr(5)
 	}
 	if obj.ConfigMapAndSecretChangeDetectionStrategy == "" {
-		obj.ConfigMapAndSecretChangeDetectionStrategy = kubeletconfigv1beta1.WatchChangeDetectionStrategy
+		obj.ConfigMapAndSecretChangeDetectionStrategy = kubeletconfigv1beta1.TTLCacheChangeDetectionStrategy
 	}
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement

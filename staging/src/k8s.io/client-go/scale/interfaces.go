@@ -34,6 +34,6 @@ type ScaleInterface interface {
 	// Get fetches the scale of the given scalable resource.
 	Get(resource schema.GroupResource, name string) (*autoscalingapi.Scale, error)
 
-	// Update updates the scale of the the given scalable resource.
+	// Update updates the scale of the given scalable resource.
 	Update(resource schema.GroupResource, scale *autoscalingapi.Scale) (*autoscalingapi.Scale, error)
 }

@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/oauth2/google"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 func TestReadConfigFile(t *testing.T) {
@@ -39,6 +39,7 @@ secondary-range-name = my-secondary-range
 node-tags = my-node-tag1
 node-instance-prefix = my-prefix
 multizone = true
+regional = true
    `
 	reader := strings.NewReader(s)
 	config, err := readConfig(reader)
@@ -57,6 +58,7 @@ multizone = true
 		NodeTags:           []string{"my-node-tag1"},
 		NodeInstancePrefix: "my-prefix",
 		Multizone:          true,
+		Regional:           true,
 	}}
 
 	if !reflect.DeepEqual(expected, config) {
@@ -89,7 +91,7 @@ func TestGetRegion(t *testing.T) {
 	if regionName != "us-central1" {
 		t.Errorf("Unexpected region from GetGCERegion: %s", regionName)
 	}
-	gce := &GCECloud{
+	gce := &Cloud{
 		localZone: zoneName,
 		region:    regionName,
 	}
@@ -297,7 +299,7 @@ func TestGetZoneByProviderID(t *testing.T) {
 		},
 	}
 
-	gce := &GCECloud{
+	gce := &Cloud{
 		localZone: "us-central1-f",
 		region:    "us-central1",
 	}
@@ -328,13 +330,14 @@ func TestGenerateCloudConfigs(t *testing.T) {
 		NodeTags:           []string{"node-tag"},
 		NodeInstancePrefix: "node-prefix",
 		Multizone:          false,
-		ApiEndpoint:        "",
+		Regional:           false,
+		APIEndpoint:        "",
 		LocalZone:          "us-central1-a",
 		AlphaFeatures:      []string{},
 	}
 
 	cloudBoilerplate := CloudConfig{
-		ApiEndpoint:        "",
+		APIEndpoint:        "",
 		ProjectID:          "project-id",
 		NetworkProjectID:   "",
 		Region:             "us-central1",
@@ -392,12 +395,12 @@ func TestGenerateCloudConfigs(t *testing.T) {
 			name: "Specified API Endpint",
 			config: func() ConfigGlobal {
 				v := configBoilerplate
-				v.ApiEndpoint = "https://www.googleapis.com/compute/staging_v1/"
+				v.APIEndpoint = "https://www.googleapis.com/compute/staging_v1/"
 				return v
 			},
 			cloud: func() CloudConfig {
 				v := cloudBoilerplate
-				v.ApiEndpoint = "https://www.googleapis.com/compute/staging_v1/"
+				v.APIEndpoint = "https://www.googleapis.com/compute/staging_v1/"
 				return v
 			},
 		},
@@ -442,6 +445,20 @@ func TestGenerateCloudConfigs(t *testing.T) {
 			},
 			cloud: func() CloudConfig {
 				v := cloudBoilerplate
+				v.ManagedZones = nil
+				return v
+			},
+		},
+		{
+			name: "Regional",
+			config: func() ConfigGlobal {
+				v := configBoilerplate
+				v.Regional = true
+				return v
+			},
+			cloud: func() CloudConfig {
+				v := cloudBoilerplate
+				v.Regional = true
 				v.ManagedZones = nil
 				return v
 			},
@@ -529,9 +546,9 @@ func TestGetRegionInURL(t *testing.T) {
 		"https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/subnetworks/a": "us-central1",
 		"https://www.googleapis.com/compute/v1/projects/my-project/regions/us-west2/subnetworks/b":    "us-west2",
 		"projects/my-project/regions/asia-central1/subnetworks/c":                                     "asia-central1",
-		"regions/europe-north2":                                                                       "europe-north2",
-		"my-url":                                                                                      "",
-		"":                                                                                            "",
+		"regions/europe-north2": "europe-north2",
+		"my-url":                "",
+		"":                      "",
 	}
 	for input, output := range cases {
 		result := getRegionInURL(input)

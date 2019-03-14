@@ -17,27 +17,47 @@ limitations under the License.
 package leaderelection
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
-	core "k8s.io/client-go/testing"
+	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/client-go/kubernetes/fake"
+	fakeclient "k8s.io/client-go/testing"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 )
 
-func createLockObject(objectType string, objectMeta metav1.ObjectMeta) (obj runtime.Object) {
+func createLockObject(objectType, namespace, name string, record rl.LeaderElectionRecord) (obj runtime.Object) {
+	objectMeta := metav1.ObjectMeta{
+		Namespace: namespace,
+		Name:      name,
+	}
 	switch objectType {
 	case "endpoints":
-		obj = &v1.Endpoints{ObjectMeta: objectMeta}
+		recordBytes, _ := json.Marshal(record)
+		objectMeta.Annotations = map[string]string{
+			rl.LeaderElectionRecordAnnotationKey: string(recordBytes),
+		}
+		obj = &corev1.Endpoints{ObjectMeta: objectMeta}
 	case "configmaps":
-		obj = &v1.ConfigMap{ObjectMeta: objectMeta}
+		recordBytes, _ := json.Marshal(record)
+		objectMeta.Annotations = map[string]string{
+			rl.LeaderElectionRecordAnnotationKey: string(recordBytes),
+		}
+		obj = &corev1.ConfigMap{ObjectMeta: objectMeta}
+	case "leases":
+		spec := rl.LeaderElectionRecordToLeaseSpec(&record)
+		obj = &coordinationv1.Lease{ObjectMeta: objectMeta, Spec: spec}
 	default:
 		panic("unexpected objType:" + objectType)
 	}
@@ -54,59 +74,56 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 	past := time.Now().Add(-1000 * time.Hour)
 
 	tests := []struct {
+		name           string
 		observedRecord rl.LeaderElectionRecord
 		observedTime   time.Time
 		reactors       []struct {
 			verb     string
-			reaction core.ReactionFunc
+			reaction fakeclient.ReactionFunc
 		}
 
 		expectSuccess    bool
 		transitionLeader bool
 		outHolder        string
 	}{
-		// acquire from no object
 		{
+			name: "acquire from no object",
 			reactors: []struct {
 				verb     string
-				reaction core.ReactionFunc
+				reaction fakeclient.ReactionFunc
 			}{
 				{
 					verb: "get",
-					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(action.(core.GetAction).GetResource().GroupResource(), action.(core.GetAction).GetName())
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
 					},
 				},
 				{
 					verb: "create",
-					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject(), nil
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
 					},
 				},
 			},
 			expectSuccess: true,
 			outHolder:     "baz",
 		},
-		// acquire from unled object
 		{
+			name: "acquire from unled object",
 			reactors: []struct {
 				verb     string
-				reaction core.ReactionFunc
+				reaction fakeclient.ReactionFunc
 			}{
 				{
 					verb: "get",
-					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						objectMeta := metav1.ObjectMeta{
-							Namespace: action.GetNamespace(),
-							Name:      action.(core.GetAction).GetName(),
-						}
-						return true, createLockObject(objectType, objectMeta), nil
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), rl.LeaderElectionRecord{}), nil
 					},
 				},
 				{
 					verb: "update",
-					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject(), nil
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
 					},
 				},
 			},
@@ -115,29 +132,22 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			transitionLeader: true,
 			outHolder:        "baz",
 		},
-		// acquire from led, unacked object
 		{
+			name: "acquire from led, unacked object",
 			reactors: []struct {
 				verb     string
-				reaction core.ReactionFunc
+				reaction fakeclient.ReactionFunc
 			}{
 				{
 					verb: "get",
-					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						objectMeta := metav1.ObjectMeta{
-							Namespace: action.GetNamespace(),
-							Name:      action.(core.GetAction).GetName(),
-							Annotations: map[string]string{
-								rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
-							},
-						}
-						return true, createLockObject(objectType, objectMeta), nil
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
 					},
 				},
 				{
 					verb: "update",
-					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject(), nil
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
 					},
 				},
 			},
@@ -148,23 +158,41 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			transitionLeader: true,
 			outHolder:        "baz",
 		},
-		// don't acquire from led, acked object
 		{
+			name: "acquire from empty led, acked object",
 			reactors: []struct {
 				verb     string
-				reaction core.ReactionFunc
+				reaction fakeclient.ReactionFunc
 			}{
 				{
 					verb: "get",
-					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						objectMeta := metav1.ObjectMeta{
-							Namespace: action.GetNamespace(),
-							Name:      action.(core.GetAction).GetName(),
-							Annotations: map[string]string{
-								rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
-							},
-						}
-						return true, createLockObject(objectType, objectMeta), nil
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), rl.LeaderElectionRecord{HolderIdentity: ""}), nil
+					},
+				},
+				{
+					verb: "update",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			observedTime: future,
+
+			expectSuccess:    true,
+			transitionLeader: true,
+			outHolder:        "baz",
+		},
+		{
+			name: "don't acquire from led, acked object",
+			reactors: []struct {
+				verb     string
+				reaction fakeclient.ReactionFunc
+			}{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
 					},
 				},
 			},
@@ -173,29 +201,22 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			expectSuccess: false,
 			outHolder:     "bing",
 		},
-		// renew already acquired object
 		{
+			name: "renew already acquired object",
 			reactors: []struct {
 				verb     string
-				reaction core.ReactionFunc
+				reaction fakeclient.ReactionFunc
 			}{
 				{
 					verb: "get",
-					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						objectMeta := metav1.ObjectMeta{
-							Namespace: action.GetNamespace(),
-							Name:      action.(core.GetAction).GetName(),
-							Annotations: map[string]string{
-								rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"baz"}`,
-							},
-						}
-						return true, createLockObject(objectType, objectMeta), nil
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
 					},
 				},
 				{
 					verb: "update",
-					reaction: func(action core.Action) (handled bool, ret runtime.Object, err error) {
-						return true, action.(core.CreateAction).GetObject(), nil
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
 					},
 				},
 			},
@@ -207,86 +228,127 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 		},
 	}
 
-	for i, test := range tests {
-		// OnNewLeader is called async so we have to wait for it.
-		var wg sync.WaitGroup
-		wg.Add(1)
-		var reportedLeader string
-		var lock rl.Interface
+	for i := range tests {
+		test := &tests[i]
+		t.Run(test.name, func(t *testing.T) {
+			// OnNewLeader is called async so we have to wait for it.
+			var wg sync.WaitGroup
+			wg.Add(1)
+			var reportedLeader string
+			var lock rl.Interface
 
-		objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
-		resourceLockConfig := rl.ResourceLockConfig{
-			Identity:      "baz",
-			EventRecorder: &record.FakeRecorder{},
-		}
-		c := &fakecorev1.FakeCoreV1{Fake: &core.Fake{}}
-		for _, reactor := range test.reactors {
-			c.AddReactor(reactor.verb, objectType, reactor.reaction)
-		}
-		c.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-			t.Errorf("[%v] unreachable action. testclient called too many times: %+v", i, action)
-			return true, nil, fmt.Errorf("unreachable action")
-		})
-
-		switch objectType {
-		case "endpoints":
-			lock = &rl.EndpointsLock{
-				EndpointsMeta: objectMeta,
-				LockConfig:    resourceLockConfig,
-				Client:        c,
+			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+			resourceLockConfig := rl.ResourceLockConfig{
+				Identity:      "baz",
+				EventRecorder: &record.FakeRecorder{},
 			}
-		case "configmaps":
-			lock = &rl.ConfigMapLock{
-				ConfigMapMeta: objectMeta,
-				LockConfig:    resourceLockConfig,
-				Client:        c,
+			c := &fake.Clientset{}
+			for _, reactor := range test.reactors {
+				c.AddReactor(reactor.verb, objectType, reactor.reaction)
 			}
-		}
+			c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {
+				t.Errorf("unreachable action. testclient called too many times: %+v", action)
+				return true, nil, fmt.Errorf("unreachable action")
+			})
 
-		lec := LeaderElectionConfig{
-			Lock:          lock,
-			LeaseDuration: 10 * time.Second,
-			Callbacks: LeaderCallbacks{
-				OnNewLeader: func(l string) {
-					defer wg.Done()
-					reportedLeader = l
+			switch objectType {
+			case "endpoints":
+				lock = &rl.EndpointsLock{
+					EndpointsMeta: objectMeta,
+					LockConfig:    resourceLockConfig,
+					Client:        c.CoreV1(),
+				}
+			case "configmaps":
+				lock = &rl.ConfigMapLock{
+					ConfigMapMeta: objectMeta,
+					LockConfig:    resourceLockConfig,
+					Client:        c.CoreV1(),
+				}
+			case "leases":
+				lock = &rl.LeaseLock{
+					LeaseMeta:  objectMeta,
+					LockConfig: resourceLockConfig,
+					Client:     c.CoordinationV1(),
+				}
+			}
+
+			lec := LeaderElectionConfig{
+				Lock:          lock,
+				LeaseDuration: 10 * time.Second,
+				Callbacks: LeaderCallbacks{
+					OnNewLeader: func(l string) {
+						defer wg.Done()
+						reportedLeader = l
+					},
 				},
-			},
-		}
-		le := &LeaderElector{
-			config:         lec,
-			observedRecord: test.observedRecord,
-			observedTime:   test.observedTime,
-		}
+			}
+			le := &LeaderElector{
+				config:         lec,
+				observedRecord: test.observedRecord,
+				observedTime:   test.observedTime,
+				clock:          clock.RealClock{},
+			}
 
-		if test.expectSuccess != le.tryAcquireOrRenew() {
-			t.Errorf("[%v]unexpected result of tryAcquireOrRenew: [succeeded=%v]", i, !test.expectSuccess)
-		}
+			if test.expectSuccess != le.tryAcquireOrRenew() {
+				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+			}
 
-		le.observedRecord.AcquireTime = metav1.Time{}
-		le.observedRecord.RenewTime = metav1.Time{}
-		if le.observedRecord.HolderIdentity != test.outHolder {
-			t.Errorf("[%v]expected holder:\n\t%+v\ngot:\n\t%+v", i, test.outHolder, le.observedRecord.HolderIdentity)
-		}
-		if len(test.reactors) != len(c.Actions()) {
-			t.Errorf("[%v]wrong number of api interactions", i)
-		}
-		if test.transitionLeader && le.observedRecord.LeaderTransitions != 1 {
-			t.Errorf("[%v]leader should have transitioned but did not", i)
-		}
-		if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
-			t.Errorf("[%v]leader should not have transitioned but did", i)
-		}
+			le.observedRecord.AcquireTime = metav1.Time{}
+			le.observedRecord.RenewTime = metav1.Time{}
+			if le.observedRecord.HolderIdentity != test.outHolder {
+				t.Errorf("expected holder:\n\t%+v\ngot:\n\t%+v", test.outHolder, le.observedRecord.HolderIdentity)
+			}
+			if len(test.reactors) != len(c.Actions()) {
+				t.Errorf("wrong number of api interactions")
+			}
+			if test.transitionLeader && le.observedRecord.LeaderTransitions != 1 {
+				t.Errorf("leader should have transitioned but did not")
+			}
+			if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
+				t.Errorf("leader should not have transitioned but did")
+			}
 
-		le.maybeReportTransition()
-		wg.Wait()
-		if reportedLeader != test.outHolder {
-			t.Errorf("[%v]reported leader was not the new leader. expected %q, got %q", i, test.outHolder, reportedLeader)
-		}
+			le.maybeReportTransition()
+			wg.Wait()
+			if reportedLeader != test.outHolder {
+				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)
+			}
+		})
 	}
 }
 
 // Will test leader election using configmap as the resource
 func TestTryAcquireOrRenewConfigMaps(t *testing.T) {
 	testTryAcquireOrRenew(t, "configmaps")
+}
+
+// Will test leader election using lease as the resource
+func TestTryAcquireOrRenewLeases(t *testing.T) {
+	testTryAcquireOrRenew(t, "leases")
+}
+
+func TestLeaseSpecToLeaderElectionRecordRoundTrip(t *testing.T) {
+	holderIdentity := "foo"
+	leaseDurationSeconds := int32(10)
+	leaseTransitions := int32(1)
+	oldSpec := coordinationv1.LeaseSpec{
+		HolderIdentity:       &holderIdentity,
+		LeaseDurationSeconds: &leaseDurationSeconds,
+		AcquireTime:          &metav1.MicroTime{time.Now()},
+		RenewTime:            &metav1.MicroTime{time.Now()},
+		LeaseTransitions:     &leaseTransitions,
+	}
+
+	oldRecord := rl.LeaseSpecToLeaderElectionRecord(&oldSpec)
+	newSpec := rl.LeaderElectionRecordToLeaseSpec(oldRecord)
+
+	if !equality.Semantic.DeepEqual(oldSpec, newSpec) {
+		t.Errorf("diff: %v", diff.ObjectReflectDiff(oldSpec, newSpec))
+	}
+
+	newRecord := rl.LeaseSpecToLeaderElectionRecord(&newSpec)
+
+	if !equality.Semantic.DeepEqual(oldRecord, newRecord) {
+		t.Errorf("diff: %v", diff.ObjectReflectDiff(oldRecord, newRecord))
+	}
 }

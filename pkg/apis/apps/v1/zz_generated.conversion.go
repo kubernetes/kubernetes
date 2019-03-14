@@ -31,7 +31,6 @@ import (
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func init() {
@@ -61,193 +60,193 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSet)(nil), (*extensions.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSet_To_extensions_DaemonSet(a.(*v1.DaemonSet), b.(*extensions.DaemonSet), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSet)(nil), (*apps.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSet_To_apps_DaemonSet(a.(*v1.DaemonSet), b.(*apps.DaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSet)(nil), (*v1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DaemonSet_To_v1_DaemonSet(a.(*extensions.DaemonSet), b.(*v1.DaemonSet), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSet)(nil), (*v1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSet_To_v1_DaemonSet(a.(*apps.DaemonSet), b.(*v1.DaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetCondition)(nil), (*extensions.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetCondition_To_extensions_DaemonSetCondition(a.(*v1.DaemonSetCondition), b.(*extensions.DaemonSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetCondition)(nil), (*apps.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(a.(*v1.DaemonSetCondition), b.(*apps.DaemonSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetCondition)(nil), (*v1.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DaemonSetCondition_To_v1_DaemonSetCondition(a.(*extensions.DaemonSetCondition), b.(*v1.DaemonSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetCondition)(nil), (*v1.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(a.(*apps.DaemonSetCondition), b.(*v1.DaemonSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetList)(nil), (*extensions.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetList_To_extensions_DaemonSetList(a.(*v1.DaemonSetList), b.(*extensions.DaemonSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetList)(nil), (*apps.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetList_To_apps_DaemonSetList(a.(*v1.DaemonSetList), b.(*apps.DaemonSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetList)(nil), (*v1.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DaemonSetList_To_v1_DaemonSetList(a.(*extensions.DaemonSetList), b.(*v1.DaemonSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetList)(nil), (*v1.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetList_To_v1_DaemonSetList(a.(*apps.DaemonSetList), b.(*v1.DaemonSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetSpec)(nil), (*extensions.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(a.(*v1.DaemonSetSpec), b.(*extensions.DaemonSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetSpec)(nil), (*apps.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(a.(*v1.DaemonSetSpec), b.(*apps.DaemonSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetSpec)(nil), (*v1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(a.(*extensions.DaemonSetSpec), b.(*v1.DaemonSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetSpec)(nil), (*v1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(a.(*apps.DaemonSetSpec), b.(*v1.DaemonSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetStatus)(nil), (*extensions.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetStatus_To_extensions_DaemonSetStatus(a.(*v1.DaemonSetStatus), b.(*extensions.DaemonSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetStatus)(nil), (*apps.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(a.(*v1.DaemonSetStatus), b.(*apps.DaemonSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetStatus)(nil), (*v1.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DaemonSetStatus_To_v1_DaemonSetStatus(a.(*extensions.DaemonSetStatus), b.(*v1.DaemonSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetStatus)(nil), (*v1.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(a.(*apps.DaemonSetStatus), b.(*v1.DaemonSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetUpdateStrategy)(nil), (*extensions.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(a.(*v1.DaemonSetUpdateStrategy), b.(*extensions.DaemonSetUpdateStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetUpdateStrategy)(nil), (*apps.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(a.(*v1.DaemonSetUpdateStrategy), b.(*apps.DaemonSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetUpdateStrategy)(nil), (*v1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(a.(*extensions.DaemonSetUpdateStrategy), b.(*v1.DaemonSetUpdateStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetUpdateStrategy)(nil), (*v1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(a.(*apps.DaemonSetUpdateStrategy), b.(*v1.DaemonSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.Deployment)(nil), (*extensions.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Deployment_To_extensions_Deployment(a.(*v1.Deployment), b.(*extensions.Deployment), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.Deployment)(nil), (*apps.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Deployment_To_apps_Deployment(a.(*v1.Deployment), b.(*apps.Deployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.Deployment)(nil), (*v1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_Deployment_To_v1_Deployment(a.(*extensions.Deployment), b.(*v1.Deployment), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.Deployment)(nil), (*v1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_Deployment_To_v1_Deployment(a.(*apps.Deployment), b.(*v1.Deployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentCondition)(nil), (*extensions.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentCondition_To_extensions_DeploymentCondition(a.(*v1.DeploymentCondition), b.(*extensions.DeploymentCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DeploymentCondition)(nil), (*apps.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentCondition_To_apps_DeploymentCondition(a.(*v1.DeploymentCondition), b.(*apps.DeploymentCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentCondition)(nil), (*v1.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DeploymentCondition_To_v1_DeploymentCondition(a.(*extensions.DeploymentCondition), b.(*v1.DeploymentCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentCondition)(nil), (*v1.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentCondition_To_v1_DeploymentCondition(a.(*apps.DeploymentCondition), b.(*v1.DeploymentCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentList)(nil), (*extensions.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentList_To_extensions_DeploymentList(a.(*v1.DeploymentList), b.(*extensions.DeploymentList), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DeploymentList)(nil), (*apps.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentList_To_apps_DeploymentList(a.(*v1.DeploymentList), b.(*apps.DeploymentList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentList)(nil), (*v1.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DeploymentList_To_v1_DeploymentList(a.(*extensions.DeploymentList), b.(*v1.DeploymentList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentList)(nil), (*v1.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentList_To_v1_DeploymentList(a.(*apps.DeploymentList), b.(*v1.DeploymentList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentSpec)(nil), (*extensions.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentSpec_To_extensions_DeploymentSpec(a.(*v1.DeploymentSpec), b.(*extensions.DeploymentSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DeploymentSpec)(nil), (*apps.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentSpec_To_apps_DeploymentSpec(a.(*v1.DeploymentSpec), b.(*apps.DeploymentSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentSpec)(nil), (*v1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DeploymentSpec_To_v1_DeploymentSpec(a.(*extensions.DeploymentSpec), b.(*v1.DeploymentSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentSpec)(nil), (*v1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentSpec_To_v1_DeploymentSpec(a.(*apps.DeploymentSpec), b.(*v1.DeploymentSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentStatus)(nil), (*extensions.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentStatus_To_extensions_DeploymentStatus(a.(*v1.DeploymentStatus), b.(*extensions.DeploymentStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DeploymentStatus)(nil), (*apps.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentStatus_To_apps_DeploymentStatus(a.(*v1.DeploymentStatus), b.(*apps.DeploymentStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentStatus)(nil), (*v1.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DeploymentStatus_To_v1_DeploymentStatus(a.(*extensions.DeploymentStatus), b.(*v1.DeploymentStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentStatus)(nil), (*v1.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentStatus_To_v1_DeploymentStatus(a.(*apps.DeploymentStatus), b.(*v1.DeploymentStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentStrategy)(nil), (*extensions.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentStrategy_To_extensions_DeploymentStrategy(a.(*v1.DeploymentStrategy), b.(*extensions.DeploymentStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.DeploymentStrategy)(nil), (*apps.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(a.(*v1.DeploymentStrategy), b.(*apps.DeploymentStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentStrategy)(nil), (*v1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy(a.(*extensions.DeploymentStrategy), b.(*v1.DeploymentStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.DeploymentStrategy)(nil), (*v1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(a.(*apps.DeploymentStrategy), b.(*v1.DeploymentStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSet)(nil), (*extensions.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSet_To_extensions_ReplicaSet(a.(*v1.ReplicaSet), b.(*extensions.ReplicaSet), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSet)(nil), (*apps.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSet_To_apps_ReplicaSet(a.(*v1.ReplicaSet), b.(*apps.ReplicaSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSet)(nil), (*v1.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_ReplicaSet_To_v1_ReplicaSet(a.(*extensions.ReplicaSet), b.(*v1.ReplicaSet), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSet)(nil), (*v1.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSet_To_v1_ReplicaSet(a.(*apps.ReplicaSet), b.(*v1.ReplicaSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetCondition)(nil), (*extensions.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(a.(*v1.ReplicaSetCondition), b.(*extensions.ReplicaSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetCondition)(nil), (*apps.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(a.(*v1.ReplicaSetCondition), b.(*apps.ReplicaSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetCondition)(nil), (*v1.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_ReplicaSetCondition_To_v1_ReplicaSetCondition(a.(*extensions.ReplicaSetCondition), b.(*v1.ReplicaSetCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetCondition)(nil), (*v1.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(a.(*apps.ReplicaSetCondition), b.(*v1.ReplicaSetCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetList)(nil), (*extensions.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSetList_To_extensions_ReplicaSetList(a.(*v1.ReplicaSetList), b.(*extensions.ReplicaSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetList)(nil), (*apps.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetList_To_apps_ReplicaSetList(a.(*v1.ReplicaSetList), b.(*apps.ReplicaSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetList)(nil), (*v1.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_ReplicaSetList_To_v1_ReplicaSetList(a.(*extensions.ReplicaSetList), b.(*v1.ReplicaSetList), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetList)(nil), (*v1.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetList_To_v1_ReplicaSetList(a.(*apps.ReplicaSetList), b.(*v1.ReplicaSetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetSpec)(nil), (*extensions.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(a.(*v1.ReplicaSetSpec), b.(*extensions.ReplicaSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetSpec)(nil), (*apps.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(a.(*v1.ReplicaSetSpec), b.(*apps.ReplicaSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetSpec)(nil), (*v1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec(a.(*extensions.ReplicaSetSpec), b.(*v1.ReplicaSetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetSpec)(nil), (*v1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(a.(*apps.ReplicaSetSpec), b.(*v1.ReplicaSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetStatus)(nil), (*extensions.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSetStatus_To_extensions_ReplicaSetStatus(a.(*v1.ReplicaSetStatus), b.(*extensions.ReplicaSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetStatus)(nil), (*apps.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(a.(*v1.ReplicaSetStatus), b.(*apps.ReplicaSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetStatus)(nil), (*v1.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_ReplicaSetStatus_To_v1_ReplicaSetStatus(a.(*extensions.ReplicaSetStatus), b.(*v1.ReplicaSetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.ReplicaSetStatus)(nil), (*v1.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(a.(*apps.ReplicaSetStatus), b.(*v1.ReplicaSetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.RollingUpdateDaemonSet)(nil), (*extensions.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(a.(*v1.RollingUpdateDaemonSet), b.(*extensions.RollingUpdateDaemonSet), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.RollingUpdateDaemonSet)(nil), (*apps.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(a.(*v1.RollingUpdateDaemonSet), b.(*apps.RollingUpdateDaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.RollingUpdateDaemonSet)(nil), (*v1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(a.(*extensions.RollingUpdateDaemonSet), b.(*v1.RollingUpdateDaemonSet), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateDaemonSet)(nil), (*v1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(a.(*apps.RollingUpdateDaemonSet), b.(*v1.RollingUpdateDaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.RollingUpdateDeployment)(nil), (*extensions.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(a.(*v1.RollingUpdateDeployment), b.(*extensions.RollingUpdateDeployment), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.RollingUpdateDeployment)(nil), (*apps.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(a.(*v1.RollingUpdateDeployment), b.(*apps.RollingUpdateDeployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*extensions.RollingUpdateDeployment)(nil), (*v1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(a.(*extensions.RollingUpdateDeployment), b.(*v1.RollingUpdateDeployment), scope)
+	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateDeployment)(nil), (*v1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(a.(*apps.RollingUpdateDeployment), b.(*v1.RollingUpdateDeployment), scope)
 	}); err != nil {
 		return err
 	}
@@ -321,6 +320,51 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*apps.DaemonSetSpec)(nil), (*v1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(a.(*apps.DaemonSetSpec), b.(*v1.DaemonSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.DaemonSetUpdateStrategy)(nil), (*v1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(a.(*apps.DaemonSetUpdateStrategy), b.(*v1.DaemonSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.DaemonSet)(nil), (*v1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DaemonSet_To_v1_DaemonSet(a.(*apps.DaemonSet), b.(*v1.DaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.DeploymentSpec)(nil), (*v1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentSpec_To_v1_DeploymentSpec(a.(*apps.DeploymentSpec), b.(*v1.DeploymentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.DeploymentStrategy)(nil), (*v1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(a.(*apps.DeploymentStrategy), b.(*v1.DeploymentStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.Deployment)(nil), (*v1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_Deployment_To_v1_Deployment(a.(*apps.Deployment), b.(*v1.Deployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.ReplicaSetSpec)(nil), (*v1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(a.(*apps.ReplicaSetSpec), b.(*v1.ReplicaSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.RollingUpdateDaemonSet)(nil), (*v1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(a.(*apps.RollingUpdateDaemonSet), b.(*v1.RollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.RollingUpdateDeployment)(nil), (*v1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(a.(*apps.RollingUpdateDeployment), b.(*v1.RollingUpdateDeployment), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*apps.StatefulSetSpec)(nil), (*v1.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(a.(*apps.StatefulSetSpec), b.(*v1.StatefulSetSpec), scope)
 	}); err != nil {
@@ -336,93 +380,48 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*extensions.DaemonSetSpec)(nil), (*v1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(a.(*extensions.DaemonSetSpec), b.(*v1.DaemonSetSpec), scope)
+	if err := s.AddConversionFunc((*v1.DaemonSetSpec)(nil), (*apps.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(a.(*v1.DaemonSetSpec), b.(*apps.DaemonSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*extensions.DaemonSetUpdateStrategy)(nil), (*v1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(a.(*extensions.DaemonSetUpdateStrategy), b.(*v1.DaemonSetUpdateStrategy), scope)
+	if err := s.AddConversionFunc((*v1.DaemonSetUpdateStrategy)(nil), (*apps.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(a.(*v1.DaemonSetUpdateStrategy), b.(*apps.DaemonSetUpdateStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*extensions.DaemonSet)(nil), (*v1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DaemonSet_To_v1_DaemonSet(a.(*extensions.DaemonSet), b.(*v1.DaemonSet), scope)
+	if err := s.AddConversionFunc((*v1.DaemonSet)(nil), (*apps.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSet_To_apps_DaemonSet(a.(*v1.DaemonSet), b.(*apps.DaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*extensions.DeploymentSpec)(nil), (*v1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DeploymentSpec_To_v1_DeploymentSpec(a.(*extensions.DeploymentSpec), b.(*v1.DeploymentSpec), scope)
+	if err := s.AddConversionFunc((*v1.DeploymentSpec)(nil), (*apps.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentSpec_To_apps_DeploymentSpec(a.(*v1.DeploymentSpec), b.(*apps.DeploymentSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*extensions.DeploymentStrategy)(nil), (*v1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy(a.(*extensions.DeploymentStrategy), b.(*v1.DeploymentStrategy), scope)
+	if err := s.AddConversionFunc((*v1.DeploymentStrategy)(nil), (*apps.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(a.(*v1.DeploymentStrategy), b.(*apps.DeploymentStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*extensions.Deployment)(nil), (*v1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_Deployment_To_v1_Deployment(a.(*extensions.Deployment), b.(*v1.Deployment), scope)
+	if err := s.AddConversionFunc((*v1.Deployment)(nil), (*apps.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Deployment_To_apps_Deployment(a.(*v1.Deployment), b.(*apps.Deployment), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*extensions.ReplicaSetSpec)(nil), (*v1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec(a.(*extensions.ReplicaSetSpec), b.(*v1.ReplicaSetSpec), scope)
+	if err := s.AddConversionFunc((*v1.ReplicaSetSpec)(nil), (*apps.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(a.(*v1.ReplicaSetSpec), b.(*apps.ReplicaSetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*extensions.RollingUpdateDaemonSet)(nil), (*v1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(a.(*extensions.RollingUpdateDaemonSet), b.(*v1.RollingUpdateDaemonSet), scope)
+	if err := s.AddConversionFunc((*v1.RollingUpdateDaemonSet)(nil), (*apps.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(a.(*v1.RollingUpdateDaemonSet), b.(*apps.RollingUpdateDaemonSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*extensions.RollingUpdateDeployment)(nil), (*v1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_extensions_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(a.(*extensions.RollingUpdateDeployment), b.(*v1.RollingUpdateDeployment), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.DaemonSetSpec)(nil), (*extensions.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(a.(*v1.DaemonSetSpec), b.(*extensions.DaemonSetSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.DaemonSetUpdateStrategy)(nil), (*extensions.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(a.(*v1.DaemonSetUpdateStrategy), b.(*extensions.DaemonSetUpdateStrategy), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.DaemonSet)(nil), (*extensions.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSet_To_extensions_DaemonSet(a.(*v1.DaemonSet), b.(*extensions.DaemonSet), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.DeploymentSpec)(nil), (*extensions.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentSpec_To_extensions_DeploymentSpec(a.(*v1.DeploymentSpec), b.(*extensions.DeploymentSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.DeploymentStrategy)(nil), (*extensions.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentStrategy_To_extensions_DeploymentStrategy(a.(*v1.DeploymentStrategy), b.(*extensions.DeploymentStrategy), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.Deployment)(nil), (*extensions.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Deployment_To_extensions_Deployment(a.(*v1.Deployment), b.(*extensions.Deployment), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.ReplicaSetSpec)(nil), (*extensions.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(a.(*v1.ReplicaSetSpec), b.(*extensions.ReplicaSetSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.RollingUpdateDaemonSet)(nil), (*extensions.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(a.(*v1.RollingUpdateDaemonSet), b.(*extensions.RollingUpdateDaemonSet), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.RollingUpdateDeployment)(nil), (*extensions.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(a.(*v1.RollingUpdateDeployment), b.(*extensions.RollingUpdateDeployment), scope)
+	if err := s.AddConversionFunc((*v1.RollingUpdateDeployment)(nil), (*apps.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(a.(*v1.RollingUpdateDeployment), b.(*apps.RollingUpdateDeployment), scope)
 	}); err != nil {
 		return err
 	}
@@ -514,30 +513,30 @@ func Convert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(in *apps.C
 	return autoConvert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(in, out, s)
 }
 
-func autoConvert_v1_DaemonSet_To_extensions_DaemonSet(in *v1.DaemonSet, out *extensions.DaemonSet, s conversion.Scope) error {
+func autoConvert_v1_DaemonSet_To_apps_DaemonSet(in *v1.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1_DaemonSetStatus_To_extensions_DaemonSetStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_extensions_DaemonSet_To_v1_DaemonSet(in *extensions.DaemonSet, out *v1.DaemonSet, s conversion.Scope) error {
+func autoConvert_apps_DaemonSet_To_v1_DaemonSet(in *apps.DaemonSet, out *v1.DaemonSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_DaemonSetStatus_To_v1_DaemonSetStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_DaemonSetCondition_To_extensions_DaemonSetCondition(in *v1.DaemonSetCondition, out *extensions.DaemonSetCondition, s conversion.Scope) error {
-	out.Type = extensions.DaemonSetConditionType(in.Type)
+func autoConvert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in *v1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
+	out.Type = apps.DaemonSetConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -545,12 +544,12 @@ func autoConvert_v1_DaemonSetCondition_To_extensions_DaemonSetCondition(in *v1.D
 	return nil
 }
 
-// Convert_v1_DaemonSetCondition_To_extensions_DaemonSetCondition is an autogenerated conversion function.
-func Convert_v1_DaemonSetCondition_To_extensions_DaemonSetCondition(in *v1.DaemonSetCondition, out *extensions.DaemonSetCondition, s conversion.Scope) error {
-	return autoConvert_v1_DaemonSetCondition_To_extensions_DaemonSetCondition(in, out, s)
+// Convert_v1_DaemonSetCondition_To_apps_DaemonSetCondition is an autogenerated conversion function.
+func Convert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in *v1.DaemonSetCondition, out *apps.DaemonSetCondition, s conversion.Scope) error {
+	return autoConvert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(in, out, s)
 }
 
-func autoConvert_extensions_DaemonSetCondition_To_v1_DaemonSetCondition(in *extensions.DaemonSetCondition, out *v1.DaemonSetCondition, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(in *apps.DaemonSetCondition, out *v1.DaemonSetCondition, s conversion.Scope) error {
 	out.Type = v1.DaemonSetConditionType(in.Type)
 	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -559,18 +558,18 @@ func autoConvert_extensions_DaemonSetCondition_To_v1_DaemonSetCondition(in *exte
 	return nil
 }
 
-// Convert_extensions_DaemonSetCondition_To_v1_DaemonSetCondition is an autogenerated conversion function.
-func Convert_extensions_DaemonSetCondition_To_v1_DaemonSetCondition(in *extensions.DaemonSetCondition, out *v1.DaemonSetCondition, s conversion.Scope) error {
-	return autoConvert_extensions_DaemonSetCondition_To_v1_DaemonSetCondition(in, out, s)
+// Convert_apps_DaemonSetCondition_To_v1_DaemonSetCondition is an autogenerated conversion function.
+func Convert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(in *apps.DaemonSetCondition, out *v1.DaemonSetCondition, s conversion.Scope) error {
+	return autoConvert_apps_DaemonSetCondition_To_v1_DaemonSetCondition(in, out, s)
 }
 
-func autoConvert_v1_DaemonSetList_To_extensions_DaemonSetList(in *v1.DaemonSetList, out *extensions.DaemonSetList, s conversion.Scope) error {
+func autoConvert_v1_DaemonSetList_To_apps_DaemonSetList(in *v1.DaemonSetList, out *apps.DaemonSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions.DaemonSet, len(*in))
+		*out = make([]apps.DaemonSet, len(*in))
 		for i := range *in {
-			if err := Convert_v1_DaemonSet_To_extensions_DaemonSet(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_v1_DaemonSet_To_apps_DaemonSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -580,18 +579,18 @@ func autoConvert_v1_DaemonSetList_To_extensions_DaemonSetList(in *v1.DaemonSetLi
 	return nil
 }
 
-// Convert_v1_DaemonSetList_To_extensions_DaemonSetList is an autogenerated conversion function.
-func Convert_v1_DaemonSetList_To_extensions_DaemonSetList(in *v1.DaemonSetList, out *extensions.DaemonSetList, s conversion.Scope) error {
-	return autoConvert_v1_DaemonSetList_To_extensions_DaemonSetList(in, out, s)
+// Convert_v1_DaemonSetList_To_apps_DaemonSetList is an autogenerated conversion function.
+func Convert_v1_DaemonSetList_To_apps_DaemonSetList(in *v1.DaemonSetList, out *apps.DaemonSetList, s conversion.Scope) error {
+	return autoConvert_v1_DaemonSetList_To_apps_DaemonSetList(in, out, s)
 }
 
-func autoConvert_extensions_DaemonSetList_To_v1_DaemonSetList(in *extensions.DaemonSetList, out *v1.DaemonSetList, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetList_To_v1_DaemonSetList(in *apps.DaemonSetList, out *v1.DaemonSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]v1.DaemonSet, len(*in))
 		for i := range *in {
-			if err := Convert_extensions_DaemonSet_To_v1_DaemonSet(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_apps_DaemonSet_To_v1_DaemonSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -601,17 +600,17 @@ func autoConvert_extensions_DaemonSetList_To_v1_DaemonSetList(in *extensions.Dae
 	return nil
 }
 
-// Convert_extensions_DaemonSetList_To_v1_DaemonSetList is an autogenerated conversion function.
-func Convert_extensions_DaemonSetList_To_v1_DaemonSetList(in *extensions.DaemonSetList, out *v1.DaemonSetList, s conversion.Scope) error {
-	return autoConvert_extensions_DaemonSetList_To_v1_DaemonSetList(in, out, s)
+// Convert_apps_DaemonSetList_To_v1_DaemonSetList is an autogenerated conversion function.
+func Convert_apps_DaemonSetList_To_v1_DaemonSetList(in *apps.DaemonSetList, out *v1.DaemonSetList, s conversion.Scope) error {
+	return autoConvert_apps_DaemonSetList_To_v1_DaemonSetList(in, out, s)
 }
 
-func autoConvert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *v1.DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
+func autoConvert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *v1.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+	if err := Convert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
@@ -619,12 +618,12 @@ func autoConvert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *v1.DaemonSetSp
 	return nil
 }
 
-func autoConvert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *v1.DaemonSetSpec, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, out *v1.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+	if err := Convert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
@@ -633,7 +632,7 @@ func autoConvert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(in *extensions.Dae
 	return nil
 }
 
-func autoConvert_v1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *v1.DaemonSetStatus, out *extensions.DaemonSetStatus, s conversion.Scope) error {
+func autoConvert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in *v1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
@@ -643,16 +642,16 @@ func autoConvert_v1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *v1.DaemonS
 	out.NumberAvailable = in.NumberAvailable
 	out.NumberUnavailable = in.NumberUnavailable
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
-	out.Conditions = *(*[]extensions.DaemonSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]apps.DaemonSetCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
-// Convert_v1_DaemonSetStatus_To_extensions_DaemonSetStatus is an autogenerated conversion function.
-func Convert_v1_DaemonSetStatus_To_extensions_DaemonSetStatus(in *v1.DaemonSetStatus, out *extensions.DaemonSetStatus, s conversion.Scope) error {
-	return autoConvert_v1_DaemonSetStatus_To_extensions_DaemonSetStatus(in, out, s)
+// Convert_v1_DaemonSetStatus_To_apps_DaemonSetStatus is an autogenerated conversion function.
+func Convert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in *v1.DaemonSetStatus, out *apps.DaemonSetStatus, s conversion.Scope) error {
+	return autoConvert_v1_DaemonSetStatus_To_apps_DaemonSetStatus(in, out, s)
 }
 
-func autoConvert_extensions_DaemonSetStatus_To_v1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *v1.DaemonSetStatus, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(in *apps.DaemonSetStatus, out *v1.DaemonSetStatus, s conversion.Scope) error {
 	out.CurrentNumberScheduled = in.CurrentNumberScheduled
 	out.NumberMisscheduled = in.NumberMisscheduled
 	out.DesiredNumberScheduled = in.DesiredNumberScheduled
@@ -666,17 +665,17 @@ func autoConvert_extensions_DaemonSetStatus_To_v1_DaemonSetStatus(in *extensions
 	return nil
 }
 
-// Convert_extensions_DaemonSetStatus_To_v1_DaemonSetStatus is an autogenerated conversion function.
-func Convert_extensions_DaemonSetStatus_To_v1_DaemonSetStatus(in *extensions.DaemonSetStatus, out *v1.DaemonSetStatus, s conversion.Scope) error {
-	return autoConvert_extensions_DaemonSetStatus_To_v1_DaemonSetStatus(in, out, s)
+// Convert_apps_DaemonSetStatus_To_v1_DaemonSetStatus is an autogenerated conversion function.
+func Convert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(in *apps.DaemonSetStatus, out *v1.DaemonSetStatus, s conversion.Scope) error {
+	return autoConvert_apps_DaemonSetStatus_To_v1_DaemonSetStatus(in, out, s)
 }
 
-func autoConvert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(in *v1.DaemonSetUpdateStrategy, out *extensions.DaemonSetUpdateStrategy, s conversion.Scope) error {
-	out.Type = extensions.DaemonSetUpdateStrategyType(in.Type)
+func autoConvert_v1_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *v1.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = apps.DaemonSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(extensions.RollingUpdateDaemonSet)
-		if err := Convert_v1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(*in, *out, s); err != nil {
+		*out = new(apps.RollingUpdateDaemonSet)
+		if err := Convert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
@@ -685,12 +684,12 @@ func autoConvert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrateg
 	return nil
 }
 
-func autoConvert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *extensions.DaemonSetUpdateStrategy, out *v1.DaemonSetUpdateStrategy, s conversion.Scope) error {
+func autoConvert_apps_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *v1.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = v1.DaemonSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
 		*out = new(v1.RollingUpdateDaemonSet)
-		if err := Convert_extensions_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(*in, *out, s); err != nil {
+		if err := Convert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
@@ -699,30 +698,30 @@ func autoConvert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrateg
 	return nil
 }
 
-func autoConvert_v1_Deployment_To_extensions_Deployment(in *v1.Deployment, out *extensions.Deployment, s conversion.Scope) error {
+func autoConvert_v1_Deployment_To_apps_Deployment(in *v1.Deployment, out *apps.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1_DeploymentSpec_To_extensions_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1_DeploymentSpec_To_apps_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1_DeploymentStatus_To_extensions_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_v1_DeploymentStatus_To_apps_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_extensions_Deployment_To_v1_Deployment(in *extensions.Deployment, out *v1.Deployment, s conversion.Scope) error {
+func autoConvert_apps_Deployment_To_v1_Deployment(in *apps.Deployment, out *v1.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_extensions_DeploymentSpec_To_v1_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_apps_DeploymentSpec_To_v1_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_DeploymentStatus_To_v1_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_apps_DeploymentStatus_To_v1_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_DeploymentCondition_To_extensions_DeploymentCondition(in *v1.DeploymentCondition, out *extensions.DeploymentCondition, s conversion.Scope) error {
-	out.Type = extensions.DeploymentConditionType(in.Type)
+func autoConvert_v1_DeploymentCondition_To_apps_DeploymentCondition(in *v1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
+	out.Type = apps.DeploymentConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
 	out.LastTransitionTime = in.LastTransitionTime
@@ -731,12 +730,12 @@ func autoConvert_v1_DeploymentCondition_To_extensions_DeploymentCondition(in *v1
 	return nil
 }
 
-// Convert_v1_DeploymentCondition_To_extensions_DeploymentCondition is an autogenerated conversion function.
-func Convert_v1_DeploymentCondition_To_extensions_DeploymentCondition(in *v1.DeploymentCondition, out *extensions.DeploymentCondition, s conversion.Scope) error {
-	return autoConvert_v1_DeploymentCondition_To_extensions_DeploymentCondition(in, out, s)
+// Convert_v1_DeploymentCondition_To_apps_DeploymentCondition is an autogenerated conversion function.
+func Convert_v1_DeploymentCondition_To_apps_DeploymentCondition(in *v1.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
+	return autoConvert_v1_DeploymentCondition_To_apps_DeploymentCondition(in, out, s)
 }
 
-func autoConvert_extensions_DeploymentCondition_To_v1_DeploymentCondition(in *extensions.DeploymentCondition, out *v1.DeploymentCondition, s conversion.Scope) error {
+func autoConvert_apps_DeploymentCondition_To_v1_DeploymentCondition(in *apps.DeploymentCondition, out *v1.DeploymentCondition, s conversion.Scope) error {
 	out.Type = v1.DeploymentConditionType(in.Type)
 	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
@@ -746,18 +745,18 @@ func autoConvert_extensions_DeploymentCondition_To_v1_DeploymentCondition(in *ex
 	return nil
 }
 
-// Convert_extensions_DeploymentCondition_To_v1_DeploymentCondition is an autogenerated conversion function.
-func Convert_extensions_DeploymentCondition_To_v1_DeploymentCondition(in *extensions.DeploymentCondition, out *v1.DeploymentCondition, s conversion.Scope) error {
-	return autoConvert_extensions_DeploymentCondition_To_v1_DeploymentCondition(in, out, s)
+// Convert_apps_DeploymentCondition_To_v1_DeploymentCondition is an autogenerated conversion function.
+func Convert_apps_DeploymentCondition_To_v1_DeploymentCondition(in *apps.DeploymentCondition, out *v1.DeploymentCondition, s conversion.Scope) error {
+	return autoConvert_apps_DeploymentCondition_To_v1_DeploymentCondition(in, out, s)
 }
 
-func autoConvert_v1_DeploymentList_To_extensions_DeploymentList(in *v1.DeploymentList, out *extensions.DeploymentList, s conversion.Scope) error {
+func autoConvert_v1_DeploymentList_To_apps_DeploymentList(in *v1.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions.Deployment, len(*in))
+		*out = make([]apps.Deployment, len(*in))
 		for i := range *in {
-			if err := Convert_v1_Deployment_To_extensions_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_v1_Deployment_To_apps_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -767,18 +766,18 @@ func autoConvert_v1_DeploymentList_To_extensions_DeploymentList(in *v1.Deploymen
 	return nil
 }
 
-// Convert_v1_DeploymentList_To_extensions_DeploymentList is an autogenerated conversion function.
-func Convert_v1_DeploymentList_To_extensions_DeploymentList(in *v1.DeploymentList, out *extensions.DeploymentList, s conversion.Scope) error {
-	return autoConvert_v1_DeploymentList_To_extensions_DeploymentList(in, out, s)
+// Convert_v1_DeploymentList_To_apps_DeploymentList is an autogenerated conversion function.
+func Convert_v1_DeploymentList_To_apps_DeploymentList(in *v1.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
+	return autoConvert_v1_DeploymentList_To_apps_DeploymentList(in, out, s)
 }
 
-func autoConvert_extensions_DeploymentList_To_v1_DeploymentList(in *extensions.DeploymentList, out *v1.DeploymentList, s conversion.Scope) error {
+func autoConvert_apps_DeploymentList_To_v1_DeploymentList(in *apps.DeploymentList, out *v1.DeploymentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]v1.Deployment, len(*in))
 		for i := range *in {
-			if err := Convert_extensions_Deployment_To_v1_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_apps_Deployment_To_v1_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -788,12 +787,12 @@ func autoConvert_extensions_DeploymentList_To_v1_DeploymentList(in *extensions.D
 	return nil
 }
 
-// Convert_extensions_DeploymentList_To_v1_DeploymentList is an autogenerated conversion function.
-func Convert_extensions_DeploymentList_To_v1_DeploymentList(in *extensions.DeploymentList, out *v1.DeploymentList, s conversion.Scope) error {
-	return autoConvert_extensions_DeploymentList_To_v1_DeploymentList(in, out, s)
+// Convert_apps_DeploymentList_To_v1_DeploymentList is an autogenerated conversion function.
+func Convert_apps_DeploymentList_To_v1_DeploymentList(in *apps.DeploymentList, out *v1.DeploymentList, s conversion.Scope) error {
+	return autoConvert_apps_DeploymentList_To_v1_DeploymentList(in, out, s)
 }
 
-func autoConvert_v1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1.DeploymentSpec, out *extensions.DeploymentSpec, s conversion.Scope) error {
+func autoConvert_v1_DeploymentSpec_To_apps_DeploymentSpec(in *v1.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -801,7 +800,7 @@ func autoConvert_v1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1.Deploymen
 	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_v1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
+	if err := Convert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
@@ -811,7 +810,7 @@ func autoConvert_v1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1.Deploymen
 	return nil
 }
 
-func autoConvert_extensions_DeploymentSpec_To_v1_DeploymentSpec(in *extensions.DeploymentSpec, out *v1.DeploymentSpec, s conversion.Scope) error {
+func autoConvert_apps_DeploymentSpec_To_v1_DeploymentSpec(in *apps.DeploymentSpec, out *v1.DeploymentSpec, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -819,7 +818,7 @@ func autoConvert_extensions_DeploymentSpec_To_v1_DeploymentSpec(in *extensions.D
 	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
+	if err := Convert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
@@ -830,24 +829,24 @@ func autoConvert_extensions_DeploymentSpec_To_v1_DeploymentSpec(in *extensions.D
 	return nil
 }
 
-func autoConvert_v1_DeploymentStatus_To_extensions_DeploymentStatus(in *v1.DeploymentStatus, out *extensions.DeploymentStatus, s conversion.Scope) error {
+func autoConvert_v1_DeploymentStatus_To_apps_DeploymentStatus(in *v1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
-	out.Conditions = *(*[]extensions.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]apps.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
 }
 
-// Convert_v1_DeploymentStatus_To_extensions_DeploymentStatus is an autogenerated conversion function.
-func Convert_v1_DeploymentStatus_To_extensions_DeploymentStatus(in *v1.DeploymentStatus, out *extensions.DeploymentStatus, s conversion.Scope) error {
-	return autoConvert_v1_DeploymentStatus_To_extensions_DeploymentStatus(in, out, s)
+// Convert_v1_DeploymentStatus_To_apps_DeploymentStatus is an autogenerated conversion function.
+func Convert_v1_DeploymentStatus_To_apps_DeploymentStatus(in *v1.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
+	return autoConvert_v1_DeploymentStatus_To_apps_DeploymentStatus(in, out, s)
 }
 
-func autoConvert_extensions_DeploymentStatus_To_v1_DeploymentStatus(in *extensions.DeploymentStatus, out *v1.DeploymentStatus, s conversion.Scope) error {
+func autoConvert_apps_DeploymentStatus_To_v1_DeploymentStatus(in *apps.DeploymentStatus, out *v1.DeploymentStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
@@ -859,17 +858,17 @@ func autoConvert_extensions_DeploymentStatus_To_v1_DeploymentStatus(in *extensio
 	return nil
 }
 
-// Convert_extensions_DeploymentStatus_To_v1_DeploymentStatus is an autogenerated conversion function.
-func Convert_extensions_DeploymentStatus_To_v1_DeploymentStatus(in *extensions.DeploymentStatus, out *v1.DeploymentStatus, s conversion.Scope) error {
-	return autoConvert_extensions_DeploymentStatus_To_v1_DeploymentStatus(in, out, s)
+// Convert_apps_DeploymentStatus_To_v1_DeploymentStatus is an autogenerated conversion function.
+func Convert_apps_DeploymentStatus_To_v1_DeploymentStatus(in *apps.DeploymentStatus, out *v1.DeploymentStatus, s conversion.Scope) error {
+	return autoConvert_apps_DeploymentStatus_To_v1_DeploymentStatus(in, out, s)
 }
 
-func autoConvert_v1_DeploymentStrategy_To_extensions_DeploymentStrategy(in *v1.DeploymentStrategy, out *extensions.DeploymentStrategy, s conversion.Scope) error {
-	out.Type = extensions.DeploymentStrategyType(in.Type)
+func autoConvert_v1_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
+	out.Type = apps.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(extensions.RollingUpdateDeployment)
-		if err := Convert_v1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(*in, *out, s); err != nil {
+		*out = new(apps.RollingUpdateDeployment)
+		if err := Convert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
@@ -878,12 +877,12 @@ func autoConvert_v1_DeploymentStrategy_To_extensions_DeploymentStrategy(in *v1.D
 	return nil
 }
 
-func autoConvert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy(in *extensions.DeploymentStrategy, out *v1.DeploymentStrategy, s conversion.Scope) error {
+func autoConvert_apps_DeploymentStrategy_To_v1_DeploymentStrategy(in *apps.DeploymentStrategy, out *v1.DeploymentStrategy, s conversion.Scope) error {
 	out.Type = v1.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
 		*out = new(v1.RollingUpdateDeployment)
-		if err := Convert_extensions_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(*in, *out, s); err != nil {
+		if err := Convert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
@@ -892,40 +891,40 @@ func autoConvert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy(in *exte
 	return nil
 }
 
-func autoConvert_v1_ReplicaSet_To_extensions_ReplicaSet(in *v1.ReplicaSet, out *extensions.ReplicaSet, s conversion.Scope) error {
+func autoConvert_v1_ReplicaSet_To_apps_ReplicaSet(in *v1.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1_ReplicaSetStatus_To_extensions_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_v1_ReplicaSet_To_extensions_ReplicaSet is an autogenerated conversion function.
-func Convert_v1_ReplicaSet_To_extensions_ReplicaSet(in *v1.ReplicaSet, out *extensions.ReplicaSet, s conversion.Scope) error {
-	return autoConvert_v1_ReplicaSet_To_extensions_ReplicaSet(in, out, s)
+// Convert_v1_ReplicaSet_To_apps_ReplicaSet is an autogenerated conversion function.
+func Convert_v1_ReplicaSet_To_apps_ReplicaSet(in *v1.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
+	return autoConvert_v1_ReplicaSet_To_apps_ReplicaSet(in, out, s)
 }
 
-func autoConvert_extensions_ReplicaSet_To_v1_ReplicaSet(in *extensions.ReplicaSet, out *v1.ReplicaSet, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSet_To_v1_ReplicaSet(in *apps.ReplicaSet, out *v1.ReplicaSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_ReplicaSetStatus_To_v1_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_extensions_ReplicaSet_To_v1_ReplicaSet is an autogenerated conversion function.
-func Convert_extensions_ReplicaSet_To_v1_ReplicaSet(in *extensions.ReplicaSet, out *v1.ReplicaSet, s conversion.Scope) error {
-	return autoConvert_extensions_ReplicaSet_To_v1_ReplicaSet(in, out, s)
+// Convert_apps_ReplicaSet_To_v1_ReplicaSet is an autogenerated conversion function.
+func Convert_apps_ReplicaSet_To_v1_ReplicaSet(in *apps.ReplicaSet, out *v1.ReplicaSet, s conversion.Scope) error {
+	return autoConvert_apps_ReplicaSet_To_v1_ReplicaSet(in, out, s)
 }
 
-func autoConvert_v1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *v1.ReplicaSetCondition, out *extensions.ReplicaSetCondition, s conversion.Scope) error {
-	out.Type = extensions.ReplicaSetConditionType(in.Type)
+func autoConvert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *v1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
+	out.Type = apps.ReplicaSetConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -933,12 +932,12 @@ func autoConvert_v1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *v1
 	return nil
 }
 
-// Convert_v1_ReplicaSetCondition_To_extensions_ReplicaSetCondition is an autogenerated conversion function.
-func Convert_v1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *v1.ReplicaSetCondition, out *extensions.ReplicaSetCondition, s conversion.Scope) error {
-	return autoConvert_v1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in, out, s)
+// Convert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition is an autogenerated conversion function.
+func Convert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *v1.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
+	return autoConvert_v1_ReplicaSetCondition_To_apps_ReplicaSetCondition(in, out, s)
 }
 
-func autoConvert_extensions_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *extensions.ReplicaSetCondition, out *v1.ReplicaSetCondition, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *v1.ReplicaSetCondition, s conversion.Scope) error {
 	out.Type = v1.ReplicaSetConditionType(in.Type)
 	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -947,18 +946,18 @@ func autoConvert_extensions_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *ex
 	return nil
 }
 
-// Convert_extensions_ReplicaSetCondition_To_v1_ReplicaSetCondition is an autogenerated conversion function.
-func Convert_extensions_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *extensions.ReplicaSetCondition, out *v1.ReplicaSetCondition, s conversion.Scope) error {
-	return autoConvert_extensions_ReplicaSetCondition_To_v1_ReplicaSetCondition(in, out, s)
+// Convert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition is an autogenerated conversion function.
+func Convert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *v1.ReplicaSetCondition, s conversion.Scope) error {
+	return autoConvert_apps_ReplicaSetCondition_To_v1_ReplicaSetCondition(in, out, s)
 }
 
-func autoConvert_v1_ReplicaSetList_To_extensions_ReplicaSetList(in *v1.ReplicaSetList, out *extensions.ReplicaSetList, s conversion.Scope) error {
+func autoConvert_v1_ReplicaSetList_To_apps_ReplicaSetList(in *v1.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions.ReplicaSet, len(*in))
+		*out = make([]apps.ReplicaSet, len(*in))
 		for i := range *in {
-			if err := Convert_v1_ReplicaSet_To_extensions_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_v1_ReplicaSet_To_apps_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -968,18 +967,18 @@ func autoConvert_v1_ReplicaSetList_To_extensions_ReplicaSetList(in *v1.ReplicaSe
 	return nil
 }
 
-// Convert_v1_ReplicaSetList_To_extensions_ReplicaSetList is an autogenerated conversion function.
-func Convert_v1_ReplicaSetList_To_extensions_ReplicaSetList(in *v1.ReplicaSetList, out *extensions.ReplicaSetList, s conversion.Scope) error {
-	return autoConvert_v1_ReplicaSetList_To_extensions_ReplicaSetList(in, out, s)
+// Convert_v1_ReplicaSetList_To_apps_ReplicaSetList is an autogenerated conversion function.
+func Convert_v1_ReplicaSetList_To_apps_ReplicaSetList(in *v1.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
+	return autoConvert_v1_ReplicaSetList_To_apps_ReplicaSetList(in, out, s)
 }
 
-func autoConvert_extensions_ReplicaSetList_To_v1_ReplicaSetList(in *extensions.ReplicaSetList, out *v1.ReplicaSetList, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetList_To_v1_ReplicaSetList(in *apps.ReplicaSetList, out *v1.ReplicaSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]v1.ReplicaSet, len(*in))
 		for i := range *in {
-			if err := Convert_extensions_ReplicaSet_To_v1_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_apps_ReplicaSet_To_v1_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -989,12 +988,12 @@ func autoConvert_extensions_ReplicaSetList_To_v1_ReplicaSetList(in *extensions.R
 	return nil
 }
 
-// Convert_extensions_ReplicaSetList_To_v1_ReplicaSetList is an autogenerated conversion function.
-func Convert_extensions_ReplicaSetList_To_v1_ReplicaSetList(in *extensions.ReplicaSetList, out *v1.ReplicaSetList, s conversion.Scope) error {
-	return autoConvert_extensions_ReplicaSetList_To_v1_ReplicaSetList(in, out, s)
+// Convert_apps_ReplicaSetList_To_v1_ReplicaSetList is an autogenerated conversion function.
+func Convert_apps_ReplicaSetList_To_v1_ReplicaSetList(in *apps.ReplicaSetList, out *v1.ReplicaSetList, s conversion.Scope) error {
+	return autoConvert_apps_ReplicaSetList_To_v1_ReplicaSetList(in, out, s)
 }
 
-func autoConvert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *v1.ReplicaSetSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
+func autoConvert_v1_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -1006,7 +1005,7 @@ func autoConvert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *v1.ReplicaSe
 	return nil
 }
 
-func autoConvert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *extensions.ReplicaSetSpec, out *v1.ReplicaSetSpec, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *v1.ReplicaSetSpec, s conversion.Scope) error {
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -1018,22 +1017,22 @@ func autoConvert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *extensions.R
 	return nil
 }
 
-func autoConvert_v1_ReplicaSetStatus_To_extensions_ReplicaSetStatus(in *v1.ReplicaSetStatus, out *extensions.ReplicaSetStatus, s conversion.Scope) error {
+func autoConvert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
-	out.Conditions = *(*[]extensions.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]apps.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
-// Convert_v1_ReplicaSetStatus_To_extensions_ReplicaSetStatus is an autogenerated conversion function.
-func Convert_v1_ReplicaSetStatus_To_extensions_ReplicaSetStatus(in *v1.ReplicaSetStatus, out *extensions.ReplicaSetStatus, s conversion.Scope) error {
-	return autoConvert_v1_ReplicaSetStatus_To_extensions_ReplicaSetStatus(in, out, s)
+// Convert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus is an autogenerated conversion function.
+func Convert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
+	return autoConvert_v1_ReplicaSetStatus_To_apps_ReplicaSetStatus(in, out, s)
 }
 
-func autoConvert_extensions_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *extensions.ReplicaSetStatus, out *v1.ReplicaSetStatus, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *v1.ReplicaSetStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
@@ -1043,28 +1042,28 @@ func autoConvert_extensions_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *extensio
 	return nil
 }
 
-// Convert_extensions_ReplicaSetStatus_To_v1_ReplicaSetStatus is an autogenerated conversion function.
-func Convert_extensions_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *extensions.ReplicaSetStatus, out *v1.ReplicaSetStatus, s conversion.Scope) error {
-	return autoConvert_extensions_ReplicaSetStatus_To_v1_ReplicaSetStatus(in, out, s)
+// Convert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus is an autogenerated conversion function.
+func Convert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *v1.ReplicaSetStatus, s conversion.Scope) error {
+	return autoConvert_apps_ReplicaSetStatus_To_v1_ReplicaSetStatus(in, out, s)
 }
 
-func autoConvert_v1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *v1.RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
+func autoConvert_v1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
 	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
 	return nil
 }
 
-func autoConvert_extensions_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *v1.RollingUpdateDaemonSet, s conversion.Scope) error {
+func autoConvert_apps_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1.RollingUpdateDaemonSet, s conversion.Scope) error {
 	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
 	return nil
 }
 
-func autoConvert_v1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *v1.RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {
+func autoConvert_v1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *v1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
 	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
 	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
 	return nil
 }
 
-func autoConvert_extensions_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *v1.RollingUpdateDeployment, s conversion.Scope) error {
+func autoConvert_apps_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *v1.RollingUpdateDeployment, s conversion.Scope) error {
 	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
 	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
 	return nil

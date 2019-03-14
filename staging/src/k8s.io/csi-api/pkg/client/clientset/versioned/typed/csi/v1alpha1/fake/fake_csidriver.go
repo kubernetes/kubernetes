@@ -112,7 +112,7 @@ func (c *FakeCSIDrivers) DeleteCollection(options *v1.DeleteOptions, listOptions
 // Patch applies the patch and returns the patched cSIDriver.
 func (c *FakeCSIDrivers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.CSIDriver, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(csidriversResource, name, data, subresources...), &v1alpha1.CSIDriver{})
+		Invokes(testing.NewRootPatchSubresourceAction(csidriversResource, name, pt, data, subresources...), &v1alpha1.CSIDriver{})
 	if obj == nil {
 		return nil, err
 	}

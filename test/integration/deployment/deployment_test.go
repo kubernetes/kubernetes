@@ -109,7 +109,9 @@ func TestNewDeployment(t *testing.T) {
 	}
 }
 
-// Deployments should support roll out, roll back, and roll over
+// Deployments should support roll out, roll back, and roll over.
+// TODO: drop the rollback portions of this test when extensions/v1beta1 is no longer served
+// and rollback endpoint is no longer supported.
 func TestDeploymentRollingUpdate(t *testing.T) {
 	s, closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
@@ -239,6 +241,7 @@ func TestDeploymentSelectorImmutability(t *testing.T) {
 	}
 
 	// test to ensure extensions/v1beta1 selector is mutable
+	// TODO: drop the extensions/v1beta1 portion of this test when extensions/v1beta1 is no longer served
 	newSelectorLabels := map[string]string{"name_extensions_v1beta1": "test_extensions_v1beta1"}
 	deploymentExtensionsV1beta1, err := c.ExtensionsV1beta1().Deployments(ns.Name).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -553,6 +556,7 @@ func TestDeploymentHashCollision(t *testing.T) {
 }
 
 // Deployment supports rollback even when there's old replica set without revision.
+// TODO: drop this test when extensions/v1beta1 is no longer served
 func TestRollbackDeploymentRSNoRevision(t *testing.T) {
 	s, closeFn, rm, dc, informers, c := dcSetup(t)
 	defer closeFn()
@@ -1252,12 +1256,12 @@ func TestGeneralReplicaSetAdoption(t *testing.T) {
 	// with Controller=false, the deployment should add a second OwnerReference (ControllerRef) pointing to itself
 	// with Controller=true
 	var falseVar = false
-	ownerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "apps/v1beta1", Kind: "StatefulSet", Name: deploymentName, Controller: &falseVar}
+	ownerReference := metav1.OwnerReference{UID: uuid.NewUUID(), APIVersion: "apps/v1", Kind: "StatefulSet", Name: deploymentName, Controller: &falseVar}
 	testRSControllerRefPatch(t, tester, rs, &ownerReference, 2)
 
 	// When the only OwnerReference of the RS points to the deployment with Controller=false,
 	// the deployment should set Controller=true for the only OwnerReference
-	ownerReference = metav1.OwnerReference{UID: tester.deployment.UID, APIVersion: "extensions/v1beta1", Kind: "Deployment", Name: deploymentName, Controller: &falseVar}
+	ownerReference = metav1.OwnerReference{UID: tester.deployment.UID, APIVersion: "apps/v1", Kind: "Deployment", Name: deploymentName, Controller: &falseVar}
 	testRSControllerRefPatch(t, tester, rs, &ownerReference, 1)
 }
 
@@ -1269,9 +1273,7 @@ func testScalingUsingScaleSubresource(t *testing.T, tester *deploymentTester, re
 	if err != nil {
 		t.Fatalf("Failed to obtain deployment %q: %v", deploymentName, err)
 	}
-	kind := "Deployment"
-	scaleClient := tester.c.ExtensionsV1beta1().Scales(ns)
-	scale, err := scaleClient.Get(kind, deploymentName)
+	scale, err := tester.c.AppsV1().Deployments(ns).GetScale(deploymentName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain scale subresource for deployment %q: %v", deploymentName, err)
 	}
@@ -1280,12 +1282,12 @@ func testScalingUsingScaleSubresource(t *testing.T, tester *deploymentTester, re
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		scale, err := scaleClient.Get(kind, deploymentName)
+		scale, err := tester.c.AppsV1().Deployments(ns).GetScale(deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		scale.Spec.Replicas = replicas
-		_, err = scaleClient.Update(kind, scale)
+		_, err = tester.c.AppsV1().Deployments(ns).UpdateScale(deploymentName, scale)
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to set .Spec.Replicas of scale subresource for deployment %q: %v", deploymentName, err)

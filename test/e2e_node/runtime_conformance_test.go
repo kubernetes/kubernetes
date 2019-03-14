@@ -60,7 +60,7 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 			}{
 				{
 					description: "should be able to pull from private registry with credential provider",
-					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
+					image:       "gcr.io/authenticated-image-pulling/alpine:3.7",
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},

@@ -340,14 +340,14 @@ func (rc *ResourceConsumer) GetReplicas() int {
 		}
 		return int(replicationController.Status.ReadyReplicas)
 	case KindDeployment:
-		deployment, err := rc.clientSet.ExtensionsV1beta1().Deployments(rc.nsName).Get(rc.name, metav1.GetOptions{})
+		deployment, err := rc.clientSet.AppsV1().Deployments(rc.nsName).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if deployment == nil {
 			framework.Failf(deploymentIsNil)
 		}
 		return int(deployment.Status.ReadyReplicas)
 	case KindReplicaSet:
-		rs, err := rc.clientSet.ExtensionsV1beta1().ReplicaSets(rc.nsName).Get(rc.name, metav1.GetOptions{})
+		rs, err := rc.clientSet.AppsV1().ReplicaSets(rc.nsName).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if rs == nil {
 			framework.Failf(rsIsNil)
@@ -357,6 +357,10 @@ func (rc *ResourceConsumer) GetReplicas() int {
 		framework.Failf(invalidKind)
 	}
 	return 0
+}
+
+func (rc *ResourceConsumer) GetHpa(name string) (*autoscalingv1.HorizontalPodAutoscaler, error) {
+	return rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Get(name, metav1.GetOptions{})
 }
 
 func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int, duration time.Duration) {
@@ -369,13 +373,25 @@ func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int, duration time.D
 	framework.ExpectNoErrorWithOffset(1, err, "timeout waiting %v for %d replicas", duration, desiredReplicas)
 }
 
-func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, duration time.Duration) {
+func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, duration time.Duration, hpaName string) {
+	rc.EnsureDesiredReplicasInRange(desiredReplicas, desiredReplicas, duration, hpaName)
+}
+
+func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(minDesiredReplicas, maxDesiredReplicas int, duration time.Duration, hpaName string) {
 	interval := 10 * time.Second
 	err := wait.PollImmediate(interval, duration, func() (bool, error) {
 		replicas := rc.GetReplicas()
-		framework.Logf("expecting there to be %d replicas (are: %d)", desiredReplicas, replicas)
-		if replicas != desiredReplicas {
-			return false, fmt.Errorf("number of replicas changed unexpectedly")
+		framework.Logf("expecting there to be in [%d, %d] replicas (are: %d)", minDesiredReplicas, maxDesiredReplicas, replicas)
+		as, err := rc.GetHpa(hpaName)
+		if err != nil {
+			framework.Logf("Error getting HPA: %s", err)
+		} else {
+			framework.Logf("HPA status: %+v", as.Status)
+		}
+		if replicas < minDesiredReplicas {
+			return false, fmt.Errorf("number of replicas below target")
+		} else if replicas > maxDesiredReplicas {
+			return false, fmt.Errorf("number of replicas above target")
 		} else {
 			return false, nil // Expected number of replicas found. Continue polling until timeout.
 		}

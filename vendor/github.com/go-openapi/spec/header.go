@@ -22,6 +22,7 @@ import (
 	"github.com/go-openapi/swag"
 )
 
+// HeaderProps describes a response header
 type HeaderProps struct {
 	Description string `json:"description,omitempty"`
 }
@@ -153,7 +154,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3), nil
 }
 
-// UnmarshalJSON marshal this from JSON
+// UnmarshalJSON unmarshals this header from JSON
 func (h *Header) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &h.CommonValidations); err != nil {
 		return err
@@ -164,32 +165,29 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &h.VendorExtensible); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &h.HeaderProps); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(data, &h.HeaderProps)
 }
 
 // JSONLookup look up a value by the json property name
-func (p Header) JSONLookup(token string) (interface{}, error) {
-	if ex, ok := p.Extensions[token]; ok {
+func (h Header) JSONLookup(token string) (interface{}, error) {
+	if ex, ok := h.Extensions[token]; ok {
 		return &ex, nil
 	}
 
-	r, _, err := jsonpointer.GetForToken(p.CommonValidations, token)
+	r, _, err := jsonpointer.GetForToken(h.CommonValidations, token)
 	if err != nil && !strings.HasPrefix(err.Error(), "object has no field") {
 		return nil, err
 	}
 	if r != nil {
 		return r, nil
 	}
-	r, _, err = jsonpointer.GetForToken(p.SimpleSchema, token)
+	r, _, err = jsonpointer.GetForToken(h.SimpleSchema, token)
 	if err != nil && !strings.HasPrefix(err.Error(), "object has no field") {
 		return nil, err
 	}
 	if r != nil {
 		return r, nil
 	}
-	r, _, err = jsonpointer.GetForToken(p.HeaderProps, token)
+	r, _, err = jsonpointer.GetForToken(h.HeaderProps, token)
 	return r, err
 }

@@ -19,6 +19,7 @@ package common
 import (
 	"fmt"
 	"path"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
@@ -70,8 +71,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium memory, volume mode default
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("volume on tmpfs should have the correct mode [NodeConformance]", func() {
+	framework.ConformanceIt("volume on tmpfs should have the correct mode [LinuxOnly] [NodeConformance]", func() {
 		doTestVolumeMode(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
@@ -79,8 +81,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium memory, volume mode 0644
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0644. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (root,0644,tmpfs) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (root,0644,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0644(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
@@ -88,8 +91,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium memory, volume mode 0666
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0666. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (root,0666,tmpfs) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (root,0666,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0666(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
@@ -97,8 +101,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium memory, volume mode 0777
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0777.  The volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (root,0777,tmpfs) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (root,0777,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0777(f, testImageRootUid, v1.StorageMediumMemory)
 	})
 
@@ -106,8 +111,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium memory, volume mode 0644, non-root user
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0644. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (non-root,0644,tmpfs) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (non-root,0644,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0644(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
@@ -115,8 +121,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium memory, volume mode 0666,, non-root user
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0666. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (non-root,0666,tmpfs) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (non-root,0666,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0666(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
@@ -124,8 +131,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium memory, volume mode 0777, non-root user
 		Description: A Pod created with an 'emptyDir' Volume and 'medium' as 'Memory', the volume mode set to 0777. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID, or the medium = 'Memory'.
 	*/
-	framework.ConformanceIt("should support (non-root,0777,tmpfs) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (non-root,0777,tmpfs) [LinuxOnly] [NodeConformance]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumMemory)
 	})
 
@@ -133,8 +141,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium default, volume mode default
 		Description: A Pod created with an 'emptyDir' Volume, the volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("volume on default medium should have the correct mode [NodeConformance]", func() {
+	framework.ConformanceIt("volume on default medium should have the correct mode [LinuxOnly] [NodeConformance]", func() {
 		doTestVolumeMode(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
@@ -142,8 +151,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium default, volume mode 0644
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0644. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (root,0644,default) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (root,0644,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0644(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
@@ -151,8 +161,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium default, volume mode 0666
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0666. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (root,0666,default) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (root,0666,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0666(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
@@ -160,8 +171,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium default, volume mode 0777
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0777.  The volume MUST have mode set as -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (root,0777,default) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (root,0777,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0777(f, testImageRootUid, v1.StorageMediumDefault)
 	})
 
@@ -169,8 +181,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium default, volume mode 0644
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0644. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-r--r-- and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (non-root,0644,default) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (non-root,0644,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0644(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
@@ -178,8 +191,9 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium default, volume mode 0666
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0666. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rw-rw-rw- and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (non-root,0666,default) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (non-root,0666,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0666(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
@@ -187,9 +201,85 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		Release : v1.9
 		Testname: EmptyDir, medium default, volume mode 0777
 		Description: A Pod created with an 'emptyDir' Volume, the volume mode set to 0777. Volume is mounted into the container where container is run as a non-root user. The volume MUST have mode -rwxrwxrwx and mount type set to tmpfs and the contents MUST be readable.
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should support (non-root,0777,default) [NodeConformance]", func() {
+	framework.ConformanceIt("should support (non-root,0777,default) [LinuxOnly] [NodeConformance]", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumDefault)
+	})
+
+	It("pod should support shared volumes between containers", func() {
+		var (
+			volumeName                 = "shared-data"
+			busyBoxMainVolumeMountPath = "/usr/share/volumeshare"
+			busyBoxSubVolumeMountPath  = "/pod-data"
+			busyBoxMainVolumeFilePath  = fmt.Sprintf("%s/shareddata.txt", busyBoxMainVolumeMountPath)
+			busyBoxSubVolumeFilePath   = fmt.Sprintf("%s/shareddata.txt", busyBoxSubVolumeMountPath)
+			message                    = "Hello from the busy-box sub-container"
+			busyBoxMainContainerName   = "busybox-main-container"
+			busyBoxSubContainerName    = "busybox-sub-container"
+			resultString               = ""
+			deletionGracePeriod        = int64(0)
+		)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-sharedvolume-" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						Name: volumeName,
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: new(v1.EmptyDirVolumeSource),
+						},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    busyBoxMainContainerName,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh"},
+						Args:    []string{"-c", "sleep 100000"},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: busyBoxMainVolumeMountPath,
+							},
+						},
+					},
+					{
+						Name:    busyBoxSubContainerName,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh"},
+						Args:    []string{"-c", fmt.Sprintf("echo %s > %s", message, busyBoxSubVolumeFilePath)},
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: busyBoxSubVolumeMountPath,
+							},
+						},
+					},
+				},
+				TerminationGracePeriodSeconds: &deletionGracePeriod,
+				RestartPolicy:                 v1.RestartPolicyNever,
+			},
+		}
+
+		var err error
+		By("Creating Pod")
+		pod = f.PodClient().CreateSync(pod)
+
+		By("Waiting for the pod running")
+		err = f.WaitForPodRunning(pod.Name)
+		framework.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
+
+		By("Geting the pod")
+		pod, err = f.PodClient().Get(pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
+
+		By("Reading file content from the nginx-container")
+		resultString, err = framework.LookForStringInFile(f.Namespace.Name, pod.Name, busyBoxMainContainerName, busyBoxMainVolumeFilePath, message, 30*time.Second)
+		framework.ExpectNoError(err, "failed to match expected string %s with %s", message, resultString)
 	})
 })
 

@@ -18,46 +18,36 @@ package auth
 
 import (
 	"fmt"
-	"net/http"
-	"net/http/httptest"
+	"io/ioutil"
+	"strings"
 	"testing"
 	"time"
 
+	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
-	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
-	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
-	versionedinformers "k8s.io/client-go/informers"
 	externalclientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/coordination"
+	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
-	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/pointer"
 )
 
 func TestNodeAuthorizer(t *testing.T) {
-	// Start the server so we know the address
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
-	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
 	const (
 		// Define credentials
 		tokenMaster      = "master-token"
@@ -66,57 +56,40 @@ func TestNodeAuthorizer(t *testing.T) {
 		tokenNode2       = "node2-token"
 	)
 
-	authenticator := bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-		tokenMaster:      {Name: "admin", Groups: []string{"system:masters"}},
-		tokenNodeUnknown: {Name: "unknown", Groups: []string{"system:nodes"}},
-		tokenNode1:       {Name: "system:node:node1", Groups: []string{"system:nodes"}},
-		tokenNode2:       {Name: "system:node:node2", Groups: []string{"system:nodes"}},
-	}))
-
-	// Build client config, clientset, and informers
-	clientConfig := &restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
-	superuserClient, superuserClientExternal := clientsetForToken(tokenMaster, clientConfig)
-	versionedInformerFactory := versionedinformers.NewSharedInformerFactory(superuserClientExternal, time.Minute)
-
-	// Enabled CSIPersistentVolume feature at startup so volumeattachments get watched
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, true)()
-
 	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
 
 	// Enable NodeLease feature so that nodes can create leases
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
 
-	// Set up Node+RBAC authorizer
-	authorizerConfig := &authorizer.AuthorizationConfig{
-		AuthorizationModes:       []string{"Node", "RBAC"},
-		VersionedInformerFactory: versionedInformerFactory,
-	}
-	nodeRBACAuthorizer, _, err := authorizerConfig.New()
+	// Enable CSINodeInfo feature so that nodes can create CSINode objects.
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
+
+	tokenFile, err := ioutil.TempFile("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
+	tokenFile.WriteString(strings.Join([]string{
+		fmt.Sprintf(`%s,admin,uid1,"system:masters"`, tokenMaster),
+		fmt.Sprintf(`%s,unknown,uid2,"system:nodes"`, tokenNodeUnknown),
+		fmt.Sprintf(`%s,system:node:node1,uid3,"system:nodes"`, tokenNode1),
+		fmt.Sprintf(`%s,system:node:node2,uid4,"system:nodes"`, tokenNode2),
+	}, "\n"))
+	tokenFile.Close()
 
-	// Set up NodeRestriction admission
-	nodeRestrictionAdmission := noderestriction.NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
-	nodeRestrictionAdmission.SetExternalKubeInformerFactory(versionedInformerFactory)
-	if err := nodeRestrictionAdmission.ValidateInitialization(); err != nil {
-		t.Fatal(err)
-	}
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--authorization-mode", "Node,RBAC",
+		"--token-auth-file", tokenFile.Name(),
+		"--enable-admission-plugins", "NodeRestriction",
+		// The "default" SA is not installed, causing the ServiceAccount plugin to retry for ~1s per
+		// API request.
+		"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	// Start the server
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
-	masterConfig.GenericConfig.Authorization.Authorizer = nodeRBACAuthorizer
-	masterConfig.GenericConfig.AdmissionControl = nodeRestrictionAdmission
-
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, apiServer, h)
-	defer closeFn()
-
-	// Start the informers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	versionedInformerFactory.Start(stopCh)
+	// Build client config and superuser clientset
+	clientConfig := server.ClientConfig
+	superuserClient, superuserClientExternal := clientsetForToken(tokenMaster, clientConfig)
 
 	// Wait for a healthy server
 	for {
@@ -130,6 +103,10 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 
 	// Create objects
+	if _, err := superuserClient.Core().Namespaces().Create(&core.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "ns"}}); err != nil {
+		t.Fatal(err)
+	}
+
 	if _, err := superuserClient.Core().Secrets("ns").Create(&api.Secret{ObjectMeta: metav1.ObjectMeta{Name: "mysecret"}}); err != nil {
 		t.Fatal(err)
 	}
@@ -143,11 +120,11 @@ func TestNodeAuthorizer(t *testing.T) {
 		t.Fatal(err)
 	}
 	pvName := "mypv"
-	if _, err := superuserClientExternal.StorageV1beta1().VolumeAttachments().Create(&storagev1beta1.VolumeAttachment{
+	if _, err := superuserClientExternal.StorageV1().VolumeAttachments().Create(&storagev1.VolumeAttachment{
 		ObjectMeta: metav1.ObjectMeta{Name: "myattachment"},
-		Spec: storagev1beta1.VolumeAttachmentSpec{
+		Spec: storagev1.VolumeAttachmentSpec{
 			Attacher: "foo",
-			Source:   storagev1beta1.VolumeAttachmentSource{PersistentVolumeName: &pvName},
+			Source:   storagev1.VolumeAttachmentSource{PersistentVolumeName: &pvName},
 			NodeName: "node2",
 		},
 	}); err != nil {
@@ -213,7 +190,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	getVolumeAttachment := func(client externalclientset.Interface) func() error {
 		return func() error {
-			_, err := client.StorageV1beta1().VolumeAttachments().Get("myattachment", metav1.GetOptions{})
+			_, err := client.StorageV1().VolumeAttachments().Get("myattachment", metav1.GetOptions{})
 			return err
 		}
 	}
@@ -324,6 +301,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	}
 	createNode2NormalPodEviction := func(client clientset.Interface) func() error {
 		return func() error {
+			zero := int64(0)
 			return client.Policy().Evictions("ns").Evict(&policy.Eviction{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "policy/v1beta1",
@@ -333,11 +311,13 @@ func TestNodeAuthorizer(t *testing.T) {
 					Name:      "node2normalpod",
 					Namespace: "ns",
 				},
+				DeleteOptions: &metav1.DeleteOptions{GracePeriodSeconds: &zero},
 			})
 		}
 	}
 	createNode2MirrorPodEviction := func(client clientset.Interface) func() error {
 		return func() error {
+			zero := int64(0)
 			return client.Policy().Evictions("ns").Evict(&policy.Eviction{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "policy/v1beta1",
@@ -347,6 +327,7 @@ func TestNodeAuthorizer(t *testing.T) {
 					Name:      "node2mirrorpod",
 					Namespace: "ns",
 				},
+				DeleteOptions: &metav1.DeleteOptions{GracePeriodSeconds: &zero},
 			})
 		}
 	}
@@ -418,9 +399,68 @@ func TestNodeAuthorizer(t *testing.T) {
 		}
 	}
 
+	getNode1CSINode := func(client externalclientset.Interface) func() error {
+		return func() error {
+			_, err := client.StorageV1beta1().CSINodes().Get("node1", metav1.GetOptions{})
+			return err
+		}
+	}
+	createNode1CSINode := func(client externalclientset.Interface) func() error {
+		return func() error {
+			nodeInfo := &storagev1beta1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+				Spec: storagev1beta1.CSINodeSpec{
+					Drivers: []storagev1beta1.CSINodeDriver{
+						{
+							Name:         "com.example.csi.driver1",
+							NodeID:       "com.example.csi/node1",
+							TopologyKeys: []string{"com.example.csi/zone"},
+						},
+					},
+				},
+			}
+			_, err := client.StorageV1beta1().CSINodes().Create(nodeInfo)
+			return err
+		}
+	}
+	updateNode1CSINode := func(client externalclientset.Interface) func() error {
+		return func() error {
+			nodeInfo, err := client.StorageV1beta1().CSINodes().Get("node1", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			nodeInfo.Spec.Drivers = []storagev1beta1.CSINodeDriver{
+				{
+					Name:         "com.example.csi.driver2",
+					NodeID:       "com.example.csi/node1",
+					TopologyKeys: []string{"com.example.csi/rack"},
+				},
+			}
+			_, err = client.StorageV1beta1().CSINodes().Update(nodeInfo)
+			return err
+		}
+	}
+	patchNode1CSINode := func(client externalclientset.Interface) func() error {
+		return func() error {
+			bs := []byte(fmt.Sprintf(`{"csiDrivers": [ { "driver": "net.example.storage.driver2", "nodeID": "net.example.storage/node1", "topologyKeys": [ "net.example.storage/region" ] } ] }`))
+			// StrategicMergePatch is unsupported by CRs. Falling back to MergePatch
+			_, err := client.StorageV1beta1().CSINodes().Patch("node1", types.MergePatchType, bs)
+			return err
+		}
+	}
+	deleteNode1CSINode := func(client externalclientset.Interface) func() error {
+		return func() error {
+			return client.StorageV1beta1().CSINodes().Delete("node1", &metav1.DeleteOptions{})
+		}
+	}
+
 	nodeanonClient, _ := clientsetForToken(tokenNodeUnknown, clientConfig)
 	node1Client, node1ClientExternal := clientsetForToken(tokenNode1, clientConfig)
 	node2Client, node2ClientExternal := clientsetForToken(tokenNode2, clientConfig)
+	_, csiNode1Client := clientsetForToken(tokenNode1, clientConfig)
+	_, csiNode2Client := clientsetForToken(tokenNode2, clientConfig)
 
 	// all node requests from node1 and unknown node fail
 	expectForbidden(t, getSecret(nodeanonClient))
@@ -465,7 +505,10 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, createNode2MirrorPodEviction(node2Client))
 	expectAllowed(t, createNode2(node2Client))
 	expectAllowed(t, updateNode2Status(node2Client))
-	expectAllowed(t, deleteNode2(node2Client))
+	// self deletion is not allowed
+	expectForbidden(t, deleteNode2(node2Client))
+	// clean up node2
+	expectAllowed(t, deleteNode2(superuserClient))
 
 	// create a pod as an admin to add object references
 	expectAllowed(t, createNode2NormalPod(superuserClient))
@@ -530,12 +573,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, updatePVCCapacity(node2Client))
 	expectForbidden(t, updatePVCPhase(node2Client))
 
-	// Disabled CSIPersistentVolume feature
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, false)()
-	expectForbidden(t, getVolumeAttachment(node1ClientExternal))
-	expectForbidden(t, getVolumeAttachment(node2ClientExternal))
 	// Enabled CSIPersistentVolume feature
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, true)()
 	expectForbidden(t, getVolumeAttachment(node1ClientExternal))
 	expectAllowed(t, getVolumeAttachment(node2ClientExternal))
 
@@ -556,7 +594,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	// node2 can no longer get the configmap after it is unassigned as its config source
 	expectForbidden(t, getConfigMapConfigSource(node2Client))
 	// clean up node2
-	expectAllowed(t, deleteNode2(node2Client))
+	expectAllowed(t, deleteNode2(superuserClient))
 
 	//TODO(mikedanese): integration test node restriction of TokenRequest
 
@@ -572,6 +610,19 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, updateNode1Lease(node2Client))
 	expectForbidden(t, patchNode1Lease(node2Client))
 	expectForbidden(t, deleteNode1Lease(node2Client))
+
+	// node1 allowed to operate on its own CSINode
+	expectAllowed(t, createNode1CSINode(csiNode1Client))
+	expectAllowed(t, getNode1CSINode(csiNode1Client))
+	expectAllowed(t, updateNode1CSINode(csiNode1Client))
+	expectAllowed(t, patchNode1CSINode(csiNode1Client))
+	expectAllowed(t, deleteNode1CSINode(csiNode1Client))
+	// node2 not allowed to operate on another node's CSINode
+	expectForbidden(t, createNode1CSINode(csiNode2Client))
+	expectForbidden(t, getNode1CSINode(csiNode2Client))
+	expectForbidden(t, updateNode1CSINode(csiNode2Client))
+	expectForbidden(t, patchNode1CSINode(csiNode2Client))
+	expectForbidden(t, deleteNode1CSINode(csiNode2Client))
 }
 
 // expect executes a function a set number of times until it either returns the
@@ -610,4 +661,18 @@ func expectAllowed(t *testing.T, f func() error) {
 	if ok, err := expect(t, f, func(e error) bool { return e == nil }); !ok {
 		t.Errorf("Expected no error, got %v", err)
 	}
+}
+
+// crdFromManifest reads a .json/yaml file and returns the CRD in it.
+func crdFromManifest(filename string) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
+	var crd apiextensionsv1beta1.CustomResourceDefinition
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), data, &crd); err != nil {
+		return nil, err
+	}
+	return &crd, nil
 }

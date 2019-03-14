@@ -17,23 +17,28 @@ limitations under the License.
 package options
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/kubernetes/pkg/features"
+	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
 
 type BuiltInAuthenticationOptions struct {
+	APIAudiences    []string
 	Anonymous       *AnonymousAuthenticationOptions
 	BootstrapToken  *BootstrapTokenAuthenticationOptions
 	ClientCert      *genericoptions.ClientCertAuthenticationOptions
@@ -76,7 +81,6 @@ type ServiceAccountAuthenticationOptions struct {
 	KeyFiles      []string
 	Lookup        bool
 	Issuer        string
-	APIAudiences  []string
 	MaxExpiration time.Duration
 }
 
@@ -169,11 +173,29 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
 		}
 	}
+	if s.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) || !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
+			allErrors = append(allErrors, errors.New("If the BoundServiceAccountTokenVolume feature is enabled,"+
+				" the TokenRequest and TokenRequestProjection features must also be enabled"))
+		}
+		if len(s.ServiceAccounts.Issuer) == 0 {
+			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag when BoundServiceAccountTokenVolume is enabled"))
+		}
+		if len(s.ServiceAccounts.KeyFiles) == 0 {
+			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag when BoundServiceAccountTokenVolume is enabled"))
+		}
+	}
 
 	return allErrors
 }
 
 func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringSliceVar(&s.APIAudiences, "api-audiences", s.APIAudiences, ""+
+		"Identifiers of the API. The service account token authenticator will validate that "+
+		"tokens used against the API are bound to at least one of these audiences. If the "+
+		"--service-account-issuer flag is configured and this flag is not, this field "+
+		"defaults to a single element list containing the issuer URL .")
+
 	if s.Anonymous != nil {
 		fs.BoolVar(&s.Anonymous.Allow, "anonymous-auth", s.Anonymous.Allow, ""+
 			"Enables anonymous requests to the secure port of the API server. "+
@@ -227,7 +249,7 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"'alg' header value not in this list will be rejected. "+
 			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
 
-		fs.Var(flag.NewMapStringStringNoSplit(&s.OIDC.RequiredClaims), "oidc-required-claim", ""+
+		fs.Var(cliflag.NewMapStringStringNoSplit(&s.OIDC.RequiredClaims), "oidc-required-claim", ""+
 			"A key=value pair that describes a required claim in the ID Token. "+
 			"If set, the claim is verified to be present in the ID Token with a matching value. "+
 			"Repeat this flag to specify multiple claims.")
@@ -258,9 +280,11 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"Identifier of the service account token issuer. The issuer will assert this identifier "+
 			"in \"iss\" claim of issued tokens. This value is a string or URI.")
 
-		fs.StringSliceVar(&s.ServiceAccounts.APIAudiences, "service-account-api-audiences", s.ServiceAccounts.APIAudiences, ""+
+		// Deprecated in 1.13
+		fs.StringSliceVar(&s.APIAudiences, "service-account-api-audiences", s.APIAudiences, ""+
 			"Identifiers of the API. The service account token authenticator will validate that "+
 			"tokens used against the API are bound to at least one of these audiences.")
+		fs.MarkDeprecated("service-account-api-audiences", "Use --api-audiences")
 
 		fs.DurationVar(&s.ServiceAccounts.MaxExpiration, "service-account-max-token-expiration", s.ServiceAccounts.MaxExpiration, ""+
 			"The maximum validity duration of a token created by the service account token issuer. If an otherwise valid "+
@@ -283,8 +307,8 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.AuthenticatorConfig {
-	ret := authenticator.AuthenticatorConfig{
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticator.Config {
+	ret := kubeauthenticator.Config{
 		TokenSuccessCacheTTL: s.TokenSuccessCacheTTL,
 		TokenFailureCacheTTL: s.TokenFailureCacheTTL,
 	}
@@ -321,11 +345,14 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.RequestHeaderConfig = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
 	}
 
+	ret.APIAudiences = s.APIAudiences
 	if s.ServiceAccounts != nil {
+		if s.ServiceAccounts.Issuer != "" && len(s.APIAudiences) == 0 {
+			ret.APIAudiences = authenticator.Audiences{s.ServiceAccounts.Issuer}
+		}
 		ret.ServiceAccountKeyFiles = s.ServiceAccounts.KeyFiles
-		ret.ServiceAccountLookup = s.ServiceAccounts.Lookup
 		ret.ServiceAccountIssuer = s.ServiceAccounts.Issuer
-		ret.ServiceAccountAPIAudiences = s.ServiceAccounts.APIAudiences
+		ret.ServiceAccountLookup = s.ServiceAccounts.Lookup
 	}
 
 	if s.TokenFile != nil {
@@ -338,10 +365,10 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 
 		if len(s.WebHook.ConfigFile) > 0 && s.WebHook.CacheTTL > 0 {
 			if s.TokenSuccessCacheTTL > 0 && s.WebHook.CacheTTL < s.TokenSuccessCacheTTL {
-				glog.Warningf("the webhook cache ttl of %s is shorter than the overall cache ttl of %s for successful token authentication attempts.", s.WebHook.CacheTTL, s.TokenSuccessCacheTTL)
+				klog.Warningf("the webhook cache ttl of %s is shorter than the overall cache ttl of %s for successful token authentication attempts.", s.WebHook.CacheTTL, s.TokenSuccessCacheTTL)
 			}
 			if s.TokenFailureCacheTTL > 0 && s.WebHook.CacheTTL < s.TokenFailureCacheTTL {
-				glog.Warningf("the webhook cache ttl of %s is shorter than the overall cache ttl of %s for failed token authentication attempts.", s.WebHook.CacheTTL, s.TokenFailureCacheTTL)
+				klog.Warningf("the webhook cache ttl of %s is shorter than the overall cache ttl of %s for failed token authentication attempts.", s.WebHook.CacheTTL, s.TokenFailureCacheTTL)
 			}
 		}
 	}
@@ -368,6 +395,11 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error
 
 	c.Authentication.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
 
+	c.Authentication.APIAudiences = o.APIAudiences
+	if o.ServiceAccounts != nil && o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {
+		c.Authentication.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
+	}
+
 	return nil
 }
 
@@ -380,7 +412,7 @@ func (o *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltIn
 	// authorization ModeAlwaysAllow cannot be combined with AnonymousAuth.
 	// in such a case the AnonymousAuth is stomped to false and you get a message
 	if o.Anonymous.Allow && sets.NewString(authorization.Modes...).Has(authzmodes.ModeAlwaysAllow) {
-		glog.Warningf("AnonymousAuth is not allowed with the AlwaysAllow authorizer. Resetting AnonymousAuth to false. You should use a different authorizer")
+		klog.Warningf("AnonymousAuth is not allowed with the AlwaysAllow authorizer. Resetting AnonymousAuth to false. You should use a different authorizer")
 		o.Anonymous.Allow = false
 	}
 }

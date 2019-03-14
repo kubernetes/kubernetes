@@ -418,6 +418,70 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 			})
 		})
 
+		// previously, we missed a panic because we were not exercising this path
+		Context("update Node.Spec.ConfigSource: non-nil last-known-good to a new non-nil last-known-good", func() {
+			It(itDescription, func() {
+				var err error
+				// we base the "lkg" configmap off of the configuration from before the test
+				lkgKC := beforeKC.DeepCopy()
+				lkgConfigMap1 := newKubeletConfigMap("dynamic-kubelet-config-test-lkg-1", lkgKC)
+				lkgConfigMap1, err = f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(lkgConfigMap1)
+				framework.ExpectNoError(err)
+
+				lkgSource1 := &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+					Namespace:        lkgConfigMap1.Namespace,
+					Name:             lkgConfigMap1.Name,
+					KubeletConfigKey: "kubelet",
+				}}
+				lkgStatus1 := lkgSource1.DeepCopy()
+				lkgStatus1.ConfigMap.UID = lkgConfigMap1.UID
+				lkgStatus1.ConfigMap.ResourceVersion = lkgConfigMap1.ResourceVersion
+
+				lkgConfigMap2 := newKubeletConfigMap("dynamic-kubelet-config-test-lkg-2", lkgKC)
+				lkgConfigMap2, err = f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(lkgConfigMap2)
+				framework.ExpectNoError(err)
+
+				lkgSource2 := &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+					Namespace:        lkgConfigMap2.Namespace,
+					Name:             lkgConfigMap2.Name,
+					KubeletConfigKey: "kubelet",
+				}}
+				lkgStatus2 := lkgSource2.DeepCopy()
+				lkgStatus2.ConfigMap.UID = lkgConfigMap2.UID
+				lkgStatus2.ConfigMap.ResourceVersion = lkgConfigMap2.ResourceVersion
+
+				// cases
+				first := nodeConfigTestCase{
+					desc:         "last-known-good-1",
+					configSource: lkgSource1,
+					configMap:    lkgConfigMap1,
+					expectConfigStatus: expectNodeConfigStatus{
+						lastKnownGood: lkgStatus1,
+					},
+					expectConfig: lkgKC,
+					event:        true,
+				}
+
+				second := nodeConfigTestCase{
+					desc:         "last-known-good-2",
+					configSource: lkgSource2,
+					configMap:    lkgConfigMap2,
+					expectConfigStatus: expectNodeConfigStatus{
+						lastKnownGood: lkgStatus2,
+					},
+					expectConfig: lkgKC,
+					event:        true,
+				}
+
+				// Manually actuate this to ensure we wait for each case to become the last-known-good
+				const lkgDuration = 12 * time.Minute
+				By(fmt.Sprintf("setting initial state %q", first.desc))
+				first.run(f, setConfigSourceFunc, true, lkgDuration)
+				By(fmt.Sprintf("from %q to %q", first.desc, second.desc))
+				second.run(f, setConfigSourceFunc, true, lkgDuration)
+			})
+		})
+
 		// exposes resource leaks across config changes
 		Context("update Node.Spec.ConfigSource: 100 update stress test:", func() {
 			It(itDescription, func() {

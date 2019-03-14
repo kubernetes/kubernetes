@@ -17,6 +17,7 @@ limitations under the License.
 package scalability
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -36,12 +37,15 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
-	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -52,9 +56,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/restmapper"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
@@ -231,6 +232,8 @@ var _ = SIGDescribe("Load capacity", func() {
 				framework.ExpectNoError(CreateQuotas(f, namespaces, 2*totalPods, testPhaseDurations.StartPhase(115, "quota creation")))
 			}
 
+			f.AddonResourceConstraints = loadResourceConstraints()
+
 			serviceCreationPhase := testPhaseDurations.StartPhase(120, "services creation")
 			defer serviceCreationPhase.End()
 			if itArg.services {
@@ -240,7 +243,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					defer GinkgoRecover()
 					framework.ExpectNoError(testutils.CreateServiceWithRetries(clientset, services[i].Namespace, services[i]))
 				}
-				workqueue.Parallelize(serviceOperationsParallelism, len(services), createService)
+				workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), createService)
 				framework.Logf("%v Services created.", len(services))
 				defer func(services []*v1.Service) {
 					serviceCleanupPhase := testPhaseDurations.StartPhase(800, "services deletion")
@@ -250,7 +253,7 @@ var _ = SIGDescribe("Load capacity", func() {
 						defer GinkgoRecover()
 						framework.ExpectNoError(testutils.DeleteResourceWithRetries(clientset, api.Kind("Service"), services[i].Namespace, services[i].Name, nil))
 					}
-					workqueue.Parallelize(serviceOperationsParallelism, len(services), deleteService)
+					workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), deleteService)
 					framework.Logf("Services deleted")
 				}(services)
 			} else {
@@ -374,9 +377,13 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 				KeepAlive: 30 * time.Second,
 			}).DialContext,
 		})
+		config.WrapTransport = transportConfig.WrapTransport
+		config.Dial = transportConfig.Dial
 		// Overwrite TLS-related fields from config to avoid collision with
 		// Transport field.
 		config.TLSClientConfig = restclient.TLSClientConfig{}
+		config.AuthProvider = nil
+		config.ExecProvider = nil
 
 		c, err := clientset.NewForConfig(config)
 		if err != nil {
@@ -426,6 +433,19 @@ func computePodCounts(total int) (int, int, int) {
 	total -= mediumGroupCount * mediumGroupSize
 	smallGroupCount := total / smallGroupSize
 	return smallGroupCount, mediumGroupCount, bigGroupCount
+}
+
+func loadResourceConstraints() map[string]framework.ResourceConstraint {
+	constraints := make(map[string]framework.ResourceConstraint)
+	constraints["coredns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
+	constraints["kubedns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
+	return constraints
 }
 
 func generateConfigs(
@@ -525,7 +545,7 @@ func GenerateConfigsForGroup(
 			InternalClient: nil, // this will be overwritten later
 			Name:           groupName + "-" + strconv.Itoa(i),
 			Namespace:      namespace,
-			Timeout:        10 * time.Minute,
+			Timeout:        UnreadyNodeToleration,
 			Image:          image,
 			Command:        command,
 			Replicas:       size,
@@ -535,6 +555,19 @@ func GenerateConfigsForGroup(
 			ConfigMapNames: configMapNames,
 			// Define a label to group every 2 RCs into one service.
 			Labels: map[string]string{svcLabelKey: groupName + "-" + strconv.Itoa((i+1)/2)},
+			Tolerations: []v1.Toleration{
+				{
+					Key:               "node.kubernetes.io/not-ready",
+					Operator:          v1.TolerationOpExists,
+					Effect:            v1.TaintEffectNoExecute,
+					TolerationSeconds: func(i int64) *int64 { return &i }(int64(UnreadyNodeToleration / time.Second)),
+				}, {
+					Key:               "node.kubernetes.io/unreachable",
+					Operator:          v1.TolerationOpExists,
+					Effect:            v1.TaintEffectNoExecute,
+					TolerationSeconds: func(i int64) *int64 { return &i }(int64(UnreadyNodeToleration / time.Second)),
+				},
+			},
 		}
 
 		if kind == randomKind {

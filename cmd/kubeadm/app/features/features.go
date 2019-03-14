@@ -22,45 +22,23 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
-	// HighAvailability is alpha in v1.9 - deprecated in v1.12 (TODO remove in v1.13)
-	HighAvailability = "HighAvailability"
 
 	// CoreDNS is GA in v1.11
 	CoreDNS = "CoreDNS"
-
-	// SelfHosting is alpha in v1.8 and v1.9 - deprecated in v1.12 (TODO remove in v1.13)
-	SelfHosting = "SelfHosting"
-
-	// StoreCertsInSecrets is alpha in v1.8 and v1.9 - deprecated in v1.12 (TODO remove in v1.13)
-	StoreCertsInSecrets = "StoreCertsInSecrets"
-
-	// DynamicKubeletConfig is beta in v1.11
-	DynamicKubeletConfig = "DynamicKubeletConfig"
-
-	// Auditing is beta in 1.8
-	Auditing = "Auditing"
 )
 
-var selfHostingDeprecationMessage = "featureGates:SelfHosting has been removed in v1.12"
-
-var storeCertsInSecretsDeprecationMessage = "featureGates:StoreCertsInSecrets has been removed in v1.12"
-
-var highAvailabilityMessage = "featureGates:HighAvailability has been removed in v1.12\n" +
-	"\tThis feature has been replaced by the kubeadm join --control-plane workflow."
+var coreDNSMessage = "featureGates:CoreDNS has been removed in v1.13\n" +
+	"\tUse kubeadm-config to select which DNS addon to install."
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	SelfHosting:          {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: selfHostingDeprecationMessage},
-	StoreCertsInSecrets:  {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: storeCertsInSecretsDeprecationMessage},
-	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: highAvailabilityMessage},
-	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.GA}},
-	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-	Auditing:             {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
+	CoreDNS: {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: coreDNSMessage},
 }
 
 // Feature represents a feature being gated
@@ -74,20 +52,20 @@ type Feature struct {
 // FeatureList represents a list of feature gates
 type FeatureList map[string]Feature
 
-// ValidateVersion ensures that a feature gate list is compatible with the chosen kubernetes version
+// ValidateVersion ensures that a feature gate list is compatible with the chosen Kubernetes version
 func ValidateVersion(allFeatures FeatureList, requestedFeatures map[string]bool, requestedVersion string) error {
 	if requestedVersion == "" {
 		return nil
 	}
 	parsedExpVersion, err := version.ParseSemantic(requestedVersion)
 	if err != nil {
-		return fmt.Errorf("Error parsing version %s: %v", requestedVersion, err)
+		return errors.Wrapf(err, "error parsing version %s", requestedVersion)
 	}
 	for k := range requestedFeatures {
 		if minVersion := allFeatures[k].MinimumVersion; minVersion != nil {
 			if !parsedExpVersion.AtLeast(minVersion) {
-				return fmt.Errorf(
-					"the requested kubernetes version (%s) is incompatible with the %s feature gate, which needs %s as a minimum",
+				return errors.Errorf(
+					"the requested Kubernetes version (%s) is incompatible with the %s feature gate, which needs %s as a minimum",
 					requestedVersion, k, minVersion)
 			}
 		}
@@ -106,9 +84,9 @@ func Enabled(featureList map[string]bool, featureName string) bool {
 // Supports indicates whether a feature name is supported on the given
 // feature set
 func Supports(featureList FeatureList, featureName string) bool {
-	for k := range featureList {
+	for k, v := range featureList {
 		if featureName == string(k) {
-			return true
+			return v.PreRelease != utilfeature.Deprecated
 		}
 	}
 	return false
@@ -152,7 +130,7 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 
 		arr := strings.SplitN(s, "=", 2)
 		if len(arr) != 2 {
-			return nil, fmt.Errorf("missing bool value for feature-gate key:%s", s)
+			return nil, errors.Errorf("missing bool value for feature-gate key:%s", s)
 		}
 
 		k := strings.TrimSpace(arr[0])
@@ -160,21 +138,19 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 
 		featureSpec, ok := (*f)[k]
 		if !ok {
-			return nil, fmt.Errorf("unrecognized feature-gate key: %s", k)
+			return nil, errors.Errorf("unrecognized feature-gate key: %s", k)
 		}
 
 		if featureSpec.PreRelease == utilfeature.Deprecated {
-			return nil, fmt.Errorf("feature-gate key is deprecated: %s", k)
+			return nil, errors.Errorf("feature-gate key is deprecated: %s", k)
 		}
 
 		boolValue, err := strconv.ParseBool(v)
 		if err != nil {
-			return nil, fmt.Errorf("invalid value %v for feature-gate key: %s, use true|false instead", v, k)
+			return nil, errors.Errorf("invalid value %v for feature-gate key: %s, use true|false instead", v, k)
 		}
 		featureGate[k] = boolValue
 	}
-
-	ResolveFeatureGateDependencies(featureGate)
 
 	return featureGate, nil
 }
@@ -200,19 +176,4 @@ func CheckDeprecatedFlags(f *FeatureList, features map[string]bool) map[string]s
 	}
 
 	return deprecatedMsg
-}
-
-// ResolveFeatureGateDependencies resolve dependencies between feature gates
-func ResolveFeatureGateDependencies(featureGate map[string]bool) {
-
-	// if HighAvailability enabled and StoreCertsInSecrets disabled, both StoreCertsInSecrets
-	// and SelfHosting should enabled
-	if Enabled(featureGate, HighAvailability) && !Enabled(featureGate, StoreCertsInSecrets) {
-		featureGate[StoreCertsInSecrets] = true
-	}
-
-	// if StoreCertsInSecrets enabled, SelfHosting should enabled
-	if Enabled(featureGate, StoreCertsInSecrets) {
-		featureGate[SelfHosting] = true
-	}
 }

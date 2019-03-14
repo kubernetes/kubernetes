@@ -10,6 +10,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "helpers.go",
+        "mayrunas.go",
         "mustrunas.go",
         "runasany.go",
         "types.go",
@@ -17,8 +19,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/group",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/policy:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
+        "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
@@ -26,12 +28,13 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "mayrunas_test.go",
         "mustrunas_test.go",
         "runasany_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/policy:go_default_library",
+        "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )

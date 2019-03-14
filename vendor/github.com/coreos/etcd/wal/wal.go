@@ -157,6 +157,48 @@ func Create(dirpath string, metadata []byte) (*WAL, error) {
 	return w, nil
 }
 
+func (w *WAL) renameWal(tmpdirpath string) (*WAL, error) {
+	if err := os.RemoveAll(w.dir); err != nil {
+		return nil, err
+	}
+	// On non-Windows platforms, hold the lock while renaming. Releasing
+	// the lock and trying to reacquire it quickly can be flaky because
+	// it's possible the process will fork to spawn a process while this is
+	// happening. The fds are set up as close-on-exec by the Go runtime,
+	// but there is a window between the fork and the exec where another
+	// process holds the lock.
+	if err := os.Rename(tmpdirpath, w.dir); err != nil {
+		if _, ok := err.(*os.LinkError); ok {
+			return w.renameWalUnlock(tmpdirpath)
+		}
+		return nil, err
+	}
+	w.fp = newFilePipeline(w.dir, SegmentSizeBytes)
+	df, err := fileutil.OpenDir(w.dir)
+	w.dirFile = df
+	return w, err
+}
+
+func (w *WAL) renameWalUnlock(tmpdirpath string) (*WAL, error) {
+	// rename of directory with locked files doesn't work on windows/cifs;
+	// close the WAL to release the locks so the directory can be renamed.
+	plog.Infof("releasing file lock to rename %q to %q", tmpdirpath, w.dir)
+	w.Close()
+	if err := os.Rename(tmpdirpath, w.dir); err != nil {
+		return nil, err
+	}
+	// reopen and relock
+	newWAL, oerr := Open(w.dir, walpb.Snapshot{})
+	if oerr != nil {
+		return nil, oerr
+	}
+	if _, _, _, err := newWAL.ReadAll(); err != nil {
+		newWAL.Close()
+		return nil, err
+	}
+	return newWAL, nil
+}
+
 // Open opens the WAL at the given snap.
 // The snap SHOULD have been previously saved to the WAL, or the following
 // ReadAll will fail.
@@ -413,6 +455,7 @@ func (w *WAL) cut() error {
 		return err
 	}
 
+	// reopen newTail with its new path so calls to Name() match the wal filename format
 	newTail.Close()
 
 	if newTail, err = fileutil.LockFile(fpath, os.O_WRONLY, fileutil.PrivateFileMode); err != nil {
@@ -460,6 +503,10 @@ func (w *WAL) ReleaseLockTo(index uint64) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	if len(w.locks) == 0 {
+		return nil
+	}
+
 	var smaller int
 	found := false
 
@@ -477,7 +524,7 @@ func (w *WAL) ReleaseLockTo(index uint64) error {
 
 	// if no lock index is greater than the release index, we can
 	// release lock up to the last one(excluding).
-	if !found && len(w.locks) != 0 {
+	if !found {
 		smaller = len(w.locks) - 1
 	}
 

@@ -14,8 +14,6 @@ go_library(
         "metrics.go",
         "openapi.go",
         "profiling.go",
-        "swagger.go",
-        "swaggerui.go",
         "version.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/routes",
@@ -27,13 +25,12 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/mux:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/server/routes/data/swagger:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd/metrics:go_default_library",
-        "//vendor/github.com/elazarl/go-bindata-assetfs:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
-        "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/builder:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/handler:go_default_library",
     ],
@@ -48,9 +45,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/server/routes/data/swagger:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

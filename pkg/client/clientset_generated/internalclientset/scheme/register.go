@@ -25,6 +25,7 @@ import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	apps "k8s.io/kubernetes/pkg/apis/apps/install"
+	auditregistration "k8s.io/kubernetes/pkg/apis/auditregistration/install"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication/install"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization/install"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/install"
@@ -35,6 +36,7 @@ import (
 	events "k8s.io/kubernetes/pkg/apis/events/install"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/install"
 	networking "k8s.io/kubernetes/pkg/apis/networking/install"
+	node "k8s.io/kubernetes/pkg/apis/node/install"
 	policy "k8s.io/kubernetes/pkg/apis/policy/install"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac/install"
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -56,6 +58,7 @@ func Install(scheme *runtime.Scheme) {
 	admissionregistration.Install(scheme)
 	core.Install(scheme)
 	apps.Install(scheme)
+	auditregistration.Install(scheme)
 	authentication.Install(scheme)
 	authorization.Install(scheme)
 	autoscaling.Install(scheme)
@@ -65,6 +68,7 @@ func Install(scheme *runtime.Scheme) {
 	events.Install(scheme)
 	extensions.Install(scheme)
 	networking.Install(scheme)
+	node.Install(scheme)
 	policy.Install(scheme)
 	rbac.Install(scheme)
 	scheduling.Install(scheme)

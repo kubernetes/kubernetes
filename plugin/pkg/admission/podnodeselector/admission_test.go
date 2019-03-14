@@ -20,26 +20,27 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 // TestPodAdmission verifies various scenarios involving pod/namespace/global node label selectors
 func TestPodAdmission(t *testing.T) {
-	namespace := &api.Namespace{
+	namespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testNamespace",
 			Namespace: "",
 		},
 	}
 
-	mockClient := &fake.Clientset{}
+	mockClient := fake.NewSimpleClientset(namespace)
 	handler, informerFactory, err := newHandlerForTest(mockClient)
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
@@ -50,12 +51,6 @@ func TestPodAdmission(t *testing.T) {
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: "testNamespace"},
-	}
-
-	oldPod := *pod
-	oldPod.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init"}}}
-	oldPod.Spec.NodeSelector = map[string]string{
-		"old": "true",
 	}
 
 	tests := []struct {
@@ -73,16 +68,16 @@ func TestPodAdmission(t *testing.T) {
 			podNodeSelector:                 map[string]string{},
 			mergedNodeSelector:              labels.Set{},
 			ignoreTestNamespaceNodeSelector: true,
-			admit:    true,
-			testName: "No node selectors",
+			admit:                           true,
+			testName:                        "No node selectors",
 		},
 		{
 			defaultNodeSelector:             "infra = false",
 			podNodeSelector:                 map[string]string{},
 			mergedNodeSelector:              labels.Set{"infra": "false"},
 			ignoreTestNamespaceNodeSelector: true,
-			admit:    true,
-			testName: "Default node selector and no conflicts",
+			admit:                           true,
+			testName:                        "Default node selector and no conflicts",
 		},
 		{
 			defaultNodeSelector:   "",
@@ -159,14 +154,14 @@ func TestPodAdmission(t *testing.T) {
 	for _, test := range tests {
 		if !test.ignoreTestNamespaceNodeSelector {
 			namespace.ObjectMeta.Annotations = map[string]string{"scheduler.alpha.kubernetes.io/node-selector": test.namespaceNodeSelector}
-			informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
+			informerFactory.Core().V1().Namespaces().Informer().GetStore().Update(namespace)
 		}
 		handler.clusterNodeSelectors = make(map[string]string)
 		handler.clusterNodeSelectors["clusterDefaultNodeSelector"] = test.defaultNodeSelector
 		handler.clusterNodeSelectors[namespace.Name] = test.whitelist
 		pod.Spec = api.PodSpec{NodeSelector: test.podNodeSelector}
 
-		err := handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+		err := handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil), nil)
 		if test.admit && err != nil {
 			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
 		} else if !test.admit && err == nil {
@@ -175,24 +170,7 @@ func TestPodAdmission(t *testing.T) {
 		if test.admit && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
 			t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
 		}
-		err = handler.Validate(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
-		if test.admit && err != nil {
-			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-		} else if !test.admit && err == nil {
-			t.Errorf("Test: %s, expected an error", test.testName)
-		}
-
-		// handles update of uninitialized pod like it's newly created.
-		err = handler.Admit(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, false, nil))
-		if test.admit && err != nil {
-			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
-		} else if !test.admit && err == nil {
-			t.Errorf("Test: %s, expected an error", test.testName)
-		}
-		if test.admit && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
-			t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
-		}
-		err = handler.Validate(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, false, nil))
+		err = handler.Validate(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil), nil)
 		if test.admit && err != nil {
 			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
 		} else if !test.admit && err == nil {
@@ -204,7 +182,7 @@ func TestPodAdmission(t *testing.T) {
 func TestHandles(t *testing.T) {
 	for op, shouldHandle := range map[admission.Operation]bool{
 		admission.Create:  true,
-		admission.Update:  true,
+		admission.Update:  false,
 		admission.Connect: false,
 		admission.Delete:  false,
 	} {
@@ -215,45 +193,11 @@ func TestHandles(t *testing.T) {
 	}
 }
 
-func TestIgnoreUpdatingInitializedPod(t *testing.T) {
-	mockClient := &fake.Clientset{}
-	handler, informerFactory, err := newHandlerForTest(mockClient)
-	if err != nil {
-		t.Errorf("unexpected error initializing handler: %v", err)
-	}
-	handler.SetReadyFunc(func() bool { return true })
-
-	podNodeSelector := map[string]string{"infra": "false"}
-	pod := &api.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: "testNamespace"},
-		Spec:       api.PodSpec{NodeSelector: podNodeSelector},
-	}
-	// this conflicts with podNodeSelector
-	namespaceNodeSelector := "infra=true"
-	namespace := &api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "testNamespace",
-			Namespace:   "",
-			Annotations: map[string]string{"scheduler.alpha.kubernetes.io/node-selector": namespaceNodeSelector},
-		},
-	}
-	err = informerFactory.Core().InternalVersion().Namespaces().Informer().GetStore().Update(namespace)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// if the update of initialized pod is not ignored, an error will be returned because the pod's nodeSelector conflicts with namespace's nodeSelector.
-	err = handler.Admit(admission.NewAttributesRecord(pod, pod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, false, nil))
-	if err != nil {
-		t.Errorf("expected no error, got: %v", err)
-	}
-}
-
 // newHandlerForTest returns the admission controller configured for testing.
-func newHandlerForTest(c clientset.Interface) (*podNodeSelector, informers.SharedInformerFactory, error) {
+func newHandlerForTest(c kubernetes.Interface) (*podNodeSelector, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler := NewPodNodeSelector(nil)
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, f, nil)
 	pluginInitializer.Initialize(handler)
 	err := admission.ValidateInitialization(handler)
 	return handler, f, err

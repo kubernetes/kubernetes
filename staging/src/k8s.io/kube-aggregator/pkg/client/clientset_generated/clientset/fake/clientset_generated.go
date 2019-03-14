@@ -82,8 +82,3 @@ func (c *Clientset) ApiregistrationV1beta1() apiregistrationv1beta1.Apiregistrat
 func (c *Clientset) ApiregistrationV1() apiregistrationv1.ApiregistrationV1Interface {
 	return &fakeapiregistrationv1.FakeApiregistrationV1{Fake: &c.Fake}
 }
-
-// Apiregistration retrieves the ApiregistrationV1Client
-func (c *Clientset) Apiregistration() apiregistrationv1.ApiregistrationV1Interface {
-	return &fakeapiregistrationv1.FakeApiregistrationV1{Fake: &c.Fake}
-}

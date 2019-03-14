@@ -21,21 +21,24 @@ import (
 )
 
 const (
-	// alpha: v1.8 (for Services)
+	// AlphaFeatureNetworkTiers allows Services backed by a GCP load balancer to choose
+	// what network tier to use. Currently supports "Standard" and "Premium" (default).
 	//
-	// Allows Services backed by a GCP load balancer to choose what network
-	// tier to use. Currently supports "Standard" and "Premium" (default).
+	// alpha: v1.8 (for Services)
 	AlphaFeatureNetworkTiers = "NetworkTiers"
 )
 
+// AlphaFeatureGate contains a mapping of alpha features to whether they are enabled
 type AlphaFeatureGate struct {
 	features map[string]bool
 }
 
+// Enabled returns true if the provided alpha feature is enabled
 func (af *AlphaFeatureGate) Enabled(key string) bool {
 	return af.features[key]
 }
 
+// NewAlphaFeatureGate marks the provided alpha features as enabled
 func NewAlphaFeatureGate(features []string) *AlphaFeatureGate {
 	featureMap := make(map[string]bool)
 	for _, name := range features {
@@ -44,9 +47,9 @@ func NewAlphaFeatureGate(features []string) *AlphaFeatureGate {
 	return &AlphaFeatureGate{featureMap}
 }
 
-func (gce *GCECloud) alphaFeatureEnabled(feature string) error {
-	if !gce.AlphaFeatureGate.Enabled(feature) {
-		return fmt.Errorf("alpha feature %q is not enabled.", feature)
+func (g *Cloud) alphaFeatureEnabled(feature string) error {
+	if !g.AlphaFeatureGate.Enabled(feature) {
+		return fmt.Errorf("alpha feature %q is not enabled", feature)
 	}
 	return nil
 }

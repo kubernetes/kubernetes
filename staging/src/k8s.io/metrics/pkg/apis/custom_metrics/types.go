@@ -71,6 +71,22 @@ type MetricValue struct {
 // for all objects matching the given label selector
 const AllObjects = "*"
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// MetricListOptions is used to select metrics by their label selectors
+type MetricListOptions struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// A selector to restrict the list of returned objects by their labels.
+	// Defaults to everything.
+	// +optional
+	LabelSelector string `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
+
+	// A selector to restrict the list of returned metrics by their labels
+	// +optional
+	MetricLabelSelector string `json:"metricLabelSelector,omitempty" protobuf:"bytes,2,opt,name=metricLabelSelector"`
+}
+
 // NOTE: ObjectReference is copied from k8s.io/kubernetes/pkg/api/types.go. We
 // cannot depend on k8s.io/kubernetes/pkg/api because that creates cyclic
 // dependency between k8s.io/metrics and k8s.io/kubernetes. We cannot depend on

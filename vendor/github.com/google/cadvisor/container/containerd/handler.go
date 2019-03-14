@@ -18,7 +18,6 @@ package containerd
 import (
 	"encoding/json"
 	"fmt"
-	"path"
 	"strings"
 	"time"
 
@@ -48,7 +47,7 @@ type containerdContainerHandler struct {
 	// Image name used for this container.
 	image string
 	// Filesystem handler.
-	ignoreMetrics container.MetricSet
+	includedMetrics container.MetricSet
 
 	libcontainerHandler *containerlibcontainer.Handler
 }
@@ -64,13 +63,10 @@ func newContainerdContainerHandler(
 	cgroupSubsystems *containerlibcontainer.CgroupSubsystems,
 	inHostNamespace bool,
 	metadataEnvs []string,
-	ignoreMetrics container.MetricSet,
+	includedMetrics container.MetricSet,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
-	cgroupPaths := make(map[string]string, len(cgroupSubsystems.MountPoints))
-	for key, val := range cgroupSubsystems.MountPoints {
-		cgroupPaths[key] = path.Join(val, name)
-	}
+	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
 
 	// Generate the equivalent cgroup manager for this container.
 	cgroupManager := &cgroupfs.Manager{
@@ -127,7 +123,7 @@ func newContainerdContainerHandler(
 		Aliases:   []string{id, name},
 	}
 
-	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootfs, int(taskPid), ignoreMetrics)
+	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootfs, int(taskPid), includedMetrics)
 
 	handler := &containerdContainerHandler{
 		machineInfoFactory:  machineInfoFactory,
@@ -135,7 +131,7 @@ func newContainerdContainerHandler(
 		fsInfo:              fsInfo,
 		envs:                make(map[string]string),
 		labels:              cntr.Labels,
-		ignoreMetrics:       ignoreMetrics,
+		includedMetrics:     includedMetrics,
 		reference:           containerReference,
 		libcontainerHandler: libcontainerHandler,
 	}
@@ -159,9 +155,9 @@ func (self *containerdContainerHandler) ContainerReference() (info.ContainerRefe
 
 func (self *containerdContainerHandler) needNet() bool {
 	// Since containerd does not handle networking ideally we need to return based
-	// on ignoreMetrics list. Here the assumption is the presence of cri-containerd
+	// on includedMetrics list. Here the assumption is the presence of cri-containerd
 	// label
-	if !self.ignoreMetrics.Has(container.NetworkUsageMetrics) {
+	if self.includedMetrics.Has(container.NetworkUsageMetrics) {
 		//TODO change it to exported cri-containerd constants
 		return self.labels["io.cri-containerd.kind"] == "sandbox"
 	}
@@ -186,7 +182,7 @@ func (self *containerdContainerHandler) getFsStats(stats *info.ContainerStats) e
 		return err
 	}
 
-	if !self.ignoreMetrics.Has(container.DiskIOMetrics) {
+	if self.includedMetrics.Has(container.DiskIOMetrics) {
 		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
 	}
 	return nil

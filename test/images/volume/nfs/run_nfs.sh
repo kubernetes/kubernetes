@@ -39,7 +39,7 @@ function start()
         chmod 644 $i/index.html
         echo "Serving $i"
     done
-  
+
     # start rpcbind if it is not started yet
     /usr/sbin/rpcinfo 127.0.0.1 > /dev/null; s=$?
     if [ $s -ne 0 ]; then
@@ -47,7 +47,7 @@ function start()
        /usr/sbin/rpcbind -w
     fi
 
-    mount -t nfsd nfds /proc/fs/nfsd
+    mount -t nfsd nfsd /proc/fs/nfsd
 
     # -V 3: enable NFSv3
     /usr/sbin/rpc.mountd -N 2 -V 3

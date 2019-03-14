@@ -131,7 +131,7 @@ func (c *FakeReplicaSets) DeleteCollection(options *v1.DeleteOptions, listOption
 // Patch applies the patch and returns the patched replicaSet.
 func (c *FakeReplicaSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.ReplicaSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, name, data, subresources...), &v1beta1.ReplicaSet{})
+		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, name, pt, data, subresources...), &v1beta1.ReplicaSet{})
 
 	if obj == nil {
 		return nil, err

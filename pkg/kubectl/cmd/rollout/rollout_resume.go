@@ -24,15 +24,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // ResumeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -53,18 +52,19 @@ type ResumeOptions struct {
 }
 
 var (
-	resume_long = templates.LongDesc(`
+	resumeLong = templates.LongDesc(`
 		Resume a paused resource
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.
 		Currently only deployments support being resumed.`)
 
-	resume_example = templates.Examples(`
+	resumeExample = templates.Examples(`
 		# Resume an already paused deployment
 		kubectl rollout resume deployment/nginx`)
 )
 
+// NewRolloutResumeOptions returns an initialized ResumeOptions instance
 func NewRolloutResumeOptions(streams genericclioptions.IOStreams) *ResumeOptions {
 	return &ResumeOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("resumed").WithTypeSetter(scheme.Scheme),
@@ -72,28 +72,22 @@ func NewRolloutResumeOptions(streams genericclioptions.IOStreams) *ResumeOptions
 	}
 }
 
+// NewCmdRolloutResume returns a Command instance for 'rollout resume' sub command
 func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutResumeOptions(streams)
 
 	validArgs := []string{"deployment"}
 
 	cmd := &cobra.Command{
-		Use: "resume RESOURCE",
+		Use:                   "resume RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Resume a paused resource"),
-		Long:    resume_long,
-		Example: resume_example,
+		Short:                 i18n.T("Resume a paused resource"),
+		Long:                  resumeLong,
+		Example:               resumeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			allErrs := []error{}
-			err := o.Complete(f, cmd, args)
-			if err != nil {
-				allErrs = append(allErrs, err)
-			}
-			err = o.RunResume()
-			if err != nil {
-				allErrs = append(allErrs, err)
-			}
-			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunResume())
 		},
 		ValidArgs: validArgs,
 	}
@@ -104,11 +98,8 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ResumeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
-		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
-	}
-
 	o.Resources = args
 
 	o.Resumer = polymorphichelpers.ObjectResumerFn
@@ -129,9 +120,17 @@ func (o *ResumeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	return nil
 }
 
+func (o *ResumeOptions) Validate() error {
+	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
+		return fmt.Errorf("required resource not specified")
+	}
+	return nil
+}
+
+// RunResume performs the execution of 'rollout resume' sub command
 func (o ResumeOptions) RunResume() error {
 	r := o.Builder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.Resources...).
@@ -154,7 +153,7 @@ func (o ResumeOptions) RunResume() error {
 		allErrs = append(allErrs, err)
 	}
 
-	for _, patch := range set.CalculatePatches(infos, cmdutil.InternalVersionJSONEncoder(), set.PatchFn(o.Resumer)) {
+	for _, patch := range set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Resumer)) {
 		info := patch.Info
 
 		if patch.Err != nil {
@@ -172,7 +171,7 @@ func (o ResumeOptions) RunResume() error {
 				allErrs = append(allErrs, err)
 				continue
 			}
-			if err = printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+			if err = printer.PrintObj(info.Object, o.Out); err != nil {
 				allErrs = append(allErrs, err)
 			}
 			continue
@@ -190,7 +189,7 @@ func (o ResumeOptions) RunResume() error {
 			allErrs = append(allErrs, err)
 			continue
 		}
-		if err = printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(info.Object, info.Mapping), o.Out); err != nil {
+		if err = printer.PrintObj(info.Object, o.Out); err != nil {
 			allErrs = append(allErrs, err)
 		}
 	}

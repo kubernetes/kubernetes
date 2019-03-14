@@ -16,13 +16,12 @@
 "spec":{
 "hostNetwork": true,
 "containers":[
-    {{kms_plugin_container}}
     {
     "name": "kube-apiserver",
     "image": "{{pillar['kube_docker_registry']}}/kube-apiserver:{{pillar['kube-apiserver_docker_tag']}}",
     "resources": {
       "requests": {
-        "cpu": "125m"
+        "cpu": "250m"
       }
     },
     "command": [
@@ -35,9 +34,18 @@
       "httpGet": {
         "host": "127.0.0.1",
         "port": 8080,
-        "path": "/healthz"
+        "path": "/healthz?exclude=etcd"
       },
       "initialDelaySeconds": {{liveness_probe_initial_delay}},
+      "timeoutSeconds": 15
+    },
+    "readinessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": 8080,
+        "path": "/healthz"
+      },
+      "periodSeconds": 1,
       "timeoutSeconds": 15
     },
     "ports":[

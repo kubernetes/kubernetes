@@ -34,23 +34,24 @@ image_service_endpoint=${IMAGE_SERVICE_ENDPOINT:-""}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
 test_args=${TEST_ARGS:-""}
 system_spec_name=${SYSTEM_SPEC_NAME:-}
+extra_envs=${EXTRA_ENVS:-}
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
-if [[ $parallelism > 1 ]]; then
-  ginkgoflags="$ginkgoflags -nodes=$parallelism "
+if [[ ${parallelism} > 1 ]]; then
+  ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
 
-if [[ $focus != "" ]]; then
-  ginkgoflags="$ginkgoflags -focus=\"$focus\" "
+if [[ ${focus} != "" ]]; then
+  ginkgoflags="${ginkgoflags} -focus=\"${focus}\" "
 fi
 
-if [[ $skip != "" ]]; then
-  ginkgoflags="$ginkgoflags -skip=\"$skip\" "
+if [[ ${skip} != "" ]]; then
+  ginkgoflags="${ginkgoflags} -skip=\"${skip}\" "
 fi
 
-if [[ $run_until_failure != "" ]]; then
-  ginkgoflags="$ginkgoflags -untilItFails=$run_until_failure "
+if [[ ${run_until_failure} != "" ]]; then
+  ginkgoflags="${ginkgoflags} -untilItFails=${run_until_failure} "
 fi
 
 # Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host
@@ -60,34 +61,34 @@ if [ ! -d "${artifacts}" ]; then
 fi
 echo "Test artifacts will be written to ${artifacts}"
 
-if [[ $runtime == "remote" ]] ; then
-  if [[ ! -z $container_runtime_endpoint ]] ; then
-    test_args="--container-runtime-endpoint=${container_runtime_endpoint} $test_args"
+if [[ ${runtime} == "remote" ]] ; then
+  if [[ ! -z ${container_runtime_endpoint} ]] ; then
+    test_args="--container-runtime-endpoint=${container_runtime_endpoint} ${test_args}"
   fi
-  if [[ ! -z $image_service_endpoint ]] ; then
-    test_args="--image-service-endpoint=$image_service_endpoint $test_args"
+  if [[ ! -z ${image_service_endpoint} ]] ; then
+    test_args="--image-service-endpoint=${image_service_endpoint} ${test_args}"
   fi
 fi
 
 
-if [ $remote = true ] ; then
+if [ ${remote} = true ] ; then
   # The following options are only valid in remote run.
   images=${IMAGES:-""}
   hosts=${HOSTS:-""}
   image_project=${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}
   metadata=${INSTANCE_METADATA:-""}
   list_images=${LIST_IMAGES:-false}
-  if  [[ $list_images == "true" ]]; then
+  if  [[ ${list_images} == "true" ]]; then
     gcloud compute images list --project="${image_project}" | grep "e2e-node"
     exit 0
   fi
   gubernator=${GUBERNATOR:-"false"}
   image_config_file=${IMAGE_CONFIG_FILE:-""}
-  if [[ $hosts == "" && $images == "" && $image_config_file == "" ]]; then
+  if [[ ${hosts} == "" && ${images} == "" && ${image_config_file} == "" ]]; then
     image_project=${IMAGE_PROJECT:-"cos-cloud"}
-    gci_image=$(gcloud compute images list --project $image_project \
+    gci_image=$(gcloud compute images list --project ${image_project} \
     --no-standard-images --filter="name ~ 'cos-beta.*'" --format="table[no-heading](name)")
-    images=$gci_image
+    images=${gci_image}
     metadata="user-data<${KUBE_ROOT}/test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
   fi
   instance_prefix=${INSTANCE_PREFIX:-"test"}
@@ -96,59 +97,59 @@ if [ $remote = true ] ; then
   test_suite=${TEST_SUITE:-"default"}
 
   # Get the compute zone
-  zone=$(gcloud info --format='value(config.properties.compute.zone)')
-  if [[ $zone == "" ]]; then
+  zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone)')"}
+  if [[ ${zone} == "" ]]; then
     echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone)'\`"
     exit 1
   fi
 
   # Get the compute project
   project=$(gcloud info --format='value(config.project)')
-  if [[ $project == "" ]]; then
+  if [[ ${project} == "" ]]; then
     echo "Could not find gcloud project when running: \`gcloud info --format='value(config.project)'\`"
     exit 1
   fi
 
   # Check if any of the images specified already have running instances.  If so reuse those instances
   # by moving the IMAGE to a HOST
-  if [[ $images != "" ]]; then
-  IFS=',' read -ra IM <<< "$images"
+  if [[ ${images} != "" ]]; then
+  IFS=',' read -ra IM <<< "${images}"
        images=""
        for i in "${IM[@]}"; do
-         if [[ $(gcloud compute instances list "${instance_prefix}-$i" | grep $i) ]]; then
-           if [[ $hosts != "" ]]; then
-             hosts="$hosts,"
+         if [[ $(gcloud compute instances list "${instance_prefix}-${i}" | grep ${i}) ]]; then
+           if [[ "${hosts}" != "" ]]; then
+             hosts="${hosts},"
            fi
-           echo "Reusing host ${instance_prefix}-$i"
+           echo "Reusing host ${instance_prefix}-${i}"
            hosts="${hosts}${instance_prefix}-${i}"
          else
-           if [[ $images != "" ]]; then
-             images="$images,"
+           if [[ "${images}" != "" ]]; then
+             images="${images},"
            fi
-           images="$images$i"
+           images="${images}${i}"
          fi
        done
   fi
 
   # Output the configuration we will try to run
   echo "Running tests remotely using"
-  echo "Project: $project"
-  echo "Image Project: $image_project"
-  echo "Compute/Zone: $zone"
-  echo "Images: $images"
-  echo "Hosts: $hosts"
-  echo "Ginkgo Flags: $ginkgoflags"
-  echo "Instance Metadata: $metadata"
-  echo "Image Config File: $image_config_file"
+  echo "Project: ${project}"
+  echo "Image Project: ${image_project}"
+  echo "Compute/Zone: ${zone}"
+  echo "Images: ${images}"
+  echo "Hosts: ${hosts}"
+  echo "Ginkgo Flags: ${ginkgoflags}"
+  echo "Instance Metadata: ${metadata}"
+  echo "Image Config File: ${image_config_file}"
   # Invoke the runner
   go run test/e2e_node/runner/remote/run_remote.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
-    --zone="$zone" --project="$project" --gubernator="$gubernator" \
-    --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
-    --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
-    --image-project="$image_project" --instance-name-prefix="$instance_prefix" \
-    --delete-instances="$delete_instances" --test_args="$test_args" --instance-metadata="$metadata" \
-    --image-config-file="$image_config_file" --system-spec-name="$system_spec_name" \
-    --test-suite="$test_suite" \
+    --zone="${zone}" --project="${project}" --gubernator="${gubernator}" \
+    --hosts="${hosts}" --images="${images}" --cleanup="${cleanup}" \
+    --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" \
+    --image-project="${image_project}" --instance-name-prefix="${instance_prefix}" \
+    --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
+    --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
+    --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 
@@ -161,17 +162,17 @@ else
 
   # Do not use any network plugin by default. User could override the flags with
   # test_args.
-  test_args='--kubelet-flags="--network-plugin= --cni-bin-dir=" '$test_args
+  test_args='--kubelet-flags="--network-plugin= --cni-bin-dir=" '${test_args}
 
   # Runtime flags
-  test_args='--kubelet-flags="--container-runtime='$runtime'" '$test_args
+  test_args='--kubelet-flags="--container-runtime='${runtime}'" '${test_args}
 
   # Test using the host the script was run on
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go \
-    --system-spec-name="$system_spec_name" --ginkgo-flags="$ginkgoflags" \
-    --test-flags="--container-runtime=${runtime} \
+    --system-spec-name="${system_spec_name}" --extra-envs="${extra_envs}" \
+    --ginkgo-flags="${ginkgoflags}" --test-flags="--container-runtime=${runtime} \
     --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
-    $test_args" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
+    ${test_args}" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 fi

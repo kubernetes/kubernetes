@@ -82,7 +82,7 @@ docker-machine create \
 # Set up local docker to talk to that machine
 eval $(docker-machine env ${KUBE_BUILD_VM})
 
-# Pin down the port that rsync will be exposed on on the remote machine
+# Pin down the port that rsync will be exposed on the remote machine
 export KUBE_RSYNC_PORT=8730
 
 # forward local 8730 to that machine so that rsync works

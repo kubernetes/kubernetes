@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
-	"github.com/golang/glog"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/types"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 const (
@@ -119,7 +119,7 @@ func (c *controllerCommon) getNodeDataDisks(nodeName types.NodeName) ([]compute.
 func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error) {
 	disks, err := c.getNodeDataDisks(nodeName)
 	if err != nil {
-		glog.Errorf("error of getting data disks for node %q: %v", nodeName, err)
+		klog.Errorf("error of getting data disks for node %q: %v", nodeName, err)
 		return -1, err
 	}
 
@@ -128,7 +128,7 @@ func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.N
 			(disk.Vhd != nil && disk.Vhd.URI != nil && diskURI != "" && *disk.Vhd.URI == diskURI) ||
 			(disk.ManagedDisk != nil && *disk.ManagedDisk.ID == diskURI) {
 			// found the disk
-			glog.V(4).Infof("azureDisk - find disk: lun %d name %q uri %q", *disk.Lun, diskName, diskURI)
+			klog.V(2).Infof("azureDisk - find disk: lun %d name %q uri %q", *disk.Lun, diskName, diskURI)
 			return *disk.Lun, nil
 		}
 	}
@@ -139,7 +139,7 @@ func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.N
 func (c *controllerCommon) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
 	disks, err := c.getNodeDataDisks(nodeName)
 	if err != nil {
-		glog.Errorf("error of getting data disks for node %q: %v", nodeName, err)
+		klog.Errorf("error of getting data disks for node %q: %v", nodeName, err)
 		return -1, err
 	}
 
@@ -168,7 +168,7 @@ func (c *controllerCommon) DisksAreAttached(diskNames []string, nodeName types.N
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// if host doesn't exist, no need to detach
-			glog.Warningf("azureDisk - Cannot find node %q, DisksAreAttached will assume disks %v are not attached to it.",
+			klog.Warningf("azureDisk - Cannot find node %q, DisksAreAttached will assume disks %v are not attached to it.",
 				nodeName, diskNames)
 			return attached, nil
 		}

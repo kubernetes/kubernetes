@@ -1,9 +1,13 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
 spec:
   replicas: 3
+  selector:
+    matchLabels:
+      app: guestbook
+      tier: frontend
   template:
     metadata:
       labels:

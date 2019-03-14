@@ -4,15 +4,18 @@ go_library(
     name = "go_default_library",
     srcs = [
         "certs.go",
+        "constant.go",
+        "doc.go",
         "generic.go",
         "token.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options",
     visibility = ["//visibility:public"],
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
+        "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
+        "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )

@@ -22,14 +22,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -127,11 +128,14 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		availabilityZone         string
 		availabilityZones        sets.String
 		selectedAvailabilityZone string
+
+		diskIopsReadWrite string
+		diskMbpsReadWrite string
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestGiB, err := util.RoundUpToGiBInt(capacity)
+	requestGiB, err := volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return nil, err
 	}
@@ -159,12 +163,16 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			availabilityZone = v
 		case "zones":
 			zonesPresent = true
-			availabilityZones, err = util.ZonesToSet(v)
+			availabilityZones, err = volumehelpers.ZonesToSet(v)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing zones %s, must be strings separated by commas: %v", v, err)
 			}
 		case "zoned":
 			strZoned = v
+		case "diskiopsreadwrite":
+			diskIopsReadWrite = v
+		case "diskmbpsreadwrite":
+			diskMbpsReadWrite = v
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
 		}
@@ -217,7 +225,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		}
 
 		if availabilityZone != "" || availabilityZones.Len() != 0 || activeZones.Len() != 0 || len(allowedTopologies) != 0 {
-			selectedAvailabilityZone, err = util.SelectZoneForVolume(zonePresent, zonesPresent, availabilityZone, availabilityZones, activeZones, selectedNode, allowedTopologies, p.options.PVC.Name)
+			selectedAvailabilityZone, err = volumehelpers.SelectZoneForVolume(zonePresent, zonesPresent, availabilityZone, availabilityZones, activeZones, selectedNode, allowedTopologies, p.options.PVC.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -241,6 +249,8 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			SizeGB:             requestGiB,
 			Tags:               tags,
 			AvailabilityZone:   selectedAvailabilityZone,
+			DiskIOPSReadWrite:  diskIopsReadWrite,
+			DiskMBpsReadWrite:  diskMbpsReadWrite,
 		}
 		diskURI, err = diskController.CreateManagedDisk(volumeOptions)
 		if err != nil {
@@ -257,7 +267,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 				return nil, err
 			}
 		} else {
-			diskURI, err = diskController.CreateBlobDisk(name, skuName, requestGiB)
+			diskURI, err = diskController.CreateBlobDisk(name, storage.SkuName(storageAccountType), requestGiB)
 			if err != nil {
 				return nil, err
 			}
@@ -301,51 +311,49 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		nodeSelectorTerms := make([]v1.NodeSelectorTerm, 0)
+	nodeSelectorTerms := make([]v1.NodeSelectorTerm, 0)
 
-		if zoned {
-			// Set node affinity labels based on availability zone labels.
-			if len(labels) > 0 {
-				requirements := make([]v1.NodeSelectorRequirement, 0)
-				for k, v := range labels {
-					requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
-				}
+	if zoned {
+		// Set node affinity labels based on availability zone labels.
+		if len(labels) > 0 {
+			requirements := make([]v1.NodeSelectorRequirement, 0)
+			for k, v := range labels {
+				requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
+			}
 
-				nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-					MatchExpressions: requirements,
-				})
-			}
-		} else {
-			// Set node affinity labels based on fault domains.
-			// This is required because unzoned AzureDisk can't be attached to zoned nodes.
-			// There are at most 3 fault domains available in each region.
-			// Refer https://docs.microsoft.com/en-us/azure/virtual-machines/windows/manage-availability.
-			for i := 0; i < 3; i++ {
-				requirements := []v1.NodeSelectorRequirement{
-					{
-						Key:      kubeletapis.LabelZoneRegion,
-						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{diskController.GetLocation()},
-					},
-					{
-						Key:      kubeletapis.LabelZoneFailureDomain,
-						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{strconv.Itoa(i)},
-					},
-				}
-				nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-					MatchExpressions: requirements,
-				})
-			}
+			nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
+				MatchExpressions: requirements,
+			})
 		}
-
-		if len(nodeSelectorTerms) > 0 {
-			pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
-				Required: &v1.NodeSelector{
-					NodeSelectorTerms: nodeSelectorTerms,
+	} else {
+		// Set node affinity labels based on fault domains.
+		// This is required because unzoned AzureDisk can't be attached to zoned nodes.
+		// There are at most 3 fault domains available in each region.
+		// Refer https://docs.microsoft.com/en-us/azure/virtual-machines/windows/manage-availability.
+		for i := 0; i < 3; i++ {
+			requirements := []v1.NodeSelectorRequirement{
+				{
+					Key:      v1.LabelZoneRegion,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{diskController.GetLocation()},
+				},
+				{
+					Key:      v1.LabelZoneFailureDomain,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{strconv.Itoa(i)},
 				},
 			}
+			nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
+				MatchExpressions: requirements,
+			})
+		}
+	}
+
+	if len(nodeSelectorTerms) > 0 {
+		pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
+			Required: &v1.NodeSelector{
+				NodeSelectorTerms: nodeSelectorTerms,
+			},
 		}
 	}
 

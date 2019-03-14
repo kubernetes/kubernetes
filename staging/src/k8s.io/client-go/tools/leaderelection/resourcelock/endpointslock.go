@@ -88,6 +88,9 @@ func (el *EndpointsLock) Update(ler LeaderElectionRecord) error {
 
 // RecordEvent in leader election while adding meta-data
 func (el *EndpointsLock) RecordEvent(s string) {
+	if el.LockConfig.EventRecorder == nil {
+		return
+	}
 	events := fmt.Sprintf("%v %v", el.LockConfig.Identity, s)
 	el.LockConfig.EventRecorder.Eventf(&v1.Endpoints{ObjectMeta: el.e.ObjectMeta}, v1.EventTypeNormal, "LeaderElection", events)
 }

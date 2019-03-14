@@ -20,18 +20,15 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -67,34 +64,38 @@ func TestUploadConfiguration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t2 *testing.T) {
-			initialcfg := &kubeadmapiv1alpha3.InitConfiguration{
-				APIEndpoint: kubeadmapiv1alpha3.APIEndpoint{
+			initialcfg := &kubeadmapiv1beta1.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
-				ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
-					KubernetesVersion: "v1.10.10",
+				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+					KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.WithPatch(10).String(),
 				},
-				BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{
+				BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
 					{
-						Token: &kubeadmapiv1alpha3.BootstrapTokenString{
+						Token: &kubeadmapiv1beta1.BootstrapTokenString{
 							ID:     "abcdef",
 							Secret: "abcdef0123456789",
 						},
 					},
 				},
-				NodeRegistration: kubeadmapiv1alpha3.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
 					Name:      "node-foo",
 					CRISocket: "/var/run/custom-cri.sock",
 				},
 			}
-			cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", initialcfg)
+			cfg, err := configutil.DefaultedInitConfiguration(initialcfg)
+
+			// cleans up component config to make cfg and decodedcfg comparable (now component config are not stored anymore in kubeadm-config config map)
+			cfg.ComponentConfigs = kubeadmapi.ComponentConfigs{}
+
 			if err != nil {
 				t2.Fatalf("UploadConfiguration() error = %v", err)
 			}
 
 			status := &kubeadmapi.ClusterStatus{
 				APIEndpoints: map[string]kubeadmapi.APIEndpoint{
-					"node-foo": cfg.APIEndpoint,
+					"node-foo": cfg.LocalAPIEndpoint,
 				},
 			}
 
@@ -119,11 +120,11 @@ func TestUploadConfiguration(t *testing.T) {
 				}
 			}
 			if tt.verifyResult {
-				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.InitConfigurationConfigMap, metav1.GetOptions{})
+				controlPlaneCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 				if err != nil {
 					t2.Fatalf("Fail to query ConfigMap error = %v", err)
 				}
-				configData := masterCfg.Data[kubeadmconstants.ClusterConfigurationConfigMapKey]
+				configData := controlPlaneCfg.Data[kubeadmconstants.ClusterConfigurationConfigMapKey]
 				if configData == "" {
 					t2.Fatal("Fail to find ClusterConfigurationConfigMapKey key")
 				}
@@ -137,7 +138,7 @@ func TestUploadConfiguration(t *testing.T) {
 					t2.Errorf("the initial and decoded ClusterConfiguration didn't match")
 				}
 
-				statusData := masterCfg.Data[kubeadmconstants.ClusterStatusConfigMapKey]
+				statusData := controlPlaneCfg.Data[kubeadmconstants.ClusterStatusConfigMapKey]
 				if statusData == "" {
 					t2.Fatal("failed to find ClusterStatusConfigMapKey key")
 				}
@@ -153,63 +154,4 @@ func TestUploadConfiguration(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestGetClusterStatus(t *testing.T) {
-	var tests = []struct {
-		name                     string
-		clusterStatus            *kubeadmapi.ClusterStatus
-		expectedClusterEndpoints int
-	}{
-		{
-			name: "return empty ClusterStatus if cluster kubeadm-config doesn't exist (e.g init)",
-			expectedClusterEndpoints: 0,
-		},
-		{
-			name: "return ClusterStatus if cluster kubeadm-config exist (e.g upgrade)",
-			clusterStatus: &kubeadmapi.ClusterStatus{
-				APIEndpoints: map[string]kubeadmapi.APIEndpoint{
-					"dummy": {AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-				},
-			},
-			expectedClusterEndpoints: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-
-			if tt.clusterStatus != nil {
-				createConfigMapWithStatus(tt.clusterStatus, client)
-			}
-
-			actual, err := getClusterStatus(client)
-			if err != nil {
-				t.Error("GetClusterStatus returned unexpected error")
-				return
-			}
-			if tt.expectedClusterEndpoints != len(actual.APIEndpoints) {
-				t.Error("actual ClusterStatus doesn't return expected endpoints")
-			}
-		})
-	}
-}
-
-// createConfigMapWithStatus create a ConfigMap with ClusterStatus for TestGetClusterStatus
-func createConfigMapWithStatus(statusToCreate *kubeadmapi.ClusterStatus, client clientset.Interface) error {
-	statusYaml, err := configutil.MarshalKubeadmConfigObject(statusToCreate)
-	if err != nil {
-		return err
-	}
-
-	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.InitConfigurationConfigMap,
-			Namespace: metav1.NamespaceSystem,
-		},
-		Data: map[string]string{
-			kubeadmconstants.ClusterStatusConfigMapKey: string(statusYaml),
-		},
-	})
 }

@@ -1,3 +1,18 @@
+### Version 9.0  (Wed January 16 2019 Jordan Liggitt <liggitt@google.com>)
+ - Prune workload resources via apps/v1 APIs
+ - Update kubectl to v1.13.2.
+
+### Version 8.9  (Fri October 19 2018 Jeff Grafton <jgrafton@google.com>)
+ - Update to use debian-base:0.4.0.
+ - Update kubectl to v1.11.3.
+
+### Version 8.8  (Mon October 1 2018 Zihong Zheng <zihongz@google.com>)
+ - Update to use debian-base:0.3.2.
+
+### Version 8.7  (Tue September 4 2018 Zihong Zheng <zihongz@google.com>)
+ - Support extra `--prune-whitelist` resources in kube-addon-manager.
+ - Update kubectl to v1.10.7.
+
 ### Version 8.6  (Tue February 20 2018 Zihong Zheng <zihongz@google.com>)
  - Allow reconcile/ensure loop to work with resource under non-kube-system namespace.
  - Update kubectl to v1.9.3.

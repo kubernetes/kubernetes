@@ -17,9 +17,9 @@ limitations under the License.
 package podsecuritypolicy
 
 import (
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
@@ -60,6 +60,7 @@ type StrategyFactory interface {
 // ProviderStrategies is a holder for all strategies that the provider requires to be populated.
 type ProviderStrategies struct {
 	RunAsUserStrategy         user.RunAsUserStrategy
+	RunAsGroupStrategy        group.GroupStrategy
 	SELinuxStrategy           selinux.SELinuxStrategy
 	AppArmorStrategy          apparmor.Strategy
 	FSGroupStrategy           group.GroupStrategy

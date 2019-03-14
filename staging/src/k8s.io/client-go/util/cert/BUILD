@@ -8,12 +8,10 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "csr_test.go",
-        "pem_test.go",
-    ],
+    srcs = ["csr_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
+    deps = ["//staging/src/k8s.io/client-go/util/keyutil:go_default_library"],
 )
 
 go_library(
@@ -26,6 +24,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/cert",
     importpath = "k8s.io/client-go/util/cert",
+    deps = ["//staging/src/k8s.io/client-go/util/keyutil:go_default_library"],
 )
 
 filegroup(
@@ -37,9 +36,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//staging/src/k8s.io/client-go/util/cert/triple:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

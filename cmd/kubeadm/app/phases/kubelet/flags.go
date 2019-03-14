@@ -23,11 +23,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -37,48 +37,53 @@ import (
 type kubeletFlagsOpts struct {
 	nodeRegOpts              *kubeadmapi.NodeRegistrationOptions
 	featureGates             map[string]bool
+	pauseImage               string
 	registerTaintsUsingFlags bool
 	execer                   utilsexec.Interface
 	pidOfFunc                func(string) ([]int, error)
 	defaultHostname          string
 }
 
-// WriteKubeletDynamicEnvFile writes a environment file with dynamic flags to the kubelet.
+// WriteKubeletDynamicEnvFile writes an environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
-func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, featureGates map[string]bool, registerTaintsUsingFlags bool, kubeletDir string) error {
+func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, registerTaintsUsingFlags bool, kubeletDir string) error {
 	hostName, err := nodeutil.GetHostname("")
 	if err != nil {
 		return err
 	}
 
 	flagOpts := kubeletFlagsOpts{
-		nodeRegOpts:              nodeRegOpts,
-		featureGates:             featureGates,
+		nodeRegOpts:              nodeReg,
+		featureGates:             cfg.FeatureGates,
+		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
-		execer:          utilsexec.New(),
-		pidOfFunc:       procfs.PidOf,
-		defaultHostname: hostName,
+		execer:                   utilsexec.New(),
+		pidOfFunc:                procfs.PidOf,
+		defaultHostname:          hostName,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
-	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeRegOpts.KubeletExtraArgs)
+	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeReg.KubeletExtraArgs)
 	envFileContent := fmt.Sprintf("%s=%s\n", constants.KubeletEnvFileVariableName, strings.Join(argList, " "))
 
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
 }
 
-// buildKubeletArgMap takes a InitConfiguration object and builds based on that a string-string map with flags
+// buildKubeletArgMap takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
 // that should be given to the local kubelet daemon.
 func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	kubeletFlags := map[string]string{}
 
-	if opts.nodeRegOpts.CRISocket == kubeadmapiv1alpha3.DefaultCRISocket {
+	if opts.nodeRegOpts.CRISocket == constants.DefaultDockerCRISocket {
 		// These flags should only be set when running docker
 		kubeletFlags["network-plugin"] = "cni"
 		driver, err := kubeadmutil.GetCgroupDriverDocker(opts.execer)
 		if err != nil {
-			glog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
+			klog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
 		} else {
 			kubeletFlags["cgroup-driver"] = driver
+		}
+		if opts.pauseImage != "" {
+			kubeletFlags["pod-infra-container-image"] = opts.pauseImage
 		}
 	} else {
 		kubeletFlags["container-runtime"] = "remote"
@@ -101,14 +106,8 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 
 	// Make sure the node name we're passed will work with Kubelet
 	if opts.nodeRegOpts.Name != "" && opts.nodeRegOpts.Name != opts.defaultHostname {
-		glog.V(1).Infof("setting kubelet hostname-override to %q", opts.nodeRegOpts.Name)
+		klog.V(1).Infof("setting kubelet hostname-override to %q", opts.nodeRegOpts.Name)
 		kubeletFlags["hostname-override"] = opts.nodeRegOpts.Name
-	}
-
-	// If the user enabled Dynamic Kubelet Configuration (which is disabled by default), set the directory
-	// in the CLI flags so that the feature actually gets enabled
-	if features.Enabled(opts.featureGates, features.DynamicKubeletConfig) {
-		kubeletFlags["dynamic-config-dir"] = filepath.Join(constants.KubeletRunDirectory, constants.DynamicKubeletConfigurationDirectoryName)
 	}
 
 	// TODO: Conditionally set `--cgroup-driver` to either `systemd` or `cgroupfs` for CRI other than Docker
@@ -119,14 +118,14 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 // writeKubeletFlagBytesToDisk writes a byte slice down to disk at the specific location of the kubelet flag overrides file
 func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 	kubeletEnvFilePath := filepath.Join(kubeletDir, constants.KubeletEnvFileName)
-	fmt.Printf("[kubelet] Writing kubelet environment file with flags to file %q\n", kubeletEnvFilePath)
+	fmt.Printf("[kubelet-start] Writing kubelet environment file with flags to file %q\n", kubeletEnvFilePath)
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {
-		return fmt.Errorf("failed to create directory %q: %v", kubeletDir, err)
+		return errors.Wrapf(err, "failed to create directory %q", kubeletDir)
 	}
 	if err := ioutil.WriteFile(kubeletEnvFilePath, b, 0644); err != nil {
-		return fmt.Errorf("failed to write kubelet configuration to the file %q: %v", kubeletEnvFilePath, err)
+		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", kubeletEnvFilePath)
 	}
 	return nil
 }

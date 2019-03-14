@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/api/core/v1"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/klog"
 )
 
 const (
@@ -139,7 +139,7 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- prometheus.Metric) 
 			float64(number),
 			storageClassName)
 		if err != nil {
-			glog.Warningf("Create bound pv number metric failed: %v", err)
+			klog.Warningf("Create bound pv number metric failed: %v", err)
 			continue
 		}
 		ch <- metric
@@ -151,7 +151,7 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- prometheus.Metric) 
 			float64(number),
 			storageClassName)
 		if err != nil {
-			glog.Warningf("Create unbound pv number metric failed: %v", err)
+			klog.Warningf("Create unbound pv number metric failed: %v", err)
 			continue
 		}
 		ch <- metric
@@ -179,7 +179,7 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- prometheus.Metric)
 			float64(number),
 			namespace)
 		if err != nil {
-			glog.Warningf("Create bound pvc number metric failed: %v", err)
+			klog.Warningf("Create bound pvc number metric failed: %v", err)
 			continue
 		}
 		ch <- metric
@@ -191,7 +191,7 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- prometheus.Metric)
 			float64(number),
 			namespace)
 		if err != nil {
-			glog.Warningf("Create unbound pvc number metric failed: %v", err)
+			klog.Warningf("Create unbound pvc number metric failed: %v", err)
 			continue
 		}
 		ch <- metric

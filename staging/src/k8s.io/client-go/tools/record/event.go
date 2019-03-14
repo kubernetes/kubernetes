@@ -21,7 +21,7 @@ import (
 	"math/rand"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,11 +29,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record/util"
 	ref "k8s.io/client-go/tools/reference"
-
-	"net/http"
-
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const maxTriesPerEvent = 12
@@ -144,7 +142,7 @@ func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrela
 		}
 		tries++
 		if tries >= maxTriesPerEvent {
-			glog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
+			klog.Errorf("Unable to write event '%#v' (retry limit exceeded!)", event)
 			break
 		}
 		// Randomize the first sleep so that various clients won't all be
@@ -155,16 +153,6 @@ func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrela
 			time.Sleep(sleepDuration)
 		}
 	}
-}
-
-func isKeyNotFoundError(err error) bool {
-	statusErr, _ := err.(*errors.StatusError)
-
-	if statusErr != nil && statusErr.Status().Code == http.StatusNotFound {
-		return true
-	}
-
-	return false
 }
 
 // recordEvent attempts to write event to a sink. It returns true if the event
@@ -178,7 +166,7 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 		newEvent, err = sink.Patch(event, patch)
 	}
 	// Update can fail because the event may have been removed and it no longer exists.
-	if !updateExistingEvent || (updateExistingEvent && isKeyNotFoundError(err)) {
+	if !updateExistingEvent || (updateExistingEvent && util.IsKeyNotFoundError(err)) {
 		// Making sure that ResourceVersion is empty on creation
 		event.ResourceVersion = ""
 		newEvent, err = sink.Create(event)
@@ -194,13 +182,13 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 	switch err.(type) {
 	case *restclient.RequestConstructionError:
 		// We will construct the request the same next time, so don't keep trying.
-		glog.Errorf("Unable to construct event '%#v': '%v' (will not retry!)", event, err)
+		klog.Errorf("Unable to construct event '%#v': '%v' (will not retry!)", event, err)
 		return true
 	case *errors.StatusError:
 		if errors.IsAlreadyExists(err) {
-			glog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+			klog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		} else {
-			glog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+			klog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
 		}
 		return true
 	case *errors.UnexpectedObjectError:
@@ -209,7 +197,7 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 	default:
 		// This case includes actual http transport errors. Go ahead and retry.
 	}
-	glog.Errorf("Unable to write event: '%v' (may retry after sleeping)", err)
+	klog.Errorf("Unable to write event: '%v' (may retry after sleeping)", err)
 	return false
 }
 
@@ -256,12 +244,12 @@ type recorderImpl struct {
 func (recorder *recorderImpl) generateEvent(object runtime.Object, annotations map[string]string, timestamp metav1.Time, eventtype, reason, message string) {
 	ref, err := ref.GetReference(recorder.scheme, object)
 	if err != nil {
-		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", object, err, eventtype, reason, message)
+		klog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", object, err, eventtype, reason, message)
 		return
 	}
 
-	if !validateEventType(eventtype) {
-		glog.Errorf("Unsupported event type: '%v'", eventtype)
+	if !util.ValidateEventType(eventtype) {
+		klog.Errorf("Unsupported event type: '%v'", eventtype)
 		return
 	}
 
@@ -273,14 +261,6 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, annotations m
 		defer utilruntime.HandleCrash()
 		recorder.Action(watch.Added, event)
 	}()
-}
-
-func validateEventType(eventtype string) bool {
-	switch eventtype {
-	case v1.EventTypeNormal, v1.EventTypeWarning:
-		return true
-	}
-	return false
 }
 
 func (recorder *recorderImpl) Event(object runtime.Object, eventtype, reason, message string) {

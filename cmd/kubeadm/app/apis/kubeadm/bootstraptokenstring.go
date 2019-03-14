@@ -24,8 +24,10 @@ import (
 	"fmt"
 	"strings"
 
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
-	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
+	"github.com/pkg/errors"
+
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 )
 
 // BootstrapTokenString is a token of the format abcdef.abcdef0123456789 that is used
@@ -77,7 +79,7 @@ func NewBootstrapTokenString(token string) (*BootstrapTokenString, error) {
 	substrs := bootstraputil.BootstrapTokenRegexp.FindStringSubmatch(token)
 	// TODO: Add a constant for the 3 value here, and explain better why it's needed (other than because how the regexp parsin works)
 	if len(substrs) != 3 {
-		return nil, fmt.Errorf("the bootstrap token %q was not of the form %q", token, bootstrapapi.BootstrapTokenPattern)
+		return nil, errors.Errorf("the bootstrap token %q was not of the form %q", token, bootstrapapi.BootstrapTokenPattern)
 	}
 
 	return &BootstrapTokenString{ID: substrs[1], Secret: substrs[2]}, nil

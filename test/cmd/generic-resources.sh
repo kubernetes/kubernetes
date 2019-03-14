@@ -268,10 +268,10 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
   kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Command
-  output_message=$(kubectl convert --local -f hack/testdata/deployment-revision1.yaml --output-version=apps/v1beta1 -o yaml "${kube_flags[@]}")
+  output_message=$(kubectl convert --local -f hack/testdata/deployment-revision1.yaml --output-version=apps/v1 -o yaml "${kube_flags[@]}")
   # Post-condition: apiVersion is still extensions/v1beta1 in the live deployment, but command output is the new value
   kube::test::get_object_assert 'deployment nginx' "{{ .apiVersion }}" 'extensions/v1beta1'
-  kube::test::if_has_string "${output_message}" "apps/v1beta1"
+  kube::test::if_has_string "${output_message}" "apps/v1"
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 
@@ -430,7 +430,7 @@ run_recursive_resources_tests() {
   ## Attempt to rollback the replication controllers to revision 1 recursively
   output_message=$(! kubectl rollout undo -f hack/testdata/recursive/rc --recursive --to-revision=1 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox1 should error as they are RC's, and since busybox2 is malformed, it should error
-  kube::test::if_has_string "${output_message}" 'no rollbacker has been implemented for {"" "ReplicationController"}'
+  kube::test::if_has_string "${output_message}" 'no rollbacker has been implemented for "ReplicationController"'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Attempt to pause the replication controllers recursively
   output_message=$(! kubectl rollout pause -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")

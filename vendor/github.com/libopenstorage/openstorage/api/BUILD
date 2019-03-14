@@ -12,8 +12,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes/timestamp:go_default_library",
         "//vendor/github.com/mohae/deepcopy:go_default_library",
-        "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
     ],
 )
 

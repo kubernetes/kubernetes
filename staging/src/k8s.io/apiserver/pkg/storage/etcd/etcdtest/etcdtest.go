@@ -21,9 +21,6 @@ import (
 	"path"
 )
 
-// Cache size to use for tests.
-const DeserializationCacheSize = 150
-
 // Returns the prefix set via the ETCD_PREFIX environment variable (if any).
 func PathPrefix() string {
 	pref := os.Getenv("ETCD_PREFIX")

@@ -21,40 +21,48 @@ import (
 	"reflect"
 	"testing"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 )
 
 func TestSortedSliceFromStringIntMap(t *testing.T) {
 	var tests = []struct {
+		name          string
 		strMap        map[string]uint16
 		expectedSlice []string
-	}{ // The returned slice should be alphabetically sorted based on the string keys in the map
+	}{
 		{
+			name:          "the returned slice should be alphabetically sorted based on the string keys in the map",
 			strMap:        map[string]uint16{"foo": 1, "bar": 2},
 			expectedSlice: []string{"bar", "foo"},
 		},
-		{ // The int value should not affect this func
+		{
+			name:          "the int value should not affect this func",
 			strMap:        map[string]uint16{"foo": 2, "bar": 1},
 			expectedSlice: []string{"bar", "foo"},
 		},
 		{
+			name:          "slice with 4 keys and different values",
 			strMap:        map[string]uint16{"b": 2, "a": 1, "cb": 0, "ca": 1000},
 			expectedSlice: []string{"a", "b", "ca", "cb"},
 		},
-		{ // This should work for version numbers as well; and the lowest version should come first
+		{
+			name:          "this should work for version numbers as well; and the lowest version should come first",
 			strMap:        map[string]uint16{"v1.7.0": 1, "v1.6.1": 1, "v1.6.2": 1, "v1.8.0": 1, "v1.8.0-alpha.1": 1},
 			expectedSlice: []string{"v1.6.1", "v1.6.2", "v1.7.0", "v1.8.0", "v1.8.0-alpha.1"},
 		},
 	}
 	for _, rt := range tests {
-		actualSlice := sortedSliceFromStringIntMap(rt.strMap)
-		if !reflect.DeepEqual(actualSlice, rt.expectedSlice) {
-			t.Errorf(
-				"failed SortedSliceFromStringIntMap:\n\texpected: %v\n\t  actual: %v",
-				rt.expectedSlice,
-				actualSlice,
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actualSlice := sortedSliceFromStringIntMap(rt.strMap)
+			if !reflect.DeepEqual(actualSlice, rt.expectedSlice) {
+				t.Errorf(
+					"failed SortedSliceFromStringIntMap:\n\texpected: %v\n\t  actual: %v",
+					rt.expectedSlice,
+					actualSlice,
+				)
+			}
+		})
 	}
 }
 
@@ -91,14 +99,14 @@ func TestPrintAvailableUpgrades(t *testing.T) {
 							"v1.8.1": 1,
 						},
 						KubeadmVersion: "v1.8.2",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.8.3",
 						KubeadmVersion: "v1.8.3",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
@@ -139,15 +147,15 @@ _____________________________________________________________________
 							"v1.8.3": 1,
 						},
 						KubeadmVersion: "v1.9.0",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.9.0",
 						KubeadmVersion: "v1.9.0",
-						DNSType:        "kube-dns",
-						DNSVersion:     "1.14.10",
+						DNSType:        kubeadmapi.KubeDNS,
+						DNSVersion:     "1.14.13",
 						EtcdVersion:    "3.1.12",
 					},
 				},
@@ -163,7 +171,7 @@ API Server           v1.8.3    v1.9.0
 Controller Manager   v1.8.3    v1.9.0
 Scheduler            v1.8.3    v1.9.0
 Kube Proxy           v1.8.3    v1.9.0
-Kube DNS             1.14.5    1.14.10
+Kube DNS             1.14.5    1.14.13
 Etcd                 3.0.17    3.1.12
 
 You can now apply the upgrade by executing the following command:
@@ -185,14 +193,14 @@ _____________________________________________________________________
 							"v1.8.3": 1,
 						},
 						KubeadmVersion: "v1.8.3",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.8.5",
 						KubeadmVersion: "v1.8.3",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
@@ -205,15 +213,15 @@ _____________________________________________________________________
 							"v1.8.3": 1,
 						},
 						KubeadmVersion: "v1.8.3",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.9.0",
 						KubeadmVersion: "v1.9.0",
-						DNSType:        "kube-dns",
-						DNSVersion:     "1.14.10",
+						DNSType:        kubeadmapi.KubeDNS,
+						DNSVersion:     "1.14.13",
 						EtcdVersion:    "3.1.12",
 					},
 				},
@@ -249,7 +257,7 @@ API Server           v1.8.3    v1.9.0
 Controller Manager   v1.8.3    v1.9.0
 Scheduler            v1.8.3    v1.9.0
 Kube Proxy           v1.8.3    v1.9.0
-Kube DNS             1.14.5    1.14.10
+Kube DNS             1.14.5    1.14.13
 Etcd                 3.0.17    3.1.12
 
 You can now apply the upgrade by executing the following command:
@@ -273,15 +281,15 @@ _____________________________________________________________________
 							"v1.8.5": 1,
 						},
 						KubeadmVersion: "v1.8.5",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.9.0-beta.1",
 						KubeadmVersion: "v1.9.0-beta.1",
-						DNSType:        "kube-dns",
-						DNSVersion:     "1.14.10",
+						DNSType:        kubeadmapi.KubeDNS,
+						DNSVersion:     "1.14.13",
 						EtcdVersion:    "3.1.12",
 					},
 				},
@@ -297,7 +305,7 @@ API Server           v1.8.5    v1.9.0-beta.1
 Controller Manager   v1.8.5    v1.9.0-beta.1
 Scheduler            v1.8.5    v1.9.0-beta.1
 Kube Proxy           v1.8.5    v1.9.0-beta.1
-Kube DNS             1.14.5    1.14.10
+Kube DNS             1.14.5    1.14.13
 Etcd                 3.0.17    3.1.12
 
 You can now apply the upgrade by executing the following command:
@@ -321,15 +329,15 @@ _____________________________________________________________________
 							"v1.8.5": 1,
 						},
 						KubeadmVersion: "v1.8.5",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.9.0-rc.1",
 						KubeadmVersion: "v1.9.0-rc.1",
-						DNSType:        "kube-dns",
-						DNSVersion:     "1.14.10",
+						DNSType:        kubeadmapi.KubeDNS,
+						DNSVersion:     "1.14.13",
 						EtcdVersion:    "3.1.12",
 					},
 				},
@@ -345,7 +353,7 @@ API Server           v1.8.5    v1.9.0-rc.1
 Controller Manager   v1.8.5    v1.9.0-rc.1
 Scheduler            v1.8.5    v1.9.0-rc.1
 Kube Proxy           v1.8.5    v1.9.0-rc.1
-Kube DNS             1.14.5    1.14.10
+Kube DNS             1.14.5    1.14.13
 Etcd                 3.0.17    3.1.12
 
 You can now apply the upgrade by executing the following command:
@@ -370,14 +378,14 @@ _____________________________________________________________________
 							"v1.9.3": 2,
 						},
 						KubeadmVersion: "v1.9.2",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.9.3",
 						KubeadmVersion: "v1.9.3",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.8",
 						EtcdVersion:    "3.1.12",
 					},
@@ -420,14 +428,14 @@ _____________________________________________________________________
 							"v1.9.2": 1,
 						},
 						KubeadmVersion: "v1.9.2",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.9.3",
 						KubeadmVersion: "v1.9.3",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.8",
 						EtcdVersion:    "3.1.12",
 					},
@@ -472,14 +480,14 @@ _____________________________________________________________________
 							"v1.10.2": 1,
 						},
 						KubeadmVersion: "v1.11.0",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.7",
 						EtcdVersion:    "3.1.11",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.11.0",
 						KubeadmVersion: "v1.11.0",
-						DNSType:        "coredns",
+						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.2.18",
 					},
@@ -519,14 +527,14 @@ _____________________________________________________________________
 							"v1.10.2": 1,
 						},
 						KubeadmVersion: "v1.11.0",
-						DNSType:        "coredns",
+						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.5",
 						EtcdVersion:    "3.1.11",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.11.0",
 						KubeadmVersion: "v1.11.0",
-						DNSType:        "coredns",
+						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.2.18",
 					},
@@ -565,14 +573,14 @@ _____________________________________________________________________
 							"v1.10.2": 1,
 						},
 						KubeadmVersion: "v1.11.0",
-						DNSType:        "coredns",
+						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.11",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.11.0",
 						KubeadmVersion: "v1.11.0",
-						DNSType:        "kube-dns",
+						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.9",
 						EtcdVersion:    "3.2.18",
 					},

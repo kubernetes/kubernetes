@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
+	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 )
@@ -33,8 +33,8 @@ const (
 	aesCBCPrefix = "k8s:enc:aescbc:v1:key1:"
 
 	aesGCMConfigYAML = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -46,8 +46,8 @@ resources:
 `
 
 	aesCBCConfigYAML = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -59,8 +59,8 @@ resources:
 `
 
 	identityConfigYAML = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -72,7 +72,7 @@ resources:
 // TestSecretsShouldBeEnveloped is an integration test between KubeAPI and etcd that checks:
 // 1. Secrets are encrypted on write
 // 2. Secrets are decrypted on read
-// when EncryptionConfig is passed to KubeAPI server.
+// when EncryptionConfiguration is passed to KubeAPI server.
 func TestSecretsShouldBeTransformed(t *testing.T) {
 	var testCases = []struct {
 		transformerConfigContent string
@@ -128,7 +128,7 @@ func runBenchmark(b *testing.B, transformerConfig string) {
 }
 
 func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
-	transformerConfig encryptionconfig.ProviderConfig) ([]byte, error) {
+	transformerConfig apiserverconfigv1.ProviderConfiguration) ([]byte, error) {
 
 	block, err := newAESCipher(transformerConfig.AESGCM.Keys[0].Secret)
 	if err != nil {
@@ -146,7 +146,7 @@ func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,
 }
 
 func unSealWithCBCTransformer(cipherText []byte, ctx value.Context,
-	transformerConfig encryptionconfig.ProviderConfig) ([]byte, error) {
+	transformerConfig apiserverconfigv1.ProviderConfiguration) ([]byte, error) {
 
 	block, err := newAESCipher(transformerConfig.AESCBC.Keys[0].Secret)
 	if err != nil {

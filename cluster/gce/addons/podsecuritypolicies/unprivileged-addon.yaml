@@ -39,6 +39,7 @@ spec:
   - 'emptyDir'
   - 'configMap'
   - 'secret'
+  - 'projected'
   hostNetwork: false
   hostIPC: false
   hostPID: false

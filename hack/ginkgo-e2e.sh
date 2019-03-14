@@ -87,7 +87,7 @@ if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   set_num_migs
   NODE_INSTANCE_GROUP=""
   for ((i=1; i<=${NUM_MIGS}; i++)); do
-    if [[ $i == ${NUM_MIGS} ]]; then
+    if [[ ${i} == ${NUM_MIGS} ]]; then
       # We are assigning the same mig names as create-nodes function from cluster/gce/util.sh.
       NODE_INSTANCE_GROUP="${NODE_INSTANCE_GROUP}${NODE_INSTANCE_PREFIX}-group"
     else
@@ -161,6 +161,8 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --master-tag="${MASTER_TAG:-}" \
   --cluster-monitoring-mode="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}" \
   --prometheus-monitoring="${KUBE_ENABLE_PROMETHEUS_MONITORING:-false}" \
+  --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
+  --ginkgo.slowSpecThreshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300}" \
   ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \

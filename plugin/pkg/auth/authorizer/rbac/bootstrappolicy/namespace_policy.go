@@ -19,10 +19,11 @@ package bootstrappolicy
 import (
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/user"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
@@ -36,13 +37,13 @@ var (
 
 func addNamespaceRole(namespace string, role rbacv1.Role) {
 	if !strings.HasPrefix(namespace, "kube-") {
-		glog.Fatalf(`roles can only be bootstrapped into reserved namespaces starting with "kube-", not %q`, namespace)
+		klog.Fatalf(`roles can only be bootstrapped into reserved namespaces starting with "kube-", not %q`, namespace)
 	}
 
 	existingRoles := namespaceRoles[namespace]
 	for _, existingRole := range existingRoles {
 		if role.Name == existingRole.Name {
-			glog.Fatalf("role %q was already registered in %q", role.Name, namespace)
+			klog.Fatalf("role %q was already registered in %q", role.Name, namespace)
 		}
 	}
 
@@ -54,13 +55,13 @@ func addNamespaceRole(namespace string, role rbacv1.Role) {
 
 func addNamespaceRoleBinding(namespace string, roleBinding rbacv1.RoleBinding) {
 	if !strings.HasPrefix(namespace, "kube-") {
-		glog.Fatalf(`rolebindings can only be bootstrapped into reserved namespaces starting with "kube-", not %q`, namespace)
+		klog.Fatalf(`rolebindings can only be bootstrapped into reserved namespaces starting with "kube-", not %q`, namespace)
 	}
 
 	existingRoleBindings := namespaceRoleBindings[namespace]
 	for _, existingRoleBinding := range existingRoleBindings {
 		if roleBinding.Name == existingRoleBinding.Name {
-			glog.Fatalf("rolebinding %q was already registered in %q", roleBinding.Name, namespace)
+			klog.Fatalf("rolebinding %q was already registered in %q", roleBinding.Name, namespace)
 		}
 	}
 
@@ -119,10 +120,15 @@ func init() {
 			rbacv1helpers.NewRule("get", "update").Groups(legacyGroup).Resources("configmaps").Names("kube-scheduler").RuleOrDie(),
 		},
 	})
+
+	delegatedAuthBinding := rbacv1helpers.NewRoleBinding("extension-apiserver-authentication-reader", metav1.NamespaceSystem).Users(user.KubeControllerManager, user.KubeScheduler).BindingOrDie()
+	delegatedAuthBinding.Name = "system::extension-apiserver-authentication-reader"
+	addNamespaceRoleBinding(metav1.NamespaceSystem, delegatedAuthBinding)
+
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
-		rbacv1helpers.NewRoleBinding("system::leader-locking-kube-controller-manager", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "kube-controller-manager").BindingOrDie())
+		rbacv1helpers.NewRoleBinding("system::leader-locking-kube-controller-manager", metav1.NamespaceSystem).Users(user.KubeControllerManager).SAs(metav1.NamespaceSystem, "kube-controller-manager").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
-		rbacv1helpers.NewRoleBinding("system::leader-locking-kube-scheduler", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "kube-scheduler").BindingOrDie())
+		rbacv1helpers.NewRoleBinding("system::leader-locking-kube-scheduler", metav1.NamespaceSystem).Users(user.KubeScheduler).SAs(metav1.NamespaceSystem, "kube-scheduler").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
 		rbacv1helpers.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
 	// cloud-provider is deprecated starting Kubernetes 1.10 and will be deleted according to GA deprecation policy.

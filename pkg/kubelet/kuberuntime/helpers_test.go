@@ -351,8 +351,7 @@ func TestNamespacesForPod(t *testing.T) {
 		assert.Equal(t, test.expected, actual)
 	}
 
-	// Test ShareProcessNamespace feature disabled, feature gate restored by previous defer
-	utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, false)
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, false)()
 
 	for desc, test := range map[string]struct {
 		input    *v1.Pod

@@ -28,8 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 )
 
 var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
@@ -59,7 +59,7 @@ var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
 
 // OnlyAllowNodeZones tests that GetAllCurrentZones returns only zones with Nodes
 func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
-	gceCloud, err := framework.GetGCECloud()
+	gceCloud, err := gce.GetGCECloud()
 	Expect(err).NotTo(HaveOccurred())
 
 	// Get all the zones that the nodes are in
@@ -165,7 +165,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 		pv, err := c.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
-		pvZone, ok := pv.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		Expect(ok).To(BeTrue(), "PV has no LabelZone to be found")
 		pvZones.Insert(pvZone)
 	}

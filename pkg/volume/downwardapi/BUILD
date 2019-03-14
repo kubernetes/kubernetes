@@ -13,13 +13,13 @@ go_library(
     deps = [
         "//pkg/api/v1/resource:go_default_library",
         "//pkg/fieldpath:go_default_library",
-        "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
 
@@ -30,7 +30,7 @@ go_test(
     deps = [
         "//pkg/fieldpath:go_default_library",
         "//pkg/volume:go_default_library",
-        "//pkg/volume/empty_dir:go_default_library",
+        "//pkg/volume/emptydir:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

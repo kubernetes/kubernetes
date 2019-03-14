@@ -17,17 +17,16 @@ limitations under the License.
 package validation
 
 import (
-	apimachinery "k8s.io/apimachinery/pkg/apis/config/validation"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	apiserver "k8s.io/apiserver/pkg/apis/config/validation"
+	componentbasevalidation "k8s.io/component-base/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
 func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apimachinery.ValidateClientConnectionConfiguration(&cc.ClientConnection, field.NewPath("clientConnection"))...)
+	allErrs = append(allErrs, componentbasevalidation.ValidateClientConnectionConfiguration(&cc.ClientConnection, field.NewPath("clientConnection"))...)
 	allErrs = append(allErrs, ValidateKubeSchedulerLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection"))...)
 	if len(cc.SchedulerName) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("schedulerName"), ""))
@@ -41,6 +40,13 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 	if cc.HardPodAffinitySymmetricWeight < 0 || cc.HardPodAffinitySymmetricWeight > 100 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("hardPodAffinitySymmetricWeight"), cc.HardPodAffinitySymmetricWeight, "not in valid range 0-100"))
 	}
+	if cc.BindTimeoutSeconds == nil {
+		allErrs = append(allErrs, field.Required(field.NewPath("bindTimeoutSeconds"), ""))
+	}
+	if cc.PercentageOfNodesToScore < 0 || cc.PercentageOfNodesToScore > 100 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("percentageOfNodesToScore"),
+			cc.PercentageOfNodesToScore, "not in valid range 0-100"))
+	}
 	return allErrs
 }
 
@@ -50,7 +56,7 @@ func ValidateKubeSchedulerLeaderElectionConfiguration(cc *config.KubeSchedulerLe
 	if !cc.LeaderElectionConfiguration.LeaderElect {
 		return allErrs
 	}
-	allErrs = append(allErrs, apiserver.ValidateLeaderElectionConfiguration(&cc.LeaderElectionConfiguration, field.NewPath("leaderElectionConfiguration"))...)
+	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElectionConfiguration, field.NewPath("leaderElectionConfiguration"))...)
 	if len(cc.LockObjectNamespace) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("lockObjectNamespace"), ""))
 	}

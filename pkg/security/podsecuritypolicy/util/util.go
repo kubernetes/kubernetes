@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"strings"
 
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 const (
@@ -129,6 +129,8 @@ func GetVolumeFSType(v api.Volume) (policy.FSType, error) {
 		return policy.PortworxVolume, nil
 	case v.ScaleIO != nil:
 		return policy.ScaleIO, nil
+	case v.CSI != nil:
+		return policy.CSI, nil
 	}
 
 	return "", fmt.Errorf("unknown volume type for volume: %#v", v)

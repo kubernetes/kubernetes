@@ -17,8 +17,9 @@ limitations under the License.
 package system
 
 import (
-	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/util/errors"
+	"fmt"
+
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // Validator is the interface for all validators.
@@ -41,12 +42,12 @@ func Validate(spec SysSpec, validators []Validator) (error, error) {
 	var warns []error
 
 	for _, v := range validators {
-		glog.Infof("Validating %s...", v.Name())
+		fmt.Printf("Validating %s...\n", v.Name())
 		warn, err := v.Validate(spec)
 		errs = append(errs, err)
 		warns = append(warns, warn)
 	}
-	return errors.NewAggregate(warns), errors.NewAggregate(errs)
+	return errorsutil.NewAggregate(warns), errorsutil.NewAggregate(errs)
 }
 
 // ValidateSpec uses all default validators to validate the system and writes to stdout.

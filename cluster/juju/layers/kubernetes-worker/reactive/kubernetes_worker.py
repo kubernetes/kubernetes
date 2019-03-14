@@ -891,13 +891,13 @@ def launch_default_ingress_controller():
        context['defaultbackend_image'] == "auto"):
         if context['arch'] == 's390x':
             context['defaultbackend_image'] = \
-                "k8s.gcr.io/defaultbackend-s390x:1.4"
+                "k8s.gcr.io/defaultbackend-s390x:1.5"
         elif context['arch'] == 'arm64':
             context['defaultbackend_image'] = \
-                "k8s.gcr.io/defaultbackend-arm64:1.4"
+                "k8s.gcr.io/defaultbackend-arm64:1.5"
         else:
             context['defaultbackend_image'] = \
-                "k8s.gcr.io/defaultbackend:1.4"
+                "k8s.gcr.io/defaultbackend-amd64:1.5"
 
     # Render the default http backend (404) replicationcontroller manifest
     manifest = addon_path.format('default-http-backend.yaml')
@@ -926,7 +926,7 @@ def launch_default_ingress_controller():
     if get_version('kubelet') < (1, 9):
         context['daemonset_api_version'] = 'extensions/v1beta1'
     else:
-        context['daemonset_api_version'] = 'apps/v1beta2'
+        context['daemonset_api_version'] = 'apps/v1'
     context['juju_application'] = hookenv.service_name()
     manifest = addon_path.format('ingress-daemon-set.yaml')
     render('ingress-daemon-set.yaml', manifest, context)
@@ -1084,7 +1084,7 @@ def enable_gpu():
     if get_version('kubelet') < (1, 9):
         hookenv.status_set(
             'active',
-            'Upgrade to snap channel >= 1.9/stable to enable GPU suppport.'
+            'Upgrade to snap channel >= 1.9/stable to enable GPU support.'
         )
         return
 

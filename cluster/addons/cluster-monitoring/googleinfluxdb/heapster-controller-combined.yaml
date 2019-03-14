@@ -33,7 +33,7 @@ data:
     apiVersion: nannyconfig/v1alpha1
     kind: NannyConfiguration
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: heapster-v1.6.0-beta.1
@@ -59,6 +59,9 @@ spec:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       priorityClassName: system-cluster-critical
+      securityContext:
+        supplementalGroups: [ 65534 ]
+        fsGroup: 65534
       containers:
         - image: k8s.gcr.io/heapster-amd64:v1.6.0-beta.1
           name: heapster
@@ -80,7 +83,7 @@ spec:
             - /eventer
             - --source=kubernetes:''
             - --sink=gcl
-        - image: k8s.gcr.io/addon-resizer:1.8.3
+        - image: k8s.gcr.io/addon-resizer:1.8.4
           name: heapster-nanny
           resources:
             limits:
@@ -116,7 +119,7 @@ spec:
             # Specifies the smallest cluster (defined in number of nodes)
             # resources will be scaled to.
             - --minClusterSize={{ heapster_min_cluster_size }}
-        - image: k8s.gcr.io/addon-resizer:1.8.2
+        - image: k8s.gcr.io/addon-resizer:1.8.4
           name: eventer-nanny
           resources:
             limits:

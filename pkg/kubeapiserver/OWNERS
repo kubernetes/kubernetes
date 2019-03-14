@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - deads2k
 - lavalamp
@@ -8,6 +10,7 @@ reviewers:
 - lavalamp
 - liggitt
 - sttts
+- cheftako
 labels:
 - sig/api-machinery
 - area/apiserver

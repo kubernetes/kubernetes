@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 
-	externalappsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,14 +31,14 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
+	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -73,9 +72,9 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against deployments.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &extensions.Deployment{} },
-		NewListFunc:              func() runtime.Object { return &extensions.DeploymentList{} },
-		DefaultQualifiedResource: extensions.Resource("deployments"),
+		NewFunc:                  func() runtime.Object { return &apps.Deployment{} },
+		NewListFunc:              func() runtime.Object { return &apps.DeploymentList{} },
+		DefaultQualifiedResource: apps.Resource("deployments"),
 
 		CreateStrategy: deployment.Strategy,
 		UpdateStrategy: deployment.Strategy,
@@ -120,7 +119,7 @@ type StatusREST struct {
 }
 
 func (r *StatusREST) New() runtime.Object {
-	return &extensions.Deployment{}
+	return &apps.Deployment{}
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
@@ -149,26 +148,32 @@ func (r *RollbackREST) ProducesMIMETypes(verb string) []string {
 // ProducesObject returns an object the specified HTTP verb respond with. It will overwrite storage object if
 // it is not nil. Only the type of the return object matters, the value will be ignored.
 func (r *RollbackREST) ProducesObject(verb string) interface{} {
-	return externalappsv1beta1.DeploymentStatus{}
+	return metav1.Status{}
 }
 
 var _ = rest.StorageMetadata(&RollbackREST{})
 
 // New creates a rollback
 func (r *RollbackREST) New() runtime.Object {
-	return &extensions.DeploymentRollback{}
+	return &apps.DeploymentRollback{}
 }
 
 var _ = rest.Creater(&RollbackREST{})
 
 func (r *RollbackREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	rollback, ok := obj.(*extensions.DeploymentRollback)
+	rollback, ok := obj.(*apps.DeploymentRollback)
 	if !ok {
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a DeploymentRollback: %#v", obj))
 	}
 
-	if errs := extvalidation.ValidateDeploymentRollback(rollback); len(errs) != 0 {
-		return nil, errors.NewInvalid(extensions.Kind("DeploymentRollback"), rollback.Name, errs)
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
+	if errs := appsvalidation.ValidateDeploymentRollback(rollback); len(errs) != 0 {
+		return nil, errors.NewInvalid(apps.Kind("DeploymentRollback"), rollback.Name, errs)
 	}
 
 	// Update the Deployment with information in DeploymentRollback to trigger rollback
@@ -183,10 +188,10 @@ func (r *RollbackREST) Create(ctx context.Context, obj runtime.Object, createVal
 	}, nil
 }
 
-func (r *RollbackREST) rollbackDeployment(ctx context.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string, dryRun bool) error {
+func (r *RollbackREST) rollbackDeployment(ctx context.Context, deploymentID string, config *apps.RollbackConfig, annotations map[string]string, dryRun bool) error {
 	if _, err := r.setDeploymentRollback(ctx, deploymentID, config, annotations, dryRun); err != nil {
-		err = storeerr.InterpretGetError(err, extensions.Resource("deployments"), deploymentID)
-		err = storeerr.InterpretUpdateError(err, extensions.Resource("deployments"), deploymentID)
+		err = storeerr.InterpretGetError(err, apps.Resource("deployments"), deploymentID)
+		err = storeerr.InterpretUpdateError(err, apps.Resource("deployments"), deploymentID)
 		if _, ok := err.(*errors.StatusError); !ok {
 			err = errors.NewInternalError(err)
 		}
@@ -195,14 +200,14 @@ func (r *RollbackREST) rollbackDeployment(ctx context.Context, deploymentID stri
 	return nil
 }
 
-func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string, dryRun bool) (*extensions.Deployment, error) {
+func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID string, config *apps.RollbackConfig, annotations map[string]string, dryRun bool) (*apps.Deployment, error) {
 	dKey, err := r.store.KeyFunc(ctx, deploymentID)
 	if err != nil {
 		return nil, err
 	}
-	var finalDeployment *extensions.Deployment
-	err = r.store.Storage.GuaranteedUpdate(ctx, dKey, &extensions.Deployment{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
-		d, ok := obj.(*extensions.Deployment)
+	var finalDeployment *apps.Deployment
+	err = r.store.Storage.GuaranteedUpdate(ctx, dKey, &apps.Deployment{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+		d, ok := obj.(*apps.Deployment)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
 		}
@@ -248,9 +253,9 @@ func (r *ScaleREST) New() runtime.Object {
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
-		return nil, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
+		return nil, errors.NewNotFound(apps.Resource("deployments/scale"), name)
 	}
-	deployment := obj.(*extensions.Deployment)
+	deployment := obj.(*apps.Deployment)
 	scale, err := scaleFromDeployment(deployment)
 	if err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -261,9 +266,9 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
-		return nil, false, errors.NewNotFound(extensions.Resource("deployments/scale"), name)
+		return nil, false, errors.NewNotFound(apps.Resource("deployments/scale"), name)
 	}
-	deployment := obj.(*extensions.Deployment)
+	deployment := obj.(*apps.Deployment)
 
 	oldScale, err := scaleFromDeployment(deployment)
 	if err != nil {
@@ -283,7 +288,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	}
 
 	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), name, errs)
+		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), name, errs)
 	}
 
 	deployment.Spec.Replicas = scale.Spec.Replicas
@@ -292,7 +297,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	if err != nil {
 		return nil, false, err
 	}
-	deployment = obj.(*extensions.Deployment)
+	deployment = obj.(*apps.Deployment)
 	newScale, err := scaleFromDeployment(deployment)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -301,7 +306,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 }
 
 // scaleFromDeployment returns a scale subresource for a deployment.
-func scaleFromDeployment(deployment *extensions.Deployment) (*autoscaling.Scale, error) {
+func scaleFromDeployment(deployment *apps.Deployment) (*autoscaling.Scale, error) {
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err

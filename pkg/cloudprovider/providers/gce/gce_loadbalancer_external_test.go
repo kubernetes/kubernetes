@@ -27,14 +27,14 @@ import (
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
 	ga "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
-	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+	utilnet "k8s.io/utils/net"
 )
 
 func TestEnsureStaticIP(t *testing.T) {
@@ -164,7 +164,7 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 	vals := DefaultTestClusterValues()
 	serviceName := "foo-svc"
 
-	baseLinkUrl := "https://www.googleapis.com/compute/%v/projects/%v/regions/%v/forwardingRules/%v"
+	baseLinkURL := "https://www.googleapis.com/compute/%v/projects/%v/regions/%v/forwardingRules/%v"
 
 	for desc, tc := range map[string]struct {
 		netTier      cloud.NetworkTier
@@ -180,7 +180,7 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 				PortRange:   "123-123",
 				Target:      target,
 				NetworkTier: "PREMIUM",
-				SelfLink:    fmt.Sprintf(baseLinkUrl, "v1", vals.ProjectID, vals.Region, "lb-1"),
+				SelfLink:    fmt.Sprintf(baseLinkURL, "v1", vals.ProjectID, vals.Region, "lb-1"),
 			},
 		},
 		"Standard tier": {
@@ -193,7 +193,7 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 				PortRange:   "123-123",
 				Target:      target,
 				NetworkTier: "STANDARD",
-				SelfLink:    fmt.Sprintf(baseLinkUrl, "alpha", vals.ProjectID, vals.Region, "lb-2"),
+				SelfLink:    fmt.Sprintf(baseLinkURL, "alpha", vals.ProjectID, vals.Region, "lb-2"),
 			},
 		},
 	} {
@@ -276,7 +276,7 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 	}
 }
 
-func createExternalLoadBalancer(gce *GCECloud, svc *v1.Service, nodeNames []string, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
+func createExternalLoadBalancer(gce *Cloud, svc *v1.Service, nodeNames []string, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
 	nodes, err := createAndInsertNodes(gce, nodeNames, zoneName)
 	if err != nil {
 		return nil, err
@@ -498,7 +498,7 @@ func TestForwardingRuleNeedsUpdate(t *testing.T) {
 		ports        []v1.ServicePort
 		exists       bool
 		needsUpdate  bool
-		expectIpAddr string
+		expectIPAddr string
 		expectError  bool
 	}{
 		"When the loadBalancerIP does not equal the FwdRule IP address.": {
@@ -506,7 +506,7 @@ func TestForwardingRuleNeedsUpdate(t *testing.T) {
 			ports:        svc.Spec.Ports,
 			exists:       true,
 			needsUpdate:  true,
-			expectIpAddr: ipAddr,
+			expectIPAddr: ipAddr,
 			expectError:  false,
 		},
 		"When loadBalancerPortRange returns an error.": {
@@ -514,7 +514,7 @@ func TestForwardingRuleNeedsUpdate(t *testing.T) {
 			ports:        []v1.ServicePort{},
 			exists:       true,
 			needsUpdate:  false,
-			expectIpAddr: "",
+			expectIPAddr: "",
 			expectError:  true,
 		},
 		"When portRange not equals to the forwardingRule port range.": {
@@ -522,7 +522,7 @@ func TestForwardingRuleNeedsUpdate(t *testing.T) {
 			ports:        wrongPorts,
 			exists:       true,
 			needsUpdate:  true,
-			expectIpAddr: ipAddr,
+			expectIPAddr: ipAddr,
 			expectError:  false,
 		},
 		"When the ports protocol does not equal the ForwardingRuel IP Protocol.": {
@@ -530,7 +530,7 @@ func TestForwardingRuleNeedsUpdate(t *testing.T) {
 			ports:        wrongProtocolPorts,
 			exists:       true,
 			needsUpdate:  true,
-			expectIpAddr: ipAddr,
+			expectIPAddr: ipAddr,
 			expectError:  false,
 		},
 		"When basic workflow.": {
@@ -538,7 +538,7 @@ func TestForwardingRuleNeedsUpdate(t *testing.T) {
 			ports:        svc.Spec.Ports,
 			exists:       true,
 			needsUpdate:  false,
-			expectIpAddr: ipAddr,
+			expectIPAddr: ipAddr,
 			expectError:  false,
 		},
 	} {
@@ -546,7 +546,7 @@ func TestForwardingRuleNeedsUpdate(t *testing.T) {
 			exists, needsUpdate, ipAddress, err := gce.forwardingRuleNeedsUpdate(lbName, vals.Region, tc.lbIP, tc.ports)
 			assert.Equal(t, tc.exists, exists, "'exists' didn't return as expected "+desc)
 			assert.Equal(t, tc.needsUpdate, needsUpdate, "'needsUpdate' didn't return as expected "+desc)
-			assert.Equal(t, tc.expectIpAddr, ipAddress, "'ipAddress' didn't return as expected "+desc)
+			assert.Equal(t, tc.expectIPAddr, ipAddress, "'ipAddress' didn't return as expected "+desc)
 			if tc.expectError {
 				assert.Error(t, err, "Should returns an error "+desc)
 			} else {
@@ -620,10 +620,10 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 	ipAddr := status.Ingress[0].IP
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 
-	ipnet, err := netsets.ParseIPNets("0.0.0.0/0")
+	ipnet, err := utilnet.ParseIPNets("0.0.0.0/0")
 	require.NoError(t, err)
 
-	wrongIpnet, err := netsets.ParseIPNets("1.0.0.0/10")
+	wrongIpnet, err := utilnet.ParseIPNets("1.0.0.0/10")
 	require.NoError(t, err)
 
 	fw, err := gce.GetFirewall(MakeFirewallName(lbName))
@@ -633,7 +633,7 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 		lbName       string
 		ipAddr       string
 		ports        []v1.ServicePort
-		ipnet        netsets.IPNet
+		ipnet        utilnet.IPNetSet
 		fwIPProtocol string
 		getHook      func(context.Context, *meta.Key, *cloud.MockFirewalls) (bool, *ga.Firewall, error)
 		sourceRange  string
@@ -806,8 +806,8 @@ func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 	region := vals.Region
 
-	hcToCreate := makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
-	hcToDelete := makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
+	hcToCreate := makeHTTPHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
+	hcToDelete := makeHTTPHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
 
 	// Apply a tag on the target pool. By verifying the change of the tag, target pool update can be ensured.
 	tag := "A Tag"
@@ -823,7 +823,7 @@ func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
 	pool, err = gce.GetTargetPool(lbName, region)
 	assert.Equal(t, 1, len(pool.Instances))
 	var manyNodeName [maxTargetPoolCreateInstances + 1]string
-	for i := 0; i < maxTargetPoolCreateInstances+1; i += 1 {
+	for i := 0; i < maxTargetPoolCreateInstances+1; i++ {
 		manyNodeName[i] = fmt.Sprintf("testnode_%d", i)
 	}
 	manyNodes, err := createAndInsertNodes(gce, manyNodeName[:], vals.ZoneName)
@@ -864,7 +864,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 	hostNames := nodeNames(nodes)
 	hosts, err := gce.getInstancesByNames(hostNames)
 	require.NoError(t, err)
-	ipnet, err := netsets.ParseIPNets("10.0.0.0/20")
+	ipnet, err := utilnet.ParseIPNets("10.0.0.0/20")
 	require.NoError(t, err)
 	gce.createFirewall(
 		svc,
@@ -1029,6 +1029,157 @@ func TestEnsureExternalLoadBalancerErrors(t *testing.T) {
 			)
 			assert.Error(t, err, "Should return an error when "+desc)
 			assert.Nil(t, status, "Should not return a status when "+desc)
+		})
+	}
+}
+
+func TestExternalLoadBalancerEnsureHttpHealthCheck(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		desc      string
+		modifier  func(*compute.HttpHealthCheck) *compute.HttpHealthCheck
+		wantEqual bool
+	}{
+		{"should ensure HC", func(_ *compute.HttpHealthCheck) *compute.HttpHealthCheck { return nil }, false},
+		{
+			"should reconcile HC interval",
+			func(hc *compute.HttpHealthCheck) *compute.HttpHealthCheck {
+				hc.CheckIntervalSec = gceHcCheckIntervalSeconds - 1
+				return hc
+			},
+			false,
+		},
+		{
+			"should allow HC to be configurable to bigger intervals",
+			func(hc *compute.HttpHealthCheck) *compute.HttpHealthCheck {
+				hc.CheckIntervalSec = gceHcCheckIntervalSeconds * 10
+				return hc
+			},
+			true,
+		},
+		{
+			"should allow HC to accept bigger intervals while applying default value to small thresholds",
+			func(hc *compute.HttpHealthCheck) *compute.HttpHealthCheck {
+				hc.CheckIntervalSec = gceHcCheckIntervalSeconds * 10
+				hc.UnhealthyThreshold = gceHcUnhealthyThreshold - 1
+				return hc
+			},
+			false,
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+
+			gce, err := fakeGCECloud(DefaultTestClusterValues())
+			require.NoError(t, err)
+			c := gce.c.(*cloud.MockGCE)
+			c.MockHttpHealthChecks.UpdateHook = func(ctx context.Context, key *meta.Key, obj *ga.HttpHealthCheck, m *cloud.MockHttpHealthChecks) error {
+				m.Objects[*key] = &cloud.MockHttpHealthChecksObj{Obj: obj}
+				return nil
+			}
+
+			hcName, hcPath, hcPort := "test-hc", "/healthz", int32(12345)
+			existingHC := makeHTTPHealthCheck(hcName, hcPath, hcPort)
+			existingHC = tc.modifier(existingHC)
+			if existingHC != nil {
+				if err := gce.CreateHTTPHealthCheck(existingHC); err != nil {
+					t.Fatalf("gce.CreateHttpHealthCheck(%#v) = %v; want err = nil", existingHC, err)
+				}
+			}
+			if _, err := gce.ensureHTTPHealthCheck(hcName, hcPath, hcPort); err != nil {
+				t.Fatalf("gce.ensureHttpHealthCheck(%q, %q, %v) = _, %d; want err = nil", hcName, hcPath, hcPort, err)
+			}
+			if hc, err := gce.GetHTTPHealthCheck(hcName); err != nil {
+				t.Fatalf("gce.GetHttpHealthCheck(%q) = _, %d; want err = nil", hcName, err)
+			} else {
+				if tc.wantEqual {
+					assert.Equal(t, hc, existingHC)
+				} else {
+					assert.NotEqual(t, hc, existingHC)
+				}
+			}
+		})
+	}
+
+}
+
+func TestMergeHttpHealthChecks(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		desc                   string
+		checkIntervalSec       int64
+		timeoutSec             int64
+		healthyThreshold       int64
+		unhealthyThreshold     int64
+		wantCheckIntervalSec   int64
+		wantTimeoutSec         int64
+		wantHealthyThreshold   int64
+		wantUnhealthyThreshold int64
+	}{
+		{"unchanged", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"interval - too small - should reconcile", gceHcCheckIntervalSeconds - 1, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"timeout - too small - should reconcile", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds - 1, gceHcHealthyThreshold, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"healthy threshold - too small - should reconcile", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold - 1, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"unhealthy threshold - too small - should reconcile", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold - 1, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"interval - user configured - should keep", gceHcCheckIntervalSeconds + 1, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds + 1, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"timeout - user configured - should keep", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds + 1, gceHcHealthyThreshold, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds + 1, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"healthy threshold - user configured - should keep", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold + 1, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold + 1, gceHcUnhealthyThreshold},
+		{"unhealthy threshold - user configured - should keep", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold + 1, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold + 1},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			wantHC := makeHTTPHealthCheck("hc", "/", 12345)
+			hc := &compute.HttpHealthCheck{
+				CheckIntervalSec:   tc.checkIntervalSec,
+				TimeoutSec:         tc.timeoutSec,
+				HealthyThreshold:   tc.healthyThreshold,
+				UnhealthyThreshold: tc.unhealthyThreshold,
+			}
+			mergeHTTPHealthChecks(hc, wantHC)
+			if wantHC.CheckIntervalSec != tc.wantCheckIntervalSec {
+				t.Errorf("wantHC.CheckIntervalSec = %d; want %d", wantHC.CheckIntervalSec, tc.checkIntervalSec)
+			}
+			if wantHC.TimeoutSec != tc.wantTimeoutSec {
+				t.Errorf("wantHC.TimeoutSec = %d; want %d", wantHC.TimeoutSec, tc.timeoutSec)
+			}
+			if wantHC.HealthyThreshold != tc.wantHealthyThreshold {
+				t.Errorf("wantHC.HealthyThreshold = %d; want %d", wantHC.HealthyThreshold, tc.healthyThreshold)
+			}
+			if wantHC.UnhealthyThreshold != tc.wantUnhealthyThreshold {
+				t.Errorf("wantHC.UnhealthyThreshold = %d; want %d", wantHC.UnhealthyThreshold, tc.unhealthyThreshold)
+			}
+		})
+	}
+}
+
+func TestNeedToUpdateHttpHealthChecks(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		desc        string
+		modifier    func(*compute.HttpHealthCheck)
+		wantChanged bool
+	}{
+		{"unchanged", nil, false},
+		{"desc does not match", func(hc *compute.HttpHealthCheck) { hc.Description = "bad-desc" }, true},
+		{"port does not match", func(hc *compute.HttpHealthCheck) { hc.Port = 54321 }, true},
+		{"requestPath does not match", func(hc *compute.HttpHealthCheck) { hc.RequestPath = "/anotherone" }, true},
+		{"interval needs update", func(hc *compute.HttpHealthCheck) { hc.CheckIntervalSec = gceHcCheckIntervalSeconds - 1 }, true},
+		{"timeout needs update", func(hc *compute.HttpHealthCheck) { hc.TimeoutSec = gceHcTimeoutSeconds - 1 }, true},
+		{"healthy threshold needs update", func(hc *compute.HttpHealthCheck) { hc.HealthyThreshold = gceHcHealthyThreshold - 1 }, true},
+		{"unhealthy threshold needs update", func(hc *compute.HttpHealthCheck) { hc.UnhealthyThreshold = gceHcUnhealthyThreshold - 1 }, true},
+		{"interval does not need update", func(hc *compute.HttpHealthCheck) { hc.CheckIntervalSec = gceHcCheckIntervalSeconds + 1 }, false},
+		{"timeout does not need update", func(hc *compute.HttpHealthCheck) { hc.TimeoutSec = gceHcTimeoutSeconds + 1 }, false},
+		{"healthy threshold does not need update", func(hc *compute.HttpHealthCheck) { hc.HealthyThreshold = gceHcHealthyThreshold + 1 }, false},
+		{"unhealthy threshold does not need update", func(hc *compute.HttpHealthCheck) { hc.UnhealthyThreshold = gceHcUnhealthyThreshold + 1 }, false},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			hc := makeHTTPHealthCheck("hc", "/", 12345)
+			wantHC := makeHTTPHealthCheck("hc", "/", 12345)
+			if tc.modifier != nil {
+				tc.modifier(hc)
+			}
+			if gotChanged := needToUpdateHTTPHealthChecks(hc, wantHC); gotChanged != tc.wantChanged {
+				t.Errorf("needToUpdateHTTPHealthChecks(%#v, %#v) = %t; want changed = %t", hc, wantHC, gotChanged, tc.wantChanged)
+			}
 		})
 	}
 }

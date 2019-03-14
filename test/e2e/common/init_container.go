@@ -304,7 +304,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		Release: v1.12
 		Testname: init-container-fails-stops-app-restartnever-pod
 		Description: Ensure that app container is not started
-		when atleast one InitContainer fails to start and Pod has restart policy as RestartNever.
+		when at least one InitContainer fails to start and Pod has restart policy as RestartNever.
 	*/
 	framework.ConformanceIt("should not start app containers and fail the pod if init containers fail on a RestartNever pod", func() {
 		By("creating the pod")

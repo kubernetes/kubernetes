@@ -20,7 +20,7 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -28,18 +28,18 @@ import (
 )
 
 const (
-	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's KubeConfig file
+	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's kubeconfig file
 	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
 )
 
 // DefaultKubeProxyConfiguration assigns default values for the kube-proxy ComponentConfig
 func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
-	// IMPORTANT NOTE: If you're changing this code you should mirror it to cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go
-	// and cmd/kubeadm/app/apis/kubeadm/v1alpha3/conversion.go. TODO: Remove this requirement when v1alpha2 is removed.
 	externalproxycfg := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
 
 	// Do a roundtrip to the external version for defaulting
-	Scheme.Convert(internalcfg.ComponentConfigs.KubeProxy, externalproxycfg, nil)
+	if internalcfg.ComponentConfigs.KubeProxy != nil {
+		Scheme.Convert(internalcfg.ComponentConfigs.KubeProxy, externalproxycfg, nil)
+	}
 
 	if externalproxycfg.ClusterCIDR == "" && internalcfg.Networking.PodSubnet != "" {
 		externalproxycfg.ClusterCIDR = internalcfg.Networking.PodSubnet
@@ -63,20 +63,20 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration)
 
 // DefaultKubeletConfiguration assigns default values for the kubelet ComponentConfig
 func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
-	// IMPORTANT NOTE: If you're changing this code you should mirror it to cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go
-	// and cmd/kubeadm/app/apis/kubeadm/v1alpha3/conversion.go. TODO: Remove this requirement when v1alpha2 is removed.
 	externalkubeletcfg := &kubeletconfigv1beta1.KubeletConfiguration{}
 
 	// Do a roundtrip to the external version for defaulting
-	Scheme.Convert(internalcfg.ComponentConfigs.Kubelet, externalkubeletcfg, nil)
+	if internalcfg.ComponentConfigs.Kubelet != nil {
+		Scheme.Convert(internalcfg.ComponentConfigs.Kubelet, externalkubeletcfg, nil)
+	}
 
 	if externalkubeletcfg.StaticPodPath == "" {
-		externalkubeletcfg.StaticPodPath = kubeadmapiv1alpha3.DefaultManifestsDir
+		externalkubeletcfg.StaticPodPath = kubeadmapiv1beta1.DefaultManifestsDir
 	}
 	if externalkubeletcfg.ClusterDNS == nil {
 		dnsIP, err := constants.GetDNSIP(internalcfg.Networking.ServiceSubnet)
 		if err != nil {
-			externalkubeletcfg.ClusterDNS = []string{kubeadmapiv1alpha3.DefaultClusterDNSIP}
+			externalkubeletcfg.ClusterDNS = []string{kubeadmapiv1beta1.DefaultClusterDNSIP}
 		} else {
 			externalkubeletcfg.ClusterDNS = []string{dnsIP.String()}
 		}
@@ -88,7 +88,7 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	// Enforce security-related kubelet options
 
 	// Require all clients to the kubelet API to have client certs signed by the cluster CA
-	externalkubeletcfg.Authentication.X509.ClientCAFile = kubeadmapiv1alpha3.DefaultCACertPath
+	externalkubeletcfg.Authentication.X509.ClientCAFile = kubeadmapiv1beta1.DefaultCACertPath
 	externalkubeletcfg.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
 
 	// On every client request to the kubelet API, execute a webhook (SubjectAccessReview request) to the API server

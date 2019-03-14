@@ -19,7 +19,7 @@ go_library(
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/cm/util:go_default_library",
-            "//vendor/github.com/golang/glog:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
         ],
         "//conditions:default": [],
     }),

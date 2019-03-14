@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - erictune
 - liggitt
@@ -7,6 +9,5 @@ reviewers:
 - erictune
 - liggitt
 - deads2k
-- ericchiang
 - enj
 - mikedanese

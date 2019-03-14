@@ -18,6 +18,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/apis/extensions/v1beta1",
     deps = [
+        "//pkg/apis/apps:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1:go_default_library",

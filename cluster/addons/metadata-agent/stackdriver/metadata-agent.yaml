@@ -8,7 +8,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 ---
 kind: DaemonSet
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 metadata:
   labels:
     app: metadata-agent
@@ -28,6 +28,7 @@ spec:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: metadata-agent
+      priorityClassName: system-node-critical
       containers:
       - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
         imagePullPolicy: IfNotPresent
@@ -42,8 +43,8 @@ spec:
           failureThreshold: 1
           successThreshold: 1
         args:
-        - -o KubernetesUseWatch=true 
-        - -o KubernetesClusterLevelMetadata=false 
+        - -o KubernetesUseWatch=true
+        - -o KubernetesClusterLevelMetadata=false
         - -o MetadataReporterPurgeDeleted=true
         ports:
         - containerPort: 8000
@@ -57,13 +58,18 @@ spec:
       restartPolicy: Always
       schedulerName: default-scheduler
       terminationGracePeriodSeconds: 30
+      tolerations:
+      - operator: "Exists"
+        effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 1
     type: RollingUpdate
 ---
 kind: Deployment
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 metadata:
   labels:
     app: metadata-agent-cluster-level
@@ -84,6 +90,7 @@ spec:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: metadata-agent
+      priorityClassName: system-cluster-critical
       containers:
       - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
         imagePullPolicy: IfNotPresent
@@ -98,8 +105,8 @@ spec:
           failureThreshold: 1
           successThreshold: 1
         args:
-        - -o KubernetesUseWatch=true 
-        - -o KubernetesClusterLevelMetadata=true 
+        - -o KubernetesUseWatch=true
+        - -o KubernetesClusterLevelMetadata=true
         - -o MetadataReporterPurgeDeleted=true
         ports:
         - containerPort: 8000

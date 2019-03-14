@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	testUpgradeDiffConfig   = `testdata/diff_master_config.yaml`
+	testUpgradeDiffConfig   = `testdata/diff_controlplane_config.yaml`
 	testUpgradeDiffManifest = `testdata/diff_dummy_manifest.yaml`
 )
 

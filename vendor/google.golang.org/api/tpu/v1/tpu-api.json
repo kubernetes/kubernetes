@@ -400,34 +400,6 @@
                     "https://www.googleapis.com/auth/cloud-platform"
                   ]
                 },
-                "reset": {
-                  "description": "Resets a node, which stops and starts the VM.",
-                  "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}:reset",
-                  "httpMethod": "POST",
-                  "id": "tpu.projects.locations.nodes.reset",
-                  "parameterOrder": [
-                    "name"
-                  ],
-                  "parameters": {
-                    "name": {
-                      "description": "The resource name.",
-                      "location": "path",
-                      "pattern": "^projects/[^/]+/locations/[^/]+/nodes/[^/]+$",
-                      "required": true,
-                      "type": "string"
-                    }
-                  },
-                  "path": "v1/{+name}:reset",
-                  "request": {
-                    "$ref": "ResetNodeRequest"
-                  },
-                  "response": {
-                    "$ref": "Operation"
-                  },
-                  "scopes": [
-                    "https://www.googleapis.com/auth/cloud-platform"
-                  ]
-                },
                 "start": {
                   "description": "Starts a node.",
                   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/nodes/{nodesId}:start",
@@ -686,7 +658,7 @@
       }
     }
   },
-  "revision": "20180601",
+  "revision": "20181010",
   "rootUrl": "https://tpu.googleapis.com/",
   "schemas": {
     "AcceleratorType": {
@@ -758,6 +730,13 @@
           "description": "The listed nodes.",
           "items": {
             "$ref": "Node"
+          },
+          "type": "array"
+        },
+        "unreachable": {
+          "description": "Locations that could not be reached.",
+          "items": {
+            "type": "string"
           },
           "type": "array"
         }
@@ -940,7 +919,9 @@
             "REPAIRING",
             "STOPPED",
             "STOPPING",
-            "STARTING"
+            "STARTING",
+            "PREEMPTED",
+            "TERMINATED"
           ],
           "enumDescriptions": [
             "TPU node state is not known/set.",
@@ -952,7 +933,9 @@
             "TPU node is being repaired and may be unusable. Details can be\nfound in the `help_description` field.",
             "7 - Reserved. Was SUSPENDED.\nTPU node is stopped.",
             "TPU node is currently stopping.",
-            "TPU node is currently starting."
+            "TPU node is currently starting.",
+            "TPU node has been preempted. Only applies to Preemptible TPU Nodes.",
+            "TPU node has been terminated due to maintenance or has reached the end of\nits life cycle (for preemptible nodes)."
           ],
           "type": "string"
         },
@@ -1044,12 +1027,6 @@
           "type": "string"
         }
       },
-      "type": "object"
-    },
-    "ResetNodeRequest": {
-      "description": "Request for ResetNode.",
-      "id": "ResetNodeRequest",
-      "properties": {},
       "type": "object"
     },
     "SchedulingConfig": {

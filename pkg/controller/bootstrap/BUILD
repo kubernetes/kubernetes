@@ -27,7 +27,7 @@ go_test(
         "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
+        "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
@@ -56,11 +56,11 @@ go_library(
         "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

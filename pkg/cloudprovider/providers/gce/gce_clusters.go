@@ -18,18 +18,22 @@ package gce
 
 import (
 	"context"
-	container "google.golang.org/api/container/v1"
+	"fmt"
+
+	"google.golang.org/api/container/v1"
+	"k8s.io/klog"
 )
 
 func newClustersMetricContext(request, zone string) *metricContext {
 	return newGenericMetricContext("clusters", request, unusedMetricLabel, zone, computeV1Version)
 }
 
-func (gce *GCECloud) ListClusters(ctx context.Context) ([]string, error) {
+// ListClusters will return a list of cluster names for the associated project
+func (g *Cloud) ListClusters(ctx context.Context) ([]string, error) {
 	allClusters := []string{}
 
-	for _, zone := range gce.managedZones {
-		clusters, err := gce.listClustersInZone(zone)
+	for _, zone := range g.managedZones {
+		clusters, err := g.listClustersInZone(zone)
 		if err != nil {
 			return nil, err
 		}
@@ -40,25 +44,38 @@ func (gce *GCECloud) ListClusters(ctx context.Context) ([]string, error) {
 	return allClusters, nil
 }
 
-func (gce *GCECloud) GetManagedClusters(ctx context.Context) ([]*container.Cluster, error) {
+// GetManagedClusters will return the cluster objects associated to this project
+func (g *Cloud) GetManagedClusters(ctx context.Context) ([]*container.Cluster, error) {
 	managedClusters := []*container.Cluster{}
-	for _, zone := range gce.managedZones {
-		clusters, err := gce.getClustersInZone(zone)
+
+	if g.regional {
+		var err error
+		managedClusters, err = g.getClustersInLocation(g.region)
 		if err != nil {
 			return nil, err
 		}
-		managedClusters = append(managedClusters, clusters...)
+	} else if len(g.managedZones) >= 1 {
+		for _, zone := range g.managedZones {
+			clusters, err := g.getClustersInLocation(zone)
+			if err != nil {
+				return nil, err
+			}
+			managedClusters = append(managedClusters, clusters...)
+		}
+	} else {
+		return nil, fmt.Errorf("no zones associated with this cluster(%s)", g.ProjectID())
 	}
 
 	return managedClusters, nil
 }
 
-func (gce *GCECloud) Master(ctx context.Context, clusterName string) (string, error) {
+// Master returned the dns address of the master
+func (g *Cloud) Master(ctx context.Context, clusterName string) (string, error) {
 	return "k8s-" + clusterName + "-master.internal", nil
 }
 
-func (gce *GCECloud) listClustersInZone(zone string) ([]string, error) {
-	clusters, err := gce.getClustersInZone(zone)
+func (g *Cloud) listClustersInZone(zone string) ([]string, error) {
+	clusters, err := g.getClustersInLocation(zone)
 	if err != nil {
 		return nil, err
 	}
@@ -70,12 +87,17 @@ func (gce *GCECloud) listClustersInZone(zone string) ([]string, error) {
 	return result, nil
 }
 
-func (gce *GCECloud) getClustersInZone(zone string) ([]*container.Cluster, error) {
-	mc := newClustersMetricContext("list_zone", zone)
+func (g *Cloud) getClustersInLocation(zoneOrRegion string) ([]*container.Cluster, error) {
+	// TODO: Issue/68913 migrate metric to list_location instead of list_zone.
+	mc := newClustersMetricContext("list_zone", zoneOrRegion)
 	// TODO: use PageToken to list all not just the first 500
-	list, err := gce.containerService.Projects.Zones.Clusters.List(gce.projectID, zone).Do()
+	location := getLocationName(g.projectID, zoneOrRegion)
+	list, err := g.containerService.Projects.Locations.Clusters.List(location).Do()
 	if err != nil {
 		return nil, mc.Observe(err)
+	}
+	if list.Header.Get("nextPageToken") != "" {
+		klog.Errorf("Failed to get all clusters for request, received next page token %s", list.Header.Get("nextPageToken"))
 	}
 
 	return list.Clusters, mc.Observe(nil)

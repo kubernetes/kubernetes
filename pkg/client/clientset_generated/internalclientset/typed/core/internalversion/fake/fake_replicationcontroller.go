@@ -132,7 +132,7 @@ func (c *FakeReplicationControllers) DeleteCollection(options *v1.DeleteOptions,
 // Patch applies the patch and returns the patched replicationController.
 func (c *FakeReplicationControllers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, data, subresources...), &core.ReplicationController{})
+		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, pt, data, subresources...), &core.ReplicationController{})
 
 	if obj == nil {
 		return nil, err

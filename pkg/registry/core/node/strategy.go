@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // nodeStrategy implements behavior for nodes
@@ -66,9 +67,9 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 func (nodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	node := obj.(*api.Node)
 	// Nodes allow *all* fields, including status, to be set on create.
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		node.Spec.ConfigSource = nil
+		node.Status.Config = nil
 	}
 }
 
@@ -78,10 +79,20 @@ func (nodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Objec
 	oldNode := old.(*api.Node)
 	newNode.Status = oldNode.Status
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeConfigSourceInUse(oldNode) {
 		newNode.Spec.ConfigSource = nil
-		oldNode.Spec.ConfigSource = nil
 	}
+}
+
+// nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)
+func nodeConfigSourceInUse(node *api.Node) bool {
+	if node == nil {
+		return false
+	}
+	if node.Spec.ConfigSource != nil {
+		return true
+	}
+	return false
 }
 
 // Validate validates a new node.
@@ -126,24 +137,25 @@ type nodeStatusStrategy struct {
 
 var StatusStrategy = nodeStatusStrategy{Strategy}
 
-func (nodeStatusStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	node := obj.(*api.Node)
-	// Nodes allow *all* fields, including status, to be set on create.
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		node.Status.Config = nil
-	}
-}
-
 func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNode := obj.(*api.Node)
 	oldNode := old.(*api.Node)
 	newNode.Spec = oldNode.Spec
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeStatusConfigInUse(oldNode) {
 		newNode.Status.Config = nil
-		oldNode.Status.Config = nil
 	}
+}
+
+// nodeStatusConfigInUse returns true if node's Status Config is set(used)
+func nodeStatusConfigInUse(node *api.Node) bool {
+	if node == nil {
+		return false
+	}
+	if node.Status.Config != nil {
+		return true
+	}
+	return false
 }
 
 func (nodeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -169,12 +181,12 @@ func NodeToSelectableFields(node *api.Node) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	nodeObj, ok := obj.(*api.Node)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("not a node")
+		return nil, nil, fmt.Errorf("not a node")
 	}
-	return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nodeObj.Initializers != nil, nil
+	return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nil
 }
 
 // MatchNode returns a generic matcher for a given label and field selector.
@@ -200,7 +212,7 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
 	}
 
-	info, err := connection.GetConnectionInfo(types.NodeName(name))
+	info, err := connection.GetConnectionInfo(ctx, types.NodeName(name))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -215,6 +227,10 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 			},
 			info.Transport,
 			nil
+	}
+
+	if err := proxyutil.IsProxyableHostname(ctx, &net.Resolver{}, info.Hostname); err != nil {
+		return nil, nil, errors.NewBadRequest(err.Error())
 	}
 
 	// Otherwise, return the requested scheme and port, and the proxy transport

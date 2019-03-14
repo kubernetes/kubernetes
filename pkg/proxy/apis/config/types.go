@@ -21,8 +21,8 @@ import (
 	"sort"
 	"strings"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
@@ -78,6 +78,20 @@ type KubeProxyConntrackConfiguration struct {
 	TCPCloseWaitTimeout *metav1.Duration
 }
 
+// KubeProxyWinkernelConfiguration contains Windows/HNS settings for
+// the Kubernetes proxy server.
+type KubeProxyWinkernelConfiguration struct {
+	// networkName is the name of the network kube-proxy will use
+	// to create endpoints and policies
+	NetworkName string
+	// sourceVip is the IP address of the source VIP endoint used for
+	// NAT when loadbalancing
+	SourceVip string
+	// enableDSR tells kube-proxy whether HNS policies should be created
+	// with DSR
+	EnableDSR bool
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeProxyConfiguration contains everything necessary to configure the
@@ -108,7 +122,7 @@ type KubeProxyConfiguration struct {
 	HostnameOverride string
 	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
 	// server to use when communicating with the apiserver.
-	ClientConnection apimachineryconfig.ClientConnectionConfiguration
+	ClientConnection componentbaseconfig.ClientConnectionConfiguration
 	// iptables contains iptables-related configuration options.
 	IPTables KubeProxyIPTablesConfiguration
 	// ipvs contains ipvs-related configuration options.
@@ -140,6 +154,8 @@ type KubeProxyConfiguration struct {
 	// If set it to a non-zero IP block, kube-proxy will filter that down to just the IPs that applied to the node.
 	// An empty string slice is meant to select all network interfaces.
 	NodePortAddresses []string
+	// winkernel contains winkernel-related configuration options.
+	Winkernel KubeProxyWinkernelConfiguration
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
@@ -172,7 +188,7 @@ type IPVSSchedulerMethod string
 const (
 	// RoundRobin distributes jobs equally amongst the available real servers.
 	RoundRobin IPVSSchedulerMethod = "rr"
-	// WeightedRoundRobin assigns jobs to real servers proportionally to there real servers' weight.
+	// WeightedRoundRobin assigns jobs to real servers proportionally to their real servers' weight.
 	// Servers with higher weights receive new jobs first and get more jobs than servers with lower weights.
 	// Servers with equal weights get an equal distribution of new jobs.
 	WeightedRoundRobin IPVSSchedulerMethod = "wrr"
@@ -199,7 +215,7 @@ const (
 	DestinationHashing IPVSSchedulerMethod = "dh"
 	// ShortestExpectedDelay assigns an incoming job to the server with the shortest expected delay.
 	// The expected delay that the job will experience is (Ci + 1) / Ui if sent to the ith server, in which
-	// Ci is the number of jobs on the the ith server and Ui is the fixed service rate (weight) of the ith server.
+	// Ci is the number of jobs on the ith server and Ui is the fixed service rate (weight) of the ith server.
 	ShortestExpectedDelay IPVSSchedulerMethod = "sed"
 	// NeverQueue assigns an incoming job to an idle server if there is, instead of waiting for a fast one;
 	// if all the servers are busy, it adopts the ShortestExpectedDelay policy to assign the job.

@@ -18,6 +18,7 @@ package scheduling
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -81,6 +82,7 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		By("Fetching the LimitRange to ensure it has proper values")
 		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(limitRange.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
 		expected := v1.ResourceRequirements{Requests: defaultRequest, Limits: defaultLimit}
 		actual := v1.ResourceRequirements{Requests: limitRange.Spec.Limits[0].DefaultRequest, Limits: limitRange.Spec.Limits[0].Default}
 		err = equalResourceRequirement(expected, actual)
@@ -139,6 +141,13 @@ var _ = SIGDescribe("LimitRange", func() {
 		limitRange.Spec.Limits[0].Min = newMin
 		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Update(limitRange)
 		Expect(err).NotTo(HaveOccurred())
+
+		By("Verifying LimitRange updating is effective")
+		Expect(wait.Poll(time.Second*2, time.Second*20, func() (bool, error) {
+			limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(limitRange.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			return reflect.DeepEqual(limitRange.Spec.Limits[0].Min, newMin), nil
+		})).NotTo(HaveOccurred())
 
 		By("Creating a Pod with less than former min resources")
 		pod = f.NewTestPod(podName, getResourceList("10m", "50Mi", "50Gi"), v1.ResourceList{})

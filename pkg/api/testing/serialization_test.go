@@ -26,9 +26,8 @@ import (
 	"testing"
 
 	jsoniter "github.com/json-iterator/go"
-
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -44,10 +43,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	k8s_apps_v1 "k8s.io/kubernetes/pkg/apis/apps/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	k8s_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
@@ -65,14 +64,14 @@ func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runti
 	return item
 }
 
-func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
-	intermediate1 := &extensions.ReplicaSet{}
-	if err := k8s_v1beta1.Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in, intermediate1, s); err != nil {
+func ConvertV1ReplicaSetToAPIReplicationController(in *appsv1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
+	intermediate1 := &apps.ReplicaSet{}
+	if err := k8s_apps_v1.Convert_v1_ReplicaSet_To_apps_ReplicaSet(in, intermediate1, s); err != nil {
 		return err
 	}
 
 	intermediate2 := &v1.ReplicationController{}
-	if err := k8s_api_v1.Convert_extensions_ReplicaSet_To_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
+	if err := k8s_api_v1.Convert_apps_ReplicaSet_To_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
 		return err
 	}
 
@@ -80,17 +79,19 @@ func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.Replica
 }
 
 func TestSetControllerConversion(t *testing.T) {
-	if err := legacyscheme.Scheme.AddConversionFuncs(Convert_v1beta1_ReplicaSet_to_api_ReplicationController); err != nil {
+	if err := legacyscheme.Scheme.AddConversionFuncs(ConvertV1ReplicaSetToAPIReplicationController); err != nil {
 		t.Fatal(err)
 	}
 
-	rs := &extensions.ReplicaSet{}
+	rs := &apps.ReplicaSet{}
 	rc := &api.ReplicationController{}
+	extGroup := schema.GroupVersion{Group: "apps", Version: "v1"}
+	extCodec := legacyscheme.Codecs.LegacyCodec(extGroup)
 
-	extGroup := testapi.Extensions
-	defaultGroup := testapi.Default
+	defaultGroup := schema.GroupVersion{Group: "", Version: "v1"}
+	defaultCodec := legacyscheme.Codecs.LegacyCodec(defaultGroup)
 
-	fuzzInternalObject(t, schema.GroupVersion{Group: "extensions", Version: runtime.APIVersionInternal}, rs, rand.Int63())
+	fuzzInternalObject(t, schema.GroupVersion{Group: "apps", Version: runtime.APIVersionInternal}, rs, rand.Int63())
 
 	// explicitly set the selector to something that is convertible to old-style selectors
 	// (since normally we'll fuzz the selectors with things that aren't convertible)
@@ -101,8 +102,8 @@ func TestSetControllerConversion(t *testing.T) {
 		},
 	}
 
-	t.Logf("rs._internal.extensions -> rs.v1beta1.extensions")
-	data, err := runtime.Encode(extGroup.Codec(), rs)
+	t.Logf("rs._internal.apps -> rs.v1.apps")
+	data, err := runtime.Encode(extCodec, rs)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
@@ -110,24 +111,24 @@ func TestSetControllerConversion(t *testing.T) {
 	decoder := legacyscheme.Codecs.DecoderToVersion(
 		legacyscheme.Codecs.UniversalDeserializer(),
 		runtime.NewMultiGroupVersioner(
-			*defaultGroup.GroupVersion(),
-			schema.GroupKind{Group: defaultGroup.GroupVersion().Group},
-			schema.GroupKind{Group: extGroup.GroupVersion().Group},
+			defaultGroup,
+			schema.GroupKind{Group: defaultGroup.Group},
+			schema.GroupKind{Group: extGroup.Group},
 		),
 	)
 
-	t.Logf("rs.v1beta1.extensions -> rc._internal")
+	t.Logf("rs.v1.apps -> rc._internal")
 	if err := runtime.DecodeInto(decoder, data, rc); err != nil {
 		t.Fatalf("unexpected decoding error: %v", err)
 	}
 
 	t.Logf("rc._internal -> rc.v1")
-	data, err = runtime.Encode(defaultGroup.Codec(), rc)
+	data, err = runtime.Encode(defaultCodec, rc)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
 
-	t.Logf("rc.v1 -> rs._internal.extensions")
+	t.Logf("rc.v1 -> rs._internal.apps")
 	if err := runtime.DecodeInto(decoder, data, rs); err != nil {
 		t.Fatalf("unexpected decoding error: %v", err)
 	}
@@ -138,7 +139,7 @@ func TestSetControllerConversion(t *testing.T) {
 func TestSpecificKind(t *testing.T) {
 	// Uncomment the following line to enable logging of which conversions
 	// legacyscheme.Scheme.Log(t)
-	internalGVK := schema.GroupVersionKind{Group: "extensions", Version: runtime.APIVersionInternal, Kind: "DaemonSet"}
+	internalGVK := schema.GroupVersionKind{Group: "apps", Version: runtime.APIVersionInternal, Kind: "DaemonSet"}
 
 	seed := rand.Int63()
 	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)
@@ -160,9 +161,10 @@ var nonRoundTrippableTypes = sets.NewString(
 	"DeleteOptions",
 	"CreateOptions",
 	"UpdateOptions",
+	"PatchOptions",
 )
 
-var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions"}
+var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions", "PatchOptions"}
 
 // TestCommonKindsRegistered verifies that all group/versions registered with
 // the testapi package have the common kinds.
@@ -214,6 +216,7 @@ func TestRoundTripTypes(t *testing.T) {
 // decoded without information loss or mutation.
 func TestEncodePtr(t *testing.T) {
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{"name": "foo"},
@@ -224,8 +227,9 @@ func TestEncodePtr(t *testing.T) {
 
 			TerminationGracePeriodSeconds: &grace,
 
-			SecurityContext: &api.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SecurityContext:    &api.PodSecurityContext{},
+			SchedulerName:      api.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
 		},
 	}
 	obj := runtime.Object(pod)
@@ -239,6 +243,29 @@ func TestEncodePtr(t *testing.T) {
 	}
 	if !apiequality.Semantic.DeepEqual(obj2, pod) {
 		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, diff.ObjectDiff(obj2, pod))
+	}
+}
+
+func TestDecodeTimeStampWithoutQuotes(t *testing.T) {
+	testYAML := []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: 2018-08-30T14:10:58Z
+  name: test
+spec:
+  containers: null
+status: {}`)
+	if obj, err := runtime.Decode(testapi.Default.Codec(), testYAML); err != nil {
+		t.Fatalf("unable to decode yaml: %v", err)
+	} else {
+		if obj2, ok := obj.(*api.Pod); !ok {
+			t.Fatalf("Got wrong type")
+		} else {
+			if obj2.ObjectMeta.CreationTimestamp.UnixNano() != parseTimeOrDie("2018-08-30T14:10:58Z").UnixNano() {
+				t.Fatalf("Time stamps do not match")
+			}
+		}
 	}
 }
 

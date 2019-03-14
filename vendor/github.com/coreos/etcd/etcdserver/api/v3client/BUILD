@@ -14,7 +14,6 @@ go_library(
         "//vendor/github.com/coreos/etcd/etcdserver:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc:go_default_library",
         "//vendor/github.com/coreos/etcd/proxy/grpcproxy/adapter:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

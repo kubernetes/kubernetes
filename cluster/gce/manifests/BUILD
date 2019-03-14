@@ -1,7 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
-load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
+load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
+load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "gce-master-manifests",
@@ -15,11 +15,9 @@ filegroup(
     srcs = [
         "abac-authz-policy.jsonl",
         "cluster-autoscaler.manifest",
-        "e2e-image-puller.manifest",
         "etcd.manifest",
         "etcd-empty-dir-cleanup.yaml",
         "glbc.manifest",
-        "kms-plugin-container.manifest",
         "kube-addon-manager.yaml",
         "kube-apiserver.manifest",
         "kube-controller-manager.manifest",

@@ -88,8 +88,10 @@ func TestRunCompletion(t *testing.T) {
 	parentCmd.AddCommand(cmd)
 
 	for _, tc := range testCases {
-		if err := RunCompletion(&out, "", cmd, tc.args); (err != nil) != tc.expectedError {
-			t.Errorf("Test case %q: TestRunCompletion expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if err := RunCompletion(&out, "", cmd, tc.args); (err != nil) != tc.expectedError {
+				t.Errorf("Test case %q: TestRunCompletion expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
+			}
+		})
 	}
 }

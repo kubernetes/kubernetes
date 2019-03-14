@@ -24,9 +24,9 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kube-openapi/pkg/util/proto/validation"
+
 	// This dependency is needed to register API types.
 	"k8s.io/kube-openapi/pkg/util/proto/testing"
-	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
@@ -45,7 +45,7 @@ var _ = Describe("resource validation using OpenAPI Schema", func() {
 
 	It("finds Deployment in Schema and validates it", func() {
 		err := validator.ValidateBytes([]byte(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
@@ -53,6 +53,9 @@ metadata:
   name: name
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: redis
   template:
     metadata:
       labels:

@@ -1,18 +1,13 @@
-apiEndpoint:
-  advertiseAddress: 192.168.2.2
-  bindPort: 6443
-apiVersion: kubeadm.k8s.io/v1alpha3
+apiVersion: kubeadm.k8s.io/v1beta1
 caCertPath: /etc/kubernetes/pki/ca.crt
-clusterName: kubernetes
-discoveryFile: ""
-discoveryTimeout: 5m0s
-discoveryToken: abcdef.0123456789abcdef
-discoveryTokenAPIServers:
-- kube-apiserver:6443
-discoveryTokenUnsafeSkipCAVerification: true
+discovery:
+  bootstrapToken:
+    apiServerEndpoint: kube-apiserver:6443
+    token: abcdef.0123456789abcdef
+    unsafeSkipCAVerification: true
+  timeout: 5m0s
+  tlsBootstrapToken: abcdef.0123456789abcdef
 kind: JoinConfiguration
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
   name: thegopher
-tlsBootstrapToken: abcdef.0123456789abcdef
-token: abcdef.0123456789abcdef

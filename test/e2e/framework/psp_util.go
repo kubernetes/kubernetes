@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	policy "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,33 +42,33 @@ var (
 )
 
 // Creates a PodSecurityPolicy that allows everything.
-func PrivilegedPSP(name string) *extensionsv1beta1.PodSecurityPolicy {
+func PrivilegedPSP(name string) *policy.PodSecurityPolicy {
 	allowPrivilegeEscalation := true
-	return &extensionsv1beta1.PodSecurityPolicy{
+	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: map[string]string{seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny},
 		},
-		Spec: extensionsv1beta1.PodSecurityPolicySpec{
+		Spec: policy.PodSecurityPolicySpec{
 			Privileged:               true,
 			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 			AllowedCapabilities:      []corev1.Capability{"*"},
-			Volumes:                  []extensionsv1beta1.FSType{extensionsv1beta1.All},
+			Volumes:                  []policy.FSType{policy.All},
 			HostNetwork:              true,
-			HostPorts:                []extensionsv1beta1.HostPortRange{{Min: 0, Max: 65535}},
+			HostPorts:                []policy.HostPortRange{{Min: 0, Max: 65535}},
 			HostIPC:                  true,
 			HostPID:                  true,
-			RunAsUser: extensionsv1beta1.RunAsUserStrategyOptions{
-				Rule: extensionsv1beta1.RunAsUserStrategyRunAsAny,
+			RunAsUser: policy.RunAsUserStrategyOptions{
+				Rule: policy.RunAsUserStrategyRunAsAny,
 			},
-			SELinux: extensionsv1beta1.SELinuxStrategyOptions{
-				Rule: extensionsv1beta1.SELinuxStrategyRunAsAny,
+			SELinux: policy.SELinuxStrategyOptions{
+				Rule: policy.SELinuxStrategyRunAsAny,
 			},
-			SupplementalGroups: extensionsv1beta1.SupplementalGroupsStrategyOptions{
-				Rule: extensionsv1beta1.SupplementalGroupsStrategyRunAsAny,
+			SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
+				Rule: policy.SupplementalGroupsStrategyRunAsAny,
 			},
-			FSGroup: extensionsv1beta1.FSGroupStrategyOptions{
-				Rule: extensionsv1beta1.FSGroupStrategyRunAsAny,
+			FSGroup: policy.FSGroupStrategyOptions{
+				Rule: policy.FSGroupStrategyRunAsAny,
 			},
 			ReadOnlyRootFilesystem: false,
 			AllowedUnsafeSysctls:   []string{"*"},
@@ -78,7 +78,7 @@ func PrivilegedPSP(name string) *extensionsv1beta1.PodSecurityPolicy {
 
 func IsPodSecurityPolicyEnabled(f *Framework) bool {
 	isPSPEnabledOnce.Do(func() {
-		psps, err := f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().List(metav1.ListOptions{})
+		psps, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
 			isPSPEnabled = false
@@ -103,7 +103,7 @@ func CreatePrivilegedPSPBinding(f *Framework, namespace string) {
 	}
 	// Create the privileged PSP & role
 	privilegedPSPOnce.Do(func() {
-		_, err := f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().Get(
+		_, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Get(
 			podSecurityPolicyPrivileged, metav1.GetOptions{})
 		if !apierrs.IsNotFound(err) {
 			// Privileged PSP was already created.
@@ -112,8 +112,10 @@ func CreatePrivilegedPSPBinding(f *Framework, namespace string) {
 		}
 
 		psp := PrivilegedPSP(podSecurityPolicyPrivileged)
-		psp, err = f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().Create(psp)
-		ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
+		psp, err = f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Create(psp)
+		if !apierrs.IsAlreadyExists(err) {
+			ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
+		}
 
 		if IsRBACEnabled(f) {
 			// Create the Role to bind it to the namespace.
@@ -126,7 +128,9 @@ func CreatePrivilegedPSPBinding(f *Framework, namespace string) {
 					Verbs:         []string{"use"},
 				}},
 			})
-			ExpectNoError(err, "Failed to create PSP role")
+			if !apierrs.IsAlreadyExists(err) {
+				ExpectNoError(err, "Failed to create PSP role")
+			}
 		}
 	})
 

@@ -24,8 +24,7 @@ import (
 
 // CloudProviderOptions holds the cloudprovider options.
 type CloudProviderOptions struct {
-	CloudConfigFile string
-	Name            string
+	*kubectrlmgrconfig.CloudProviderConfiguration
 }
 
 // Validate checks validation of cloudprovider options.

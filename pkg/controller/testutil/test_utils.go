@@ -46,7 +46,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 var (
@@ -55,7 +55,7 @@ var (
 
 // FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface. It
 // allows test cases to have fine-grained control over mock behaviors. We also need
-// PodsInterface and PodInterface to test list & delet pods, which is implemented in
+// PodsInterface and PodInterface to test list & delete pods, which is implemented in
 // the embedded client.Fake field.
 type FakeNodeHandler struct {
 	*fake.Clientset
@@ -77,7 +77,7 @@ type FakeNodeHandler struct {
 	PatchWaitChan  chan struct{}
 }
 
-// FakeLegacyHandler is a fake implemtation of CoreV1Interface.
+// FakeLegacyHandler is a fake implementation of CoreV1Interface.
 type FakeLegacyHandler struct {
 	v1core.CoreV1Interface
 	n *FakeNodeHandler
@@ -96,7 +96,7 @@ func (m *FakeNodeHandler) GetUpdatedNodesCopy() []*v1.Node {
 
 // Core returns fake CoreInterface.
 func (m *FakeNodeHandler) Core() v1core.CoreV1Interface {
-	return &FakeLegacyHandler{m.Clientset.Core(), m}
+	return &FakeLegacyHandler{m.Clientset.CoreV1(), m}
 }
 
 // CoreV1 returns fake CoreV1Interface
@@ -181,7 +181,7 @@ func (m *FakeNodeHandler) List(opts metav1.ListOptions) (*v1.NodeList, error) {
 	return nodeList, nil
 }
 
-// Delete delets a Node from the fake store.
+// Delete deletes a Node from the fake store.
 func (m *FakeNodeHandler) Delete(id string, opt *metav1.DeleteOptions) error {
 	m.lock.Lock()
 	defer func() {
@@ -299,12 +299,12 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 
 	originalObjJS, err := json.Marshal(nodeCopy)
 	if err != nil {
-		glog.Errorf("Failed to marshal %v", nodeCopy)
+		klog.Errorf("Failed to marshal %v", nodeCopy)
 		return nil, nil
 	}
 	var originalNode v1.Node
 	if err = json.Unmarshal(originalObjJS, &originalNode); err != nil {
-		glog.Errorf("Failed to unmarshall original object: %v", err)
+		klog.Errorf("Failed to unmarshal original object: %v", err)
 		return nil, nil
 	}
 
@@ -313,31 +313,31 @@ func (m *FakeNodeHandler) Patch(name string, pt types.PatchType, data []byte, su
 	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(data)
 		if err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 		if patchedObjJS, err = patchObj.Apply(originalObjJS); err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 	case types.MergePatchType:
 		if patchedObjJS, err = jsonpatch.MergePatch(originalObjJS, data); err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 	case types.StrategicMergePatchType:
 		if patchedObjJS, err = strategicpatch.StrategicMergePatch(originalObjJS, data, originalNode); err != nil {
-			glog.Error(err.Error())
+			klog.Error(err.Error())
 			return nil, nil
 		}
 	default:
-		glog.Errorf("unknown Content-Type header for patch: %v", pt)
+		klog.Errorf("unknown Content-Type header for patch: %v", pt)
 		return nil, nil
 	}
 
 	var updatedNode v1.Node
 	if err = json.Unmarshal(patchedObjJS, &updatedNode); err != nil {
-		glog.Errorf("Failed to unmarshall patched object: %v", err)
+		klog.Errorf("Failed to unmarshal patched object: %v", err)
 		return nil, nil
 	}
 
@@ -374,7 +374,7 @@ func (f *FakeRecorder) PastEventf(obj runtime.Object, timestamp metav1.Time, eve
 
 // AnnotatedEventf emits a fake formatted event to the fake recorder
 func (f *FakeRecorder) AnnotatedEventf(obj runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.Eventf(obj, eventtype, reason, messageFmt, args)
+	f.Eventf(obj, eventtype, reason, messageFmt, args...)
 }
 
 func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, eventtype, reason, message string) {
@@ -382,7 +382,7 @@ func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, 
 	defer f.Unlock()
 	ref, err := ref.GetReference(legacyscheme.Scheme, obj)
 	if err != nil {
-		glog.Errorf("Encoutered error while getting reference: %v", err)
+		klog.Errorf("Encountered error while getting reference: %v", err)
 		return
 	}
 	event := f.makeEvent(ref, eventtype, reason, message)

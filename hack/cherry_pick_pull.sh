@@ -14,24 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Usage Instructions: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-release/cherry-picks.md
+
 # Checkout a PR from GitHub. (Yes, this is sitting in a Git tree. How
 # meta.) Assumes you care about pulls from remote "upstream" and
-# checks thems out to a branch named:
+# checks them out to a branch named:
 #  automated-cherry-pick-of-<pr>-<target branch>-<timestamp>
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-declare -r KUBE_ROOT="$(dirname "${BASH_SOURCE}")/.."
-cd "${KUBE_ROOT}"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+declare -r REPO_ROOT
+cd "${REPO_ROOT}"
 
-declare -r STARTINGBRANCH=$(git symbolic-ref --short HEAD)
-declare -r REBASEMAGIC="${KUBE_ROOT}/.git/rebase-apply"
+STARTINGBRANCH=$(git symbolic-ref --short HEAD)
+declare -r STARTINGBRANCH
+declare -r REBASEMAGIC="${REPO_ROOT}/.git/rebase-apply"
 DRY_RUN=${DRY_RUN:-""}
 REGENERATE_DOCS=${REGENERATE_DOCS:-""}
 UPSTREAM_REMOTE=${UPSTREAM_REMOTE:-upstream}
 FORK_REMOTE=${FORK_REMOTE:-origin}
+MAIN_REPO_ORG=${MAIN_REPO_ORG:-$(git remote get-url "$UPSTREAM_REMOTE" | awk '{gsub(/http[s]:\/\/|git@/,"")}1' | awk -F'[@:./]' 'NR==1{print $3}')}
+MAIN_REPO_NAME=${MAIN_REPO_NAME:-$(git remote get-url "$UPSTREAM_REMOTE" | awk '{gsub(/http[s]:\/\/|git@/,"")}1' | awk -F'[@:./]' 'NR==1{print $4}')}
 
 if [[ -z ${GITHUB_USER:-} ]]; then
   echo "Please export GITHUB_USER=<your-user> (or GH organization, if that's where your fork lives)"
@@ -140,7 +146,7 @@ Cherry pick of ${PULLSUBJ} on ${rel}.
 ${numandtitle}
 EOF
 
-  hub pull-request -F "${prtext}" -h "${GITHUB_USER}:${NEWBRANCH}" -b "kubernetes:${rel}"
+hub pull-request -F "${prtext}" -h "${GITHUB_USER}:${NEWBRANCH}" -b "${MAIN_REPO_ORG}:${rel}"
 }
 
 git checkout -b "${NEWBRANCHUNIQ}" "${BRANCH}"
@@ -149,7 +155,8 @@ cleanbranch="${NEWBRANCHUNIQ}"
 gitamcleanup=true
 for pull in "${PULLS[@]}"; do
   echo "+++ Downloading patch to /tmp/${pull}.patch (in case you need to do this again)"
-  curl -o "/tmp/${pull}.patch" -sSL "http://pr.k8s.io/${pull}.patch"
+
+  curl -o "/tmp/${pull}.patch" -sSL "https://github.com/${MAIN_REPO_ORG}/${MAIN_REPO_NAME}/pull/${pull}.patch"
   echo
   echo "+++ About to attempt cherry pick of PR. To reattempt:"
   echo "  $ git am -3 /tmp/${pull}.patch"
@@ -211,8 +218,8 @@ if [[ -n "${DRY_RUN}" ]]; then
   exit 0
 fi
 
-if git remote -v | grep ^${FORK_REMOTE} | grep kubernetes/kubernetes.git; then
-  echo "!!! You have ${FORK_REMOTE} configured as your kubernetes/kubernetes.git"
+if git remote -v | grep ^${FORK_REMOTE} | grep ${MAIN_REPO_ORG}/${MAIN_REPO_NAME}.git; then
+  echo "!!! You have ${FORK_REMOTE} configured as your ${MAIN_REPO_ORG}/${MAIN_REPO_NAME}.git"
   echo "This isn't normal. Leaving you with push instructions:"
   echo
   echo "+++ First manually push the branch this script created:"

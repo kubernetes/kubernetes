@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -85,7 +85,7 @@ func (g *genProtoIDL) Filter(c *generator.Context, t *types.Type) bool {
 			// Type specified "true".
 			return true
 		}
-		glog.Fatalf(`Comment tag "protobuf" must be true or false, found: %q`, tagVals[0])
+		klog.Fatalf(`Comment tag "protobuf" must be true or false, found: %q`, tagVals[0])
 	}
 	if !g.generateAll {
 		// We're not generating everything.
@@ -724,6 +724,10 @@ func genComment(out io.Writer, lines []string, indent string) {
 		lines = lines[:l-1]
 	}
 	for _, c := range lines {
+		if len(c) == 0 {
+			fmt.Fprintf(out, "%s//\n", indent) // avoid trailing whitespace
+			continue
+		}
 		fmt.Fprintf(out, "%s// %s\n", indent, c)
 	}
 }

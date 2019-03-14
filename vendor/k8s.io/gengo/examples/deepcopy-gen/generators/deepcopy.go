@@ -29,7 +29,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // CustomArgs is used tby the go2idl framework to pass args specific to this
@@ -62,7 +62,7 @@ func extractTag(comments []string) *tagValue {
 	}
 	// If there are multiple values, abort.
 	if len(tagVals) > 1 {
-		glog.Fatalf("Found %d %s tags: %q", len(tagVals), tagName, tagVals)
+		klog.Fatalf("Found %d %s tags: %q", len(tagVals), tagName, tagVals)
 	}
 
 	// If we got here we are returning something.
@@ -89,7 +89,7 @@ func extractTag(comments []string) *tagValue {
 				tag.register = true
 			}
 		default:
-			glog.Fatalf("Unsupported %s param: %q", tagName, parts[i])
+			klog.Fatalf("Unsupported %s param: %q", tagName, parts[i])
 		}
 	}
 	return tag
@@ -123,7 +123,7 @@ func DefaultNameSystem() string {
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
-		glog.Fatalf("Failed loading boilerplate: %v", err)
+		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	inputs := sets.NewString(context.Inputs...)
@@ -143,7 +143,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	for i := range inputs {
-		glog.V(5).Infof("Considering pkg %q", i)
+		klog.V(5).Infof("Considering pkg %q", i)
 		pkg := context.Universe[i]
 		if pkg == nil {
 			// If the input had no Go files, for example.
@@ -156,12 +156,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		if ptag != nil {
 			ptagValue = ptag.value
 			if ptagValue != tagValuePackage {
-				glog.Fatalf("Package %v: unsupported %s value: %q", i, tagName, ptagValue)
+				klog.Fatalf("Package %v: unsupported %s value: %q", i, tagName, ptagValue)
 			}
 			ptagRegister = ptag.register
-			glog.V(5).Infof("  tag.value: %q, tag.register: %t", ptagValue, ptagRegister)
+			klog.V(5).Infof("  tag.value: %q, tag.register: %t", ptagValue, ptagRegister)
 		} else {
-			glog.V(5).Infof("  no tag")
+			klog.V(5).Infof("  no tag")
 		}
 
 		// If the pkg-scoped tag says to generate, we can skip scanning types.
@@ -170,12 +170,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			// If the pkg-scoped tag did not exist, scan all types for one that
 			// explicitly wants generation.
 			for _, t := range pkg.Types {
-				glog.V(5).Infof("  considering type %q", t.Name.String())
+				klog.V(5).Infof("  considering type %q", t.Name.String())
 				ttag := extractTag(t.CommentLines)
 				if ttag != nil && ttag.value == "true" {
-					glog.V(5).Infof("    tag=true")
+					klog.V(5).Infof("    tag=true")
 					if !copyableType(t) {
-						glog.Fatalf("Type %v requests deepcopy generation but is not copyable", t)
+						klog.Fatalf("Type %v requests deepcopy generation but is not copyable", t)
 					}
 					pkgNeedsGeneration = true
 					break
@@ -184,7 +184,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 
 		if pkgNeedsGeneration {
-			glog.V(3).Infof("Package %q needs generation", i)
+			klog.V(3).Infof("Package %q needs generation", i)
 			path := pkg.Path
 			// if the source path is within a /vendor/ directory (for example,
 			// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
@@ -263,10 +263,10 @@ func (g *genDeepCopy) Filter(c *generator.Context, t *types.Type) bool {
 		return false
 	}
 	if !copyableType(t) {
-		glog.V(2).Infof("Type %v is not copyable", t)
+		klog.V(2).Infof("Type %v is not copyable", t)
 		return false
 	}
-	glog.V(4).Infof("Type %v is copyable", t)
+	klog.V(4).Infof("Type %v is copyable", t)
 	g.typesForInit = append(g.typesForInit, t)
 	return true
 }
@@ -321,12 +321,12 @@ func deepCopyMethod(t *types.Type) (*types.Signature, error) {
 	return f.Signature, nil
 }
 
-// deepCopyMethodOrDie returns the signatrue of a DeepCopy method, nil or calls glog.Fatalf
+// deepCopyMethodOrDie returns the signatrue of a DeepCopy method, nil or calls klog.Fatalf
 // if the type does not match.
 func deepCopyMethodOrDie(t *types.Type) *types.Signature {
 	ret, err := deepCopyMethod(t)
 	if err != nil {
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 	return ret
 }
@@ -367,12 +367,12 @@ func deepCopyIntoMethod(t *types.Type) (*types.Signature, error) {
 	return f.Signature, nil
 }
 
-// deepCopyIntoMethodOrDie returns the signature of a DeepCopyInto() method, nil or calls glog.Fatalf
+// deepCopyIntoMethodOrDie returns the signature of a DeepCopyInto() method, nil or calls klog.Fatalf
 // if the type is wrong.
 func deepCopyIntoMethodOrDie(t *types.Type) *types.Signature {
 	ret, err := deepCopyIntoMethod(t)
 	if err != nil {
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 	return ret
 }
@@ -465,17 +465,17 @@ func (g *genDeepCopy) needsGeneration(t *types.Type) bool {
 	if tag != nil {
 		tv = tag.value
 		if tv != "true" && tv != "false" {
-			glog.Fatalf("Type %v: unsupported %s value: %q", t, tagName, tag.value)
+			klog.Fatalf("Type %v: unsupported %s value: %q", t, tagName, tag.value)
 		}
 	}
 	if g.allTypes && tv == "false" {
 		// The whole package is being generated, but this type has opted out.
-		glog.V(5).Infof("Not generating for type %v because type opted out", t)
+		klog.V(5).Infof("Not generating for type %v because type opted out", t)
 		return false
 	}
 	if !g.allTypes && tv != "true" {
 		// The whole package is NOT being generated, and this type has NOT opted in.
-		glog.V(5).Infof("Not generating for type %v because type did not opt in", t)
+		klog.V(5).Infof("Not generating for type %v because type did not opt in", t)
 		return false
 	}
 	return true
@@ -576,7 +576,7 @@ func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	if !g.needsGeneration(t) {
 		return nil
 	}
-	glog.V(5).Infof("Generating deepcopy function for type %v", t)
+	klog.V(5).Infof("Generating deepcopy function for type %v", t)
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	args := argsFromType(t)
@@ -678,12 +678,12 @@ func (g *genDeepCopy) generateFor(t *types.Type, sw *generator.SnippetWriter) {
 		f = g.doPointer
 	case types.Interface:
 		// interfaces are handled in-line in the other cases
-		glog.Fatalf("Hit an interface type %v. This should never happen.", t)
+		klog.Fatalf("Hit an interface type %v. This should never happen.", t)
 	case types.Alias:
 		// can never happen because we branch on the underlying type which is never an alias
-		glog.Fatalf("Hit an alias type %v. This should never happen.", t)
+		klog.Fatalf("Hit an alias type %v. This should never happen.", t)
 	default:
-		glog.Fatalf("Hit an unsupported type %v.", t)
+		klog.Fatalf("Hit an unsupported type %v.", t)
 	}
 	f(t, sw)
 }
@@ -711,7 +711,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 	}
 
 	if !ut.Key.IsAssignable() {
-		glog.Fatalf("Hit an unsupported type %v.", uet)
+		klog.Fatalf("Hit an unsupported type %v.", uet)
 	}
 
 	sw.Do("*out = make($.|raw$, len(*in))\n", t)
@@ -754,7 +754,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 	case uet.Kind == types.Struct:
 		sw.Do("(*out)[key] = *val.DeepCopy()\n", uet)
 	default:
-		glog.Fatalf("Hit an unsupported type %v.", uet)
+		klog.Fatalf("Hit an unsupported type %v.", uet)
 	}
 	sw.Do("}\n", nil)
 }
@@ -795,7 +795,7 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 		} else if uet.Kind == types.Struct {
 			sw.Do("(*in)[i].DeepCopyInto(&(*out)[i])\n", nil)
 		} else {
-			glog.Fatalf("Hit an unsupported type %v.", uet)
+			klog.Fatalf("Hit an unsupported type %v.", uet)
 		}
 		sw.Do("}\n", nil)
 	}
@@ -863,7 +863,7 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do(fmt.Sprintf("out.$.name$ = in.$.name$.DeepCopy%s()\n", uft.Name.Name), args)
 			sw.Do("}\n", nil)
 		default:
-			glog.Fatalf("Hit an unsupported type %v.", uft)
+			klog.Fatalf("Hit an unsupported type %v.", uft)
 		}
 	}
 }
@@ -900,6 +900,6 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 		sw.Do("*out = new($.Elem|raw$)\n", ut)
 		sw.Do("(*in).DeepCopyInto(*out)\n", nil)
 	default:
-		glog.Fatalf("Hit an unsupported type %v.", uet)
+		klog.Fatalf("Hit an unsupported type %v.", uet)
 	}
 }

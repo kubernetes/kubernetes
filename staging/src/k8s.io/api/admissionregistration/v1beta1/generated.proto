@@ -66,7 +66,7 @@ message Rule {
   repeated string apiVersions = 2;
 
   // Resources is a list of resources this rule applies to.
-  // 
+  //
   // For example:
   // 'pods' means pods.
   // 'pods/log' means the log subresource of pods.
@@ -74,13 +74,25 @@ message Rule {
   // 'pods/*' means all subresources of pods.
   // '*/scale' means all scale subresources.
   // '*/*' means all resources and their subresources.
-  // 
+  //
   // If wildcard is present, the validation rule will ensure resources do not
   // overlap with each other.
-  // 
+  //
   // Depending on the enclosing object, subresources might not be allowed.
   // Required.
   repeated string resources = 3;
+
+  // scope specifies the scope of this rule.
+  // Valid values are "Cluster", "Namespaced", and "*"
+  // "Cluster" means that only cluster-scoped resources will match this rule.
+  // Namespace API objects are cluster-scoped.
+  // "Namespaced" means that only namespaced resources will match this rule.
+  // "*" means that there are no scope restrictions.
+  // Subresources match the scope of their parent resource.
+  // Default is "*".
+  //
+  // +optional
+  optional string scope = 4;
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
@@ -168,7 +180,7 @@ message Webhook {
   // object itself is a namespace, the matching is performed on
   // object.metadata.labels. If the object is another cluster scoped resource,
   // it never skips the webhook.
-  // 
+  //
   // For example, to run the webhook on any objects whose namespace is not
   // associated with "runlevel" of "0" or "1";  you will set the selector as
   // follows:
@@ -184,7 +196,7 @@ message Webhook {
   //     }
   //   ]
   // }
-  // 
+  //
   // If instead you want to only run the webhook on any objects whose
   // namespace is associated with the "environment" of "prod" or "staging";
   // you will set the selector as follows:
@@ -200,11 +212,11 @@ message Webhook {
   //     }
   //   ]
   // }
-  // 
+  //
   // See
   // https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
   // for more examples of label selectors.
-  // 
+  //
   // Default to the empty LabelSelector, which matches everything.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 5;
@@ -217,53 +229,72 @@ message Webhook {
   // sideEffects == Unknown or Some. Defaults to Unknown.
   // +optional
   optional string sideEffects = 6;
+
+  // TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+  // the webhook call will be ignored or the API call will fail based on the
+  // failure policy.
+  // The timeout value must be between 1 and 30 seconds.
+  // Default to 30 seconds.
+  // +optional
+  optional int32 timeoutSeconds = 7;
+
+  // AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+  // versions the Webhook expects. API server will try to use first version in
+  // the list which it supports. If none of the versions specified in this list
+  // supported by API server, validation will fail for this object.
+  // If a persisted webhook configuration specifies allowed versions and does not
+  // include any versions known to the API Server, calls to the webhook will fail
+  // and be subject to the failure policy.
+  // Default to `['v1beta1']`.
+  // +optional
+  repeated string admissionReviewVersions = 8;
 }
 
 // WebhookClientConfig contains the information to make a TLS
 // connection with the webhook
 message WebhookClientConfig {
   // `url` gives the location of the webhook, in standard URL form
-  // (`[scheme://]host:port/path`). Exactly one of `url` or `service`
+  // (`scheme://host:port/path`). Exactly one of `url` or `service`
   // must be specified.
-  // 
+  //
   // The `host` should not refer to a service running in the cluster; use
   // the `service` field instead. The host might be resolved via external
   // DNS in some apiservers (e.g., `kube-apiserver` cannot resolve
   // in-cluster DNS as that would be a layering violation). `host` may
   // also be an IP address.
-  // 
+  //
   // Please note that using `localhost` or `127.0.0.1` as a `host` is
   // risky unless you take great care to run this webhook on all hosts
   // which run an apiserver which might need to make calls to this
   // webhook. Such installs are likely to be non-portable, i.e., not easy
   // to turn up in a new cluster.
-  // 
+  //
   // The scheme must be "https"; the URL must begin with "https://".
-  // 
+  //
   // A path is optional, and if present may be any string permissible in
   // a URL. You may use the path to pass an arbitrary string to the
   // webhook, for example, a cluster identifier.
-  // 
+  //
   // Attempting to use a user or basic auth e.g. "user:password@" is not
   // allowed. Fragments ("#...") and query parameters ("?...") are not
   // allowed, either.
-  // 
+  //
   // +optional
   optional string url = 3;
 
   // `service` is a reference to the service for this webhook. Either
   // `service` or `url` must be specified.
-  // 
+  //
   // If the webhook is running within the cluster, then you should use `service`.
-  // 
+  //
   // Port 443 will be used if it is open, otherwise it is an error.
-  // 
+  //
   // +optional
   optional ServiceReference service = 1;
 
-  // `caBundle` is a PEM encoded CA bundle which will be used to validate
-  // the webhook's server certificate.
-  // Required.
+  // `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+  // If unspecified, system trust roots on the apiserver are used.
+  // +optional
   optional bytes caBundle = 2;
 }
 

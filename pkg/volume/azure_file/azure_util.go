@@ -31,8 +31,8 @@ const (
 	dirMode         = "dir_mode"
 	gid             = "gid"
 	vers            = "vers"
-	defaultFileMode = "0755"
-	defaultDirMode  = "0755"
+	defaultFileMode = "0777"
+	defaultDirMode  = "0777"
 	defaultVers     = "3.0"
 )
 

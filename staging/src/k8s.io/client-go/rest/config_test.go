@@ -19,6 +19,7 @@ package rest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -26,13 +27,15 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/flowcontrol"
 
 	fuzz "github.com/google/gofuzz"
@@ -236,6 +239,9 @@ func TestAnonymousConfig(t *testing.T) {
 		func(fn *func(http.RoundTripper) http.RoundTripper, f fuzz.Continue) {
 			*fn = fakeWrapperFunc
 		},
+		func(fn *transport.WrapperFunc, f fuzz.Continue) {
+			*fn = fakeWrapperFunc
+		},
 		func(r *runtime.NegotiatedSerializer, f fuzz.Continue) {
 			serializer := &fakeNegotiatedSerializer{}
 			f.Fuzz(serializer)
@@ -264,6 +270,7 @@ func TestAnonymousConfig(t *testing.T) {
 		// is added to Config, update AnonymousClientConfig to preserve the field otherwise.
 		expected.Impersonate = ImpersonationConfig{}
 		expected.BearerToken = ""
+		expected.BearerTokenFile = ""
 		expected.Username = ""
 		expected.Password = ""
 		expected.AuthProvider = nil
@@ -313,6 +320,9 @@ func TestCopyConfig(t *testing.T) {
 			*r = roundTripper
 		},
 		func(fn *func(http.RoundTripper) http.RoundTripper, f fuzz.Continue) {
+			*fn = fakeWrapperFunc
+		},
+		func(fn *transport.WrapperFunc, f fuzz.Continue) {
 			*fn = fakeWrapperFunc
 		},
 		func(r *runtime.NegotiatedSerializer, f fuzz.Continue) {
@@ -370,6 +380,143 @@ func TestCopyConfig(t *testing.T) {
 
 		if !reflect.DeepEqual(*actual, expected) {
 			t.Fatalf("CopyConfig  dropped unexpected fields, identify whether they are security related or not: %s", diff.ObjectReflectDiff(expected, *actual))
+		}
+	}
+}
+
+func TestConfigStringer(t *testing.T) {
+	formatBytes := func(b []byte) string {
+		// %#v for []byte always pre-pends "[]byte{".
+		// %#v for struct with []byte field always pre-pends "[]uint8{".
+		return strings.Replace(fmt.Sprintf("%#v", b), "byte", "uint8", 1)
+	}
+	tests := []struct {
+		desc            string
+		c               *Config
+		expectContent   []string
+		prohibitContent []string
+	}{
+		{
+			desc:          "nil config",
+			c:             nil,
+			expectContent: []string{"<nil>"},
+		},
+		{
+			desc: "non-sensitive config",
+			c: &Config{
+				Host:      "localhost:8080",
+				APIPath:   "v1",
+				UserAgent: "gobot",
+			},
+			expectContent: []string{"localhost:8080", "v1", "gobot"},
+		},
+		{
+			desc: "sensitive config",
+			c: &Config{
+				Host:        "localhost:8080",
+				Username:    "gopher",
+				Password:    "g0ph3r",
+				BearerToken: "1234567890",
+				TLSClientConfig: TLSClientConfig{
+					CertFile: "a.crt",
+					KeyFile:  "a.key",
+					CertData: []byte("fake cert"),
+					KeyData:  []byte("fake key"),
+				},
+				AuthProvider: &clientcmdapi.AuthProviderConfig{
+					Config: map[string]string{"secret": "s3cr3t"},
+				},
+				ExecProvider: &clientcmdapi.ExecConfig{
+					Args: []string{"secret"},
+					Env:  []clientcmdapi.ExecEnvVar{{Name: "secret", Value: "s3cr3t"}},
+				},
+			},
+			expectContent: []string{
+				"localhost:8080",
+				"gopher",
+				"a.crt",
+				"a.key",
+				"--- REDACTED ---",
+				formatBytes([]byte("--- REDACTED ---")),
+				formatBytes([]byte("--- TRUNCATED ---")),
+			},
+			prohibitContent: []string{
+				"g0ph3r",
+				"1234567890",
+				formatBytes([]byte("fake cert")),
+				formatBytes([]byte("fake key")),
+				"secret",
+				"s3cr3t",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := tt.c.String()
+			t.Logf("formatted config: %q", got)
+
+			for _, expect := range tt.expectContent {
+				if !strings.Contains(got, expect) {
+					t.Errorf("missing expected string %q", expect)
+				}
+			}
+			for _, prohibit := range tt.prohibitContent {
+				if strings.Contains(got, prohibit) {
+					t.Errorf("found prohibited string %q", prohibit)
+				}
+			}
+		})
+	}
+}
+
+func TestConfigSprint(t *testing.T) {
+	c := &Config{
+		Host:    "localhost:8080",
+		APIPath: "v1",
+		ContentConfig: ContentConfig{
+			AcceptContentTypes: "application/json",
+			ContentType:        "application/json",
+		},
+		Username:    "gopher",
+		Password:    "g0ph3r",
+		BearerToken: "1234567890",
+		Impersonate: ImpersonationConfig{
+			UserName: "gopher2",
+		},
+		AuthProvider: &clientcmdapi.AuthProviderConfig{
+			Name:   "gopher",
+			Config: map[string]string{"secret": "s3cr3t"},
+		},
+		AuthConfigPersister: fakeAuthProviderConfigPersister{},
+		ExecProvider: &clientcmdapi.ExecConfig{
+			Command: "sudo",
+			Args:    []string{"secret"},
+			Env:     []clientcmdapi.ExecEnvVar{{Name: "secret", Value: "s3cr3t"}},
+		},
+		TLSClientConfig: TLSClientConfig{
+			CertFile: "a.crt",
+			KeyFile:  "a.key",
+			CertData: []byte("fake cert"),
+			KeyData:  []byte("fake key"),
+		},
+		UserAgent:     "gobot",
+		Transport:     &fakeRoundTripper{},
+		WrapTransport: fakeWrapperFunc,
+		QPS:           1,
+		Burst:         2,
+		RateLimiter:   &fakeLimiter{},
+		Timeout:       3 * time.Second,
+		Dial:          fakeDialFunc,
+	}
+	want := fmt.Sprintf(
+		`&rest.Config{Host:"localhost:8080", APIPath:"v1", ContentConfig:rest.ContentConfig{AcceptContentTypes:"application/json", ContentType:"application/json", GroupVersion:(*schema.GroupVersion)(nil), NegotiatedSerializer:runtime.NegotiatedSerializer(nil)}, Username:"gopher", Password:"--- REDACTED ---", BearerToken:"--- REDACTED ---", BearerTokenFile:"", Impersonate:rest.ImpersonationConfig{UserName:"gopher2", Groups:[]string(nil), Extra:map[string][]string(nil)}, AuthProvider:api.AuthProviderConfig{Name: "gopher", Config: map[string]string{--- REDACTED ---}}, AuthConfigPersister:rest.AuthProviderConfigPersister(--- REDACTED ---), ExecProvider:api.AuthProviderConfig{Command: "sudo", Args: []string{"--- REDACTED ---"}, Env: []ExecEnvVar{--- REDACTED ---}, APIVersion: ""}, TLSClientConfig:rest.sanitizedTLSClientConfig{Insecure:false, ServerName:"", CertFile:"a.crt", KeyFile:"a.key", CAFile:"", CertData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x54, 0x52, 0x55, 0x4e, 0x43, 0x41, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, KeyData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x52, 0x45, 0x44, 0x41, 0x43, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, CAData:[]uint8(nil)}, UserAgent:"gobot", Transport:(*rest.fakeRoundTripper)(%p), WrapTransport:(transport.WrapperFunc)(%p), QPS:1, Burst:2, RateLimiter:(*rest.fakeLimiter)(%p), Timeout:3000000000, Dial:(func(context.Context, string, string) (net.Conn, error))(%p)}`,
+		c.Transport, fakeWrapperFunc, c.RateLimiter, fakeDialFunc,
+	)
+
+	for _, f := range []string{"%s", "%v", "%+v", "%#v"} {
+		if got := fmt.Sprintf(f, c); want != got {
+			t.Errorf("fmt.Sprintf(%q, c)\ngot:  %q\nwant: %q", f, got, want)
 		}
 	}
 }

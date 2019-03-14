@@ -6,8 +6,8 @@ go_library(
         "diff.go",
         "fix.go",
         "fix-update.go",
-        "flags.go",
         "gazelle.go",
+        "langs.go",
         "print.go",
         "update-repos.go",
         "version.go",
@@ -17,21 +17,25 @@ go_library(
     visibility = ["//visibility:private"],
     deps = [
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/config:go_default_library",
-        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/generator:go_default_library",
+        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/flag:go_default_library",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/label:go_default_library",
+        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/language:go_default_library",
+        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/language/go:go_default_library",
+        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/language/proto:go_default_library",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/merger:go_default_library",
-        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/packages:go_default_library",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/repos:go_default_library",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/resolve:go_default_library",
+        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/rule:go_default_library",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/version:go_default_library",
-        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/wspace:go_default_library",
-        "//vendor/github.com/bazelbuild/buildtools/build:go_default_library",
+        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/walk:go_default_library",
+        "//vendor/github.com/pmezard/go-difflib/difflib:go_default_library",
     ],
 )
 
 go_binary(
     name = "gazelle",
     embed = [":go_default_library"],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 

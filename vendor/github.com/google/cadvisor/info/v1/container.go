@@ -102,11 +102,11 @@ type ContainerInfoRequest struct {
 	NumStats int `json:"num_stats,omitempty"`
 
 	// Start time for which to query information.
-	// If ommitted, the beginning of time is assumed.
+	// If omitted, the beginning of time is assumed.
 	Start time.Time `json:"start,omitempty"`
 
 	// End time for which to query information.
-	// If ommitted, current time is assumed.
+	// If omitted, current time is assumed.
 	End time.Time `json:"end,omitempty"`
 }
 
@@ -358,6 +358,9 @@ type MemoryStats struct {
 	// Units: Bytes.
 	Swap uint64 `json:"swap"`
 
+	// The amount of memory used for mapped files (includes tmpfs/shmem)
+	MappedFile uint64 `json:"mapped_file"`
+
 	// The amount of working set memory, this includes recently accessed memory,
 	// dirty memory, and kernel memory. Working set is <= "usage".
 	// Units: Bytes.
@@ -554,6 +557,14 @@ type AcceleratorStats struct {
 	DutyCycle uint64 `json:"duty_cycle"`
 }
 
+type ProcessStats struct {
+	// Number of processes
+	ProcessCount uint64 `json:"process_count"`
+
+	// Number of open file descriptors
+	FdCount uint64 `json:"fd_count"`
+}
+
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time    `json:"timestamp"`
@@ -570,6 +581,9 @@ type ContainerStats struct {
 
 	// Metrics for Accelerators. Each Accelerator corresponds to one element in the array.
 	Accelerators []AcceleratorStats `json:"accelerators,omitempty"`
+
+	// ProcessStats for Containers
+	Processes ProcessStats `json:"processes,omitempty"`
 
 	// Custom metrics from all collectors
 	CustomMetrics map[string][]MetricVal `json:"custom_metrics,omitempty"`

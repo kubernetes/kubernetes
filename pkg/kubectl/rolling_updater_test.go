@@ -40,8 +40,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	manualfake "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 )
@@ -88,7 +86,7 @@ func newRc(replicas int, desired int) *corev1.ReplicationController {
 		Name:      "foo-v2",
 		Annotations: map[string]string{
 			desiredReplicasAnnotation: fmt.Sprintf("%d", desired),
-			sourceIdAnnotation:        "foo-v1:7764ae47-9092-11e4-8393-42010af018ff",
+			sourceIDAnnotation:        "foo-v1:7764ae47-9092-11e4-8393-42010af018ff",
 		},
 	}
 	return rc
@@ -814,7 +812,7 @@ Scaling foo-v2 up to 2
 					rc.Status.Replicas = *rc.Spec.Replicas
 					return rc, nil
 				},
-				getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceId string) (*corev1.ReplicationController, bool, error) {
+				getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {
 					// Simulate a create vs. update of an existing controller.
 					return tt.newRc, tt.newRcExists, nil
 				},
@@ -867,7 +865,7 @@ func TestUpdate_progressTimeout(t *testing.T) {
 			// Do nothing.
 			return rc, nil
 		},
-		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceId string) (*corev1.ReplicationController, bool, error) {
+		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {
 			return newRc, false, nil
 		},
 		cleanup: func(oldRc, newRc *corev1.ReplicationController, config *RollingUpdaterConfig) error {
@@ -905,13 +903,13 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 	newRc := newRc(1, 1)
 	fake := fake.NewSimpleClientset(oldRc)
 	updater := &RollingUpdater{
-		rcClient:  fake.Core(),
-		podClient: fake.Core(),
+		rcClient:  fake.CoreV1(),
+		podClient: fake.CoreV1(),
 		ns:        "default",
 		scaleAndWait: func(rc *corev1.ReplicationController, retry *RetryParams, wait *RetryParams) (*corev1.ReplicationController, error) {
 			return rc, nil
 		},
-		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceId string) (*corev1.ReplicationController, bool, error) {
+		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {
 			return newRc, false, nil
 		},
 		cleanup: func(oldRc, newRc *corev1.ReplicationController, config *RollingUpdaterConfig) error {
@@ -1103,7 +1101,7 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 				Container:     tt.container,
 				DeploymentKey: tt.deploymentKey,
 			}
-			updatedRc, err := CreateNewControllerFromCurrentController(fake.Core(), codec, config)
+			updatedRc, err := CreateNewControllerFromCurrentController(fake.CoreV1(), codec, config)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1179,8 +1177,8 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 			fake := fake.NewSimpleClientset(objs...)
 			updater := &RollingUpdater{
 				ns:        "default",
-				rcClient:  fake.Core(),
-				podClient: fake.Core(),
+				rcClient:  fake.CoreV1(),
+				podClient: fake.CoreV1(),
 			}
 			config := &RollingUpdaterConfig{
 				Out:           ioutil.Discard,
@@ -1229,7 +1227,7 @@ func TestRollingUpdater_cleanupWithClients_Rename(t *testing.T) {
 		return false, nil, nil
 	})
 
-	err := Rename(fake.Core(), rcExisting, rc.Name)
+	err := Rename(fake.CoreV1(), rcExisting, rc.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1246,7 +1244,7 @@ func TestFindSourceController(t *testing.T) {
 			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 			Annotations: map[string]string{
-				sourceIdAnnotation: "bar:1234",
+				sourceIDAnnotation: "bar:1234",
 			},
 		},
 	}
@@ -1255,7 +1253,7 @@ func TestFindSourceController(t *testing.T) {
 			Namespace: metav1.NamespaceDefault,
 			Name:      "bar",
 			Annotations: map[string]string{
-				sourceIdAnnotation: "foo:12345",
+				sourceIDAnnotation: "foo:12345",
 			},
 		},
 	}
@@ -1264,7 +1262,7 @@ func TestFindSourceController(t *testing.T) {
 			Namespace: metav1.NamespaceDefault,
 			Name:      "baz",
 			Annotations: map[string]string{
-				sourceIdAnnotation: "baz:45667",
+				sourceIDAnnotation: "baz:45667",
 			},
 		},
 	}
@@ -1317,7 +1315,7 @@ func TestFindSourceController(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(tt.list)
-			ctrl, err := FindSourceController(fakeClient.Core(), "default", tt.name)
+			ctrl, err := FindSourceController(fakeClient.CoreV1(), "default", tt.name)
 			if tt.expectError && err == nil {
 				t.Errorf("unexpected non-error")
 			}
@@ -1427,7 +1425,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			buffer := &bytes.Buffer{}
 			fakeClient := fake.NewSimpleClientset(tt.expectedRc)
-			rc, err := UpdateExistingReplicationController(fakeClient.Core(), fakeClient.Core(), tt.rc, "default", tt.name, tt.deploymentKey, tt.deploymentValue, buffer)
+			rc, err := UpdateExistingReplicationController(fakeClient.CoreV1(), fakeClient.CoreV1(), tt.rc, "default", tt.name, tt.deploymentKey, tt.deploymentValue, buffer)
 			if !reflect.DeepEqual(rc, tt.expectedRc) {
 				t.Errorf("expected:\n%#v\ngot:\n%#v\n", tt.expectedRc, rc)
 			}
@@ -1444,6 +1442,8 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 func TestUpdateRcWithRetries(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	one := int32(1)
+	grace := int64(30)
+	enableServiceLinks := corev1.DefaultEnableServiceLinks
 	rc := &corev1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -1465,7 +1465,13 @@ func TestUpdateRcWithRetries(t *testing.T) {
 						"foo": "bar",
 					},
 				},
-				Spec: apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 		},
 	}
@@ -1490,11 +1496,11 @@ func TestUpdateRcWithRetries(t *testing.T) {
 		{StatusCode: 200, Header: header, Body: objBody(codec, rc)},
 	}
 	fakeClient := &manualfake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+		GroupVersion:         corev1.SchemeGroupVersion,
 		NegotiatedSerializer: scheme.Codecs,
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
+			case p == "/api/v1/namespaces/default/replicationcontrollers/rc" && m == "PUT":
 				update := updates[0]
 				updates = updates[1:]
 				// We should always get an update with a valid rc even when the get fails. The rc should always
@@ -1508,7 +1514,7 @@ func TestUpdateRcWithRetries(t *testing.T) {
 					delete(c.Spec.Selector, "baz")
 				}
 				return update, nil
-			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "GET":
+			case p == "/api/v1/namespaces/default/replicationcontrollers/rc" && m == "GET":
 				get := gets[0]
 				gets = gets[1:]
 				return get, nil
@@ -1518,7 +1524,13 @@ func TestUpdateRcWithRetries(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
+	clientConfig := &restclient.Config{
+		APIPath: "/api",
+		ContentConfig: restclient.ContentConfig{
+			NegotiatedSerializer: scheme.Codecs,
+			GroupVersion:         &corev1.SchemeGroupVersion,
+		},
+	}
 	restClient, _ := restclient.RESTClientFor(clientConfig)
 	restClient.Client = fakeClient.Client
 	clientset := kubernetes.New(restClient)
@@ -1586,33 +1598,33 @@ func TestAddDeploymentHash(t *testing.T) {
 	seen := sets.String{}
 	updatedRc := false
 	fakeClient := &manualfake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+		GroupVersion:         corev1.SchemeGroupVersion,
 		NegotiatedSerializer: scheme.Codecs,
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			header := http.Header{}
 			header.Set("Content-Type", runtime.ContentTypeJSON)
 			switch p, m := req.URL.Path, req.Method; {
-			case p == testapi.Default.ResourcePath("pods", "default", "") && m == "GET":
+			case p == "/api/v1/namespaces/default/pods" && m == "GET":
 				if req.URL.RawQuery != "labelSelector=foo%3Dbar" {
 					t.Errorf("Unexpected query string: %s", req.URL.RawQuery)
 				}
 				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, podList)}, nil
-			case p == testapi.Default.ResourcePath("pods", "default", "foo") && m == "PUT":
+			case p == "/api/v1/namespaces/default/pods/foo" && m == "PUT":
 				seen.Insert("foo")
 				obj := readOrDie(t, req, codec)
 				podList.Items[0] = *(obj.(*corev1.Pod))
 				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, &podList.Items[0])}, nil
-			case p == testapi.Default.ResourcePath("pods", "default", "bar") && m == "PUT":
+			case p == "/api/v1/namespaces/default/pods/bar" && m == "PUT":
 				seen.Insert("bar")
 				obj := readOrDie(t, req, codec)
 				podList.Items[1] = *(obj.(*corev1.Pod))
 				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, &podList.Items[1])}, nil
-			case p == testapi.Default.ResourcePath("pods", "default", "baz") && m == "PUT":
+			case p == "/api/v1/namespaces/default/pods/baz" && m == "PUT":
 				seen.Insert("baz")
 				obj := readOrDie(t, req, codec)
 				podList.Items[2] = *(obj.(*corev1.Pod))
 				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, &podList.Items[2])}, nil
-			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
+			case p == "/api/v1/namespaces/default/replicationcontrollers/rc" && m == "PUT":
 				updatedRc = true
 				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, rc)}, nil
 			default:
@@ -1621,7 +1633,13 @@ func TestAddDeploymentHash(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
+	clientConfig := &restclient.Config{
+		APIPath: "/api",
+		ContentConfig: restclient.ContentConfig{
+			NegotiatedSerializer: scheme.Codecs,
+			GroupVersion:         &corev1.SchemeGroupVersion,
+		},
+	}
 	restClient, _ := restclient.RESTClientFor(clientConfig)
 	restClient.Client = fakeClient.Client
 	clientset := kubernetes.New(restClient)
@@ -1814,8 +1832,8 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 
 			updater := &RollingUpdater{
 				ns:        "default",
-				rcClient:  client.Core(),
-				podClient: client.Core(),
+				rcClient:  client.CoreV1(),
+				podClient: client.CoreV1(),
 				nowFn:     tt.nowFn,
 			}
 			oldReady, newReady, err := updater.readyPods(tt.oldRc, tt.newRc, tt.minReadySeconds)

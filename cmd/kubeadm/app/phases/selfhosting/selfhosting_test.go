@@ -18,10 +18,11 @@ package selfhosting
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -33,8 +34,6 @@ const (
 apiVersion: v1
 kind: Pod
 metadata:
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
   name: kube-apiserver
   namespace: kube-system
@@ -53,12 +52,11 @@ spec:
     - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
     - --advertise-address=192.168.1.115
     - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
-    - --insecure-port=0
     - --experimental-bootstrap-token-auth=true
     - --requestheader-username-headers=X-Remote-User
     - --requestheader-extra-headers-prefix=X-Remote-Extra-
     - --requestheader-allowed-names=front-proxy-client
-    - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+    - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
     - --allow-privileged=true
     - --client-ca-file=/etc/kubernetes/pki/ca.crt
     - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
@@ -90,6 +88,7 @@ spec:
       name: ca-certs-etc-pki
       readOnly: true
   hostNetwork: true
+  priorityClassName: system-cluster-critical
   volumes:
   - hostPath:
       path: /etc/kubernetes/pki
@@ -135,12 +134,11 @@ spec:
         - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
         - --advertise-address=$(HOST_IP)
         - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
-        - --insecure-port=0
         - --experimental-bootstrap-token-auth=true
         - --requestheader-username-headers=X-Remote-User
         - --requestheader-extra-headers-prefix=X-Remote-Extra-
         - --requestheader-allowed-names=front-proxy-client
-        - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+        - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
         - --allow-privileged=true
         - --client-ca-file=/etc/kubernetes/pki/ca.crt
         - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
@@ -180,6 +178,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -206,8 +205,6 @@ status:
 apiVersion: v1
 kind: Pod
 metadata:
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
   name: kube-controller-manager
   namespace: kube-system
@@ -222,8 +219,9 @@ spec:
     - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
     - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
     - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-    - --address=127.0.0.1
+    - --bind-address=127.0.0.1
     - --use-service-account-credentials=true
+    - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
     image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
@@ -252,6 +250,7 @@ spec:
       name: ca-certs-etc-pki
       readOnly: true
   hostNetwork: true
+  priorityClassName: system-cluster-critical
   volumes:
   - hostPath:
       path: /etc/kubernetes/pki
@@ -297,8 +296,9 @@ spec:
         - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
         - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
         - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-        - --address=127.0.0.1
+        - --bind-address=127.0.0.1
         - --use-service-account-credentials=true
+        - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
         image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
@@ -330,6 +330,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -360,8 +361,6 @@ status:
 apiVersion: v1
 kind: Pod
 metadata:
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
   name: kube-scheduler
   namespace: kube-system
@@ -371,7 +370,7 @@ spec:
     - kube-scheduler
     - --leader-elect=true
     - --kubeconfig=/etc/kubernetes/scheduler.conf
-    - --address=127.0.0.1
+    - --bind-address=127.0.0.1
     image: k8s.gcr.io/kube-scheduler-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
@@ -391,6 +390,7 @@ spec:
       name: kubeconfig
       readOnly: true
   hostNetwork: true
+  priorityClassName: system-cluster-critical
   volumes:
   - hostPath:
       path: /etc/kubernetes/scheduler.conf
@@ -422,7 +422,7 @@ spec:
         - kube-scheduler
         - --leader-elect=true
         - --kubeconfig=/etc/kubernetes/scheduler.conf
-        - --address=127.0.0.1
+        - --bind-address=127.0.0.1
         image: k8s.gcr.io/kube-scheduler-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
@@ -445,6 +445,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -487,41 +488,44 @@ func TestBuildDaemonSet(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		tempFile, err := createTempFileWithContent(rt.podBytes)
-		if err != nil {
-			t.Errorf("error creating tempfile with content:%v", err)
-		}
-		defer os.Remove(tempFile)
+		t.Run(rt.component, func(t *testing.T) {
+			tempFile, err := createTempFileWithContent(rt.podBytes)
+			if err != nil {
+				t.Errorf("error creating tempfile with content:%v", err)
+			}
+			defer os.Remove(tempFile)
 
-		podSpec, err := loadPodSpecFromFile(tempFile)
-		if err != nil {
-			t.Fatalf("couldn't load the specified Pod Spec")
-		}
+			podSpec, err := loadPodSpecFromFile(tempFile)
+			if err != nil {
+				t.Fatalf("couldn't load the specified Pod Spec")
+			}
 
-		ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
-		dsBytes, err := util.MarshalToYaml(ds, apps.SchemeGroupVersion)
-		if err != nil {
-			t.Fatalf("failed to marshal daemonset to YAML: %v", err)
-		}
+			ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
+			dsBytes, err := util.MarshalToYaml(ds, apps.SchemeGroupVersion)
+			if err != nil {
+				t.Fatalf("failed to marshal daemonset to YAML: %v", err)
+			}
 
-		if !bytes.Equal(dsBytes, rt.dsBytes) {
-			t.Errorf("failed TestBuildDaemonSet:\nexpected:\n%s\nsaw:\n%s", rt.dsBytes, dsBytes)
-		}
+			if !bytes.Equal(dsBytes, rt.dsBytes) {
+				t.Errorf("failed TestBuildDaemonSet:\nexpected:\n%s\nsaw:\n%s", rt.dsBytes, dsBytes)
+			}
+		})
 	}
 }
 
 func TestLoadPodSpecFromFile(t *testing.T) {
 	tests := []struct {
+		name        string
 		content     string
 		expectError bool
 	}{
 		{
-			// No content
+			name:        "no content",
 			content:     "",
 			expectError: true,
 		},
 		{
-			// Good YAML
+			name: "valid YAML",
 			content: `
 apiVersion: v1
 kind: Pod
@@ -534,7 +538,7 @@ spec:
 			expectError: false,
 		},
 		{
-			// Good JSON
+			name: "valid JSON",
 			content: `
 {
   "apiVersion": "v1",
@@ -553,7 +557,7 @@ spec:
 			expectError: false,
 		},
 		{
-			// Bad PodSpec
+			name: "incorrect PodSpec",
 			content: `
 apiVersion: v1
 kind: Pod
@@ -567,34 +571,38 @@ spec:
 	}
 
 	for _, rt := range tests {
-		tempFile, err := createTempFileWithContent([]byte(rt.content))
-		if err != nil {
-			t.Errorf("error creating tempfile with content:%v", err)
-		}
-		defer os.Remove(tempFile)
+		t.Run(rt.name, func(t *testing.T) {
+			tempFile, err := createTempFileWithContent([]byte(rt.content))
+			if err != nil {
+				t.Errorf("error creating tempfile with content:%v", err)
+			}
+			defer os.Remove(tempFile)
 
-		_, err = loadPodSpecFromFile(tempFile)
-		if (err != nil) != rt.expectError {
-			t.Errorf("failed TestLoadPodSpecFromFile:\nexpected error:\n%t\nsaw:\n%v", rt.expectError, err)
-		}
+			_, err = loadPodSpecFromFile(tempFile)
+			if (err != nil) != rt.expectError {
+				t.Errorf("failed TestLoadPodSpecFromFile:\nexpected error:\n%t\nsaw:\n%v", rt.expectError, err)
+			}
+		})
 	}
 
-	_, err := loadPodSpecFromFile("")
-	if err == nil {
-		t.Error("unexpected success: loadPodSpecFromFile should return error when no file is given")
-	}
+	t.Run("empty file name", func(t *testing.T) {
+		_, err := loadPodSpecFromFile("")
+		if err == nil {
+			t.Error("unexpected success: loadPodSpecFromFile should return error when no file is given")
+		}
+	})
 }
 
 func createTempFileWithContent(content []byte) (string, error) {
 	tempFile, err := ioutil.TempFile("", "")
 	if err != nil {
-		return "", fmt.Errorf("cannot create temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot create temporary file")
 	}
 	if _, err = tempFile.Write([]byte(content)); err != nil {
-		return "", fmt.Errorf("cannot save temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot save temporary file")
 	}
 	if err = tempFile.Close(); err != nil {
-		return "", fmt.Errorf("cannot close temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot close temporary file")
 	}
 	return tempFile.Name(), nil
 }

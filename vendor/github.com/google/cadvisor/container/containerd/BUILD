@@ -20,7 +20,6 @@ go_library(
         "//vendor/github.com/containerd/containerd/errdefs:go_default_library",
         "//vendor/github.com/containerd/containerd/namespaces:go_default_library",
         "//vendor/github.com/gogo/protobuf/types:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/container/common:go_default_library",
         "//vendor/github.com/google/cadvisor/container/libcontainer:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "//vendor/github.com/opencontainers/runtime-spec/specs-go:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

@@ -19,14 +19,13 @@ package uploadconfig
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -40,9 +39,72 @@ const (
 	NodesKubeadmConfigClusterRoleName = "kubeadm:nodes-kubeadm-config"
 )
 
+// ResetClusterStatusForNode removes the APIEndpoint of a given control-plane node
+// from the ClusterStatus and updates the kubeadm ConfigMap
+func ResetClusterStatusForNode(nodeName string, client clientset.Interface) error {
+	fmt.Printf("[reset] Removing info for node %q from the ConfigMap %q in the %q Namespace\n",
+		nodeName, kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+
+	// Get the kubeadm ConfigMap
+	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrap(err, "failed to get config map")
+	}
+
+	// Handle missing ClusterConfiguration in the ConfigMap. Should only happen if someone manually
+	// interacted with the ConfigMap.
+	clusterConfigurationYaml, ok := configMap.Data[kubeadmconstants.ClusterConfigurationConfigMapKey]
+	if !ok {
+		return errors.Errorf("cannot find key %q in ConfigMap %q in the %q Namespace",
+			kubeadmconstants.ClusterConfigurationConfigMapKey, kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+	}
+
+	// Obtain the existing ClusterStatus object
+	clusterStatus, err := configutil.UnmarshalClusterStatus(configMap.Data)
+	if err != nil {
+		return err
+	}
+
+	// Handle a nil APIEndpoints map. Should only happen if someone manually
+	// interacted with the ConfigMap.
+	if clusterStatus.APIEndpoints == nil {
+		return errors.Errorf("APIEndpoints from ConfigMap %q in the %q Namespace is nil",
+			kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+	}
+
+	// Check for existence of the nodeName key in the list of APIEndpoints.
+	// Return early if it's missing.
+	apiEndpoint, ok := clusterStatus.APIEndpoints[nodeName]
+	if !ok {
+		klog.Warningf("No APIEndpoint registered for node %q", nodeName)
+		return nil
+	}
+
+	klog.V(2).Infof("Removing APIEndpoint %#v for node %q", apiEndpoint, nodeName)
+	delete(clusterStatus.APIEndpoints, nodeName)
+
+	// Marshal the ClusterStatus back into YAML
+	clusterStatusYaml, err := configutil.MarshalKubeadmConfigObject(clusterStatus)
+	if err != nil {
+		return err
+	}
+
+	// Update the ClusterStatus in the ConfigMap
+	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubeadmconstants.KubeadmConfigConfigMap,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: map[string]string{
+			kubeadmconstants.ClusterConfigurationConfigMapKey: clusterConfigurationYaml,
+			kubeadmconstants.ClusterStatusConfigMapKey:        string(clusterStatusYaml),
+		},
+	})
+}
+
 // UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
 func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
-	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.InitConfigurationConfigMap, metav1.NamespaceSystem)
+	fmt.Printf("[upload-config] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
 	// Prepare the ClusterConfiguration for upload
 	// The components store their config in their own ConfigMaps, then reset the .ComponentConfig struct;
@@ -59,7 +121,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	// Prepare the ClusterStatus for upload
 	// Gets the current cluster status
 	// TODO: use configmap locks on this object on the get before the update.
-	clusterStatus, err := getClusterStatus(client)
+	clusterStatus, err := configutil.GetClusterStatus(client)
 	if err != nil {
 		return err
 	}
@@ -68,9 +130,9 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	if clusterStatus.APIEndpoints == nil {
 		clusterStatus.APIEndpoints = map[string]kubeadmapi.APIEndpoint{}
 	}
-	clusterStatus.APIEndpoints[cfg.NodeRegistration.Name] = cfg.APIEndpoint
+	clusterStatus.APIEndpoints[cfg.NodeRegistration.Name] = cfg.LocalAPIEndpoint
 
-	// Marshal the ClusterStatus back into into YAML
+	// Marshal the ClusterStatus back into YAML
 	clusterStatusYaml, err := configutil.MarshalKubeadmConfigObject(clusterStatus)
 	if err != nil {
 		return err
@@ -78,7 +140,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 
 	err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.InitConfigurationConfigMap,
+			Name:      kubeadmconstants.KubeadmConfigConfigMap,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Data: map[string]string{
@@ -97,7 +159,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.InitConfigurationConfigMap).RuleOrDie(),
+			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.KubeadmConfigConfigMap).RuleOrDie(),
 		},
 	})
 	if err != nil {
@@ -128,23 +190,4 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 			},
 		},
 	})
-}
-
-func getClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, error) {
-	obj := &kubeadmapi.ClusterStatus{}
-
-	// Read the ConfigMap from the cluster
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.InitConfigurationConfigMap, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return obj, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// Decode the file content  using the componentconfig Codecs that knows about all APIs
-	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(configMap.Data[kubeadmconstants.ClusterStatusConfigMapKey]), obj); err != nil {
-		return nil, err
-	}
-	return obj, nil
 }

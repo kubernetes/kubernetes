@@ -18,16 +18,17 @@ package lifecycle
 
 import (
 	"encoding/xml"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/discovery"
-	"k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
@@ -37,6 +38,11 @@ import (
 	"k8s.io/kubernetes/test/utils/junit"
 
 	. "github.com/onsi/ginkgo"
+)
+
+var (
+	upgradeTarget = flag.String("upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
+	upgradeImage  = flag.String("upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
 )
 
 var upgradeTests = []upgrades.Test{
@@ -52,6 +58,7 @@ var upgradeTests = []upgrades.Test{
 	&apps.DaemonSetUpgradeTest{},
 	&upgrades.IngressUpgradeTest{},
 	&upgrades.AppArmorUpgradeTest{},
+	&storage.VolumeModeDowngradeTest{},
 }
 
 var gpuUpgradeTests = []upgrades.Test{
@@ -59,7 +66,7 @@ var gpuUpgradeTests = []upgrades.Test{
 }
 
 var statefulsetUpgradeTests = []upgrades.Test{
-	&upgrades.MySqlUpgradeTest{},
+	&upgrades.MySQLUpgradeTest{},
 	&upgrades.EtcdUpgradeTest{},
 	&upgrades.CassandraUpgradeTest{},
 }
@@ -89,7 +96,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 	testFrameworks := createUpgradeFrameworks(upgradeTests)
 	Describe("master upgrade", func() {
 		It("should maintain a functioning cluster [Feature:MasterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Master upgrade"}
@@ -112,7 +119,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 
 	Describe("node upgrade", func() {
 		It("should maintain a functioning cluster [Feature:NodeUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Node upgrade"}
@@ -125,7 +132,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, nodeUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.NodeUpgrade, upgradeFunc)
@@ -134,7 +141,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 
 	Describe("cluster upgrade", func() {
 		It("should maintain a functioning cluster [Feature:ClusterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster upgrade"}
@@ -146,7 +153,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
@@ -163,7 +170,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 
 	Describe("cluster downgrade", func() {
 		It("should maintain a functioning cluster [Feature:ClusterDowngrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster downgrade"}
@@ -175,7 +182,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 				defer finalizeUpgradeTest(start, clusterDowngradeTest)
 				// Yes this really is a downgrade. And nodes must downgrade first.
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
@@ -268,7 +275,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	testFrameworks := createUpgradeFrameworks(gpuUpgradeTests)
 	Describe("master upgrade", func() {
 		It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU master upgrade"}
@@ -286,7 +293,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	})
 	Describe("cluster upgrade", func() {
 		It("should be able to run gpu pod after upgrade [Feature:GPUClusterUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU cluster upgrade"}
@@ -298,7 +305,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
@@ -306,7 +313,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	})
 	Describe("cluster downgrade", func() {
 		It("should be able to run gpu pod after downgrade [Feature:GPUClusterDowngrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "GPU cluster downgrade"}
@@ -316,7 +323,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, gpuDowngradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
@@ -334,7 +341,7 @@ var _ = Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]", func()
 	testFrameworks := createUpgradeFrameworks(statefulsetUpgradeTests)
 	framework.KubeDescribe("stateful upgrade", func() {
 		It("should maintain a functioning cluster", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Stateful upgrade"}
@@ -346,7 +353,7 @@ var _ = Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]", func()
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(framework.NodeUpgrade(f, target, framework.TestContext.UpgradeImage))
+				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, statefulsetUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
@@ -365,7 +372,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 		testFrameworks := createUpgradeFrameworks(kubeProxyUpgradeTests)
 
 		It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "kube-proxy upgrade"}
@@ -381,7 +388,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, true))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
-				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, framework.TestContext.UpgradeImage, true))
+				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, true))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, kubeProxyUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
@@ -392,7 +399,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 		testFrameworks := createUpgradeFrameworks(kubeProxyDowngradeTests)
 
 		It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "kube-proxy downgrade"}
@@ -407,7 +414,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				defer finalizeUpgradeTest(start, kubeProxyDowngradeTest)
 				// Yes this really is a downgrade. And nodes must downgrade first.
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, framework.TestContext.UpgradeImage, false))
+				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, false))
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, false))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
@@ -427,11 +434,19 @@ type chaosMonkeyAdapter struct {
 
 func (cma *chaosMonkeyAdapter) Test(sem *chaosmonkey.Semaphore) {
 	start := time.Now()
-	var once sync.Once
+
+	// Using an atomic with a CAS is a potential workaround for #74890.
+	//
+	// This is a speculative workaround - we are really seeing if
+	// this is better; if not we should revert.
+	//
+	// If it is better we should file a bug against go 1.12, and
+	// then revert!
+	var onceWithoutMutex uint32
 	ready := func() {
-		once.Do(func() {
+		if atomic.CompareAndSwapUint32(&onceWithoutMutex, 0, 1) {
 			sem.Ready()
-		})
+		}
 	}
 	defer finalizeUpgradeTest(start, cma.testReport)
 	defer ready()
@@ -496,7 +511,7 @@ func runUpgradeSuite(
 	upgradeType upgrades.UpgradeType,
 	upgradeFunc func(),
 ) {
-	upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+	upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 	framework.ExpectNoError(err)
 
 	cm := chaosmonkey.New(upgradeFunc)
@@ -569,7 +584,7 @@ func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget string) (*u
 
 	upgCtx.Versions = append(upgCtx.Versions, upgrades.VersionContext{
 		Version:   *nextVer,
-		NodeImage: framework.TestContext.UpgradeImage,
+		NodeImage: *upgradeImage,
 	})
 
 	return upgCtx, nil

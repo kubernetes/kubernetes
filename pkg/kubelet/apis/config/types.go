@@ -151,10 +151,16 @@ type KubeletConfiguration struct {
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout metav1.Duration
-	// nodeStatusUpdateFrequency is the frequency that kubelet posts node
-	// status to master. Note: be cautious when changing the constant, it
-	// must work with nodeMonitorGracePeriod in nodecontroller.
+	// nodeStatusUpdateFrequency is the frequency that kubelet computes node
+	// status. If node lease feature is not enabled, it is also the frequency that
+	// kubelet posts node status to master. In that case, be cautious when
+	// changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency metav1.Duration
+	// nodeStatusReportFrequency is the frequency that kubelet posts node
+	// status to master if node status does not change. Kubelet will ignore this
+	// frequency and post node status immediately if any change is detected. It is
+	// only used when node lease feature is enabled.
+	NodeStatusReportFrequency metav1.Duration
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
 	NodeLeaseDurationSeconds int32
 	// imageMinimumGCAge is the minimum age for an unused image before it is
@@ -212,7 +218,7 @@ type KubeletConfiguration struct {
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
-	// PodPidsLimit is the maximum number of pids in any pod.
+	// The maximum number of processes per pod.  If -1, the kubelet defaults to the node allocatable pid capacity.
 	PodPidsLimit int64
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.
@@ -285,12 +291,12 @@ type KubeletConfiguration struct {
 
 	/* the following fields are meant for Node Allocatable */
 
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pids=100) pairs
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	SystemReserved map[string]string
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pids=100) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently cpu, memory and local ephemeral storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.

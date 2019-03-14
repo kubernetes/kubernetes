@@ -20,10 +20,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -38,6 +39,7 @@ var (
 		kubectl create priorityclass default-priority --value=1000 --global-default=true --description="default priority"`))
 )
 
+// PriorityClassOpts holds the options for 'create priorityclass' sub command
 type PriorityClassOpts struct {
 	CreateSubcommandOptions *CreateSubcommandOptions
 }
@@ -49,7 +51,7 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 	}
 
 	cmd := &cobra.Command{
-		Use: "priorityclass NAME --value=VALUE --global-default=BOOL [--dry-run]",
+		Use:                   "priorityclass NAME --value=VALUE --global-default=BOOL [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"pc"},
 		Short:                 i18n.T("Create a priorityclass with the specified name."),
@@ -65,7 +67,7 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.PriorityClassV1Alpha1GeneratorName)
+	cmdutil.AddGeneratorFlags(cmd, generateversioned.PriorityClassV1Alpha1GeneratorName)
 
 	cmd.Flags().Int32("value", 0, i18n.T("the value of this priority class."))
 	cmd.Flags().Bool("global-default", false, i18n.T("global-default specifies whether this PriorityClass should be considered as the default priority."))
@@ -73,16 +75,17 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *PriorityClassOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
 
-	var generator kubectl.StructuredGenerator
+	var generator generate.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case cmdutil.PriorityClassV1Alpha1GeneratorName:
-		generator = &kubectl.PriorityClassV1Generator{
+	case generateversioned.PriorityClassV1Alpha1GeneratorName:
+		generator = &generateversioned.PriorityClassV1Generator{
 			Name:          name,
 			Value:         cmdutil.GetFlagInt32(cmd, "value"),
 			GlobalDefault: cmdutil.GetFlagBool(cmd, "global-default"),
@@ -95,7 +98,7 @@ func (o *PriorityClassOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreatePriorityClass implements the behavior to run the create priorityClass command.
+// Run calls the CreateSubcommandOptions.Run in the PriorityClassOpts instance
 func (o *PriorityClassOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

@@ -48,6 +48,7 @@ go_library(
         "flock_linux_32bit.go",
         "openbsd_pledge.go",
         "pagesize_unix.go",
+        "race.go",
         "race0.go",
         "sockcmsg_linux.go",
         "sockcmsg_unix.go",

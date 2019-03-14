@@ -25,7 +25,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -99,7 +99,7 @@ type DeploymentController struct {
 // NewDeploymentController creates a new DeploymentController.
 func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
@@ -149,8 +149,8 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer dc.queue.ShutDown()
 
-	glog.Infof("Starting deployment controller")
-	defer glog.Infof("Shutting down deployment controller")
+	klog.Infof("Starting deployment controller")
+	defer klog.Infof("Shutting down deployment controller")
 
 	if !controller.WaitForCacheSync("deployment", stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
@@ -165,14 +165,14 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 
 func (dc *DeploymentController) addDeployment(obj interface{}) {
 	d := obj.(*apps.Deployment)
-	glog.V(4).Infof("Adding deployment %s", d.Name)
+	klog.V(4).Infof("Adding deployment %s", d.Name)
 	dc.enqueueDeployment(d)
 }
 
 func (dc *DeploymentController) updateDeployment(old, cur interface{}) {
 	oldD := old.(*apps.Deployment)
 	curD := cur.(*apps.Deployment)
-	glog.V(4).Infof("Updating deployment %s", oldD.Name)
+	klog.V(4).Infof("Updating deployment %s", oldD.Name)
 	dc.enqueueDeployment(curD)
 }
 
@@ -190,7 +190,7 @@ func (dc *DeploymentController) deleteDeployment(obj interface{}) {
 			return
 		}
 	}
-	glog.V(4).Infof("Deleting deployment %s", d.Name)
+	klog.V(4).Infof("Deleting deployment %s", d.Name)
 	dc.enqueueDeployment(d)
 }
 
@@ -211,7 +211,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 		if d == nil {
 			return
 		}
-		glog.V(4).Infof("ReplicaSet %s added.", rs.Name)
+		klog.V(4).Infof("ReplicaSet %s added.", rs.Name)
 		dc.enqueueDeployment(d)
 		return
 	}
@@ -222,7 +222,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 	if len(ds) == 0 {
 		return
 	}
-	glog.V(4).Infof("Orphan ReplicaSet %s added.", rs.Name)
+	klog.V(4).Infof("Orphan ReplicaSet %s added.", rs.Name)
 	for _, d := range ds {
 		dc.enqueueDeployment(d)
 	}
@@ -242,7 +242,7 @@ func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *apps.ReplicaSet)
 	if len(deployments) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		glog.V(4).Infof("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s",
+		klog.V(4).Infof("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s",
 			rs.Namespace, rs.Name, rs.Labels, deployments[0].Namespace, deployments[0].Name)
 	}
 	return deployments
@@ -277,7 +277,7 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 		if d == nil {
 			return
 		}
-		glog.V(4).Infof("ReplicaSet %s updated.", curRS.Name)
+		klog.V(4).Infof("ReplicaSet %s updated.", curRS.Name)
 		dc.enqueueDeployment(d)
 		return
 	}
@@ -290,7 +290,7 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 		if len(ds) == 0 {
 			return
 		}
-		glog.V(4).Infof("Orphan ReplicaSet %s updated.", curRS.Name)
+		klog.V(4).Infof("Orphan ReplicaSet %s updated.", curRS.Name)
 		for _, d := range ds {
 			dc.enqueueDeployment(d)
 		}
@@ -329,7 +329,7 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 	if d == nil {
 		return
 	}
-	glog.V(4).Infof("ReplicaSet %s deleted.", rs.Name)
+	klog.V(4).Infof("ReplicaSet %s deleted.", rs.Name)
 	dc.enqueueDeployment(d)
 }
 
@@ -353,7 +353,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 			return
 		}
 	}
-	glog.V(4).Infof("Pod %s deleted.", pod.Name)
+	klog.V(4).Infof("Pod %s deleted.", pod.Name)
 	if d := dc.getDeploymentForPod(pod); d != nil && d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
 		// Sync if this Deployment now has no more Pods.
 		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client.AppsV1()))
@@ -421,7 +421,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *apps.Deploymen
 	}
 	rs, err = dc.rsLister.ReplicaSets(pod.Namespace).Get(controllerRef.Name)
 	if err != nil || rs.UID != controllerRef.UID {
-		glog.V(4).Infof("Cannot get replicaset %q for pod %q: %v", controllerRef.Name, pod.Name, err)
+		klog.V(4).Infof("Cannot get replicaset %q for pod %q: %v", controllerRef.Name, pod.Name, err)
 		return nil
 	}
 
@@ -481,13 +481,13 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 	}
 
 	if dc.queue.NumRequeues(key) < maxRetries {
-		glog.V(2).Infof("Error syncing deployment %v: %v", key, err)
+		klog.V(2).Infof("Error syncing deployment %v: %v", key, err)
 		dc.queue.AddRateLimited(key)
 		return
 	}
 
 	utilruntime.HandleError(err)
-	glog.V(2).Infof("Dropping deployment %q out of the queue: %v", key, err)
+	klog.V(2).Infof("Dropping deployment %q out of the queue: %v", key, err)
 	dc.queue.Forget(key)
 }
 
@@ -559,9 +559,9 @@ func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsLis
 // This function is not meant to be invoked concurrently with the same key.
 func (dc *DeploymentController) syncDeployment(key string) error {
 	startTime := time.Now()
-	glog.V(4).Infof("Started syncing deployment %q (%v)", key, startTime)
+	klog.V(4).Infof("Started syncing deployment %q (%v)", key, startTime)
 	defer func() {
-		glog.V(4).Infof("Finished syncing deployment %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing deployment %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -570,7 +570,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 	deployment, err := dc.dLister.Deployments(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		glog.V(2).Infof("Deployment %v has been deleted", key)
+		klog.V(2).Infof("Deployment %v has been deleted", key)
 		return nil
 	}
 	if err != nil {

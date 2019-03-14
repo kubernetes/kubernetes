@@ -17,8 +17,8 @@ limitations under the License.
 package cpumanager
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 )
 
@@ -39,7 +39,7 @@ func (p *nonePolicy) Name() string {
 }
 
 func (p *nonePolicy) Start(s state.State) {
-	glog.Info("[cpumanager] none policy: Start")
+	klog.Info("[cpumanager] none policy: Start")
 }
 
 func (p *nonePolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {

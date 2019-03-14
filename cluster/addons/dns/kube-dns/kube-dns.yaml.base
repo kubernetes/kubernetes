@@ -56,7 +56,7 @@ metadata:
   labels:
     addonmanager.kubernetes.io/mode: EnsureExists
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kube-dns
@@ -86,6 +86,9 @@ spec:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       priorityClassName: system-cluster-critical
+      securityContext:
+        supplementalGroups: [ 65534 ]
+        fsGroup: 65534
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
@@ -96,7 +99,7 @@ spec:
           optional: true
       containers:
       - name: kubedns
-        image: k8s.gcr.io/k8s-dns-kube-dns-amd64:1.14.10
+        image: k8s.gcr.io/k8s-dns-kube-dns:1.14.13
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -147,7 +150,7 @@ spec:
         - name: kube-dns-config
           mountPath: /kube-dns-config
       - name: dnsmasq
-        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny-amd64:1.14.10
+        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny:1.14.13
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -187,7 +190,7 @@ spec:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
       - name: sidecar
-        image: k8s.gcr.io/k8s-dns-sidecar-amd64:1.14.10
+        image: k8s.gcr.io/k8s-dns-sidecar:1.14.13
         livenessProbe:
           httpGet:
             path: /metrics

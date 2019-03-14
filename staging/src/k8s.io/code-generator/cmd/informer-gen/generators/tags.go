@@ -17,8 +17,8 @@ limitations under the License.
 package generators
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/gengo/types"
+	"k8s.io/klog"
 )
 
 // extractBoolTagOrDie gets the comment-tags for the key and asserts that, if
@@ -27,7 +27,7 @@ import (
 func extractBoolTagOrDie(key string, lines []string) bool {
 	val, err := types.ExtractSingleBoolCommentTag("+", key, false, lines)
 	if err != nil {
-		glog.Fatal(err)
+		klog.Fatal(err)
 	}
 	return val
 }

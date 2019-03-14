@@ -20,12 +20,10 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kube-apiserver",
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
-        "//pkg/client/metrics/prometheus:go_default_library",
+        "//pkg/util/prometheusclientgo:go_default_library",
         "//pkg/version/prometheus:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/logs:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//staging/src/k8s.io/component-base/logs:go_default_library",
     ],
 )
 

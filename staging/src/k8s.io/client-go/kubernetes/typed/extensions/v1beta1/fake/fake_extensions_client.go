@@ -48,10 +48,6 @@ func (c *FakeExtensionsV1beta1) ReplicaSets(namespace string) v1beta1.ReplicaSet
 	return &FakeReplicaSets{c, namespace}
 }
 
-func (c *FakeExtensionsV1beta1) Scales(namespace string) v1beta1.ScaleInterface {
-	return &FakeScales{c, namespace}
-}
-
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeExtensionsV1beta1) RESTClient() rest.Interface {

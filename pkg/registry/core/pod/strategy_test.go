@@ -395,7 +395,7 @@ type mockConnectionInfoGetter struct {
 	info *client.ConnectionInfo
 }
 
-func (g mockConnectionInfoGetter) GetConnectionInfo(nodeName types.NodeName) (*client.ConnectionInfo, error) {
+func (g mockConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*client.ConnectionInfo, error) {
 	return g.info, nil
 }
 

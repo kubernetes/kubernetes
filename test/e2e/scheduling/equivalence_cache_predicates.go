@@ -46,7 +46,6 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 	var systemPodsNo int
 	var ns string
 	f := framework.NewDefaultFramework("equivalence-cache")
-	ignoreLabels := framework.ImagePullerLabels
 
 	BeforeEach(func() {
 		cs = f.ClientSet
@@ -60,7 +59,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
 		// cannot be run in parallel with any other test that touches Nodes or Pods.
 		// It is so because we need to have precise control on what's running in the cluster.
-		systemPods, err := framework.GetPodsInNamespace(cs, ns, ignoreLabels)
+		systemPods, err := framework.GetPodsInNamespace(cs, ns, map[string]string{})
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = 0
 		for _, pod := range systemPods {
@@ -69,7 +68,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(cs, api.NamespaceSystem, int32(systemPodsNo), int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels)
+		err = framework.WaitForPodsRunningReady(cs, api.NamespaceSystem, int32(systemPodsNo), int32(systemPodsNo), framework.PodReadyBeforeTimeout, map[string]string{})
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
@@ -229,7 +228,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 			return err
 		}, ns, labelRCName, false)
 
-		// these two replicas should all be rejected since podAntiAffinity says it they anit-affinity with pod {"service": "S1"}
+		// these two replicas should all be rejected since podAntiAffinity says it they anti-affinity with pod {"service": "S1"}
 		verifyReplicasResult(cs, 0, replica, ns, labelRCName)
 	})
 })

@@ -1,11 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- api-approvers
 - sig-node-approvers
 - sttts
 - luxas
 - mtaufen
 reviewers:
-- api-reviewers
 - sig-node-reviewers
 - luxas
 - sttts

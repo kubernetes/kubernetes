@@ -21,7 +21,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,16 +94,21 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.ServeHostname
+		privateimage := imageutils.GetConfig(imageutils.ServeHostname)
 		privateimage.SetRegistry(imageutils.PrivateRegistry)
-		testReplicaSetServeImageOrFail(f, "private", imageutils.GetE2EImage(privateimage))
+		testReplicaSetServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 
 	It("should surface a failure condition on a common issue like exceeded quota", func() {
 		testReplicaSetConditionCheck(f)
 	})
 
-	It("should adopt matching pods on creation and release no longer matching pods", func() {
+	/*
+		Release : v1.13
+		Testname: Replica Set, adopt matching pods and release non matching pods
+		Description: A Pod is created, then a Replica Set (RS) whose label selector will match the Pod. The RS MUST either adopt the Pod or delete and replace it with a new Pod. When the labels on one of the Pods owned by the RS change to no longer match the RS's label selector, the RS MUST release the Pod and update the Pod's owner references
+	*/
+	framework.ConformanceIt("should adopt matching pods on creation and release no longer matching pods", func() {
 		testRSAdoptMatchingAndReleaseNotMatching(f)
 	})
 })
@@ -266,7 +271,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: NginxImageName,
+					Image: NginxImage,
 				},
 			},
 		},
@@ -274,7 +279,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 
 	By("When a replicaset with a matching selector is created")
 	replicas := int32(1)
-	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, NginxImageName)
+	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, NginxImage)
 	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
 	rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(rsSt)
 	Expect(err).NotTo(HaveOccurred())

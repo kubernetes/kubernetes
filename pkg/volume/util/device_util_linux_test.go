@@ -159,8 +159,8 @@ func (handler *mockOsIOHandler) Lstat(name string) (os.FileInfo, error) {
 
 func (handler *mockOsIOHandler) EvalSymlinks(path string) (string, error) {
 	links := map[string]string{
-		"/returns/a/dev":                                              "/dev/sde",
-		"/returns/non/dev":                                            "/sys/block",
+		"/returns/a/dev":   "/dev/sde",
+		"/returns/non/dev": "/sys/block",
 		"/dev/disk/by-path/127.0.0.1:3260-eui.02004567A425678D-lun-0": "/dev/sda",
 		"/dev/disk/by-path/127.0.0.3:3260-eui.03004567A425678D-lun-0": "/dev/sdb",
 		"/dev/dm-2": "/dev/dm-2",

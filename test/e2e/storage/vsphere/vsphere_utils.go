@@ -19,24 +19,24 @@ package vsphere
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	vim25types "github.com/vmware/govmomi/vim25/types"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -235,7 +235,7 @@ func verifyContentOfVSpherePV(client clientset.Interface, pvc *v1.PersistentVolu
 	framework.Logf("Successfully verified content of the volume")
 }
 
-func getVSphereStorageClassSpec(name string, scParameters map[string]string) *storage.StorageClass {
+func getVSphereStorageClassSpec(name string, scParameters map[string]string, zones []string) *storage.StorageClass {
 	var sc *storage.StorageClass
 
 	sc = &storage.StorageClass{
@@ -249,6 +249,17 @@ func getVSphereStorageClassSpec(name string, scParameters map[string]string) *st
 	}
 	if scParameters != nil {
 		sc.Parameters = scParameters
+	}
+	if zones != nil {
+		term := v1.TopologySelectorTerm{
+			MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+				{
+					Key:    v1.LabelZoneFailureDomain,
+					Values: zones,
+				},
+			},
+		}
+		sc.AllowedTopologies = append(sc.AllowedTopologies, term)
 	}
 	return sc
 }
@@ -399,6 +410,39 @@ func verifyVSphereVolumesAccessible(c clientset.Interface, pod *v1.Pod, persiste
 	}
 }
 
+// verify volumes are created on one of the specified zones
+func verifyVolumeCreationOnRightZone(persistentvolumes []*v1.PersistentVolume, nodeName string, zones []string) {
+	for _, pv := range persistentvolumes {
+		volumePath := pv.Spec.VsphereVolume.VolumePath
+		// Extract datastoreName from the volume path in the pv spec
+		// For example : "vsanDatastore" is extracted from "[vsanDatastore] 25d8b159-948c-4b73-e499-02001ad1b044/volume.vmdk"
+		datastorePathObj, _ := getDatastorePathObjFromVMDiskPath(volumePath)
+		datastoreName := datastorePathObj.Datastore
+		nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodeName)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		// Get the datastore object reference from the datastore name
+		datastoreRef, err := nodeInfo.VSphere.GetDatastoreRefFromName(ctx, nodeInfo.DataCenterRef, datastoreName)
+		if err != nil {
+			Expect(err).NotTo(HaveOccurred())
+		}
+		// Find common datastores among the specified zones
+		var datastoreCountMap = make(map[string]int)
+		numZones := len(zones)
+		var commonDatastores []string
+		for _, zone := range zones {
+			datastoreInZone := TestContext.NodeMapper.GetDatastoresInZone(nodeInfo.VSphere.Config.Hostname, zone)
+			for _, datastore := range datastoreInZone {
+				datastoreCountMap[datastore] = datastoreCountMap[datastore] + 1
+				if datastoreCountMap[datastore] == numZones {
+					commonDatastores = append(commonDatastores, datastore)
+				}
+			}
+		}
+		Expect(commonDatastores).To(ContainElement(datastoreRef.Value), "PV was created in an unsupported zone.")
+	}
+}
+
 // Get vSphere Volume Path from PVC
 func getvSphereVolumePathFromClaim(client clientset.Interface, namespace string, claimName string) string {
 	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
@@ -478,7 +522,7 @@ func getVirtualDiskPage83Data(ctx context.Context, dc *object.Datacenter, diskPa
 	diskUUID, err := vdm.QueryVirtualDiskUuid(ctx, diskPath, dc)
 
 	if err != nil {
-		glog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
+		klog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
 		return "", err
 	}
 	diskUUID = formatVirtualDiskUUID(diskUUID)
@@ -747,7 +791,6 @@ func GetReadySchedulableNodeInfos() []*NodeInfo {
 // and it's associated NodeInfo object is returned.
 func GetReadySchedulableRandomNodeInfo() *NodeInfo {
 	nodesInfo := GetReadySchedulableNodeInfos()
-	rand.Seed(time.Now().Unix())
 	Expect(nodesInfo).NotTo(BeEmpty())
 	return nodesInfo[rand.Int()%len(nodesInfo)]
 }

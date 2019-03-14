@@ -17,11 +17,11 @@ limitations under the License.
 package node
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
+	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
@@ -41,14 +41,14 @@ func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens 
 		secretName := bootstraputil.BootstrapTokenSecretName(token.Token.ID)
 		secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(secretName, metav1.GetOptions{})
 		if secret != nil && err == nil && failIfExists {
-			return fmt.Errorf("a token with id %q already exists", token.Token.ID)
+			return errors.Errorf("a token with id %q already exists", token.Token.ID)
 		}
 
 		updatedOrNewSecret := token.ToSecret()
 		// Try to create or update the token with an exponential backoff
 		err = apiclient.TryRunCommand(func() error {
 			if err := apiclient.CreateOrUpdateSecret(client, updatedOrNewSecret); err != nil {
-				return fmt.Errorf("failed to create or update bootstrap token with name %s: %v", secretName, err)
+				return errors.Wrapf(err, "failed to create or update bootstrap token with name %s", secretName)
 			}
 			return nil
 		}, 5)

@@ -64,7 +64,7 @@ func WriteObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSer
 	stream, ok := object.(rest.ResourceStreamer)
 	if ok {
 		requestInfo, _ := request.RequestInfoFrom(req.Context())
-		metrics.RecordLongRunning(req, requestInfo, func() {
+		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
 			StreamObject(statusCode, gv, s, stream, w, req)
 		})
 		return
@@ -101,6 +101,10 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 	}
 	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(statusCode)
+	// Flush headers, if possible
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 	writer := w.(io.Writer)
 	if flush {
 		writer = flushwriter.Wrap(w)

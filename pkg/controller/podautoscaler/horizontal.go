@@ -21,7 +21,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/golang/glog"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
@@ -36,16 +35,20 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	autoscalinginformers "k8s.io/client-go/informers/autoscaling/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	autoscalingclient "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	autoscalinglisters "k8s.io/client-go/listers/autoscaling/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
+	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 )
 
 var (
@@ -76,6 +79,11 @@ type HorizontalController struct {
 	hpaLister       autoscalinglisters.HorizontalPodAutoscalerLister
 	hpaListerSynced cache.InformerSynced
 
+	// podLister is able to list/get Pods from the shared cache from the informer passed in to
+	// NewHorizontalController.
+	podLister       corelisters.PodLister
+	podListerSynced cache.InformerSynced
+
 	// Controllers that need to be synced
 	queue workqueue.RateLimitingInterface
 
@@ -89,26 +97,29 @@ func NewHorizontalController(
 	scaleNamespacer scaleclient.ScalesGetter,
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
 	mapper apimeta.RESTMapper,
-	replicaCalc *ReplicaCalculator,
+	metricsClient metricsclient.MetricsClient,
 	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
+	podInformer coreinformers.PodInformer,
 	resyncPeriod time.Duration,
 	downscaleStabilisationWindow time.Duration,
+	tolerance float64,
+	cpuInitializationPeriod,
+	delayOfInitialReadinessStatus time.Duration,
 
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(glog.Infof)
+	broadcaster.StartLogging(klog.Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	hpaController := &HorizontalController{
-		replicaCalc:                  replicaCalc,
 		eventRecorder:                recorder,
 		scaleNamespacer:              scaleNamespacer,
 		hpaNamespacer:                hpaNamespacer,
 		downscaleStabilisationWindow: downscaleStabilisationWindow,
-		queue:           workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
-		mapper:          mapper,
-		recommendations: map[string][]timestampedRecommendation{},
+		queue:                        workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
+		mapper:                       mapper,
+		recommendations:              map[string][]timestampedRecommendation{},
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -122,6 +133,18 @@ func NewHorizontalController(
 	hpaController.hpaLister = hpaInformer.Lister()
 	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced
 
+	hpaController.podLister = podInformer.Lister()
+	hpaController.podListerSynced = podInformer.Informer().HasSynced
+
+	replicaCalc := NewReplicaCalculator(
+		metricsClient,
+		hpaController.podLister,
+		tolerance,
+		cpuInitializationPeriod,
+		delayOfInitialReadinessStatus,
+	)
+	hpaController.replicaCalc = replicaCalc
+
 	return hpaController
 }
 
@@ -130,10 +153,10 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer a.queue.ShutDown()
 
-	glog.Infof("Starting HPA controller")
-	defer glog.Infof("Shutting down HPA controller")
+	klog.Infof("Starting HPA controller")
+	defer klog.Infof("Shutting down HPA controller")
 
-	if !controller.WaitForCacheSync("HPA", stopCh, a.hpaListerSynced) {
+	if !controller.WaitForCacheSync("HPA", stopCh, a.hpaListerSynced, a.podListerSynced) {
 		return
 	}
 
@@ -156,7 +179,9 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 		return
 	}
 
-	// always add rate-limitted so we don't fetch metrics more that once per resync interval
+	// Requests are always added to queue with resyncPeriod delay.  If there's already
+	// request for the HPA in the queue then a new request is always dropped. Requests spend resync
+	// interval in queue so HPAs are processed every resync interval.
 	a.queue.AddRateLimited(key)
 }
 
@@ -174,7 +199,7 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 func (a *HorizontalController) worker() {
 	for a.processNextWorkItem() {
 	}
-	glog.Infof("horizontal pod autoscaler controller worker shutting down")
+	klog.Infof("horizontal pod autoscaler controller worker shutting down")
 }
 
 func (a *HorizontalController) processNextWorkItem() bool {
@@ -184,14 +209,23 @@ func (a *HorizontalController) processNextWorkItem() bool {
 	}
 	defer a.queue.Done(key)
 
-	err := a.reconcileKey(key.(string))
-	if err == nil {
-		// don't "forget" here because we want to only process a given HPA once per resync interval
-		return true
+	deleted, err := a.reconcileKey(key.(string))
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+	// Add request processing HPA to queue with resyncPeriod delay.
+	// Requests are always added to queue with resyncPeriod delay. If there's already request
+	// for the HPA in the queue then a new request is always dropped. Requests spend resyncPeriod
+	// in queue so HPAs are processed every resyncPeriod.
+	// Request is added here just in case last resync didn't insert request into the queue. This
+	// happens quite often because there is race condition between adding request after resyncPeriod
+	// and removing them from queue. Request can be added by resync before previous request is
+	// removed from queue. If we didn't add request here then in this case one request would be dropped
+	// and HPA would processed after 2 x resyncPeriod.
+	if !deleted {
+		a.queue.AddRateLimited(key)
 	}
 
-	a.queue.AddRateLimited(key)
-	utilruntime.HandleError(err)
 	return true
 }
 
@@ -275,44 +309,70 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 	return replicas, metric, statuses, timestamp, nil
 }
 
-func (a *HorizontalController) reconcileKey(key string) error {
+func (a *HorizontalController) reconcileKey(key string) (deleted bool, err error) {
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return err
+		return true, err
 	}
 
 	hpa, err := a.hpaLister.HorizontalPodAutoscalers(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		glog.Infof("Horizontal Pod Autoscaler %s has been deleted in %s", name, namespace)
+		klog.Infof("Horizontal Pod Autoscaler %s has been deleted in %s", name, namespace)
 		delete(a.recommendations, key)
-		return nil
+		return true, nil
 	}
 
-	return a.reconcileAutoscaler(hpa, key)
+	return false, a.reconcileAutoscaler(hpa, key)
 }
 
 // computeStatusForObjectMetric computes the desired number of replicas for the specified metric of type ObjectMetricSourceType.
 func (a *HorizontalController) computeStatusForObjectMetric(currentReplicas int32, metricSpec autoscalingv2.MetricSpec, hpa *autoscalingv2.HorizontalPodAutoscaler, selector labels.Selector, status *autoscalingv2.MetricStatus, metricSelector labels.Selector) (int32, time.Time, string, error) {
-	replicaCountProposal, utilizationProposal, timestampProposal, err := a.replicaCalc.GetObjectMetricReplicas(currentReplicas, metricSpec.Object.Target.Value.MilliValue(), metricSpec.Object.Metric.Name, hpa.Namespace, &metricSpec.Object.DescribedObject, selector, metricSelector)
-	if err != nil {
-		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetObjectMetric", err.Error())
-		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetObjectMetric", "the HPA was unable to compute the replica count: %v", err)
-		return 0, timestampProposal, "", err
-	}
-	*status = autoscalingv2.MetricStatus{
-		Type: autoscalingv2.ObjectMetricSourceType,
-		Object: &autoscalingv2.ObjectMetricStatus{
-			DescribedObject: metricSpec.Object.DescribedObject,
-			Metric: autoscalingv2.MetricIdentifier{
-				Name:     metricSpec.Object.Metric.Name,
-				Selector: metricSpec.Object.Metric.Selector,
+	if metricSpec.Object.Target.Type == autoscalingv2.ValueMetricType {
+		replicaCountProposal, utilizationProposal, timestampProposal, err := a.replicaCalc.GetObjectMetricReplicas(currentReplicas, metricSpec.Object.Target.Value.MilliValue(), metricSpec.Object.Metric.Name, hpa.Namespace, &metricSpec.Object.DescribedObject, selector, metricSelector)
+		if err != nil {
+			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetObjectMetric", err.Error())
+			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetObjectMetric", "the HPA was unable to compute the replica count: %v", err)
+			return 0, timestampProposal, "", err
+		}
+		*status = autoscalingv2.MetricStatus{
+			Type: autoscalingv2.ObjectMetricSourceType,
+			Object: &autoscalingv2.ObjectMetricStatus{
+				DescribedObject: metricSpec.Object.DescribedObject,
+				Metric: autoscalingv2.MetricIdentifier{
+					Name:     metricSpec.Object.Metric.Name,
+					Selector: metricSpec.Object.Metric.Selector,
+				},
+				Current: autoscalingv2.MetricValueStatus{
+					Value: resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
+				},
 			},
-			Current: autoscalingv2.MetricValueStatus{
-				Value: resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
+		}
+		return replicaCountProposal, timestampProposal, fmt.Sprintf("%s metric %s", metricSpec.Object.DescribedObject.Kind, metricSpec.Object.Metric.Name), nil
+	} else if metricSpec.Object.Target.Type == autoscalingv2.AverageValueMetricType {
+		replicaCountProposal, utilizationProposal, timestampProposal, err := a.replicaCalc.GetObjectPerPodMetricReplicas(currentReplicas, metricSpec.Object.Target.AverageValue.MilliValue(), metricSpec.Object.Metric.Name, hpa.Namespace, &metricSpec.Object.DescribedObject, metricSelector)
+		if err != nil {
+			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetObjectMetric", err.Error())
+			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetObjectMetric", "the HPA was unable to compute the replica count: %v", err)
+			return 0, time.Time{}, "", fmt.Errorf("failed to get %s object metric: %v", metricSpec.Object.Metric.Name, err)
+		}
+		*status = autoscalingv2.MetricStatus{
+			Type: autoscalingv2.ObjectMetricSourceType,
+			Object: &autoscalingv2.ObjectMetricStatus{
+				Metric: autoscalingv2.MetricIdentifier{
+					Name:     metricSpec.Object.Metric.Name,
+					Selector: metricSpec.Object.Metric.Selector,
+				},
+				Current: autoscalingv2.MetricValueStatus{
+					AverageValue: resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
+				},
 			},
-		},
+		}
+		return replicaCountProposal, timestampProposal, fmt.Sprintf("external metric %s(%+v)", metricSpec.Object.Metric.Name, metricSpec.Object.Metric.Selector), nil
 	}
-	return replicaCountProposal, timestampProposal, fmt.Sprintf("%s metric %s", metricSpec.Object.DescribedObject.Kind, metricSpec.Object.Metric.Name), nil
+	errMsg := "invalid object metric source: neither a value target nor an average value target was set"
+	a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetObjectMetric", errMsg)
+	setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetObjectMetric", "the HPA was unable to compute the replica count: %s", errMsg)
+	return 0, time.Time{}, "", fmt.Errorf(errMsg)
 }
 
 // computeStatusForPodsMetric computes the desired number of replicas for the specified metric of type PodsMetricSourceType.
@@ -350,7 +410,7 @@ func (a *HorizontalController) computeStatusForResourceMetric(currentReplicas in
 			return 0, time.Time{}, "", fmt.Errorf("failed to get %s utilization: %v", metricSpec.Resource.Name, err)
 		}
 		metricNameProposal := fmt.Sprintf("%s resource", metricSpec.Resource.Name)
-		status = &autoscalingv2.MetricStatus{
+		*status = autoscalingv2.MetricStatus{
 			Type: autoscalingv2.ResourceMetricSourceType,
 			Resource: &autoscalingv2.ResourceMetricStatus{
 				Name: metricSpec.Resource.Name,
@@ -441,6 +501,12 @@ func (a *HorizontalController) computeStatusForExternalMetric(currentReplicas in
 	return 0, time.Time{}, "", fmt.Errorf(errMsg)
 }
 
+func (a *HorizontalController) recordInitialRecommendation(currentReplicas int32, key string) {
+	if a.recommendations[key] == nil {
+		a.recommendations[key] = []timestampedRecommendation{{currentReplicas, time.Now()}}
+	}
+}
+
 func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.HorizontalPodAutoscaler, key string) error {
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
 	hpav1 := hpav1Shared.DeepCopy()
@@ -485,6 +551,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	}
 	setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededGetScale", "the HPA controller was able to get the target's current scale")
 	currentReplicas := scale.Status.Replicas
+	a.recordInitialRecommendation(currentReplicas, key)
 
 	var metricStatuses []autoscalingv2.MetricStatus
 	metricDesiredReplicas := int32(0)
@@ -523,7 +590,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			return fmt.Errorf("failed to compute desired number of replicas based on listed metrics for %s: %v", reference, err)
 		}
 
-		glog.V(4).Infof("proposing %v desired replicas (based on %s from %s) for %s", metricDesiredReplicas, metricName, timestamp, reference)
+		klog.V(4).Infof("proposing %v desired replicas (based on %s from %s) for %s", metricDesiredReplicas, metricName, timestamp, reference)
 
 		rescaleMetric := ""
 		if metricDesiredReplicas > desiredReplicas {
@@ -555,10 +622,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		}
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededRescale", "the HPA controller was able to update the target scale to %d", desiredReplicas)
 		a.eventRecorder.Eventf(hpa, v1.EventTypeNormal, "SuccessfulRescale", "New size: %d; reason: %s", desiredReplicas, rescaleReason)
-		glog.Infof("Successful rescale of %s, old size: %d, new size: %d, reason: %s",
+		klog.Infof("Successful rescale of %s, old size: %d, new size: %d, reason: %s",
 			hpa.Name, currentReplicas, desiredReplicas, rescaleReason)
 	} else {
-		glog.V(4).Infof("decided not to scale %s to %v (last scale time was %s)", reference, desiredReplicas, hpa.Status.LastScaleTime)
+		klog.V(4).Infof("decided not to scale %s to %v (last scale time was %s)", reference, desiredReplicas, hpa.Status.LastScaleTime)
 		desiredReplicas = currentReplicas
 	}
 
@@ -740,7 +807,7 @@ func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAuto
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedUpdateStatus", err.Error())
 		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
 	}
-	glog.V(2).Infof("Successfully updated status for %s", hpa.Name)
+	klog.V(2).Infof("Successfully updated status for %s", hpa.Name)
 	return nil
 }
 

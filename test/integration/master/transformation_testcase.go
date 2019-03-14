@@ -28,12 +28,12 @@ import (
 	"testing"
 
 	"github.com/coreos/etcd/clientv3"
-	"github.com/ghodss/yaml"
 	"github.com/prometheus/client_golang/prometheus"
+	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
+	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/client-go/kubernetes"
@@ -51,7 +51,7 @@ const (
 	metricsPrefix            = "apiserver_storage_"
 )
 
-type unSealSecret func(cipherText []byte, ctx value.Context, config encryptionconfig.ProviderConfig) ([]byte, error)
+type unSealSecret func(cipherText []byte, ctx value.Context, config apiserverconfigv1.ProviderConfiguration) ([]byte, error)
 
 type transformTest struct {
 	logger            kubeapiservertesting.Logger
@@ -164,7 +164,7 @@ func (e *transformTest) getRawSecretFromETCD() ([]byte, error) {
 
 func (e *transformTest) getEncryptionOptions() []string {
 	if e.transformerConfig != "" {
-		return []string{"--experimental-encryption-provider-config", path.Join(e.configDir, encryptionConfigFileName)}
+		return []string{"--encryption-provider-config", path.Join(e.configDir, encryptionConfigFileName)}
 	}
 
 	return nil
@@ -186,8 +186,8 @@ func (e *transformTest) createEncryptionConfig() (string, error) {
 	return tempDir, nil
 }
 
-func (e *transformTest) getEncryptionConfig() (*encryptionconfig.ProviderConfig, error) {
-	var config encryptionconfig.EncryptionConfig
+func (e *transformTest) getEncryptionConfig() (*apiserverconfigv1.ProviderConfiguration, error) {
+	var config apiserverconfigv1.EncryptionConfiguration
 	err := yaml.Unmarshal([]byte(e.transformerConfig), &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract transformer key: %v", err)
@@ -228,7 +228,7 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 }
 
 func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetResponse, error) {
-	etcdClient, err := integration.GetEtcdKVClient(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig)
+	_, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create etcd client: %v", err)
 	}

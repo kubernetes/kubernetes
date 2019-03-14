@@ -24,7 +24,7 @@ import (
 
 	ktypes "k8s.io/apimachinery/pkg/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type clock interface {
@@ -37,10 +37,11 @@ func (realClock) Now() time.Time {
 	return time.Now()
 }
 
-// BackoffEntry is single threaded.  in particular, it only allows a single action to be waiting on backoff at a time.
-// It is expected that all users will only use the public TryWait(...) method
+// backoffEntry is single threaded.  in particular, it only allows a single action to be waiting on backoff at a time.
 // It is also not safe to copy this object.
-type BackoffEntry struct {
+type backoffEntry struct {
+	initialized bool
+	podName     ktypes.NamespacedName
 	backoff     time.Duration
 	lastUpdate  time.Time
 	reqInFlight int32
@@ -48,45 +49,41 @@ type BackoffEntry struct {
 
 // tryLock attempts to acquire a lock via atomic compare and swap.
 // returns true if the lock was acquired, false otherwise
-func (b *BackoffEntry) tryLock() bool {
+func (b *backoffEntry) tryLock() bool {
 	return atomic.CompareAndSwapInt32(&b.reqInFlight, 0, 1)
 }
 
 // unlock returns the lock.  panics if the lock isn't held
-func (b *BackoffEntry) unlock() {
+func (b *backoffEntry) unlock() {
 	if !atomic.CompareAndSwapInt32(&b.reqInFlight, 1, 0) {
 		panic(fmt.Sprintf("unexpected state on unlocking: %+v", b))
 	}
 }
 
-// TryWait tries to acquire the backoff lock, maxDuration is the maximum allowed period to wait for.
-func (b *BackoffEntry) TryWait(maxDuration time.Duration) bool {
-	if !b.tryLock() {
-		return false
-	}
-	defer b.unlock()
-	b.wait(maxDuration)
-	return true
+// backoffTime returns the Time when a backoffEntry completes backoff
+func (b *backoffEntry) backoffTime() time.Time {
+	return b.lastUpdate.Add(b.backoff)
 }
 
-func (b *BackoffEntry) getBackoff(maxDuration time.Duration) time.Duration {
-	duration := b.backoff
-	newDuration := time.Duration(duration) * 2
+// getBackoff returns the duration until this entry completes backoff
+func (b *backoffEntry) getBackoff(maxDuration time.Duration) time.Duration {
+	if !b.initialized {
+		b.initialized = true
+		return b.backoff
+	}
+	newDuration := b.backoff * 2
 	if newDuration > maxDuration {
 		newDuration = maxDuration
 	}
 	b.backoff = newDuration
-	glog.V(4).Infof("Backing off %s", duration.String())
-	return duration
-}
-
-func (b *BackoffEntry) wait(maxDuration time.Duration) {
-	time.Sleep(b.getBackoff(maxDuration))
+	klog.V(4).Infof("Backing off %s", newDuration.String())
+	return newDuration
 }
 
 // PodBackoff is used to restart a pod with back-off delay.
 type PodBackoff struct {
-	perPodBackoff   map[ktypes.NamespacedName]*BackoffEntry
+	// expiryQ stores backoffEntry orderedy by lastUpdate until they reach maxDuration and are GC'd
+	expiryQ         *Heap
 	lock            sync.Mutex
 	clock           clock
 	defaultDuration time.Duration
@@ -111,24 +108,58 @@ func CreatePodBackoff(defaultDuration, maxDuration time.Duration) *PodBackoff {
 // CreatePodBackoffWithClock creates a pod back-off object by default duration, max duration and clock.
 func CreatePodBackoffWithClock(defaultDuration, maxDuration time.Duration, clock clock) *PodBackoff {
 	return &PodBackoff{
-		perPodBackoff:   map[ktypes.NamespacedName]*BackoffEntry{},
+		expiryQ:         NewHeap(backoffEntryKeyFunc, backoffEntryCompareUpdate),
 		clock:           clock,
 		defaultDuration: defaultDuration,
 		maxDuration:     maxDuration,
 	}
 }
 
-// GetEntry returns a back-off entry by Pod ID.
-func (p *PodBackoff) GetEntry(podID ktypes.NamespacedName) *BackoffEntry {
+// getEntry returns the backoffEntry for a given podID
+func (p *PodBackoff) getEntry(podID ktypes.NamespacedName) *backoffEntry {
+	entry, exists, _ := p.expiryQ.GetByKey(podID.String())
+	var be *backoffEntry
+	if !exists {
+		be = &backoffEntry{
+			initialized: false,
+			podName:     podID,
+			backoff:     p.defaultDuration,
+		}
+		p.expiryQ.Update(be)
+	} else {
+		be = entry.(*backoffEntry)
+	}
+	return be
+}
+
+// BackoffPod updates the backoff for a podId and returns the duration until backoff completion
+func (p *PodBackoff) BackoffPod(podID ktypes.NamespacedName) time.Duration {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	entry, ok := p.perPodBackoff[podID]
-	if !ok {
-		entry = &BackoffEntry{backoff: p.defaultDuration}
-		p.perPodBackoff[podID] = entry
-	}
+	entry := p.getEntry(podID)
 	entry.lastUpdate = p.clock.Now()
-	return entry
+	p.expiryQ.Update(entry)
+	return entry.getBackoff(p.maxDuration)
+}
+
+// TryBackoffAndWait tries to acquire the backoff lock
+func (p *PodBackoff) TryBackoffAndWait(podID ktypes.NamespacedName, stop <-chan struct{}) bool {
+	p.lock.Lock()
+	entry := p.getEntry(podID)
+
+	if !entry.tryLock() {
+		p.lock.Unlock()
+		return false
+	}
+	defer entry.unlock()
+	duration := entry.getBackoff(p.maxDuration)
+	p.lock.Unlock()
+	select {
+	case <-time.After(duration):
+		return true
+	case <-stop:
+		return false
+	}
 }
 
 // Gc execute garbage collection on the pod back-off.
@@ -136,9 +167,54 @@ func (p *PodBackoff) Gc() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	now := p.clock.Now()
-	for podID, entry := range p.perPodBackoff {
-		if now.Sub(entry.lastUpdate) > p.maxDuration {
-			delete(p.perPodBackoff, podID)
+	var be *backoffEntry
+	for {
+		entry := p.expiryQ.Peek()
+		if entry == nil {
+			break
+		}
+		be = entry.(*backoffEntry)
+		if now.Sub(be.lastUpdate) > p.maxDuration {
+			p.expiryQ.Pop()
+		} else {
+			break
 		}
 	}
+}
+
+// GetBackoffTime returns the time that podID completes backoff
+func (p *PodBackoff) GetBackoffTime(podID ktypes.NamespacedName) (time.Time, bool) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	rawBe, exists, _ := p.expiryQ.GetByKey(podID.String())
+	if !exists {
+		return time.Time{}, false
+	}
+	be := rawBe.(*backoffEntry)
+	return be.lastUpdate.Add(be.backoff), true
+}
+
+// ClearPodBackoff removes all tracking information for podID (clears expiry)
+func (p *PodBackoff) ClearPodBackoff(podID ktypes.NamespacedName) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	entry, exists, _ := p.expiryQ.GetByKey(podID.String())
+	if exists {
+		err := p.expiryQ.Delete(entry)
+		return err == nil
+	}
+	return false
+}
+
+// backoffEntryKeyFunc is the keying function used for mapping a backoffEntry to string for heap
+func backoffEntryKeyFunc(b interface{}) (string, error) {
+	be := b.(*backoffEntry)
+	return be.podName.String(), nil
+}
+
+// backoffEntryCompareUpdate returns true when b1's backoff time is before b2's
+func backoffEntryCompareUpdate(b1, b2 interface{}) bool {
+	be1 := b1.(*backoffEntry)
+	be2 := b2.(*backoffEntry)
+	return be1.lastUpdate.Before(be2.lastUpdate)
 }

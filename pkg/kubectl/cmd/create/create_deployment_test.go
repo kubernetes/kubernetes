@@ -27,18 +27,17 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func Test_generatorFromName(t *testing.T) {
 	const (
 		nonsenseName         = "not-a-real-generator-name"
-		basicName            = cmdutil.DeploymentBasicV1Beta1GeneratorName
-		basicAppsV1Beta1Name = cmdutil.DeploymentBasicAppsV1Beta1GeneratorName
-		basicAppsV1Name      = cmdutil.DeploymentBasicAppsV1GeneratorName
+		basicName            = generateversioned.DeploymentBasicV1Beta1GeneratorName
+		basicAppsV1Beta1Name = generateversioned.DeploymentBasicAppsV1Beta1GeneratorName
+		basicAppsV1Name      = generateversioned.DeploymentBasicAppsV1GeneratorName
 		deploymentName       = "deployment-name"
 	)
 	imageNames := []string{"image-1", "image-2"}
@@ -51,8 +50,8 @@ func Test_generatorFromName(t *testing.T) {
 	assert.True(t, ok)
 
 	{
-		expectedGenerator := &kubectl.DeploymentBasicGeneratorV1{
-			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+		expectedGenerator := &generateversioned.DeploymentBasicGeneratorV1{
+			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
 				Name:   deploymentName,
 				Images: imageNames,
 			},
@@ -64,8 +63,8 @@ func Test_generatorFromName(t *testing.T) {
 	assert.True(t, ok)
 
 	{
-		expectedGenerator := &kubectl.DeploymentBasicAppsGeneratorV1Beta1{
-			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+		expectedGenerator := &generateversioned.DeploymentBasicAppsGeneratorV1Beta1{
+			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
 				Name:   deploymentName,
 				Images: imageNames,
 			},
@@ -77,8 +76,8 @@ func Test_generatorFromName(t *testing.T) {
 	assert.True(t, ok)
 
 	{
-		expectedGenerator := &kubectl.DeploymentBasicAppsGeneratorV1{
-			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+		expectedGenerator := &generateversioned.DeploymentBasicAppsGeneratorV1{
+			BaseDeploymentGenerator: generateversioned.BaseDeploymentGenerator{
 				Name:   deploymentName,
 				Images: imageNames,
 			},

@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
@@ -32,7 +32,7 @@ import (
 
 func init() {
 	if err := restclient.RegisterAuthProviderPlugin("openstack", newOpenstackAuthProvider); err != nil {
-		glog.Fatalf("Failed to register openstack auth plugin: %s", err)
+		klog.Fatalf("Failed to register openstack auth plugin: %s", err)
 	}
 }
 
@@ -62,7 +62,7 @@ func (t *tokenGetter) Token() (string, error) {
 	var err error
 	if t.authOpt == nil {
 		// reads the config from the environment
-		glog.V(4).Info("reading openstack config from the environment variables")
+		klog.V(4).Info("reading openstack config from the environment variables")
 		options, err = openstack.AuthOptionsFromEnv()
 		if err != nil {
 			return "", fmt.Errorf("failed to read openstack env vars: %s", err)
@@ -126,7 +126,7 @@ func (t *tokenRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	if err == nil {
 		req.Header.Set("Authorization", "Bearer "+token)
 	} else {
-		glog.V(4).Infof("failed to get token: %s", err)
+		klog.V(4).Infof("failed to get token: %s", err)
 	}
 
 	return t.RoundTripper.RoundTrip(req)
@@ -140,7 +140,7 @@ func newOpenstackAuthProvider(_ string, config map[string]string, persister rest
 	var ttlDuration time.Duration
 	var err error
 
-	glog.Warningf("WARNING: in-tree openstack auth plugin is now deprecated. please use the \"client-keystone-auth\" kubectl/client-go credential plugin instead")
+	klog.Warningf("WARNING: in-tree openstack auth plugin is now deprecated. please use the \"client-keystone-auth\" kubectl/client-go credential plugin instead")
 	ttl, found := config["ttl"]
 	if !found {
 		ttlDuration = DefaultTTLDuration

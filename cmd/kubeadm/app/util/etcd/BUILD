@@ -8,9 +8,12 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/app/util/staticpod:go_default_library",
+        "//cmd/kubeadm/app/util/config:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -20,7 +23,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/test:go_default_library",
+        "//cmd/kubeadm/app/constants:go_default_library",
     ],
 )
 

@@ -26,16 +26,14 @@ import (
 	"path"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
-	"github.com/google/cadvisor/metrics"
 	"github.com/google/cadvisor/utils/sysfs"
-	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/klog"
 )
 
 type cadvisorClient struct {
@@ -67,55 +65,31 @@ func init() {
 			f.DefValue = defaultValue
 			f.Value.Set(defaultValue)
 		} else {
-			glog.Errorf("Expected cAdvisor flag %q not found", name)
+			klog.Errorf("Expected cAdvisor flag %q not found", name)
 		}
 	}
 }
 
-func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
-	// Prometheus requires that all metrics in the same family have the same labels,
-	// so we arrange to supply blank strings for missing labels
-	var name, image, podName, namespace, containerName string
-	if len(c.Aliases) > 0 {
-		name = c.Aliases[0]
-	}
-	image = c.Spec.Image
-	if v, ok := c.Spec.Labels[types.KubernetesPodNameLabel]; ok {
-		podName = v
-	}
-	if v, ok := c.Spec.Labels[types.KubernetesPodNamespaceLabel]; ok {
-		namespace = v
-	}
-	if v, ok := c.Spec.Labels[types.KubernetesContainerNameLabel]; ok {
-		containerName = v
-	}
-	set := map[string]string{
-		metrics.LabelID:    c.Name,
-		metrics.LabelName:  name,
-		metrics.LabelImage: image,
-		"pod_name":         podName,
-		"namespace":        namespace,
-		"container_name":   containerName,
-	}
-	return set
-}
-
-// New creates a cAdvisor and exports its API on the specified port if port > 0.
 func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
-	ignoreMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.NetworkTcpUsageMetrics:  struct{}{},
-		cadvisormetrics.NetworkUdpUsageMetrics:  struct{}{},
-		cadvisormetrics.PerCpuUsageMetrics:      struct{}{},
-		cadvisormetrics.ProcessSchedulerMetrics: struct{}{},
+	includedMetrics := cadvisormetrics.MetricSet{
+		cadvisormetrics.CpuUsageMetrics:         struct{}{},
+		cadvisormetrics.MemoryUsageMetrics:      struct{}{},
+		cadvisormetrics.CpuLoadMetrics:          struct{}{},
+		cadvisormetrics.DiskIOMetrics:           struct{}{},
+		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
+		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
+		cadvisormetrics.AppMetrics:              struct{}{},
 	}
-	if !usingLegacyStats {
-		ignoreMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
+	if usingLegacyStats {
+		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
 	}
 
+	// collect metrics for all cgroups
+	rawContainerCgroupPathPrefixWhiteList := []string{"/"}
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, ignoreMetrics, http.DefaultClient)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, includedMetrics, http.DefaultClient, rawContainerCgroupPathPrefixWhiteList)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +168,7 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 	}
 	// TODO(vmarmol): Handle this better when a label has more than one image filesystem.
 	if len(res) > 1 {
-		glog.Warningf("More than one filesystem labeled %q: %#v. Only using the first one", label, res)
+		klog.Warningf("More than one filesystem labeled %q: %#v. Only using the first one", label, res)
 	}
 
 	return res[0], nil

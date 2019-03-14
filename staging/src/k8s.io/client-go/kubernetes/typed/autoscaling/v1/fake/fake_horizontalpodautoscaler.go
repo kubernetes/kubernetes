@@ -131,7 +131,7 @@ func (c *FakeHorizontalPodAutoscalers) DeleteCollection(options *v1.DeleteOption
 // Patch applies the patch and returns the patched horizontalPodAutoscaler.
 func (c *FakeHorizontalPodAutoscalers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *autoscalingv1.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, name, data, subresources...), &autoscalingv1.HorizontalPodAutoscaler{})
+		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, name, pt, data, subresources...), &autoscalingv1.HorizontalPodAutoscaler{})
 
 	if obj == nil {
 		return nil, err

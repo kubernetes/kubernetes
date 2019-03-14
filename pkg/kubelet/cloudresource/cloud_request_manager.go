@@ -25,12 +25,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
-
-var nodeAddressesRetryPeriod = 5 * time.Second
 
 // SyncManager is an interface for making requests to a cloud provider
 type SyncManager interface {
@@ -46,79 +44,92 @@ type cloudResourceSyncManager struct {
 	// Sync period
 	syncPeriod time.Duration
 
-	nodeAddressesMux sync.Mutex
-	nodeAddressesErr error
-	nodeAddresses    []v1.NodeAddress
+	nodeAddressesMonitor *sync.Cond
+	nodeAddressesErr     error
+	nodeAddresses        []v1.NodeAddress
 
 	nodeName types.NodeName
 }
 
-// NewSyncManager creates a manager responsible for collecting resources
-// from a cloud provider through requests that are sensitive to timeouts and hanging
+// NewSyncManager creates a manager responsible for collecting resources from a
+// cloud provider through requests that are sensitive to timeouts and hanging
 func NewSyncManager(cloud cloudprovider.Interface, nodeName types.NodeName, syncPeriod time.Duration) SyncManager {
 	return &cloudResourceSyncManager{
 		cloud:      cloud,
 		syncPeriod: syncPeriod,
 		nodeName:   nodeName,
+		// nodeAddressesMonitor is a monitor that guards a result (nodeAddresses,
+		// nodeAddressesErr) of the sync loop under the condition that a result has
+		// been saved at least once. The semantics here are:
+		//
+		// * Readers of the result will wait on the monitor until the first result
+		//   has been saved.
+		// * The sync loop (i.e. the only writer), will signal all waiters every
+		//   time it updates the result.
+		nodeAddressesMonitor: sync.NewCond(&sync.Mutex{}),
 	}
 }
 
-func (manager *cloudResourceSyncManager) getNodeAddressSafe() ([]v1.NodeAddress, error) {
-	manager.nodeAddressesMux.Lock()
-	defer manager.nodeAddressesMux.Unlock()
-
-	return manager.nodeAddresses, manager.nodeAddressesErr
-}
-
-func (manager *cloudResourceSyncManager) setNodeAddressSafe(nodeAddresses []v1.NodeAddress, err error) {
-	manager.nodeAddressesMux.Lock()
-	defer manager.nodeAddressesMux.Unlock()
-
-	manager.nodeAddresses = nodeAddresses
-	manager.nodeAddressesErr = err
-}
-
-// NodeAddresses does not wait for cloud provider to return a node addresses.
-// It always returns node addresses or an error.
-func (manager *cloudResourceSyncManager) NodeAddresses() ([]v1.NodeAddress, error) {
+// NodeAddresses waits for the first sync loop to run. If no successful syncs
+// have run, it will return the most recent error. If node addresses have been
+// synced successfully, it will return the list of node addresses from the most
+// recent successful sync.
+func (m *cloudResourceSyncManager) NodeAddresses() ([]v1.NodeAddress, error) {
+	m.nodeAddressesMonitor.L.Lock()
+	defer m.nodeAddressesMonitor.L.Unlock()
 	// wait until there is something
 	for {
-		nodeAddresses, err := manager.getNodeAddressSafe()
-		if len(nodeAddresses) == 0 && err == nil {
-			glog.V(5).Infof("Waiting for %v for cloud provider to provide node addresses", nodeAddressesRetryPeriod)
-			time.Sleep(nodeAddressesRetryPeriod)
-			continue
+		if addrs, err := m.nodeAddresses, m.nodeAddressesErr; len(addrs) > 0 || err != nil {
+			return addrs, err
 		}
-		return nodeAddresses, err
+		klog.V(5).Infof("Waiting for cloud provider to provide node addresses")
+		m.nodeAddressesMonitor.Wait()
 	}
 }
 
-func (manager *cloudResourceSyncManager) collectNodeAddresses(ctx context.Context, nodeName types.NodeName) {
-	glog.V(5).Infof("Requesting node addresses from cloud provider for node %q", nodeName)
-
-	instances, ok := manager.cloud.Instances()
+// getNodeAddresses calls the cloud provider to get a current list of node addresses.
+func (m *cloudResourceSyncManager) getNodeAddresses() ([]v1.NodeAddress, error) {
+	// TODO(roberthbailey): Can we do this without having credentials to talk to
+	// the cloud provider?
+	// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and
+	// returned an interface.
+	// TODO: If IP addresses couldn't be fetched from the cloud provider, should
+	// kubelet fallback on the other methods for getting the IP below?
+	instances, ok := m.cloud.Instances()
 	if !ok {
-		manager.setNodeAddressSafe(nil, fmt.Errorf("failed to get instances from cloud provider"))
+		return nil, fmt.Errorf("failed to get instances from cloud provider")
+	}
+	return instances.NodeAddresses(context.TODO(), m.nodeName)
+}
+
+func (m *cloudResourceSyncManager) syncNodeAddresses() {
+	klog.V(5).Infof("Requesting node addresses from cloud provider for node %q", m.nodeName)
+
+	addrs, err := m.getNodeAddresses()
+
+	m.nodeAddressesMonitor.L.Lock()
+	defer m.nodeAddressesMonitor.L.Unlock()
+	defer m.nodeAddressesMonitor.Broadcast()
+
+	if err != nil {
+		klog.V(2).Infof("Node addresses from cloud provider for node %q not collected: %v", m.nodeName, err)
+
+		if len(m.nodeAddresses) > 0 {
+			// in the event that a sync loop fails when a previous sync had
+			// succeeded, continue to use the old addresses.
+			return
+		}
+
+		m.nodeAddressesErr = fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		return
 	}
 
-	// TODO(roberthbailey): Can we do this without having credentials to talk
-	// to the cloud provider?
-	// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and returned an interface
-	// TODO: If IP addresses couldn't be fetched from the cloud provider, should kubelet fallback on the other methods for getting the IP below?
-
-	nodeAddresses, err := instances.NodeAddresses(ctx, nodeName)
-	if err != nil {
-		manager.setNodeAddressSafe(nil, fmt.Errorf("failed to get node address from cloud provider: %v", err))
-		glog.V(2).Infof("Node addresses from cloud provider for node %q not collected", nodeName)
-	} else {
-		manager.setNodeAddressSafe(nodeAddresses, nil)
-		glog.V(5).Infof("Node addresses from cloud provider for node %q collected", nodeName)
-	}
+	klog.V(5).Infof("Node addresses from cloud provider for node %q collected", m.nodeName)
+	m.nodeAddressesErr = nil
+	m.nodeAddresses = addrs
 }
 
-func (manager *cloudResourceSyncManager) Run(stopCh <-chan struct{}) {
-	wait.Until(func() {
-		manager.collectNodeAddresses(context.TODO(), manager.nodeName)
-	}, manager.syncPeriod, stopCh)
+// Run starts the cloud resource sync manager's sync loop.
+func (m *cloudResourceSyncManager) Run(stopCh <-chan struct{}) {
+	wait.Until(m.syncNodeAddresses, m.syncPeriod, stopCh)
 }

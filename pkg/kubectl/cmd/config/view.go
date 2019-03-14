@@ -21,24 +21,25 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/clientcmd/api/latest"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
+// ViewOptions holds the command-line options for 'config view' sub command
 type ViewOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	PrintObject printers.ResourcePrinterFunc
 
 	ConfigAccess clientcmd.ConfigAccess
-	Merge        flag.Tristate
+	Merge        cliflag.Tristate
 	Flatten      bool
 	Minify       bool
 	RawByteData  bool
@@ -50,12 +51,12 @@ type ViewOptions struct {
 }
 
 var (
-	view_long = templates.LongDesc(`
+	viewLong = templates.LongDesc(`
 		Display merged kubeconfig settings or a specified kubeconfig file.
 
 		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`)
 
-	view_example = templates.Examples(`
+	viewExample = templates.Examples(`
 		# Show merged kubeconfig settings.
 		kubectl config view
 
@@ -68,9 +69,10 @@ var (
 	defaultOutputFormat = "yaml"
 )
 
+// NewCmdConfigView returns a Command instance for 'config view' sub command
 func NewCmdConfigView(f cmdutil.Factory, streams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	o := &ViewOptions{
-		PrintFlags:   genericclioptions.NewPrintFlags("").WithTypeSetter(legacyscheme.Scheme).WithDefaultOutput("yaml"),
+		PrintFlags:   genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
 		ConfigAccess: ConfigAccess,
 
 		IOStreams: streams,
@@ -79,10 +81,10 @@ func NewCmdConfigView(f cmdutil.Factory, streams genericclioptions.IOStreams, Co
 	cmd := &cobra.Command{
 		Use:     "view",
 		Short:   i18n.T("Display merged kubeconfig settings or a specified kubeconfig file"),
-		Long:    view_long,
-		Example: view_example,
+		Long:    viewLong,
+		Example: viewExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(cmd))
+			cmdutil.CheckErr(o.Complete(cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
@@ -99,7 +101,11 @@ func NewCmdConfigView(f cmdutil.Factory, streams genericclioptions.IOStreams, Co
 	return cmd
 }
 
-func (o *ViewOptions) Complete(cmd *cobra.Command) error {
+// Complete completes the required command-line options
+func (o *ViewOptions) Complete(cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
+	}
 	if o.ConfigAccess.IsExplicitFile() {
 		if !o.Merge.Provided() {
 			o.Merge.Set("false")
@@ -116,6 +122,7 @@ func (o *ViewOptions) Complete(cmd *cobra.Command) error {
 	return nil
 }
 
+// Validate makes sure that provided values for command-line options are valid
 func (o ViewOptions) Validate() error {
 	if !o.Merge.Value() && !o.ConfigAccess.IsExplicitFile() {
 		return errors.New("if merge==false a precise file must to specified")
@@ -124,6 +131,7 @@ func (o ViewOptions) Validate() error {
 	return nil
 }
 
+// Run performs the execution of 'config view' sub command
 func (o ViewOptions) Run() error {
 	config, err := o.loadConfig()
 	if err != nil {

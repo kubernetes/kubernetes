@@ -17,7 +17,6 @@ go_library(
         "fake_runtime.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/remote/fake",
-    tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/apis/cri/testing:go_default_library",

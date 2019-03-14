@@ -15,9 +15,11 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
+// +k8s:protobuf-gen=package
 // +k8s:conversion-gen=k8s.io/apiserver/pkg/apis/example
 // +k8s:openapi-gen=false
 // +k8s:defaulter-gen=TypeMeta
 
 // +groupName=example.apiserver.k8s.io
+
 package v1 // import "k8s.io/apiserver/pkg/apis/example/v1"

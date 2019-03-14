@@ -21,10 +21,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -111,17 +111,17 @@ func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
 	}
 }
 
-func newOwnerDeployment(f *framework.Framework, deploymentName string, labels map[string]string) *v1beta1.Deployment {
+func newOwnerDeployment(f *framework.Framework, deploymentName string, labels map[string]string) *apps.Deployment {
 	replicas := int32(2)
-	return &v1beta1.Deployment{
+	return &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: deploymentName,
 		},
-		Spec: v1beta1.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
-			Strategy: v1beta1.DeploymentStrategy{
-				Type: v1beta1.RollingUpdateDeploymentStrategyType,
+			Strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
 			},
 			Template: getPodTemplateSpec(labels),
 		},
@@ -185,7 +185,7 @@ func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (boo
 				By(fmt.Sprintf("expected %d pods, got %d pods", num, len(pods.Items)))
 			}
 		case "Deployments":
-			deployments, err := f.ClientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name).List(metav1.ListOptions{})
+			deployments, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list deployments: %v", err)
 			}
@@ -194,7 +194,7 @@ func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (boo
 				By(fmt.Sprintf("expected %d Deployments, got %d Deployments", num, len(deployments.Items)))
 			}
 		case "ReplicaSets":
-			rs, err := f.ClientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
+			rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list rs: %v", err)
 			}
@@ -480,8 +480,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 	*/
 	framework.ConformanceIt("should delete RS created by deployment when not orphaning", func() {
 		clientSet := f.ClientSet
-		deployClient := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name)
-		rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name)
+		deployClient := clientSet.AppsV1().Deployments(f.Namespace.Name)
+		rsClient := clientSet.AppsV1().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
 		uniqLabels := getUniqLabel("gctest", "delete_rs")
 		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
@@ -539,8 +539,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 	*/
 	framework.ConformanceIt("should orphan RS created by deployment when deleteOptions.PropagationPolicy is Orphan", func() {
 		clientSet := f.ClientSet
-		deployClient := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name)
-		rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name)
+		deployClient := clientSet.AppsV1().Deployments(f.Namespace.Name)
+		rsClient := clientSet.AppsV1().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
 		uniqLabels := getUniqLabel("gctest", "orphan_rs")
 		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
@@ -593,7 +593,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			aggregatedError := utilerrors.NewAggregate(errList)
 			framework.Failf("Failed to verify remaining deployments, rs, and pods: %v", aggregatedError)
 		}
-		rs, err := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
+		rs, err := clientSet.AppsV1().ReplicaSets(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
 			framework.Failf("Failed to list ReplicaSet %v", err)
 		}
@@ -737,12 +737,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		By(fmt.Sprintf("set half of pods created by rc %s to have rc %s as owner as well", rc1Name, rc2Name))
 		pods, err := podClient.List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to list pods in namespace: %s", f.Namespace.Name)
 		patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"ReplicationController","name":"%s","uid":"%s"}]}}`, rc2.ObjectMeta.Name, rc2.ObjectMeta.UID)
 		for i := 0; i < halfReplicas; i++ {
 			pod := pods.Items[i]
 			_, err := podClient.Patch(pod.Name, types.StrategicMergePatchType, []byte(patch))
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod.Name, f.Namespace.Name, patch)
 		}
 
 		By(fmt.Sprintf("delete the rc %s", rc1Name))
@@ -816,33 +816,39 @@ var _ = SIGDescribe("Garbage collector", func() {
 	framework.ConformanceIt("should not be blocked by dependency circle", func() {
 		clientSet := f.ClientSet
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
-		pod1 := newGCPod("pod1")
+		pod1Name := "pod1"
+		pod1 := newGCPod(pod1Name)
 		pod1, err := podClient.Create(pod1)
-		Expect(err).NotTo(HaveOccurred())
-		pod2 := newGCPod("pod2")
+		Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace: %s", pod1Name, f.Namespace.Name)
+		pod2Name := "pod2"
+		pod2 := newGCPod(pod2Name)
 		pod2, err = podClient.Create(pod2)
-		Expect(err).NotTo(HaveOccurred())
-		pod3 := newGCPod("pod3")
+		Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace: %s", pod2Name, f.Namespace.Name)
+		pod3Name := "pod3"
+		pod3 := newGCPod(pod3Name)
 		pod3, err = podClient.Create(pod3)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create pod %s in namespace: %s", pod3Name, f.Namespace.Name)
 		// create circular dependency
 		addRefPatch := func(name string, uid types.UID) []byte {
 			return []byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"Pod","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}]}}`, name, uid))
 		}
-		pod1, err = podClient.Patch(pod1.Name, types.StrategicMergePatchType, addRefPatch(pod3.Name, pod3.UID))
-		Expect(err).NotTo(HaveOccurred())
+		patch1 := addRefPatch(pod3.Name, pod3.UID)
+		pod1, err = podClient.Patch(pod1.Name, types.StrategicMergePatchType, patch1)
+		Expect(err).NotTo(HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod1.Name, f.Namespace.Name, patch1)
 		framework.Logf("pod1.ObjectMeta.OwnerReferences=%#v", pod1.ObjectMeta.OwnerReferences)
-		pod2, err = podClient.Patch(pod2.Name, types.StrategicMergePatchType, addRefPatch(pod1.Name, pod1.UID))
-		Expect(err).NotTo(HaveOccurred())
+		patch2 := addRefPatch(pod1.Name, pod1.UID)
+		pod2, err = podClient.Patch(pod2.Name, types.StrategicMergePatchType, patch2)
+		Expect(err).NotTo(HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod2.Name, f.Namespace.Name, patch2)
 		framework.Logf("pod2.ObjectMeta.OwnerReferences=%#v", pod2.ObjectMeta.OwnerReferences)
-		pod3, err = podClient.Patch(pod3.Name, types.StrategicMergePatchType, addRefPatch(pod2.Name, pod2.UID))
-		Expect(err).NotTo(HaveOccurred())
+		patch3 := addRefPatch(pod2.Name, pod2.UID)
+		pod3, err = podClient.Patch(pod3.Name, types.StrategicMergePatchType, patch3)
+		Expect(err).NotTo(HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod3.Name, f.Namespace.Name, patch3)
 		framework.Logf("pod3.ObjectMeta.OwnerReferences=%#v", pod3.ObjectMeta.OwnerReferences)
 		// delete one pod, should result in the deletion of all pods
 		deleteOptions := getForegroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod1.UID))
 		err = podClient.Delete(pod1.ObjectMeta.Name, deleteOptions)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to delete pod %s in namespace: %s", pod1.Name, f.Namespace.Name)
 		var pods *v1.PodList
 		var err2 error
 		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
@@ -1073,7 +1079,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
 		cronJob, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Create(cronJob)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
 
 		By("Wait for the CronJob to create new Job")
 		err = wait.PollImmediate(500*time.Millisecond, 2*time.Minute, func() (bool, error) {

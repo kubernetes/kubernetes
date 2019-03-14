@@ -63,7 +63,7 @@ type crioContainerHandler struct {
 	// The IP address of the container
 	ipAddress string
 
-	ignoreMetrics container.MetricSet
+	includedMetrics container.MetricSet
 
 	reference info.ContainerReference
 
@@ -83,13 +83,10 @@ func newCrioContainerHandler(
 	cgroupSubsystems *containerlibcontainer.CgroupSubsystems,
 	inHostNamespace bool,
 	metadataEnvs []string,
-	ignoreMetrics container.MetricSet,
+	includedMetrics container.MetricSet,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
-	cgroupPaths := make(map[string]string, len(cgroupSubsystems.MountPoints))
-	for key, val := range cgroupSubsystems.MountPoints {
-		cgroupPaths[key] = path.Join(val, name)
-	}
+	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
 
 	// Generate the equivalent cgroup manager for this container.
 	cgroupManager := &cgroupfs.Manager{
@@ -141,7 +138,7 @@ func newCrioContainerHandler(
 		Namespace: CrioNamespace,
 	}
 
-	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootFs, cInfo.Pid, ignoreMetrics)
+	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootFs, cInfo.Pid, includedMetrics)
 
 	// TODO: extract object mother method
 	handler := &crioContainerHandler{
@@ -152,7 +149,7 @@ func newCrioContainerHandler(
 		rootfsStorageDir:    rootfsStorageDir,
 		envs:                make(map[string]string),
 		labels:              cInfo.Labels,
-		ignoreMetrics:       ignoreMetrics,
+		includedMetrics:     includedMetrics,
 		reference:           containerReference,
 		libcontainerHandler: libcontainerHandler,
 	}
@@ -171,12 +168,12 @@ func newCrioContainerHandler(
 	handler.ipAddress = cInfo.IP
 
 	// we optionally collect disk usage metrics
-	if !ignoreMetrics.Has(container.DiskUsageMetrics) {
+	if includedMetrics.Has(container.DiskUsageMetrics) {
 		handler.fsHandler = common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, storageLogDir, fsInfo)
 	}
 	// TODO for env vars we wanted to show from container.Config.Env from whitelist
 	//for _, exposedEnv := range metadataEnvs {
-	//glog.V(4).Infof("TODO env whitelist: %v", exposedEnv)
+	//klog.V(4).Infof("TODO env whitelist: %v", exposedEnv)
 	//}
 
 	return handler, nil
@@ -199,14 +196,14 @@ func (self *crioContainerHandler) ContainerReference() (info.ContainerReference,
 }
 
 func (self *crioContainerHandler) needNet() bool {
-	if !self.ignoreMetrics.Has(container.NetworkUsageMetrics) {
+	if self.includedMetrics.Has(container.NetworkUsageMetrics) {
 		return self.labels["io.kubernetes.container.name"] == "POD"
 	}
 	return false
 }
 
 func (self *crioContainerHandler) GetSpec() (info.ContainerSpec, error) {
-	hasFilesystem := !self.ignoreMetrics.Has(container.DiskUsageMetrics)
+	hasFilesystem := self.includedMetrics.Has(container.DiskUsageMetrics)
 	spec, err := common.GetSpec(self.cgroupPaths, self.machineInfoFactory, self.needNet(), hasFilesystem)
 
 	spec.Labels = self.labels
@@ -222,11 +219,11 @@ func (self *crioContainerHandler) getFsStats(stats *info.ContainerStats) error {
 		return err
 	}
 
-	if !self.ignoreMetrics.Has(container.DiskIOMetrics) {
+	if self.includedMetrics.Has(container.DiskIOMetrics) {
 		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
 	}
 
-	if self.ignoreMetrics.Has(container.DiskUsageMetrics) {
+	if !self.includedMetrics.Has(container.DiskUsageMetrics) {
 		return nil
 	}
 	var device string

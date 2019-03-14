@@ -21,13 +21,16 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/build/common.sh"
 source "${KUBE_ROOT}/build/lib/release.sh"
 
 CMD_TARGETS="${KUBE_SERVER_IMAGE_TARGETS[*]}"
 if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
     CMD_TARGETS="${CMD_TARGETS} cmd/hyperkube"
+fi
+if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
+    CMD_TARGETS="${CMD_TARGETS} ${KUBE_CONFORMANCE_IMAGE_TARGETS[*]}"
 fi
 
 kube::build::verify_prereqs

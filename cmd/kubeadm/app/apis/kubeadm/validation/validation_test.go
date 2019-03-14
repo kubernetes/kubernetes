@@ -23,31 +23,29 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestValidateToken(t *testing.T) {
 	var tests = []struct {
-		c        *kubeadm.JoinConfiguration
-		f        *field.Path
+		token    string
 		expected bool
 	}{
-		{&kubeadm.JoinConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, true},
-		{&kubeadm.JoinConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, false},
-		{&kubeadm.JoinConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, false},
-		{&kubeadm.JoinConfiguration{Token: "772ef5.6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"2001:db8::100:6443"}}, nil, true},
-		{&kubeadm.JoinConfiguration{Token: ".6b6baab1d4a0a171", DiscoveryTokenAPIServers: []string{"2001:db8::100:6443"}}, nil, false},
-		{&kubeadm.JoinConfiguration{Token: "772ef5.", DiscoveryTokenAPIServers: []string{"2001:db8::100:6443"}}, nil, false},
-		{&kubeadm.JoinConfiguration{Token: "abcdef.1234567890123456@foobar", DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"}}, nil, false},
+		{"772ef5.6b6baab1d4a0a171", true},
+		{".6b6baab1d4a0a171", false},
+		{"772ef5.", false},
+		{"772ef5.6b6baab1d4a0a171", true},
+		{".6b6baab1d4a0a171", false},
+		{"772ef5.", false},
+		{"abcdef.1234567890123456@foobar", false},
 	}
 	for _, rt := range tests {
-		err := ValidateToken(rt.c.Token, rt.f).ToAggregate()
+		err := ValidateToken(rt.token, nil).ToAggregate()
 		if (err == nil) != rt.expected {
 			t.Errorf(
 				"failed ValidateToken:\n\texpected: %t\n\t  actual: %t",
@@ -109,15 +107,15 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 		criSocket      string
 		expectedErrors bool
 	}{
-		{"", "/some/path", true},                                                              // node name can't be empty
-		{"INVALID-NODENAME", "/some/path", true},                                              // Upper cases is invalid
-		{"invalid-nodename-", "/some/path", true},                                             // Can't have trailing dashes
-		{"invalid-node?name", "/some/path", true},                                             // Unsupported characters
-		{"valid-nodename", "/some/path", false},                                               // supported
-		{"valid-nodename-with-numbers01234", "/some/path/with/numbers/01234/", false},         // supported, with numbers as well
-		{"valid-nodename", kubeadmapiv1alpha3.DefaultUrlScheme + "://" + "/some/path", false}, // supported, with socket url
-		{"valid-nodename", "bla:///some/path", true},                                          // unsupported url scheme
-		{"valid-nodename", ":::", true},                                                       // unparseable url
+		{"", "/some/path", true},                                                             // node name can't be empty
+		{"INVALID-NODENAME", "/some/path", true},                                             // Upper cases is invalid
+		{"invalid-nodename-", "/some/path", true},                                            // Can't have trailing dashes
+		{"invalid-node?name", "/some/path", true},                                            // Unsupported characters
+		{"valid-nodename", "/some/path", false},                                              // supported
+		{"valid-nodename-with-numbers01234", "/some/path/with/numbers/01234/", false},        // supported, with numbers as well
+		{"valid-nodename", kubeadmapiv1beta1.DefaultUrlScheme + "://" + "/some/path", false}, // supported, with socket url
+		{"valid-nodename", "bla:///some/path", true},                                         // unsupported url scheme
+		{"valid-nodename", ":::", true},                                                      // unparseable url
 	}
 	for _, rt := range tests {
 		nro := kubeadm.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: rt.criSocket}
@@ -356,11 +354,11 @@ func TestValidateInitConfiguration(t *testing.T) {
 		s        *kubeadm.InitConfiguration
 		expected bool
 	}{
-		{"invalid missing master configuration",
+		{"invalid missing InitConfiguration",
 			&kubeadm.InitConfiguration{}, false},
 		{"invalid missing token with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -375,7 +373,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -390,7 +388,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing node name",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -402,9 +400,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 					CertificatesDir: "/some/other/cert/dir",
 				},
 			}, false},
-		{"valid master configuration with incorrect IPv4 pod subnet",
+		{"valid InitConfiguration with incorrect IPv4 pod subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -418,9 +416,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
-		{"valid master configuration with IPv4 service subnet",
+		{"valid InitConfiguration with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
@@ -448,9 +446,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 							},
 							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-								Max:        utilpointer.Int32Ptr(2),
-								MaxPerCore: utilpointer.Int32Ptr(1),
-								Min:        utilpointer.Int32Ptr(1),
+								Max:                   utilpointer.Int32Ptr(2),
+								MaxPerCore:            utilpointer.Int32Ptr(1),
+								Min:                   utilpointer.Int32Ptr(1),
 								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 								TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 							},
@@ -465,9 +463,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
-		{"valid master configuration using IPv6 service subnet",
+		{"valid InitConfiguration using IPv6 service subnet",
 			&kubeadm.InitConfiguration{
-				APIEndpoint: kubeadm.APIEndpoint{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
 					AdvertiseAddress: "1:2:3::4",
 					BindPort:         3446,
 				},
@@ -495,9 +493,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 							},
 							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-								Max:        utilpointer.Int32Ptr(2),
-								MaxPerCore: utilpointer.Int32Ptr(1),
-								Min:        utilpointer.Int32Ptr(1),
+								Max:                   utilpointer.Int32Ptr(2),
+								MaxPerCore:            utilpointer.Int32Ptr(1),
+								Min:                   utilpointer.Int32Ptr(1),
 								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 								TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 							},
@@ -532,9 +530,93 @@ func TestValidateJoinConfiguration(t *testing.T) {
 	}{
 		{&kubeadm.JoinConfiguration{}, false},
 		{&kubeadm.JoinConfiguration{
-			DiscoveryFile:  "foo",
-			DiscoveryToken: "abcdef.1234567890123456@foobar",
-			CACertPath:     "/some/cert.crt",
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token: "abcdef.1234567890123456@foobar",
+				},
+				File: &kubeadm.FileDiscovery{
+					KubeConfigPath: "foo",
+				},
+			},
+		}, false},
+		{&kubeadm.JoinConfiguration{ // Pass without JoinControlPlane
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+		}, true},
+		{&kubeadm.JoinConfiguration{ // Pass with JoinControlPlane
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         1234,
+				},
+			},
+		}, true},
+		{&kubeadm.JoinConfiguration{ // Fail JoinControlPlane.AdvertiseAddress validation
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "aaa",
+					BindPort:         1234,
+				},
+			},
+		}, false},
+		{&kubeadm.JoinConfiguration{ // Fail JoinControlPlane.BindPort validation
+			CACertPath: "/some/cert.crt",
+			Discovery: kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token:             "abcdef.1234567890123456",
+					APIServerEndpoint: "1.2.3.4:6443",
+					CACertHashes:      []string{"aaaa"},
+				},
+				TLSBootstrapToken: "abcdef.1234567890123456",
+			},
+			NodeRegistration: kubeadm.NodeRegistrationOptions{
+				Name:      "aaa",
+				CRISocket: "/var/run/dockershim.sock",
+			},
+			ControlPlane: &kubeadm.JoinControlPlane{
+				LocalAPIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         -1,
+				},
+			},
 		}, false},
 	}
 	for _, rt := range tests {
@@ -598,17 +680,15 @@ func TestValidateFeatureGates(t *testing.T) {
 		featureGates featureFlag
 		expected     bool
 	}{
-		{featureFlag{"SelfHosting": true}, true},
-		{featureFlag{"SelfHosting": false}, true},
-		{featureFlag{"StoreCertsInSecrets": true}, true},
-		{featureFlag{"StoreCertsInSecrets": false}, true},
-		{featureFlag{"Foo": true}, false},
+		{featureFlag{"Unknown": true}, false},
+		{featureFlag{"Unknown": false}, false},
 	}
 	for _, rt := range tests {
 		actual := ValidateFeatureGates(rt.featureGates, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed featureGates:\n\texpected: %t\n\t  actual: %t",
+				"failed featureGates %v:\n\texpected: %t\n\t  actual: %t",
+				rt.featureGates,
 				rt.expected,
 				(len(actual) == 0),
 			)
@@ -642,133 +722,120 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 	}
 }
 
-func TestValidateArgSelection(t *testing.T) {
+func TestValidateDiscovery(t *testing.T) {
 	var tests = []struct {
 		name     string
-		c        *kubeadm.JoinConfiguration
+		d        *kubeadm.Discovery
 		expected bool
 	}{
 		{
-			"invalid: DiscoveryToken and DiscoveryFile cannot both be set",
-			&kubeadm.JoinConfiguration{
-				DiscoveryFile:  "https://url/file.conf",
-				DiscoveryToken: "abcdef.1234567890123456",
+			"invalid: .BootstrapToken and .File cannot both be set",
+			&kubeadm.Discovery{
+				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+					Token: "abcdef.1234567890123456",
+				},
+				File: &kubeadm.FileDiscovery{
+					KubeConfigPath: "https://url/file.conf",
+				},
 			},
 			false,
 		},
 		{
-			"invalid: DiscoveryToken or DiscoveryFile must be set",
-			&kubeadm.JoinConfiguration{
-				DiscoveryFile:  "",
-				DiscoveryToken: "",
-			},
+			"invalid: .BootstrapToken or .File must be set",
+			&kubeadm.Discovery{},
 			false,
-		},
-		{
-			"invalid: DiscoveryTokenAPIServers not set",
-			&kubeadm.JoinConfiguration{
-				DiscoveryToken: "abcdef.1234567890123456",
-			},
-			false,
-		},
-		{
-			"invalid: DiscoveryTokenCACertHashes cannot be used with DiscoveryFile",
-			&kubeadm.JoinConfiguration{
-				DiscoveryFile:              "https://url/file.conf",
-				DiscoveryTokenCACertHashes: []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
-			},
-			false,
-		},
-		{
-			"invalid: using token-based discovery without DiscoveryTokenCACertHashes and DiscoveryTokenUnsafeSkipCAVerification",
-			&kubeadm.JoinConfiguration{
-				DiscoveryToken:                         "abcdef.1234567890123456",
-				DiscoveryTokenUnsafeSkipCAVerification: false,
-				DiscoveryTokenAPIServers:               []string{"192.168.122.100:6443"},
-			},
-			false,
-		},
-		{
-			"WARNING: kubeadm doesn't fully support multiple API Servers yet",
-			&kubeadm.JoinConfiguration{
-				DiscoveryToken:                         "abcdef.1234567890123456",
-				DiscoveryTokenUnsafeSkipCAVerification: true,
-				DiscoveryTokenAPIServers:               []string{"192.168.122.100:6443", "192.168.122.88:6443"},
-			},
-			true,
-		},
-		{
-			"valid: DiscoveryFile with DiscoveryTokenAPIServers",
-			&kubeadm.JoinConfiguration{
-				DiscoveryFile:            "https://url/file.conf",
-				DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"},
-			},
-			true,
-		},
-		{
-			"valid: DiscoveryFile without DiscoveryTokenAPIServers",
-			&kubeadm.JoinConfiguration{
-				DiscoveryFile: "https://url/file.conf",
-			},
-			true,
-		},
-		{
-			"valid: using token-based discovery with DiscoveryTokenCACertHashes",
-			&kubeadm.JoinConfiguration{
-				DiscoveryToken:                         "abcdef.1234567890123456",
-				DiscoveryTokenAPIServers:               []string{"192.168.122.100:6443"},
-				DiscoveryTokenCACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
-				DiscoveryTokenUnsafeSkipCAVerification: false,
-			},
-			true,
-		},
-		{
-			"valid: using token-based discovery with DiscoveryTokenCACertHashe but skip ca verification",
-			&kubeadm.JoinConfiguration{
-				DiscoveryToken:                         "abcdef.1234567890123456",
-				DiscoveryTokenAPIServers:               []string{"192.168.122.100:6443"},
-				DiscoveryTokenCACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
-				DiscoveryTokenUnsafeSkipCAVerification: true,
-			},
-			true,
 		},
 	}
 	for _, rt := range tests {
-		err := ValidateArgSelection(rt.c, nil).ToAggregate()
-		if (err == nil) != rt.expected {
-			t.Errorf(
-				"%s test case failed: ValidateArgSelection:\n\texpected: %t\n\t  actual: %t",
-				rt.name,
-				rt.expected,
-				(err == nil),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			err := ValidateDiscovery(rt.d, nil).ToAggregate()
+			if (err == nil) != rt.expected {
+				t.Errorf(
+					"test case failed: ValidateDiscovery:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(err == nil),
+				)
+			}
+		})
 	}
 }
 
-func TestValidateJoinDiscoveryTokenAPIServer(t *testing.T) {
+func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 	var tests = []struct {
-		s        *kubeadm.JoinConfiguration
+		name     string
+		btd      *kubeadm.BootstrapTokenDiscovery
 		expected bool
 	}{
 		{
-			&kubeadm.JoinConfiguration{
-				DiscoveryTokenAPIServers: []string{"192.168.122.100"},
+			"invalid: .APIServerEndpoint not set",
+			&kubeadm.BootstrapTokenDiscovery{
+				Token: "abcdef.1234567890123456",
 			},
 			false,
 		},
 		{
-			&kubeadm.JoinConfiguration{
-				DiscoveryTokenAPIServers: []string{"192.168.122.100:6443"},
+			"invalid: using token-based discovery without .BootstrapToken.CACertHashes and .BootstrapToken.UnsafeSkipCAVerification",
+			&kubeadm.BootstrapTokenDiscovery{
+				Token:                    "abcdef.1234567890123456",
+				APIServerEndpoint:        "192.168.122.100:6443",
+				UnsafeSkipCAVerification: false,
+			},
+			false,
+		},
+		{
+			"valid: using token-based discovery with .BootstrapToken.CACertHashes",
+			&kubeadm.BootstrapTokenDiscovery{
+				Token:                    "abcdef.1234567890123456",
+				APIServerEndpoint:        "192.168.122.100:6443",
+				CACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
+				UnsafeSkipCAVerification: false,
+			},
+			true,
+		},
+		{
+			"valid: using token-based discovery with .BootstrapToken.CACertHashe but skip ca verification",
+			&kubeadm.BootstrapTokenDiscovery{
+				Token:                    "abcdef.1234567890123456",
+				APIServerEndpoint:        "192.168.122.100:6443",
+				CACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
+				UnsafeSkipCAVerification: true,
 			},
 			true,
 		},
 	}
 	for _, rt := range tests {
-		actual := ValidateJoinDiscoveryTokenAPIServer(rt.s.DiscoveryTokenAPIServers, nil)
+		t.Run(rt.name, func(t *testing.T) {
+			err := ValidateDiscoveryBootstrapToken(rt.btd, nil).ToAggregate()
+			if (err == nil) != rt.expected {
+				t.Errorf(
+					"test case failed: ValidateDiscoveryBootstrapToken:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(err == nil),
+				)
+			}
+		})
+	}
+}
+
+func TestValidateDiscoveryTokenAPIServer(t *testing.T) {
+	var tests = []struct {
+		apiServerEndpoint string
+		expected          bool
+	}{
+		{
+			"192.168.122.100",
+			false,
+		},
+		{
+			"192.168.122.100:6443",
+			true,
+		},
+	}
+	for _, rt := range tests {
+		actual := ValidateDiscoveryTokenAPIServer(rt.apiServerEndpoint, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed ValidateJoinDiscoveryTokenAPIServer:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateDiscoveryTokenAPIServer:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(len(actual) == 0),
 			)
@@ -776,7 +843,7 @@ func TestValidateJoinDiscoveryTokenAPIServer(t *testing.T) {
 	}
 }
 
-func TestValidateDiscoveryFile(t *testing.T) {
+func TestValidateDiscoveryKubeConfigPath(t *testing.T) {
 	tmpfile, err := ioutil.TempFile("/tmp", "test_discovery_file")
 	if err != nil {
 		t.Errorf("Error creating temporary file: %v", err)
@@ -796,10 +863,10 @@ func TestValidateDiscoveryFile(t *testing.T) {
 		{"https://url/file.conf", true},
 	}
 	for i, rt := range tests {
-		actual := ValidateDiscoveryFile(rt.s, nil)
+		actual := ValidateDiscoveryKubeConfigPath(rt.s, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"%d: failed ValidateDiscoveryFile:\n\texpected: %t\n\t  actual: %t",
+				"%d: failed ValidateDiscoveryKubeConfigPath:\n\texpected: %t\n\t  actual: %t",
 				i,
 				rt.expected,
 				(len(actual) == 0),

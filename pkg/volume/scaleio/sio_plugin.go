@@ -19,11 +19,11 @@ package scaleio
 import (
 	"errors"
 
-	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/keymutex"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/keymutex"
 )
 
 const (
@@ -36,6 +36,7 @@ type sioPlugin struct {
 	volumeMtx keymutex.KeyMutex
 }
 
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	p := &sioPlugin{
 		host: nil,
@@ -69,6 +70,10 @@ func (p *sioPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 func (p *sioPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.ScaleIO != nil) ||
 		(spec.Volume != nil && spec.Volume.ScaleIO != nil)
+}
+
+func (p *sioPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (p *sioPlugin) RequiresRemount() bool {
@@ -107,7 +112,7 @@ func (p *sioPlugin) NewMounter(
 
 // NewUnmounter creates a representation of the volume to unmount
 func (p *sioPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
-	glog.V(4).Info(log("Unmounter for %s", specName))
+	klog.V(4).Info(log("Unmounter for %s", specName))
 
 	return &sioVolume{
 		podUID:      podUID,
@@ -160,7 +165,7 @@ var _ volume.DeletableVolumePlugin = &sioPlugin{}
 func (p *sioPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	attribs, err := getVolumeSourceAttribs(spec)
 	if err != nil {
-		glog.Error(log("deleter failed to extract volume attributes from spec: %v", err))
+		klog.Error(log("deleter failed to extract volume attributes from spec: %v", err))
 		return nil, err
 	}
 
@@ -186,11 +191,11 @@ func (p *sioPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 var _ volume.ProvisionableVolumePlugin = &sioPlugin{}
 
 func (p *sioPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	glog.V(4).Info(log("creating Provisioner"))
+	klog.V(4).Info(log("creating Provisioner"))
 
 	configData := options.Parameters
 	if configData == nil {
-		glog.Error(log("provisioner missing parameters, unable to continue"))
+		klog.Error(log("provisioner missing parameters, unable to continue"))
 		return nil, errors.New("option parameters missing")
 	}
 

@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
 	"k8s.io/metrics/pkg/client/external_metrics"
@@ -48,9 +49,19 @@ func startHPAController(ctx ControllerContext) (http.Handler, bool, error) {
 
 func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, bool, error) {
 	clientConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
+	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
+
+	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(hpaClient.Discovery())
+	// invalidate the discovery information roughly once per resync interval our API
+	// information is *at most* two resync intervals old.
+	go custom_metrics.PeriodicallyInvalidate(
+		apiVersionsGetter,
+		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
+		ctx.Stop)
+
 	metricsClient := metrics.NewRESTMetricsClient(
 		resourceclient.NewForConfigOrDie(clientConfig),
-		custom_metrics.NewForConfigOrDie(clientConfig),
+		custom_metrics.NewForConfig(clientConfig, ctx.RESTMapper, apiVersionsGetter),
 		external_metrics.NewForConfigOrDie(clientConfig),
 	)
 	return startHPAControllerWithMetricsClient(ctx, metricsClient)
@@ -80,22 +91,19 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 		return nil, false, err
 	}
 
-	replicaCalc := podautoscaler.NewReplicaCalculator(
-		metricsClient,
-		hpaClient.CoreV1(),
-		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
-		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
-		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
-	)
 	go podautoscaler.NewHorizontalController(
 		hpaClient.CoreV1(),
 		scaleClient,
 		hpaClient.AutoscalingV1(),
 		ctx.RESTMapper,
-		replicaCalc,
+		metricsClient,
 		ctx.InformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
+		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
 		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerDownscaleStabilizationWindow.Duration,
+		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
+		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
+		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
 	).Run(ctx.Stop)
 	return nil, true, nil
 }

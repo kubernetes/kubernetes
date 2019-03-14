@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
@@ -25,13 +26,12 @@ import (
 	"fmt"
 	"strings"
 
+	jose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
+
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
-
-	jose "gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
@@ -111,21 +111,23 @@ func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims inte
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
 // Token signatures are verified using each of the given public keys until one works (allowing key rotation)
 // If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
-func JWTTokenAuthenticator(iss string, keys []interface{}, validator Validator) authenticator.Token {
+func JWTTokenAuthenticator(iss string, keys []interface{}, implicitAuds authenticator.Audiences, validator Validator) authenticator.Token {
 	return &jwtTokenAuthenticator{
-		iss:       iss,
-		keys:      keys,
-		validator: validator,
+		iss:          iss,
+		keys:         keys,
+		implicitAuds: implicitAuds,
+		validator:    validator,
 	}
 }
 
 type jwtTokenAuthenticator struct {
-	iss       string
-	keys      []interface{}
-	validator Validator
+	iss          string
+	keys         []interface{}
+	validator    Validator
+	implicitAuds authenticator.Audiences
 }
 
-// Validator is called by the JWT token authentictaor to apply domain specific
+// Validator is called by the JWT token authenticator to apply domain specific
 // validation to a token and extract user information.
 type Validator interface {
 	// Validate validates a token and returns user information or an error.
@@ -140,7 +142,7 @@ type Validator interface {
 	NewPrivateClaims() interface{}
 }
 
-func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, bool, error) {
+func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil
 	}
@@ -170,6 +172,23 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, 
 		return nil, false, utilerrors.NewAggregate(errlist)
 	}
 
+	tokenAudiences := authenticator.Audiences(public.Audience)
+	if len(tokenAudiences) == 0 {
+		// only apiserver audiences are allowed for legacy tokens
+		tokenAudiences = j.implicitAuds
+	}
+
+	requestedAudiences, ok := authenticator.AudiencesFrom(ctx)
+	if !ok {
+		// default to apiserver audiences
+		requestedAudiences = j.implicitAuds
+	}
+
+	auds := authenticator.Audiences(tokenAudiences).Intersect(requestedAudiences)
+	if len(auds) == 0 && len(j.implicitAuds) != 0 {
+		return nil, false, fmt.Errorf("token audiences %q is invalid for the target audiences %q", tokenAudiences, requestedAudiences)
+	}
+
 	// If we get here, we have a token with a recognized signature and
 	// issuer string.
 	sa, err := j.validator.Validate(tokenData, public, private)
@@ -177,7 +196,10 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, 
 		return nil, false, err
 	}
 
-	return sa.UserInfo(), true, nil
+	return &authenticator.Response{
+		User:      sa.UserInfo(),
+		Audiences: auds,
+	}, true, nil
 }
 
 // hasCorrectIssuer returns true if tokenData is a valid JWT in compact

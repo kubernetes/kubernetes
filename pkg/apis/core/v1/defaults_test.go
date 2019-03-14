@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
@@ -803,78 +802,91 @@ func TestSetDefaultSecret(t *testing.T) {
 }
 
 func TestSetDefaultPersistentVolume(t *testing.T) {
-	pv := &v1.PersistentVolume{}
-	obj2 := roundTrip(t, runtime.Object(pv))
-	pv2 := obj2.(*v1.PersistentVolume)
+	fsMode := v1.PersistentVolumeFilesystem
+	blockMode := v1.PersistentVolumeBlock
 
-	if pv2.Status.Phase != v1.VolumePending {
-		t.Errorf("Expected volume phase %v, got %v", v1.VolumePending, pv2.Status.Phase)
-	}
-	if pv2.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimRetain {
-		t.Errorf("Expected pv reclaim policy %v, got %v", v1.PersistentVolumeReclaimRetain, pv2.Spec.PersistentVolumeReclaimPolicy)
-	}
-
-	// When feature gate is disabled, field should not be defaulted
-	defaultMode := v1.PersistentVolumeFilesystem
-	outputMode := pv2.Spec.VolumeMode
-	if outputMode != nil {
-		t.Errorf("Expected VolumeMode to not be defaulted, got: %+v", outputMode)
-	}
-
-	// When feature gate is enabled, field should be defaulted
-	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for BlockVolume: %v", err)
-	}
-	obj3 := roundTrip(t, runtime.Object(pv)).(*v1.PersistentVolume)
-	outputMode3 := obj3.Spec.VolumeMode
-
-	if outputMode3 == nil {
-		t.Errorf("Expected VolumeMode to be defaulted to: %+v, got: nil", defaultMode)
-	} else if *outputMode3 != defaultMode {
-		t.Errorf("Expected VolumeMode to be defaulted to: %+v, got: %+v", defaultMode, outputMode3)
+	tests := []struct {
+		name               string
+		volumeMode         *v1.PersistentVolumeMode
+		expectedVolumeMode v1.PersistentVolumeMode
+	}{
+		{
+			name:               "volume mode nil",
+			volumeMode:         nil,
+			expectedVolumeMode: v1.PersistentVolumeFilesystem,
+		},
+		{
+			name:               "volume mode filesystem",
+			volumeMode:         &fsMode,
+			expectedVolumeMode: v1.PersistentVolumeFilesystem,
+		},
+		{
+			name:               "volume mode block",
+			volumeMode:         &blockMode,
+			expectedVolumeMode: v1.PersistentVolumeBlock,
+		},
 	}
 
-	err = utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for BlockVolume: %v", err)
+	for _, test := range tests {
+		pv := &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{
+				VolumeMode: test.volumeMode,
+			},
+		}
+		obj1 := roundTrip(t, runtime.Object(pv))
+		pv1 := obj1.(*v1.PersistentVolume)
+		if pv1.Status.Phase != v1.VolumePending {
+			t.Errorf("Expected claim phase %v, got %v", v1.ClaimPending, pv1.Status.Phase)
+		}
+		if pv1.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimRetain {
+			t.Errorf("Expected pv reclaim policy %v, got %v", v1.PersistentVolumeReclaimRetain, pv1.Spec.PersistentVolumeReclaimPolicy)
+		}
+		if *pv1.Spec.VolumeMode != test.expectedVolumeMode {
+			t.Errorf("Test %s failed, Expected VolumeMode: %v, but got %v", test.name, test.volumeMode, *pv1.Spec.VolumeMode)
+		}
 	}
-
 }
 
 func TestSetDefaultPersistentVolumeClaim(t *testing.T) {
-	pvc := &v1.PersistentVolumeClaim{}
-	obj2 := roundTrip(t, runtime.Object(pvc))
-	pvc2 := obj2.(*v1.PersistentVolumeClaim)
+	fsMode := v1.PersistentVolumeFilesystem
+	blockMode := v1.PersistentVolumeBlock
 
-	if pvc2.Status.Phase != v1.ClaimPending {
-		t.Errorf("Expected claim phase %v, got %v", v1.ClaimPending, pvc2.Status.Phase)
+	tests := []struct {
+		name               string
+		volumeMode         *v1.PersistentVolumeMode
+		expectedVolumeMode v1.PersistentVolumeMode
+	}{
+		{
+			name:               "volume mode nil",
+			volumeMode:         nil,
+			expectedVolumeMode: v1.PersistentVolumeFilesystem,
+		},
+		{
+			name:               "volume mode filesystem",
+			volumeMode:         &fsMode,
+			expectedVolumeMode: v1.PersistentVolumeFilesystem,
+		},
+		{
+			name:               "volume mode block",
+			volumeMode:         &blockMode,
+			expectedVolumeMode: v1.PersistentVolumeBlock,
+		},
 	}
 
-	// When feature gate is disabled, field should not be defaulted
-	defaultMode := v1.PersistentVolumeFilesystem
-	outputMode := pvc2.Spec.VolumeMode
-	if outputMode != nil {
-		t.Errorf("Expected VolumeMode to not be defaulted, got: %+v", outputMode)
-	}
-
-	// When feature gate is enabled, field should be defaulted
-	err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for BlockVolume: %v", err)
-	}
-	obj3 := roundTrip(t, runtime.Object(pvc)).(*v1.PersistentVolumeClaim)
-	outputMode3 := obj3.Spec.VolumeMode
-
-	if outputMode3 == nil {
-		t.Errorf("Expected VolumeMode to be defaulted to: %+v, got: nil", defaultMode)
-	} else if *outputMode3 != defaultMode {
-		t.Errorf("Expected VolumeMode to be defaulted to: %+v, got: %+v", defaultMode, outputMode3)
-	}
-
-	err = utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for BlockVolume: %v", err)
+	for _, test := range tests {
+		pvc := &v1.PersistentVolumeClaim{
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeMode: test.volumeMode,
+			},
+		}
+		obj1 := roundTrip(t, runtime.Object(pvc))
+		pvc1 := obj1.(*v1.PersistentVolumeClaim)
+		if pvc1.Status.Phase != v1.ClaimPending {
+			t.Errorf("Expected claim phase %v, got %v", v1.ClaimPending, pvc1.Status.Phase)
+		}
+		if *pvc1.Spec.VolumeMode != test.expectedVolumeMode {
+			t.Errorf("Test %s failed, Expected VolumeMode: %v, but got %v", test.name, test.volumeMode, *pvc1.Spec.VolumeMode)
+		}
 	}
 }
 
@@ -1368,5 +1380,13 @@ func TestSetDefaultHostPathVolumeSource(t *testing.T) {
 
 	if defaultType == nil || *defaultType != expectedType {
 		t.Errorf("Expected v1.HostPathVolumeSource default type %v, got %v", expectedType, defaultType)
+	}
+}
+
+func TestSetDefaultEnableServiceLinks(t *testing.T) {
+	pod := &v1.Pod{}
+	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+	if output.Spec.EnableServiceLinks == nil || *output.Spec.EnableServiceLinks != v1.DefaultEnableServiceLinks {
+		t.Errorf("Expected enableServiceLinks value: %+v\ngot: %+v\n", v1.DefaultEnableServiceLinks, *output.Spec.EnableServiceLinks)
 	}
 }

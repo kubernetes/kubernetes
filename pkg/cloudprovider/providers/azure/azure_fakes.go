@@ -27,11 +27,11 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -207,6 +207,13 @@ func (fAPC *fakeAzurePIPClient) List(ctx context.Context, resourceGroupName stri
 	return value, nil
 }
 
+func (fAPC *fakeAzurePIPClient) setFakeStore(store map[string]map[string]network.PublicIPAddress) {
+	fAPC.mutex.Lock()
+	defer fAPC.mutex.Unlock()
+
+	fAPC.FakeStore = store
+}
+
 type fakeAzureInterfacesClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]network.Interface
@@ -247,7 +254,24 @@ func (fIC *fakeAzureInterfacesClient) Get(ctx context.Context, resourceGroupName
 }
 
 func (fIC *fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error) {
-	return result, nil
+	fIC.mutex.Lock()
+	defer fIC.mutex.Unlock()
+	if _, ok := fIC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := fIC.FakeStore[resourceGroupName][networkInterfaceName]; ok {
+			return entity, nil
+		}
+	}
+	return result, autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "Not such Interface",
+	}
+}
+
+func (fIC *fakeAzureInterfacesClient) setFakeStore(store map[string]map[string]network.Interface) {
+	fIC.mutex.Lock()
+	defer fIC.mutex.Unlock()
+
+	fIC.FakeStore = store
 }
 
 type fakeAzureVirtualMachinesClient struct {
@@ -874,11 +898,11 @@ func (f *fakeVMSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (availa
 	return nil, fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string, isInternal bool) error {
+func (f *fakeVMSet) EnsureHostsInPool(service *v1.Service, nodes []*v1.Node, backendPoolID string, vmSetName string, isInternal bool) error {
 	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) EnsureBackendPoolDeleted(poolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
+func (f *fakeVMSet) EnsureBackendPoolDeleted(service *v1.Service, poolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
 	return fmt.Errorf("unimplemented")
 }
 
@@ -892,4 +916,8 @@ func (f *fakeVMSet) DetachDiskByName(diskName, diskURI string, nodeName types.No
 
 func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
 	return nil, fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) GetPowerStatusByNodeName(name string) (string, error) {
+	return "", fmt.Errorf("unimplemented")
 }

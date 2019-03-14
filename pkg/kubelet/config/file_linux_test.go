@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -140,6 +139,7 @@ type testCase struct {
 
 func getTestCases(hostname types.NodeName) []*testCase {
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	return []*testCase{
 		{
 			lock: &sync.Mutex{},
@@ -181,15 +181,16 @@ func getTestCases(hostname types.NodeName) []*testCase {
 						Effect:   "NoExecute",
 					}},
 					Containers: []v1.Container{{
-						Name:  "image",
-						Image: "test/image",
+						Name:                     "image",
+						Image:                    "test/image",
 						TerminationMessagePath:   "/dev/termination-log",
 						ImagePullPolicy:          "Always",
 						SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
 						TerminationMessagePolicy: v1.TerminationMessageReadFile,
 					}},
-					SecurityContext: &v1.PodSecurityContext{},
-					SchedulerName:   api.DefaultSchedulerName,
+					SecurityContext:    &v1.PodSecurityContext{},
+					SchedulerName:      api.DefaultSchedulerName,
+					EnableServiceLinks: &enableServiceLinks,
 				},
 				Status: v1.PodStatus{
 					Phase: v1.PodPending,
@@ -426,7 +427,7 @@ func writeFile(filename string, data []byte) error {
 func changeFileName(dir, from, to string, t *testing.T) {
 	fromPath := filepath.Join(dir, from)
 	toPath := filepath.Join(dir, to)
-	if err := exec.Command("mv", fromPath, toPath).Run(); err != nil {
+	if err := os.Rename(fromPath, toPath); err != nil {
 		t.Errorf("Fail to change file name: %s", err)
 	}
 }

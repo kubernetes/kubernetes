@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	fakeapiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -163,13 +162,13 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -230,13 +229,13 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -265,7 +264,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.Core().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -298,13 +297,13 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -333,7 +332,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.Core().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -351,9 +350,8 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 		objects := podInformer.GetIndexer().List()
 		if len(objects) == podNum {
 			return true, nil
-		} else {
-			return false, nil
 		}
+		return false, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -394,7 +392,6 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	}
 	resyncPeriod := 12 * time.Hour
 	testClient := clientset.NewForConfigOrDie(&config)
-	fakeApiExtensionsClient := fakeapiextensionsclient.NewSimpleClientset()
 
 	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
 	plugin := &volumetest.FakeVolumePlugin{
@@ -414,12 +411,11 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	informers := informers.NewSharedInformerFactory(testClient, resyncPeriod)
 	ctrl, err := attachdetach.NewAttachDetachController(
 		testClient,
-		nil, /* csiClient */
-		fakeApiExtensionsClient, /* crdClient */
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Core().V1().PersistentVolumes(),
+		informers.Storage().V1beta1().CSINodes(),
 		cloud,
 		plugins,
 		nil, /* prober */
@@ -478,13 +474,13 @@ func TestPodAddedByDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -553,7 +549,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 			},
 		},
 	}
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
@@ -561,10 +557,10 @@ func TestPVCBoundWithADC(t *testing.T) {
 	pvcs := []*v1.PersistentVolumeClaim{}
 	for i := 0; i < 3; i++ {
 		pod, pvc := fakePodWithPVC(fmt.Sprintf("fakepod-pvcnotbound-%d", i), fmt.Sprintf("fakepvc-%d", i), namespaceName)
-		if _, err := testClient.Core().Pods(pod.Namespace).Create(pod); err != nil {
+		if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(pod); err != nil {
 			t.Errorf("Failed to create pod : %v", err)
 		}
-		if _, err := testClient.Core().PersistentVolumeClaims(pvc.Namespace).Create(pvc); err != nil {
+		if _, err := testClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc); err != nil {
 			t.Errorf("Failed to create pvc : %v", err)
 		}
 		pvcs = append(pvcs, pvc)
@@ -572,7 +568,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 	// pod with no pvc
 	podNew := fakePodWithVol(namespaceName)
 	podNew.SetName("fakepod")
-	if _, err := testClient.Core().Pods(podNew.Namespace).Create(podNew); err != nil {
+	if _, err := testClient.CoreV1().Pods(podNew.Namespace).Create(podNew); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -612,7 +608,7 @@ func createPVForPVC(t *testing.T, testClient *clientset.Clientset, pvc *v1.Persi
 			StorageClassName: *pvc.Spec.StorageClassName,
 		},
 	}
-	if _, err := testClient.Core().PersistentVolumes().Create(pv); err != nil {
+	if _, err := testClient.CoreV1().PersistentVolumes().Create(pv); err != nil {
 		t.Errorf("Failed to create pv : %v", err)
 	}
 }

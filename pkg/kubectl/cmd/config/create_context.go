@@ -23,43 +23,44 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 type createContextOptions struct {
 	configAccess clientcmd.ConfigAccess
 	name         string
 	currContext  bool
-	cluster      flag.StringFlag
-	authInfo     flag.StringFlag
-	namespace    flag.StringFlag
+	cluster      cliflag.StringFlag
+	authInfo     cliflag.StringFlag
+	namespace    cliflag.StringFlag
 }
 
 var (
-	create_context_long = templates.LongDesc(`
+	createContextLong = templates.LongDesc(`
 		Sets a context entry in kubeconfig
 
 		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
 
-	create_context_example = templates.Examples(`
+	createContextExample = templates.Examples(`
 		# Set the user field on the gce context entry without touching other values
 		kubectl config set-context gce --user=cluster-admin`)
 )
 
+// NewCmdConfigSetContext returns a Command instance for 'config set-context' sub command
 func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: fmt.Sprintf("set-context [NAME | --current] [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
+		Use:                   fmt.Sprintf("set-context [NAME | --current] [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Sets a context entry in kubeconfig"),
-		Long:    create_context_long,
-		Example: create_context_example,
+		Short:                 i18n.T("Sets a context entry in kubeconfig"),
+		Long:                  createContextLong,
+		Example:               createContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			name, exists, err := options.run()
@@ -142,10 +143,10 @@ func (o *createContextOptions) complete(cmd *cobra.Command) error {
 
 func (o createContextOptions) validate() error {
 	if len(o.name) == 0 && !o.currContext {
-		return errors.New("you must specify a non-empty context name or --current-context")
+		return errors.New("you must specify a non-empty context name or --current")
 	}
 	if len(o.name) > 0 && o.currContext {
-		return errors.New("you cannot specify a context name and --current-context")
+		return errors.New("you cannot specify both a context name and --current")
 	}
 
 	return nil

@@ -196,20 +196,24 @@ func (d *Definitions) parseKind(s *openapi_v2.Schema, path *Path) (Schema, error
 	}
 
 	fields := map[string]Schema{}
+	fieldOrder := []string{}
 
 	for _, namedSchema := range s.GetProperties().GetAdditionalProperties() {
 		var err error
-		path := path.FieldPath(namedSchema.GetName())
-		fields[namedSchema.GetName()], err = d.ParseSchema(namedSchema.GetValue(), &path)
+		name := namedSchema.GetName()
+		path := path.FieldPath(name)
+		fields[name], err = d.ParseSchema(namedSchema.GetValue(), &path)
 		if err != nil {
 			return nil, err
 		}
+		fieldOrder = append(fieldOrder, name)
 	}
 
 	return &Kind{
 		BaseSchema:     d.parseBaseSchema(s, path),
 		RequiredFields: s.GetRequired(),
 		Fields:         fields,
+		FieldOrder:     fieldOrder,
 	}, nil
 }
 

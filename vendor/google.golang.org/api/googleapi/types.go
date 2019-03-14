@@ -120,33 +120,33 @@ func quotedList(n int, fn func(dst []byte, i int) []byte) ([]byte, error) {
 	return dst, nil
 }
 
-func (s Int64s) MarshalJSON() ([]byte, error) {
-	return quotedList(len(s), func(dst []byte, i int) []byte {
-		return strconv.AppendInt(dst, s[i], 10)
+func (q Int64s) MarshalJSON() ([]byte, error) {
+	return quotedList(len(q), func(dst []byte, i int) []byte {
+		return strconv.AppendInt(dst, q[i], 10)
 	})
 }
 
-func (s Int32s) MarshalJSON() ([]byte, error) {
-	return quotedList(len(s), func(dst []byte, i int) []byte {
-		return strconv.AppendInt(dst, int64(s[i]), 10)
+func (q Int32s) MarshalJSON() ([]byte, error) {
+	return quotedList(len(q), func(dst []byte, i int) []byte {
+		return strconv.AppendInt(dst, int64(q[i]), 10)
 	})
 }
 
-func (s Uint64s) MarshalJSON() ([]byte, error) {
-	return quotedList(len(s), func(dst []byte, i int) []byte {
-		return strconv.AppendUint(dst, s[i], 10)
+func (q Uint64s) MarshalJSON() ([]byte, error) {
+	return quotedList(len(q), func(dst []byte, i int) []byte {
+		return strconv.AppendUint(dst, q[i], 10)
 	})
 }
 
-func (s Uint32s) MarshalJSON() ([]byte, error) {
-	return quotedList(len(s), func(dst []byte, i int) []byte {
-		return strconv.AppendUint(dst, uint64(s[i]), 10)
+func (q Uint32s) MarshalJSON() ([]byte, error) {
+	return quotedList(len(q), func(dst []byte, i int) []byte {
+		return strconv.AppendUint(dst, uint64(q[i]), 10)
 	})
 }
 
-func (s Float64s) MarshalJSON() ([]byte, error) {
-	return quotedList(len(s), func(dst []byte, i int) []byte {
-		return strconv.AppendFloat(dst, s[i], 'g', -1, 64)
+func (q Float64s) MarshalJSON() ([]byte, error) {
+	return quotedList(len(q), func(dst []byte, i int) []byte {
+		return strconv.AppendFloat(dst, q[i], 'g', -1, 64)
 	})
 }
 

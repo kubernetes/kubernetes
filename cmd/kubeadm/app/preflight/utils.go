@@ -17,11 +17,12 @@ limitations under the License.
 package preflight
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util/version"
+	"github.com/pkg/errors"
+
+	"k8s.io/apimachinery/pkg/util/version"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -32,13 +33,13 @@ func GetKubeletVersion(execer utilsexec.Interface) (*version.Version, error) {
 	command := execer.Command("kubelet", "--version")
 	out, err := command.CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "cannot execute 'kubelet --version'")
 	}
 
 	cleanOutput := strings.TrimSpace(string(out))
 	subs := kubeletVersionRegex.FindAllStringSubmatch(cleanOutput, -1)
 	if len(subs) != 1 || len(subs[0]) < 2 {
-		return nil, fmt.Errorf("Unable to parse output from Kubelet: %q", cleanOutput)
+		return nil, errors.Errorf("Unable to parse output from Kubelet: %q", cleanOutput)
 	}
 	return version.ParseSemantic(subs[0][1])
 }

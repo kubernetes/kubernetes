@@ -14,7 +14,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/settings/podpreset",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/pod:go_default_library",
         "//pkg/apis/settings:go_default_library",
         "//pkg/apis/settings/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

@@ -21,7 +21,7 @@ import (
 	"crypto/x509"
 
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // FileRenewal renews a certificate using local certs

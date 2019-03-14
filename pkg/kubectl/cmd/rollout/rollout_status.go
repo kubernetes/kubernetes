@@ -31,21 +31,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
 var (
-	status_long = templates.LongDesc(`
+	statusLong = templates.LongDesc(`
 		Show the status of the rollout.
 
 		By default 'rollout status' will watch the status of the latest rollout
@@ -55,11 +55,12 @@ var (
 		pin to a specific revision and abort if it is rolled over by another revision,
 		use --revision=N where N is the revision you need to watch for.`)
 
-	status_example = templates.Examples(`
+	statusExample = templates.Examples(`
 		# Watch the rollout status of a deployment
 		kubectl rollout status deployment/nginx`)
 )
 
+// RolloutStatusOptions holds the command-line options for 'rollout status' sub command
 type RolloutStatusOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 
@@ -71,14 +72,15 @@ type RolloutStatusOptions struct {
 	Revision int64
 	Timeout  time.Duration
 
-	StatusViewer  func(*meta.RESTMapping) (kubectl.StatusViewer, error)
-	Builder       func() *resource.Builder
-	DynamicClient dynamic.Interface
+	StatusViewerFn func(*meta.RESTMapping) (kubectl.StatusViewer, error)
+	Builder        func() *resource.Builder
+	DynamicClient  dynamic.Interface
 
 	FilenameOptions *resource.FilenameOptions
 	genericclioptions.IOStreams
 }
 
+// NewRolloutStatusOptions returns an initialized RolloutStatusOptions instance
 func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatusOptions {
 	return &RolloutStatusOptions{
 		PrintFlags:      genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
@@ -89,20 +91,21 @@ func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatus
 	}
 }
 
+// NewCmdRolloutStatus returns a Command instance for the 'rollout status' sub command
 func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutStatusOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
 	cmd := &cobra.Command{
-		Use: "status (TYPE NAME | TYPE/NAME) [flags]",
+		Use:                   "status (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Show the status of the rollout"),
-		Long:    status_long,
-		Example: status_example,
+		Short:                 i18n.T("Show the status of the rollout"),
+		Long:                  statusLong,
+		Example:               statusExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
-			cmdutil.CheckErr(o.Validate(cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 		ValidArgs: validArgs,
@@ -117,6 +120,7 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error {
 	o.Builder = f.NewBuilder
 
@@ -127,9 +131,7 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 	}
 
 	o.BuilderArgs = args
-	o.StatusViewer = func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
-		return polymorphichelpers.StatusViewerFn(f, mapping)
-	}
+	o.StatusViewerFn = polymorphichelpers.StatusViewerFn
 
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
@@ -144,9 +146,10 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 	return nil
 }
 
-func (o *RolloutStatusOptions) Validate(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
-		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
+// Validate makes sure all the provided values for command-line options are valid
+func (o *RolloutStatusOptions) Validate() error {
+	if len(o.BuilderArgs) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
+		return fmt.Errorf("required resource not specified")
 	}
 
 	if o.Revision < 0 {
@@ -156,6 +159,7 @@ func (o *RolloutStatusOptions) Validate(cmd *cobra.Command, args []string) error
 	return nil
 }
 
+// Run performs the execution of 'rollout status' sub command
 func (o *RolloutStatusOptions) Run() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
@@ -180,7 +184,7 @@ func (o *RolloutStatusOptions) Run() error {
 	info := infos[0]
 	mapping := info.ResourceMapping()
 
-	statusViewer, err := o.StatusViewer(mapping)
+	statusViewer, err := o.StatusViewerFn(mapping)
 	if err != nil {
 		return err
 	}

@@ -24,11 +24,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 )
 
 const (
@@ -74,6 +75,7 @@ type Manager struct {
 // * If refresh fails and the old token is no longer valid, return an error
 func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	key := keyFunc(name, namespace, tr)
+
 	ctr, ok := m.get(key)
 
 	if ok && !m.requiresRefresh(ctr) {
@@ -88,13 +90,25 @@ func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticat
 		case m.expired(ctr):
 			return nil, fmt.Errorf("token %s expired and refresh failed: %v", key, err)
 		default:
-			glog.Errorf("couldn't update token %s: %v", key, err)
+			klog.Errorf("couldn't update token %s: %v", key, err)
 			return ctr, nil
 		}
 	}
 
 	m.set(key, tr)
 	return tr, nil
+}
+
+// DeleteServiceAccountToken should be invoked when pod got deleted. It simply
+// clean token manager cache.
+func (m *Manager) DeleteServiceAccountToken(podUID types.UID) {
+	m.cacheMutex.Lock()
+	defer m.cacheMutex.Unlock()
+	for k, tr := range m.cache {
+		if tr.Spec.BoundObjectRef.UID == podUID {
+			delete(m.cache, k)
+		}
+	}
 }
 
 func (m *Manager) cleanup() {
@@ -128,7 +142,7 @@ func (m *Manager) expired(t *authenticationv1.TokenRequest) bool {
 // ttl, or if the token is older than 24 hours.
 func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 	if tr.Spec.ExpirationSeconds == nil {
-		glog.Errorf("expiration seconds was nil for tr: %#v", tr)
+		klog.Errorf("expiration seconds was nil for tr: %#v", tr)
 		return false
 	}
 	now := m.clock.Now()
@@ -147,5 +161,15 @@ func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 
 // keys should be nonconfidential and safe to log
 func keyFunc(name, namespace string, tr *authenticationv1.TokenRequest) string {
-	return fmt.Sprintf("%q/%q/%#v", name, namespace, tr.Spec)
+	var exp int64
+	if tr.Spec.ExpirationSeconds != nil {
+		exp = *tr.Spec.ExpirationSeconds
+	}
+
+	var ref authenticationv1.BoundObjectReference
+	if tr.Spec.BoundObjectRef != nil {
+		ref = *tr.Spec.BoundObjectRef
+	}
+
+	return fmt.Sprintf("%q/%q/%#v/%#v/%#v", name, namespace, tr.Spec.Audiences, exp, ref)
 }

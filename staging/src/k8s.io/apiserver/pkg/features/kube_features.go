@@ -29,10 +29,19 @@ const (
 
 	// owner: @tallclair
 	// alpha: v1.5
+	// beta: v1.6
 	//
 	// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
 	// redirects from the backend (Kubelet) for streaming requests (exec/attach/port-forward).
 	StreamingProxyRedirects utilfeature.Feature = "StreamingProxyRedirects"
+
+	// owner: @tallclair
+	// alpha: v1.10
+	// beta: v1.14
+	//
+	// ValidateProxyRedirects controls whether the apiserver should validate that redirects are only
+	// followed to the same host. Only used if StreamingProxyRedirects is enabled.
+	ValidateProxyRedirects utilfeature.Feature = "ValidateProxyRedirects"
 
 	// owner: @tallclair
 	// alpha: v1.7
@@ -44,18 +53,18 @@ const (
 	// audited.
 	AdvancedAuditing utilfeature.Feature = "AdvancedAuditing"
 
+	// owner: @pbarker
+	// alpha: v1.13
+	//
+	// DynamicAuditing enables configuration of audit policy and webhook backends through an
+	// AuditSink API object.
+	DynamicAuditing utilfeature.Feature = "DynamicAuditing"
+
 	// owner: @ilackams
 	// alpha: v1.7
 	//
 	// Enables compression of REST responses (GET and LIST only)
 	APIResponseCompression utilfeature.Feature = "APIResponseCompression"
-
-	// owner: @smarterclayton
-	// alpha: v1.7
-	//
-	// Allow asynchronous coordination of object creation.
-	// Auto-enabled by the Initializers admission plugin.
-	Initializers utilfeature.Feature = "Initializers"
 
 	// owner: @smarterclayton
 	// alpha: v1.8
@@ -67,15 +76,41 @@ const (
 
 	// owner: @apelisse
 	// alpha: v1.12
+	// beta: v1.13
 	//
 	// Allow requests to be processed but not stored, so that
 	// validation, merging, mutation can be tested without
 	// committing.
 	DryRun utilfeature.Feature = "DryRun"
+
+	// owner: @apelisse, @lavalamp
+	// alpha: v1.14
+	//
+	// Server-side apply. Merging happens on the server.
+	ServerSideApply utilfeature.Feature = "ServerSideApply"
+
+	// owner: @caesarxuchao
+	// alpha: v1.14
+	//
+	// Allow apiservers to expose the storage version hash in the discovery
+	// document.
+	StorageVersionHash utilfeature.Feature = "StorageVersionHash"
+
+	// owner: @ksubrmnn
+	// alpha: v1.14
+	//
+	// Allows kube-proxy to run in Overlay mode for Windows
+	WinOverlay utilfeature.Feature = "WinOverlay"
+
+	// owner: @ksubrmnn
+	// alpha: v1.14
+	//
+	// Allows kube-proxy to create DSR loadbalancers for Windows
+	WinDSR utilfeature.Feature = "WinDSR"
 )
 
 func init() {
-	utilfeature.DefaultFeatureGate.Add(defaultKubernetesFeatureGates)
+	utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -83,9 +118,14 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
 	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
+	ValidateProxyRedirects:  {Default: true, PreRelease: utilfeature.Beta},
 	AdvancedAuditing:        {Default: true, PreRelease: utilfeature.GA},
+	DynamicAuditing:         {Default: false, PreRelease: utilfeature.Alpha},
 	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
-	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
-	DryRun:                  {Default: false, PreRelease: utilfeature.Alpha},
+	DryRun:                  {Default: true, PreRelease: utilfeature.Beta},
+	ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
+	StorageVersionHash:      {Default: false, PreRelease: utilfeature.Alpha},
+	WinOverlay:              {Default: false, PreRelease: utilfeature.Alpha},
+	WinDSR:                  {Default: false, PreRelease: utilfeature.Alpha},
 }

@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -112,13 +112,14 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 		cmd = append(cmd, "@"+t.dnsPod.Status.PodIP)
 	case "kube-dns":
 		cmd = append(cmd, "@"+t.dnsPod.Status.PodIP, "-p", "10053")
+	case "ptr-record":
+		cmd = append(cmd, "-x")
 	case "cluster-dns":
+	case "cluster-dns-ipv6":
+		cmd = append(cmd, "AAAA")
 		break
 	default:
 		panic(fmt.Errorf("invalid target: " + target))
-	}
-	if strings.HasSuffix(dnsName, "in-addr.arpa") || strings.HasSuffix(dnsName, "in-addr.arpa.") {
-		cmd = append(cmd, []string{"-t", "ptr"}...)
 	}
 	cmd = append(cmd, dnsName)
 
@@ -327,7 +328,7 @@ func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
 	t.createDNSPodFromObj(generateDNSServerPod(aRecords))
 }
 
-func (t *dnsTestCommon) createDNSServerWithPtrRecord() {
+func (t *dnsTestCommon) createDNSServerWithPtrRecord(isIPv6 bool) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Pod",
@@ -345,13 +346,22 @@ func (t *dnsTestCommon) createDNSServerWithPtrRecord() {
 						"-u", "root",
 						"-k",
 						"--log-facility", "-",
-						"--host-record=my.test,192.0.2.123",
 						"-q",
 					},
 				},
 			},
 			DNSPolicy: "Default",
 		},
+	}
+
+	if isIPv6 {
+		pod.Spec.Containers[0].Command = append(
+			pod.Spec.Containers[0].Command,
+			fmt.Sprintf("--host-record=my.test,2001:db8::29"))
+	} else {
+		pod.Spec.Containers[0].Command = append(
+			pod.Spec.Containers[0].Command,
+			fmt.Sprintf("--host-record=my.test,192.0.2.123"))
 	}
 
 	t.createDNSPodFromObj(pod)
@@ -434,7 +444,7 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, servic
 	return dnsPod
 }
 
-func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookupIP string, fileNamePrefix, namespace string) (string, []string) {
+func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookupIP string, fileNamePrefix, namespace, dnsDomain string) (string, []string) {
 	fileNames := make([]string, 0, len(namesToResolve)*2)
 	probeCmd := "for i in `seq 1 600`; do "
 	for _, name := range namesToResolve {
@@ -447,10 +457,10 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 		}
 		fileName := fmt.Sprintf("%s_udp@%s", fileNamePrefix, name)
 		fileNames = append(fileNames, fileName)
-		probeCmd += fmt.Sprintf(`test -n "$$(dig +notcp +noall +answer +search %s %s)" && echo OK > /results/%s;`, name, lookup, fileName)
+		probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search %s %s)" && test -n "$$check" && echo OK > /results/%s;`, name, lookup, fileName)
 		fileName = fmt.Sprintf("%s_tcp@%s", fileNamePrefix, name)
 		fileNames = append(fileNames, fileName)
-		probeCmd += fmt.Sprintf(`test -n "$$(dig +tcp +noall +answer +search %s %s)" && echo OK > /results/%s;`, name, lookup, fileName)
+		probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search %s %s)" && test -n "$$check" && echo OK > /results/%s;`, name, lookup, fileName)
 	}
 
 	for _, name := range hostEntries {
@@ -461,9 +471,9 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 
 	podARecByUDPFileName := fmt.Sprintf("%s_udp@PodARecord", fileNamePrefix)
 	podARecByTCPFileName := fmt.Sprintf("%s_tcp@PodARecord", fileNamePrefix)
-	probeCmd += fmt.Sprintf(`podARec=$$(hostname -i| awk -F. '{print $$1"-"$$2"-"$$3"-"$$4".%s.pod.cluster.local"}');`, namespace)
-	probeCmd += fmt.Sprintf(`test -n "$$(dig +notcp +noall +answer +search $${podARec} A)" && echo OK > /results/%s;`, podARecByUDPFileName)
-	probeCmd += fmt.Sprintf(`test -n "$$(dig +tcp +noall +answer +search $${podARec} A)" && echo OK > /results/%s;`, podARecByTCPFileName)
+	probeCmd += fmt.Sprintf(`podARec=$$(hostname -i| awk -F. '{print $$1"-"$$2"-"$$3"-"$$4".%s.pod.%s"}');`, namespace, dnsDomain)
+	probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search $${podARec} A)" && test -n "$$check" && echo OK > /results/%s;`, podARecByUDPFileName)
+	probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search $${podARec} A)" && test -n "$$check" && echo OK > /results/%s;`, podARecByTCPFileName)
 	fileNames = append(fileNames, podARecByUDPFileName)
 	fileNames = append(fileNames, podARecByTCPFileName)
 
@@ -471,8 +481,8 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 		ptrLookup := fmt.Sprintf("%s.in-addr.arpa.", strings.Join(reverseArray(strings.Split(ptrLookupIP, ".")), "."))
 		ptrRecByUDPFileName := fmt.Sprintf("%s_udp@PTR", ptrLookupIP)
 		ptrRecByTCPFileName := fmt.Sprintf("%s_tcp@PTR", ptrLookupIP)
-		probeCmd += fmt.Sprintf(`test -n "$$(dig +notcp +noall +answer +search %s PTR)" && echo OK > /results/%s;`, ptrLookup, ptrRecByUDPFileName)
-		probeCmd += fmt.Sprintf(`test -n "$$(dig +tcp +noall +answer +search %s PTR)" && echo OK > /results/%s;`, ptrLookup, ptrRecByTCPFileName)
+		probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search %s PTR)" && test -n "$$check" && echo OK > /results/%s;`, ptrLookup, ptrRecByUDPFileName)
+		probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search %s PTR)" && test -n "$$check" && echo OK > /results/%s;`, ptrLookup, ptrRecByTCPFileName)
 		fileNames = append(fileNames, ptrRecByUDPFileName)
 		fileNames = append(fileNames, ptrRecByTCPFileName)
 	}
@@ -484,7 +494,7 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 // createTargetedProbeCommand returns a command line that performs a DNS lookup for a specific record type
 func createTargetedProbeCommand(nameToResolve string, lookup string, fileNamePrefix string) (string, string) {
 	fileName := fmt.Sprintf("%s_udp@%s", fileNamePrefix, nameToResolve)
-	probeCmd := fmt.Sprintf("dig +short +tries=12 +norecurse %s %s > /results/%s", nameToResolve, lookup, fileName)
+	probeCmd := fmt.Sprintf("for i in `seq 1 30`; do dig +short %s %s > /results/%s; sleep 1; done", nameToResolve, lookup, fileName)
 	return probeCmd, fileName
 }
 
@@ -495,7 +505,7 @@ func assertFilesExist(fileNames []string, fileDir string, pod *v1.Pod, client cl
 func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client clientset.Interface, check bool, expected string) {
 	var failed []string
 
-	framework.ExpectNoError(wait.Poll(time.Second*10, time.Second*600, func() (bool, error) {
+	framework.ExpectNoError(wait.PollImmediate(time.Second*5, time.Second*600, func() (bool, error) {
 		failed = []string{}
 
 		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)

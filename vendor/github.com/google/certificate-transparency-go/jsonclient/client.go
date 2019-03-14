@@ -53,7 +53,7 @@ type backoffer interface {
 // JSONClient provides common functionality for interacting with a JSON server
 // that uses cryptographic signatures.
 type JSONClient struct {
-	uri        string                // the base URI of the server. e.g. http://ct.googleapis/pilot
+	uri        string                // the base URI of the server. e.g. https://ct.googleapis/pilot
 	httpClient *http.Client          // used to interact with the server via HTTP
 	Verifier   *ct.SignatureVerifier // nil for no verification (e.g. no public key available)
 	logger     Logger                // interface to use for logging warnings and errors
@@ -137,6 +137,11 @@ func New(uri string, hc *http.Client, opts Options) (*JSONClient, error) {
 		logger:     logger,
 		backoff:    &backoff{},
 	}, nil
+}
+
+// BaseURI returns the base URI that the JSONClient makes queries to.
+func (c *JSONClient) BaseURI() string {
+	return c.uri
 }
 
 // GetAndParse makes a HTTP GET call to the given path, and attempta to parse

@@ -20,10 +20,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -57,8 +57,9 @@ var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
 			1. The Pod with hostNetwork=false MUST have /etc/hosts of containers managed by the Kubelet.
 			2. The Pod with hostNetwork=false but the container mounts /etc/hosts file from the host. The /etc/hosts file MUST not be managed by the Kubelet.
 			3. The Pod with hostNetwork=true , /etc/hosts file MUST not be managed by the Kubelet.
+		This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 	*/
-	framework.ConformanceIt("should test kubelet managed /etc/hosts file [NodeConformance]", func() {
+	framework.ConformanceIt("should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance]", func() {
 		By("Setting up the test")
 		config.setup()
 
@@ -126,7 +127,7 @@ func assertManagedStatus(
 			}
 		}
 
-		glog.Warningf(
+		klog.Warningf(
 			"For pod: %s, name: %s, expected %t, (/etc/hosts was %q), (/etc/hosts-original was %q), retryCount: %d",
 			podName, name, expectedIsManaged, etcHostsContent, etcHostsOriginalContent, retryCount)
 

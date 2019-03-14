@@ -23,11 +23,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 )
 
+// DeviceManagerCheckpoint defines the operations to retrieve pod devices
 type DeviceManagerCheckpoint interface {
 	checkpointmanager.Checkpoint
 	GetData() ([]PodDevicesEntry, map[string][]string)
 }
 
+// PodDevicesEntry connects pod information to devices
 type PodDevicesEntry struct {
 	PodUID        string
 	ContainerName string
@@ -44,12 +46,13 @@ type checkpointData struct {
 	RegisteredDevices map[string][]string
 }
 
+// Data holds checkpoint data and its checksum
 type Data struct {
 	Data     checkpointData
 	Checksum checksum.Checksum
 }
 
-// NewDeviceManagerCheckpoint returns an instance of Checkpoint
+// New returns an instance of Checkpoint
 func New(devEntries []PodDevicesEntry,
 	devices map[string][]string) DeviceManagerCheckpoint {
 	return &Data{
@@ -76,6 +79,7 @@ func (cp *Data) VerifyChecksum() error {
 	return cp.Checksum.Verify(cp.Data)
 }
 
+// GetData returns device entries and registered devices
 func (cp *Data) GetData() ([]PodDevicesEntry, map[string][]string) {
 	return cp.Data.PodDeviceEntries, cp.Data.RegisteredDevices
 }

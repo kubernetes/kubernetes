@@ -1,6 +1,14 @@
-language: go
+after_success:
+- bash <(curl -s https://codecov.io/bash)
+env:
+- TEST_COMMAND="go test -v -race -covermode=atomic"
+- TEST_COMMAND="go test -v -timeout=20m -cover -coverprofile=coverage.txt -args -enable-long"
+- TEST_COMMAND="go test -v -timeout=30m -args -enable-go-swagger"
+- TEST_COMMAND="go test -v -timeout=30m github.com/go-openapi/runtime/..."
 go:
-- 1.7
+- '1.9'
+- 1.10.x
+- 1.11.x
 install:
 - go get -u github.com/axw/gocov/gocov
 - go get -u gopkg.in/matm/v1/gocov-html
@@ -8,15 +16,20 @@ install:
 - go get -u github.com/stretchr/testify/assert
 - go get -u github.com/kr/pretty
 - go get -u gopkg.in/yaml.v2
+- go get -u github.com/go-openapi/spec
 - go get -u github.com/go-openapi/analysis
 - go get -u github.com/go-openapi/errors
 - go get -u github.com/go-openapi/loads
 - go get -u github.com/go-openapi/strfmt
 - go get -u github.com/go-openapi/runtime
-script:
-- go test -v -race -cover -coverprofile=coverage.txt -covermode=atomic
-after_success:
-- bash <(curl -s https://codecov.io/bash)
+- go get -u github.com/docker/go-units
+language: go
+matrix:
+  exclude:
+  - env: TEST_COMMAND="go test -v -timeout=30m -args -enable-go-swagger"
+    go: 1.8
 notifications:
   slack:
     secure: EmObnQuM9Mw8J9vpFaKKHqSMN4Wsr/A9+v7ewAD5cEhA0T1P4m7MbJMiJOhxUhj/X+BFh2DamW+P2lT8mybj5wg8wnkQ2BteKA8Tawi6f9PRw2NRheO8tAi8o/npLnlmet0kc93mn+oLuqHw36w4+j5mkOl2FghkfGiUVhwrhkCP7KXQN+3TU87e+/HzQumlJ3nsE+6terVxkH3PmaUTsS5ONaODZfuxFpfb7RsoEl3skHf6d+tr+1nViLxxly7558Nc33C+W1mr0qiEvMLZ+kJ/CpGWBJ6CUJM3jm6hNe2eMuIPwEK2hxZob8c7n22VPap4K6a0bBRoydoDXaba+2sD7Ym6ivDO/DVyL44VeBBLyIiIBylDGQdZH+6SoWm90Qe/i7tnY/T5Ao5igT8f3cfQY1c3EsTfqmlDfrhmACBmwSlgkdVBLTprHL63JMY24LWmh4jhxsmMRZhCL4dze8su1w6pLN/pD1pGHtKYCEVbdTmaM3PblNRFf12XB7qosmQsgUndH4Vq3bTbU0s1pKjeDhRyLvFzvR0TBbo0pDLEoF1A/i5GVFWa7yLZNUDudQERRh7qv/xBl2excIaQ1sV4DSVm7bAE9l6Kp+yeHQJW2uN6Y3X8wu9gB9nv9l5HBze7wh8KE6PyWAOLYYqZg9/sAtsv/2GcQqXcKFF1zcA=
+script:
+- (eval "$TEST_COMMAND")

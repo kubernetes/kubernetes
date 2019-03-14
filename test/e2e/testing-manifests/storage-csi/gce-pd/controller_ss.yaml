@@ -1,67 +1,51 @@
 kind: StatefulSet
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 metadata:
-  name: csi-gce-controller
+  name: csi-gce-pd-controller
 spec:
   serviceName: "csi-gce-pd"
   replicas: 1
   selector:
     matchLabels:
-      app: csi-gce-pd-driver
+      app: gcp-compute-persistent-disk-csi-driver
   template:
     metadata:
       labels:
-        app: csi-gce-pd-driver
+        app: gcp-compute-persistent-disk-csi-driver
     spec:
-      serviceAccount: csi-gce-pd
+      serviceAccountName: csi-controller-sa
       containers:
-        - name: csi-external-provisioner
-          imagePullPolicy: Always
-          image: quay.io/k8scsi/csi-provisioner:v0.2.0
+        - name: csi-provisioner
+          # TODO: replace with official image
+          image: quay.io/k8scsi/csi-provisioner:tmp-test-1.14
           args:
             - "--v=5"
-            - "--provisioner=csi-gce-pd"
-            - "--csi-address=$(ADDRESS)"
-          env:
-            - name: ADDRESS
-              value: /csi/csi.sock
+            - "--csi-address=/csi/csi.sock"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
         - name: csi-attacher
-          imagePullPolicy: Always
-          image: quay.io/k8scsi/csi-attacher:v0.2.0
+          image: gcr.io/gke-release/csi-attacher:v1.0.1-gke.0
           args:
             - "--v=5"
-            - "--csi-address=$(ADDRESS)"
-          env:
-            - name: ADDRESS
-              value: /csi/csi.sock
+            - "--csi-address=/csi/csi.sock"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
-        - name: gce-driver
-          imagePullPolicy: Always
-          image: gcr.io/google-containers/volume-csi/compute-persistent-disk-csi-driver:v0.2.0.alpha
+        - name: gce-pd-driver
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.3.1-gke.0
           args:
             - "--v=5"
-            - "--endpoint=$(CSI_ENDPOINT)"
-            - "--nodeid=$(KUBE_NODE_NAME)"
+            - "--endpoint=unix:/csi/csi.sock"
           env:
-            - name: CSI_ENDPOINT
-              value: unix:///csi/csi.sock
-            - name: KUBE_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
             - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: "/etc/service-account/cloud-sa.json"
+              value: "/etc/cloud-sa/cloud-sa.json"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
             - name: cloud-sa-volume
               readOnly: true
-              mountPath: "/etc/service-account"
+              mountPath: "/etc/cloud-sa"
       volumes:
         - name: socket-dir
           emptyDir: {}

@@ -27,16 +27,13 @@ import (
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	extensionsvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
@@ -68,13 +65,13 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPat
 	}
 
 	if spec.MinAvailable != nil {
-		allErrs = append(allErrs, extensionsvalidation.ValidatePositiveIntOrPercent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
-		allErrs = append(allErrs, extensionsvalidation.IsNotMoreThan100Percent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
 	}
 
 	if spec.MaxUnavailable != nil {
-		allErrs = append(allErrs, extensionsvalidation.ValidatePositiveIntOrPercent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
-		allErrs = append(allErrs, extensionsvalidation.IsNotMoreThan100Percent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
 	}
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
@@ -109,6 +106,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validatePSPRunAsUser(fldPath.Child("runAsUser"), &spec.RunAsUser)...)
+	allErrs = append(allErrs, validatePSPRunAsGroup(fldPath.Child("runAsGroup"), spec.RunAsGroup)...)
 	allErrs = append(allErrs, validatePSPSELinux(fldPath.Child("seLinux"), &spec.SELinux)...)
 	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
 	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
@@ -120,8 +118,10 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.DefaultAddCapabilities, field.NewPath("defaultAddCapabilities"))...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
 	allErrs = append(allErrs, validatePSPDefaultAllowPrivilegeEscalation(fldPath.Child("defaultAllowPrivilegeEscalation"), spec.DefaultAllowPrivilegeEscalation, spec.AllowPrivilegeEscalation)...)
+	allErrs = append(allErrs, validatePSPAllowedProcMountTypes(fldPath.Child("allowedProcMountTypes"), spec.AllowedProcMountTypes)...)
 	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 	allErrs = append(allErrs, validatePSPAllowedFlexVolumes(fldPath.Child("allowedFlexVolumes"), spec.AllowedFlexVolumes)...)
+	allErrs = append(allErrs, validatePSPAllowedCSIDrivers(fldPath.Child("allowedCSIDrivers"), spec.AllowedCSIDrivers)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("allowedUnsafeSysctls"), spec.AllowedUnsafeSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("forbiddenSysctls"), spec.ForbiddenSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctlListsDoNotOverlap(fldPath.Child("allowedUnsafeSysctls"), fldPath.Child("forbiddenSysctls"), spec.AllowedUnsafeSysctls, spec.ForbiddenSysctls)...)
@@ -195,6 +195,17 @@ func validatePSPAllowedFlexVolumes(fldPath *field.Path, flexVolumes []policy.All
 	return allErrs
 }
 
+func validatePSPAllowedCSIDrivers(fldPath *field.Path, csiDrivers []policy.AllowedCSIDriver) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(csiDrivers) > 0 {
+		for idx, csiDriver := range csiDrivers {
+			fieldPath := fldPath.Child("allowedCSIDriver").Index(idx).Child("name")
+			allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(csiDriver.Name, fieldPath)...)
+		}
+	}
+	return allErrs
+}
+
 // validatePSPSELinux validates the SELinux fields of PodSecurityPolicy.
 func validatePSPSELinux(fldPath *field.Path, seLinux *policy.SELinuxStrategyOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -233,12 +244,45 @@ func validatePSPRunAsUser(fldPath *field.Path, runAsUser *policy.RunAsUserStrate
 	return allErrs
 }
 
+// validatePSPRunAsGroup validates the RunAsGroup fields of PodSecurityPolicy.
+func validatePSPRunAsGroup(fldPath *field.Path, runAsGroup *policy.RunAsGroupStrategyOptions) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if runAsGroup == nil {
+		return allErrs
+	}
+
+	switch runAsGroup.Rule {
+	case policy.RunAsGroupStrategyRunAsAny:
+		if len(runAsGroup.Ranges) != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ranges"), runAsGroup.Ranges, "Ranges must be empty"))
+		}
+	case policy.RunAsGroupStrategyMustRunAs, policy.RunAsGroupStrategyMayRunAs:
+		if len(runAsGroup.Ranges) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ranges"), runAsGroup.Ranges, "must provide at least one range"))
+		}
+		// validate range settings
+		for idx, rng := range runAsGroup.Ranges {
+			allErrs = append(allErrs, validateGroupIDRange(fldPath.Child("ranges").Index(idx), rng)...)
+		}
+	default:
+		supportedRunAsGroupRules := []string{
+			string(policy.RunAsGroupStrategyMustRunAs),
+			string(policy.RunAsGroupStrategyRunAsAny),
+			string(policy.RunAsGroupStrategyMayRunAs),
+		}
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rule"), runAsGroup.Rule, supportedRunAsGroupRules))
+	}
+	return allErrs
+}
+
 // validatePSPFSGroup validates the FSGroupStrategyOptions fields of the PodSecurityPolicy.
 func validatePSPFSGroup(fldPath *field.Path, groupOptions *policy.FSGroupStrategyOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	supportedRules := sets.NewString(
 		string(policy.FSGroupStrategyMustRunAs),
+		string(policy.FSGroupStrategyMayRunAs),
 		string(policy.FSGroupStrategyRunAsAny),
 	)
 	if !supportedRules.Has(string(groupOptions.Rule)) {
@@ -257,6 +301,7 @@ func validatePSPSupplementalGroup(fldPath *field.Path, groupOptions *policy.Supp
 
 	supportedRules := sets.NewString(
 		string(policy.SupplementalGroupsStrategyRunAsAny),
+		string(policy.SupplementalGroupsStrategyMayRunAs),
 		string(policy.SupplementalGroupsStrategyMustRunAs),
 	)
 	if !supportedRules.Has(string(groupOptions.Rule)) {
@@ -290,6 +335,17 @@ func validatePSPDefaultAllowPrivilegeEscalation(fldPath *field.Path, defaultAllo
 		allErrs = append(allErrs, field.Invalid(fldPath, defaultAllowPrivilegeEscalation, "Cannot set DefaultAllowPrivilegeEscalation to true without also setting AllowPrivilegeEscalation to true"))
 	}
 
+	return allErrs
+}
+
+// validatePSPAllowedProcMountTypes validates the DefaultAllowPrivilegeEscalation field against the AllowPrivilegeEscalation field of a PodSecurityPolicy.
+func validatePSPAllowedProcMountTypes(fldPath *field.Path, allowedProcMountTypes []core.ProcMountType) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, procMountType := range allowedProcMountTypes {
+		if err := apivalidation.ValidateProcMountType(fldPath.Index(i), procMountType); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
 	return allErrs
 }
 
@@ -352,10 +408,6 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 
 	if len(sysctls) == 0 {
 		return allErrs
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
-		return append(allErrs, field.Forbidden(fldPath, "Sysctls are disabled by Sysctls feature-gate"))
 	}
 
 	coversAll := false

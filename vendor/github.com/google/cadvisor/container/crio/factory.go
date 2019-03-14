@@ -26,7 +26,7 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/manager/watcher"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // The namespace under which crio aliases are unique.
@@ -55,7 +55,7 @@ type crioFactory struct {
 	// Information about mounted filesystems.
 	fsInfo fs.FsInfo
 
-	ignoreMetrics container.MetricSet
+	includedMetrics container.MetricSet
 
 	client crioClient
 }
@@ -81,7 +81,7 @@ func (self *crioFactory) NewContainerHandler(name string, inHostNamespace bool) 
 		&self.cgroupSubsystems,
 		inHostNamespace,
 		metadataEnvs,
-		self.ignoreMetrics,
+		self.includedMetrics,
 	)
 	return
 }
@@ -136,7 +136,7 @@ var (
 )
 
 // Register root container before running this function!
-func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics container.MetricSet) error {
+func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics container.MetricSet) error {
 	client, err := Client()
 	if err != nil {
 		return err
@@ -149,12 +149,12 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 
 	// TODO determine crio version so we can work differently w/ future versions if needed
 
-	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
+	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(includedMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
 
-	glog.V(1).Infof("Registering CRI-O factory")
+	klog.V(1).Infof("Registering CRI-O factory")
 	f := &crioFactory{
 		client:             client,
 		cgroupSubsystems:   cgroupSubsystems,
@@ -162,7 +162,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 		machineInfoFactory: factory,
 		storageDriver:      storageDriver(info.StorageDriver),
 		storageDir:         info.StorageRoot,
-		ignoreMetrics:      ignoreMetrics,
+		includedMetrics:    includedMetrics,
 	}
 
 	container.RegisterContainerHandlerFactory(f, []watcher.ContainerWatchSource{watcher.Raw})

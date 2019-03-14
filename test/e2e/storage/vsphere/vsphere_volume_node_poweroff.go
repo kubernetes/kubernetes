@@ -75,7 +75,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 	*/
 	It("verify volume status after node power off", func() {
 		By("Creating a Storage Class")
-		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil)
+		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil)
 		storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
 		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
@@ -95,7 +95,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		By("Creating a Deployment")
 		deployment, err := framework.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create Deployment with err: %v", err))
-		defer client.ExtensionsV1beta1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
+		defer client.AppsV1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
 
 		By("Get pod from the deployement")
 		podList, err := framework.GetPodsForDeployment(client, deployment)

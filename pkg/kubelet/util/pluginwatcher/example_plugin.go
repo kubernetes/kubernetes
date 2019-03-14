@@ -18,15 +18,17 @@ package pluginwatcher
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"k8s.io/klog"
 
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
+	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1"
 	v1beta2 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2"
 )
@@ -39,6 +41,7 @@ type examplePlugin struct {
 	endpoint           string                              // for testing
 	pluginName         string
 	pluginType         string
+	versions           []string
 }
 
 type pluginServiceV1Beta1 struct {
@@ -46,7 +49,7 @@ type pluginServiceV1Beta1 struct {
 }
 
 func (s *pluginServiceV1Beta1) GetExampleInfo(ctx context.Context, rqt *v1beta1.ExampleRequest) (*v1beta1.ExampleResponse, error) {
-	glog.Infof("GetExampleInfo v1beta1field: %s", rqt.V1Beta1Field)
+	klog.Infof("GetExampleInfo v1beta1field: %s", rqt.V1Beta1Field)
 	return &v1beta1.ExampleResponse{}, nil
 }
 
@@ -59,7 +62,7 @@ type pluginServiceV1Beta2 struct {
 }
 
 func (s *pluginServiceV1Beta2) GetExampleInfo(ctx context.Context, rqt *v1beta2.ExampleRequest) (*v1beta2.ExampleResponse, error) {
-	glog.Infof("GetExampleInfo v1beta2_field: %s", rqt.V1Beta2Field)
+	klog.Infof("GetExampleInfo v1beta2_field: %s", rqt.V1Beta2Field)
 	return &v1beta2.ExampleResponse{}, nil
 }
 
@@ -73,12 +76,13 @@ func NewExamplePlugin() *examplePlugin {
 }
 
 // NewTestExamplePlugin returns an initialized examplePlugin instance for testing
-func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string) *examplePlugin {
+func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string, advertisedVersions ...string) *examplePlugin {
 	return &examplePlugin{
 		pluginName:         pluginName,
 		pluginType:         pluginType,
-		registrationStatus: make(chan registerapi.RegistrationStatus),
 		endpoint:           endpoint,
+		versions:           advertisedVersions,
+		registrationStatus: make(chan registerapi.RegistrationStatus),
 	}
 }
 
@@ -88,36 +92,48 @@ func (e *examplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoReques
 		Type:              e.pluginType,
 		Name:              e.pluginName,
 		Endpoint:          e.endpoint,
-		SupportedVersions: []string{"v1beta1", "v1beta2"},
+		SupportedVersions: e.versions,
 	}, nil
 }
 
 func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
+	klog.Errorf("Registration is: %v\n", status)
+
 	if e.registrationStatus != nil {
 		e.registrationStatus <- *status
 	}
-	if !status.PluginRegistered {
-		glog.Errorf("Registration failed: %s\n", status.Error)
-	}
+
 	return &registerapi.RegistrationStatusResponse{}, nil
 }
 
-// Serve starts example plugin grpc server
-func (e *examplePlugin) Serve(socketPath string) error {
-	glog.Infof("starting example server at: %s\n", socketPath)
-	lis, err := net.Listen("unix", socketPath)
+// Serve starts a pluginwatcher server and one or more of the plugin services
+func (e *examplePlugin) Serve(services ...string) error {
+	klog.Infof("starting example server at: %s\n", e.endpoint)
+	lis, err := net.Listen("unix", e.endpoint)
 	if err != nil {
 		return err
 	}
-	glog.Infof("example server started at: %s\n", socketPath)
+
+	klog.Infof("example server started at: %s\n", e.endpoint)
 	e.grpcServer = grpc.NewServer()
+
 	// Registers kubelet plugin watcher api.
 	registerapi.RegisterRegistrationServer(e.grpcServer, e)
-	// Registers services for both v1beta1 and v1beta2 versions.
-	v1beta1 := &pluginServiceV1Beta1{server: e}
-	v1beta1.RegisterService()
-	v1beta2 := &pluginServiceV1Beta2{server: e}
-	v1beta2.RegisterService()
+
+	for _, service := range services {
+		switch service {
+		case "v1beta1":
+			v1beta1 := &pluginServiceV1Beta1{server: e}
+			v1beta1.RegisterService()
+			break
+		case "v1beta2":
+			v1beta2 := &pluginServiceV1Beta2{server: e}
+			v1beta2.RegisterService()
+			break
+		default:
+			return fmt.Errorf("Unsupported service: '%s'", service)
+		}
+	}
 
 	// Starts service
 	e.wg.Add(1)
@@ -125,25 +141,33 @@ func (e *examplePlugin) Serve(socketPath string) error {
 		defer e.wg.Done()
 		// Blocking call to accept incoming connections.
 		if err := e.grpcServer.Serve(lis); err != nil {
-			glog.Errorf("example server stopped serving: %v", err)
+			klog.Errorf("example server stopped serving: %v", err)
 		}
 	}()
+
 	return nil
 }
 
 func (e *examplePlugin) Stop() error {
-	glog.Infof("Stopping example server\n")
+	klog.Infof("Stopping example server at: %s\n", e.endpoint)
+
 	e.grpcServer.Stop()
 	c := make(chan struct{})
 	go func() {
 		defer close(c)
 		e.wg.Wait()
 	}()
+
 	select {
 	case <-c:
-		return nil
+		break
 	case <-time.After(time.Second):
-		glog.Errorf("Timed out on waiting for stop completion")
 		return errors.New("Timed out on waiting for stop completion")
 	}
+
+	if err := os.Remove(e.endpoint); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
 }

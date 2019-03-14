@@ -28,6 +28,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -146,4 +148,24 @@ func TestInputStreamInternalServerErrorTransport(t *testing.T) {
 	if !reflect.DeepEqual(err, expectedError) {
 		t.Errorf("StreamInternalServerError does not match. Got: %s. Expected: %s.", err, expectedError)
 	}
+}
+
+func TestInputStreamRedirects(t *testing.T) {
+	const redirectPath = "/redirect"
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == redirectPath {
+			t.Fatal("Redirects should not be followed")
+		} else {
+			http.Redirect(w, req, redirectPath, http.StatusFound)
+		}
+	}))
+	loc, err := url.Parse(s.URL)
+	require.NoError(t, err, "Error parsing server URL")
+
+	streamer := &LocationStreamer{
+		Location:        loc,
+		RedirectChecker: PreventRedirects,
+	}
+	_, _, _, err = streamer.InputStream(context.Background(), "", "")
+	assert.Error(t, err, "Redirect should trigger an error")
 }

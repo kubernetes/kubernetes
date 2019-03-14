@@ -21,11 +21,11 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
 var _ algorithm.NodeLister = &FakeNodeLister{}
@@ -54,7 +54,7 @@ func (f FakePodLister) List(s labels.Selector) (selected []*v1.Pod, err error) {
 }
 
 // FilteredList returns pods matching a pod filter and a label selector.
-func (f FakePodLister) FilteredList(podFilter schedulercache.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
+func (f FakePodLister) FilteredList(podFilter algorithm.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
 	for _, pod := range f {
 		if podFilter(pod) && s.Matches(labels.Set(pod.Labels)) {
 			selected = append(selected, pod)
@@ -213,4 +213,12 @@ func (f *fakePersistentVolumeClaimNamespaceLister) Get(name string) (*v1.Persist
 
 func (f fakePersistentVolumeClaimNamespaceLister) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+// FakePDBLister implements PDBLister on a slice of PodDisruptionBudgets for test purposes.
+type FakePDBLister []*policy.PodDisruptionBudget
+
+// List returns a list of PodDisruptionBudgets.
+func (f FakePDBLister) List(labels.Selector) ([]*policy.PodDisruptionBudget, error) {
+	return f, nil
 }

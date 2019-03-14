@@ -101,7 +101,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 
 					responseBinding := &rbac.ClusterRoleBinding{}
 					responseBinding.Name = "fake-binding"
-					return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseBinding))))}, nil
+					return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseBinding))))}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -144,10 +144,4 @@ func (c *ClusterRoleBindingRESTClient) Post() *restclient.Request {
 		serializers.Framer = info.StreamSerializer.Framer
 	}
 	return restclient.NewRequest(c, "POST", &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
-}
-
-func defaultHeader() http.Header {
-	header := http.Header{}
-	header.Set("Content-Type", runtime.ContentTypeJSON)
-	return header
 }

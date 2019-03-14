@@ -19,10 +19,11 @@ package capabilities
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 // defaultCapabilities implements the Strategy interface
@@ -36,11 +37,23 @@ var _ Strategy = &defaultCapabilities{}
 
 // NewDefaultCapabilities creates a new defaultCapabilities strategy that will provide defaults and validation
 // based on the configured initial caps and allowed caps.
-func NewDefaultCapabilities(defaultAddCapabilities, requiredDropCapabilities, allowedCaps []api.Capability) (Strategy, error) {
+func NewDefaultCapabilities(defaultAddCapabilities, requiredDropCapabilities, allowedCaps []corev1.Capability) (Strategy, error) {
+	internalDefaultAddCaps := make([]api.Capability, len(defaultAddCapabilities))
+	for i, capability := range defaultAddCapabilities {
+		internalDefaultAddCaps[i] = api.Capability(capability)
+	}
+	internalRequiredDropCaps := make([]api.Capability, len(requiredDropCapabilities))
+	for i, capability := range requiredDropCapabilities {
+		internalRequiredDropCaps[i] = api.Capability(capability)
+	}
+	internalAllowedCaps := make([]api.Capability, len(allowedCaps))
+	for i, capability := range allowedCaps {
+		internalAllowedCaps[i] = api.Capability(capability)
+	}
 	return &defaultCapabilities{
-		defaultAddCapabilities:   defaultAddCapabilities,
-		requiredDropCapabilities: requiredDropCapabilities,
-		allowedCaps:              allowedCaps,
+		defaultAddCapabilities:   internalDefaultAddCaps,
+		requiredDropCapabilities: internalRequiredDropCaps,
+		allowedCaps:              internalAllowedCaps,
 	}, nil
 }
 

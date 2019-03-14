@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -40,8 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -61,6 +58,7 @@ func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcdtesting.Et
 
 func validNewPod() *api.Pod {
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -82,8 +80,9 @@ func validNewPod() *api.Pod {
 					SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
 				},
 			},
-			SecurityContext: &api.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SecurityContext:    &api.PodSecurityContext{},
+			SchedulerName:      api.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
 		},
 	}
 }
@@ -419,8 +418,11 @@ func TestConvertToTableList(t *testing.T) {
 		{Name: "IP", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["podIP"]},
 		{Name: "Node", Type: "string", Priority: 1, Description: v1.PodSpec{}.SwaggerDoc()["nodeName"]},
 		{Name: "Nominated Node", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["nominatedNodeName"]},
+		{Name: "Readiness Gates", Type: "string", Priority: 1, Description: v1.PodSpec{}.SwaggerDoc()["readinessGates"]},
 	}
 
+	condition1 := "condition1"
+	condition2 := "condition2"
 	pod1 := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo", CreationTimestamp: metav1.NewTime(time.Now().Add(-370 * 24 * time.Hour))},
 		Spec: api.PodSpec{
@@ -429,8 +431,26 @@ func TestConvertToTableList(t *testing.T) {
 				{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 			},
 			NodeName: "test-node",
+			ReadinessGates: []api.PodReadinessGate{
+				{
+					ConditionType: api.PodConditionType(condition1),
+				},
+				{
+					ConditionType: api.PodConditionType(condition2),
+				},
+			},
 		},
 		Status: api.PodStatus{
+			Conditions: []api.PodCondition{
+				{
+					Type:   api.PodConditionType(condition1),
+					Status: api.ConditionFalse,
+				},
+				{
+					Type:   api.PodConditionType(condition2),
+					Status: api.ConditionTrue,
+				},
+			},
 			PodIP: "10.1.2.3",
 			Phase: api.PodPending,
 			ContainerStatuses: []api.ContainerStatus{
@@ -455,7 +475,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
+					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
 				},
 			},
 		},
@@ -464,7 +484,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "370d", "10.1.2.3", "test-node", "nominated-node"}, Object: runtime.RawExtension{Object: pod1}},
+					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "370d", "10.1.2.3", "test-node", "nominated-node", "1/2"}, Object: runtime.RawExtension{Object: pod1}},
 				},
 			},
 		},
@@ -706,76 +726,6 @@ func TestEtcdCreateBinding(t *testing.T) {
 	}
 }
 
-func TestEtcdUpdateUninitialized(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
-	storage, _, _, server := newStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.NewDefaultContext()
-
-	pod := validNewPod()
-	// add pending initializers to the pod
-	pod.ObjectMeta.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}}
-	if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{IncludeUninitialized: true}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	podIn := *pod
-	// only uninitialized pod is allowed to add containers via update
-	podIn.Spec.Containers = append(podIn.Spec.Containers, api.Container{
-		Name:                     "foo2",
-		Image:                    "test",
-		ImagePullPolicy:          api.PullAlways,
-		TerminationMessagePath:   api.TerminationMessagePathDefault,
-		TerminationMessagePolicy: api.TerminationMessageReadFile,
-		SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
-	})
-	podIn.ObjectMeta.Initializers = nil
-
-	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	obj, err := storage.Get(ctx, podIn.ObjectMeta.Name, &metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	podOut := obj.(*api.Pod)
-	if podOut.GetInitializers() != nil {
-		t.Errorf("expect nil initializers, got %v", podOut.ObjectMeta.Initializers)
-	}
-	if !apiequality.Semantic.DeepEqual(podIn.Spec.Containers, podOut.Spec.Containers) {
-		t.Errorf("objects differ: %v", diff.ObjectDiff(podOut, &podIn))
-	}
-}
-
-func TestEtcdStatusUpdateUninitialized(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
-	storage, _, statusStorage, server := newStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.NewDefaultContext()
-
-	pod := validNewPod()
-	// add pending initializers to the pod
-	pod.ObjectMeta.Initializers = &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}}
-	if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{IncludeUninitialized: true}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	podIn := *pod
-	// only uninitialized pod is allowed to add containers via update
-	podIn.Status.Phase = api.PodRunning
-	podIn.ObjectMeta.Initializers = nil
-
-	_, _, err := statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	expected := "Forbidden: must not update status when the object is uninitialized"
-	if err == nil {
-		t.Fatalf("Unexpected no err, expected %q", expected)
-	}
-	if !strings.Contains(err.Error(), expected) {
-		t.Errorf("unexpected error: %v, expected %q", err, expected)
-	}
-}
-
 func TestEtcdUpdateNotScheduled(t *testing.T) {
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
@@ -832,6 +782,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 	}
 
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	podIn := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -855,6 +806,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			TerminationGracePeriodSeconds: &grace,
 			SecurityContext:               &api.PodSecurityContext{},
 			SchedulerName:                 api.DefaultSchedulerName,
+			EnableServiceLinks:            &enableServiceLinks,
 		},
 	}
 	_, _, err = storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
@@ -932,9 +884,11 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	expected := podStart
 	expected.ResourceVersion = "2"
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	expected.Spec.TerminationGracePeriodSeconds = &grace
 	expected.Spec.RestartPolicy = api.RestartPolicyAlways
 	expected.Spec.DNSPolicy = api.DNSClusterFirst
+	expected.Spec.EnableServiceLinks = &enableServiceLinks
 	expected.Spec.Containers[0].ImagePullPolicy = api.PullIfNotPresent
 	expected.Spec.Containers[0].TerminationMessagePath = api.TerminationMessagePathDefault
 	expected.Spec.Containers[0].TerminationMessagePolicy = api.TerminationMessageReadFile

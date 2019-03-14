@@ -27,12 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/volume"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // volumeStatCalculator calculates volume metrics for a given pod periodically in the background and caches the result
 type volumeStatCalculator struct {
-	statsProvider StatsProvider
+	statsProvider Provider
 	jitterPeriod  time.Duration
 	pod           *v1.Pod
 	stopChannel   chan struct{}
@@ -49,7 +49,7 @@ type PodVolumeStats struct {
 }
 
 // newVolumeStatCalculator creates a new VolumeStatCalculator
-func newVolumeStatCalculator(statsProvider StatsProvider, jitterPeriod time.Duration, pod *v1.Pod) *volumeStatCalculator {
+func newVolumeStatCalculator(statsProvider Provider, jitterPeriod time.Duration, pod *v1.Pod) *volumeStatCalculator {
 	return &volumeStatCalculator{
 		statsProvider: statsProvider,
 		jitterPeriod:  jitterPeriod,
@@ -79,11 +79,11 @@ func (s *volumeStatCalculator) StopOnce() *volumeStatCalculator {
 
 // getLatest returns the most recent PodVolumeStats from the cache
 func (s *volumeStatCalculator) GetLatest() (PodVolumeStats, bool) {
-	if result := s.latest.Load(); result == nil {
+	result := s.latest.Load()
+	if result == nil {
 		return PodVolumeStats{}, false
-	} else {
-		return result.(PodVolumeStats), true
 	}
+	return result.(PodVolumeStats), true
 }
 
 // calcAndStoreStats calculates PodVolumeStats for a given pod and writes the result to the s.latest cache.
@@ -102,14 +102,14 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 	}
 
 	// Call GetMetrics on each Volume and copy the result to a new VolumeStats.FsStats
-	ephemeralStats := []stats.VolumeStats{}
-	persistentStats := []stats.VolumeStats{}
+	var ephemeralStats []stats.VolumeStats
+	var persistentStats []stats.VolumeStats
 	for name, v := range volumes {
 		metric, err := v.GetMetrics()
 		if err != nil {
 			// Expected for Volumes that don't support Metrics
 			if !volume.IsNotSupported(err) {
-				glog.V(4).Infof("Failed to calculate volume metrics for pod %s volume %s: %+v", format.Pod(s.pod), name, err)
+				klog.V(4).Infof("Failed to calculate volume metrics for pod %s volume %s: %+v", format.Pod(s.pod), name, err)
 			}
 			continue
 		}

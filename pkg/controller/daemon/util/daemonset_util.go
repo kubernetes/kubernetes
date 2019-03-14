@@ -23,14 +23,10 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 // GetTemplateGeneration gets the template generation associated with a v1.DaemonSet by extracting it from the
@@ -49,17 +45,14 @@ func GetTemplateGeneration(ds *apps.DaemonSet) (*int64, error) {
 	return &generation, nil
 }
 
-// CreatePodTemplate returns copy of provided template with additional
-// label which contains templateGeneration (for backward compatibility),
-// hash of provided template and sets default daemon tolerations.
-func CreatePodTemplate(template v1.PodTemplateSpec, generation *int64, hash string) v1.PodTemplateSpec {
-	newTemplate := *template.DeepCopy()
+// AddOrUpdateDaemonPodTolerations apply necessary tolerations to DeamonSet Pods, e.g. node.kubernetes.io/not-ready:NoExecute.
+func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec) {
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
 	// Add infinite toleration for taint notReady:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns not ready.
-	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-		Key:      algorithm.TaintNodeNotReady,
+	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+		Key:      schedulerapi.TaintNodeNotReady,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
@@ -68,36 +61,54 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation *int64, hash stri
 	// Add infinite toleration for taint unreachable:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns unreachable.
-	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-		Key:      algorithm.TaintNodeUnreachable,
+	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+		Key:      schedulerapi.TaintNodeUnreachable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
 
 	// According to TaintNodesByCondition feature, all DaemonSet pods should tolerate
-	// MemoryPressure and DisPressure taints, and the critical pods should tolerate
-	// OutOfDisk taint.
-	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-		Key:      algorithm.TaintNodeDiskPressure,
+	// MemoryPressure, DiskPressure, PIDPressure, Unschedulable and NetworkUnavailable taints.
+	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+		Key:      schedulerapi.TaintNodeDiskPressure,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
-	v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-		Key:      algorithm.TaintNodeMemoryPressure,
+	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+		Key:      schedulerapi.TaintNodeMemoryPressure,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
-	// TODO(#48843) OutOfDisk taints will be removed in 1.10
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCritical(newTemplate.Namespace, newTemplate.Annotations) {
-		v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{
-			Key:      algorithm.TaintNodeOutOfDisk,
+	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+		Key:      schedulerapi.TaintNodePIDPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+		Key:      schedulerapi.TaintNodeUnschedulable,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	if spec.HostNetwork {
+		v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+			Key:      schedulerapi.TaintNodeNetworkUnavailable,
 			Operator: v1.TolerationOpExists,
-			Effect:   v1.TaintEffectNoExecute,
+			Effect:   v1.TaintEffectNoSchedule,
 		})
 	}
+}
+
+// CreatePodTemplate returns copy of provided template with additional
+// label which contains templateGeneration (for backward compatibility),
+// hash of provided template and sets default daemon tolerations.
+func CreatePodTemplate(template v1.PodTemplateSpec, generation *int64, hash string) v1.PodTemplateSpec {
+	newTemplate := *template.DeepCopy()
+
+	AddOrUpdateDaemonPodTolerations(&newTemplate.Spec)
 
 	if newTemplate.ObjectMeta.Labels == nil {
 		newTemplate.ObjectMeta.Labels = make(map[string]string)
@@ -140,7 +151,7 @@ func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*
 // Note that this function assumes that no NodeAffinity conflicts with the selected nodeName.
 func ReplaceDaemonSetPodNodeNameNodeAffinity(affinity *v1.Affinity, nodename string) *v1.Affinity {
 	nodeSelReq := v1.NodeSelectorRequirement{
-		Key:      algorithm.NodeFieldSelectorKeyNodeName,
+		Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 		Operator: v1.NodeSelectorOpIn,
 		Values:   []string{nodename},
 	}
@@ -185,31 +196,6 @@ func ReplaceDaemonSetPodNodeNameNodeAffinity(affinity *v1.Affinity, nodename str
 	return affinity
 }
 
-// AppendNoScheduleTolerationIfNotExist appends unschedulable toleration to `.spec` if not exist; otherwise,
-// no changes to `.spec.tolerations`.
-func AppendNoScheduleTolerationIfNotExist(tolerations []v1.Toleration) []v1.Toleration {
-	unschedulableToleration := v1.Toleration{
-		Key:      algorithm.TaintNodeUnschedulable,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoSchedule,
-	}
-
-	unschedulableTaintExist := false
-
-	for _, t := range tolerations {
-		if apiequality.Semantic.DeepEqual(t, unschedulableToleration) {
-			unschedulableTaintExist = true
-			break
-		}
-	}
-
-	if !unschedulableTaintExist {
-		tolerations = append(tolerations, unschedulableToleration)
-	}
-
-	return tolerations
-}
-
 // GetTargetNodeName get the target node name of DaemonSet pods. If `.spec.NodeName` is not empty (nil),
 // return `.spec.NodeName`; otherwise, retrieve node name of pending pods from NodeAffinity. Return error
 // if failed to retrieve node name from `.spec.NodeName` and NodeAffinity.
@@ -234,11 +220,11 @@ func GetTargetNodeName(pod *v1.Pod) (string, error) {
 
 	for _, term := range terms {
 		for _, exp := range term.MatchFields {
-			if exp.Key == algorithm.NodeFieldSelectorKeyNodeName &&
+			if exp.Key == schedulerapi.NodeFieldSelectorKeyNodeName &&
 				exp.Operator == v1.NodeSelectorOpIn {
 				if len(exp.Values) != 1 {
 					return "", fmt.Errorf("the matchFields value of '%s' is not unique for pod %s/%s",
-						algorithm.NodeFieldSelectorKeyNodeName, pod.Namespace, pod.Name)
+						schedulerapi.NodeFieldSelectorKeyNodeName, pod.Namespace, pod.Name)
 				}
 
 				return exp.Values[0], nil

@@ -83,7 +83,12 @@ build() {
       else
         ${SED} -i "s|QEMUARCH|${QEMUARCHS[$arch]}|g" Dockerfile
         # Register qemu-*-static for all supported processors except the current one
-        docker run --rm --privileged multiarch/qemu-user-static:register --reset
+        echo "Registering qemu-*-static binaries in the kernel"
+        local sudo=""
+        if [[ $(id -u) != 0 ]]; then
+          sudo=sudo
+        fi
+        "${sudo}" "${KUBE_ROOT}/third_party/multiarch/qemu-user-static/register/register.sh" --reset
         curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/${QEMUVERSION}/x86_64_qemu-${QEMUARCHS[$arch]}-static.tar.gz | tar -xz -C ${temp_dir}
         # Ensure we don't get surprised by umask settings
         chmod 0755 "${temp_dir}/qemu-${QEMUARCHS[$arch]}-static"
@@ -98,6 +103,8 @@ build() {
 }
 
 docker_version_check() {
+  # The reason for this version check is even though "docker manifest" command is available in 18.03, it does
+  # not work properly in that version. So we insist on 18.06.0 or higher.
   docker_version=$(docker version --format '{{.Client.Version}}' | cut -d"-" -f1)
   if [[ ${docker_version} != 18.06.0 && ${docker_version} < 18.06.0 ]]; then
     echo "Minimum docker version 18.06.0 is required for creating and pushing manifest images[found: ${docker_version}]"
@@ -120,6 +127,8 @@ push() {
 
   kube::util::ensure-gnu-sed
 
+  # The manifest command is still experimental as of Docker 18.09.2
+  export DOCKER_CLI_EXPERIMENTAL="enabled"
   # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${IMAGE}-amd64:${TAG} ${REGISTRY}/${IMAGE}-ppc64le:${TAG}'
   manifest=$(echo $archs | ${SED} -e "s~[^ ]*~$REGISTRY\/$IMAGE\-&:$TAG~g")
   docker manifest create --amend ${REGISTRY}/${IMAGE}:${TAG} ${manifest}

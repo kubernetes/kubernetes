@@ -21,7 +21,6 @@ import (
 	"net/http"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 // Authenticator authenticates requests using basic auth
@@ -37,18 +36,18 @@ func New(auth authenticator.Password) *Authenticator {
 var errInvalidAuth = errors.New("invalid username/password combination")
 
 // AuthenticateRequest authenticates the request using the "Authorization: Basic" header in the request
-func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	username, password, found := req.BasicAuth()
 	if !found {
 		return nil, false, nil
 	}
 
-	user, ok, err := a.auth.AuthenticatePassword(username, password)
+	resp, ok, err := a.auth.AuthenticatePassword(req.Context(), username, password)
 
 	// If the password authenticator didn't error, provide a default error
 	if !ok && err == nil {
 		err = errInvalidAuth
 	}
 
-	return user, ok, err
+	return resp, ok, err
 }

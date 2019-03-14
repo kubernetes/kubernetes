@@ -30,7 +30,7 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/utils/sysinfo"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"golang.org/x/sys/unix"
 )
@@ -50,7 +50,7 @@ func getInfoFromFiles(filePaths string) string {
 			return strings.TrimSpace(string(id))
 		}
 	}
-	glog.Warningf("Couldn't collect info from any of the files in %q", filePaths)
+	klog.Warningf("Couldn't collect info from any of the files in %q", filePaths)
 	return ""
 }
 
@@ -117,27 +117,27 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 
 	filesystems, err := fsInfo.GetGlobalFsInfo()
 	if err != nil {
-		glog.Errorf("Failed to get global filesystem information: %v", err)
+		klog.Errorf("Failed to get global filesystem information: %v", err)
 	}
 
 	diskMap, err := sysinfo.GetBlockDeviceInfo(sysFs)
 	if err != nil {
-		glog.Errorf("Failed to get disk map: %v", err)
+		klog.Errorf("Failed to get disk map: %v", err)
 	}
 
 	netDevices, err := sysinfo.GetNetworkDevices(sysFs)
 	if err != nil {
-		glog.Errorf("Failed to get network devices: %v", err)
+		klog.Errorf("Failed to get network devices: %v", err)
 	}
 
 	topology, numCores, err := GetTopology(sysFs, string(cpuinfo))
 	if err != nil {
-		glog.Errorf("Failed to get topology information: %v", err)
+		klog.Errorf("Failed to get topology information: %v", err)
 	}
 
 	systemUUID, err := sysinfo.GetSystemUUID(sysFs)
 	if err != nil {
-		glog.Errorf("Failed to get system UUID: %v", err)
+		klog.Errorf("Failed to get system UUID: %v", err)
 	}
 
 	realCloudInfo := cloudinfo.NewRealCloudInfo()

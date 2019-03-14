@@ -30,7 +30,7 @@ option go_package = "v1alpha1";
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
-// 
+//
 // VolumeAttachment objects are non-namespaced.
 message VolumeAttachment {
   // Standard object metadata.

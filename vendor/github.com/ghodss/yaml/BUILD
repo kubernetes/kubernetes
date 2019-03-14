@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "fields.go",
         "yaml.go",
+        "yaml_go110.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/ghodss/yaml",
     importpath = "github.com/ghodss/yaml",

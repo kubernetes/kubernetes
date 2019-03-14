@@ -20,8 +20,8 @@ import (
 	"bytes"
 	"testing"
 
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestDefaultObjectPauser(t *testing.T) {
@@ -31,8 +31,8 @@ func TestDefaultObjectPauser(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			object: &extensions.Deployment{
-				Spec: extensions.DeploymentSpec{
+			object: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Paused: false,
 				},
 			},
@@ -40,15 +40,15 @@ func TestDefaultObjectPauser(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			object: &extensions.Deployment{
-				Spec: extensions.DeploymentSpec{
+			object: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
 					Paused: true,
 				},
 			},
 			expectErr: true,
 		},
 		{
-			object:    &extensions.ReplicaSet{},
+			object:    &extensionsv1beta1.ReplicaSet{},
 			expectErr: true,
 		},
 	}

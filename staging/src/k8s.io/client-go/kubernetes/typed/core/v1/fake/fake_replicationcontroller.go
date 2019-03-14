@@ -19,8 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -132,7 +132,7 @@ func (c *FakeReplicationControllers) DeleteCollection(options *v1.DeleteOptions,
 // Patch applies the patch and returns the patched replicationController.
 func (c *FakeReplicationControllers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.ReplicationController, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, data, subresources...), &corev1.ReplicationController{})
+		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, pt, data, subresources...), &corev1.ReplicationController{})
 
 	if obj == nil {
 		return nil, err
@@ -141,23 +141,23 @@ func (c *FakeReplicationControllers) Patch(name string, pt types.PatchType, data
 }
 
 // GetScale takes name of the replicationController, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeReplicationControllers) GetScale(replicationControllerName string, options v1.GetOptions) (result *v1beta1.Scale, err error) {
+func (c *FakeReplicationControllers) GetScale(replicationControllerName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(replicationcontrollersResource, c.ns, "scale", replicationControllerName), &v1beta1.Scale{})
+		Invokes(testing.NewGetSubresourceAction(replicationcontrollersResource, c.ns, "scale", replicationControllerName), &autoscalingv1.Scale{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1beta1.Scale), err
+	return obj.(*autoscalingv1.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeReplicationControllers) UpdateScale(replicationControllerName string, scale *v1beta1.Scale) (result *v1beta1.Scale, err error) {
+func (c *FakeReplicationControllers) UpdateScale(replicationControllerName string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "scale", c.ns, scale), &v1beta1.Scale{})
+		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1beta1.Scale), err
+	return obj.(*autoscalingv1.Scale), err
 }

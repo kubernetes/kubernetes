@@ -25,11 +25,11 @@ import (
 	"github.com/spf13/pflag"
 
 	// libs that provide registration functions
-	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	// ensure libs have a chance to globally register their flags
-	_ "github.com/golang/glog"
+	_ "k8s.io/klog"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 )
@@ -84,9 +84,6 @@ func addCredentialProviderFlags(fs *pflag.FlagSet) {
 	global := pflag.CommandLine
 	local := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
 
-	// Note this is deprecated in the library that provides it, so we just allow that deprecation
-	// notice to pass through our registration here.
-	pflagRegister(global, local, "google-json-key")
 	// TODO(#58034): This is not a static file, so it's not quite as straightforward as --google-json-key.
 	// We need to figure out how ACR users can dynamically provide pull credentials before we can deprecate this.
 	pflagRegister(global, local, "azure-container-registry-config")
@@ -94,7 +91,7 @@ func addCredentialProviderFlags(fs *pflag.FlagSet) {
 	fs.AddFlagSet(local)
 }
 
-// addGlogFlags adds flags from github.com/golang/glog
+// addGlogFlags adds flags from k8s.io/klog
 func addGlogFlags(fs *pflag.FlagSet) {
 	// lookup flags in global flag set and re-register the values with our flagset
 	global := flag.CommandLine
@@ -107,6 +104,7 @@ func addGlogFlags(fs *pflag.FlagSet) {
 	register(global, local, "vmodule")
 	register(global, local, "log_backtrace_at")
 	register(global, local, "log_dir")
+	register(global, local, "log_file")
 
 	fs.AddFlagSet(local)
 }

@@ -25,7 +25,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // factoryGenerator produces a file of listers for a given GroupVersion and
@@ -65,7 +65,7 @@ func (g *factoryGenerator) Imports(c *generator.Context) (imports []string) {
 func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "{{", "}}")
 
-	glog.V(5).Infof("processing type %v", t)
+	klog.V(5).Infof("processing type %v", t)
 
 	gvInterfaces := make(map[string]*types.Type)
 	gvNewFuncs := make(map[string]*types.Type)
@@ -152,7 +152,7 @@ func NewSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync 
 // as specified here.
 // Deprecated: Please use NewSharedInformerFactoryWithOptions instead
 func NewFilteredSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}, namespace string, tweakListOptions {{.interfacesTweakListOptionsFunc|raw}}) SharedInformerFactory {
-	return NewSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace), WithTweakListOptions(tweakListOptions)) 
+	return NewSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace), WithTweakListOptions(tweakListOptions))
 }
 
 // NewSharedInformerFactoryWithOptions constructs a new instance of a SharedInformerFactory with additional options.
@@ -165,7 +165,7 @@ func NewSharedInformerFactoryWithOptions(client {{.clientSetInterface|raw}}, def
 		startedInformers: make(map[{{.reflectType|raw}}]bool),
 		customResync:     make(map[{{.reflectType|raw}}]{{.timeDuration|raw}}),
 	}
-	
+
 	// Apply all options
 	for _, opt := range options {
 		factory = opt(factory)

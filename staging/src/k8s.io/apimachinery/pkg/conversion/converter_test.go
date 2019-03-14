@@ -333,7 +333,7 @@ func TestConverter_IgnoredConversionNested(t *testing.T) {
 	}
 }
 
-func TestConverter_GeneratedConversionOverriden(t *testing.T) {
+func TestConverter_GeneratedConversionOverridden(t *testing.T) {
 	type A struct{}
 	type B struct{}
 	c := NewConverter(DefaultNameFunc)
@@ -355,7 +355,7 @@ func TestConverter_GeneratedConversionOverriden(t *testing.T) {
 	}
 }
 
-func TestConverter_WithConversionOverriden(t *testing.T) {
+func TestConverter_WithConversionOverridden(t *testing.T) {
 	type A struct{}
 	type B struct{}
 	c := NewConverter(DefaultNameFunc)

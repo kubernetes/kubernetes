@@ -19,10 +19,10 @@ package vsphere
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog"
 	"net/http"
 	"strings"
 	"sync"
@@ -71,12 +71,12 @@ func (secretCredentialManager *SecretCredentialManager) GetCredential(server str
 			return nil, err
 		}
 		// Handle secrets deletion by finding credentials from cache
-		glog.Warningf("secret %q not found in namespace %q", secretCredentialManager.SecretName, secretCredentialManager.SecretNamespace)
+		klog.Warningf("secret %q not found in namespace %q", secretCredentialManager.SecretName, secretCredentialManager.SecretNamespace)
 	}
 
 	credential, found := secretCredentialManager.Cache.GetCredential(server)
 	if !found {
-		glog.Errorf("credentials not found for server %q", server)
+		klog.Errorf("credentials not found for server %q", server)
 		return nil, ErrCredentialsNotFound
 	}
 	return &credential, nil
@@ -88,13 +88,13 @@ func (secretCredentialManager *SecretCredentialManager) updateCredentialsMap() e
 	}
 	secret, err := secretCredentialManager.SecretLister.Secrets(secretCredentialManager.SecretNamespace).Get(secretCredentialManager.SecretName)
 	if err != nil {
-		glog.Errorf("Cannot get secret %s in namespace %s. error: %q", secretCredentialManager.SecretName, secretCredentialManager.SecretNamespace, err)
+		klog.Errorf("Cannot get secret %s in namespace %s. error: %q", secretCredentialManager.SecretName, secretCredentialManager.SecretNamespace, err)
 		return err
 	}
 	cacheSecret := secretCredentialManager.Cache.GetSecret()
 	if cacheSecret != nil &&
 		cacheSecret.GetResourceVersion() == secret.GetResourceVersion() {
-		glog.V(4).Infof("VCP SecretCredentialManager: Secret %q will not be updated in cache. Since, secrets have same resource version %q", secretCredentialManager.SecretName, cacheSecret.GetResourceVersion())
+		klog.V(4).Infof("VCP SecretCredentialManager: Secret %q will not be updated in cache. Since, secrets have same resource version %q", secretCredentialManager.SecretName, cacheSecret.GetResourceVersion())
 		return nil
 	}
 	secretCredentialManager.Cache.UpdateSecret(secret)
@@ -150,13 +150,13 @@ func parseConfig(data map[string][]byte, config map[string]*Credential) error {
 			}
 			config[vcServer].User = string(credentialValue)
 		} else {
-			glog.Errorf("Unknown secret key %s", credentialKey)
+			klog.Errorf("Unknown secret key %s", credentialKey)
 			return ErrUnknownSecretKey
 		}
 	}
 	for vcServer, credential := range config {
 		if credential.User == "" || credential.Password == "" {
-			glog.Errorf("Username/Password is missing for server %s", vcServer)
+			klog.Errorf("Username/Password is missing for server %s", vcServer)
 			return ErrCredentialMissing
 		}
 	}

@@ -34,10 +34,10 @@ import (
 
 	dockercontainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
-	"github.com/golang/glog"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"golang.org/x/net/context"
+	"k8s.io/klog"
 )
 
 const (
@@ -83,7 +83,7 @@ type dockerContainerHandler struct {
 	// The IP address of the container
 	ipAddress string
 
-	ignoreMetrics container.MetricSet
+	includedMetrics container.MetricSet
 
 	// the devicemapper poolname
 	poolName string
@@ -128,16 +128,13 @@ func newDockerContainerHandler(
 	inHostNamespace bool,
 	metadataEnvs []string,
 	dockerVersion []int,
-	ignoreMetrics container.MetricSet,
+	includedMetrics container.MetricSet,
 	thinPoolName string,
 	thinPoolWatcher *devicemapper.ThinPoolWatcher,
 	zfsWatcher *zfs.ZfsWatcher,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
-	cgroupPaths := make(map[string]string, len(cgroupSubsystems.MountPoints))
-	for key, val := range cgroupSubsystems.MountPoints {
-		cgroupPaths[key] = path.Join(val, name)
-	}
+	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
 
 	// Generate the equivalent cgroup manager for this container.
 	cgroupManager := &cgroupfs.Manager{
@@ -203,7 +200,7 @@ func newDockerContainerHandler(
 		rootfsStorageDir:   rootfsStorageDir,
 		envs:               make(map[string]string),
 		labels:             ctnr.Config.Labels,
-		ignoreMetrics:      ignoreMetrics,
+		includedMetrics:    includedMetrics,
 		zfsParent:          zfsParent,
 	}
 	// Timestamp returned by Docker is in time.RFC3339Nano format.
@@ -212,7 +209,7 @@ func newDockerContainerHandler(
 		// This should not happen, report the error just in case
 		return nil, fmt.Errorf("failed to parse the create timestamp %q for container %q: %v", ctnr.Created, id, err)
 	}
-	handler.libcontainerHandler = containerlibcontainer.NewHandler(cgroupManager, rootFs, ctnr.State.Pid, ignoreMetrics)
+	handler.libcontainerHandler = containerlibcontainer.NewHandler(cgroupManager, rootFs, ctnr.State.Pid, includedMetrics)
 
 	// Add the name and bare ID as aliases of the container.
 	handler.reference = info.ContainerReference{
@@ -228,7 +225,7 @@ func newDockerContainerHandler(
 		handler.labels["restartcount"] = strconv.Itoa(ctnr.RestartCount)
 	}
 
-	// Obtain the IP address for the contianer.
+	// Obtain the IP address for the container.
 	// If the NetworkMode starts with 'container:' then we need to use the IP address of the container specified.
 	// This happens in cases such as kubernetes where the containers doesn't have an IP address itself and we need to use the pod's address
 	ipAddress := ctnr.NetworkSettings.IPAddress
@@ -244,7 +241,7 @@ func newDockerContainerHandler(
 
 	handler.ipAddress = ipAddress
 
-	if !ignoreMetrics.Has(container.DiskUsageMetrics) {
+	if includedMetrics.Has(container.DiskUsageMetrics) {
 		handler.fsHandler = &dockerFsHandler{
 			fsHandler:       common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, otherStorageDir, fsInfo),
 			thinPoolWatcher: thinPoolWatcher,
@@ -309,7 +306,7 @@ func (h *dockerFsHandler) Usage() common.FsUsage {
 			// TODO: ideally we should keep track of how many times we failed to get the usage for this
 			// device vs how many refreshes of the cache there have been, and display an error e.g. if we've
 			// had at least 1 refresh and we still can't find the device.
-			glog.V(5).Infof("unable to get fs usage from thin pool for device %s: %v", h.deviceID, err)
+			klog.V(5).Infof("unable to get fs usage from thin pool for device %s: %v", h.deviceID, err)
 		} else {
 			usage.BaseUsageBytes = thinPoolUsage
 			usage.TotalUsageBytes += thinPoolUsage
@@ -319,7 +316,7 @@ func (h *dockerFsHandler) Usage() common.FsUsage {
 	if h.zfsWatcher != nil {
 		zfsUsage, err := h.zfsWatcher.GetUsage(h.zfsFilesystem)
 		if err != nil {
-			glog.V(5).Infof("unable to get fs usage from zfs for filesystem %s: %v", h.zfsFilesystem, err)
+			klog.V(5).Infof("unable to get fs usage from zfs for filesystem %s: %v", h.zfsFilesystem, err)
 		} else {
 			usage.BaseUsageBytes = zfsUsage
 			usage.TotalUsageBytes += zfsUsage
@@ -345,14 +342,14 @@ func (self *dockerContainerHandler) ContainerReference() (info.ContainerReferenc
 }
 
 func (self *dockerContainerHandler) needNet() bool {
-	if !self.ignoreMetrics.Has(container.NetworkUsageMetrics) {
+	if self.includedMetrics.Has(container.NetworkUsageMetrics) {
 		return !self.networkMode.IsContainer()
 	}
 	return false
 }
 
 func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
-	hasFilesystem := !self.ignoreMetrics.Has(container.DiskUsageMetrics)
+	hasFilesystem := self.includedMetrics.Has(container.DiskUsageMetrics)
 	spec, err := common.GetSpec(self.cgroupPaths, self.machineInfoFactory, self.needNet(), hasFilesystem)
 
 	spec.Labels = self.labels
@@ -369,11 +366,11 @@ func (self *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error
 		return err
 	}
 
-	if !self.ignoreMetrics.Has(container.DiskIOMetrics) {
+	if self.includedMetrics.Has(container.DiskIOMetrics) {
 		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
 	}
 
-	if self.ignoreMetrics.Has(container.DiskUsageMetrics) {
+	if !self.includedMetrics.Has(container.DiskUsageMetrics) {
 		return nil
 	}
 	var device string

@@ -61,7 +61,7 @@ func (p *PerHost) dialerForRequest(host string) Dialer {
 			return p.bypass
 		}
 		if host == zone[1:] {
-			// For a zone "example.com", we match "example.com"
+			// For a zone ".example.com", we match "example.com"
 			// too.
 			return p.bypass
 		}

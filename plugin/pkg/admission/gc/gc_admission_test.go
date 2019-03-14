@@ -17,10 +17,12 @@ limitations under the License.
 package gc
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,7 +30,9 @@ import (
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/restmapper"
+	coretesting "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
@@ -68,6 +72,15 @@ func (fakeAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, s
 		return authorizer.DecisionAllow, "", nil
 	}
 
+	if username == "non-node-deleter" {
+		if a.GetVerb() == "delete" && a.GetResource() == "nodes" {
+			return authorizer.DecisionNoOpinion, "", nil
+		}
+		if a.GetVerb() == "update" && a.GetResource() == "nodes" && a.GetSubresource() == "finalizers" {
+			return authorizer.DecisionNoOpinion, "", nil
+		}
+		return authorizer.DecisionAllow, "", nil
+	}
 	return authorizer.DecisionAllow, "", nil
 }
 
@@ -87,8 +100,31 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		whiteList: whiteList,
 	}
 
-	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{}, nil)
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme), nil)
+	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{})
+	fakeDiscoveryClient := &fakediscovery.FakeDiscovery{Fake: &coretesting.Fake{}}
+	fakeDiscoveryClient.Resources = []*metav1.APIResourceList{
+		{
+			GroupVersion: corev1.SchemeGroupVersion.String(),
+			APIResources: []metav1.APIResource{
+				{Name: "nodes", Namespaced: false, Kind: "Node"},
+				{Name: "pods", Namespaced: true, Kind: "Pod"},
+				{Name: "replicationcontrollers", Namespaced: true, Kind: "ReplicationController"},
+			},
+		},
+		{
+			GroupVersion: appsv1.SchemeGroupVersion.String(),
+			APIResources: []metav1.APIResource{
+				{Name: "daemonsets", Namespaced: true, Kind: "DaemonSet"},
+			},
+		},
+	}
+
+	restMapperRes, err := restmapper.GetAPIGroupResources(fakeDiscoveryClient)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error while constructing resource list from fake discovery client: %v", err)
+	}
+	restMapper := restmapper.NewDiscoveryRESTMapper(restMapperRes)
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, restMapper, nil)
 	initializersChain := admission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)
@@ -272,7 +308,7 @@ func TestGCAdmission(t *testing.T) {
 			user := &user.DefaultInfo{Name: tc.username}
 			attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, user)
 
-			err = gcAdmit.Validate(attributes)
+			err = gcAdmit.Validate(attributes, nil)
 			if !tc.checkError(err) {
 				t.Errorf("unexpected err: %v", err)
 			}
@@ -336,16 +372,33 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		Name:       "rc2",
 	}
 	blockDS1 := metav1.OwnerReference{
-		APIVersion:         "extensions/v1beta1",
+		APIVersion:         "apps/v1",
 		Kind:               "DaemonSet",
 		Name:               "ds1",
 		BlockOwnerDeletion: getTrueVar(),
 	}
 	notBlockDS1 := metav1.OwnerReference{
-		APIVersion:         "extensions/v1beta1",
+		APIVersion:         "apps/v1",
 		Kind:               "DaemonSet",
 		Name:               "ds1",
 		BlockOwnerDeletion: getFalseVar(),
+	}
+	blockNode := metav1.OwnerReference{
+		APIVersion:         "v1",
+		Kind:               "Node",
+		Name:               "node1",
+		BlockOwnerDeletion: getTrueVar(),
+	}
+	notBlockNode := metav1.OwnerReference{
+		APIVersion:         "v1",
+		Kind:               "Node",
+		Name:               "node",
+		BlockOwnerDeletion: getFalseVar(),
+	}
+	nilBlockNode := metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       "node",
 	}
 
 	expectNoError := func(err error) bool {
@@ -386,7 +439,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			name:       "super-user, create, some ownerReferences have blockOwnerDeletion=true",
 			username:   "super",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			newObj:     podWithOwnerRefs(blockRC1, blockRC2),
+			newObj:     podWithOwnerRefs(blockRC1, blockRC2, blockNode),
 			checkError: expectNoError,
 		},
 		{
@@ -404,6 +457,13 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			checkError: expectNoError,
 		},
 		{
+			name:       "non-node-deleter, create, all ownerReferences have blockOwnerDeletion=false",
+			username:   "non-node-deleter",
+			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			newObj:     podWithOwnerRefs(notBlockNode),
+			checkError: expectNoError,
+		},
+		{
 			name:       "non-rc-deleter, create, some ownerReferences have blockOwnerDeletion=true",
 			username:   "non-rc-deleter",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
@@ -417,21 +477,28 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			newObj:     podWithOwnerRefs(blockDS1),
 			checkError: expectNoError,
 		},
+		{
+			name:       "non-node-deleter, create, some ownerReferences have blockOwnerDeletion=true",
+			username:   "non-node-deleter",
+			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			newObj:     podWithOwnerRefs(blockNode),
+			checkError: expectCantSetBlockOwnerDeletionError,
+		},
 		// cases are for update
 		{
 			name:       "super-user, update, no ownerReferences change blockOwnerDeletion",
 			username:   "super",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     podWithOwnerRefs(nilBlockRC1),
-			newObj:     podWithOwnerRefs(notBlockRC1),
+			oldObj:     podWithOwnerRefs(nilBlockRC1, nilBlockNode),
+			newObj:     podWithOwnerRefs(notBlockRC1, notBlockNode),
 			checkError: expectNoError,
 		},
 		{
 			name:       "super-user, update, some ownerReferences change to blockOwnerDeletion=true",
 			username:   "super",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
-			oldObj:     podWithOwnerRefs(notBlockRC1),
-			newObj:     podWithOwnerRefs(blockRC1),
+			oldObj:     podWithOwnerRefs(notBlockRC1, notBlockNode),
+			newObj:     podWithOwnerRefs(blockRC1, blockNode),
 			checkError: expectNoError,
 		},
 		{
@@ -439,7 +506,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			username:   "super",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(),
-			newObj:     podWithOwnerRefs(blockRC1),
+			newObj:     podWithOwnerRefs(blockRC1, blockNode),
 			checkError: expectNoError,
 		},
 		{
@@ -467,11 +534,27 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			checkError: expectCantSetBlockOwnerDeletionError,
 		},
 		{
+			name:       "non-node-deleter, update, some ownerReferences change from blockOwnerDeletion=nil to true",
+			username:   "non-node-deleter",
+			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     podWithOwnerRefs(nilBlockNode),
+			newObj:     podWithOwnerRefs(blockNode),
+			checkError: expectCantSetBlockOwnerDeletionError,
+		},
+		{
 			name:       "non-rc-deleter, update, some ownerReferences change from blockOwnerDeletion=true to false",
 			username:   "non-rc-deleter",
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
 			oldObj:     podWithOwnerRefs(blockRC1),
 			newObj:     podWithOwnerRefs(notBlockRC1),
+			checkError: expectNoError,
+		},
+		{
+			name:       "non-node-deleter, update, some ownerReferences change from blockOwnerDeletion=true to false",
+			username:   "non-node-deleter",
+			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     podWithOwnerRefs(blockNode),
+			newObj:     podWithOwnerRefs(notBlockNode),
 			checkError: expectNoError,
 		},
 		{
@@ -506,6 +589,14 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			newObj:     podWithOwnerRefs(blockDS1),
 			checkError: expectNoError,
 		},
+		{
+			name:       "non-node-deleter, update, add ownerReferences with blockOwnerDeletion=true",
+			username:   "non-node-deleter",
+			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			oldObj:     podWithOwnerRefs(),
+			newObj:     podWithOwnerRefs(blockNode),
+			checkError: expectCantSetBlockOwnerDeletionError,
+		},
 	}
 	gcAdmit, err := newGCPermissionsEnforcement()
 	if err != nil {
@@ -520,7 +611,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, user)
 
-		err := gcAdmit.Validate(attributes)
+		err := gcAdmit.Validate(attributes, nil)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}

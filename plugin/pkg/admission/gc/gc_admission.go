@@ -84,7 +84,7 @@ func (a *gcPermissionsEnforcement) isWhiteListed(groupResource schema.GroupResou
 	return false
 }
 
-func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (err error) {
+func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// // if the request is in the whitelist, we skip mutation checks for this resource.
 	if a.isWhiteListed(attributes.GetResource().GroupResource(), attributes.GetSubresource()) {
 		return nil
@@ -186,11 +186,9 @@ func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.O
 		return ret, err
 	}
 	for _, mapping := range mappings {
-		ret = append(ret, authorizer.AttributesRecord{
-			User: attributes.GetUserInfo(),
-			Verb: "update",
-			// ownerReference can only refer to an object in the same namespace, so attributes.GetNamespace() equals to the owner's namespace
-			Namespace:       attributes.GetNamespace(),
+		ar := authorizer.AttributesRecord{
+			User:            attributes.GetUserInfo(),
+			Verb:            "update",
 			APIGroup:        mapping.Resource.Group,
 			APIVersion:      mapping.Resource.Version,
 			Resource:        mapping.Resource.Resource,
@@ -198,7 +196,12 @@ func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.O
 			Name:            ref.Name,
 			ResourceRequest: true,
 			Path:            "",
-		})
+		}
+		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+			// if the owner is namespaced, it must be in the same namespace as the dependent is.
+			ar.Namespace = attributes.GetNamespace()
+		}
+		ret = append(ret, ar)
 	}
 	return ret, nil
 }

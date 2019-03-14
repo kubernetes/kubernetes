@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -35,7 +35,7 @@ var (
 	podUIDVersion = utilversion.MustParseSemantic("v1.8.0")
 )
 
-var _ = Describe("[sig-api-machinery] Downward API", func() {
+var _ = Describe("[sig-node] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	/*
@@ -114,7 +114,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 	/*
 	   Release : v1.9
 	   Testname: DownwardAPI, environment for CPU and memory limits and requests
-	   Description: Downward API MUST expose CPU request amd Memory request set through environment variables at runtime in the container.
+	   Description: Downward API MUST expose CPU request and Memory request set through environment variables at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide container's limits.cpu/memory and requests.cpu/memory as env vars [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
@@ -165,7 +165,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 	/*
 	   Release : v1.9
 	   Testname: DownwardAPI, environment for default CPU and memory limits and requests
-	   Description: Downward API MUST expose CPU request amd Memory limits set through environment variables at runtime in the container.
+	   Description: Downward API MUST expose CPU request and Memory limits set through environment variables at runtime in the container.
 	*/
 	framework.ConformanceIt("should provide default limits.cpu/memory from node allocatable [NodeConformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())

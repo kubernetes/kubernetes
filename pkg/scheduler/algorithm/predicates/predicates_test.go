@@ -29,11 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -69,7 +67,7 @@ func makeAllocatableResources(milliCPU, memory, pods, extendedA, storage, hugePa
 	}
 }
 
-func newResourcePod(usage ...schedulercache.Resource) *v1.Pod {
+func newResourcePod(usage ...schedulernodeinfo.Resource) *v1.Pod {
 	containers := []v1.Container{}
 	for _, req := range usage {
 		containers = append(containers, v1.Container{
@@ -83,12 +81,12 @@ func newResourcePod(usage ...schedulercache.Resource) *v1.Pod {
 	}
 }
 
-func newResourceInitPod(pod *v1.Pod, usage ...schedulercache.Resource) *v1.Pod {
+func newResourceInitPod(pod *v1.Pod, usage ...schedulernodeinfo.Resource) *v1.Pod {
 	pod.Spec.InitContainers = newResourcePod(usage...).Spec.Containers
 	return pod
 }
 
-func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) algorithm.PredicateMetadata {
+func GetPredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata {
 	pm := PredicateMetadataFactory{schedulertesting.FakePodLister{p}}
 	return pm.GetMetadata(p, nodeInfo)
 }
@@ -96,262 +94,262 @@ func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) 
 func TestPodFitsResources(t *testing.T) {
 	enoughPodsTests := []struct {
 		pod                      *v1.Pod
-		nodeInfo                 *schedulercache.NodeInfo
+		nodeInfo                 *schedulernodeinfo.NodeInfo
 		fits                     bool
 		name                     string
-		reasons                  []algorithm.PredicateFailureReason
+		reasons                  []PredicateFailureReason
 		ignoredExtendedResources sets.String
 	}{
 		{
 			pod: &v1.Pod{},
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 20})),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
 			fits: true,
 			name: "no resources requested always fits",
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 20})),
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
 			fits: false,
 			name: "too many resources fails",
-			reasons: []algorithm.PredicateFailureReason{
+			reasons: []PredicateFailureReason{
 				NewInsufficientResourceError(v1.ResourceCPU, 1, 10, 10),
 				NewInsufficientResourceError(v1.ResourceMemory, 1, 20, 20),
 			},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 3, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 8, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 3, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 8, Memory: 19})),
 			fits:    false,
 			name:    "too many resources fails due to init container cpu",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourceCPU, 3, 8, 10)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(v1.ResourceCPU, 3, 8, 10)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 3, Memory: 1}, schedulercache.Resource{MilliCPU: 2, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 8, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 3, Memory: 1}, schedulernodeinfo.Resource{MilliCPU: 2, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 8, Memory: 19})),
 			fits:    false,
 			name:    "too many resources fails due to highest init container cpu",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourceCPU, 3, 8, 10)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(v1.ResourceCPU, 3, 8, 10)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 3}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 1, Memory: 3}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 19})),
 			fits:    false,
 			name:    "too many resources fails due to init container memory",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourceMemory, 3, 19, 20)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(v1.ResourceMemory, 3, 19, 20)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 3}, schedulercache.Resource{MilliCPU: 1, Memory: 2}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 1, Memory: 3}, schedulernodeinfo.Resource{MilliCPU: 1, Memory: 2}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 19})),
 			fits:    false,
 			name:    "too many resources fails due to highest init container memory",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourceMemory, 3, 19, 20)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(v1.ResourceMemory, 3, 19, 20)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 19})),
 			fits: true,
 			name: "init container fits because it's the max, not sum, of containers and init containers",
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 1}, schedulercache.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}, schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 19})),
 			fits: true,
 			name: "multiple init containers fit because it's the max, not sum, of containers and init containers",
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 5})),
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 5})),
 			fits: true,
 			name: "both resources fit",
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 5})),
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 2, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 5})),
 			fits:    false,
 			name:    "one resource memory fits",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourceCPU, 2, 9, 10)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(v1.ResourceCPU, 2, 9, 10)},
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 2}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 2}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
 			fits:    false,
 			name:    "one resource cpu fits",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourceMemory, 2, 19, 20)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(v1.ResourceMemory, 2, 19, 20)},
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
 			fits: true,
 			name: "equal edge case",
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 4, Memory: 1}), schedulercache.Resource{MilliCPU: 5, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 4, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 5, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
 			fits: true,
 			name: "equal edge case for init container",
 		},
 		{
-			pod:      newResourcePod(schedulercache.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
-			nodeInfo: schedulercache.NewNodeInfo(newResourcePod(schedulercache.Resource{})),
+			pod:      newResourcePod(schedulernodeinfo.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{})),
 			fits:     true,
 			name:     "extended resource fits",
 		},
 		{
-			pod:      newResourceInitPod(newResourcePod(schedulercache.Resource{}), schedulercache.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
-			nodeInfo: schedulercache.NewNodeInfo(newResourcePod(schedulercache.Resource{})),
+			pod:      newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}), schedulernodeinfo.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(newResourcePod(schedulernodeinfo.Resource{})),
 			fits:     true,
 			name:     "extended resource fits for init container",
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 10}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 0}})),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 10}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 0}})),
 			fits:    false,
 			name:    "extended resource capacity enforced",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 10, 0, 5)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 10, 0, 5)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 10}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 0}})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 10}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 0}})),
 			fits:    false,
 			name:    "extended resource capacity enforced for init container",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 10, 0, 5)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 10, 0, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 5}})),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 5}})),
 			fits:    false,
 			name:    "extended resource allocatable enforced",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 1, 5, 5)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 1, 5, 5)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 5}})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 5}})),
 			fits:    false,
 			name:    "extended resource allocatable enforced for init container",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 1, 5, 5)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 1, 5, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}},
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
 			fits:    false,
 			name:    "extended resource allocatable enforced for multiple containers",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 6, 2, 5)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 6, 2, 5)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}},
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
 			fits: true,
 			name: "extended resource allocatable admits multiple init containers",
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 6}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 6}},
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 3}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2}})),
 			fits:    false,
 			name:    "extended resource allocatable enforced for multiple init containers",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 6, 2, 5)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(extendedResourceA, 6, 2, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
 			fits:    false,
 			name:    "extended resource allocatable enforced for unknown resource",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(extendedResourceB, 1, 0, 0)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(extendedResourceB, 1, 0, 0)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
 			fits:    false,
 			name:    "extended resource allocatable enforced for unknown resource for init container",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(extendedResourceB, 1, 0, 0)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(extendedResourceB, 1, 0, 0)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceA: 10}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceA: 10}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
 			fits:    false,
 			name:    "kubernetes.io resource capacity enforced",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(kubernetesIOResourceA, 10, 0, 0)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(kubernetesIOResourceA, 10, 0, 0)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceB: 10}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceB: 10}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
 			fits:    false,
 			name:    "kubernetes.io resource capacity enforced for init container",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(kubernetesIOResourceB, 10, 0, 0)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(kubernetesIOResourceB, 10, 0, 0)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
 			fits:    false,
 			name:    "hugepages resource capacity enforced",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{}),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
 			fits:    false,
 			name:    "hugepages resource capacity enforced for init container",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 2}})),
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}},
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 2}})),
 			fits:    false,
 			name:    "hugepages resource allocatable enforced for multiple containers",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 6, 2, 5)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 6, 2, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
-			fits: true,
+				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
+			fits:                     true,
 			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
-			name: "skip checking ignored extended resource",
+			name:                     "skip checking ignored extended resource",
 		},
 	}
 
@@ -360,7 +358,7 @@ func TestPodFitsResources(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 			RegisterPredicateMetadataProducerWithExtendedResourceOptions(test.ignoredExtendedResources)
-			meta := PredicateMetadata(test.pod, nil)
+			meta := GetPredicateMetadata(test.pod, nil)
 			fits, reasons, err := PodFitsResources(test.pod, meta, test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -376,49 +374,49 @@ func TestPodFitsResources(t *testing.T) {
 
 	notEnoughPodsTests := []struct {
 		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		fits     bool
 		name     string
-		reasons  []algorithm.PredicateFailureReason
+		reasons  []PredicateFailureReason
 	}{
 		{
 			pod: &v1.Pod{},
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 20})),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
 			fits:    false,
 			name:    "even without specified resources predicate fails when there's no space for additional pod",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourcePods, 1, 1, 1)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(v1.ResourcePods, 1, 1, 1)},
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 5})),
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 5})),
 			fits:    false,
 			name:    "even if both resources fit predicate fails when there's no space for additional pod",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourcePods, 1, 1, 1)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(v1.ResourcePods, 1, 1, 1)},
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
 			fits:    false,
 			name:    "even for equal edge case predicate fails when there's no space for additional pod",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourcePods, 1, 1, 1)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(v1.ResourcePods, 1, 1, 1)},
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 1}), schedulercache.Resource{MilliCPU: 5, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 5, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
 			fits:    false,
 			name:    "even for equal edge case predicate fails when there's no space for additional pod due to init container",
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourcePods, 1, 1, 1)},
+			reasons: []PredicateFailureReason{NewInsufficientResourceError(v1.ResourcePods, 1, 1, 1)},
 		},
 	}
 	for _, test := range notEnoughPodsTests {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 			test.nodeInfo.SetNode(&node)
-			fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+			fits, reasons, err := PodFitsResources(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -433,42 +431,42 @@ func TestPodFitsResources(t *testing.T) {
 
 	storagePodsTests := []struct {
 		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		fits     bool
 		name     string
-		reasons  []algorithm.PredicateFailureReason
+		reasons  []PredicateFailureReason
 	}{
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 10})),
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 10})),
 			fits: false,
 			name: "due to container scratch disk",
-			reasons: []algorithm.PredicateFailureReason{
+			reasons: []PredicateFailureReason{
 				NewInsufficientResourceError(v1.ResourceCPU, 1, 10, 10),
 			},
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 10})),
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 2, Memory: 10})),
 			fits: true,
 			name: "pod fit",
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{EphemeralStorage: 25}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2})),
+			pod: newResourcePod(schedulernodeinfo.Resource{EphemeralStorage: 25}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 2, Memory: 2})),
 			fits: false,
 			name: "storage ephemeral local storage request exceeds allocatable",
-			reasons: []algorithm.PredicateFailureReason{
+			reasons: []PredicateFailureReason{
 				NewInsufficientResourceError(v1.ResourceEphemeralStorage, 25, 0, 20),
 			},
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{EphemeralStorage: 10}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2})),
+			pod: newResourcePod(schedulernodeinfo.Resource{EphemeralStorage: 10}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 2, Memory: 2})),
 			fits: true,
 			name: "pod fits",
 		},
@@ -478,7 +476,7 @@ func TestPodFitsResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
-			fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+			fits, reasons, err := PodFitsResources(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -535,13 +533,13 @@ func TestPodFitsHost(t *testing.T) {
 			name: "host doesn't match",
 		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodNotMatchHostName}
+	expectedFailureReasons := []PredicateFailureReason{ErrPodNotMatchHostName}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeInfo := schedulercache.NewNodeInfo()
+			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
-			fits, reasons, err := PodFitsHost(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+			fits, reasons, err := PodFitsHost(test.pod, GetPredicateMetadata(test.pod, nil), nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -582,106 +580,106 @@ func newPod(host string, hostPortInfos ...string) *v1.Pod {
 func TestPodFitsHostPorts(t *testing.T) {
 	tests := []struct {
 		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		fits     bool
 		name     string
 	}{
 		{
 			pod:      &v1.Pod{},
-			nodeInfo: schedulercache.NewNodeInfo(),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(),
 			fits:     true,
 			name:     "nothing running",
 		},
 		{
 			pod: newPod("m1", "UDP/127.0.0.1/8080"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "UDP/127.0.0.1/9090")),
 			fits: true,
 			name: "other port",
 		},
 		{
 			pod: newPod("m1", "UDP/127.0.0.1/8080"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "UDP/127.0.0.1/8080")),
 			fits: false,
 			name: "same udp port",
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8080"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8080")),
 			fits: false,
 			name: "same tcp port",
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8080"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.2/8080")),
 			fits: true,
 			name: "different host ip",
 		},
 		{
 			pod: newPod("m1", "UDP/127.0.0.1/8080"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8080")),
 			fits: true,
 			name: "different protocol",
 		},
 		{
 			pod: newPod("m1", "UDP/127.0.0.1/8000", "UDP/127.0.0.1/8080"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "UDP/127.0.0.1/8080")),
 			fits: false,
 			name: "second udp port conflict",
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8001", "UDP/127.0.0.1/8080"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001", "UDP/127.0.0.1/8081")),
 			fits: false,
 			name: "first tcp port conflict",
 		},
 		{
 			pod: newPod("m1", "TCP/0.0.0.0/8001"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001")),
 			fits: false,
 			name: "first tcp port conflict due to 0.0.0.0 hostIP",
 		},
 		{
 			pod: newPod("m1", "TCP/10.0.10.10/8001", "TCP/0.0.0.0/8001"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001")),
 			fits: false,
 			name: "TCP hostPort conflict due to 0.0.0.0 hostIP",
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8001"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001")),
 			fits: false,
 			name: "second tcp port conflict to 0.0.0.0 hostIP",
 		},
 		{
 			pod: newPod("m1", "UDP/127.0.0.1/8001"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001")),
 			fits: true,
 			name: "second different protocol",
 		},
 		{
 			pod: newPod("m1", "UDP/127.0.0.1/8001"),
-			nodeInfo: schedulercache.NewNodeInfo(
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001", "UDP/0.0.0.0/8001")),
 			fits: false,
 			name: "UDP hostPort conflict due to 0.0.0.0 hostIP",
 		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}
+	expectedFailureReasons := []PredicateFailureReason{ErrPodNotFitsHostPorts}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fits, reasons, err := PodFitsHostPorts(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+			fits, reasons, err := PodFitsHostPorts(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -720,20 +718,20 @@ func TestGCEDiskConflicts(t *testing.T) {
 	}
 	tests := []struct {
 		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		isOk     bool
 		name     string
 	}{
-		{&v1.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
-		{&v1.Pod{}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state"},
-		{&v1.Pod{Spec: volState}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
-		{&v1.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
+		{&v1.Pod{}, schedulernodeinfo.NewNodeInfo(), true, "nothing"},
+		{&v1.Pod{}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state"},
+		{&v1.Pod{Spec: volState}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
+		{&v1.Pod{Spec: volState2}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrDiskConflict}
+	expectedFailureReasons := []PredicateFailureReason{ErrDiskConflict}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+			ok, reasons, err := NoDiskConflict(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -775,20 +773,20 @@ func TestAWSDiskConflicts(t *testing.T) {
 	}
 	tests := []struct {
 		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		isOk     bool
 		name     string
 	}{
-		{&v1.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
-		{&v1.Pod{}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state"},
-		{&v1.Pod{Spec: volState}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
-		{&v1.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
+		{&v1.Pod{}, schedulernodeinfo.NewNodeInfo(), true, "nothing"},
+		{&v1.Pod{}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state"},
+		{&v1.Pod{Spec: volState}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
+		{&v1.Pod{Spec: volState2}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrDiskConflict}
+	expectedFailureReasons := []PredicateFailureReason{ErrDiskConflict}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+			ok, reasons, err := NoDiskConflict(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -836,20 +834,20 @@ func TestRBDDiskConflicts(t *testing.T) {
 	}
 	tests := []struct {
 		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		isOk     bool
 		name     string
 	}{
-		{&v1.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
-		{&v1.Pod{}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state"},
-		{&v1.Pod{Spec: volState}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
-		{&v1.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
+		{&v1.Pod{}, schedulernodeinfo.NewNodeInfo(), true, "nothing"},
+		{&v1.Pod{}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state"},
+		{&v1.Pod{Spec: volState}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
+		{&v1.Pod{Spec: volState2}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrDiskConflict}
+	expectedFailureReasons := []PredicateFailureReason{ErrDiskConflict}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+			ok, reasons, err := NoDiskConflict(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -897,20 +895,20 @@ func TestISCSIDiskConflicts(t *testing.T) {
 	}
 	tests := []struct {
 		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		isOk     bool
 		name     string
 	}{
-		{&v1.Pod{}, schedulercache.NewNodeInfo(), true, "nothing"},
-		{&v1.Pod{}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state"},
-		{&v1.Pod{Spec: volState}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
-		{&v1.Pod{Spec: volState2}, schedulercache.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
+		{&v1.Pod{}, schedulernodeinfo.NewNodeInfo(), true, "nothing"},
+		{&v1.Pod{}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state"},
+		{&v1.Pod{Spec: volState}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
+		{&v1.Pod{Spec: volState2}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrDiskConflict}
+	expectedFailureReasons := []PredicateFailureReason{ErrDiskConflict}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+			ok, reasons, err := NoDiskConflict(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1417,7 +1415,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1443,7 +1441,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1469,7 +1467,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1505,7 +1503,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1539,7 +1537,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1573,7 +1571,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1600,7 +1598,7 @@ func TestPodFitsSelector(t *testing.T) {
 			name:     "Pod with two terms: both matchFields and matchExpressions do not match",
 		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
+	expectedFailureReasons := []PredicateFailureReason{ErrNodeSelectorNotMatch}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1608,10 +1606,10 @@ func TestPodFitsSelector(t *testing.T) {
 				Name:   test.nodeName,
 				Labels: test.labels,
 			}}
-			nodeInfo := schedulercache.NewNodeInfo()
+			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
-			fits, reasons, err := PodMatchNodeSelector(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+			fits, reasons, err := PodMatchNodeSelector(test.pod, GetPredicateMetadata(test.pod, nil), nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1671,16 +1669,16 @@ func TestNodeLabelPresence(t *testing.T) {
 			name:     "all labels match, presence false",
 		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeLabelPresenceViolated}
+	expectedFailureReasons := []PredicateFailureReason{ErrNodeLabelPresenceViolated}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: label}}
-			nodeInfo := schedulercache.NewNodeInfo()
+			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
 			labelChecker := NodeLabelChecker{test.labels, test.presence}
-			fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+			fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, GetPredicateMetadata(test.pod, nil), nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1820,14 +1818,14 @@ func TestServiceAffinity(t *testing.T) {
 			name:     "service pod on different node, multiple labels, all match",
 		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrServiceAffinityViolated}
+	expectedFailureReasons := []PredicateFailureReason{ErrServiceAffinityViolated}
 	for _, test := range tests {
 		testIt := func(skipPrecompute bool) {
 			t.Run(fmt.Sprintf("%v/skipPrecompute/%v", test.name, skipPrecompute), func(t *testing.T) {
 				nodes := []v1.Node{node1, node2, node3, node4, node5}
-				nodeInfo := schedulercache.NewNodeInfo()
+				nodeInfo := schedulernodeinfo.NewNodeInfo()
 				nodeInfo.SetNode(test.node)
-				nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
+				nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{test.node.Name: nodeInfo}
 				// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
 				predicate, precompute := NewServiceAffinityPredicate(schedulertesting.FakePodLister(test.pods), schedulertesting.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
 				// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
@@ -1836,7 +1834,7 @@ func TestServiceAffinity(t *testing.T) {
 						precompute(pm)
 					}
 				})
-				if pmeta, ok := (PredicateMetadata(test.pod, nodeInfoMap)).(*predicateMetadata); ok {
+				if pmeta, ok := (GetPredicateMetadata(test.pod, nodeInfoMap)).(*predicateMetadata); ok {
 					fits, reasons, err := predicate(test.pod, pmeta, nodeInfo)
 					if err != nil {
 						t.Errorf("unexpected error: %v", err)
@@ -1877,17 +1875,17 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 func TestRunGeneralPredicates(t *testing.T) {
 	resourceTests := []struct {
 		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		node     *v1.Node
 		fits     bool
 		name     string
 		wErr     error
-		reasons  []algorithm.PredicateFailureReason
+		reasons  []PredicateFailureReason
 	}{
 		{
 			pod: &v1.Pod{},
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 9, Memory: 19})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
@@ -1897,16 +1895,16 @@ func TestRunGeneralPredicates(t *testing.T) {
 			name: "no resources/port/host requested always fits",
 		},
 		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 8, Memory: 10}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 8, Memory: 10}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 19})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits: false,
 			wErr: nil,
-			reasons: []algorithm.PredicateFailureReason{
+			reasons: []PredicateFailureReason{
 				NewInsufficientResourceError(v1.ResourceCPU, 8, 5, 10),
 				NewInsufficientResourceError(v1.ResourceMemory, 10, 19, 20),
 			},
@@ -1918,33 +1916,33 @@ func TestRunGeneralPredicates(t *testing.T) {
 					NodeName: "machine2",
 				},
 			},
-			nodeInfo: schedulercache.NewNodeInfo(),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits:    false,
 			wErr:    nil,
-			reasons: []algorithm.PredicateFailureReason{ErrPodNotMatchHostName},
+			reasons: []PredicateFailureReason{ErrPodNotMatchHostName},
 			name:    "host not match",
 		},
 		{
 			pod:      newPodWithPort(123),
-			nodeInfo: schedulercache.NewNodeInfo(newPodWithPort(123)),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(newPodWithPort(123)),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits:    false,
 			wErr:    nil,
-			reasons: []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts},
+			reasons: []PredicateFailureReason{ErrPodNotFitsHostPorts},
 			name:    "hostport conflict",
 		},
 	}
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
 			test.nodeInfo.SetNode(test.node)
-			fits, reasons, err := GeneralPredicates(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+			fits, reasons, err := GeneralPredicates(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1973,7 +1971,7 @@ func TestInterPodAffinity(t *testing.T) {
 		node                 *v1.Node
 		fits                 bool
 		name                 string
-		expectFailureReasons []algorithm.PredicateFailureReason
+		expectFailureReasons []PredicateFailureReason
 	}{
 		{
 			pod:  new(v1.Pod),
@@ -2073,7 +2071,7 @@ func TestInterPodAffinity(t *testing.T) {
 			node:                 &node1,
 			fits:                 false,
 			name:                 "Does not satisfy the PodAffinity with labelSelector because of diff Namespace",
-			expectFailureReasons: []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
 		},
 		{
 			pod: &v1.Pod{
@@ -2104,7 +2102,7 @@ func TestInterPodAffinity(t *testing.T) {
 			node:                 &node1,
 			fits:                 false,
 			name:                 "Doesn't satisfy the PodAffinity because of unmatching labelSelector with the existing pod",
-			expectFailureReasons: []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
 		},
 		{
 			pod: &v1.Pod{
@@ -2201,7 +2199,7 @@ func TestInterPodAffinity(t *testing.T) {
 			node:                 &node1,
 			fits:                 false,
 			name:                 "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node because one of the matchExpression item don't match.",
-			expectFailureReasons: []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
 		},
 		{
 			pod: &v1.Pod{
@@ -2367,8 +2365,8 @@ func TestInterPodAffinity(t *testing.T) {
 			pods:                 []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
 			node:                 &node1,
 			fits:                 false,
-			name:                 "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
-			expectFailureReasons: []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
+			name:                 "satisfies the PodAffinity but doesn't satisfy the PodAntiAffinity with the existing pod",
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
 		},
 		{
 			pod: &v1.Pod{
@@ -2440,8 +2438,8 @@ func TestInterPodAffinity(t *testing.T) {
 			},
 			node:                 &node1,
 			fits:                 false,
-			name:                 "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfies PodAntiAffinity symmetry with the existing pod",
-			expectFailureReasons: []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+			name:                 "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfy PodAntiAffinity symmetry with the existing pod",
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
 		},
 		{
 			pod: &v1.Pod{
@@ -2473,7 +2471,7 @@ func TestInterPodAffinity(t *testing.T) {
 			node:                 &node1,
 			fits:                 false,
 			name:                 "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
-			expectFailureReasons: []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
 		},
 		{
 			pod: &v1.Pod{
@@ -2509,7 +2507,7 @@ func TestInterPodAffinity(t *testing.T) {
 			node:                 &node1,
 			fits:                 false,
 			name:                 "verify that PodAntiAffinity from existing pod is respected when pod has no AntiAffinity constraints. doesn't satisfy PodAntiAffinity symmetry with the existing pod",
-			expectFailureReasons: []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
 		},
 		{
 			pod: &v1.Pod{
@@ -2546,6 +2544,349 @@ func TestInterPodAffinity(t *testing.T) {
 			fits: true,
 			name: "verify that PodAntiAffinity from existing pod is respected when pod has no AntiAffinity constraints. satisfy PodAntiAffinity symmetry with the existing pod",
 		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabel,
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "security",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Labels: podLabel2},
+					Spec: v1.PodSpec{NodeName: "machine1",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "security",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			node:                 &node1,
+			fits:                 false,
+			name:                 "satisfies the PodAntiAffinity with existing pod but doesn't satisfy PodAntiAffinity symmetry with incoming pod",
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Labels: podLabel},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "service",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "security",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Labels: podLabel2},
+					Spec: v1.PodSpec{
+						NodeName: "machine1",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "security",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			node:                 &node1,
+			fits:                 false,
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
+			name:                 "PodAntiAffinity symmetry check a1: incoming pod and existing pod partially match each other on AffinityTerms",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Labels: podLabel2},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "security",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Labels: podLabel},
+					Spec: v1.PodSpec{
+						NodeName: "machine1",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "service",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "security",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			node:                 &node1,
+			fits:                 false,
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+			name:                 "PodAntiAffinity symmetry check a2: incoming pod and existing pod partially match each other on AffinityTerms",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"abc": "", "xyz": ""}},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "abc",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "def",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"def": "", "xyz": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "machine1",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "abc",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "def",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			node:                 &node1,
+			fits:                 false,
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+			name:                 "PodAntiAffinity symmetry check b1: incoming pod and existing pod partially match each other on AffinityTerms",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"def": "", "xyz": ""}},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "abc",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "def",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"abc": "", "xyz": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "machine1",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "abc",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "def",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			node:                 &node1,
+			fits:                 false,
+			expectFailureReasons: []PredicateFailureReason{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+			name:                 "PodAntiAffinity symmetry check b2: incoming pod and existing pod partially match each other on AffinityTerms",
+		},
 	}
 
 	for _, test := range tests {
@@ -2562,10 +2903,10 @@ func TestInterPodAffinity(t *testing.T) {
 				info:      FakeNodeInfo(*node),
 				podLister: schedulertesting.FakePodLister(test.pods),
 			}
-			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
+			nodeInfo := schedulernodeinfo.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(test.node)
-			nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
-			fits, reasons, _ := fit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+			nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{test.node.Name: nodeInfo}
+			fits, reasons, _ := fit.InterPodAffinityMatches(test.pod, GetPredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 			if !fits && !reflect.DeepEqual(reasons, test.expectFailureReasons) {
 				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, test.expectFailureReasons)
 			}
@@ -2598,7 +2939,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 		pod                               *v1.Pod
 		pods                              []*v1.Pod
 		nodes                             []v1.Node
-		nodesExpectAffinityFailureReasons [][]algorithm.PredicateFailureReason
+		nodesExpectAffinityFailureReasons [][]PredicateFailureReason
 		fits                              map[string]bool
 		name                              string
 		nometa                            bool
@@ -2639,8 +2980,8 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"machine2": true,
 				"machine3": false,
 			},
-			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{nil, nil, {ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch}},
-			name: "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that match the affinity rules",
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{nil, nil, {ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch}},
+			name:                              "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that matches the affinity rules",
 		},
 		{
 			pod: &v1.Pod{
@@ -2688,12 +3029,12 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "h1"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "h2"}}},
 			},
-			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{nil, nil},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{nil, nil},
 			fits: map[string]bool{
 				"nodeA": false,
 				"nodeB": true,
 			},
-			name: "NodeA and nodeB have same topologyKey and label value. NodeA does not satisfy node affinity rule, but has an existing pod that match the inter pod affinity rule. The pod can be scheduled onto nodeB.",
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA does not satisfy node affinity rule, but has an existing pod that matches the inter pod affinity rule. The pod can be scheduled onto nodeB.",
 		},
 		{
 			pod: &v1.Pod{
@@ -2741,13 +3082,13 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zone": "az1", "hostname": "h1"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zone": "az2", "hostname": "h2"}}},
 			},
-			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{nil, nil},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{nil, nil},
 			fits: map[string]bool{
 				"nodeA": true,
 				"nodeB": true,
 			},
 			name: "The affinity rule is to schedule all of the pods of this collection to the same zone. The first pod of the collection " +
-				"should not be blocked from being scheduled onto any node, even there's no existing pod that match the rule anywhere.",
+				"should not be blocked from being scheduled onto any node, even there's no existing pod that matches the rule anywhere.",
 		},
 		{
 			pod: &v1.Pod{
@@ -2779,12 +3120,12 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "nodeB"}}},
 			},
-			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch}, {ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch}},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch}, {ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch}},
 			fits: map[string]bool{
 				"nodeA": false,
 				"nodeB": false,
 			},
-			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB.",
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB.",
 		},
 		{
 			pod: &v1.Pod{
@@ -2828,12 +3169,15 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch}},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
+				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
+				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
+			},
 			fits: map[string]bool{
 				"nodeA": false,
-				"nodeB": true,
+				"nodeB": false,
 			},
-			name: "This test ensures that anti-affinity matches a pod when all terms of the anti-affinity rule matches a pod.",
+			name: "This test ensures that anti-affinity matches a pod when any term of the anti-affinity rule matches a pod.",
 		},
 		{
 			pod: &v1.Pod{
@@ -2866,13 +3210,13 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
 			},
-			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch}, {ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch}, nil},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch}, {ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch}, nil},
 			fits: map[string]bool{
 				"nodeA": false,
 				"nodeB": false,
 				"nodeC": true,
 			},
-			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be scheduled onto nodeC",
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be scheduled onto nodeC",
 		},
 		{
 			pod: &v1.Pod{
@@ -2930,7 +3274,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeD", Labels: labelRgUS}},
 			},
-			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
 				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
 				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
 				{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
@@ -2942,7 +3286,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeC": false,
 				"nodeD": true,
 			},
-			name:   "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. NodeC has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB and nodeC but can be schedulerd onto nodeD",
+			name:   "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. NodeC has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB and nodeC but can be schedulerd onto nodeD",
 			nometa: true,
 		},
 		{
@@ -3010,7 +3354,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
 			},
-			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
 				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
 				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
 				nil,
@@ -3020,16 +3364,641 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeB": false,
 				"nodeC": true,
 			},
-			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB, but can be scheduled onto nodeC (NodeC has an existing pod that match the inter pod affinity rule but in different namespace)",
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB, but can be scheduled onto nodeC (NodeC has an existing pod that match the inter pod affinity rule but in different namespace)",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": ""}},
+			},
+			pods: []*v1.Pod{
+				{
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "foo",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "invalid-node-label",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{},
+			fits: map[string]bool{
+				"nodeA": true,
+				"nodeB": true,
+			},
+			name: "Test existing pod's anti-affinity: if an existing pod has a term with invalid topologyKey, labelSelector of the term is firstly checked, and then topologyKey of the term is also checked",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "invalid-node-label",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{},
+			fits: map[string]bool{
+				"nodeA": true,
+				"nodeB": true,
+			},
+			name: "Test incoming pod's anti-affinity: even if labelSelector matches, we still check if topologyKey matches",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "", "bar": ""}},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "foo",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod2"},
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "bar",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "region",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
+				{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+				{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+			},
+			name: "Test existing pod's anti-affinity: incoming pod wouldn't considered as a fit as it violates each existingPod's terms on all nodes",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "bar",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"bar": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "nodeB",
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
+				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
+				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+			},
+			name: "Test incoming pod's anti-affinity: incoming pod wouldn't considered as a fit as it at least violates one anti-affinity rule of existingPod",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "", "bar": ""}},
+			},
+			pods: []*v1.Pod{
+				{
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "foo",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "invalid-node-label",
+									},
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "bar",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
+				{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": true,
+			},
+			name: "Test existing pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when one term has invalid topologyKey",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "invalid-node-label",
+								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "bar",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "podA", Labels: map[string]string{"foo": "", "bar": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
+				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": true,
+			},
+			name: "Test incoming pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when one term has invalid topologyKey",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "", "bar": ""}},
+			},
+			pods: []*v1.Pod{
+				{
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "foo",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "region",
+									},
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "bar",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
+				{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+				{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+			},
+			name: "Test existing pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when all terms have valid topologyKey",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "bar",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "", "bar": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
+				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
+				{ErrPodAffinityNotMatch, ErrPodAntiAffinityRulesNotMatch},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+			},
+			name: "Test incoming pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when all terms have valid topologyKey",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "", "bar": ""}},
+			},
+			pods: []*v1.Pod{
+				{
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "foo",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "labelA",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Spec: v1.PodSpec{
+						NodeName: "nodeB",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: &v1.PodAntiAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "bar",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchExpressions: []metav1.LabelSelectorRequirement{
+												{
+													Key:      "labelB",
+													Operator: metav1.LabelSelectorOpExists,
+												},
+											},
+										},
+										TopologyKey: "zone",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: map[string]string{"region": "r1", "zone": "z3", "hostname": "nodeC"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
+				{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+				{ErrPodAffinityNotMatch, ErrExistingPodsAntiAffinityRulesNotMatch},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+				"nodeC": true,
+			},
+			name: "Test existing pod's anti-affinity: existingPod on nodeA and nodeB has at least one anti-affinity term matches incoming pod, so incoming pod can only be scheduled to nodeC",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "bar",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: map[string]string{"foo": "", "bar": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
+				{},
+				{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
+			},
+			fits: map[string]bool{
+				"nodeA": true,
+				"nodeB": true,
+			},
+			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "bar",
+												Operator: metav1.LabelSelectorOpExists,
+											},
+										},
+									},
+									TopologyKey: "zone",
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: map[string]string{"foo": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "nodeA",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: map[string]string{"bar": ""}},
+					Spec: v1.PodSpec{
+						NodeName: "nodeB",
+					},
+				},
+			},
+			nodes: []v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+			},
+			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{
+				{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
+				{ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch},
+			},
+			fits: map[string]bool{
+				"nodeA": false,
+				"nodeB": false,
+			},
+			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satified on the same pod",
 		},
 	}
 
-	selectorExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
+	selectorExpectedFailureReasons := []PredicateFailureReason{ErrNodeSelectorNotMatch}
 
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodeListInfo := FakeNodeListInfo(test.nodes)
-			nodeInfoMap := make(map[string]*schedulercache.NodeInfo)
+			nodeInfoMap := make(map[string]*schedulernodeinfo.NodeInfo)
 			for i, node := range test.nodes {
 				var podsOnNode []*v1.Pod
 				for _, pod := range test.pods {
@@ -3038,7 +4007,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					}
 				}
 
-				nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
+				nodeInfo := schedulernodeinfo.NewNodeInfo(podsOnNode...)
 				nodeInfo.SetNode(&test.nodes[i])
 				nodeInfoMap[node.Name] = nodeInfo
 			}
@@ -3049,9 +4018,9 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					podLister: schedulertesting.FakePodLister(test.pods),
 				}
 
-				var meta algorithm.PredicateMetadata
+				var meta PredicateMetadata
 				if !test.nometa {
-					meta = PredicateMetadata(test.pod, nodeInfoMap)
+					meta = GetPredicateMetadata(test.pod, nodeInfoMap)
 				}
 
 				fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, nodeInfoMap[node.Name])
@@ -3060,10 +4029,10 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				}
 				affinity := test.pod.Spec.Affinity
 				if affinity != nil && affinity.NodeAffinity != nil {
-					nodeInfo := schedulercache.NewNodeInfo()
+					nodeInfo := schedulernodeinfo.NewNodeInfo()
 					nodeInfo.SetNode(&node)
-					nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
-					fits2, reasons, err := PodMatchNodeSelector(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+					nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{node.Name: nodeInfo}
+					fits2, reasons, err := PodMatchNodeSelector(test.pod, GetPredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 					if err != nil {
 						t.Errorf("unexpected error: %v", err)
 					}
@@ -3100,7 +4069,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
-			name: "a pod having no tolerations can't be scheduled onto a node with nonempty taints",
+			name: "A pod having no tolerations can't be scheduled onto a node with nonempty taints",
 		},
 		{
 			pod: &v1.Pod{
@@ -3118,7 +4087,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: true,
-			name: "a pod which can be scheduled on a dedicated node assigned to user1 with effect NoSchedule",
+			name: "A pod which can be scheduled on a dedicated node assigned to user1 with effect NoSchedule",
 		},
 		{
 			pod: &v1.Pod{
@@ -3136,7 +4105,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
-			name: "a pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
+			name: "A pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
 		},
 		{
 			pod: &v1.Pod{
@@ -3154,7 +4123,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: true,
-			name: "a pod can be scheduled onto the node, with a toleration uses operator Exists that tolerates the taints on the node",
+			name: "A pod can be scheduled onto the node, with a toleration uses operator Exists that tolerates the taints on the node",
 		},
 		{
 			pod: &v1.Pod{
@@ -3178,7 +4147,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: true,
-			name: "a pod has multiple tolerations, node has multiple taints, all the taints are tolerated, pod can be scheduled onto the node",
+			name: "A pod has multiple tolerations, node has multiple taints, all the taints are tolerated, pod can be scheduled onto the node",
 		},
 		{
 			pod: &v1.Pod{
@@ -3198,7 +4167,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
-			name: "a pod has a toleration that keys and values match the taint on the node, but (non-empty) effect doesn't match, " +
+			name: "A pod has a toleration that keys and values match the taint on the node, but (non-empty) effect doesn't match, " +
 				"can't be scheduled onto the node",
 		},
 		{
@@ -3264,13 +4233,13 @@ func TestPodToleratesTaints(t *testing.T) {
 				"but the effect of taint on node is PreferNochedule. Pod can be scheduled onto the node",
 		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}
+	expectedFailureReasons := []PredicateFailureReason{ErrTaintsTolerationsNotMatch}
 
 	for _, test := range podTolerateTaintsTests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeInfo := schedulercache.NewNodeInfo()
+			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(&test.node)
-			fits, reasons, err := PodToleratesNodeTaints(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+			fits, reasons, err := PodToleratesNodeTaints(test.pod, GetPredicateMetadata(test.pod, nil), nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3284,8 +4253,8 @@ func TestPodToleratesTaints(t *testing.T) {
 	}
 }
 
-func makeEmptyNodeInfo(node *v1.Node) *schedulercache.NodeInfo {
-	nodeInfo := schedulercache.NewNodeInfo()
+func makeEmptyNodeInfo(node *v1.Node) *schedulernodeinfo.NodeInfo {
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
 	nodeInfo.SetNode(node)
 	return nodeInfo
 }
@@ -3349,7 +4318,7 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 
 	tests := []struct {
 		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		fits     bool
 		name     string
 	}{
@@ -3378,11 +4347,11 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 			name:     "non best-effort pod schedulable on node without memory pressure condition on",
 		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}
+	expectedFailureReasons := []PredicateFailureReason{ErrNodeUnderMemoryPressure}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fits, reasons, err := CheckNodeMemoryPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+			fits, reasons, err := CheckNodeMemoryPressurePredicate(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3435,7 +4404,7 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 
 	tests := []struct {
 		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		fits     bool
 		name     string
 	}{
@@ -3452,11 +4421,11 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 			name:     "pod not schedulable on node with pressure condition on",
 		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}
+	expectedFailureReasons := []PredicateFailureReason{ErrNodeUnderDiskPressure}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fits, reasons, err := CheckNodeDiskPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+			fits, reasons, err := CheckNodeDiskPressurePredicate(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3497,7 +4466,7 @@ func TestPodSchedulesOnNodeWithPIDPressureCondition(t *testing.T) {
 	}
 
 	tests := []struct {
-		nodeInfo *schedulercache.NodeInfo
+		nodeInfo *schedulernodeinfo.NodeInfo
 		fits     bool
 		name     string
 	}{
@@ -3512,11 +4481,11 @@ func TestPodSchedulesOnNodeWithPIDPressureCondition(t *testing.T) {
 			name:     "pod not schedulable on node with pressure condition on",
 		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeUnderPIDPressure}
+	expectedFailureReasons := []PredicateFailureReason{ErrNodeUnderPIDPressure}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fits, reasons, err := CheckNodePIDPressurePredicate(&v1.Pod{}, PredicateMetadata(&v1.Pod{}, nil), test.nodeInfo)
+			fits, reasons, err := CheckNodePIDPressurePredicate(&v1.Pod{}, GetPredicateMetadata(&v1.Pod{}, nil), test.nodeInfo)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -3547,47 +4516,17 @@ func TestNodeConditionPredicate(t *testing.T) {
 			schedulable: false,
 		},
 		{
-			name:        "node3 ignored - node out of disk",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			schedulable: false,
-		},
-		{
-			name:        "node4 considered",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-			schedulable: true,
-		},
-		{
-			name:        "node5 ignored - node out of disk",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node5"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			schedulable: false,
-		},
-		{
-			name:        "node6 considered",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node6"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-			schedulable: true,
-		},
-		{
-			name:        "node7 ignored - node out of disk, node not Ready",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node7"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
-			schedulable: false,
-		},
-		{
-			name:        "node8 ignored - node not Ready",
-			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node8"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
-			schedulable: false,
-		},
-		{
-			name:        "node9 ignored - node unschedulable",
+			name:        "node3 ignored - node unschedulable",
 			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node9"}, Spec: v1.NodeSpec{Unschedulable: true}},
 			schedulable: false,
 		},
 		{
-			name:        "node10 considered",
+			name:        "node4 considered",
 			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node10"}, Spec: v1.NodeSpec{Unschedulable: false}},
 			schedulable: true,
 		},
 		{
-			name:        "node11 considered",
+			name:        "node5 considered",
 			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node11"}},
 			schedulable: true,
 		},
@@ -3625,13 +4564,13 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 func TestVolumeZonePredicate(t *testing.T) {
 	pvInfo := FakePersistentVolumeInfo{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{v1.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-c"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{v1.LabelZoneRegion: "us-west1-c"}},
 		},
 	}
 
@@ -3668,7 +4607,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"},
+					Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"},
 				},
 			},
 			Fits: true,
@@ -3689,7 +4628,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -3700,7 +4639,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -3711,7 +4650,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneRegion: "no_us-west1-b", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneRegion: "no_us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,
@@ -3722,19 +4661,19 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "no_us-west1-a", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneFailureDomain: "no_us-west1-a", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,
 		},
 	}
 
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}
+	expectedFailureReasons := []PredicateFailureReason{ErrVolumeZoneConflict}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fit := NewVolumeZonePredicate(pvInfo, pvcInfo, nil)
-			node := &schedulercache.NodeInfo{}
+			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 
 			fits, reasons, err := fit(test.Pod, nil, node)
@@ -3754,13 +4693,13 @@ func TestVolumeZonePredicate(t *testing.T) {
 func TestVolumeZonePredicateMultiZone(t *testing.T) {
 	pvInfo := FakePersistentVolumeInfo{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-c__us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-c__us-west1-a"}},
 		},
 	}
 
@@ -3805,7 +4744,7 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -3816,19 +4755,19 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,
 		},
 	}
 
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}
+	expectedFailureReasons := []PredicateFailureReason{ErrVolumeZoneConflict}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fit := NewVolumeZonePredicate(pvInfo, pvcInfo, nil)
-			node := &schedulercache.NodeInfo{}
+			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 
 			fits, reasons, err := fit(test.Pod, nil, node)
@@ -3866,7 +4805,7 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 
 	pvInfo := FakePersistentVolumeInfo{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 	}
 
@@ -3895,7 +4834,7 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 	testNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "host1",
-			Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
+			Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
 		},
 	}
 
@@ -3941,15 +4880,10 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 		},
 	}
 
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	if err != nil {
-		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
-	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fit := NewVolumeZonePredicate(pvInfo, pvcInfo, classInfo)
-			node := &schedulercache.NodeInfo{}
+			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 
 			fits, _, err := fit(test.Pod, nil, node)
@@ -3965,10 +4899,6 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 		})
 	}
 
-	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
-	}
 }
 
 func TestGetMaxVols(t *testing.T) {
@@ -4009,5 +4939,67 @@ func TestGetMaxVols(t *testing.T) {
 	os.Unsetenv(KubeMaxPDVols)
 	if previousValue != "" {
 		os.Setenv(KubeMaxPDVols, previousValue)
+	}
+}
+
+func TestCheckNodeUnschedulablePredicate(t *testing.T) {
+	testCases := []struct {
+		name string
+		pod  *v1.Pod
+		node *v1.Node
+		fit  bool
+	}{
+		{
+			name: "Does not schedule pod to unschedulable node (node.Spec.Unschedulable==true)",
+			pod:  &v1.Pod{},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: true,
+				},
+			},
+			fit: false,
+		},
+		{
+			name: "Schedule pod to normal node",
+			pod:  &v1.Pod{},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: false,
+				},
+			},
+			fit: true,
+		},
+		{
+			name: "Schedule pod with toleration to unschedulable node (node.Spec.Unschedulable==true)",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Tolerations: []v1.Toleration{
+						{
+							Key:    schedulerapi.TaintNodeUnschedulable,
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: true,
+				},
+			},
+			fit: true,
+		},
+	}
+
+	for _, test := range testCases {
+		nodeInfo := schedulernodeinfo.NewNodeInfo()
+		nodeInfo.SetNode(test.node)
+		fit, _, err := CheckNodeUnschedulablePredicate(test.pod, nil, nodeInfo)
+		if err != nil {
+			t.Fatalf("Failed to check node unschedulable: %v", err)
+		}
+
+		if fit != test.fit {
+			t.Errorf("Unexpected fit: expected %v, got %v", test.fit, fit)
+		}
 	}
 }

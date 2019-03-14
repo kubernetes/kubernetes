@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 func TestOVirtCloudConfiguration(t *testing.T) {
@@ -62,14 +62,14 @@ uri = https://localhost:8443/ovirt-engine/api
 func TestOVirtCloudXmlParsing(t *testing.T) {
 	body1 := (io.Reader)(nil)
 
-	_, err1 := getInstancesFromXml(body1)
+	_, err1 := getInstancesFromXML(body1)
 	if err1 == nil {
 		t.Fatalf("An error is expected when body is missing")
 	}
 
 	body2 := strings.NewReader("")
 
-	_, err2 := getInstancesFromXml(body2)
+	_, err2 := getInstancesFromXML(body2)
 	if err2 == nil {
 		t.Fatalf("An error is expected when body is empty")
 	}
@@ -80,7 +80,7 @@ func TestOVirtCloudXmlParsing(t *testing.T) {
 </vms>
 `)
 
-	instances3, err3 := getInstancesFromXml(body3)
+	instances3, err3 := getInstancesFromXML(body3)
 	if err3 != nil {
 		t.Fatalf("Unexpected error listing instances: %s", err3)
 	}
@@ -111,7 +111,7 @@ func TestOVirtCloudXmlParsing(t *testing.T) {
 </vms>
 `)
 
-	instances4, err4 := getInstancesFromXml(body4)
+	instances4, err4 := getInstancesFromXML(body4)
 	if err4 != nil {
 		t.Fatalf("Unexpected error listing instances: %s", err4)
 	}

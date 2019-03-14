@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
@@ -54,7 +55,8 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -234,14 +236,6 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
-							Type:               v1.NodeOutOfDisk,
-							Status:             v1.ConditionFalse,
-							Reason:             "KubeletHasSufficientDisk",
-							Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-							LastHeartbeatTime:  metav1.Time{},
-							LastTransitionTime: metav1.Time{},
-						},
-						{
 							Type:               v1.NodeMemoryPressure,
 							Status:             v1.ConditionFalse,
 							Reason:             "KubeletHasSufficientMemory",
@@ -317,7 +311,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			assert.NoError(t, err)
 			for i, cond := range updatedNode.Status.Conditions {
 				assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
-				assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition  is zero", cond.Type)
+				assert.False(t, cond.LastTransitionTime.IsZero(), "LastTransitionTime for %v condition is zero", cond.Type)
 				updatedNode.Status.Conditions[i].LastHeartbeatTime = metav1.Time{}
 				updatedNode.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 			}
@@ -359,14 +353,6 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
-				{
-					Type:               v1.NodeOutOfDisk,
-					Status:             v1.ConditionFalse,
-					Reason:             "KubeletHasSufficientDisk",
-					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-					LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-					LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
 				{
 					Type:               v1.NodeMemoryPressure,
 					Status:             v1.ConditionFalse,
@@ -427,14 +413,6 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		Spec:       v1.NodeSpec{},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
-				{
-					Type:               v1.NodeOutOfDisk,
-					Status:             v1.ConditionFalse,
-					Reason:             "KubeletHasSufficientDisk",
-					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-					LastHeartbeatTime:  metav1.Time{},
-					LastTransitionTime: metav1.Time{},
-				},
 				{
 					Type:               v1.NodeMemoryPressure,
 					Status:             v1.ConditionFalse,
@@ -641,14 +619,6 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
 				{
-					Type:               v1.NodeOutOfDisk,
-					Status:             v1.ConditionFalse,
-					Reason:             "KubeletHasSufficientDisk",
-					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
-					LastHeartbeatTime:  metav1.Time{},
-					LastTransitionTime: metav1.Time{},
-				},
-				{
 					Type:               v1.NodeMemoryPressure,
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientMemory",
@@ -827,6 +797,446 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	assert.Len(t, testKubelet.fakeKubeClient.Actions(), nodeStatusUpdateRetry)
 }
 
+func TestUpdateNodeStatusWithLease(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	clock := testKubelet.fakeClock
+	kubelet := testKubelet.kubelet
+	kubelet.nodeStatusMaxImages = 5 // don't truncate the image list that gets constructed by hand for this test
+	kubelet.kubeClient = nil        // ensure only the heartbeat client is used
+	kubelet.containerManager = &localCM{
+		ContainerManager: cm.NewStubContainerManager(),
+		allocatableReservation: v1.ResourceList{
+			v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(100E6, resource.BinarySI),
+		},
+		capacity: v1.ResourceList{
+			v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(20E9, resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+		},
+	}
+	// Since this test retroactively overrides the stub container manager,
+	// we have to regenerate default status setters.
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
+	kubelet.nodeStatusReportFrequency = time.Minute
+
+	kubeClient := testKubelet.fakeKubeClient
+	existingNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*existingNode}}).ReactionChain
+	machineInfo := &cadvisorapi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 20E9,
+	}
+	kubelet.machineInfo = machineInfo
+
+	now := metav1.NewTime(clock.Now()).Rfc3339Copy()
+	expectedNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		Spec:       v1.NodeSpec{},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:               v1.NodeMemoryPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientMemory",
+					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
+					LastHeartbeatTime:  now,
+					LastTransitionTime: now,
+				},
+				{
+					Type:               v1.NodeDiskPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasNoDiskPressure",
+					Message:            fmt.Sprintf("kubelet has no disk pressure"),
+					LastHeartbeatTime:  now,
+					LastTransitionTime: now,
+				},
+				{
+					Type:               v1.NodePIDPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientPID",
+					Message:            fmt.Sprintf("kubelet has sufficient PID available"),
+					LastHeartbeatTime:  now,
+					LastTransitionTime: now,
+				},
+				{
+					Type:               v1.NodeReady,
+					Status:             v1.ConditionTrue,
+					Reason:             "KubeletReady",
+					Message:            fmt.Sprintf("kubelet is posting ready status"),
+					LastHeartbeatTime:  now,
+					LastTransitionTime: now,
+				},
+			},
+			NodeInfo: v1.NodeSystemInfo{
+				MachineID:               "123",
+				SystemUUID:              "abc",
+				BootID:                  "1b3",
+				KernelVersion:           cadvisortest.FakeKernelVersion,
+				OSImage:                 cadvisortest.FakeContainerOsVersion,
+				OperatingSystem:         goruntime.GOOS,
+				Architecture:            goruntime.GOARCH,
+				ContainerRuntimeVersion: "test://1.5.0",
+				KubeletVersion:          version.Get().String(),
+				KubeProxyVersion:        version.Get().String(),
+			},
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(20E9, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
+				v1.ResourceMemory:           *resource.NewQuantity(19900E6, resource.BinarySI),
+				v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
+				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+			},
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			// images will be sorted from max to min in node status.
+			Images: []v1.ContainerImage{
+				{
+					Names:     []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
+					SizeBytes: 123,
+				},
+				{
+					Names:     []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
+					SizeBytes: 456,
+				},
+			},
+		},
+	}
+
+	// Update node status when node status is created.
+	// Report node status.
+	kubelet.updateRuntimeUp()
+	assert.NoError(t, kubelet.updateNodeStatus())
+
+	actions := kubeClient.Actions()
+	assert.Len(t, actions, 2)
+	assert.IsType(t, core.GetActionImpl{}, actions[0])
+	assert.IsType(t, core.PatchActionImpl{}, actions[1])
+	patchAction := actions[1].(core.PatchActionImpl)
+
+	updatedNode, err := applyNodeStatusPatch(existingNode, patchAction.GetPatch())
+	require.NoError(t, err)
+	for _, cond := range updatedNode.Status.Conditions {
+		cond.LastHeartbeatTime = cond.LastHeartbeatTime.Rfc3339Copy()
+		cond.LastTransitionTime = cond.LastTransitionTime.Rfc3339Copy()
+	}
+	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
+
+	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
+	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
+		"NodeReady should be the last condition")
+
+	// Update node status again when nothing is changed (except heatbeat time).
+	// Report node status if it has exceeded the duration of nodeStatusReportFrequency.
+	clock.Step(time.Minute)
+	assert.NoError(t, kubelet.updateNodeStatus())
+
+	// 2 more action (There were 2 actions before).
+	actions = kubeClient.Actions()
+	assert.Len(t, actions, 4)
+	assert.IsType(t, core.GetActionImpl{}, actions[2])
+	assert.IsType(t, core.PatchActionImpl{}, actions[3])
+	patchAction = actions[3].(core.PatchActionImpl)
+
+	updatedNode, err = applyNodeStatusPatch(updatedNode, patchAction.GetPatch())
+	require.NoError(t, err)
+	for _, cond := range updatedNode.Status.Conditions {
+		cond.LastHeartbeatTime = cond.LastHeartbeatTime.Rfc3339Copy()
+		cond.LastTransitionTime = cond.LastTransitionTime.Rfc3339Copy()
+	}
+
+	// Expect LastHearbeat updated, other things unchanged.
+	for i, cond := range expectedNode.Status.Conditions {
+		expectedNode.Status.Conditions[i].LastHeartbeatTime = metav1.NewTime(cond.LastHeartbeatTime.Time.Add(time.Minute)).Rfc3339Copy()
+	}
+	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
+
+	// Update node status again when nothing is changed (except heatbeat time).
+	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
+	clock.Step(10 * time.Second)
+	assert.NoError(t, kubelet.updateNodeStatus())
+
+	// Only 1 more action (There were 4 actions before).
+	actions = kubeClient.Actions()
+	assert.Len(t, actions, 5)
+	assert.IsType(t, core.GetActionImpl{}, actions[4])
+
+	// Update node status again when something is changed.
+	// Report node status even if it is still within the duration of nodeStatusReportFrequency.
+	clock.Step(10 * time.Second)
+	var newMemoryCapacity int64 = 40E9
+	kubelet.machineInfo.MemoryCapacity = uint64(newMemoryCapacity)
+	assert.NoError(t, kubelet.updateNodeStatus())
+
+	// 2 more action (There were 5 actions before).
+	actions = kubeClient.Actions()
+	assert.Len(t, actions, 7)
+	assert.IsType(t, core.GetActionImpl{}, actions[5])
+	assert.IsType(t, core.PatchActionImpl{}, actions[6])
+	patchAction = actions[6].(core.PatchActionImpl)
+
+	updatedNode, err = applyNodeStatusPatch(updatedNode, patchAction.GetPatch())
+	require.NoError(t, err)
+	memCapacity, _ := updatedNode.Status.Capacity[v1.ResourceMemory]
+	updatedMemoryCapacity, _ := (&memCapacity).AsInt64()
+	assert.Equal(t, newMemoryCapacity, updatedMemoryCapacity, "Memory capacity")
+
+	now = metav1.NewTime(clock.Now()).Rfc3339Copy()
+	for _, cond := range updatedNode.Status.Conditions {
+		// Expect LastHearbeat updated, while LastTransitionTime unchanged.
+		assert.Equal(t, now, cond.LastHeartbeatTime.Rfc3339Copy(),
+			"LastHeartbeatTime for condition %v", cond.Type)
+		assert.Equal(t, now, metav1.NewTime(cond.LastTransitionTime.Time.Add(time.Minute+20*time.Second)).Rfc3339Copy(),
+			"LastTransitionTime for condition %v", cond.Type)
+	}
+
+	// Update node status when changing pod CIDR.
+	// Report node status if it is still within the duration of nodeStatusReportFrequency.
+	clock.Step(10 * time.Second)
+	assert.Equal(t, "", kubelet.runtimeState.podCIDR(), "Pod CIDR should be empty")
+	podCIDR := "10.0.0.0/24"
+	updatedNode.Spec.PodCIDR = podCIDR
+	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*updatedNode}}).ReactionChain
+	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.Equal(t, podCIDR, kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
+	// 2 more action (There were 7 actions before).
+	actions = kubeClient.Actions()
+	assert.Len(t, actions, 9)
+	assert.IsType(t, core.GetActionImpl{}, actions[7])
+	assert.IsType(t, core.PatchActionImpl{}, actions[8])
+	patchAction = actions[8].(core.PatchActionImpl)
+
+	// Update node status when keeping the pod CIDR.
+	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
+	clock.Step(10 * time.Second)
+	assert.Equal(t, podCIDR, kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
+	assert.NoError(t, kubelet.updateNodeStatus())
+	// Only 1 more action (There were 9 actions before).
+	actions = kubeClient.Actions()
+	assert.Len(t, actions, 10)
+	assert.IsType(t, core.GetActionImpl{}, actions[9])
+}
+
+func TestUpdateNodeStatusAndVolumesInUseWithoutNodeLease(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, false)()
+
+	cases := []struct {
+		desc                  string
+		existingVolumes       []v1.UniqueVolumeName // volumes to initially populate volumeManager
+		existingNode          *v1.Node              // existing node object
+		expectedNode          *v1.Node              // new node object after patch
+		expectedReportedInUse []v1.UniqueVolumeName // expected volumes reported in use in volumeManager
+	}{
+		{
+			desc:         "no volumes and no update",
+			existingNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}},
+			expectedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}},
+		},
+		{
+			desc:            "volumes inuse on node and volumeManager",
+			existingVolumes: []v1.UniqueVolumeName{"vol1"},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Status: v1.NodeStatus{
+					VolumesInUse: []v1.UniqueVolumeName{"vol1"},
+				},
+			},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Status: v1.NodeStatus{
+					VolumesInUse: []v1.UniqueVolumeName{"vol1"},
+				},
+			},
+			expectedReportedInUse: []v1.UniqueVolumeName{"vol1"},
+		},
+		{
+			desc: "volumes inuse on node but not in volumeManager",
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Status: v1.NodeStatus{
+					VolumesInUse: []v1.UniqueVolumeName{"vol1"},
+				},
+			},
+			expectedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}},
+		},
+		{
+			desc:            "volumes inuse in volumeManager but not on node",
+			existingVolumes: []v1.UniqueVolumeName{"vol1"},
+			existingNode:    &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Status: v1.NodeStatus{
+					VolumesInUse: []v1.UniqueVolumeName{"vol1"},
+				},
+			},
+			expectedReportedInUse: []v1.UniqueVolumeName{"vol1"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			// Setup
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+
+			kubelet := testKubelet.kubelet
+			kubelet.kubeClient = nil // ensure only the heartbeat client is used
+			kubelet.containerManager = &localCM{ContainerManager: cm.NewStubContainerManager()}
+			kubelet.lastStatusReportTime = kubelet.clock.Now()
+			kubelet.nodeStatusReportFrequency = time.Hour
+			kubelet.machineInfo = &cadvisorapi.MachineInfo{}
+
+			// override test volumeManager
+			fakeVolumeManager := kubeletvolume.NewFakeVolumeManager(tc.existingVolumes)
+			kubelet.volumeManager = fakeVolumeManager
+
+			// Only test VolumesInUse setter
+			kubelet.setNodeStatusFuncs = []func(*v1.Node) error{
+				nodestatus.VolumesInUse(kubelet.volumeManager.ReconcilerStatesHasBeenSynced,
+					kubelet.volumeManager.GetVolumesInUse),
+			}
+
+			kubeClient := testKubelet.fakeKubeClient
+			kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*tc.existingNode}}).ReactionChain
+
+			// Execute
+			assert.NoError(t, kubelet.updateNodeStatus())
+
+			// Validate
+			actions := kubeClient.Actions()
+			if tc.expectedNode != nil {
+				assert.Len(t, actions, 2)
+				assert.IsType(t, core.GetActionImpl{}, actions[0])
+				assert.IsType(t, core.PatchActionImpl{}, actions[1])
+				patchAction := actions[1].(core.PatchActionImpl)
+
+				updatedNode, err := applyNodeStatusPatch(tc.existingNode, patchAction.GetPatch())
+				require.NoError(t, err)
+				assert.True(t, apiequality.Semantic.DeepEqual(tc.expectedNode, updatedNode), "%s", diff.ObjectDiff(tc.expectedNode, updatedNode))
+			} else {
+				assert.Len(t, actions, 1)
+				assert.IsType(t, core.GetActionImpl{}, actions[0])
+			}
+
+			reportedInUse := fakeVolumeManager.GetVolumesReportedInUse()
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectedReportedInUse, reportedInUse), "%s", diff.ObjectDiff(tc.expectedReportedInUse, reportedInUse))
+		})
+	}
+}
+
+func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
+
+	cases := []struct {
+		desc                  string
+		existingVolumes       []v1.UniqueVolumeName // volumes to initially populate volumeManager
+		existingNode          *v1.Node              // existing node object
+		expectedNode          *v1.Node              // new node object after patch
+		expectedReportedInUse []v1.UniqueVolumeName // expected volumes reported in use in volumeManager
+	}{
+		{
+			desc:         "no volumes and no update",
+			existingNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}},
+		},
+		{
+			desc:            "volumes inuse on node and volumeManager",
+			existingVolumes: []v1.UniqueVolumeName{"vol1"},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Status: v1.NodeStatus{
+					VolumesInUse: []v1.UniqueVolumeName{"vol1"},
+				},
+			},
+			expectedReportedInUse: []v1.UniqueVolumeName{"vol1"},
+		},
+		{
+			desc: "volumes inuse on node but not in volumeManager",
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Status: v1.NodeStatus{
+					VolumesInUse: []v1.UniqueVolumeName{"vol1"},
+				},
+			},
+			expectedNode: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}},
+		},
+		{
+			desc:            "volumes inuse in volumeManager but not on node",
+			existingVolumes: []v1.UniqueVolumeName{"vol1"},
+			existingNode:    &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}},
+			expectedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+				Status: v1.NodeStatus{
+					VolumesInUse: []v1.UniqueVolumeName{"vol1"},
+				},
+			},
+			expectedReportedInUse: []v1.UniqueVolumeName{"vol1"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			// Setup
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+
+			kubelet := testKubelet.kubelet
+			kubelet.kubeClient = nil // ensure only the heartbeat client is used
+			kubelet.containerManager = &localCM{ContainerManager: cm.NewStubContainerManager()}
+			kubelet.lastStatusReportTime = kubelet.clock.Now()
+			kubelet.nodeStatusReportFrequency = time.Hour
+			kubelet.machineInfo = &cadvisorapi.MachineInfo{}
+
+			// override test volumeManager
+			fakeVolumeManager := kubeletvolume.NewFakeVolumeManager(tc.existingVolumes)
+			kubelet.volumeManager = fakeVolumeManager
+
+			// Only test VolumesInUse setter
+			kubelet.setNodeStatusFuncs = []func(*v1.Node) error{
+				nodestatus.VolumesInUse(kubelet.volumeManager.ReconcilerStatesHasBeenSynced,
+					kubelet.volumeManager.GetVolumesInUse),
+			}
+
+			kubeClient := testKubelet.fakeKubeClient
+			kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*tc.existingNode}}).ReactionChain
+
+			// Execute
+			assert.NoError(t, kubelet.updateNodeStatus())
+
+			// Validate
+			actions := kubeClient.Actions()
+			if tc.expectedNode != nil {
+				assert.Len(t, actions, 2)
+				assert.IsType(t, core.GetActionImpl{}, actions[0])
+				assert.IsType(t, core.PatchActionImpl{}, actions[1])
+				patchAction := actions[1].(core.PatchActionImpl)
+
+				updatedNode, err := applyNodeStatusPatch(tc.existingNode, patchAction.GetPatch())
+				require.NoError(t, err)
+				assert.True(t, apiequality.Semantic.DeepEqual(tc.expectedNode, updatedNode), "%s", diff.ObjectDiff(tc.expectedNode, updatedNode))
+			} else {
+				assert.Len(t, actions, 1)
+				assert.IsType(t, core.GetActionImpl{}, actions[0])
+			}
+
+			reportedInUse := fakeVolumeManager.GetVolumesReportedInUse()
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectedReportedInUse, reportedInUse), "%s", diff.ObjectDiff(tc.expectedReportedInUse, reportedInUse))
+		})
+	}
+}
+
 func TestRegisterWithApiServer(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
@@ -844,9 +1254,11 @@ func TestRegisterWithApiServer(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testKubeletHostname,
 				Labels: map[string]string{
-					kubeletapis.LabelHostname: testKubeletHostname,
-					kubeletapis.LabelOS:       goruntime.GOOS,
-					kubeletapis.LabelArch:     goruntime.GOARCH,
+					v1.LabelHostname:      testKubeletHostname,
+					v1.LabelOSStable:      goruntime.GOOS,
+					v1.LabelArchStable:    goruntime.GOARCH,
+					kubeletapis.LabelOS:   goruntime.GOOS,
+					kubeletapis.LabelArch: goruntime.GOARCH,
 				},
 			},
 		}, nil
@@ -889,9 +1301,11 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					kubeletapis.LabelHostname: testKubeletHostname,
-					kubeletapis.LabelOS:       goruntime.GOOS,
-					kubeletapis.LabelArch:     goruntime.GOARCH,
+					v1.LabelHostname:      testKubeletHostname,
+					v1.LabelOSStable:      goruntime.GOOS,
+					v1.LabelArchStable:    goruntime.GOARCH,
+					kubeletapis.LabelOS:   goruntime.GOOS,
+					kubeletapis.LabelArch: goruntime.GOARCH,
 				},
 			},
 		}
@@ -1119,12 +1533,12 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			initialNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          "new-hostname",
-						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-						kubeletapis.LabelZoneRegion:        "new-zone-region",
-						kubeletapis.LabelInstanceType:      "new-instance-type",
-						kubeletapis.LabelOS:                "new-os",
-						kubeletapis.LabelArch:              "new-arch",
+						v1.LabelHostname:          "new-hostname",
+						v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						v1.LabelZoneRegion:        "new-zone-region",
+						v1.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:       "new-os",
+						kubeletapis.LabelArch:     "new-arch",
 					},
 				},
 			},
@@ -1135,12 +1549,12 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			},
 			needsUpdate: true,
 			finalLabels: map[string]string{
-				kubeletapis.LabelHostname:          "new-hostname",
-				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-				kubeletapis.LabelZoneRegion:        "new-zone-region",
-				kubeletapis.LabelInstanceType:      "new-instance-type",
-				kubeletapis.LabelOS:                "new-os",
-				kubeletapis.LabelArch:              "new-arch",
+				v1.LabelHostname:          "new-hostname",
+				v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+				v1.LabelZoneRegion:        "new-zone-region",
+				v1.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:       "new-os",
+				kubeletapis.LabelArch:     "new-arch",
 			},
 		},
 		{
@@ -1148,35 +1562,35 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			initialNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          "new-hostname",
-						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-						kubeletapis.LabelZoneRegion:        "new-zone-region",
-						kubeletapis.LabelInstanceType:      "new-instance-type",
-						kubeletapis.LabelOS:                "new-os",
-						kubeletapis.LabelArch:              "new-arch",
+						v1.LabelHostname:          "new-hostname",
+						v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						v1.LabelZoneRegion:        "new-zone-region",
+						v1.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:       "new-os",
+						kubeletapis.LabelArch:     "new-arch",
 					},
 				},
 			},
 			existingNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          "old-hostname",
-						kubeletapis.LabelZoneFailureDomain: "old-zone-failure-domain",
-						kubeletapis.LabelZoneRegion:        "old-zone-region",
-						kubeletapis.LabelInstanceType:      "old-instance-type",
-						kubeletapis.LabelOS:                "old-os",
-						kubeletapis.LabelArch:              "old-arch",
+						v1.LabelHostname:          "old-hostname",
+						v1.LabelZoneFailureDomain: "old-zone-failure-domain",
+						v1.LabelZoneRegion:        "old-zone-region",
+						v1.LabelInstanceType:      "old-instance-type",
+						kubeletapis.LabelOS:       "old-os",
+						kubeletapis.LabelArch:     "old-arch",
 					},
 				},
 			},
 			needsUpdate: true,
 			finalLabels: map[string]string{
-				kubeletapis.LabelHostname:          "new-hostname",
-				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-				kubeletapis.LabelZoneRegion:        "new-zone-region",
-				kubeletapis.LabelInstanceType:      "new-instance-type",
-				kubeletapis.LabelOS:                "new-os",
-				kubeletapis.LabelArch:              "new-arch",
+				v1.LabelHostname:          "new-hostname",
+				v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+				v1.LabelZoneRegion:        "new-zone-region",
+				v1.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:       "new-os",
+				kubeletapis.LabelArch:     "new-arch",
 			},
 		},
 		{
@@ -1184,37 +1598,37 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			initialNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          "new-hostname",
-						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-						kubeletapis.LabelZoneRegion:        "new-zone-region",
-						kubeletapis.LabelInstanceType:      "new-instance-type",
-						kubeletapis.LabelOS:                "new-os",
-						kubeletapis.LabelArch:              "new-arch",
+						v1.LabelHostname:          "new-hostname",
+						v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						v1.LabelZoneRegion:        "new-zone-region",
+						v1.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:       "new-os",
+						kubeletapis.LabelArch:     "new-arch",
 					},
 				},
 			},
 			existingNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          "new-hostname",
-						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-						kubeletapis.LabelZoneRegion:        "new-zone-region",
-						kubeletapis.LabelInstanceType:      "new-instance-type",
-						kubeletapis.LabelOS:                "new-os",
-						kubeletapis.LabelArch:              "new-arch",
-						"please-persist":                   "foo",
+						v1.LabelHostname:          "new-hostname",
+						v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						v1.LabelZoneRegion:        "new-zone-region",
+						v1.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:       "new-os",
+						kubeletapis.LabelArch:     "new-arch",
+						"please-persist":          "foo",
 					},
 				},
 			},
 			needsUpdate: false,
 			finalLabels: map[string]string{
-				kubeletapis.LabelHostname:          "new-hostname",
-				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-				kubeletapis.LabelZoneRegion:        "new-zone-region",
-				kubeletapis.LabelInstanceType:      "new-instance-type",
-				kubeletapis.LabelOS:                "new-os",
-				kubeletapis.LabelArch:              "new-arch",
-				"please-persist":                   "foo",
+				v1.LabelHostname:          "new-hostname",
+				v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+				v1.LabelZoneRegion:        "new-zone-region",
+				v1.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:       "new-os",
+				kubeletapis.LabelArch:     "new-arch",
+				"please-persist":          "foo",
 			},
 		},
 		{
@@ -1227,25 +1641,25 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			existingNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          "new-hostname",
-						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-						kubeletapis.LabelZoneRegion:        "new-zone-region",
-						kubeletapis.LabelInstanceType:      "new-instance-type",
-						kubeletapis.LabelOS:                "new-os",
-						kubeletapis.LabelArch:              "new-arch",
-						"please-persist":                   "foo",
+						v1.LabelHostname:          "new-hostname",
+						v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						v1.LabelZoneRegion:        "new-zone-region",
+						v1.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:       "new-os",
+						kubeletapis.LabelArch:     "new-arch",
+						"please-persist":          "foo",
 					},
 				},
 			},
 			needsUpdate: false,
 			finalLabels: map[string]string{
-				kubeletapis.LabelHostname:          "new-hostname",
-				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-				kubeletapis.LabelZoneRegion:        "new-zone-region",
-				kubeletapis.LabelInstanceType:      "new-instance-type",
-				kubeletapis.LabelOS:                "new-os",
-				kubeletapis.LabelArch:              "new-arch",
-				"please-persist":                   "foo",
+				v1.LabelHostname:          "new-hostname",
+				v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+				v1.LabelZoneRegion:        "new-zone-region",
+				v1.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:       "new-os",
+				kubeletapis.LabelArch:     "new-arch",
+				"please-persist":          "foo",
 			},
 		},
 		{
@@ -1253,35 +1667,35 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			initialNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          "new-hostname",
-						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-						kubeletapis.LabelZoneRegion:        "new-zone-region",
-						kubeletapis.LabelInstanceType:      "new-instance-type",
-						kubeletapis.LabelOS:                "new-os",
-						kubeletapis.LabelArch:              "new-arch",
+						v1.LabelHostname:          "new-hostname",
+						v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						v1.LabelZoneRegion:        "new-zone-region",
+						v1.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:       "new-os",
+						kubeletapis.LabelArch:     "new-arch",
 					},
 				},
 			},
 			existingNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          "new-hostname",
-						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-						kubeletapis.LabelZoneRegion:        "new-zone-region",
-						kubeletapis.LabelInstanceType:      "new-instance-type",
-						kubeletapis.LabelOS:                "new-os",
-						kubeletapis.LabelArch:              "new-arch",
+						v1.LabelHostname:          "new-hostname",
+						v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						v1.LabelZoneRegion:        "new-zone-region",
+						v1.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:       "new-os",
+						kubeletapis.LabelArch:     "new-arch",
 					},
 				},
 			},
 			needsUpdate: false,
 			finalLabels: map[string]string{
-				kubeletapis.LabelHostname:          "new-hostname",
-				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-				kubeletapis.LabelZoneRegion:        "new-zone-region",
-				kubeletapis.LabelInstanceType:      "new-instance-type",
-				kubeletapis.LabelOS:                "new-os",
-				kubeletapis.LabelArch:              "new-arch",
+				v1.LabelHostname:          "new-hostname",
+				v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+				v1.LabelZoneRegion:        "new-zone-region",
+				v1.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:       "new-os",
+				kubeletapis.LabelArch:     "new-arch",
 			},
 		},
 		{
@@ -1289,12 +1703,12 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			initialNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          "new-hostname",
-						kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-						kubeletapis.LabelZoneRegion:        "new-zone-region",
-						kubeletapis.LabelInstanceType:      "new-instance-type",
-						kubeletapis.LabelOS:                "new-os",
-						kubeletapis.LabelArch:              "new-arch",
+						v1.LabelHostname:          "new-hostname",
+						v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						v1.LabelZoneRegion:        "new-zone-region",
+						v1.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:       "new-os",
+						kubeletapis.LabelArch:     "new-arch",
 					},
 				},
 			},
@@ -1303,12 +1717,12 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			},
 			needsUpdate: true,
 			finalLabels: map[string]string{
-				kubeletapis.LabelHostname:          "new-hostname",
-				kubeletapis.LabelZoneFailureDomain: "new-zone-failure-domain",
-				kubeletapis.LabelZoneRegion:        "new-zone-region",
-				kubeletapis.LabelInstanceType:      "new-instance-type",
-				kubeletapis.LabelOS:                "new-os",
-				kubeletapis.LabelArch:              "new-arch",
+				v1.LabelHostname:          "new-hostname",
+				v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+				v1.LabelZoneRegion:        "new-zone-region",
+				v1.LabelInstanceType:      "new-instance-type",
+				kubeletapis.LabelOS:       "new-os",
+				kubeletapis.LabelArch:     "new-arch",
 			},
 		},
 	}
@@ -1549,7 +1963,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 		// Check the unschedulable taint.
 		got := gotNode.(*v1.Node)
 		unschedulableTaint := &v1.Taint{
-			Key:    algorithm.TaintNodeUnschedulable,
+			Key:    schedulerapi.TaintNodeUnschedulable,
 			Effect: v1.TaintEffectNoSchedule,
 		}
 
@@ -1560,4 +1974,160 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 
 		return
 	})
+}
+
+func TestNodeStatusHasChanged(t *testing.T) {
+	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	fakeFuture := metav1.Time{Time: fakeNow.Time.Add(time.Minute)}
+	readyCondition := v1.NodeCondition{
+		Type:               v1.NodeReady,
+		Status:             v1.ConditionTrue,
+		LastHeartbeatTime:  fakeNow,
+		LastTransitionTime: fakeNow,
+	}
+	readyConditionAtDiffHearbeatTime := v1.NodeCondition{
+		Type:               v1.NodeReady,
+		Status:             v1.ConditionTrue,
+		LastHeartbeatTime:  fakeFuture,
+		LastTransitionTime: fakeNow,
+	}
+	readyConditionAtDiffTransitionTime := v1.NodeCondition{
+		Type:               v1.NodeReady,
+		Status:             v1.ConditionTrue,
+		LastHeartbeatTime:  fakeFuture,
+		LastTransitionTime: fakeFuture,
+	}
+	notReadyCondition := v1.NodeCondition{
+		Type:               v1.NodeReady,
+		Status:             v1.ConditionFalse,
+		LastHeartbeatTime:  fakeNow,
+		LastTransitionTime: fakeNow,
+	}
+	memoryPressureCondition := v1.NodeCondition{
+		Type:               v1.NodeMemoryPressure,
+		Status:             v1.ConditionFalse,
+		LastHeartbeatTime:  fakeNow,
+		LastTransitionTime: fakeNow,
+	}
+	testcases := []struct {
+		name           string
+		originalStatus *v1.NodeStatus
+		status         *v1.NodeStatus
+		expectChange   bool
+	}{
+		{
+			name:           "Node status does not change with nil status.",
+			originalStatus: nil,
+			status:         nil,
+			expectChange:   false,
+		},
+		{
+			name:           "Node status does not change with default status.",
+			originalStatus: &v1.NodeStatus{},
+			status:         &v1.NodeStatus{},
+			expectChange:   false,
+		},
+		{
+			name:           "Node status changes with nil and default status.",
+			originalStatus: nil,
+			status:         &v1.NodeStatus{},
+			expectChange:   true,
+		},
+		{
+			name:           "Node status changes with nil and status.",
+			originalStatus: nil,
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			expectChange: true,
+		},
+		{
+			name:           "Node status does not change with empty conditions.",
+			originalStatus: &v1.NodeStatus{Conditions: []v1.NodeCondition{}},
+			status:         &v1.NodeStatus{Conditions: []v1.NodeCondition{}},
+			expectChange:   false,
+		},
+		{
+			name: "Node status does not change",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			expectChange: false,
+		},
+		{
+			name: "Node status does not change even if heartbeat time changes.",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyConditionAtDiffHearbeatTime, memoryPressureCondition},
+			},
+			expectChange: false,
+		},
+		{
+			name: "Node status does not change even if the orders of conditions are different.",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{memoryPressureCondition, readyConditionAtDiffHearbeatTime},
+			},
+			expectChange: false,
+		},
+		{
+			name: "Node status changes if condition status differs.",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{notReadyCondition, memoryPressureCondition},
+			},
+			expectChange: true,
+		},
+		{
+			name: "Node status changes if transition time changes.",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyConditionAtDiffTransitionTime, memoryPressureCondition},
+			},
+			expectChange: true,
+		},
+		{
+			name: "Node status changes with different number of conditions.",
+			originalStatus: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition},
+			},
+			status: &v1.NodeStatus{
+				Conditions: []v1.NodeCondition{readyCondition, memoryPressureCondition},
+			},
+			expectChange: true,
+		},
+		{
+			name: "Node status changes with different phase.",
+			originalStatus: &v1.NodeStatus{
+				Phase:      v1.NodePending,
+				Conditions: []v1.NodeCondition{readyCondition},
+			},
+			status: &v1.NodeStatus{
+				Phase:      v1.NodeRunning,
+				Conditions: []v1.NodeCondition{readyCondition},
+			},
+			expectChange: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalStatusCopy := tc.originalStatus.DeepCopy()
+			statusCopy := tc.status.DeepCopy()
+			changed := nodeStatusHasChanged(tc.originalStatus, tc.status)
+			assert.Equal(t, tc.expectChange, changed, "Expect node status change to be %t, but got %t.", tc.expectChange, changed)
+			assert.True(t, apiequality.Semantic.DeepEqual(originalStatusCopy, tc.originalStatus), "%s", diff.ObjectDiff(originalStatusCopy, tc.originalStatus))
+			assert.True(t, apiequality.Semantic.DeepEqual(statusCopy, tc.status), "%s", diff.ObjectDiff(statusCopy, tc.status))
+		})
+	}
 }

@@ -30,7 +30,7 @@ const dockerEndpoint = "unix:///var/run/docker.sock"
 var DefaultSysSpec = SysSpec{
 	OS: "Linux",
 	KernelSpec: KernelSpec{
-		Versions: []string{`3\.[1-9][0-9].*`, `4\..*`}, // Requires 3.10+ or 4+
+		Versions: []string{`3\.[1-9][0-9].*`, `4\..*`, `5\..*`}, // Requires 3.10+, 4+ or 5+
 		// TODO(random-liu): Add more config
 		// TODO(random-liu): Add description for each kernel configuration:
 		Required: []KernelConfig{
@@ -62,7 +62,7 @@ var DefaultSysSpec = SysSpec{
 	Cgroups: []string{"cpu", "cpuacct", "cpuset", "devices", "freezer", "memory"},
 	RuntimeSpec: RuntimeSpec{
 		DockerSpec: &DockerSpec{
-			Version:     []string{`1\.1[1-3]\..*`, `17\.03\..*`}, // Requires [1.11, 17.03]
+			Version:     []string{`1\.1[1-3]\..*`, `17\.0[3,6,9]\..*`, `18\.0[6,9]\..*`},
 			GraphDriver: []string{"aufs", "overlay", "overlay2", "devicemapper", "zfs"},
 		},
 	},

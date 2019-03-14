@@ -16,12 +16,7 @@ limitations under the License.
 
 package fuzzer
 
-// TODO: Fuzzing rouudtrip tests are currently disabled in the v1.12 cycle due to the
-// v1alpha2 -> v1alpha3 migration. As the ComponentConfigs were embedded in the structs
-// earlier now have moved out it's not possible to do a lossless roundtrip "the normal way"
-// When we support v1alpha3 and higher only, we can reenable this
-
-/*import (
+import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
@@ -30,4 +25,4 @@ package fuzzer
 
 func TestRoundTripTypes(t *testing.T) {
 	roundtrip.RoundTripTestForAPIGroup(t, scheme.AddToScheme, Funcs)
-}*/
+}

@@ -17,8 +17,7 @@ go_library(
     srcs = ["main.go"],
     importpath = "k8s.io/kubernetes/test/typecheck",
     deps = [
-        "//test/typecheck/srcimporter:go_default_library",
-        "//third_party/forked/golang/go/types:go_default_library",
+        "//third_party/go-srcimporter:go_default_library",
         "//vendor/golang.org/x/crypto/ssh/terminal:go_default_library",
     ],
 )
@@ -32,10 +31,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//test/typecheck/srcimporter:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
 

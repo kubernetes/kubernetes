@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"reflect"
 	"strconv"
 
@@ -15,30 +16,49 @@ import (
 func Marshal(o interface{}) ([]byte, error) {
 	j, err := json.Marshal(o)
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling into JSON: ", err)
+		return nil, fmt.Errorf("error marshaling into JSON: %v", err)
 	}
 
 	y, err := JSONToYAML(j)
 	if err != nil {
-		return nil, fmt.Errorf("error converting JSON to YAML: ", err)
+		return nil, fmt.Errorf("error converting JSON to YAML: %v", err)
 	}
 
 	return y, nil
 }
 
-// Converts YAML to JSON then uses JSON to unmarshal into an object.
-func Unmarshal(y []byte, o interface{}) error {
+// JSONOpt is a decoding option for decoding from JSON format.
+type JSONOpt func(*json.Decoder) *json.Decoder
+
+// Unmarshal converts YAML to JSON then uses JSON to unmarshal into an object,
+// optionally configuring the behavior of the JSON unmarshal.
+func Unmarshal(y []byte, o interface{}, opts ...JSONOpt) error {
 	vo := reflect.ValueOf(o)
-	j, err := yamlToJSON(y, &vo)
+	j, err := yamlToJSON(y, &vo, yaml.Unmarshal)
 	if err != nil {
 		return fmt.Errorf("error converting YAML to JSON: %v", err)
 	}
 
-	err = json.Unmarshal(j, o)
+	err = jsonUnmarshal(bytes.NewReader(j), o, opts...)
 	if err != nil {
 		return fmt.Errorf("error unmarshaling JSON: %v", err)
 	}
 
+	return nil
+}
+
+// jsonUnmarshal unmarshals the JSON byte stream from the given reader into the
+// object, optionally applying decoder options prior to decoding.  We are not
+// using json.Unmarshal directly as we want the chance to pass in non-default
+// options.
+func jsonUnmarshal(r io.Reader, o interface{}, opts ...JSONOpt) error {
+	d := json.NewDecoder(r)
+	for _, opt := range opts {
+		d = opt(d)
+	}
+	if err := d.Decode(&o); err != nil {
+		return fmt.Errorf("while decoding JSON: %v", err)
+	}
 	return nil
 }
 
@@ -48,7 +68,7 @@ func JSONToYAML(j []byte) ([]byte, error) {
 	var jsonObj interface{}
 	// We are using yaml.Unmarshal here (instead of json.Unmarshal) because the
 	// Go JSON library doesn't try to pick the right number type (int, float,
-	// etc.) when unmarshling to interface{}, it just picks float64
+	// etc.) when unmarshalling to interface{}, it just picks float64
 	// universally. go-yaml does go through the effort of picking the right
 	// number type, so we can preserve number type throughout this process.
 	err := yaml.Unmarshal(j, &jsonObj)
@@ -60,8 +80,8 @@ func JSONToYAML(j []byte) ([]byte, error) {
 	return yaml.Marshal(jsonObj)
 }
 
-// Convert YAML to JSON. Since JSON is a subset of YAML, passing JSON through
-// this method should be a no-op.
+// YAMLToJSON converts YAML to JSON. Since JSON is a subset of YAML,
+// passing JSON through this method should be a no-op.
 //
 // Things YAML can do that are not supported by JSON:
 // * In YAML you can have binary and null keys in your maps. These are invalid
@@ -70,14 +90,22 @@ func JSONToYAML(j []byte) ([]byte, error) {
 //   use binary data with this library, encode the data as base64 as usual but do
 //   not use the !!binary tag in your YAML. This will ensure the original base64
 //   encoded data makes it all the way through to the JSON.
+//
+// For strict decoding of YAML, use YAMLToJSONStrict.
 func YAMLToJSON(y []byte) ([]byte, error) {
-	return yamlToJSON(y, nil)
+	return yamlToJSON(y, nil, yaml.Unmarshal)
 }
 
-func yamlToJSON(y []byte, jsonTarget *reflect.Value) ([]byte, error) {
+// YAMLToJSONStrict is like YAMLToJSON but enables strict YAML decoding,
+// returning an error on any duplicate field names.
+func YAMLToJSONStrict(y []byte) ([]byte, error) {
+	return yamlToJSON(y, nil, yaml.UnmarshalStrict)
+}
+
+func yamlToJSON(y []byte, jsonTarget *reflect.Value, yamlUnmarshal func([]byte, interface{}) error) ([]byte, error) {
 	// Convert the YAML to an object.
 	var yamlObj interface{}
-	err := yaml.Unmarshal(y, &yamlObj)
+	err := yamlUnmarshal(y, &yamlObj)
 	if err != nil {
 		return nil, err
 	}

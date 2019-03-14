@@ -25,7 +25,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -37,7 +37,7 @@ func DefaultMemorySwap() int64 {
 
 func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
 	if seccompProfile != "" {
-		glog.Warningf("seccomp annotations are not supported on windows")
+		klog.Warningf("seccomp annotations are not supported on windows")
 	}
 	return nil, nil
 }

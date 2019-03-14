@@ -21,7 +21,6 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/clientv3/namespace"
-	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/proxy/grpcproxy"
 	"github.com/coreos/etcd/proxy/grpcproxy/adapter"
 )
@@ -58,6 +57,7 @@ func toGRPC(c *clientv3.Client) grpcAPI {
 	lp, lpch := grpcproxy.NewLeaseProxy(c)
 	mp := grpcproxy.NewMaintenanceProxy(c)
 	clp, _ := grpcproxy.NewClusterProxy(c, "", "") // without registering proxy URLs
+	authp := grpcproxy.NewAuthProxy(c)
 	lockp := grpcproxy.NewLockProxy(c)
 	electp := grpcproxy.NewElectionProxy(c)
 
@@ -67,7 +67,7 @@ func toGRPC(c *clientv3.Client) grpcAPI {
 		adapter.LeaseServerToLeaseClient(lp),
 		adapter.WatchServerToWatchClient(wp),
 		adapter.MaintenanceServerToMaintenanceClient(mp),
-		pb.NewAuthClient(c.ActiveConnection()),
+		adapter.AuthServerToAuthClient(authp),
 		adapter.LockServerToLockClient(lockp),
 		adapter.ElectionServerToElectionClient(electp),
 	}

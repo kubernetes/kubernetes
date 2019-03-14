@@ -17,11 +17,11 @@ limitations under the License.
 package pod
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -79,13 +79,13 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
 	}
 	name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
 	if err != nil {
-		glog.Errorf("Failed to parse a pod full name %q", podFullName)
+		klog.Errorf("Failed to parse a pod full name %q", podFullName)
 		return err
 	}
-	glog.V(2).Infof("Deleting a mirror pod %q", podFullName)
+	klog.V(2).Infof("Deleting a mirror pod %q", podFullName)
 	// TODO(random-liu): Delete the mirror pod with uid precondition in mirror pod manager
 	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0)); err != nil && !errors.IsNotFound(err) {
-		glog.Errorf("Failed deleting a mirror pod %q: %v", podFullName, err)
+		klog.Errorf("Failed deleting a mirror pod %q: %v", podFullName, err)
 	}
 	return nil
 }

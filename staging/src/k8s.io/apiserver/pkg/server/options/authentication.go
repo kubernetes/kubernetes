@@ -22,8 +22,8 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -117,7 +117,12 @@ type DelegatingAuthenticationOptions struct {
 	ClientCert    ClientCertAuthenticationOptions
 	RequestHeader RequestHeaderAuthenticationOptions
 
+	// SkipInClusterLookup indicates missing authentication configuration should not be retrieved from the cluster configmap
 	SkipInClusterLookup bool
+
+	// TolerateInClusterLookupFailure indicates failures to look up authentication configuration from the cluster configmap should not be fatal.
+	// Setting this can result in an authenticator that will reject all requests.
+	TolerateInClusterLookupFailure bool
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
@@ -160,6 +165,9 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.SkipInClusterLookup, "authentication-skip-lookup", s.SkipInClusterLookup, ""+
 		"If false, the authentication-kubeconfig will be used to lookup missing authentication "+
 		"configuration from the cluster.")
+	fs.BoolVar(&s.TolerateInClusterLookupFailure, "authentication-tolerate-lookup-failure", s.TolerateInClusterLookupFailure, ""+
+		"If true, failures to look up missing authentication configuration from the cluster are not considered fatal. "+
+		"Note that this can result in authentication that treats all requests as anonymous.")
 }
 
 func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, servingInfo *server.SecureServingInfo, openAPIConfig *openapicommon.Config) error {
@@ -187,14 +195,22 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, 
 	if !s.SkipInClusterLookup {
 		err := s.lookupMissingConfigInCluster(client)
 		if err != nil {
-			return err
+			if s.TolerateInClusterLookupFailure {
+				klog.Warningf("Error looking up in-cluster authentication configuration: %v", err)
+				klog.Warningf("Continuing without authentication configuration. This may treat all requests as anonymous.")
+				klog.Warningf("To require authentication configuration lookup to succeed, set --authentication-tolerate-lookup-failure=false")
+			} else {
+				return err
+			}
 		}
 	}
 
 	// configure AuthenticationInfo config
+	cfg.ClientCAFile = s.ClientCert.ClientCA
 	if err = c.ApplyClientCert(s.ClientCert.ClientCA, servingInfo); err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
+
 	cfg.RequestHeaderConfig = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
 	if err = c.ApplyClientCert(s.RequestHeader.ClientCAFile, servingInfo); err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
@@ -230,10 +246,10 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 	}
 	if client == nil {
 		if len(s.ClientCert.ClientCA) == 0 {
-			glog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			klog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 		if len(s.RequestHeader.ClientCAFile) == 0 {
-			glog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			klog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 		return nil
 	}
@@ -243,8 +259,8 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 	case errors.IsNotFound(err):
 		// ignore, authConfigMap is nil now
 	case errors.IsForbidden(err):
-		glog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
-			"'kubectl create rolebinding -n %s ROLE_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
+		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
+			"'kubectl create rolebinding -n %s ROLEBINDING_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
 			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
 		return err
 	case err != nil:
@@ -262,7 +278,7 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 			}
 		}
 		if len(s.ClientCert.ClientCA) == 0 {
-			glog.Warningf("Cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			klog.Warningf("Cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 	}
 
@@ -277,7 +293,7 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 			}
 		}
 		if len(s.RequestHeader.ClientCAFile) == 0 {
-			glog.Warningf("Cluster doesn't provide requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			klog.Warningf("Cluster doesn't provide requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 	}
 
@@ -364,9 +380,12 @@ func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, err
 		clientConfig, err = loader.ClientConfig()
 	} else {
 		// without the remote kubeconfig file, try to use the in-cluster config.  Most addon API servers will
-		// use this path
+		// use this path. If it is optional, ignore errors.
 		clientConfig, err = rest.InClusterConfig()
-		if err == rest.ErrNotInCluster && s.RemoteKubeConfigFileOptional {
+		if err != nil && s.RemoteKubeConfigFileOptional {
+			if err != rest.ErrNotInCluster {
+				klog.Warningf("failed to read in-cluster kubeconfig for delegated authentication: %v", err)
+			}
 			return nil, nil
 		}
 	}

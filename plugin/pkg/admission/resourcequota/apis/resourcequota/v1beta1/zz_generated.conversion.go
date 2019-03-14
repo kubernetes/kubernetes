@@ -26,7 +26,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	core "k8s.io/kubernetes/pkg/apis/core"
 	resourcequota "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 )
 
@@ -84,7 +83,7 @@ func autoConvert_v1beta1_LimitedResource_To_resourcequota_LimitedResource(in *Li
 	out.APIGroup = in.APIGroup
 	out.Resource = in.Resource
 	out.MatchContains = *(*[]string)(unsafe.Pointer(&in.MatchContains))
-	out.MatchScopes = *(*[]core.ScopedResourceSelectorRequirement)(unsafe.Pointer(&in.MatchScopes))
+	out.MatchScopes = *(*[]v1.ScopedResourceSelectorRequirement)(unsafe.Pointer(&in.MatchScopes))
 	return nil
 }
 

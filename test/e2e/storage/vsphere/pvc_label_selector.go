@@ -34,7 +34,7 @@ import (
    Test Steps
    ----------
    1. Create VMDK.
-   2. Create pv with lable volume-type:ssd, volume path set to vmdk created in previous step, and PersistentVolumeReclaimPolicy is set to Delete.
+   2. Create pv with label volume-type:ssd, volume path set to vmdk created in previous step, and PersistentVolumeReclaimPolicy is set to Delete.
    3. Create PVC (pvc_vvol) with label selector to match with volume-type:vvol
    4. Create PVC (pvc_ssd) with label selector to match with volume-type:ssd
    5. Wait and verify pvc_ssd is bound with PV.
@@ -105,15 +105,14 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 })
 
 func testSetupVSpherePVClabelselector(c clientset.Interface, nodeInfo *NodeInfo, ns string, ssdlabels map[string]string, vvollabels map[string]string) (volumePath string, pv_ssd *v1.PersistentVolume, pvc_ssd *v1.PersistentVolumeClaim, pvc_vvol *v1.PersistentVolumeClaim, err error) {
-	volumePath = ""
 	By("creating vmdk")
-	Expect(err).NotTo(HaveOccurred())
+	volumePath = ""
 	volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 	if err != nil {
 		return
 	}
 
-	By("creating the pv with lable volume-type:ssd")
+	By("creating the pv with label volume-type:ssd")
 	pv_ssd = getVSpherePersistentVolumeSpec(volumePath, v1.PersistentVolumeReclaimDelete, ssdlabels)
 	pv_ssd, err = c.CoreV1().PersistentVolumes().Create(pv_ssd)
 	if err != nil {
@@ -145,6 +144,6 @@ func testCleanupVSpherePVClabelselector(c clientset.Interface, ns string, nodeIn
 		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc_vvol.Name, ns), "Failed to delete PVC ", pvc_vvol.Name)
 	}
 	if pv_ssd != nil {
-		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv_ssd.Name), "Faled to delete PV ", pv_ssd.Name)
+		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv_ssd.Name), "Failed to delete PV ", pv_ssd.Name)
 	}
 }

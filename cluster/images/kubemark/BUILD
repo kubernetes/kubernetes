@@ -1,16 +1,18 @@
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_push")
+load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_push")
 
-docker_build(
+container_image(
     name = "image",
     base = "@official_busybox//image",
     entrypoint = ["/kubemark"],
     files = ["//cmd/kubemark"],
+    stamp = True,
 )
 
-docker_push(
+container_push(
     name = "push",
+    format = "Docker",
     image = ":image",
     registry = "$(REGISTRY)",
     repository = "kubemark",

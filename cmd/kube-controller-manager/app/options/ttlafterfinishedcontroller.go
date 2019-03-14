@@ -24,7 +24,7 @@ import (
 
 // TTLAfterFinishedControllerOptions holds the TTLAfterFinishedController options.
 type TTLAfterFinishedControllerOptions struct {
-	ConcurrentTTLSyncs int32
+	*kubectrlmgrconfig.TTLAfterFinishedControllerConfiguration
 }
 
 // AddFlags adds flags related to TTLAfterFinishedController for controller manager to the specified FlagSet.

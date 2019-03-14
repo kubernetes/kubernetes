@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"sync"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
@@ -129,23 +131,46 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 		case PatchActionImpl:
 			obj, err := tracker.Get(gvr, ns, action.GetName())
 			if err != nil {
-				// object is not registered
-				return false, nil, err
+				return true, nil, err
 			}
 
 			old, err := json.Marshal(obj)
 			if err != nil {
 				return true, nil, err
 			}
-			// Only supports strategic merge patch
-			// TODO: Add support for other Patch types
-			mergedByte, err := strategicpatch.StrategicMergePatch(old, action.GetPatch(), obj)
-			if err != nil {
-				return true, nil, err
-			}
 
-			if err = json.Unmarshal(mergedByte, obj); err != nil {
-				return true, nil, err
+			switch action.GetPatchType() {
+			case types.JSONPatchType:
+				patch, err := jsonpatch.DecodePatch(action.GetPatch())
+				if err != nil {
+					return true, nil, err
+				}
+				modified, err := patch.Apply(old)
+				if err != nil {
+					return true, nil, err
+				}
+				if err = json.Unmarshal(modified, obj); err != nil {
+					return true, nil, err
+				}
+			case types.MergePatchType:
+				modified, err := jsonpatch.MergePatch(old, action.GetPatch())
+				if err != nil {
+					return true, nil, err
+				}
+
+				if err := json.Unmarshal(modified, obj); err != nil {
+					return true, nil, err
+				}
+			case types.StrategicMergePatchType:
+				mergedByte, err := strategicpatch.StrategicMergePatch(old, action.GetPatch(), obj)
+				if err != nil {
+					return true, nil, err
+				}
+				if err = json.Unmarshal(mergedByte, obj); err != nil {
+					return true, nil, err
+				}
+			default:
+				return true, nil, fmt.Errorf("PatchType is not supported")
 			}
 
 			if err = tracker.Update(gvr, obj, ns); err != nil {
@@ -322,8 +347,10 @@ func (t *tracker) getWatches(gvr schema.GroupVersionResource, ns string) []*watc
 		if w := t.watchers[gvr][ns]; w != nil {
 			watches = append(watches, w...)
 		}
-		if w := t.watchers[gvr][""]; w != nil {
-			watches = append(watches, w...)
+		if ns != metav1.NamespaceAll {
+			if w := t.watchers[gvr][metav1.NamespaceAll]; w != nil {
+				watches = append(watches, w...)
+			}
 		}
 	}
 	return watches

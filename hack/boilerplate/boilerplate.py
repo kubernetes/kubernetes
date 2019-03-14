@@ -83,10 +83,12 @@ def file_passes(filename, refs, regexs):
     generated = is_generated_file(filename, data, regexs)
 
     basename = os.path.basename(filename)
+    extension = file_extension(filename)
     if generated:
-        extension = "generatego"
-    else:
-        extension = file_extension(filename)
+        if extension == "go":
+            extension = "generatego"
+        elif extension == "bzl":
+            extension = "generatebzl"
 
     if extension != "":
         ref = refs[extension]
@@ -147,11 +149,10 @@ def file_extension(filename):
 
 skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git', 'cluster/env.sh',
                 "vendor", "test/e2e/generated/bindata.go", "hack/boilerplate/test",
-                "pkg/generated/bindata.go"]
+                "pkg/kubectl/generated/bindata.go"]
 
 # list all the files contain 'DO NOT EDIT', but are not generated
-skipped_ungenerated_files = ['hack/build-ui.sh', 'hack/lib/swagger.sh',
-                             'hack/boilerplate/boilerplate.py']
+skipped_ungenerated_files = ['hack/lib/swagger.sh', 'hack/boilerplate/boilerplate.py']
 
 def normalize_files(files):
     newfiles = []

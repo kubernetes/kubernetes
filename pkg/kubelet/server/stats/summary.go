@@ -19,26 +19,49 @@ package stats
 import (
 	"fmt"
 
+	"k8s.io/klog"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
+// SummaryProvider provides summaries of the stats from Kubelet.
 type SummaryProvider interface {
 	// Get provides a new Summary with the stats from Kubelet,
 	// and will update some stats if updateStats is true
 	Get(updateStats bool) (*statsapi.Summary, error)
+	// GetCPUAndMemoryStats provides a new Summary with the CPU and memory stats from Kubelet,
+	GetCPUAndMemoryStats() (*statsapi.Summary, error)
 }
 
 // summaryProviderImpl implements the SummaryProvider interface.
 type summaryProviderImpl struct {
-	provider StatsProvider
+	// kubeletCreationTime is the time at which the summaryProvider was created.
+	kubeletCreationTime metav1.Time
+	// systemBootTime is the time at which the system was started
+	systemBootTime metav1.Time
+
+	provider Provider
 }
 
 var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a SummaryProvider using the stats provided by the
 // specified statsProvider.
-func NewSummaryProvider(statsProvider StatsProvider) SummaryProvider {
-	return &summaryProviderImpl{statsProvider}
+func NewSummaryProvider(statsProvider Provider) SummaryProvider {
+	kubeletCreationTime := metav1.Now()
+	bootTime, err := util.GetBootTime()
+	if err != nil {
+		// bootTime will be zero if we encounter an error getting the boot time.
+		klog.Warningf("Error getting system boot time.  Node metrics will have an incorrect start time: %v", err)
+	}
+
+	return &summaryProviderImpl{
+		kubeletCreationTime: kubeletCreationTime,
+		systemBootTime:      metav1.NewTime(bootTime),
+		provider:            statsProvider,
+	}
 }
 
 func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) {
@@ -61,10 +84,16 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get imageFs stats: %v", err)
 	}
-	podStats, err := sp.provider.ListPodStats()
+	var podStats []statsapi.PodStats
+	if updateStats {
+		podStats, err = sp.provider.ListPodStatsAndUpdateCPUNanoCoreUsage()
+	} else {
+		podStats, err = sp.provider.ListPodStats()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pod stats: %v", err)
 	}
+
 	rlimit, err := sp.provider.RlimitStats()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rlimit stats: %v", err)
@@ -75,11 +104,43 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		CPU:              rootStats.CPU,
 		Memory:           rootStats.Memory,
 		Network:          networkStats,
-		StartTime:        rootStats.StartTime,
+		StartTime:        sp.systemBootTime,
 		Fs:               rootFsStats,
 		Runtime:          &statsapi.RuntimeStats{ImageFs: imageFsStats},
 		Rlimit:           rlimit,
 		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
+	}
+	summary := statsapi.Summary{
+		Node: nodeStats,
+		Pods: podStats,
+	}
+	return &summary, nil
+}
+
+func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
+	// TODO(timstclair): Consider returning a best-effort response if any of
+	// the following errors occur.
+	node, err := sp.provider.GetNode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node info: %v", err)
+	}
+	nodeConfig := sp.provider.GetNodeConfig()
+	rootStats, err := sp.provider.GetCgroupCPUAndMemoryStats("/", false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
+	}
+
+	podStats, err := sp.provider.ListPodCPUAndMemoryStats()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pod stats: %v", err)
+	}
+
+	nodeStats := statsapi.NodeStats{
+		NodeName:         node.Name,
+		CPU:              rootStats.CPU,
+		Memory:           rootStats.Memory,
+		StartTime:        rootStats.StartTime,
+		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(nodeConfig, podStats, false),
 	}
 	summary := statsapi.Summary{
 		Node: nodeStats,

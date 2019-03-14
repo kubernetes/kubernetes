@@ -14,14 +14,14 @@ spec:
   - name: kube-addon-manager
     # When updating version also bump it in:
     # - test/kubemark/resources/manifests/kube-addon-manager.yaml
-    image: k8s.gcr.io/kube-addon-manager:v8.6
+    image: k8s.gcr.io/kube-addon-manager:v9.0
     command:
     - /bin/bash
     - -c
     - exec /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
     resources:
       requests:
-        cpu: 3m
+        cpu: 5m
         memory: 50Mi
     volumeMounts:
     - mountPath: /etc/kubernetes/

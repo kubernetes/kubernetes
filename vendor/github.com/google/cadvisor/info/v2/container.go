@@ -38,7 +38,7 @@ type CpuSpec struct {
 	Mask string `json:"mask,omitempty"`
 	// CPUQuota Default is disabled
 	Quota uint64 `json:"quota,omitempty"`
-	// Period is the CPU reference time in ns e.g the quota is compared aginst this.
+	// Period is the CPU reference time in ns e.g the quota is compared against this.
 	Period uint64 `json:"period,omitempty"`
 }
 
@@ -254,6 +254,7 @@ type ProcessInfo struct {
 	RunningTime   string  `json:"running_time"`
 	CgroupPath    string  `json:"cgroup_path"`
 	Cmd           string  `json:"cmd"`
+	FdCount       int     `json:"fd_count"`
 }
 
 type TcpStat struct {

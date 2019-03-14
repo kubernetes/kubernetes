@@ -23,6 +23,7 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,6 +84,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			if s.SchedulerName == "" {
 				s.SchedulerName = core.DefaultSchedulerName
+			}
+			if s.EnableServiceLinks == nil {
+				enableServiceLinks := corev1.DefaultEnableServiceLinks
+				s.EnableServiceLinks = &enableServiceLinks
 			}
 		},
 		func(j *core.PodPhase, c fuzz.Continue) {
@@ -349,6 +354,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				c.Fuzz(&sc.Capabilities.Add)
 				c.Fuzz(&sc.Capabilities.Drop)
 			}
+			if sc.ProcMount == nil {
+				defProcMount := core.DefaultProcMount
+				sc.ProcMount = &defProcMount
+			}
 		},
 		func(s *core.Secret, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
@@ -398,11 +407,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			pv.Status.Message = c.RandString()
 			reclamationPolicies := []core.PersistentVolumeReclaimPolicy{core.PersistentVolumeReclaimRecycle, core.PersistentVolumeReclaimRetain}
 			pv.Spec.PersistentVolumeReclaimPolicy = reclamationPolicies[c.Rand.Intn(len(reclamationPolicies))]
+			volumeModes := []core.PersistentVolumeMode{core.PersistentVolumeFilesystem, core.PersistentVolumeBlock}
+			pv.Spec.VolumeMode = &volumeModes[c.Rand.Intn(len(volumeModes))]
 		},
 		func(pvc *core.PersistentVolumeClaim, c fuzz.Continue) {
 			c.FuzzNoCustom(pvc) // fuzz self without calling this function again
 			types := []core.PersistentVolumeClaimPhase{core.ClaimBound, core.ClaimPending, core.ClaimLost}
 			pvc.Status.Phase = types[c.Rand.Intn(len(types))]
+			volumeModes := []core.PersistentVolumeMode{core.PersistentVolumeFilesystem, core.PersistentVolumeBlock}
+			pvc.Spec.VolumeMode = &volumeModes[c.Rand.Intn(len(volumeModes))]
 		},
 		func(obj *core.AzureDiskVolumeSource, c fuzz.Continue) {
 			if obj.CachingMode == nil {

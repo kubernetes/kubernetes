@@ -131,7 +131,7 @@ func (c *FakeJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 // Patch applies the patch and returns the patched job.
 func (c *FakeJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batchv1.Job, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, name, data, subresources...), &batchv1.Job{})
+		Invokes(testing.NewPatchSubresourceAction(jobsResource, c.ns, name, pt, data, subresources...), &batchv1.Job{})
 
 	if obj == nil {
 		return nil, err

@@ -1,7 +1,7 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: fluentd-es-config-v0.1.5
+  name: fluentd-es-config-v0.2.0
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
@@ -142,6 +142,39 @@ data:
       max_bytes 500000
       max_lines 1000
     </match>
+
+    # Concatenate multi-line logs
+    <filter **>
+      @id filter_concat
+      @type concat
+      key message
+      multiline_end_regexp /\n$/
+      separator ""
+    </filter>
+
+    # Enriches records with Kubernetes metadata
+    <filter kubernetes.**>
+      @id filter_kubernetes_metadata
+      @type kubernetes_metadata
+    </filter>
+
+    # Fixes json fields in Elasticsearch
+    <filter kubernetes.**>
+      @id filter_parser
+      @type parser
+      key_name log
+      reserve_data true
+      remove_key_name_field true
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+        </pattern>
+        <pattern>
+          format none
+        </pattern>
+      </parse>
+    </filter>
 
   system.input.conf: |-
     # Example:
@@ -320,7 +353,7 @@ data:
     <source>
       @id journald-container-runtime
       @type systemd
-      matches [{ "_SYSTEMD_UNIT": "{{ container_runtime }}.service" }]
+      matches [{ "_SYSTEMD_UNIT": "{{ fluentd_container_runtime_service }}.service" }]
       <storage>
         @type local
         persistent true
@@ -376,6 +409,7 @@ data:
   forward.input.conf: |-
     # Takes the messages sent over TCP
     <source>
+      @id forward
       @type forward
     </source>
 
@@ -383,15 +417,18 @@ data:
     # Prometheus Exporter Plugin
     # input plugin that exports metrics
     <source>
+      @id prometheus
       @type prometheus
     </source>
 
     <source>
+      @id monitor_agent
       @type monitor_agent
     </source>
 
     # input plugin that collects metrics from MonitorAgent
     <source>
+      @id prometheus_monitor
       @type prometheus_monitor
       <labels>
         host ${hostname}
@@ -400,6 +437,7 @@ data:
 
     # input plugin that collects metrics for output plugin
     <source>
+      @id prometheus_output_monitor
       @type prometheus_output_monitor
       <labels>
         host ${hostname}
@@ -408,6 +446,7 @@ data:
 
     # input plugin that collects metrics for in_tail plugin
     <source>
+      @id prometheus_tail_monitor
       @type prometheus_tail_monitor
       <labels>
         host ${hostname}
@@ -415,16 +454,11 @@ data:
     </source>
 
   output.conf: |-
-    # Enriches records with Kubernetes metadata
-    <filter kubernetes.**>
-      @type kubernetes_metadata
-    </filter>
-
     <match **>
       @id elasticsearch
       @type elasticsearch
       @log_level info
-      type_name fluentd
+      type_name _doc
       include_tag_key true
       host elasticsearch-logging
       port 9200

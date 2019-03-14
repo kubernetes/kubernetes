@@ -71,6 +71,7 @@ func newPerfCounter(counter string) (*perfCounter, error) {
 	}, nil
 }
 
+// getData is used for getting data without * in counter name.
 func (p *perfCounter) getData() (uint64, error) {
 	ret := win_pdh.PdhCollectQueryData(p.queryHandle)
 	if ret != win_pdh.ERROR_SUCCESS {
@@ -96,6 +97,39 @@ func (p *perfCounter) getData() (uint64, error) {
 	for i := 0; i < int(bufCount); i++ {
 		c := filledBuf[i]
 		data = uint64(c.FmtValue.DoubleValue)
+	}
+
+	return data, nil
+}
+
+// getData is used for getting data with * in counter name.
+func (p *perfCounter) getDataList() (map[string]uint64, error) {
+	ret := win_pdh.PdhCollectQueryData(p.queryHandle)
+	if ret != win_pdh.ERROR_SUCCESS {
+		return nil, fmt.Errorf("unable to collect data from counter. Error code is %x", ret)
+	}
+
+	var bufSize, bufCount uint32
+	var size = uint32(unsafe.Sizeof(win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE{}))
+	var emptyBuf [1]win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE // need at least 1 addressable null ptr.
+	data := map[string]uint64{}
+
+	ret = win_pdh.PdhGetFormattedCounterArrayDouble(p.counterHandle, &bufSize, &bufCount, &emptyBuf[0])
+	if ret != win_pdh.PDH_MORE_DATA {
+		return nil, fmt.Errorf("unable to collect data from counter. Error code is %x", ret)
+	}
+
+	filledBuf := make([]win_pdh.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE, bufCount*size)
+	ret = win_pdh.PdhGetFormattedCounterArrayDouble(p.counterHandle, &bufSize, &bufCount, &filledBuf[0])
+	if ret != win_pdh.ERROR_SUCCESS {
+		return nil, fmt.Errorf("unable to collect data from counter. Error code is %x", ret)
+	}
+
+	for i := 0; i < int(bufCount); i++ {
+		c := filledBuf[i]
+		value := uint64(c.FmtValue.DoubleValue)
+		name := win_pdh.UTF16PtrToString(c.SzName)
+		data[name] = value
 	}
 
 	return data, nil

@@ -46,7 +46,7 @@ docker build -t <YOUR_DOCKERHUB_USER>/kube-sample-apiserver:latest ./artifacts/s
 docker push <YOUR_DOCKERHUB_USER>/kube-sample-apiserver
 ```
 
-## Modify the the replication controller
+## Modify the replication controller
 
 You need to modify the [artifacts/example/rc.yaml](/artifacts/example/rc.yaml) file to change the ```imagePullPolicy``` to ```Always``` or ```IfNotPresent```.
 

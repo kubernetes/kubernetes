@@ -17,15 +17,16 @@ limitations under the License.
 package kubeadm
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
-	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 )
 
 // ToSecret converts the given BootstrapToken object to its Secret representation that
@@ -84,24 +85,24 @@ func BootstrapTokenFromSecret(secret *v1.Secret) (*BootstrapToken, error) {
 	// Get the Token ID field from the Secret data
 	tokenID := getSecretString(secret, bootstrapapi.BootstrapTokenIDKey)
 	if len(tokenID) == 0 {
-		return nil, fmt.Errorf("Bootstrap Token Secret has no token-id data: %s", secret.Name)
+		return nil, errors.Errorf("bootstrap Token Secret has no token-id data: %s", secret.Name)
 	}
 
 	// Enforce the right naming convention
 	if secret.Name != bootstraputil.BootstrapTokenSecretName(tokenID) {
-		return nil, fmt.Errorf("bootstrap token name is not of the form '%s(token-id)'. Actual: %q. Expected: %q",
+		return nil, errors.Errorf("bootstrap token name is not of the form '%s(token-id)'. Actual: %q. Expected: %q",
 			bootstrapapi.BootstrapTokenSecretPrefix, secret.Name, bootstraputil.BootstrapTokenSecretName(tokenID))
 	}
 
 	tokenSecret := getSecretString(secret, bootstrapapi.BootstrapTokenSecretKey)
 	if len(tokenSecret) == 0 {
-		return nil, fmt.Errorf("Bootstrap Token Secret has no token-secret data: %s", secret.Name)
+		return nil, errors.Errorf("bootstrap Token Secret has no token-secret data: %s", secret.Name)
 	}
 
 	// Create the BootstrapTokenString object based on the ID and Secret
 	bts, err := NewBootstrapTokenStringFromIDAndSecret(tokenID, tokenSecret)
 	if err != nil {
-		return nil, fmt.Errorf("Bootstrap Token Secret is invalid and couldn't be parsed: %v", err)
+		return nil, errors.Wrap(err, "bootstrap Token Secret is invalid and couldn't be parsed")
 	}
 
 	// Get the description (if any) from the Secret
@@ -114,7 +115,7 @@ func BootstrapTokenFromSecret(secret *v1.Secret) (*BootstrapToken, error) {
 	if len(secretExpiration) > 0 {
 		expTime, err := time.Parse(time.RFC3339, secretExpiration)
 		if err != nil {
-			return nil, fmt.Errorf("can't parse expiration time of bootstrap token %q: %v", secret.Name, err)
+			return nil, errors.Wrapf(err, "can't parse expiration time of bootstrap token %q", secret.Name)
 		}
 		expires = &metav1.Time{Time: expTime}
 	}

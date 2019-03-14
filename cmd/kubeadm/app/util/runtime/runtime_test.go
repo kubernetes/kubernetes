@@ -17,11 +17,16 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
+	"io/ioutil"
+	"net"
+	"os"
 	"reflect"
+	"runtime"
 	"testing"
 
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"github.com/pkg/errors"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )
@@ -31,7 +36,7 @@ func TestNewContainerRuntime(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 	execLookPathErr := fakeexec.FakeExec{
-		LookPathFunc: func(cmd string) (string, error) { return "", fmt.Errorf("%s not found", cmd) },
+		LookPathFunc: func(cmd string) (string, error) { return "", errors.Errorf("%s not found", cmd) },
 	}
 	cases := []struct {
 		name      string
@@ -40,7 +45,7 @@ func TestNewContainerRuntime(t *testing.T) {
 		isDocker  bool
 		isError   bool
 	}{
-		{"valid: default cri socket", execLookPathOK, kubeadmapiv1alpha3.DefaultCRISocket, true, false},
+		{"valid: default cri socket", execLookPathOK, constants.DefaultDockerCRISocket, true, false},
 		{"valid: cri-o socket url", execLookPathOK, "unix:///var/run/crio/crio.sock", false, false},
 		{"valid: cri-o socket path", execLookPathOK, "/var/run/crio/crio.sock", false, false},
 		{"invalid: no crictl", execLookPathErr, "unix:///var/run/crio/crio.sock", false, true},
@@ -104,8 +109,8 @@ func TestIsRunning(t *testing.T) {
 	}{
 		{"valid: CRI-O is running", "unix:///var/run/crio/crio.sock", criExecer, false},
 		{"invalid: CRI-O is not running", "unix:///var/run/crio/crio.sock", criExecer, true},
-		{"valid: docker is running", kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, false},
-		{"invalid: docker is not running", kubeadmapiv1alpha3.DefaultCRISocket, dockerExecer, true},
+		{"valid: docker is running", constants.DefaultDockerCRISocket, dockerExecer, false},
+		{"invalid: docker is not running", constants.DefaultDockerCRISocket, dockerExecer, true},
 	}
 
 	for _, tc := range cases {
@@ -145,7 +150,7 @@ func TestListKubeContainers(t *testing.T) {
 	}{
 		{"valid: list containers using CRI socket url", "unix:///var/run/crio/crio.sock", false},
 		{"invalid: list containers using CRI socket url", "unix:///var/run/crio/crio.sock", true},
-		{"valid: list containers using docker", kubeadmapiv1alpha3.DefaultCRISocket, false},
+		{"valid: list containers using docker", constants.DefaultDockerCRISocket, false},
 	}
 
 	for _, tc := range cases {
@@ -198,8 +203,8 @@ func TestRemoveContainers(t *testing.T) {
 		{"valid: remove containers using CRI", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, false}, // Test case 1
 		{"invalid: CRI rmp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
 		{"invalid: CRI stopp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},
-		{"valid: remove containers using docker", kubeadmapiv1alpha3.DefaultCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, false},
-		{"invalid: remove containers using docker", kubeadmapiv1alpha3.DefaultCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, true},
+		{"valid: remove containers using docker", constants.DefaultDockerCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, false},
+		{"invalid: remove containers using docker", constants.DefaultDockerCRISocket, []string{"k8s_c1", "k8s_c2", "k8s_c3"}, true},
 	}
 
 	for _, tc := range cases {
@@ -242,8 +247,8 @@ func TestPullImage(t *testing.T) {
 	}{
 		{"valid: pull image using CRI", "unix:///var/run/crio/crio.sock", "image1", false},
 		{"invalid: CRI pull error", "unix:///var/run/crio/crio.sock", "image2", true},
-		{"valid: pull image using docker", kubeadmapiv1alpha3.DefaultCRISocket, "image1", false},
-		{"invalide: docer pull error", kubeadmapiv1alpha3.DefaultCRISocket, "image2", true},
+		{"valid: pull image using docker", constants.DefaultDockerCRISocket, "image1", false},
+		{"invalide: docer pull error", constants.DefaultDockerCRISocket, "image2", true},
 	}
 
 	for _, tc := range cases {
@@ -286,8 +291,8 @@ func TestImageExists(t *testing.T) {
 	}{
 		{"valid: test if image exists using CRI", "unix:///var/run/crio/crio.sock", "image1", false},
 		{"invalid: CRI inspecti failure", "unix:///var/run/crio/crio.sock", "image2", true},
-		{"valid: test if image exists using docker", kubeadmapiv1alpha3.DefaultCRISocket, "image1", false},
-		{"invalid: docker inspect failure", kubeadmapiv1alpha3.DefaultCRISocket, "image2", true},
+		{"valid: test if image exists using docker", constants.DefaultDockerCRISocket, "image1", false},
+		{"invalid: docker inspect failure", constants.DefaultDockerCRISocket, "image2", true},
 	}
 
 	for _, tc := range cases {
@@ -300,6 +305,145 @@ func TestImageExists(t *testing.T) {
 			result, err := runtime.ImageExists(tc.image)
 			if !tc.result != result {
 				t.Errorf("unexpected ImageExists result: %t, criSocket: %s, image: %s, expected result: %t", err, tc.criSocket, tc.image, tc.result)
+			}
+		})
+	}
+}
+
+func TestIsExistingSocket(t *testing.T) {
+	// this test is not expected to work on Windows
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	const tempPrefix = "test.kubeadm.runtime.isExistingSocket."
+	tests := []struct {
+		name string
+		proc func(*testing.T)
+	}{
+		{
+			name: "Valid domain socket is detected as such",
+			proc: func(t *testing.T) {
+				tmpFile, err := ioutil.TempFile("", tempPrefix)
+				if err != nil {
+					t.Fatalf("unexpected error by TempFile: %v", err)
+				}
+				theSocket := tmpFile.Name()
+				os.Remove(theSocket)
+				tmpFile.Close()
+
+				con, err := net.Listen("unix", theSocket)
+				if err != nil {
+					t.Fatalf("unexpected error while dialing a socket: %v", err)
+				}
+				defer con.Close()
+
+				if !isExistingSocket(theSocket) {
+					t.Fatalf("isExistingSocket(%q) gave unexpected result. Should have been true, instead of false", theSocket)
+				}
+			},
+		},
+		{
+			name: "Regular file is not a domain socket",
+			proc: func(t *testing.T) {
+				tmpFile, err := ioutil.TempFile("", tempPrefix)
+				if err != nil {
+					t.Fatalf("unexpected error by TempFile: %v", err)
+				}
+				theSocket := tmpFile.Name()
+				defer os.Remove(theSocket)
+				tmpFile.Close()
+
+				if isExistingSocket(theSocket) {
+					t.Fatalf("isExistingSocket(%q) gave unexpected result. Should have been false, instead of true", theSocket)
+				}
+			},
+		},
+		{
+			name: "Non existent socket is not a domain socket",
+			proc: func(t *testing.T) {
+				const theSocket = "/non/existent/socket"
+				if isExistingSocket(theSocket) {
+					t.Fatalf("isExistingSocket(%q) gave unexpected result. Should have been false, instead of true", theSocket)
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, test.proc)
+	}
+}
+
+func TestDetectCRISocketImpl(t *testing.T) {
+	tests := []struct {
+		name            string
+		existingSockets []string
+		expectedError   bool
+		expectedSocket  string
+	}{
+		{
+			name:            "No existing sockets, use Docker",
+			existingSockets: []string{},
+			expectedError:   false,
+			expectedSocket:  constants.DefaultDockerCRISocket,
+		},
+		{
+			name:            "One valid CRI socket leads to success",
+			existingSockets: []string{"/var/run/crio/crio.sock"},
+			expectedError:   false,
+			expectedSocket:  "/var/run/crio/crio.sock",
+		},
+		{
+			name:            "Correct Docker CRI socket is returned",
+			existingSockets: []string{"/var/run/docker.sock"},
+			expectedError:   false,
+			expectedSocket:  constants.DefaultDockerCRISocket,
+		},
+		{
+			name: "CRI and Docker sockets lead to an error",
+			existingSockets: []string{
+				"/var/run/docker.sock",
+				"/var/run/crio/crio.sock",
+			},
+			expectedError: true,
+		},
+		{
+			name: "Docker and containerd lead to Docker being used",
+			existingSockets: []string{
+				"/var/run/docker.sock",
+				"/run/containerd/containerd.sock",
+			},
+			expectedError:  false,
+			expectedSocket: constants.DefaultDockerCRISocket,
+		},
+		{
+			name: "A couple of CRI sockets lead to an error",
+			existingSockets: []string{
+				"/var/run/crio/crio.sock",
+				"/run/containerd/containerd.sock",
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			socket, err := detectCRISocketImpl(func(path string) bool {
+				for _, existing := range test.existingSockets {
+					if path == existing {
+						return true
+					}
+				}
+
+				return false
+			})
+			if (err != nil) != test.expectedError {
+				t.Fatalf("detectCRISocketImpl returned unexpected result\n\tExpected error: %t\n\tGot error: %t", test.expectedError, err != nil)
+			}
+			if !test.expectedError && socket != test.expectedSocket {
+				t.Fatalf("detectCRISocketImpl returned unexpected CRI socket\n\tExpected socket: %s\n\tReturned socket: %s",
+					test.expectedSocket, socket)
 			}
 		})
 	}

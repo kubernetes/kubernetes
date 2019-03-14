@@ -119,7 +119,7 @@ func (c *FakeEndpoints) DeleteCollection(options *v1.DeleteOptions, listOptions 
 // Patch applies the patch and returns the patched endpoints.
 func (c *FakeEndpoints) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.Endpoints, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(endpointsResource, c.ns, name, data, subresources...), &corev1.Endpoints{})
+		Invokes(testing.NewPatchSubresourceAction(endpointsResource, c.ns, name, pt, data, subresources...), &corev1.Endpoints{})
 
 	if obj == nil {
 		return nil, err

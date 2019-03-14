@@ -119,7 +119,7 @@ func (c *FakeConfigMaps) DeleteCollection(options *v1.DeleteOptions, listOptions
 // Patch applies the patch and returns the patched configMap.
 func (c *FakeConfigMaps) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.ConfigMap, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, name, data, subresources...), &corev1.ConfigMap{})
+		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, name, pt, data, subresources...), &corev1.ConfigMap{})
 
 	if obj == nil {
 		return nil, err

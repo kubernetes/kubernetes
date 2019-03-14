@@ -8,9 +8,39 @@
 // can be used to override the system default locations for the SSL certificate
 // file and SSL certificate files directory, respectively.
 //
-// This is a fork of the go library crypto/x509 package, it's more relaxed
-// about certificates that it'll accept, and exports the TBSCertificate
-// structure.
+// This is a fork of the Go library crypto/x509 package, primarily adapted for
+// use with Certificate Transparency.  Main areas of difference are:
+//
+//  - Life as a fork:
+//     - Rename OS-specific cgo code so it doesn't clash with main Go library.
+//     - Use local library imports (asn1, pkix) throughout.
+//     - Add version-specific wrappers for Go version-incompatible code (in
+//       nilref_*_darwin.go, ptr_*_windows.go).
+//  - Laxer certificate parsing:
+//     - Add options to disable various validation checks (times, EKUs etc).
+//     - Use NonFatalErrors type for some errors and continue parsing; this
+//       can be checked with IsFatal(err).
+//     - Support for short bitlength ECDSA curves (in curves.go).
+//  - Certificate Transparency specific function:
+//     - Parsing and marshaling of SCTList extension.
+//     - RemoveSCTList() function for rebuilding CT leaf entry.
+//     - Pre-certificate processing (RemoveCTPoison(), BuildPrecertTBS(),
+//       ParseTBSCertificate(), IsPrecertificate()).
+//  - Revocation list processing:
+//     - Detailed CRL parsing (in revoked.go)
+//     - Detailed error recording mechanism (in error.go, errors.go)
+//     - Factor out parseDistributionPoints() for reuse.
+//     - Factor out and generalize GeneralNames parsing (in names.go)
+//     - Fix CRL commenting.
+//  - RPKI support:
+//     - Support for SubjectInfoAccess extension
+//     - Support for RFC3779 extensions (in rpki.go)
+//  - General improvements:
+//     - Export and use OID values throughout.
+//     - Export OIDFromNamedCurve().
+//     - Export SignatureAlgorithmFromAI().
+//     - Add OID value to UnhandledCriticalExtension error.
+//     - Minor typo/lint fixes.
 package x509
 
 import (
@@ -69,7 +99,16 @@ func ParsePKIXPublicKey(derBytes []byte) (pub interface{}, err error) {
 	if algo == UnknownPublicKeyAlgorithm {
 		return nil, errors.New("x509: unknown public key algorithm")
 	}
-	return parsePublicKey(algo, &pki)
+	var nfe NonFatalErrors
+	pub, err = parsePublicKey(algo, &pki, &nfe)
+	if err != nil {
+		return pub, err
+	}
+	// Treat non-fatal errors as fatal for this entrypoint.
+	if len(nfe.Errors) > 0 {
+		return nil, nfe.Errors[0]
+	}
+	return pub, nil
 }
 
 func marshalPublicKey(pub interface{}) (publicKeyBytes []byte, publicKeyAlgorithm pkix.AlgorithmIdentifier, err error) {
@@ -500,15 +539,21 @@ func getPublicKeyAlgorithmFromOID(oid asn1.ObjectIdentifier) PublicKeyAlgorithm 
 // secp521r1 OBJECT IDENTIFIER ::= {
 //   iso(1) identified-organization(3) certicom(132) curve(0) 35 }
 //
-// NB: secp256r1 is equivalent to prime256v1
+// secp192r1 OBJECT IDENTIFIER ::= {
+//     iso(1) member-body(2) us(840) ansi-X9-62(10045) curves(3)
+//     prime(1) 1 }
+//
+// NB: secp256r1 is equivalent to prime256v1,
+// secp192r1 is equivalent to ansix9p192r and prime192v1
 var (
 	OIDNamedCurveP224 = asn1.ObjectIdentifier{1, 3, 132, 0, 33}
 	OIDNamedCurveP256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 3, 1, 7}
 	OIDNamedCurveP384 = asn1.ObjectIdentifier{1, 3, 132, 0, 34}
 	OIDNamedCurveP521 = asn1.ObjectIdentifier{1, 3, 132, 0, 35}
+	OIDNamedCurveP192 = asn1.ObjectIdentifier{1, 2, 840, 10045, 3, 1, 1}
 )
 
-func namedCurveFromOID(oid asn1.ObjectIdentifier) elliptic.Curve {
+func namedCurveFromOID(oid asn1.ObjectIdentifier, nfe *NonFatalErrors) elliptic.Curve {
 	switch {
 	case oid.Equal(OIDNamedCurveP224):
 		return elliptic.P224()
@@ -518,6 +563,9 @@ func namedCurveFromOID(oid asn1.ObjectIdentifier) elliptic.Curve {
 		return elliptic.P384()
 	case oid.Equal(OIDNamedCurveP521):
 		return elliptic.P521()
+	case oid.Equal(OIDNamedCurveP192):
+		nfe.AddError(errors.New("insecure curve (secp192r1) specified"))
+		return secp192r1()
 	}
 	return nil
 }
@@ -534,6 +582,8 @@ func OIDFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
 		return OIDNamedCurveP384, true
 	case elliptic.P521():
 		return OIDNamedCurveP521, true
+	case secp192r1():
+		return OIDNamedCurveP192, true
 	}
 
 	return nil, false
@@ -737,7 +787,13 @@ type Certificate struct {
 	OCSPServer            []string
 	IssuingCertificateURL []string
 
-	// Subject Alternate Name values
+	// Subject Information Access
+	SubjectTimestamps     []string
+	SubjectCARepositories []string
+
+	// Subject Alternate Name values. (Note that these values may not be valid
+	// if invalid values were contained within a parsed certificate. For
+	// example, an element of DNSNames may not be a valid DNS domain name.)
 	DNSNames       []string
 	EmailAddresses []string
 	IPAddresses    []net.IP
@@ -758,6 +814,9 @@ type Certificate struct {
 	CRLDistributionPoints []string
 
 	PolicyIdentifiers []asn1.ObjectIdentifier
+
+	RPKIAddressRanges                   []*IPAddressFamilyBlocks
+	RPKIASNumbers, RPKIRoutingDomainIDs *ASIdentifiers
 
 	// Certificate Transparency SCT extension contents; this is a TLS-encoded
 	// SignedCertificateTimestampList (RFC 6962 s3.3).
@@ -790,6 +849,20 @@ func (ConstraintViolationError) Error() string {
 // DER-encoded values).
 func (c *Certificate) Equal(other *Certificate) bool {
 	return bytes.Equal(c.Raw, other.Raw)
+}
+
+// IsPrecertificate checks whether the certificate is a precertificate, by
+// checking for the presence of the CT Poison extension.
+func (c *Certificate) IsPrecertificate() bool {
+	if c == nil {
+		return false
+	}
+	for _, ext := range c.Extensions {
+		if ext.Id.Equal(OIDExtensionCTPoison) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Certificate) hasSANExtension() bool {
@@ -995,6 +1068,50 @@ func (h UnhandledCriticalExtension) Error() string {
 	return fmt.Sprintf("x509: unhandled critical extension (%v)", h.ID)
 }
 
+// removeExtension takes a DER-encoded TBSCertificate, removes the extension
+// specified by oid (preserving the order of other extensions), and returns the
+// result still as a DER-encoded TBSCertificate.  This function will fail if
+// there is not exactly 1 extension of the type specified by the oid present.
+func removeExtension(tbsData []byte, oid asn1.ObjectIdentifier) ([]byte, error) {
+	var tbs tbsCertificate
+	rest, err := asn1.Unmarshal(tbsData, &tbs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse TBSCertificate: %v", err)
+	} else if rLen := len(rest); rLen > 0 {
+		return nil, fmt.Errorf("trailing data (%d bytes) after TBSCertificate", rLen)
+	}
+	extAt := -1
+	for i, ext := range tbs.Extensions {
+		if ext.Id.Equal(oid) {
+			if extAt != -1 {
+				return nil, errors.New("multiple extensions of specified type present")
+			}
+			extAt = i
+		}
+	}
+	if extAt == -1 {
+		return nil, errors.New("no extension of specified type present")
+	}
+	tbs.Extensions = append(tbs.Extensions[:extAt], tbs.Extensions[extAt+1:]...)
+	// Clear out the asn1.RawContent so the re-marshal operation sees the
+	// updated structure (rather than just copying the out-of-date DER data).
+	tbs.Raw = nil
+
+	data, err := asn1.Marshal(tbs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to re-marshal TBSCertificate: %v", err)
+	}
+	return data, nil
+}
+
+// RemoveSCTList takes a DER-encoded TBSCertificate and removes the CT SCT
+// extension that contains the SCT list (preserving the order of other
+// extensions), and returns the result still as a DER-encoded TBSCertificate.
+// This function will fail if there is not exactly 1 CT SCT extension present.
+func RemoveSCTList(tbsData []byte) ([]byte, error) {
+	return removeExtension(tbsData, OIDExtensionCTSCT)
+}
+
 // RemoveCTPoison takes a DER-encoded TBSCertificate and removes the CT poison
 // extension (preserving the order of other extensions), and returns the result
 // still as a DER-encoded TBSCertificate.  This function will fail if there is
@@ -1019,27 +1136,18 @@ func RemoveCTPoison(tbsData []byte) ([]byte, error) {
 //  - The precert's AuthorityKeyId is changed to the AuthorityKeyId of the
 //    intermediate.
 func BuildPrecertTBS(tbsData []byte, preIssuer *Certificate) ([]byte, error) {
+	data, err := removeExtension(tbsData, OIDExtensionCTPoison)
+	if err != nil {
+		return nil, err
+	}
+
 	var tbs tbsCertificate
-	rest, err := asn1.Unmarshal(tbsData, &tbs)
+	rest, err := asn1.Unmarshal(data, &tbs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse TBSCertificate: %v", err)
 	} else if rLen := len(rest); rLen > 0 {
 		return nil, fmt.Errorf("trailing data (%d bytes) after TBSCertificate", rLen)
 	}
-	poisonAt := -1
-	for i, ext := range tbs.Extensions {
-		if ext.Id.Equal(OIDExtensionCTPoison) {
-			if poisonAt != -1 {
-				return nil, errors.New("multiple CT poison extensions present")
-			}
-			poisonAt = i
-		}
-	}
-	if poisonAt == -1 {
-		return nil, errors.New("no CT poison extension present")
-	}
-	tbs.Extensions = append(tbs.Extensions[:poisonAt], tbs.Extensions[poisonAt+1:]...)
-	tbs.Raw = nil
 
 	if preIssuer != nil {
 		// Update the precert's Issuer field.  Use the RawIssuer rather than the
@@ -1092,9 +1200,13 @@ func BuildPrecertTBS(tbsData []byte, preIssuer *Certificate) ([]byte, error) {
 			}
 			tbs.Extensions = append(tbs.Extensions, authKeyIDExt)
 		}
+
+		// Clear out the asn1.RawContent so the re-marshal operation sees the
+		// updated structure (rather than just copying the out-of-date DER data).
+		tbs.Raw = nil
 	}
 
-	data, err := asn1.Marshal(tbs)
+	data, err = asn1.Marshal(tbs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to re-marshal TBSCertificate: %v", err)
 	}
@@ -1120,7 +1232,7 @@ const (
 )
 
 // RFC 5280, 4.2.2.1
-type authorityInfoAccess struct {
+type accessDescription struct {
 	Method   asn1.ObjectIdentifier
 	Location asn1.RawValue
 }
@@ -1137,14 +1249,14 @@ type distributionPointName struct {
 	RelativeName pkix.RDNSequence `asn1:"optional,tag:1"`
 }
 
-func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo) (interface{}, error) {
+func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo, nfe *NonFatalErrors) (interface{}, error) {
 	asn1Data := keyData.PublicKey.RightAlign()
 	switch algo {
 	case RSA:
 		// RSA public keys must have a NULL in the parameters
 		// (https://tools.ietf.org/html/rfc3279#section-2.3.1).
 		if !bytes.Equal(keyData.Algorithm.Parameters.FullBytes, asn1.NullBytes) {
-			return nil, errors.New("x509: RSA key missing NULL parameters")
+			nfe.AddError(errors.New("x509: RSA key missing NULL parameters"))
 		}
 
 		p := new(pkcs1PublicKey)
@@ -1208,9 +1320,9 @@ func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo) (interface{
 		if len(rest) != 0 {
 			return nil, errors.New("x509: trailing data after ECDSA parameters")
 		}
-		namedCurve := namedCurveFromOID(*namedCurveOID)
+		namedCurve := namedCurveFromOID(*namedCurveOID, nfe)
 		if namedCurve == nil {
-			return nil, errors.New("x509: unsupported elliptic curve")
+			return nil, fmt.Errorf("x509: unsupported elliptic curve %v", namedCurveOID)
 		}
 		x, y := elliptic.Unmarshal(namedCurve, asn1Data)
 		if x == nil {
@@ -1235,7 +1347,7 @@ type NonFatalErrors struct {
 	Errors []error
 }
 
-// Adds an error to the list of errors contained by NonFatalErrors.
+// AddError adds an error to the list of errors contained by NonFatalErrors.
 func (e *NonFatalErrors) AddError(err error) {
 	e.Errors = append(e.Errors, err)
 }
@@ -1250,9 +1362,23 @@ func (e NonFatalErrors) Error() string {
 	return r
 }
 
-// Returns true if |e| contains at least one error
+// HasError returns true if |e| contains at least one error
 func (e *NonFatalErrors) HasError() bool {
 	return len(e.Errors) > 0
+}
+
+// IsFatal indicates whether an error is fatal.
+func IsFatal(err error) bool {
+	if err == nil {
+		return false
+	}
+	if _, ok := err.(NonFatalErrors); ok {
+		return false
+	}
+	if errs, ok := err.(*Errors); ok {
+		return errs.Fatal()
+	}
+	return true
 }
 
 func parseDistributionPoints(data []byte, crldp *[]string) error {
@@ -1337,17 +1463,9 @@ func parseSANExtension(value []byte, nfe *NonFatalErrors) (dnsNames, emailAddres
 	err = forEachSAN(value, func(tag int, data []byte) error {
 		switch tag {
 		case nameTypeEmail:
-			mailbox := string(data)
-			if _, ok := parseRFC2821Mailbox(mailbox); !ok {
-				return fmt.Errorf("x509: cannot parse rfc822Name %q", mailbox)
-			}
-			emailAddresses = append(emailAddresses, mailbox)
+			emailAddresses = append(emailAddresses, string(data))
 		case nameTypeDNS:
-			domain := string(data)
-			if _, ok := domainToReverseLabels(domain); !ok {
-				return fmt.Errorf("x509: cannot parse dnsName %q", string(data))
-			}
-			dnsNames = append(dnsNames, domain)
+			dnsNames = append(dnsNames, string(data))
 		case nameTypeURI:
 			uri, err := url.Parse(string(data))
 			if err != nil {
@@ -1364,7 +1482,7 @@ func parseSANExtension(value []byte, nfe *NonFatalErrors) (dnsNames, emailAddres
 			case net.IPv4len, net.IPv6len:
 				ipAddresses = append(ipAddresses, data)
 			default:
-				nfe.AddError(fmt.Errorf("x509: certificate contained IP address of length %d : %v", len(data), data))
+				nfe.AddError(errors.New("x509: cannot parse IP address of length " + strconv.Itoa(len(data))))
 			}
 		}
 
@@ -1399,7 +1517,7 @@ func isValidIPMask(mask []byte) bool {
 	return true
 }
 
-func parseNameConstraintsExtension(out *Certificate, e pkix.Extension) (unhandled bool, err error) {
+func parseNameConstraintsExtension(out *Certificate, e pkix.Extension, nfe *NonFatalErrors) (unhandled bool, err error) {
 	// RFC 5280, 4.2.1.10
 
 	// NameConstraints ::= SEQUENCE {
@@ -1466,7 +1584,7 @@ func parseNameConstraintsExtension(out *Certificate, e pkix.Extension) (unhandle
 					trimmedDomain = trimmedDomain[1:]
 				}
 				if _, ok := domainToReverseLabels(trimmedDomain); !ok {
-					return nil, nil, nil, nil, fmt.Errorf("x509: failed to parse dnsName constraint %q", domain)
+					nfe.AddError(fmt.Errorf("x509: failed to parse dnsName constraint %q", domain))
 				}
 				dnsNames = append(dnsNames, domain)
 
@@ -1503,7 +1621,7 @@ func parseNameConstraintsExtension(out *Certificate, e pkix.Extension) (unhandle
 				// it specifies an exact mailbox name.
 				if strings.Contains(constraint, "@") {
 					if _, ok := parseRFC2821Mailbox(constraint); !ok {
-						return nil, nil, nil, nil, fmt.Errorf("x509: failed to parse rfc822Name constraint %q", constraint)
+						nfe.AddError(fmt.Errorf("x509: failed to parse rfc822Name constraint %q", constraint))
 					}
 				} else {
 					// Otherwise it's a domain name.
@@ -1512,7 +1630,7 @@ func parseNameConstraintsExtension(out *Certificate, e pkix.Extension) (unhandle
 						domain = domain[1:]
 					}
 					if _, ok := domainToReverseLabels(domain); !ok {
-						return nil, nil, nil, nil, fmt.Errorf("x509: failed to parse rfc822Name constraint %q", constraint)
+						nfe.AddError(fmt.Errorf("x509: failed to parse rfc822Name constraint %q", constraint))
 					}
 				}
 				emails = append(emails, constraint)
@@ -1536,7 +1654,7 @@ func parseNameConstraintsExtension(out *Certificate, e pkix.Extension) (unhandle
 					trimmedDomain = trimmedDomain[1:]
 				}
 				if _, ok := domainToReverseLabels(trimmedDomain); !ok {
-					return nil, nil, nil, nil, fmt.Errorf("x509: failed to parse URI constraint %q", domain)
+					nfe.AddError(fmt.Errorf("x509: failed to parse URI constraint %q", domain))
 				}
 				uriDomains = append(uriDomains, domain)
 
@@ -1575,7 +1693,7 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 	out.PublicKeyAlgorithm =
 		getPublicKeyAlgorithmFromOID(in.TBSCertificate.PublicKey.Algorithm.Algorithm)
 	var err error
-	out.PublicKey, err = parsePublicKey(out.PublicKeyAlgorithm, &in.TBSCertificate.PublicKey)
+	out.PublicKey, err = parsePublicKey(out.PublicKeyAlgorithm, &in.TBSCertificate.PublicKey, &nfe)
 	if err != nil {
 		return nil, err
 	}
@@ -1651,7 +1769,7 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 				}
 
 			case OIDExtensionNameConstraints[3]:
-				unhandled, err = parseNameConstraintsExtension(out, e)
+				unhandled, err = parseNameConstraintsExtension(out, e, &nfe)
 				if err != nil {
 					return nil, err
 				}
@@ -1682,10 +1800,14 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 				// KeyPurposeId ::= OBJECT IDENTIFIER
 
 				var keyUsage []asn1.ObjectIdentifier
-				if rest, err := asn1.Unmarshal(e.Value, &keyUsage); err != nil {
-					return nil, err
-				} else if len(rest) != 0 {
-					return nil, errors.New("x509: trailing data after X.509 ExtendedKeyUsage")
+				if len(e.Value) == 0 {
+					nfe.AddError(errors.New("x509: empty ExtendedKeyUsage"))
+				} else {
+					if rest, err := asn1.Unmarshal(e.Value, &keyUsage); err != nil {
+						return nil, err
+					} else if len(rest) != 0 {
+						return nil, errors.New("x509: trailing data after X.509 ExtendedKeyUsage")
+					}
 				}
 
 				for _, u := range keyUsage {
@@ -1725,11 +1847,14 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 			}
 		} else if e.Id.Equal(OIDExtensionAuthorityInfoAccess) {
 			// RFC 5280 4.2.2.1: Authority Information Access
-			var aia []authorityInfoAccess
+			var aia []accessDescription
 			if rest, err := asn1.Unmarshal(e.Value, &aia); err != nil {
 				return nil, err
 			} else if len(rest) != 0 {
 				return nil, errors.New("x509: trailing data after X.509 authority information")
+			}
+			if len(aia) == 0 {
+				nfe.AddError(errors.New("x509: empty AuthorityInfoAccess extension"))
 			}
 
 			for _, v := range aia {
@@ -1743,6 +1868,34 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 					out.IssuingCertificateURL = append(out.IssuingCertificateURL, string(v.Location.Bytes))
 				}
 			}
+		} else if e.Id.Equal(OIDExtensionSubjectInfoAccess) {
+			// RFC 5280 4.2.2.2: Subject Information Access
+			var sia []accessDescription
+			if rest, err := asn1.Unmarshal(e.Value, &sia); err != nil {
+				return nil, err
+			} else if len(rest) != 0 {
+				return nil, errors.New("x509: trailing data after X.509 subject information")
+			}
+			if len(sia) == 0 {
+				nfe.AddError(errors.New("x509: empty SubjectInfoAccess extension"))
+			}
+
+			for _, v := range sia {
+				// TODO(drysdale): cope with non-URI types of GeneralName
+				// GeneralName: uniformResourceIdentifier [6] IA5String
+				if v.Location.Tag != 6 {
+					continue
+				}
+				if v.Method.Equal(OIDSubjectInfoAccessTimestamp) {
+					out.SubjectTimestamps = append(out.SubjectTimestamps, string(v.Location.Bytes))
+				} else if v.Method.Equal(OIDSubjectInfoAccessCARepo) {
+					out.SubjectCARepositories = append(out.SubjectCARepositories, string(v.Location.Bytes))
+				}
+			}
+		} else if e.Id.Equal(OIDExtensionIPPrefixList) {
+			out.RPKIAddressRanges = parseRPKIAddrBlocks(e.Value, &nfe)
+		} else if e.Id.Equal(OIDExtensionASList) {
+			out.RPKIASNumbers, out.RPKIRoutingDomainIDs = parseRPKIASIdentifiers(e.Value, &nfe)
 		} else if e.Id.Equal(OIDExtensionCTSCT) {
 			if rest, err := asn1.Unmarshal(e.Value, &out.RawSCT); err != nil {
 				nfe.AddError(fmt.Errorf("failed to asn1.Unmarshal SCT list extension: %v", err))
@@ -1787,6 +1940,8 @@ func ParseTBSCertificate(asn1Data []byte) (*Certificate, error) {
 }
 
 // ParseCertificate parses a single certificate from the given ASN.1 DER data.
+// This function can return both a Certificate and an error (in which case the
+// error will be of type NonFatalErrors).
 func ParseCertificate(asn1Data []byte) (*Certificate, error) {
 	var cert certificate
 	rest, err := asn1.Unmarshal(asn1Data, &cert)
@@ -1802,6 +1957,8 @@ func ParseCertificate(asn1Data []byte) (*Certificate, error) {
 
 // ParseCertificates parses one or more certificates from the given ASN.1 DER
 // data. The certificates must be concatenated with no intermediate padding.
+// This function can return both a slice of Certificate and an error (in which
+// case the error will be of type NonFatalErrors).
 func ParseCertificates(asn1Data []byte) ([]*Certificate, error) {
 	var v []*certificate
 
@@ -1815,15 +1972,23 @@ func ParseCertificates(asn1Data []byte) ([]*Certificate, error) {
 		v = append(v, cert)
 	}
 
+	var nfe NonFatalErrors
 	ret := make([]*Certificate, len(v))
 	for i, ci := range v {
 		cert, err := parseCertificate(ci)
 		if err != nil {
-			return nil, err
+			if errs, ok := err.(NonFatalErrors); !ok {
+				return nil, err
+			} else {
+				nfe.Errors = append(nfe.Errors, errs.Errors...)
+			}
 		}
 		ret[i] = cert
 	}
 
+	if nfe.HasError() {
+		return ret, nfe
+	}
 	return ret, nil
 }
 
@@ -1875,15 +2040,23 @@ var (
 
 	OIDExtensionAuthorityInfoAccess = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 1}
 	OIDExtensionSubjectInfoAccess   = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 11}
+
 	// OIDExtensionCTPoison is defined in RFC 6962 s3.1.
 	OIDExtensionCTPoison = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 3}
 	// OIDExtensionCTSCT is defined in RFC 6962 s3.3.
 	OIDExtensionCTSCT = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
+	// OIDExtensionIPPrefixList is defined in RFC 3779 s2.
+	OIDExtensionIPPrefixList = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 7}
+	// OIDExtensionASList is defined in RFC 3779 s3.
+	OIDExtensionASList = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 8}
 )
 
 var (
 	OIDAuthorityInfoAccessOCSP    = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 1}
 	OIDAuthorityInfoAccessIssuers = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 2}
+	OIDSubjectInfoAccessTimestamp = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 3}
+	OIDSubjectInfoAccessCARepo    = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 48, 5}
+	OIDAnyPolicy                  = asn1.ObjectIdentifier{2, 5, 29, 32, 0}
 )
 
 // oidInExtensions returns whether an extension with the given oid exists in
@@ -1932,7 +2105,7 @@ func isIA5String(s string) error {
 }
 
 func buildExtensions(template *Certificate, subjectIsEmpty bool, authorityKeyId []byte) (ret []pkix.Extension, err error) {
-	ret = make([]pkix.Extension, 11 /* maximum number of elements. */)
+	ret = make([]pkix.Extension, 12 /* maximum number of elements. */)
 	n := 0
 
 	if template.KeyUsage != 0 &&
@@ -2017,20 +2190,43 @@ func buildExtensions(template *Certificate, subjectIsEmpty bool, authorityKeyId 
 	if (len(template.OCSPServer) > 0 || len(template.IssuingCertificateURL) > 0) &&
 		!oidInExtensions(OIDExtensionAuthorityInfoAccess, template.ExtraExtensions) {
 		ret[n].Id = OIDExtensionAuthorityInfoAccess
-		var aiaValues []authorityInfoAccess
+		var aiaValues []accessDescription
 		for _, name := range template.OCSPServer {
-			aiaValues = append(aiaValues, authorityInfoAccess{
+			aiaValues = append(aiaValues, accessDescription{
 				Method:   OIDAuthorityInfoAccessOCSP,
 				Location: asn1.RawValue{Tag: 6, Class: asn1.ClassContextSpecific, Bytes: []byte(name)},
 			})
 		}
 		for _, name := range template.IssuingCertificateURL {
-			aiaValues = append(aiaValues, authorityInfoAccess{
+			aiaValues = append(aiaValues, accessDescription{
 				Method:   OIDAuthorityInfoAccessIssuers,
 				Location: asn1.RawValue{Tag: 6, Class: asn1.ClassContextSpecific, Bytes: []byte(name)},
 			})
 		}
 		ret[n].Value, err = asn1.Marshal(aiaValues)
+		if err != nil {
+			return
+		}
+		n++
+	}
+
+	if len(template.SubjectTimestamps) > 0 || len(template.SubjectCARepositories) > 0 &&
+		!oidInExtensions(OIDExtensionSubjectInfoAccess, template.ExtraExtensions) {
+		ret[n].Id = OIDExtensionSubjectInfoAccess
+		var siaValues []accessDescription
+		for _, ts := range template.SubjectTimestamps {
+			siaValues = append(siaValues, accessDescription{
+				Method:   OIDSubjectInfoAccessTimestamp,
+				Location: asn1.RawValue{Tag: 6, Class: asn1.ClassContextSpecific, Bytes: []byte(ts)},
+			})
+		}
+		for _, repo := range template.SubjectCARepositories {
+			siaValues = append(siaValues, accessDescription{
+				Method:   OIDSubjectInfoAccessCARepo,
+				Location: asn1.RawValue{Tag: 6, Class: asn1.ClassContextSpecific, Bytes: []byte(repo)},
+			})
+		}
+		ret[n].Value, err = asn1.Marshal(siaValues)
 		if err != nil {
 			return
 		}
@@ -2290,12 +2486,25 @@ func signingParamsForPublicKey(pub interface{}, requestedSigAlgo SignatureAlgori
 var emptyASN1Subject = []byte{0x30, 0}
 
 // CreateCertificate creates a new X.509v3 certificate based on a template.
-// The following members of template are used: AuthorityKeyId,
-// BasicConstraintsValid, DNSNames, ExcludedDNSDomains, ExtKeyUsage,
-// IsCA, KeyUsage, MaxPathLen, MaxPathLenZero, NotAfter, NotBefore,
-// PermittedDNSDomains, PermittedDNSDomainsCritical, SerialNumber,
-// SignatureAlgorithm, Subject, SubjectKeyId, UnknownExtKeyUsage,
-// and RawSCT.
+// The following members of template are used:
+//  - SerialNumber
+//  - Subject
+//  - NotBefore, NotAfter
+//  - SignatureAlgorithm
+//  - For extensions:
+//    - KeyUsage
+//    - ExtKeyUsage
+//    - BasicConstraintsValid, IsCA, MaxPathLen, MaxPathLenZero
+//    - SubjectKeyId
+//    - AuthorityKeyId
+//    - OCSPServer, IssuingCertificateURL
+//    - SubjectTimestamps, SubjectCARepositories
+//    - DNSNames, EmailAddresses, IPAddresses, URIs
+//    - PolicyIdentifiers
+//    - ExcludedDNSDomains, ExcludedIPRanges, ExcludedEmailAddresses, ExcludedURIDomains, PermittedDNSDomainsCritical,
+//      PermittedDNSDomains, PermittedIPRanges, PermittedEmailAddresses, PermittedURIDomains
+//    - CRLDistributionPoints
+//    - RawSCT, SCTList
 //
 // The certificate is signed by parent. If parent is equal to template then the
 // certificate is self-signed. The parameter pub is the public key of the
@@ -2804,9 +3013,14 @@ func parseCertificateRequest(in *certificateRequest) (*CertificateRequest, error
 	}
 
 	var err error
-	out.PublicKey, err = parsePublicKey(out.PublicKeyAlgorithm, &in.TBSCSR.PublicKey)
+	var nfe NonFatalErrors
+	out.PublicKey, err = parsePublicKey(out.PublicKeyAlgorithm, &in.TBSCSR.PublicKey, &nfe)
 	if err != nil {
 		return nil, err
+	}
+	// Treat non-fatal errors as fatal here.
+	if len(nfe.Errors) > 0 {
+		return nil, nfe.Errors[0]
 	}
 
 	var subject pkix.RDNSequence
@@ -2822,7 +3036,6 @@ func parseCertificateRequest(in *certificateRequest) (*CertificateRequest, error
 		return nil, err
 	}
 
-	var nfe NonFatalErrors
 	for _, extension := range out.Extensions {
 		if extension.Id.Equal(OIDExtensionSubjectAltName) {
 			out.DNSNames, out.EmailAddresses, out.IPAddresses, out.URIs, err = parseSANExtension(extension.Value, &nfe)
