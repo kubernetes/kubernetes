@@ -65,6 +65,37 @@ func OperationCompleteHook(plugin, operationName string) func(*error) {
 	return opComplete
 }
 
+type OperationRequestTime interface {
+	GetOperationRequestTime() time.Time
+}
+
+// CaptureTotalOpTime function captures total time taken by an operation and time taken by particular volume operation
+// once started. For example:
+//	- volume_mount : metric captures time taken by mount operation once volumemanager has actually started the
+//	   mount process.
+//	- total_volume_mount - metric captures total time taken for entire mount operation once it enters desired
+//	  state of the world. This time could include waiting for volume to be attached, node to be updated and everything.
+func CaptureTotalOpTime(opData OperationRequestTime, plugin, operationName string) func(*error) {
+	requestTime := time.Now()
+	opComplete := func(err *error) {
+		timeTaken := time.Since(requestTime).Seconds()
+		// Create metric with operation name and plugin name
+		if *err != nil {
+			storageOperationErrorMetric.WithLabelValues(plugin, operationName).Inc()
+		} else {
+			totalOperationName := "total_" + operationName
+			totalTimeTaken := time.Since(opData.GetOperationRequestTime()).Seconds()
+
+			// record same operation's total time taken
+			storageOperationMetric.WithLabelValues(plugin, totalOperationName).Observe(totalTimeTaken)
+
+			// record just time taken for operation to run once started
+			storageOperationMetric.WithLabelValues(plugin, operationName).Observe(timeTaken)
+		}
+	}
+	return opComplete
+}
+
 // GetFullQualifiedPluginNameForVolume returns full qualified plugin name for
 // given volume. For CSI plugin, it appends plugin driver name at the end of
 // plugin name, e.g. kubernetes.io/csi:csi-hostpath. It helps to distinguish

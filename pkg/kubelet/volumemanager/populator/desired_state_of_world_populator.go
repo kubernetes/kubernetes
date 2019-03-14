@@ -267,6 +267,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
 			volumeToMount.PodName, volumeToMount.VolumeName)
 		dswp.deleteProcessedPod(volumeToMount.PodName)
+		dswp.actualStateOfWorld.RecordVolumeUnmount(volumeToMount.PodName, volumeToMount.VolumeName)
 	}
 }
 

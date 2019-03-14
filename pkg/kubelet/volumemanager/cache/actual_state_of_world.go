@@ -23,6 +23,7 @@ package cache
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -159,6 +160,8 @@ type ActualStateOfWorld interface {
 	// to the node. This list can be used to determine volumes that are either in-use
 	// or have a mount/unmount operation pending.
 	GetAttachedVolumes() []AttachedVolume
+
+	RecordVolumeUnmount(podName volumetypes.UniquePodName, volumeSpecName v1.UniqueVolumeName)
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -306,6 +309,9 @@ type mountedPod struct {
 	// fsResizeRequired indicates the underlying volume has been successfully
 	// mounted to this pod but its size has been expanded after that.
 	fsResizeRequired bool
+
+	// Time at which unmount was requested
+	unmountRequestTime time.Time
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
@@ -423,6 +429,19 @@ func (asw *actualStateOfWorld) addVolume(
 	asw.attachedVolumes[volumeName] = volumeObj
 
 	return nil
+}
+
+func (asw *actualStateOfWorld) RecordVolumeUnmount(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) {
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists {
+		return
+	}
+	podObj, podExists := volumeObj.mountedPods[podName]
+	if !podExists {
+		return
+	}
+	podObj.unmountRequestTime = time.Now()
+	asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
 }
 
 func (asw *actualStateOfWorld) AddPodToVolume(
@@ -871,5 +890,6 @@ func getMountedVolume(
 			BlockVolumeMapper:   mountedPod.blockVolumeMapper,
 			VolumeGidValue:      mountedPod.volumeGidValue,
 			VolumeSpec:          mountedPod.volumeSpec,
+			UnmountRequestTime:  mountedPod.unmountRequestTime,
 			DeviceMountPath:     attachedVolume.deviceMountPath}}
 }

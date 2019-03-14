@@ -349,7 +349,13 @@ type VolumeToMount struct {
 	// ReportedInUse indicates that the volume was successfully added to the
 	// VolumesInUse field in the node's status.
 	ReportedInUse bool
+
+	// time at which volume was requested to be mounted
+	MountRequestTime time.Time
 }
+
+var _ util.OperationRequestTime = &VolumeToMount{}
+var _ util.OperationRequestTime = &MountedVolume{}
 
 // GenerateMsgDetailed returns detailed msgs for volumes to mount
 func (volume *VolumeToMount) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
@@ -369,6 +375,10 @@ func (volume *VolumeToMount) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg
 		volumeSpecName = volume.VolumeSpec.Name()
 	}
 	return generateVolumeMsg(prefixMsg, suffixMsg, volumeSpecName, detailedStr)
+}
+
+func (volume VolumeToMount) GetOperationRequestTime() time.Time {
+	return volume.MountRequestTime
 }
 
 // GenerateErrorDetailed returns detailed errors for volumes to mount
@@ -556,6 +566,9 @@ type MountedVolume struct {
 	// DeviceMountPath contains the path on the node where the device should
 	// be mounted after it is attached.
 	DeviceMountPath string
+
+	// contains time at which volume was requested to be unmounted
+	UnmountRequestTime time.Time
 }
 
 // GenerateMsgDetailed returns detailed msgs for mounted volumes
@@ -579,6 +592,11 @@ func (volume *MountedVolume) GenerateErrorDetailed(prefixMsg string, err error) 
 func (volume *MountedVolume) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
 	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+}
+
+// GetOperationRequestTime returns time at which unmount was requested.
+func (volume MountedVolume) GetOperationRequestTime() time.Time {
+	return volume.UnmountRequestTime
 }
 
 type operationExecutor struct {

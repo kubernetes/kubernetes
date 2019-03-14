@@ -23,6 +23,7 @@ package cache
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -182,6 +183,9 @@ type podToMount struct {
 	// volume claim, this contains the volume.Spec.Name() of the persistent
 	// volume claim
 	outerVolumeSpecName string
+
+	// time at which mount was first requested
+	mountRequestTime time.Time
 }
 
 func (dsw *desiredStateOfWorld) AddPodToVolume(
@@ -239,11 +243,18 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	// Create new podToMount object. If it already exists, it is refreshed with
 	// updated values (this is required for volumes that require remounting on
 	// pod update, like Downward API volumes).
+	oldPodMount, ok := dsw.volumesToMount[volumeName].podsToMount[podName]
+	mountRequestTime := time.Now()
+	if ok {
+		mountRequestTime = oldPodMount.mountRequestTime
+	}
+
 	dsw.volumesToMount[volumeName].podsToMount[podName] = podToMount{
 		podName:             podName,
 		pod:                 pod,
 		volumeSpec:          volumeSpec,
 		outerVolumeSpecName: outerVolumeSpecName,
+		mountRequestTime:    mountRequestTime,
 	}
 	return volumeName, nil
 }
@@ -360,6 +371,7 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 						PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
 						OuterVolumeSpecName:     podObj.outerVolumeSpecName,
 						VolumeGidValue:          volumeObj.volumeGidValue,
+						MountRequestTime:        podObj.mountRequestTime,
 						ReportedInUse:           volumeObj.reportedInUse}})
 		}
 	}

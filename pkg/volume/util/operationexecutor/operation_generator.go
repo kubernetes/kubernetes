@@ -706,10 +706,12 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 	}
 
+	qualifiedPluginName := util.GetFullQualifiedPluginNameForVolume(volumePluginName, volumeToMount.VolumeSpec)
+
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     mountVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePluginName, volumeToMount.VolumeSpec), "volume_mount"),
+		CompleteFunc:      util.CaptureTotalOpTime(volumeToMount, qualifiedPluginName, "volume_mount"),
 	}
 }
 
@@ -832,10 +834,11 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 
 		return nil, nil
 	}
+	qualifiedPluginName := util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToUnmount.VolumeSpec)
 
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     unmountVolumeFunc,
-		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToUnmount.VolumeSpec), "volume_unmount"),
+		CompleteFunc:      util.CaptureTotalOpTime(volumeToUnmount, qualifiedPluginName, "volume_unmount"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
