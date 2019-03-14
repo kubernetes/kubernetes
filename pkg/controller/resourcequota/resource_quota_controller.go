@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -321,12 +322,12 @@ func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err err
 // syncResourceQuota runs a complete sync of resource quota status across all known kinds
 func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota *v1.ResourceQuota) (err error) {
 	// quota is dirty if any part of spec hard limits differs from the status hard limits
-	dirty := !apiequality.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard)
+	statusLimitsDirty := !apiequality.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard)
 
 	// dirty tracks if the usage status differs from the previous sync,
 	// if so, we send a new usage with latest status
 	// if this is our first sync, it will be dirty by default, since we need track usage
-	dirty = dirty || resourceQuota.Status.Hard == nil || resourceQuota.Status.Used == nil
+	dirty := statusLimitsDirty || resourceQuota.Status.Hard == nil || resourceQuota.Status.Used == nil
 
 	used := v1.ResourceList{}
 	if resourceQuota.Status.Used != nil {
@@ -334,9 +335,12 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota *v1.ResourceQ
 	}
 	hardLimits := quota.Add(v1.ResourceList{}, resourceQuota.Spec.Hard)
 
+	errors := []error{}
+
 	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry, resourceQuota.Spec.ScopeSelector)
 	if err != nil {
-		return err
+		// if err is non-nil, remember it to return, but continue updating status with any resources in newUsage
+		errors = append(errors, err)
 	}
 	for key, value := range newUsage {
 		used[key] = value
@@ -359,9 +363,11 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota *v1.ResourceQ
 	// there was a change observed by this controller that requires we update quota
 	if dirty {
 		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(usage)
-		return err
+		if err != nil {
+			errors = append(errors, err)
+		}
 	}
-	return nil
+	return utilerrors.NewAggregate(errors)
 }
 
 // replenishQuota is a replenishment function invoked by a controller to notify that a quota should be recalculated

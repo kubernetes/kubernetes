@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -81,6 +82,23 @@ func newGenericLister(groupResource schema.GroupResource, items []runtime.Object
 		store.Add(item)
 	}
 	return cache.NewGenericLister(store, groupResource)
+}
+
+func newErrorLister() cache.GenericLister {
+	return errorLister{}
+}
+
+type errorLister struct {
+}
+
+func (errorLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	return nil, fmt.Errorf("error listing")
+}
+func (errorLister) Get(name string) (runtime.Object, error) {
+	return nil, fmt.Errorf("error getting")
+}
+func (errorLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
+	return errorLister{}
 }
 
 type quotaController struct {
@@ -205,9 +223,11 @@ func newTestPodsWithPriorityClasses() []runtime.Object {
 func TestSyncResourceQuota(t *testing.T) {
 	testCases := map[string]struct {
 		gvr               schema.GroupVersionResource
+		errorGVR          schema.GroupVersionResource
 		items             []runtime.Object
 		quota             v1.ResourceQuota
 		status            v1.ResourceQuotaStatus
+		expectedError     string
 		expectedActionSet sets.String
 	}{
 		"non-matching-best-effort-scoped-quota": {
@@ -699,18 +719,75 @@ func TestSyncResourceQuota(t *testing.T) {
 			expectedActionSet: sets.NewString(),
 			items:             []runtime.Object{},
 		},
+		"quota-missing-status-with-calculation-error": {
+			errorGVR: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourcePods: resource.MustParse("1"),
+					},
+				},
+				Status: v1.ResourceQuotaStatus{},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourcePods: resource.MustParse("1"),
+				},
+			},
+			expectedError:     "error listing",
+			expectedActionSet: sets.NewString("update-resourcequotas-status"),
+			items:             []runtime.Object{},
+		},
+		"quota-missing-status-with-partial-calculation-error": {
+			gvr:      v1.SchemeGroupVersion.WithResource("configmaps"),
+			errorGVR: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourcePods:       resource.MustParse("1"),
+						v1.ResourceConfigMaps: resource.MustParse("1"),
+					},
+				},
+				Status: v1.ResourceQuotaStatus{},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourcePods:       resource.MustParse("1"),
+					v1.ResourceConfigMaps: resource.MustParse("1"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceConfigMaps: resource.MustParse("0"),
+				},
+			},
+			expectedError:     "error listing",
+			expectedActionSet: sets.NewString("update-resourcequotas-status"),
+			items:             []runtime.Object{},
+		},
 	}
 
 	for testName, testCase := range testCases {
 		kubeClient := fake.NewSimpleClientset(&testCase.quota)
 		listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
-			testCase.gvr: newGenericLister(testCase.gvr.GroupResource(), testCase.items),
+			testCase.gvr:      newGenericLister(testCase.gvr.GroupResource(), testCase.items),
+			testCase.errorGVR: newErrorLister(),
 		}
 		qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig), mockDiscoveryFunc)
 		defer close(qc.stop)
 
 		if err := qc.syncResourceQuota(&testCase.quota); err != nil {
-			t.Fatalf("test: %s, unexpected error: %v", testName, err)
+			if len(testCase.expectedError) == 0 || !strings.Contains(err.Error(), testCase.expectedError) {
+				t.Fatalf("test: %s, unexpected error: %v", testName, err)
+			}
+		} else if len(testCase.expectedError) > 0 {
+			t.Fatalf("test: %s, expected error %q, got none", testName, testCase.expectedError)
 		}
 
 		actionSet := sets.NewString()
