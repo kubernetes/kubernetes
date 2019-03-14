@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	expandcache "k8s.io/kubernetes/pkg/controller/volume/expand/cache"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -141,7 +140,7 @@ type OperationExecutor interface {
 	// otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
 	// Expand Volume will grow size available to PVC
-	ExpandVolume(*expandcache.PVCWithResizeRequest, expandcache.VolumeResizeMap) error
+	ExpandVolume(*v1.PersistentVolumeClaim, *v1.PersistentVolume) error
 	// ExpandVolumeFSWithoutUnmounting will resize volume's file system to expected size without unmounting the volume.
 	ExpandVolumeFSWithoutUnmounting(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
@@ -821,13 +820,12 @@ func (oe *operationExecutor) UnmountDevice(
 		deviceToDetach.VolumeName, podName, generatedOperations)
 }
 
-func (oe *operationExecutor) ExpandVolume(pvcWithResizeRequest *expandcache.PVCWithResizeRequest, resizeMap expandcache.VolumeResizeMap) error {
-	generatedOperations, err := oe.operationGenerator.GenerateExpandVolumeFunc(pvcWithResizeRequest, resizeMap)
-
+func (oe *operationExecutor) ExpandVolume(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) error {
+	generatedOperations, err := oe.operationGenerator.GenerateExpandVolumeFunc(pvc, pv)
 	if err != nil {
 		return err
 	}
-	uniqueVolumeKey := v1.UniqueVolumeName(pvcWithResizeRequest.UniquePVCKey())
+	uniqueVolumeKey := v1.UniqueVolumeName(pvc.UID)
 
 	return oe.pendingOperations.Run(uniqueVolumeKey, "", generatedOperations)
 }
