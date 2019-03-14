@@ -2082,17 +2082,17 @@ func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interf
 	Expect(err).NotTo(HaveOccurred())
 
 	if !isTransitionTest {
-		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, true, false)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, true)).To(BeTrue())
 	}
 	if isTransitionTest {
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
-		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, false, true)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, false)).To(BeTrue())
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
-		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, true, true)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, true)).To(BeTrue())
 	}
 }
 
@@ -2120,16 +2120,16 @@ func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface
 	port := int(svc.Spec.Ports[0].Port)
 
 	if !isTransitionTest {
-		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, true, false)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, true)).To(BeTrue())
 	}
 	if isTransitionTest {
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
-		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, false, true)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, false)).To(BeTrue())
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
-		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, true, true)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, true)).To(BeTrue())
 	}
 }
