@@ -270,11 +270,6 @@ func New(client clientset.Interface,
 		}
 		predicateKeys = provider.FitPredicateKeys
 		priorityKeys = provider.PriorityFunctionKeys
-		// sc, err := CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
-		// if err != nil {
-		// 	return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
-		// }
-		// config = sc
 	case source.Policy != nil:
 		// Create the config from a user specified policy source.
 		policy := &schedulerapi.Policy{}
@@ -348,11 +343,6 @@ func New(client clientset.Interface,
 		if policy.AlwaysCheckAllPredicates {
 			alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
 		}
-		// sc, err := configurator.CreateFromConfig(*policy)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
-		// }
-		// config = sc
 	default:
 		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
 	}
@@ -600,11 +590,6 @@ func (sched *Scheduler) Run() {
 
 	go wait.Until(sched.scheduleOne, 0, sched.StopEverything)
 }
-
-// Config returns scheduler's config pointer. It is exposed for testing purposes.
-// func (sched *Scheduler) Config() *factory.Config {
-// 	return sched.config
-// }
 
 // recordFailedSchedulingEvent records an event for the pod that indicates the
 // pod has failed to schedule.

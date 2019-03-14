@@ -86,14 +86,6 @@ func (fp fakePodPreemptor) RemoveNominatedNodeName(pod *v1.Pod) error {
 	return nil
 }
 
-// type nodeLister struct {
-// 	corelister.NodeLister
-// }
-
-// func (n *nodeLister) List() ([]*v1.Node, error) {
-// 	return n.NodeLister.List(labels.Everything())
-// }
-
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
