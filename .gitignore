@@ -111,6 +111,8 @@ kubernetes.tar.gz
 # TODO(thockin): uncomment this when we stop committing the generated files.
 #zz_generated.*
 zz_generated.openapi.go
+# TODO(roycaihw): remove this when we stop committing the generated definition
+!staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
 zz_generated_*_test.go
 
 # make-related metadata
