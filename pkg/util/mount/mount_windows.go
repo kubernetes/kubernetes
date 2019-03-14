@@ -29,6 +29,7 @@ import (
 	"syscall"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/keymutex"
 
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 )
@@ -48,6 +49,9 @@ func New(mounterPath string) Interface {
 		mounterPath: mounterPath,
 	}
 }
+
+// acquire lock for smb mount
+var getSMBMountMutex = keymutex.NewKeyMutex()
 
 // Mount : mounts source to target with given options.
 // currently only supports cifs(smb), bind mount(for disk)
@@ -83,6 +87,10 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		if strings.ToLower(fstype) != "cifs" {
 			return fmt.Errorf("only cifs mount is supported now, fstype: %q, mounting source (%q), target (%q), with options (%q)", fstype, source, target, options)
 		}
+
+		// lock smb mount for the same source
+		getSMBMountMutex.LockKey(source)
+		defer getSMBMountMutex.UnlockKey(source)
 
 		if output, err := newSMBMapping(options[0], options[1], source); err != nil {
 			if isSMBMappingExist(source) {

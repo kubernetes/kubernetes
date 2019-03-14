@@ -108,6 +108,7 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/util/file:go_default_library",
+            "//pkg/util/keymutex:go_default_library",
             "//pkg/util/nsenter:go_default_library",
         ],
         "//conditions:default": [],
