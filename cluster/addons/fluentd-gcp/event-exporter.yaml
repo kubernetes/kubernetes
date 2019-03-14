@@ -53,7 +53,7 @@ spec:
         - -sink-opts=-stackdriver-resource-model={{ exporter_sd_resource_model }}
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: k8s.gcr.io/prometheus-to-sd:v0.3.1
+        image: k8s.gcr.io/prometheus-to-sd:v0.5.0
         command:
           - /monitor
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
