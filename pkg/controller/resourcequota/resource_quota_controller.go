@@ -439,8 +439,13 @@ func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, p
 			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
 			return
 		}
-		if rq.quotaMonitor != nil && !controller.WaitForCacheSync("resource quota", stopCh, rq.quotaMonitor.IsSynced) {
+		// wait for caches to fill for a while (our sync period).
+		// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
+		// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
+		// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
+		if rq.quotaMonitor != nil && !controller.WaitForCacheSync("resource quota", waitForStopOrTimeout(stopCh, period), rq.quotaMonitor.IsSynced) {
 			utilruntime.HandleError(fmt.Errorf("timed out waiting for quota monitor sync"))
+			return
 		}
 
 		// success, remember newly synced resources
@@ -464,6 +469,19 @@ func printDiff(oldResources, newResources map[schema.GroupVersionResource]struct
 		}
 	}
 	return fmt.Sprintf("added: %v, removed: %v", added.List(), removed.List())
+}
+
+// waitForStopOrTimeout returns a stop channel that closes when the provided stop channel closes or when the specified timeout is reached
+func waitForStopOrTimeout(stopCh <-chan struct{}, timeout time.Duration) <-chan struct{} {
+	stopChWithTimeout := make(chan struct{})
+	go func() {
+		defer close(stopChWithTimeout)
+		select {
+		case <-stopCh:
+		case <-time.After(timeout):
+		}
+	}()
+	return stopChWithTimeout
 }
 
 // resyncMonitors starts or stops quota monitors as needed to ensure that all
