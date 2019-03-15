@@ -40,6 +40,20 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 	}
 }
 
+// Create node with extended resources.
+func makeNodeWithAllResources(nodeName string, milliCPU, memory int64, ephemeralStorage int64, scalarResources map[v1.ResourceName]int64) *v1.Node {
+	node := makeNode(nodeName, milliCPU, memory)
+	// ephemeralStorage
+	node.Status.Capacity[v1.ResourceEphemeralStorage] = *resource.NewQuantity(ephemeralStorage, resource.DecimalSI)
+	node.Status.Allocatable[v1.ResourceEphemeralStorage] = *resource.NewQuantity(ephemeralStorage, resource.DecimalSI)
+	// scalarResources
+	for key, value := range scalarResources {
+		node.Status.Capacity[key] = *resource.NewQuantity(value, resource.DecimalSI)
+		node.Status.Allocatable[key] = *resource.NewQuantity(value, resource.DecimalSI)
+	}
+	return node
+}
+
 func priorityFunction(mapFn PriorityMapFunction, reduceFn PriorityReduceFunction, metaData interface{}) PriorityFunction {
 	return func(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 		result := make(schedulerapi.HostPriorityList, 0, len(nodes))

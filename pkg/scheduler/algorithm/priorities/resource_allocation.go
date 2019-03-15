@@ -18,6 +18,7 @@ package priorities
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -56,6 +57,14 @@ func (r *ResourceAllocationPriority) PriorityMap(
 
 	requested.MilliCPU += nodeInfo.NonZeroRequest().MilliCPU
 	requested.Memory += nodeInfo.NonZeroRequest().Memory
+
+	// If we are using a extended resources priority scorer
+	// Then
+	if strings.Contains(r.Name, "Extended") {
+		getOtherRequestsFromPod(pod, &requested)
+		getOtherRequestsOnNode(nodeInfo, &requested)
+	}
+
 	var score int64
 	// Check if the pod has volumes and this could be added to scorer function for balanced resource allocation.
 	if len(pod.Spec.Volumes) >= 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
@@ -100,4 +109,37 @@ func getNonZeroRequests(pod *v1.Pod) *schedulernodeinfo.Resource {
 		result.Memory += memory
 	}
 	return result
+}
+
+// getOtherRequests gets requests besides CPU and memory from the pod
+func getOtherRequestsFromPod(pod *v1.Pod, requested *schedulernodeinfo.Resource) {
+	if requested.ScalarResources == nil {
+		requested.ScalarResources = make(map[v1.ResourceName]int64)
+	}
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		// Ephemeral storage
+		if value, ok := container.Resources.Requests[v1.ResourceEphemeralStorage]; ok {
+			requested.EphemeralStorage += value.Value()
+		}
+		// Other scalar resources
+		for key, value := range container.Resources.Requests {
+			if key != v1.ResourceCPU && key != v1.ResourceMemory && key != v1.ResourceEphemeralStorage {
+				requested.ScalarResources[key] += value.Value()
+			}
+		}
+	}
+}
+
+// getOtherRequests gets requests besides CPU and memory based on the node info
+func getOtherRequestsOnNode(nodeInfo *schedulernodeinfo.NodeInfo, requested *schedulernodeinfo.Resource) {
+	if requested.ScalarResources == nil {
+		requested.ScalarResources = make(map[v1.ResourceName]int64)
+	}
+	requested.EphemeralStorage += nodeInfo.RequestedResource().EphemeralStorage
+	for key, value := range nodeInfo.RequestedResource().ScalarResources {
+		if key != v1.ResourceCPU && key != v1.ResourceMemory {
+			requested.ScalarResources[key] += value
+		}
+	}
 }
