@@ -89,19 +89,7 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 
 // GetActivePods returns non-terminal pods
 func (kl *Kubelet) GetActivePods() []*v1.Pod {
-	allPods, mirrorPods := kl.podManager.GetPodsAndMirrorPods()
-	mirrorPodSet := make(map[string]*v1.Pod)
-	for _, p := range mirrorPods {
-		mirrorPodSet[kubecontainer.GetPodFullName(p)] = p
-	}
-	for i := range allPods {
-		podFullName := kubecontainer.GetPodFullName(allPods[i])
-		// replace static pod with mirror pod as some info (e.g. spec.Priority)
-		// is needed to make further decisions (e.g. eviction)
-		if mirrorPod, ok := mirrorPodSet[podFullName]; ok {
-			allPods[i] = mirrorPod
-		}
-	}
+	allPods := kl.podManager.GetPods()
 	activePods := kl.filterOutTerminatedPods(allPods)
 	return activePods
 }
