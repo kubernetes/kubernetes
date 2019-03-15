@@ -58,8 +58,8 @@ func (r *ResourceAllocationPriority) PriorityMap(
 	requested.MilliCPU += nodeInfo.NonZeroRequest().MilliCPU
 	requested.Memory += nodeInfo.NonZeroRequest().Memory
 
-	// If we are using a extended resources priority scorer
-	// Then
+	// If we are using a extended resources priority scorer,
+	// then we need to get requests of resources besides CPU and memory
 	if strings.Contains(r.Name, "Extended") {
 		getOtherRequestsFromPod(pod, &requested)
 		getOtherRequestsOnNode(nodeInfo, &requested)
@@ -111,7 +111,7 @@ func getNonZeroRequests(pod *v1.Pod) *schedulernodeinfo.Resource {
 	return result
 }
 
-// getOtherRequests gets requests besides CPU and memory from the pod
+// getOtherRequestsFromPod gets requests besides CPU and memory from the pod
 func getOtherRequestsFromPod(pod *v1.Pod, requested *schedulernodeinfo.Resource) {
 	if requested.ScalarResources == nil {
 		requested.ScalarResources = make(map[v1.ResourceName]int64)
@@ -131,7 +131,7 @@ func getOtherRequestsFromPod(pod *v1.Pod, requested *schedulernodeinfo.Resource)
 	}
 }
 
-// getOtherRequests gets requests besides CPU and memory based on the node info
+// getOtherRequestsOnNode gets requests besides CPU and memory based on the node info
 func getOtherRequestsOnNode(nodeInfo *schedulernodeinfo.NodeInfo, requested *schedulernodeinfo.Resource) {
 	if requested.ScalarResources == nil {
 		requested.ScalarResources = make(map[v1.ResourceName]int64)
