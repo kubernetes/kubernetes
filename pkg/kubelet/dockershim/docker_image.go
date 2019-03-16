@@ -127,6 +127,11 @@ func (ds *dockerService) RemoveImage(_ context.Context, r *runtimeapi.RemoveImag
 		return nil, err
 	}
 
+	if imageInspect == nil {
+		// image is nil, assuming it doesn't exist.
+		return &runtimeapi.RemoveImageResponse{}, nil
+	}
+
 	// An image can have different numbers of RepoTags and RepoDigests.
 	// Iterating over both of them plus the image ID ensures the image really got removed.
 	// It also prevents images from being deleted, which actually are deletable using this approach.
