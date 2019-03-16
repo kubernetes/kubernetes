@@ -215,7 +215,7 @@ func initImageConfigs() map[int]Config {
 	configs[Iperf] = Config{e2eRegistry, "iperf", "1.0"}
 	configs[JessieDnsutils] = Config{e2eRegistry, "jessie-dnsutils", "1.0"}
 	configs[Kitten] = Config{e2eRegistry, "kitten", "1.0"}
-	configs[Liveness] = Config{e2eRegistry, "liveness", "1.0"}
+	configs[Liveness] = Config{e2eRegistry, "liveness", "1.1"}
 	configs[LogsGenerator] = Config{e2eRegistry, "logs-generator", "1.0"}
 	configs[Mounttest] = Config{e2eRegistry, "mounttest", "1.0"}
 	configs[MounttestUser] = Config{e2eRegistry, "mounttest-user", "1.0"}
