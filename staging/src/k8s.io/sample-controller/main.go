@@ -58,8 +58,23 @@ func main() {
 		klog.Fatalf("Error building example clientset: %s", err.Error())
 	}
 
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
-	exampleInformerFactory := informers.NewSharedInformerFactory(exampleClient, time.Second*30)
+	// Informers trigger events on resource changes, which typically queues
+	// a reconciliation of that resource.  The resync period acts as a
+	// safety net to protect against dropped events, and the informer will
+	// signal a "nop" event to trigger a reconciliation of every resource
+	// on this interval.  Small values here have an assortment of problems:
+	//  1. It can mask unhandled events.  If an event is not handled then
+	//    the associated resources will still be reconciled quickly and
+	//    likely not caught by e2e testing.
+	//  2. Doesn't scale well.  The default rest QPS limit is 5, so assuming
+	//    one call per reconcile a 30s period starts to strain at 150
+	//    resources (just with nop reconciles).  With 10h that number
+	//     becomes 180,000 resources.
+	// 10 hours is the resync period used by sigs.k8s.io/controller-runtime.
+	resyncPeriod := 10 * time.Hour
+
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, resyncPeriod)
+	exampleInformerFactory := informers.NewSharedInformerFactory(exampleClient, resyncPeriod)
 
 	controller := NewController(kubeClient, exampleClient,
 		kubeInformerFactory.Apps().V1().Deployments(),
