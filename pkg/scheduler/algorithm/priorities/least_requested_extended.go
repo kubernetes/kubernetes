@@ -44,7 +44,7 @@ func leastResourceScorerExtended(requested, allocable *schedulernodeinfo.Resourc
 	// EphemeralStorage
 	if allocable.EphemeralStorage != 0 {
 		result += leastRequestedScoreExtended(float32(requested.EphemeralStorage), float32(allocable.EphemeralStorage))
-		numOfResources += 1
+		numOfResources++
 	}
 	// ScalarResources
 	for key, value := range allocable.ScalarResources {
