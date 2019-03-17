@@ -163,6 +163,8 @@ type KubeletConfiguration struct {
 	NodeStatusReportFrequency metav1.Duration
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
 	NodeLeaseDurationSeconds int32
+	// imageWhitelist is the imagelist that garbage collection will ignore
+	ImageGCWhitelist []string
 	// imageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
 	ImageMinimumGCAge metav1.Duration

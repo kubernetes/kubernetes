@@ -128,6 +128,7 @@ ComponentConfigs:
     IPTablesMasqueradeBit: 14
     ImageGCHighThresholdPercent: 85
     ImageGCLowThresholdPercent: 80
+    ImageGCWhitelist: null
     ImageMinimumGCAge: 2m0s
     KubeAPIBurst: 10
     KubeAPIQPS: 5

@@ -328,6 +328,10 @@ type KubeletConfiguration struct {
 	// Default: 40
 	// +optional
 	NodeLeaseDurationSeconds int32 `json:"nodeLeaseDurationSeconds,omitempty"`
+	// imageWhitelist is the imagelist that garbage collection will ignore
+	// Default: nil
+	// +optional
+	ImageGCWhitelist []string `json:"imageGCWhitelist,omitempty"`
 	// imageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
