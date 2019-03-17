@@ -43,10 +43,10 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 // Create node with extended resources.
 func makeNodeWithAllResources(nodeName string, milliCPU, memory int64, ephemeralStorage int64, scalarResources map[v1.ResourceName]int64) *v1.Node {
 	node := makeNode(nodeName, milliCPU, memory)
-	// ephemeralStorage
+	// set capacity and allocatable for ephemeralStorage
 	node.Status.Capacity[v1.ResourceEphemeralStorage] = *resource.NewQuantity(ephemeralStorage, resource.DecimalSI)
 	node.Status.Allocatable[v1.ResourceEphemeralStorage] = *resource.NewQuantity(ephemeralStorage, resource.DecimalSI)
-	// scalarResources
+	// set capacity and allocatable for all scalarResources
 	for key, value := range scalarResources {
 		node.Status.Capacity[key] = *resource.NewQuantity(value, resource.DecimalSI)
 		node.Status.Allocatable[key] = *resource.NewQuantity(value, resource.DecimalSI)
