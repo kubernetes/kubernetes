@@ -148,6 +148,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
+				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -184,6 +185,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 			expected: []string{
 				"kube-apiserver",
+				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -228,6 +230,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 			expected: []string{
 				"kube-apiserver",
+				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -269,6 +272,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 			expected: []string{
 				"kube-apiserver",
+				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -312,6 +316,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
+				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=baz",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -357,6 +362,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
+				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -385,14 +391,14 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "secure-port extra-args",
+			name: "insecure-port extra-args",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir: testCertsDir,
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
 						ExtraArgs: map[string]string{
-							"secure-port": "123",
+							"insecure-port": "1234",
 						},
 					},
 				},
@@ -400,6 +406,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
+				"--insecure-port=1234",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -443,6 +450,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
+				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
