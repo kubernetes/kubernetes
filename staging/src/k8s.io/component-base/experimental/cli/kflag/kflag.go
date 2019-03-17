@@ -18,9 +18,58 @@ package kflag
 
 import (
 	"github.com/spf13/pflag"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	utilflag "k8s.io/component-base/cli/flag"
 )
 
+// TODO(mtaufen):
+// - Figure out how to do codegen.
+// - Figure out how to integrate codegen with standard k8s build processes (bazel, scripts, etc).
+
+//go:generate go run gen/gen.go -- kflag.go
+
+// +kflag:bool
+// +kflag:[]bool
+
+// +kflag:float32
+// +kflag:float64
+// +kflag:[]float32
+// +kflag:[]float64
+
+// +kflag:int
+// +kflag:int8
+// +kflag:int16
+// +kflag:int32
+// +kflag:int64
+// +kflag:[]int
+// +kflag:[]int8
+// +kflag:[]int16
+// +kflag:[]int32
+// +kflag:[]int64
+
+// +kflag:uint
+// +kflag:uint8
+// +kflag:uint16
+// +kflag:uint32
+// +kflag:uint64
+// +kflag:[]uint
+// +kflag:[]uint8
+// +kflag:[]uint16
+// +kflag:[]uint32
+// +kflag:[]uint64
+
+// +kflag:string
+// +kflag:[]string
+
+// +kflag:map[string]string
+// +kflag:map[string]bool
+
+// Possible TODO(mtaufen):
+// - IP, IPMask, IPNet, etc.
+// - Bytes
+// - Duration
+// - With maps, allow arbitrary specification of separator, e.g. "foo=bar" or "foo<bar" or "foo:bar", whatever you want
+
+// FlagSet tracks the registered flags.
 type FlagSet struct {
 	fs *pflag.FlagSet
 }
@@ -42,96 +91,61 @@ func (fs *FlagSet) Parse(args []string) error {
 	return fs.fs.Parse(args)
 }
 
-// Basic Int32Var approach, including a helper so components don't
-// have to repeatedly implement the basic apply for int32s.
+// // Example of a more complicated structure. In this case, we include
+// // two helpers, one to override the map completely, and another to
+// // merge the map while respecting flag precedence.
 
-type Int32Value struct {
-	name  string
-	value int32
-	fs    *pflag.FlagSet
-}
+// type MapStringBoolValue struct {
+// 	name  string
+// 	value map[string]bool
+// 	fs    *pflag.FlagSet
+// }
 
-// Int32Var registers an int32 flag against the FlagSet, and returns an Int32Value that
-// contains the scratch space the flag will be parsed into. This internal value
-// can be applied to a target location with the below helpers.
-func (fs *FlagSet) Int32Var(name string, def int32, usage string) *Int32Value {
-	v := &Int32Value{
-		name: name,
-		fs:   fs.fs,
-	}
-	fs.fs.Int32Var(&v.value, name, def, usage)
-	return v
-}
+// // MapStringBoolVar registers an int32 flag against the FlagSet, and returns a MapStringBoolValue that
+// // contains the scratch space the flag will be parsed into. This internal value
+// // can be applied to a target location with the below helpers.
+// func (fs *FlagSet) MapStringBoolVar(name string, def map[string]bool, usage string) *MapStringBoolValue {
+// 	val := &MapStringBoolValue{
+// 		name:  name,
+// 		value: make(map[string]bool),
+// 		fs:    fs.fs,
+// 	}
+// 	for k, v := range def {
+// 		val.value[k] = v
+// 	}
+// 	fs.fs.Var(utilflag.NewMapStringBool(&val.value), name, usage)
+// 	return val
+// }
 
-// Set copies the internal value to the target location if the flag was set.
-func (v *Int32Value) Set(target *int32) {
-	if v.fs.Changed(v.name) {
-		*target = v.value
-	}
-}
+// // Set copies the map over the target if the flag was set.
+// // It completely overwrites any existing target.
+// func (v *MapStringBoolValue) Set(target *map[string]bool) {
+// 	if v.fs.Changed(v.name) {
+// 		*target = make(map[string]bool)
+// 		for k, v := range v.value {
+// 			(*target)[k] = v
+// 		}
+// 	}
+// }
 
-// Apply calls the user-provided apply function with the internal value if the flag was set.
-func (v *Int32Value) Apply(apply func(value int32)) {
-	if v.fs.Changed(v.name) {
-		apply(v.value)
-	}
-}
+// // Merge copies the map keys/values piecewise into the target if the flag was set.
+// func (v *MapStringBoolValue) Merge(target *map[string]bool) {
+// 	if v.fs.Changed(v.name) {
+// 		if *target == nil {
+// 			*target = make(map[string]bool)
+// 		}
+// 		for k, v := range v.value {
+// 			(*target)[k] = v
+// 		}
+// 	}
+// }
 
-// Example of a more complicated structure. In this case, we include
-// two helpers, one to override the map completely, and another to
-// merge the map while respecting flag precedence.
-
-type MapStringBoolValue struct {
-	name  string
-	value map[string]bool
-	fs    *pflag.FlagSet
-}
-
-// MapStringBoolVar registers an int32 flag against the FlagSet, and returns a MapStringBoolValue that
-// contains the scratch space the flag will be parsed into. This internal value
-// can be applied to a target location with the below helpers.
-func (fs *FlagSet) MapStringBoolVar(name string, def map[string]bool, usage string) *MapStringBoolValue {
-	val := &MapStringBoolValue{
-		name:  name,
-		value: make(map[string]bool),
-		fs:    fs.fs,
-	}
-	for k, v := range def {
-		val.value[k] = v
-	}
-	fs.fs.Var(utilflag.NewMapStringBool(&val.value), name, usage)
-	return val
-}
-
-// Set copies the map over the target if the flag was set.
-// It completely overwrites any existing target.
-func (v *MapStringBoolValue) Set(target *map[string]bool) {
-	if v.fs.Changed(v.name) {
-		*target = make(map[string]bool)
-		for k, v := range v.value {
-			(*target)[k] = v
-		}
-	}
-}
-
-// Merge copies the map keys/values piecewise into the target if the flag was set.
-func (v *MapStringBoolValue) Merge(target *map[string]bool) {
-	if v.fs.Changed(v.name) {
-		if *target == nil {
-			*target = make(map[string]bool)
-		}
-		for k, v := range v.value {
-			(*target)[k] = v
-		}
-	}
-}
-
-// Apply calls the user-provided apply function with the map if the flag was set.
-func (v *MapStringBoolValue) Apply(apply func(value map[string]bool)) {
-	if v.fs.Changed(v.name) {
-		apply(v.value)
-	}
-}
+// // Apply calls the user-provided apply function with the map if the flag was set.
+// func (v *MapStringBoolValue) Apply(apply func(value map[string]bool)) {
+// 	if v.fs.Changed(v.name) {
+// 		apply(v.value)
+// 	}
+// }
 
 // One way to deal with the generic Var flag. In this case, users provide a pre-defaulted
 // scratch space, since we don't know how to construct the underlying type.
