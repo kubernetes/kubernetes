@@ -25,6 +25,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 )
 
 var class1Parameters = map[string]string{
@@ -191,13 +192,11 @@ func TestProvisionSync(t *testing.T) {
 			// The claim would be bound in next syncClaim
 			newClaimArray("claim11-7", "uid11-7", "1Gi", "", v1.ClaimPending, &classGold, annStorageProvisioner),
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Create a volume before provisionClaimOperation starts.
 				// This similates a parallel controller provisioning the volume.
-				reactor.lock.Lock()
 				volume := newVolume("pvc-uid11-7", "1Gi", "uid11-7", "claim11-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, annBoundByController, annDynamicallyProvisioned)
-				reactor.volumes[volume.Name] = volume
-				reactor.lock.Unlock()
+				reactor.AddVolume(volume)
 			}),
 		},
 		{
@@ -210,7 +209,7 @@ func TestProvisionSync(t *testing.T) {
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim11-8", "uid11-8", "1Gi", "", v1.ClaimPending, &classGold, annStorageProvisioner),
 			[]string{"Normal ProvisioningSucceeded"},
-			[]reactorError{
+			[]pvtesting.ReactorError{
 				// Inject error to the first
 				// kubeclient.PersistentVolumes.Create() call. All other calls
 				// will succeed.
@@ -227,7 +226,7 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-9", "uid11-9", "1Gi", "", v1.ClaimPending, &classGold),
 			newClaimArray("claim11-9", "uid11-9", "1Gi", "", v1.ClaimPending, &classGold, annStorageProvisioner),
 			[]string{"Warning ProvisioningFailed"},
-			[]reactorError{
+			[]pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
 				{"create", "persistentvolumes", errors.New("Mock creation error1")},
@@ -252,7 +251,7 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-10", "uid11-10", "1Gi", "", v1.ClaimPending, &classGold),
 			newClaimArray("claim11-10", "uid11-10", "1Gi", "", v1.ClaimPending, &classGold, annStorageProvisioner),
 			[]string{"Warning ProvisioningFailed", "Warning ProvisioningCleanupFailed"},
-			[]reactorError{
+			[]pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
 				{"create", "persistentvolumes", errors.New("Mock creation error1")},
@@ -273,7 +272,7 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-11", "uid11-11", "1Gi", "", v1.ClaimPending, &classGold),
 			newClaimArray("claim11-11", "uid11-11", "1Gi", "", v1.ClaimPending, &classGold, annStorageProvisioner),
 			[]string{"Warning ProvisioningFailed", "Warning ProvisioningCleanupFailed"},
-			[]reactorError{
+			[]pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
 				{"create", "persistentvolumes", errors.New("Mock creation error1")},
@@ -303,7 +302,7 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-12", "uid11-12", "1Gi", "", v1.ClaimPending, &classGold),
 			newClaimArray("claim11-12", "uid11-12", "1Gi", "", v1.ClaimPending, &classGold, annStorageProvisioner),
 			[]string{"Warning ProvisioningFailed"},
-			[]reactorError{
+			[]pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
 				{"create", "persistentvolumes", errors.New("Mock creation error1")},
@@ -397,7 +396,7 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-19", "uid11-19", "1Gi", "", v1.ClaimPending, &classGold),
 			newClaimArray("claim11-19", "uid11-19", "1Gi", "", v1.ClaimPending, &classGold, annStorageProvisioner),
 			noevents,
-			[]reactorError{
+			[]pvtesting.ReactorError{
 				// Inject errors to simulate crashed API server during
 				// kubeclient.PersistentVolumes.Create()
 				{"create", "persistentvolumes", errors.New("Mock creation error1")},
