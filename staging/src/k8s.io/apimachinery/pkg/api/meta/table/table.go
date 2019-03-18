@@ -67,5 +67,5 @@ func ConvertToHumanReadableDateType(timestamp metav1.Time) string {
 	if timestamp.IsZero() {
 		return "<unknown>"
 	}
-	return duration.HumanDuration(time.Now().Sub(timestamp.Time))
+	return duration.HumanDuration(time.Since(timestamp.Time))
 }
