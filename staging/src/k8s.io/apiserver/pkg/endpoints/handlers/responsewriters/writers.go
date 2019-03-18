@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -125,7 +126,11 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, innerW http.Resp
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
 // The context is optional and can be nil.
 func WriteObjectNegotiated(s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+	fmt.Println("A")
 	serializer, err := negotiation.NegotiateOutputSerializer(req, s)
+	//TODO(aaron-prindle)
+	// err = fmt.Errorf("FAKE ERROR")
+	time.Sleep(2 * time.Second)
 	if err != nil {
 		// if original statusCode was not successful we need to return the original error
 		// we cannot hide it behind negotiation problems
@@ -138,6 +143,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, gv schema.GroupVersio
 		return
 	}
 
+	fmt.Println("Y")
 	if ae := request.AuditEventFrom(req.Context()); ae != nil {
 		audit.LogResponseObject(ae, object, gv, s)
 	}
@@ -149,6 +155,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, gv schema.GroupVersio
 // ErrorNegotiated renders an error to the response. Returns the HTTP status code of the error.
 // The context is optional and may be nil.
 func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request) int {
+	fmt.Println("B")
 	status := ErrorToAPIStatus(err)
 	code := int(status.Code)
 	// when writing an error, check to see if the status indicates a retry after period
@@ -169,6 +176,7 @@ func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupV
 // errSerializationFatal renders an error to the response, and if codec fails will render plaintext.
 // Returns the HTTP status code of the error.
 func errSerializationFatal(err error, codec runtime.Encoder, w httpResponseWriterWithInit) {
+	fmt.Println("C")
 	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
 	status := ErrorToAPIStatus(err)
 	candidateStatusCode := int(status.Code)

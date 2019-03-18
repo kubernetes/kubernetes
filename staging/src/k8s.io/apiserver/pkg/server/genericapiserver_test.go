@@ -25,10 +25,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	goruntime "runtime"
-	"runtime/debug"
-	"runtime/pprof"
 	"strconv"
 	"sync"
 	"testing"
@@ -227,10 +224,227 @@ func TestInstallAPIGroups(t *testing.T) {
 		// should serve APIGroup at group path
 		info := &apis[i]
 		path := groupPaths[i]
+		fmt.Println(server.URL + path)
 		resp, err := http.Get(server.URL + path)
 		if err != nil {
 			t.Errorf("[%d] unexpected error getting path %q path: %v", i, path, err)
 			continue
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Errorf("[%d] unexpected error reading body at path %q: %v", i, path, err)
+			continue
+		}
+
+		t.Logf("[%d] json at %s: %s", i, path, string(body))
+
+		if i == 0 {
+			// legacy API returns APIVersions
+			group := metav1.APIVersions{}
+			err = json.Unmarshal(body, &group)
+			if err != nil {
+				t.Errorf("[%d] unexpected error parsing json body at path %q: %v", i, path, err)
+				continue
+			}
+		} else {
+			// API groups return APIGroup
+			group := metav1.APIGroup{}
+			err = json.Unmarshal(body, &group)
+			if err != nil {
+				t.Errorf("[%d] unexpected error parsing json body at path %q: %v", i, path, err)
+				continue
+			}
+
+			if got, expected := group.Name, info.PrioritizedVersions[0].Group; got != expected {
+				t.Errorf("[%d] unexpected group name at path %q: got=%q expected=%q", i, path, got, expected)
+				continue
+			}
+
+			if got, expected := group.PreferredVersion.Version, info.PrioritizedVersions[0].Version; got != expected {
+				t.Errorf("[%d] unexpected group version at path %q: got=%q expected=%q", i, path, got, expected)
+				continue
+			}
+		}
+
+		// should serve APIResourceList at group path + /<group-version>
+		path = path + "/" + info.PrioritizedVersions[0].Version
+		resp, err = http.Get(server.URL + path)
+		if err != nil {
+			t.Errorf("[%d] unexpected error getting path %q path: %v", i, path, err)
+			continue
+		}
+
+		body, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Errorf("[%d] unexpected error reading body at path %q: %v", i, path, err)
+			continue
+		}
+
+		t.Logf("[%d] json at %s: %s", i, path, string(body))
+
+		resources := metav1.APIResourceList{}
+		err = json.Unmarshal(body, &resources)
+		if err != nil {
+			t.Errorf("[%d] unexpected error parsing json body at path %q: %v", i, path, err)
+			continue
+		}
+
+		if got, expected := resources.GroupVersion, info.PrioritizedVersions[0].String(); got != expected {
+			t.Errorf("[%d] unexpected groupVersion at path %q: got=%q expected=%q", i, path, got, expected)
+			continue
+		}
+
+		// the verbs should match the features of resources
+		for _, r := range resources.APIResources {
+			switch r.Name {
+			case "getter":
+				if got, expected := sets.NewString([]string(r.Verbs)...), sets.NewString("get"); !got.Equal(expected) {
+					t.Errorf("[%d] unexpected verbs for resource %s/%s: got=%v expected=%v", i, resources.GroupVersion, r.Name, got, expected)
+				}
+			case "noverbs":
+				if r.Verbs == nil {
+					t.Errorf("[%d] unexpected nil verbs slice. Expected: []string{}", i)
+				}
+				if got, expected := sets.NewString([]string(r.Verbs)...), sets.NewString(); !got.Equal(expected) {
+					t.Errorf("[%d] unexpected verbs for resource %s/%s: got=%v expected=%v", i, resources.GroupVersion, r.Name, got, expected)
+				}
+			}
+		}
+	}
+}
+
+var timeout = time.Duration(1 * time.Nanosecond)
+
+func dialTimeout(network, addr string) (net.Conn, error) {
+	return net.DialTimeout(network, addr, timeout)
+}
+
+// Verifies that AddGroupVersions works as expected.
+func TestAPIServer500v5(t *testing.T) {
+	config, assert := setUp(t)
+
+	// TODO(aaron-prindle)
+	transport := &http.Transport{
+		Dial: (&net.Dialer{
+			// Timeout: 1 * time.Millisecond,
+		}).Dial,
+		// TLSHandshakeTimeout: 2 * time.Millisecond,
+	}
+
+	// transport := &http.Transport{
+	// 	Proxy:                 http.ProxyFromEnvironment,
+	// 	ResponseHeaderTimeout: time.Nanosecond * 200,
+	// }
+
+	// transport := &http.Transport{
+	// 	Dial: dialTimeout,
+	// }
+
+	// transport = &http.Transport{ MaxIdleConns: 1, MaxIdleConnsPerHost: 1, IdleConnTimeout: 5 * time.Second }
+
+	client := &http.Client{
+		// Timeout:   5 * time.Second,
+		Transport: transport,
+	}
+
+	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
+	config.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: "ExternalAddress"}
+
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
+
+	testAPI := func(gv schema.GroupVersion) APIGroupInfo {
+		getter, noVerbs := testGetterStorage{}, testNoVerbsStorage{}
+
+		scheme := runtime.NewScheme()
+		scheme.AddKnownTypeWithName(gv.WithKind("Getter"), getter.New())
+		scheme.AddKnownTypeWithName(gv.WithKind("NoVerb"), noVerbs.New())
+		scheme.AddKnownTypes(v1GroupVersion, &metav1.Status{})
+		metav1.AddToGroupVersion(scheme, v1GroupVersion)
+
+		return APIGroupInfo{
+			PrioritizedVersions: []schema.GroupVersion{gv},
+			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				gv.Version: {
+					"getter":  &testGetterStorage{Version: gv.Version},
+					"noverbs": &testNoVerbsStorage{Version: gv.Version},
+				},
+			},
+			OptionsExternalVersion: &schema.GroupVersion{Version: "v1"},
+			ParameterCodec:         parameterCodec,
+			NegotiatedSerializer:   codecs,
+			Scheme:                 scheme,
+		}
+	}
+
+	apis := []APIGroupInfo{
+		testAPI(schema.GroupVersion{Group: "", Version: "v1"}),
+		testAPI(schema.GroupVersion{Group: extensionsGroupName, Version: "v1"}),
+		testAPI(schema.GroupVersion{Group: "batch", Version: "v1"}),
+	}
+
+	err = s.InstallLegacyAPIGroup("/apiPrefix", &apis[0])
+	assert.NoError(err)
+	groupPaths := []string{
+		config.LegacyAPIGroupPrefixes.List()[0], // /apiPrefix
+	}
+	for _, api := range apis[1:] {
+		err = s.InstallAPIGroup(&api)
+		assert.NoError(err)
+		groupPaths = append(groupPaths, APIGroupPrefix+"/"+api.PrioritizedVersions[0].Group) // /apis/<group>
+	}
+
+	server := httptest.NewServer(s.Handler)
+	defer server.Close()
+
+	var resp *http.Response
+	for i := range apis {
+		// should serve APIGroup at group path
+		info := &apis[i]
+		path := groupPaths[i]
+
+		// Get a set of pipes, we'll use these to send data to the server
+		// pipeReader, pipeWriter := io.Pipe()
+
+		// Initialize the request
+		for i := 0; i < 10; i++ {
+			req, err := http.NewRequest("GET", server.URL+path, nil)
+			// req, err := http.NewRequest("GET", server.URL+path, pipeReader)
+			if err != nil {
+				// pipeWriter.Close()
+				// pipeReader.Close()
+				t.Fatalf("Error while initializing http request: %v", err)
+			}
+			// ctx, _ := context.WithTimeout(context.Background(), 1 * time.Second)
+			// req = req.WithContext(ctx)
+			// req.WithContext(ctx)
+			resp, err = client.Do(req)
+			// transport.CancelRequest(req)
+			// time.Sleep(5 * time.Minute)
+			if err != nil {
+				t.Fatalf("Error while initializing http request: %v", err)
+			}
+		}
+		// Set the body of the request to the reader end of our pipe, and initiate the request.
+		// req.Body = pipeReader
+		// resp, err := c.Do(req)
+		// if err != nil {
+		//     pipeWriter.Close()
+		//     log.Fatalf("Error during http call: %v", err)
+		// }
+
+		// resp, err := http.Get(server.URL + path)
+		// TODO(aaron-prindle)
+		// resp, err := client.Get(server.URL + path)
+		if err != nil {
+			t.Errorf("[%d] unexpected error getting path %q path: %v", i, path, err)
+			continue
+		} else {
+			time.Sleep(5 * time.Second)
+			return
 		}
 
 		body, err := ioutil.ReadAll(resp.Body)
@@ -342,41 +556,68 @@ func TestPrepareRun(t *testing.T) {
 	assert.Equal(http.StatusOK, resp.StatusCode)
 }
 
-func TestAPIServer500v3(t *testing.T) {
+func TestAPIServer500v4(t *testing.T) {
 	s, config, assert := newMaster(t)
+	s.PrepareRun()
+	s.RunPostStartHooks(make(chan struct{}))
+
+	assert.NotNil(config.OpenAPIConfig)
 
 	timeout := time.Duration(1 * time.Nanosecond)
 	client := http.Client{
 		Timeout: timeout,
 	}
 
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
+
+	handler := http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
+		// time.Sleep(20 * time.Second)
+		t.Log("called")
+	})
+	s.Handler.NonGoRestfulMux.Handle("/generror", handler)
+	server := httptest.NewServer(s.Handler)
+	defer server.Close()
+
+	for i := 0; i < 100; i++ {
+		_, err = client.Get(server.URL + "/generror")
+		// t.Log(pprof.Lookup("goroutine").WriteTo(os.Stdout, 1))
+	}
+
+	time.Sleep(3 * time.Second)
+	assert.Error(err)
+}
+
+func TestAPIServer500v3(t *testing.T) {
+	s, config, assert := newMaster(t)
+	s.PrepareRun()
+	s.RunPostStartHooks(make(chan struct{}))
+
 	assert.NotNil(config.OpenAPIConfig)
+
+	timeout := time.Duration(1 * time.Nanosecond)
+	client := http.Client{
+		Timeout: timeout,
+	}
+
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
 
 	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
 
-	// var resp *http.Response
-	var err error
-	// openapi is installed in PrepareRunq
 	for i := 0; i < 100; i++ {
-		// _, err = client.Get(server.URL + "/api")
-		_, err = client.Get(server.URL + "/apis")
-		// t.Log(string(debug.Stack()))
-		t.Log(pprof.Lookup("goroutine").WriteTo(os.Stdout, 1))
+		// _, err = client.Get(server.URL + "/apis")
+		_, err = client.Get(server.URL + "/apis/")
+		// t.Log(pprof.Lookup("goroutine").WriteTo(os.Stdout, 1))
 	}
 
-	// assert.NoError(err)
 	time.Sleep(3 * time.Second)
 	assert.Error(err)
-	// assert.Equal(http.StatusInternalServerError, resp.StatusCode)
-
-	// healthz checks are installed in PrepareRun
-	// resp, err = http.Get(server.URL + "/healthz")
-	// assert.NoError(err)
-	// assert.Equal(http.StatusOK, resp.StatusCode)
-	// resp, err = http.Get(server.URL + "/healthz/ping")
-	// assert.NoError(err)
-	// assert.Equal(http.StatusOK, resp.StatusCode)
 }
 
 func TestUpdateOpenAPISpec(t *testing.T) {
@@ -417,86 +658,6 @@ func TestUpdateOpenAPISpec(t *testing.T) {
 	body, err = ioutil.ReadAll(resp.Body)
 	assert.NoError(err)
 	assert.Equal(newSpec, body)
-}
-func TestAPIserver500(t *testing.T) {
-	timeout := time.Duration(5 * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-	}
-
-	// s, _, _ := newMaster(t)
-	s, _, assert := newMaster(t)
-	s.PrepareRun()
-	s.RunPostStartHooks(make(chan struct{}))
-
-	server := httptest.NewServer(s.Handler.Director)
-	defer server.Close()
-
-	// var called bool
-	resp, err := client.Get(server.URL + "/")
-	assert.NoError(err)
-	assert.Equal(http.StatusOK, resp.StatusCode)
-	t.Log(string(debug.Stack()))
-
-	time.Sleep(20 * time.Second)
-	// if !called {
-	// 	t.Errorf("Expected handler to be called.")
-	// }
-}
-
-// TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.
-func TestAPIServer500v2(t *testing.T) {
-	config, _ := setUp(t)
-
-	var protected, called bool
-
-	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			// time.Sleep(20 * time.Second)
-			protected = true
-			apiHandler.ServeHTTP(w, req)
-		})
-	}
-	handler := http.HandlerFunc(func(r http.ResponseWriter, req *http.Request) {
-		// time.Sleep(20 * time.Second)
-		called = true
-	})
-
-	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
-	if err != nil {
-		t.Fatalf("Error in bringing up the server: %v", err)
-	}
-
-	s.Handler.NonGoRestfulMux.Handle("/nonswagger", handler)
-	s.Handler.NonGoRestfulMux.Handle("/secret", handler)
-
-	type Test struct {
-		handler   http.Handler
-		path      string
-		protected bool
-	}
-	for i, test := range []Test{
-		{s.Handler, "/nonswagger", true},
-		{s.Handler, "/secret", true},
-	} {
-		protected, called = false, false
-
-		var w io.Reader
-		req, err := http.NewRequest("GET", test.path, w)
-		if err != nil {
-			t.Errorf("%d: Unexpected http error: %v", i, err)
-			continue
-		}
-
-		test.handler.ServeHTTP(httptest.NewRecorder(), req)
-
-		if !called {
-			t.Errorf("%d: Expected handler to be called.", i)
-		}
-		if test.protected != protected {
-			t.Errorf("%d: Expected protected=%v, got protected=%v.", i, test.protected, protected)
-		}
-	}
 }
 
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.

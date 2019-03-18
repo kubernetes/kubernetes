@@ -34,20 +34,25 @@ type statusError interface {
 func ErrorToAPIStatus(err error) *metav1.Status {
 	switch t := err.(type) {
 	case statusError:
+		fmt.Println("1")
 		status := t.Status()
 		if len(status.Status) == 0 {
 			status.Status = metav1.StatusFailure
 		}
 		switch status.Status {
 		case metav1.StatusSuccess:
+			fmt.Println("2")
 			if status.Code == 0 {
 				status.Code = http.StatusOK
 			}
 		case metav1.StatusFailure:
+			fmt.Println("3")
 			if status.Code == 0 {
 				status.Code = http.StatusInternalServerError
 			}
 		default:
+			fmt.Println("4")
+
 			runtime.HandleError(fmt.Errorf("apiserver received an error with wrong status field : %#+v", err))
 			if status.Code == 0 {
 				status.Code = http.StatusInternalServerError
@@ -62,12 +67,14 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 		switch {
 		//TODO: replace me with NewConflictErr
 		case storage.IsConflict(err):
+			fmt.Println("5")
 			status = http.StatusConflict
 		}
 		// Log errors that were not converted to an error status
 		// by REST storage - these typically indicate programmer
 		// error by not using pkg/api/errors, or unexpected failure
 		// cases.
+		fmt.Println("6")
 		runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %#+v", err))
 		return &metav1.Status{
 			TypeMeta: metav1.TypeMeta{

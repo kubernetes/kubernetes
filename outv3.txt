@@ -1,0 +1,192 @@
+=== RUN   TestAPIServer500v3
+W0314 14:14:05.949670  174952 authorization.go:47] Authorization is disabled
+W0314 14:14:05.949753  174952 authentication.go:55] Authentication is disabled
+W0314 14:14:05.951723  174952 authorization.go:47] Authorization is disabled
+W0314 14:14:05.951736  174952 authentication.go:55] Authentication is disabled
+A
+Z
+6
+E0314 14:14:05.956825  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.957467  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.957798  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.957882  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.957954  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.958238  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.958311  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.958692  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.958819  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.958996  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.959312  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.959382  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.959562  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.960455  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.961176  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.961452  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.961633  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.961789  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.961914  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.962281  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.962721  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.962935  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.963159  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.963292  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.963341  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.963422  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.964014  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.964211  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.964272  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.964382  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.964522  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.964715  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.964980  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.966126  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.967394  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.967545  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.967563  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.967664  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.967718  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.967943  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.968110  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.968249  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.968527  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.968630  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.968680  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+A
+Z
+6
+E0314 14:14:05.968901  174952 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+--- PASS: TestAPIServer500v3 (3.02s)
+PASS
+ok  	k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server	(cached)

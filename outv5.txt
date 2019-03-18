@@ -1,0 +1,56 @@
+=== RUN   TestAPIServer500v5
+W0315 13:38:50.886576  210960 authorization.go:47] Authorization is disabled
+W0315 13:38:50.887230  210960 authentication.go:55] Authentication is disabled
+in withPanicRecovery handler!!!!
+A
+6
+E0315 13:38:50.907737  210960 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+500
+in withPanicRecovery handler!!!!
+A
+6
+E0315 13:38:50.908272  210960 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+500
+in withPanicRecovery handler!!!!
+A
+6
+E0315 13:38:50.912357  210960 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+500
+in withPanicRecovery handler!!!!
+A
+6
+E0315 13:38:50.915103  210960 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+500
+in withPanicRecovery handler!!!!
+A
+6
+E0315 13:38:50.915600  210960 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+500
+in withPanicRecovery handler!!!!
+A
+6
+E0315 13:38:50.916697  210960 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+500
+in withPanicRecovery handler!!!!
+A
+6
+E0315 13:38:50.917621  210960 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+500
+in withPanicRecovery handler!!!!
+A
+6
+E0315 13:38:50.918759  210960 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+500
+in withPanicRecovery handler!!!!
+A
+6
+E0315 13:38:50.919798  210960 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+500
+in withPanicRecovery handler!!!!
+A
+6
+E0315 13:38:50.920861  210960 status.go:78] apiserver received an error that is not an metav1.Status: &errors.errorString{s:"FAKE ERROR"}
+500
+--- PASS: TestAPIServer500v5 (5.04s)
+PASS
+ok  	k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server	5.360s

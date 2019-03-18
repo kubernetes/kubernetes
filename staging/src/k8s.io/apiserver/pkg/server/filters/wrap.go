@@ -40,7 +40,7 @@ func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWrit
 			crashHandler(w, req, err)
 		})
 
-		fmt.Println("HELLO!!!!!!")
+		fmt.Println("in withPanicRecovery handler!!!!")
 		logger := httplog.NewLogged(req, &w)
 		defer logger.Log()
 
