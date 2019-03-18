@@ -20,8 +20,6 @@
 ./cluster/pre-existing/util.sh
 ./cluster/restore-from-backup.sh
 ./cluster/test-e2e.sh
-./cluster/test-network.sh
-./cluster/test-smoke.sh
 ./cluster/validate-cluster.sh
 ./hack/cherry_pick_pull.sh
 ./hack/ginkgo-e2e.sh
