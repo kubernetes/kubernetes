@@ -24,6 +24,7 @@ package cache
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -183,6 +184,8 @@ type volumeToAttach struct {
 	// the name of the pod and the value is a pod object containing more
 	// information about the pod.
 	scheduledPods map[types.UniquePodName]pod
+
+	attachRequestTime time.Time
 }
 
 // The pod represents a pod that references the underlying volume and is
@@ -248,6 +251,7 @@ func (dsw *desiredStateOfWorld) AddPod(
 			volumeName:               volumeName,
 			spec:                     volumeSpec,
 			scheduledPods:            make(map[types.UniquePodName]pod),
+			attachRequestTime:        time.Now(),
 		}
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volumeObj
 	}
@@ -383,6 +387,7 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 						VolumeSpec:               volumeObj.spec,
 						NodeName:                 nodeName,
 						ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
+						AttachRequestTime:        volumeObj.attachRequestTime,
 					}})
 		}
 	}

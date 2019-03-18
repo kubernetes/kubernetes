@@ -274,6 +274,9 @@ type VolumeToAttach struct {
 	// the name of the pod and the value is a pod object containing more
 	// information about the pod.
 	ScheduledPods []*v1.Pod
+
+	// AttachRequestTime stores time at which attach was issued.
+	AttachRequestTime time.Time
 }
 
 // GenerateMsgDetailed returns detailed msgs for volumes to attach
@@ -284,6 +287,11 @@ func (volume *VolumeToAttach) GenerateMsgDetailed(prefixMsg, suffixMsg string) (
 		volumeSpecName = volume.VolumeSpec.Name()
 	}
 	return generateVolumeMsgDetailed(prefixMsg, suffixMsg, volumeSpecName, detailedStr)
+}
+
+// GetOperationRequestTime returns time at which attach operation was performed.
+func (volume VolumeToAttach) GetOperationRequestTime() time.Time {
+	return volume.AttachRequestTime
 }
 
 // GenerateMsg returns simple and detailed msgs for volumes to attach

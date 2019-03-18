@@ -387,10 +387,12 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		return nil, nil
 	}
 
+	qualifiedPluginName := util.GetFullQualifiedPluginNameForVolume(attachableVolumePlugin.GetPluginName(), volumeToAttach.VolumeSpec)
+
 	return volumetypes.GeneratedOperations{
 		OperationFunc:     attachVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(attachableVolumePlugin.GetPluginName(), volumeToAttach.VolumeSpec), "volume_attach"),
+		CompleteFunc:      util.CaptureTotalOpTime(volumeToAttach, qualifiedPluginName, "volume_attach"),
 	}, nil
 }
 
