@@ -46,7 +46,6 @@ type CertificateSigningRequest struct {
 // Kubernetes and cannot be modified by users.
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
-	// The value should be base64 encoded when specified in JSON or YAML.
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
 	// allowedUsages specifies a set of usage contexts the key will be

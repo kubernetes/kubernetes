@@ -92,7 +92,6 @@ type AdmissionResponse struct {
 	Result *metav1.Status `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 
 	// The patch body. Currently we only support "JSONPatch" which implements RFC 6902.
-	// The value should be base64 encoded when specified in JSON or YAML.
 	// +optional
 	Patch []byte `json:"patch,omitempty" protobuf:"bytes,4,opt,name=patch"`
 
