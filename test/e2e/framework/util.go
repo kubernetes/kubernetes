@@ -1060,7 +1060,7 @@ func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c c
 func findAvailableNamespaceName(baseName string, c clientset.Interface) (string, error) {
 	var name string
 	err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
-		name = fmt.Sprintf("%v-%v", baseName, randomSuffix())
+		name = fmt.Sprintf("%v-%v", baseName, RandomSuffix())
 		_, err := c.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
 		if err == nil {
 			// Already taken
@@ -2154,7 +2154,7 @@ func LoadClientset() (*clientset.Clientset, error) {
 //       for pods and replication controllers so we don't
 //       need to use such a function and can instead
 //       use the UUID utility function.
-func randomSuffix() string {
+func RandomSuffix() string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return strconv.Itoa(r.Int() % 10000)
 }
