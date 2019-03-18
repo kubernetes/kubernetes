@@ -399,12 +399,12 @@ func TestProxyUpgrade(t *testing.T) {
 			}))
 
 			backendServer := httptest.NewUnstartedServer(backendHandler)
-			if cert, err := tls.X509KeyPair(svcCrt, svcKey); err != nil {
+			cert, err := tls.X509KeyPair(svcCrt, svcKey)
+			if err != nil {
 				t.Errorf("https (valid hostname): %v", err)
 				return
-			} else {
-				backendServer.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
 			}
+			backendServer.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
 			backendServer.StartTLS()
 			defer backendServer.Close()
 

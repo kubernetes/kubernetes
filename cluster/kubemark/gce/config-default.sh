@@ -19,12 +19,15 @@
 # gce/util.sh script which assumes config filename), but if some things that
 # are enabled by default should not run in hollow clusters, they should be disabled here.
 
+# shellcheck disable=SC2034 # Variables sourced in other scripts.
+
 source "${KUBE_ROOT}/cluster/gce/config-common.sh"
 
 GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
 REGION=${ZONE%-*}
 NUM_NODES=${KUBEMARK_NUM_NODES:-10}
+NUM_WINDOWS_NODES=${KUBEMARK_NUM_WINDOWS_NODES:-0}
 MASTER_SIZE=${KUBEMARK_MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-$(get-master-disk-size)}
@@ -37,7 +40,7 @@ EVENT_PD=${EVENT_PD:-false}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-gci}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-gci}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-cos-stable-65-10323-64-0}
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-cos-beta-73-11647-64-0}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 CLEANUP_KUBEMARK_IMAGE=${CLEANUP_KUBEMARK_IMAGE:-true}
 
@@ -114,7 +117,7 @@ ENABLE_KUBEMARK_CLUSTER_AUTOSCALER="${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-false}
 # (e.g. kubemark master, Heapster) enough resources to handle maximum cluster size.
 if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER}" == "true" ]]; then
   NUM_REPLICAS=1
-  if [[ ! -z "$NUM_NODES" ]]; then
+  if [[ -n "$NUM_NODES" ]]; then
     echo "WARNING: Using Cluster Autoscaler, ignoring NUM_NODES parameter. Set KUBEMARK_AUTOSCALER_MAX_NODES to specify maximum size of the cluster."
   fi
 fi

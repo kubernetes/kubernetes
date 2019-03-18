@@ -27,8 +27,8 @@ import (
 )
 
 // CalculateNodeAffinityPriorityMap prioritizes nodes according to node affinity scheduling preferences
-// indicated in PreferredDuringSchedulingIgnoredDuringExecution. Each time a node matchs a preferredSchedulingTerm,
-// it will a get an add of preferredSchedulingTerm.Weight. Thus, the more preferredSchedulingTerms
+// indicated in PreferredDuringSchedulingIgnoredDuringExecution. Each time a node matches a preferredSchedulingTerm,
+// it will get an add of preferredSchedulingTerm.Weight. Thus, the more preferredSchedulingTerms
 // the node satisfies and the more the preferredSchedulingTerm that is satisfied weights, the higher
 // score the node gets.
 func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {

@@ -35,6 +35,7 @@ go_library(
         "vsphere_volume_placement.go",
         "vsphere_volume_vpxd_restart.go",
         "vsphere_volume_vsan_policy.go",
+        "vsphere_zone_support.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/storage/vsphere",
     deps = [
@@ -59,6 +60,8 @@ go_library(
         "//vendor/github.com/vmware/govmomi/find:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
         "//vendor/github.com/vmware/govmomi/session:go_default_library",
+        "//vendor/github.com/vmware/govmomi/vapi/rest:go_default_library",
+        "//vendor/github.com/vmware/govmomi/vapi/tags:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",

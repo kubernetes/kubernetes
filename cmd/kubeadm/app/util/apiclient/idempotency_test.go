@@ -22,7 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 func TestPatchNodeNonErrorCases(t *testing.T) {
@@ -38,7 +37,7 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 			node: v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "testnode",
-					Labels: map[string]string{kubeletapis.LabelHostname: ""},
+					Labels: map[string]string{v1.LabelHostname: ""},
 				},
 			},
 			success: true,
@@ -63,7 +62,7 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
-			_, err := client.Core().Nodes().Create(&tc.node)
+			_, err := client.CoreV1().Nodes().Create(&tc.node)
 			if err != nil {
 				t.Fatalf("failed to create node to fake client: %v", err)
 			}

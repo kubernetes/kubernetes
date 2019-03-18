@@ -177,6 +177,12 @@ type Store struct {
 	// resource. It is wrapped into a "DryRunnableStorage" that will
 	// either pass-through or simply dry-run.
 	Storage DryRunnableStorage
+	// StorageVersioner outputs the <group/version/kind> an object will be
+	// converted to before persisted in etcd, given a list of possible
+	// kinds of the object.
+	// If the StorageVersioner is nil, apiserver will leave the
+	// storageVersionHash as empty in the discovery document.
+	StorageVersioner runtime.GroupVersioner
 	// Called to cleanup clients used by the underlying Storage; optional.
 	DestroyFunc func()
 }
@@ -442,6 +448,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	storagePreconditions := &storage.Preconditions{}
 	if preconditions := objInfo.Preconditions(); preconditions != nil {
 		storagePreconditions.UID = preconditions.UID
+		storagePreconditions.ResourceVersion = preconditions.ResourceVersion
 	}
 
 	out := e.NewFunc()
@@ -873,6 +880,7 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 	var preconditions storage.Preconditions
 	if options.Preconditions != nil {
 		preconditions.UID = options.Preconditions.UID
+		preconditions.ResourceVersion = options.Preconditions.ResourceVersion
 	}
 	graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options)
 	if err != nil {
@@ -1287,6 +1295,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			attrFunc,
 			triggerFunc,
 		)
+		e.StorageVersioner = opts.StorageConfig.EncodeVersioner
 
 		if opts.CountMetricPollPeriod > 0 {
 			stopFunc := e.startObservingCount(opts.CountMetricPollPeriod)
@@ -1326,4 +1335,8 @@ func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, table
 		return e.TableConvertor.ConvertToTable(ctx, object, tableOptions)
 	}
 	return rest.NewDefaultTableConvertor(e.qualifiedResourceFromContext(ctx)).ConvertToTable(ctx, object, tableOptions)
+}
+
+func (e *Store) StorageVersion() runtime.GroupVersioner {
+	return e.StorageVersioner
 }

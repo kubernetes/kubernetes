@@ -41,7 +41,7 @@ function run_kube_apiserver() {
   AUTHORIZATION_MODE="RBAC,AlwaysAllow"
 
   # Enable features
-  ENABLE_FEATURE_GATES="DryRun=true"
+  ENABLE_FEATURE_GATES="ServerSideApply=true"
 
   "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
     --insecure-bind-address="127.0.0.1" \
@@ -96,6 +96,20 @@ function create_node() {
 }
 __EOF__
 }
+
+# Run it if:
+# 1) $WHAT is empty
+# 2) $WHAT is not empty and kubeadm is part of $WHAT
+WHAT=${WHAT:-}
+if [[ ${WHAT} == "" || ${WHAT} =~ .*kubeadm.* ]] ; then
+  kube::log::status "Running kubeadm tests"  
+  run_kubeadm_tests
+  # if we ONLY want to run kubeadm, then exit here.
+  if [[ ${WHAT} == "kubeadm" ]]; then
+    kube::log::status "TESTS PASSED"
+    exit 0
+  fi
+fi
 
 kube::log::status "Running kubectl tests for kube-apiserver"
 

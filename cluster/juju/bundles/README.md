@@ -31,7 +31,7 @@ juju-quickstart`) or Ubuntu (`apt-get install juju-quickstart`).
 ### Deploy a Kubernetes Bundle
 
 Use the 'juju quickstart' command to deploy a Kubernetes cluster to any cloud
-supported by Juju.  
+supported by Juju.
 
 The charm store version of the Kubernetes bundle can be deployed as follows:
 
@@ -174,7 +174,7 @@ for more details of what can be done with the command line tool.
 
 The kubernetes-bundle is open source and available on github.com.  If
 you want to get started developing on the bundle you can clone it from
-github.  
+github.
 
     git clone https://github.com/kubernetes/kubernetes.git
 

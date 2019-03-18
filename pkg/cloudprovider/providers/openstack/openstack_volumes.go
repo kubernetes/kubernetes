@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	k8s_volume "k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	cloudvolume "k8s.io/cloud-provider/volume"
+	volerr "k8s.io/cloud-provider/volume/errors"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 
 	"github.com/gophercloud/gophercloud"
 	volumeexpand "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
@@ -345,7 +345,7 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 		}
 		// using volume.AttachedDevice may cause problems because cinder does not report device path correctly see issue #33128
 		devicePath := volume.AttachedDevice
-		danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
+		danglingErr := volerr.NewDanglingError(attachErr, nodeName, devicePath)
 		klog.V(2).Infof("Found dangling volume %s attached to node %s", volumeID, nodeName)
 		return "", danglingErr
 	}
@@ -413,7 +413,7 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 	}
 
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGiB, err := volumeutil.RoundUpToGiBInt(newSize)
+	volSizeGiB, err := volumehelpers.RoundUpToGiBInt(newSize)
 	if err != nil {
 		return oldSize, err
 	}
@@ -572,7 +572,7 @@ func (os *OpenStack) DeleteVolume(volumeID string) error {
 	}
 	if used {
 		msg := fmt.Sprintf("Cannot delete the volume %q, it's still attached to a node", volumeID)
-		return k8s_volume.NewDeletedVolumeInUseError(msg)
+		return volerr.NewDeletedVolumeInUseError(msg)
 	}
 
 	volumes, err := os.volumeService("")
@@ -695,6 +695,11 @@ func (os *OpenStack) ShouldTrustDevicePath() bool {
 	return os.bsOpts.TrustDevicePath
 }
 
+// NodeVolumeAttachLimit specifies number of cinder volumes that can be attached to this node.
+func (os *OpenStack) NodeVolumeAttachLimit() int {
+	return os.bsOpts.NodeVolumeAttachLimit
+}
+
 // GetLabelsForVolume implements PVLabeler.GetLabelsForVolume
 func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
 	// Ignore if not Cinder.
@@ -703,7 +708,7 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 	}
 
 	// Ignore any volumes that are being provisioned
-	if pv.Spec.Cinder.VolumeID == k8s_volume.ProvisionedVolumeName {
+	if pv.Spec.Cinder.VolumeID == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 
@@ -715,8 +720,8 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 
 	// Construct Volume Labels
 	labels := make(map[string]string)
-	labels[kubeletapis.LabelZoneFailureDomain] = volume.AvailabilityZone
-	labels[kubeletapis.LabelZoneRegion] = os.region
+	labels[v1.LabelZoneFailureDomain] = volume.AvailabilityZone
+	labels[v1.LabelZoneRegion] = os.region
 	klog.V(4).Infof("The Volume %s has labels %v", pv.Spec.Cinder.VolumeID, labels)
 
 	return labels, nil

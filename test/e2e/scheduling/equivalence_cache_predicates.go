@@ -228,7 +228,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 			return err
 		}, ns, labelRCName, false)
 
-		// these two replicas should all be rejected since podAntiAffinity says it they anit-affinity with pod {"service": "S1"}
+		// these two replicas should all be rejected since podAntiAffinity says it they anti-affinity with pod {"service": "S1"}
 		verifyReplicasResult(cs, 0, replica, ns, labelRCName)
 	})
 })

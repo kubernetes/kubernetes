@@ -91,7 +91,7 @@ kernelSpec:
   - name: SCSI_PROC_FS
   # Currently Kubelet supports three docker graph drivers: overlay, aufs, and
   # devicemapper due to the legacy reason. But for GKE, we plan to only support
-  # overlayfs. 
+  # overlayfs.
   - name: OVERLAY_FS
     description: 'Enable OverlayFS, which will be the only docker graph driver
       supported on GKE.'

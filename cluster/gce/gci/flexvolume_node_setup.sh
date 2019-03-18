@@ -80,7 +80,7 @@ flex_clean() {
   umount_silent ${MOUNTER_PATH}/var/lib/kubelet
   umount_silent ${MOUNTER_PATH}
   rm -rf ${MOUNTER_PATH}
-  
+
   if [[ -n ${IMAGE_URL:-} ]]; then
     docker rmi -f ${IMAGE_URL} &> /dev/null || /bin/true
   fi
@@ -98,7 +98,7 @@ generate_chroot_wrapper() {
     echo "Failed to set up FlexVolume driver: cannot find directory '/flexvolume' in the mount utility image."
     exit 1
   fi
-  
+
   for driver_dir in ${MOUNTER_PATH}/flexvolume/*; do
     if [ -d "$driver_dir" ]; then
 
@@ -107,7 +107,7 @@ generate_chroot_wrapper() {
         echo "ERROR: Expected 1 file in the FlexVolume directory but found $filecount."
         exit 1
       fi
-      
+
       driver_file=$( ls $driver_dir | head -n 1 )
 
       # driver_path points to the actual driver inside the mount utility image,

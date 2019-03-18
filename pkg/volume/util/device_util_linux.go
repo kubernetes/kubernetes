@@ -21,10 +21,12 @@ package util
 import (
 	"errors"
 	"fmt"
-	"k8s.io/klog"
+	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"k8s.io/klog"
 )
 
 // FindMultipathDeviceForDevice given a device name like /dev/sdx, find the devicemapper parent
@@ -98,6 +100,9 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 	sysPath := "/sys/class/iscsi_host"
 	hostDirs, err := io.ReadDir(sysPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return portalHostMap, nil
+		}
 		return nil, err
 	}
 	for _, hostDir := range hostDirs {
@@ -135,7 +140,8 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 			targetNamePath := sessionPath + "/iscsi_session/" + sessionName + "/targetname"
 			targetName, err := io.ReadFile(targetNamePath)
 			if err != nil {
-				return nil, err
+				klog.Infof("Failed to process session %s, assuming this session is unavailable: %s", sessionName, err)
+				continue
 			}
 
 			// Ignore hosts that don't matchthe target we were looking for.
@@ -147,7 +153,8 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 			// for the iSCSI connection.
 			dirs2, err := io.ReadDir(sessionPath)
 			if err != nil {
-				return nil, err
+				klog.Infof("Failed to process session %s, assuming this session is unavailable: %s", sessionName, err)
+				continue
 			}
 			for _, dir2 := range dirs2 {
 				// Skip over files that aren't the connection
@@ -164,25 +171,29 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 				addrPath := connectionPath + "/address"
 				addr, err := io.ReadFile(addrPath)
 				if err != nil {
-					return nil, err
+					klog.Infof("Failed to process connection %s, assuming this connection is unavailable: %s", dirName, err)
+					continue
 				}
 
 				portPath := connectionPath + "/port"
 				port, err := io.ReadFile(portPath)
 				if err != nil {
-					return nil, err
+					klog.Infof("Failed to process connection %s, assuming this connection is unavailable: %s", dirName, err)
+					continue
 				}
 
 				persistentAddrPath := connectionPath + "/persistent_address"
 				persistentAddr, err := io.ReadFile(persistentAddrPath)
 				if err != nil {
-					return nil, err
+					klog.Infof("Failed to process connection %s, assuming this connection is unavailable: %s", dirName, err)
+					continue
 				}
 
 				persistentPortPath := connectionPath + "/persistent_port"
 				persistentPort, err := io.ReadFile(persistentPortPath)
 				if err != nil {
-					return nil, err
+					klog.Infof("Failed to process connection %s, assuming this connection is unavailable: %s", dirName, err)
+					continue
 				}
 
 				// Add entries to the map for both the current and persistent portals

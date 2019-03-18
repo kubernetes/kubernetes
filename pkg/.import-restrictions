@@ -6,7 +6,8 @@
 		    ""
 		],
 		"ForbiddenPrefixes": [
-			"k8s.io/kubernetes/cmd"
+			"k8s.io/kubernetes/cmd",
+			"github.com/ghodss/yaml"
 		]
 	  }
 	]

@@ -24,23 +24,23 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 	f := framework.NewDefaultFramework("cloudprovider")
 	var c clientset.Interface
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// Only supported in AWS/GCE because those are the only cloud providers
 		// where E2E test are currently running.
 		framework.SkipUnlessProviderIs("aws", "gce", "gke")
 		c = f.ClientSet
 	})
 
-	It("should be deleted on API server if it doesn't exist in the cloud provider", func() {
-		By("deleting a node on the cloud provider")
+	ginkgo.It("should be deleted on API server if it doesn't exist in the cloud provider", func() {
+		ginkgo.By("deleting a node on the cloud provider")
 
 		nodeDeleteCandidates := framework.GetReadySchedulableNodesOrDie(c)
 		nodeToDelete := nodeDeleteCandidates.Items[0]
@@ -54,8 +54,8 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		}
 
 		newNodes, err := framework.CheckNodesReady(c, len(origNodes.Items)-1, 5*time.Minute)
-		Expect(err).To(BeNil())
-		Expect(len(newNodes)).To(Equal(len(origNodes.Items) - 1))
+		gomega.Expect(err).To(gomega.BeNil())
+		gomega.Expect(len(newNodes)).To(gomega.Equal(len(origNodes.Items) - 1))
 
 		_, err = c.CoreV1().Nodes().Get(nodeToDelete.Name, metav1.GetOptions{})
 		if err == nil {

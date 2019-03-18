@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -238,11 +239,15 @@ func WritePKIFiles(t *testing.T, dir string, files PKIFiles) {
 			if err != nil {
 				t.Errorf("unable to write public key to file %q: [%v]", filename, err)
 			}
-			if err := certutil.WriteKey(path.Join(dir, filename), publicKeyBytes); err != nil {
+			if err := keyutil.WriteKey(path.Join(dir, filename), publicKeyBytes); err != nil {
 				t.Errorf("unable to write public key to file %q: [%v]", filename, err)
 			}
 		case *rsa.PrivateKey:
-			if err := certutil.WriteKey(path.Join(dir, filename), certutil.EncodePrivateKeyPEM(body)); err != nil {
+			privateKey, err := keyutil.MarshalPrivateKeyToPEM(body)
+			if err != nil {
+				t.Errorf("unable to write private key to file %q: [%v]", filename, err)
+			}
+			if err := keyutil.WriteKey(path.Join(dir, filename), privateKey); err != nil {
 				t.Errorf("unable to write private key to file %q: [%v]", filename, err)
 			}
 		}

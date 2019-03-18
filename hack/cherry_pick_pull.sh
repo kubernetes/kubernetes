@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Usage Instructions: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-release/cherry-picks.md
+
 # Checkout a PR from GitHub. (Yes, this is sitting in a Git tree. How
 # meta.) Assumes you care about pulls from remote "upstream" and
 # checks them out to a branch named:

@@ -295,6 +295,10 @@ func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) error
 	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 }
 
+func (plugin *vsphereVolumePlugin) CanAttach(spec *volume.Spec) bool {
+	return true
+}
+
 func setNodeVolume(
 	nodeVolumeMap map[types.NodeName]map[*volume.Spec]bool,
 	volumeSpec *volume.Spec,

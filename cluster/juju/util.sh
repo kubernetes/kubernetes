@@ -20,9 +20,9 @@ set -o nounset
 set -o pipefail
 #set -o xtrace
 
-UTIL_SCRIPT=$(readlink -m "${BASH_SOURCE}")
-JUJU_PATH=$(dirname ${UTIL_SCRIPT})
-KUBE_ROOT=$(readlink -m ${JUJU_PATH}/../../)
+UTIL_SCRIPT=$(readlink -m "${BASH_SOURCE[0]}")
+JUJU_PATH=$(dirname "${UTIL_SCRIPT}")
+KUBE_ROOT=$(readlink -m "${JUJU_PATH}/../../")
 # Use the config file specified in $KUBE_CONFIG_FILE, or config-default.sh.
 source "${JUJU_PATH}/${KUBE_CONFIG_FILE-config-default.sh}"
 # This attempts installation of Juju - This really needs to support multiple
@@ -38,14 +38,14 @@ function build-local() {
     # This used to build the kubernetes project. Now it rebuilds the charm(s)
     # living in `cluster/juju/layers`
 
-    charm build ${JUJU_PATH}/layers/kubernetes -o $JUJU_REPOSITORY -r --no-local-layers
+    charm build "${JUJU_PATH}/layers/kubernetes" -o "$JUJU_REPOSITORY" -r --no-local-layers
 }
 
 function detect-master() {
     local kubestatus
 
     # Capturing a newline, and my awk-fu was weak - pipe through tr -d
-    kubestatus=$(juju status --format=oneline kubernetes | grep ${KUBE_MASTER_NAME} | awk '{print $3}' | tr -d "\n")
+    kubestatus=$(juju status --format=oneline kubernetes | grep "${KUBE_MASTER_NAME}" | awk '{print $3}' | tr -d "\n")
     export KUBE_MASTER_IP=${kubestatus}
     export KUBE_SERVER=https://${KUBE_MASTER_IP}:6433
 
@@ -61,7 +61,10 @@ function detect-nodes() {
     # ]
 
     # Strip out the IP addresses
-    export KUBE_NODE_IP_ADDRESSES=($(${JUJU_PATH}/return-node-ips.py "${ipoutput}"))
+    while IFS=$'\n' read -r ip;
+        do KUBE_NODE_IP_ADDRESSES+=("$ip");
+    done < <("${JUJU_PATH}/return-node-ips.py" "${ipoutput}")
+    export KUBE_NODE_IP_ADDRESSES
     # echo "Kubernetes minions: " ${KUBE_NODE_IP_ADDRESSES[@]} 1>&2
     export NUM_NODES=${#KUBE_NODE_IP_ADDRESSES[@]}
 }
@@ -70,11 +73,11 @@ function kube-up() {
     build-local
 
     # Replace the charm directory in the bundle.
-    sed "s|__CHARM_DIR__|${JUJU_REPOSITORY}|" < ${KUBE_BUNDLE_PATH}.base > ${KUBE_BUNDLE_PATH}
+    sed "s|__CHARM_DIR__|${JUJU_REPOSITORY}|" < "${KUBE_BUNDLE_PATH}.base" > "${KUBE_BUNDLE_PATH}"
 
     # The juju-deployer command will deploy the bundle and can be run
     # multiple times to continue deploying the parts that fail.
-    juju deploy ${KUBE_BUNDLE_PATH}
+    juju deploy "${KUBE_BUNDLE_PATH}"
 
     source "${KUBE_ROOT}/cluster/common.sh"
 
@@ -86,9 +89,9 @@ function kube-up() {
     # Copy kubectl, the cert and key to this machine from master.
     (
       umask 077
-      mkdir -p ${KUBECTL_DIR}
-      juju scp ${KUBE_MASTER_NAME}:kubectl_package.tar.gz ${KUBECTL_DIR}
-      tar xfz ${KUBECTL_DIR}/kubectl_package.tar.gz -C ${KUBECTL_DIR}
+      mkdir -p "${KUBECTL_DIR}"
+      juju scp "${KUBE_MASTER_NAME}:kubectl_package.tar.gz" "${KUBECTL_DIR}"
+      tar xfz "${KUBECTL_DIR}/kubectl_package.tar.gz" -C "${KUBECTL_DIR}"
     )
     # Export the location of the kubectl configuration file.
     export KUBECONFIG="${KUBECTL_DIR}/kubeconfig"
@@ -98,11 +101,11 @@ function kube-down() {
     local force="${1-}"
     local jujuenv
     jujuenv=$(juju switch)
-    juju destroy-model ${jujuenv} ${force} || true
+    juju destroy-model "${jujuenv}" "${force}" || true
     # Clean up the generated charm files.
-    rm -rf ${KUBE_ROOT}/cluster/juju/charms
+    rm -rf "${KUBE_ROOT}/cluster/juju/charms"
     # Clean up the kubectl binary and config file.
-    rm -rf ${KUBECTL_DIR}
+    rm -rf "${KUBECTL_DIR}"
 }
 
 function prepare-e2e() {
@@ -121,7 +124,7 @@ function sleep-status() {
     while [[ $i < $maxtime && -z $jujustatus ]]; do
       sleep 15
       i=$((i + 15))
-      jujustatus=$(${JUJU_PATH}/identify-leaders.py)
+      jujustatus=$("${JUJU_PATH}/identify-leaders.py")
       export KUBE_MASTER_NAME=${jujustatus}
     done
 

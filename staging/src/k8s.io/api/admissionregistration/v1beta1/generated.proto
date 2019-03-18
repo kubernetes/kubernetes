@@ -81,6 +81,18 @@ message Rule {
   // Depending on the enclosing object, subresources might not be allowed.
   // Required.
   repeated string resources = 3;
+
+  // scope specifies the scope of this rule.
+  // Valid values are "Cluster", "Namespaced", and "*"
+  // "Cluster" means that only cluster-scoped resources will match this rule.
+  // Namespace API objects are cluster-scoped.
+  // "Namespaced" means that only namespaced resources will match this rule.
+  // "*" means that there are no scope restrictions.
+  // Subresources match the scope of their parent resource.
+  // Default is "*".
+  //
+  // +optional
+  optional string scope = 4;
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
@@ -217,6 +229,25 @@ message Webhook {
   // sideEffects == Unknown or Some. Defaults to Unknown.
   // +optional
   optional string sideEffects = 6;
+
+  // TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+  // the webhook call will be ignored or the API call will fail based on the
+  // failure policy.
+  // The timeout value must be between 1 and 30 seconds.
+  // Default to 30 seconds.
+  // +optional
+  optional int32 timeoutSeconds = 7;
+
+  // AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+  // versions the Webhook expects. API server will try to use first version in
+  // the list which it supports. If none of the versions specified in this list
+  // supported by API server, validation will fail for this object.
+  // If a persisted webhook configuration specifies allowed versions and does not
+  // include any versions known to the API Server, calls to the webhook will fail
+  // and be subject to the failure policy.
+  // Default to `['v1beta1']`.
+  // +optional
+  repeated string admissionReviewVersions = 8;
 }
 
 // WebhookClientConfig contains the information to make a TLS

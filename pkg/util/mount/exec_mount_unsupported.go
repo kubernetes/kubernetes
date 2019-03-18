@@ -91,18 +91,6 @@ func (m *execMounter) EvalHostSymlinks(pathname string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
-func (mounter *execMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return subPath.Path, nil, nil
-}
-
-func (mounter *execMounter) CleanSubPaths(podDir string, volumeName string) error {
-	return nil
-}
-
-func (mounter *execMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return nil
-}
-
 func (mounter *execMounter) GetMountRefs(pathname string) ([]string, error) {
 	return nil, errors.New("not implemented")
 }

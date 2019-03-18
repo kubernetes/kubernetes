@@ -130,7 +130,7 @@ func Register(
 		return fmt.Errorf("unable to create mesos agent client: %v", err)
 	}
 
-	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
+	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(includedMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}

@@ -85,8 +85,6 @@ func init() {
 	prometheus.MustRegister(watchDuration)
 	prometheus.MustRegister(itemsPerWatch)
 	prometheus.MustRegister(lastResourceVersion)
-
-	cache.SetReflectorMetricsProvider(prometheusMetricsProvider{})
 }
 
 type prometheusMetricsProvider struct{}

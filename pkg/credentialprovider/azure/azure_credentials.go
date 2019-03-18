@@ -206,6 +206,13 @@ func (a *acrProvider) Provide() credentialprovider.DockerConfig {
 			cfg[url] = *cred
 		}
 	}
+
+	// add ACR anonymous repo support: use empty username and password for anonymous access
+	cfg["*.azurecr.*"] = credentialprovider.DockerConfigEntry{
+		Username: "",
+		Password: "",
+		Email:    dummyRegistryEmail,
+	}
 	return cfg
 }
 

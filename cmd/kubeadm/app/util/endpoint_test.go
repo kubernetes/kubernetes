@@ -22,7 +22,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func TestGetMasterEndpoint(t *testing.T) {
+func TestGetControlPlaneEndpoint(t *testing.T) {
 	var tests = []struct {
 		name             string
 		cfg              *kubeadmapi.InitConfiguration
@@ -198,7 +198,7 @@ func TestGetMasterEndpoint(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actualEndpoint, actualError := GetMasterEndpoint(rt.cfg.ControlPlaneEndpoint, &rt.cfg.LocalAPIEndpoint)
+			actualEndpoint, actualError := GetControlPlaneEndpoint(rt.cfg.ControlPlaneEndpoint, &rt.cfg.LocalAPIEndpoint)
 
 			if (actualError != nil) && !rt.expectedError {
 				t.Errorf("%s unexpected failure: %v", rt.name, actualError)

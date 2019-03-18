@@ -22,7 +22,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_HACK_ROOT=$(dirname "${BASH_SOURCE}")
+KUBE_HACK_ROOT=$(dirname "${BASH_SOURCE[0]}")
 
 echo "WARNING: hack/generate-docs.sh is an alias for hack/update-generated-docs.sh"
 echo "and will be removed in a future version."

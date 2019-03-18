@@ -29,14 +29,13 @@ import (
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 func (sched *Scheduler) onPvAdd(obj interface{}) {
 	// Pods created when there are no PVs available will be stuck in
 	// unschedulable queue. But unbound PVs created for static provisioning and
 	// delay binding storage class are skipped in PV controller dynamic
-	// provisiong and binding process, will not trigger events to schedule pod
+	// provisioning and binding process, will not trigger events to schedule pod
 	// again. So we need to move pods to active queue on PV add for this
 	// scenario.
 	sched.config.SchedulingQueue.MoveAllToActiveQueue()
@@ -268,11 +267,6 @@ func assignedPod(pod *v1.Pod) bool {
 // responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
 func responsibleForPod(pod *v1.Pod, schedulerName string) bool {
 	return schedulerName == pod.Spec.SchedulerName
-}
-
-// isZoneRegionLabel check if given key of label is zone or region label.
-func isZoneRegionLabel(k string) bool {
-	return k == kubeletapis.LabelZoneFailureDomain || k == kubeletapis.LabelZoneRegion
 }
 
 // skipPodUpdate checks whether the specified pod update should be ignored.

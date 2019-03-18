@@ -18,6 +18,10 @@ limitations under the License.
 
 package internalversion
 
+type CSIDriverExpansion interface{}
+
+type CSINodeExpansion interface{}
+
 type StorageClassExpansion interface{}
 
 type VolumeAttachmentExpansion interface{}

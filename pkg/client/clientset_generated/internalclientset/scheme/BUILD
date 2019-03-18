@@ -26,6 +26,7 @@ go_library(
         "//pkg/apis/events/install:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/networking/install:go_default_library",
+        "//pkg/apis/node/install:go_default_library",
         "//pkg/apis/policy/install:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/scheduling/install:go_default_library",

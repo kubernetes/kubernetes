@@ -21,7 +21,6 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 # and to write the test CA in /var/run/kubernetes.
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER=(docker ${DOCKER_OPTS})
-DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
 DOCKER_ROOT=${DOCKER_ROOT:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 DENY_SECURITY_CONTEXT_ADMISSION=${DENY_SECURITY_CONTEXT_ADMISSION:-""}
@@ -115,6 +114,9 @@ START_MODE=${START_MODE:-"all"}
 
 # A list of controllers to enable
 KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
+
+# Audit policy
+AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
 
 # sanity check for OpenStack provider
 if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
@@ -334,21 +336,6 @@ function detect_binary {
    GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
 }
 
-cleanup_dockerized_kubelet()
-{
-  if [[ -e ${KUBELET_CIDFILE} ]]; then
-    docker kill $(<${KUBELET_CIDFILE}) > /dev/null
-    rm -f ${KUBELET_CIDFILE}
-
-    # Save the docker logs
-    if [[ -f /var/log/docker.log ]]; then
-      sudo cp /var/log/docker.log ${LOG_DIR}/docker.log
-    elif command -v journalctl &>/dev/null; then
-      journalctl -u docker --no-pager > ${LOG_DIR}/docker.log
-    fi
-  fi
-}
-
 cleanup()
 {
   echo "Cleaning up..."
@@ -368,13 +355,9 @@ cleanup()
   [[ -n "${CTLRMGR_PID-}" ]] && CTLRMGR_PIDS=$(pgrep -P ${CTLRMGR_PID} ; ps -o pid= -p ${CTLRMGR_PID})
   [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill ${CTLRMGR_PIDS} 2>/dev/null
 
-  if [[ -n "${DOCKERIZE_KUBELET}" ]]; then
-    cleanup_dockerized_kubelet
-  else
-    # Check if the kubelet is still running
-    [[ -n "${KUBELET_PID-}" ]] && KUBELET_PIDS=$(pgrep -P ${KUBELET_PID} ; ps -o pid= -p ${KUBELET_PID})
-    [[ -n "${KUBELET_PIDS-}" ]] && sudo kill ${KUBELET_PIDS} 2>/dev/null
-  fi
+  # Check if the kubelet is still running
+  [[ -n "${KUBELET_PID-}" ]] && KUBELET_PIDS=$(pgrep -P ${KUBELET_PID} ; ps -o pid= -p ${KUBELET_PID})
+  [[ -n "${KUBELET_PIDS-}" ]] && sudo kill ${KUBELET_PIDS} 2>/dev/null
 
   # Check if the proxy is still running
   [[ -n "${PROXY_PID-}" ]] && PROXY_PIDS=$(pgrep -P ${PROXY_PID} ; ps -o pid= -p ${PROXY_PID})
@@ -405,10 +388,7 @@ function healthcheck {
     CTLRMGR_PID=
   fi
 
-  if [[ -n "${DOCKERIZE_KUBELET}" ]]; then
-    # TODO (https://github.com/kubernetes/kubernetes/issues/62474): check health also in this case
-    :
-  elif [[ -n "${KUBELET_PID-}" ]] && ! sudo kill -0 ${KUBELET_PID} 2>/dev/null; then
+  if [[ -n "${KUBELET_PID-}" ]] && ! sudo kill -0 ${KUBELET_PID} 2>/dev/null; then
     warning_log "kubelet terminated unexpectedly, see ${KUBELET_LOG}"
     KUBELET_PID=
   fi
@@ -477,7 +457,6 @@ function generate_certs {
     kube::util::create_serving_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "server-ca" kube-apiserver kubernetes.default kubernetes.default.svc "localhost" ${API_HOST_IP} ${API_HOST} ${FIRST_SERVICE_CLUSTER_IP}
 
     # Create client certs signed with client-ca, given id, given CN and a number of groups
-    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kubelet system:node:${HOSTNAME_OVERRIDE} system:nodes
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-proxy system:kube-proxy system:nodes
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' controller system:kube-controller-manager
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' scheduler  system:kube-scheduler
@@ -490,6 +469,11 @@ function generate_certs {
     # TODO remove masters and add rolebinding
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-aggregator system:kube-aggregator system:masters
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-aggregator
+}
+
+function generate_kubelet_certs {
+    kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kubelet system:node:${HOSTNAME_OVERRIDE} system:nodes
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kubelet
 }
 
 function start_apiserver {
@@ -552,6 +536,17 @@ function start_apiserver {
       cloud_config_arg="--cloud-provider=external"
     fi
 
+    if [[ -n "${AUDIT_POLICY_FILE}" ]]; then
+      cat <<EOF > /tmp/kube-audit-policy-file
+# Log all requests at the Metadata level.
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+- level: Metadata
+EOF
+      AUDIT_POLICY_FILE="/tmp/kube-audit-policy-file"
+    fi
+
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${authorizer_arg} ${priv_arg} ${runtime_config} \
       ${cloud_config_arg} \
@@ -559,6 +554,8 @@ function start_apiserver {
       ${node_port_range} \
       --v=${LOG_LEVEL} \
       --vmodule="${LOG_SPEC}" \
+      --audit-policy-file="${AUDIT_POLICY_FILE}" \
+      --audit-log-path=${LOG_DIR}/kube-apiserver-audit.log \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
@@ -598,7 +595,6 @@ function start_apiserver {
     # Create kubeconfigs for all components, using client certs
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" admin
     ${CONTROLPLANE_SUDO} chown "${USER}" "${CERT_DIR}/client-admin.key" # make readable for kubectl
-    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kubelet
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-proxy
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" controller
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
@@ -781,77 +777,13 @@ function start_kubelet {
       ${KUBELET_FLAGS}
     )
 
-    if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
-      sudo -E "${GO_OUT}/hyperkube" kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
-      KUBELET_PID=$!
-    else
-
-      # Build the hyperkube container image if necessary
-      if [[ -z "${KUBELET_IMAGE}" && -n "${DOCKERIZE_KUBELET}" ]]; then
-        HYPERKUBE_BIN="${GO_OUT}/hyperkube" REGISTRY="k8s.gcr.io" VERSION="latest" make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
-        KUBELET_IMAGE="k8s.gcr.io/hyperkube-amd64:latest"
-      fi
-
-      # Docker won't run a container with a cidfile (container id file)
-      # unless that file does not already exist; clean up an existing
-      # dockerized kubelet that might be running.
-      cleanup_dockerized_kubelet
-      cred_bind=""
-      # path to cloud credentials.
-      cloud_cred=""
-      if [ "${CLOUD_PROVIDER}" == "aws" ]; then
-          cloud_cred="${HOME}/.aws/credentials"
-      fi
-      if [ "${CLOUD_PROVIDER}" == "gce" ]; then
-          cloud_cred="${HOME}/.config/gcloud"
-      fi
-      if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
-          cloud_cred="${CLOUD_CONFIG}"
-      fi
-      if  [[ -n "${cloud_cred}" ]]; then
-          cred_bind="--volume=${cloud_cred}:${cloud_cred}:ro"
-      fi
-      all_kubelet_flags+=(--containerized)
-
-      all_kubelet_volumes=(
-        --volume=/:/rootfs:ro,rslave \
-        --volume=/var/run:/var/run:rw \
-        --volume=/sys:/sys:ro \
-        --volume=/usr/libexec/kubernetes/kubelet-plugins/volume/exec:/usr/libexec/kubernetes/kubelet-plugins/volume/exec:rw \
-        --volume=/var/lib/docker/:/var/lib/docker:rslave \
-        --volume=/var/lib/kubelet/:/var/lib/kubelet:rslave \
-        --volume=/dev:/dev \
-        --volume=/run/xtables.lock:/run/xtables.lock:rw \
-      )
-
-      if [[ -n "${DOCKER_ROOT}" ]]; then
-        all_kubelet_flags+=(--root-dir="${DOCKER_ROOT}")
-        all_kubelet_volumes+=(--volume="${DOCKER_ROOT}:${DOCKER_ROOT}:rslave")
-      fi
-
-      docker run --rm --name kubelet \
-        "${all_kubelet_volumes[@]}" \
-        ${cred_bind} \
-        --net=host \
-        --pid=host \
-        --privileged=true \
-        -i \
-        --cidfile=${KUBELET_CIDFILE} \
-        "${KUBELET_IMAGE}" \
-        /kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
-      # Get PID of kubelet container.
-      for i in {1..3}; do
-        echo -n "Trying to get PID of kubelet container..."
-        KUBELET_PID=$(docker inspect kubelet -f '{{.State.Pid}}' 2>/dev/null || true)
-        if [[ -n ${KUBELET_PID} && ${KUBELET_PID} -gt 0 ]]; then
-            echo " ok, ${KUBELET_PID}."
-            break
-        else
-            echo " failed, retry in 1 second."
-            sleep 1
-        fi
-      done
+    if [[ "${REUSE_CERTS}" != true ]]; then
+        generate_kubelet_certs
     fi
+
+    sudo -E "${GO_OUT}/hyperkube" kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
+    KUBELET_PID=$!
+
     # Quick check that kubelet is running.
     if [ -n "${KUBELET_PID}" ] && ps -p ${KUBELET_PID} > /dev/null; then
       echo "kubelet ( ${KUBELET_PID} ) is running."
@@ -886,6 +818,9 @@ EOF
       --config=/tmp/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
+}
+
+function start_kubescheduler {
 
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
@@ -1080,6 +1015,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
     start_cloud_controller_manager
   fi
   start_kubeproxy
+  start_kubescheduler
   start_kubedns
   if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
     start_nodelocaldns

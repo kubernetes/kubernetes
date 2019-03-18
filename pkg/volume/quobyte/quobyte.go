@@ -254,6 +254,7 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	os.MkdirAll(dir, 0750)
 	var options []string
+	options = append(options, "allow-usermapping-in-volumename")
 	if mounter.readOnly {
 		options = append(options, "ro")
 	}
@@ -330,6 +331,7 @@ func (plugin *quobytePlugin) newDeleterInternal(spec *volume.Spec) (volume.Delet
 				group:   source.Group,
 				volume:  source.Volume,
 				plugin:  plugin,
+				tenant:  source.Tenant,
 			},
 			registry: source.Registry,
 			readOnly: readOnly,
@@ -428,6 +430,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, al
 		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
 	pv.Spec.MountOptions = provisioner.options.MountOptions
+	pv.Spec.PersistentVolumeSource.Quobyte.Tenant = provisioner.tenant
 	return pv, nil
 }
 

@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/code-generator",
-	"GoVersion": "go1.11",
+	"GoVersion": "go1.12",
 	"GodepVersion": "v80-k8s-r1",
 	"Packages": [
 		"./..."
@@ -112,11 +112,127 @@
 		},
 		{
 			"ImportPath": "golang.org/x/tools/go/ast/astutil",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/gcexportdata",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/internal/cgo",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/internal/gcimporter",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/internal/packagesdriver",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/go/packages",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
 		},
 		{
 			"ImportPath": "golang.org/x/tools/imports",
-			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/fastwalk",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/gopathwalk",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/module",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "golang.org/x/tools/internal/semver",
+			"Rev": "7f7074d5bcfd282eb16bc382b0bb3da762461985"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/blas",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/blas/blas64",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/blas/gonum",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/floats",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/graph",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/graph/internal/linear",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/graph/internal/ordered",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/graph/internal/set",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/graph/internal/uid",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/graph/simple",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/graph/topo",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/graph/traverse",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/internal/asm/c128",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/internal/asm/f32",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/internal/asm/f64",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/internal/math32",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/lapack",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/lapack/gonum",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/lapack/lapack64",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
+		},
+		{
+			"ImportPath": "gonum.org/v1/gonum/mat",
+			"Rev": "cebdade430ccb61c1feba4878085f6cf8cb3320e"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/args",
@@ -160,7 +276,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/klog",
-			"Rev": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
+			"Rev": "8e90cee79f823779174776412c13478955131846"
 		}
 	]
 }

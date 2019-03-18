@@ -101,7 +101,9 @@ func newWorker(
 	w.proberResultsMetricLabels = prometheus.Labels{
 		"probe_type":     w.probeType.String(),
 		"container_name": w.container.Name,
+		"container":      w.container.Name,
 		"pod_name":       w.pod.Name,
+		"pod":            w.pod.Name,
 		"namespace":      w.pod.Namespace,
 		"pod_uid":        string(w.pod.UID),
 	}

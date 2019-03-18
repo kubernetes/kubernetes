@@ -35,7 +35,6 @@ filegroup(
         "//pkg/util/maps:all-srcs",
         "//pkg/util/metrics:all-srcs",
         "//pkg/util/mount:all-srcs",
-        "//pkg/util/net:all-srcs",
         "//pkg/util/netsh:all-srcs",
         "//pkg/util/node:all-srcs",
         "//pkg/util/normalizer:all-srcs",

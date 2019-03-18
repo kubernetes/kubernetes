@@ -29,24 +29,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-// certificateRequest is an x509 certificate request in PEM encoded format
-// openssl req -new -key rsa2048.pem -sha256 -nodes -out x509certrequest.pem -subj "/C=US/CN=not-valid"
-const certificateRequest = `-----BEGIN CERTIFICATE REQUEST-----
-MIICZjCCAU4CAQAwITELMAkGA1UEBhMCVVMxEjAQBgNVBAMMCW5vdC12YWxpZDCC
-ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMdoBxV0SbSS+7XrgVDF/P4x
-tqyun+DLxeRF5265ZOFRJDXCJgYH7wKlxlkEaHZQhnNmnqFiy96MHSKaiQmlkEm4
-EhlqTf38yEWx+t98A0CDbHsIPZ0/+MPCjb2kf+OfBXJJl908io0grs02jxN9lceL
-RFrKT6vaB+6i7LxbPQcOmjF7OUqWS6S2qSpShw2GY+mJz4HM7OFb9RcN4izh+GF6
-7hajYgt7pAFyWF1ua/H98Ysn4FVgIYk30rHCNBkQpJnna7EyGYuj08VuFa088W9g
-c/DCpL+VgBDwTel9tfeMxRAoLIPF9iJ8Ftr7dsRZ/Y/SnxfUJo2ed8y7dgIiLuEC
-AwEAAaAAMA0GCSqGSIb3DQEBCwUAA4IBAQCOjPB/4LKa2G7LarMMLAeNqvWF9SIG
-y2VGQoTn9D5blXMvnfzWSYgU6nBzf/E/32q26OwiCriuOPXfxM/cxEMOJ62u7b50
-OR52JFvQdONsCZaLgylGWppl0YeqylbTosHjsWJNlp+zjXcQHjCQ9OoLgfmrwYyD
-2MsYJR4p7JZ2ZN8FF1hgMUrDzypZ0NSBKAiQMU9TFhxgyk75RNDtmX+2K35zqLyr
-0otimyYwPCGPD2GHwNfvu1oP0A+/cT+rCPz6AlXhWEbz2JkLo6/muRfRl0QSRgHE
-Q3+eWlA1YdqEBwvp3NEQI9BtMnzxJVWA5dvYluMNllsV/q8s2IEEAFG9
------END CERTIFICATE REQUEST-----`
-
 func TestNewCertificateAuthority(t *testing.T) {
 	cert, key, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
 

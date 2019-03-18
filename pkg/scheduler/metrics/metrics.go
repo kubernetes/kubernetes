@@ -28,7 +28,9 @@ const (
 	// SchedulerSubsystem - subsystem name used by scheduler
 	SchedulerSubsystem = "scheduler"
 	// SchedulingLatencyName - scheduler latency metric name
-	SchedulingLatencyName = "scheduling_latency_seconds"
+	SchedulingLatencyName = "scheduling_duration_seconds"
+	// DeprecatedSchedulingLatencyName - scheduler latency metric name which is deprecated
+	DeprecatedSchedulingLatencyName = "scheduling_latency_seconds"
 
 	// OperationLabel - operation label name
 	OperationLabel = "operation"
@@ -70,10 +72,21 @@ var (
 		},
 		[]string{OperationLabel},
 	)
+	DeprecatedSchedulingLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      DeprecatedSchedulingLatencyName,
+			Help:      "(Deprecated) Scheduling latency in seconds split by sub-parts of the scheduling operation",
+			// Make the sliding window of 5h.
+			// TODO: The value for this should be based on some SLI definition (long term).
+			MaxAge: 5 * time.Hour,
+		},
+		[]string{OperationLabel},
+	)
 	E2eSchedulingLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "e2e_scheduling_latency_seconds",
+			Name:      "e2e_scheduling_duration_seconds",
 			Help:      "E2e scheduling latency in seconds (scheduling algorithm + binding)",
 			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
 		},
@@ -89,7 +102,7 @@ var (
 	SchedulingAlgorithmLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "scheduling_algorithm_latency_seconds",
+			Name:      "scheduling_algorithm_duration_seconds",
 			Help:      "Scheduling algorithm latency in seconds",
 			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
 		},
@@ -153,7 +166,7 @@ var (
 	BindingLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "binding_latency_seconds",
+			Name:      "binding_duration_seconds",
 			Help:      "Binding latency in seconds",
 			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
 		},
@@ -182,6 +195,7 @@ var (
 	metricsList = []prometheus.Collector{
 		scheduleAttempts,
 		SchedulingLatency,
+		DeprecatedSchedulingLatency,
 		E2eSchedulingLatency,
 		DeprecatedE2eSchedulingLatency,
 		SchedulingAlgorithmLatency,
@@ -216,6 +230,7 @@ func Register() {
 // Reset resets metrics
 func Reset() {
 	SchedulingLatency.Reset()
+	DeprecatedSchedulingLatency.Reset()
 }
 
 // SinceInMicroseconds gets the time since the specified start in microseconds.

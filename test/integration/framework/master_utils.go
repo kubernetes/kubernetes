@@ -27,14 +27,13 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
-	"k8s.io/klog"
-
 	apps "k8s.io/api/apps/v1beta1"
 	auditreg "k8s.io/api/auditregistration/v1alpha1"
 	autoscaling "k8s.io/api/autoscaling/v1"
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbac "k8s.io/api/rbac/v1alpha1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,8 +54,9 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/generated/openapi"
@@ -104,9 +104,29 @@ type MasterHolder struct {
 	M           *master.Master
 }
 
+// SetMaster assigns the current master.
 func (h *MasterHolder) SetMaster(m *master.Master) {
 	h.M = m
 	close(h.Initialized)
+}
+
+// DefaultOpenAPIConfig returns an openapicommon.Config initialized to default values.
+func DefaultOpenAPIConfig() *openapicommon.Config {
+	openAPIConfig := genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+	openAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
+	openAPIConfig.DefaultResponse = &spec.Response{
+		ResponseProps: spec.ResponseProps{
+			Description: "Default Response.",
+		},
+	}
+	openAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
+
+	return openAPIConfig
 }
 
 // startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
@@ -138,19 +158,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
-		masterConfig.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
-		masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
-			InfoProps: spec.InfoProps{
-				Title:   "Kubernetes",
-				Version: "unversioned",
-			},
-		}
-		masterConfig.GenericConfig.OpenAPIConfig.DefaultResponse = &spec.Response{
-			ResponseProps: spec.ResponseProps{
-				Description: "Default Response.",
-			},
-		}
-		masterConfig.GenericConfig.OpenAPIConfig.GetDefinitions = openapi.GetOpenAPIDefinitions
+		masterConfig.GenericConfig.OpenAPIConfig = DefaultOpenAPIConfig()
 	}
 
 	// set the loopback client config
@@ -232,7 +240,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	return m, s, closeFn
 }
 
-// Returns the master config appropriate for most integration tests.
+// NewIntegrationTestMasterConfig returns the master config appropriate for most integration tests.
 func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
@@ -244,7 +252,7 @@ func NewIntegrationTestMasterConfig() *master.Config {
 	return masterConfig
 }
 
-// Returns a basic master config.
+// NewMasterConfig returns a basic master config.
 func NewMasterConfig() *master.Config {
 	// This causes the integration tests to exercise the etcd
 	// prefix code, so please don't change without ensuring
@@ -257,12 +265,11 @@ func NewMasterConfig() *master.Config {
 
 	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
 	// FIXME (soltysh): this GroupVersionResource override should be configurable
-	// we need to set both for the whole group and for cronjobs, separately
-	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: batch.GroupName, Resource: "cronjobs"}, schema.GroupVersion{Group: batch.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
 	// we also need to set both for the storage group and for volumeattachments, separately
-	resourceEncoding.SetVersionEncoding(storage.GroupName, *testapi.Storage.GroupVersion(), schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "volumeattachments"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "csinodes"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "csidrivers"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
 
 	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, resourceEncoding, master.DefaultAPIResourceConfigSource(), nil)
 	storageFactory.SetSerializer(
@@ -305,6 +312,10 @@ func NewMasterConfig() *master.Config {
 		schema.GroupResource{Group: auditreg.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
+	storageFactory.SetSerializer(
+		schema.GroupResource{Group: nodev1alpha1.GroupName, Resource: serverstorage.AllResources},
+		"",
+		ns)
 
 	genericConfig := genericapiserver.NewConfig(legacyscheme.Codecs)
 	kubeVersion := version.Get()
@@ -334,6 +345,7 @@ func NewMasterConfig() *master.Config {
 // CloseFunc can be called to cleanup the master
 type CloseFunc func()
 
+// RunAMaster starts a master with the provided config.
 func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, CloseFunc) {
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
@@ -342,6 +354,7 @@ func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, 
 	return startMasterOrDie(masterConfig, nil, nil)
 }
 
+// RunAMasterUsingServer starts up a master using the provided config on the specified server.
 func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
 	return startMasterOrDie(masterConfig, s, masterReceiver)
 }

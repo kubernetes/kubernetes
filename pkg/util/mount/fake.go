@@ -220,17 +220,6 @@ func (f *FakeMounter) EvalHostSymlinks(pathname string) (string, error) {
 	return pathname, nil
 }
 
-func (f *FakeMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return subPath.Path, nil, nil
-}
-
-func (f *FakeMounter) CleanSubPaths(podDir string, volumeName string) error {
-	return nil
-}
-func (mounter *FakeMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return nil
-}
-
 func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {

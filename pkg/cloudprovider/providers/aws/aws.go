@@ -59,10 +59,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
-	"k8s.io/kubernetes/pkg/api/v1/service"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
+	cloudvolume "k8s.io/cloud-provider/volume"
+	volerr "k8s.io/cloud-provider/volume/errors"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 )
 
 // NLBHealthCheckRuleDescription is the comment used on a security group rule to
@@ -2036,7 +2036,7 @@ func (d *awsDisk) deleteVolume() (bool, error) {
 		}
 		if awsError, ok := err.(awserr.Error); ok {
 			if awsError.Code() == "VolumeInUse" {
-				return false, volume.NewDeletedVolumeInUseError(err.Error())
+				return false, volerr.NewDeletedVolumeInUseError(err.Error())
 			}
 		}
 		return false, fmt.Errorf("error deleting EBS volume %q: %q", d.awsID, err)
@@ -2425,7 +2425,7 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 			devicePath := aws.StringValue(attachment.Device)
 			nodeName := mapInstanceToNodeName(attachedInstance)
 
-			danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
+			danglingErr := volerr.NewDanglingError(attachErr, nodeName, devicePath)
 			return false, danglingErr
 		}
 
@@ -2444,7 +2444,7 @@ func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume)
 	}
 
 	// Ignore any volumes that are being provisioned
-	if pv.Spec.AWSElasticBlockStore.VolumeID == volume.ProvisionedVolumeName {
+	if pv.Spec.AWSElasticBlockStore.VolumeID == cloudvolume.ProvisionedVolumeName {
 		return nil, nil
 	}
 
@@ -2473,12 +2473,12 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 		return nil, fmt.Errorf("volume did not have AZ information: %q", aws.StringValue(info.VolumeId))
 	}
 
-	labels[kubeletapis.LabelZoneFailureDomain] = az
+	labels[v1.LabelZoneFailureDomain] = az
 	region, err := azToRegion(az)
 	if err != nil {
 		return nil, err
 	}
-	labels[kubeletapis.LabelZoneRegion] = region
+	labels[v1.LabelZoneRegion] = region
 
 	return labels, nil
 }
@@ -2604,7 +2604,7 @@ func (c *Cloud) ResizeDisk(
 		return oldSize, descErr
 	}
 	// AWS resizes in chunks of GiB (not GB)
-	requestGiB := volumeutil.RoundUpToGiB(newSize)
+	requestGiB := volumehelpers.RoundUpToGiB(newSize)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
 
 	// If disk already if of greater or equal size than requested we return
@@ -3434,7 +3434,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		return nil, err
 	}
 
-	sourceRanges, err := service.GetLoadBalancerSourceRanges(apiService)
+	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
 	}
@@ -3450,7 +3450,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 
 	if isNLB(annotations) {
 
-		if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+		if path, healthCheckNodePort := servicehelpers.GetServiceHealthCheckPathPort(apiService); path != "" {
 			for i := range v2Mappings {
 				v2Mappings[i].HealthCheckPort = int64(healthCheckNodePort)
 				v2Mappings[i].HealthCheckPath = path
@@ -3708,7 +3708,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 	}
 
-	if path, healthCheckNodePort := service.GetServiceHealthCheckPathPort(apiService); path != "" {
+	if path, healthCheckNodePort := servicehelpers.GetServiceHealthCheckPathPort(apiService); path != "" {
 		klog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
 		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path, annotations)
 		if err != nil {
@@ -3725,8 +3725,15 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			tcpHealthCheckPort = int32(*listener.InstancePort)
 			break
 		}
+		annotationProtocol := strings.ToLower(annotations[ServiceAnnotationLoadBalancerBEProtocol])
+		var hcProtocol string
+		if annotationProtocol == "https" || annotationProtocol == "ssl" {
+			hcProtocol = "SSL"
+		} else {
+			hcProtocol = "TCP"
+		}
 		// there must be no path on TCP health check
-		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "TCP", tcpHealthCheckPort, "", annotations)
+		err = c.ensureLoadBalancerHealthCheck(loadBalancer, hcProtocol, tcpHealthCheckPort, "", annotations)
 		if err != nil {
 			return nil, err
 		}
@@ -4205,18 +4212,39 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 		// Note that this is annoying: the load balancer disappears from the API immediately, but it is still
 		// deleting in the background.  We get a DependencyViolation until the load balancer has deleted itself
 
+		var loadBalancerSGs = aws.StringValueSlice(lb.SecurityGroups)
+
+		describeRequest := &ec2.DescribeSecurityGroupsInput{}
+		filters := []*ec2.Filter{
+			newEc2Filter("group-id", loadBalancerSGs...),
+		}
+		describeRequest.Filters = c.tagging.addFilters(filters)
+		response, err := c.ec2.DescribeSecurityGroups(describeRequest)
+		if err != nil {
+			return fmt.Errorf("error querying security groups for ELB: %q", err)
+		}
+
 		// Collect the security groups to delete
 		securityGroupIDs := map[string]struct{}{}
-		for _, securityGroupID := range lb.SecurityGroups {
-			if *securityGroupID == c.cfg.Global.ElbSecurityGroup {
-				//We don't want to delete a security group that was defined in the Cloud Configurationn.
+
+		for _, sg := range response {
+			sgID := aws.StringValue(sg.GroupId)
+
+			if sgID == c.cfg.Global.ElbSecurityGroup {
+				//We don't want to delete a security group that was defined in the Cloud Configuration.
 				continue
 			}
-			if aws.StringValue(securityGroupID) == "" {
-				klog.Warning("Ignoring empty security group in ", service.Name)
+			if sgID == "" {
+				klog.Warningf("Ignoring empty security group in %s", service.Name)
 				continue
 			}
-			securityGroupIDs[*securityGroupID] = struct{}{}
+
+			if !c.tagging.hasClusterTag(sg.Tags) {
+				klog.Warningf("Ignoring security group with no cluster tag in %s", service.Name)
+				continue
+			}
+
+			securityGroupIDs[sgID] = struct{}{}
 		}
 
 		// Loop through and try to delete them

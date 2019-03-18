@@ -2,11 +2,14 @@ package matchers
 
 import (
 	"fmt"
-	"github.com/onsi/gomega/format"
 	"reflect"
+
+	"github.com/onsi/gomega/format"
 )
 
-type PanicMatcher struct{}
+type PanicMatcher struct {
+	object interface{}
+}
 
 func (matcher *PanicMatcher) Match(actual interface{}) (success bool, err error) {
 	if actual == nil {
@@ -24,6 +27,7 @@ func (matcher *PanicMatcher) Match(actual interface{}) (success bool, err error)
 	success = false
 	defer func() {
 		if e := recover(); e != nil {
+			matcher.object = e
 			success = true
 		}
 	}()
@@ -38,5 +42,5 @@ func (matcher *PanicMatcher) FailureMessage(actual interface{}) (message string)
 }
 
 func (matcher *PanicMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "not to panic")
+	return format.Message(actual, fmt.Sprintf("not to panic, but panicked with\n%s", format.Object(matcher.object, 1)))
 }

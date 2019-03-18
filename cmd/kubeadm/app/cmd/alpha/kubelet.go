@@ -130,7 +130,7 @@ func getKubeletVersion(kubeletVersionStr string) (*version.Version, error) {
 // This feature is still in alpha and an experimental state
 func newCmdKubeletConfigEnableDynamic() *cobra.Command {
 	var nodeName, kubeletVersionStr string
-	kubeConfigFile := constants.GetAdminKubeConfigPath()
+	var kubeConfigFile string
 
 	cmd := &cobra.Command{
 		Use:     "enable-dynamic",
@@ -148,7 +148,7 @@ func newCmdKubeletConfigEnableDynamic() *cobra.Command {
 			kubeletVersion, err := version.ParseSemantic(kubeletVersionStr)
 			kubeadmutil.CheckErr(err)
 
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 

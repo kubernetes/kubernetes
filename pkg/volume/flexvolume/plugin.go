@@ -56,7 +56,7 @@ type flexVolumeAttachablePlugin struct {
 
 var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
-var _ volume.FSResizableVolumePlugin = &flexVolumePlugin{}
+var _ volume.NodeExpandableVolumePlugin = &flexVolumePlugin{}
 var _ volume.ExpandableVolumePlugin = &flexVolumePlugin{}
 
 var _ volume.DeviceMountableVolumePlugin = &flexVolumeAttachablePlugin{}
@@ -254,6 +254,10 @@ func (plugin *flexVolumeAttachablePlugin) NewDetacher() (volume.Detacher, error)
 
 func (plugin *flexVolumeAttachablePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return plugin.NewDetacher()
+}
+
+func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) bool {
+	return true
 }
 
 // ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.

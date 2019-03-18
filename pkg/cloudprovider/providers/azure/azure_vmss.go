@@ -185,7 +185,13 @@ func (ss *scaleSet) GetInstanceIDByNodeName(name string) (string, error) {
 		return "", err
 	}
 
-	return *vm.ID, nil
+	resourceID := *vm.ID
+	convertedResourceID, err := convertResourceGroupNameToLower(resourceID)
+	if err != nil {
+		klog.Errorf("convertResourceGroupNameToLower failed with error: %v", err)
+		return "", err
+	}
+	return convertedResourceID, nil
 }
 
 // GetNodeNameByProviderID gets the node name by provider ID.
@@ -980,7 +986,7 @@ func (az *Cloud) getVmssMachineID(resourceGroup, scaleSetName, instanceID string
 	return fmt.Sprintf(
 		vmssMachineIDTemplate,
 		az.SubscriptionID,
-		resourceGroup,
+		strings.ToLower(resourceGroup),
 		scaleSetName,
 		instanceID)
 }

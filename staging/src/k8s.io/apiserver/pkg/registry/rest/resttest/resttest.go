@@ -909,6 +909,45 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 	}
 }
 
+//  This test the fast-fail path. We test that the precondition gets verified
+//  again before deleting the object in tests of pkg/storage/etcd.
+func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn CreateFunc, getFn GetFunc, isNotFoundFn IsErrorFunc, opts metav1.DeleteOptions) {
+	ctx := t.TestContext()
+
+	foo := obj.DeepCopyObject()
+	t.setObjectMeta(foo, t.namer(1))
+	objectMeta := t.getObjectMetaOrFail(foo)
+	objectMeta.SetResourceVersion("RV0000")
+	if err := createFn(ctx, foo); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	opts.Preconditions = metav1.NewRVDeletionPrecondition("RV1111").Preconditions
+	obj, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &opts)
+	if err == nil || !errors.IsConflict(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.GetName())
+	}
+	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewRVDeletionPrecondition("RV0000"))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if !t.returnDeletedObject {
+		if status, ok := obj.(*metav1.Status); !ok {
+			t.Errorf("expected status of delete, got %v", status)
+		} else if status.Status != metav1.StatusSuccess {
+			t.Errorf("expected success, got: %v", status.Status)
+		}
+	}
+
+	_, err = getFn(ctx, foo)
+	if err == nil || !isNotFoundFn(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 // =============================================================================
 // Graceful Deletion tests.
 

@@ -85,7 +85,7 @@ func TestWithValidCaCert(t *testing.T) {
 
 	server, _ := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
 	server.StartTLS()
-	u := mustParseUrl(t, server.URL)
+	u := mustParseURL(t, server.URL)
 
 	connection := &vclib.VSphereConnection{
 		Hostname: u.Hostname(),
@@ -104,7 +104,7 @@ func TestWithVerificationWithWrongThumbprint(t *testing.T) {
 
 	server, _ := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
 	server.StartTLS()
-	u := mustParseUrl(t, server.URL)
+	u := mustParseURL(t, server.URL)
 
 	connection := &vclib.VSphereConnection{
 		Hostname:   u.Hostname(),
@@ -124,7 +124,7 @@ func TestWithVerificationWithoutCaCertOrThumbprint(t *testing.T) {
 
 	server, _ := createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
 	server.StartTLS()
-	u := mustParseUrl(t, server.URL)
+	u := mustParseURL(t, server.URL)
 
 	connection := &vclib.VSphereConnection{
 		Hostname: u.Hostname(),
@@ -142,7 +142,7 @@ func TestWithValidThumbprint(t *testing.T) {
 	server, thumbprint :=
 		createTestServer(t, fixtures.CaCertPath, fixtures.ServerCertPath, fixtures.ServerKeyPath, handler)
 	server.StartTLS()
-	u := mustParseUrl(t, server.URL)
+	u := mustParseURL(t, server.URL)
 
 	connection := &vclib.VSphereConnection{
 		Hostname:   u.Hostname(),
@@ -213,7 +213,7 @@ func getRequestVerifier(t *testing.T) (http.HandlerFunc, func()) {
 	return handler, checker
 }
 
-func mustParseUrl(t *testing.T, i string) *url.URL {
+func mustParseURL(t *testing.T, i string) *url.URL {
 	u, err := url.Parse(i)
 	if err != nil {
 		t.Fatalf("Cannot parse URL: %v", err)

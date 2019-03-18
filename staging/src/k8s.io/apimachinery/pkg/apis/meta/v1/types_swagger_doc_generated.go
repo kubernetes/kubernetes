@@ -87,8 +87,9 @@ func (APIVersions) SwaggerDoc() map[string]string {
 }
 
 var map_CreateOptions = map[string]string{
-	"":       "CreateOptions may be provided when creating an API object.",
-	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"":             "CreateOptions may be provided when creating an API object.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
 }
 
 func (CreateOptions) SwaggerDoc() map[string]string {
@@ -109,13 +110,21 @@ func (DeleteOptions) SwaggerDoc() map[string]string {
 }
 
 var map_ExportOptions = map[string]string{
-	"":       "ExportOptions is the query options to the standard REST get call.",
-	"export": "Should this value be exported.  Export strips fields that a user can not specify.",
-	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+	"":       "ExportOptions is the query options to the standard REST get call. Deprecated. Planned for removal in 1.18.",
+	"export": "Should this value be exported.  Export strips fields that a user can not specify. Deprecated. Planned for removal in 1.18.",
+	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'. Deprecated. Planned for removal in 1.18.",
 }
 
 func (ExportOptions) SwaggerDoc() map[string]string {
 	return map_ExportOptions
+}
+
+var map_Fields = map[string]string{
+	"": "Fields stores a set of fields in a data structure like a Trie. To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff",
+}
+
+func (Fields) SwaggerDoc() map[string]string {
+	return map_Fields
 }
 
 var map_GetOptions = map[string]string{
@@ -213,6 +222,19 @@ func (ListOptions) SwaggerDoc() map[string]string {
 	return map_ListOptions
 }
 
+var map_ManagedFieldsEntry = map[string]string{
+	"":           "ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource that the fieldset applies to.",
+	"manager":    "Manager is an identifier of the workflow managing these fields.",
+	"operation":  "Operation is the type of operation which lead to this ManagedFieldsEntry being created. The only valid values for this field are 'Apply' and 'Update'.",
+	"apiVersion": "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
+	"time":       "Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'",
+	"fields":     "Fields identifies a set of fields.",
+}
+
+func (ManagedFieldsEntry) SwaggerDoc() map[string]string {
+	return map_ManagedFieldsEntry
+}
+
 var map_ObjectMeta = map[string]string{
 	"":                           "ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.",
 	"name":                       "Name must be unique within a namespace. Is required when creating resources, although some resources may allow a client to request the generation of an appropriate name automatically. Name is primarily intended for creation idempotence and configuration definition. Cannot be updated. More info: http://kubernetes.io/docs/user-guide/identifiers#names",
@@ -231,6 +253,7 @@ var map_ObjectMeta = map[string]string{
 	"initializers":               "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.\n\nDEPRECATED - initializers are an alpha field and will be removed in v1.15.",
 	"finalizers":                 "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.",
 	"clusterName":                "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.",
+	"managedFields":              "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.\n\nThis field is alpha and can be changed or removed without notice.",
 }
 
 func (ObjectMeta) SwaggerDoc() map[string]string {
@@ -259,9 +282,21 @@ func (Patch) SwaggerDoc() map[string]string {
 	return map_Patch
 }
 
+var map_PatchOptions = map[string]string{
+	"":             "PatchOptions may be provided when patching an API object. PatchOptions is meant to be a superset of UpdateOptions.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"force":        "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
+}
+
+func (PatchOptions) SwaggerDoc() map[string]string {
+	return map_PatchOptions
+}
+
 var map_Preconditions = map[string]string{
-	"":    "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
-	"uid": "Specifies the target UID.",
+	"":                "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
+	"uid":             "Specifies the target UID.",
+	"resourceVersion": "Specifies the target ResourceVersion",
 }
 
 func (Preconditions) SwaggerDoc() map[string]string {
@@ -337,8 +372,9 @@ func (TypeMeta) SwaggerDoc() map[string]string {
 }
 
 var map_UpdateOptions = map[string]string{
-	"":       "UpdateOptions may be provided when updating an API object.",
-	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"":             "UpdateOptions may be provided when updating an API object. All fields in UpdateOptions should also be present in PatchOptions.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
 }
 
 func (UpdateOptions) SwaggerDoc() map[string]string {

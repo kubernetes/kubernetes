@@ -65,7 +65,7 @@ var (
 //
 // This prevents users from deleting a PVC that's used by a running pod.
 // This also prevents admin from deleting a PV that's bound by a PVC
-func (c *storageProtectionPlugin) Admit(a admission.Attributes) error {
+func (c *storageProtectionPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if !feature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 		return nil
 	}

@@ -82,8 +82,3 @@ func (c *Clientset) MetricsV1alpha1() metricsv1alpha1.MetricsV1alpha1Interface {
 func (c *Clientset) MetricsV1beta1() metricsv1beta1.MetricsV1beta1Interface {
 	return &fakemetricsv1beta1.FakeMetricsV1beta1{Fake: &c.Fake}
 }
-
-// Metrics retrieves the MetricsV1beta1Client
-func (c *Clientset) Metrics() metricsv1beta1.MetricsV1beta1Interface {
-	return &fakemetricsv1beta1.FakeMetricsV1beta1{Fake: &c.Fake}
-}

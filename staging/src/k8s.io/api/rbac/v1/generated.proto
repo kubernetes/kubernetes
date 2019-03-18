@@ -43,6 +43,7 @@ message ClusterRole {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this ClusterRole
+  // +optional
   repeated PolicyRule rules = 2;
 
   // AggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
@@ -121,6 +122,7 @@ message Role {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this Role
+  // +optional
   repeated PolicyRule rules = 2;
 }
 

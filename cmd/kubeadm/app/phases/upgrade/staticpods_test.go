@@ -32,7 +32,6 @@ import (
 	"github.com/pkg/errors"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
@@ -257,6 +256,14 @@ func (c fakeTLSEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.
 	return []etcdutil.Member{}, nil
 }
 
+func (c fakeTLSEtcdClient) GetMemberID(peerURL string) (uint64, error) {
+	return 0, nil
+}
+
+func (c fakeTLSEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
+
 type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
 
 func (c fakePodManifestEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
@@ -295,6 +302,14 @@ func (c fakePodManifestEtcdClient) GetVersion() (string, error) {
 func (c fakePodManifestEtcdClient) Sync() error { return nil }
 
 func (c fakePodManifestEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
+
+func (c fakePodManifestEtcdClient) GetMemberID(peerURL string) (uint64, error) {
+	return 0, nil
+}
+
+func (c fakePodManifestEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
@@ -541,22 +556,7 @@ func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.InitConfigura
 	configBytes := []byte(fmt.Sprintf(testConfiguration, certsDir, etcdDataDir, version))
 
 	// Unmarshal the config
-	cfg, err := configutil.BytesToInternalConfig(configBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	// Applies dynamic defaults to settings not provided with flags
-	if err = configutil.SetInitDynamicDefaults(cfg); err != nil {
-		return nil, err
-	}
-
-	// Validates cfg (flags/configs + defaults + dynamic defaults)
-	if err = validation.ValidateInitConfiguration(cfg).ToAggregate(); err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
+	return configutil.BytesToInitConfiguration(configBytes)
 }
 
 func getTempDir(t *testing.T, name string) (string, func()) {

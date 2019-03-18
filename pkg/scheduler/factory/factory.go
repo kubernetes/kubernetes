@@ -706,7 +706,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, 
 	}
 }
 
-// nodeEnumerator allows a cache.Poller to enumerate items in an v1.NodeList
+// nodeEnumerator allows a cache.Poller to enumerate items in a v1.NodeList
 type nodeEnumerator struct {
 	*v1.NodeList
 }

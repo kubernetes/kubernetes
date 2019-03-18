@@ -29,6 +29,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//vendor/github.com/heketi/heketi/client/api/go-client:go_default_library",
         "//vendor/github.com/heketi/heketi/pkg/glusterfs/api:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",

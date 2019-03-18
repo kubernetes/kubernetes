@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	restclient "k8s.io/client-go/rest"
-	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 )
 
 func TestLoadRESTClientConfig(t *testing.T) {
@@ -104,7 +104,7 @@ func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
 	client := &fakeClient{
 		failureType: createError,
 	}
-	privateKeyData, err := certutil.MakeEllipticPrivateKeyPEM()
+	privateKeyData, err := keyutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
 		t.Fatalf("Unable to generate a new private key: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
 }
 
 func TestRequestNodeCertificate(t *testing.T) {
-	privateKeyData, err := certutil.MakeEllipticPrivateKeyPEM()
+	privateKeyData, err := keyutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
 		t.Fatalf("Unable to generate a new private key: %v", err)
 	}

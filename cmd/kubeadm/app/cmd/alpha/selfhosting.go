@@ -53,7 +53,7 @@ var (
 		` + cmdutil.AlphaDisclaimer)
 
 	selfhostingExample = normalizer.Examples(`
-		# Converts a static Pod-hosted control plane into a self-hosted one. 
+		# Converts a static Pod-hosted control plane into a self-hosted one.
 
 		kubeadm alpha phase self-hosting convert-from-staticpods
 		`)
@@ -79,9 +79,8 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
-	var cfgPath, featureGatesString string
+	var cfgPath, featureGatesString, kubeConfigFile string
 	forcePivot, certsInSecrets := false, false
-	kubeConfigFile := constants.GetAdminKubeConfigPath()
 
 	// Creates the UX Command
 	cmd := &cobra.Command{
@@ -119,16 +118,16 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 			}
 
 			// Gets the Kubernetes client
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
-			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			// of the version from the internet when executing LoadOrDefaultInitConfiguration
 			phases.SetKubernetesVersion(&cfg.ClusterConfiguration)
 
 			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 
 			// Converts the Static Pod-hosted control plane into a self-hosted one
@@ -141,7 +140,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 	// Add flags to the command
 	// flags bound to the configuration object
 	cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, `The path where certificates are stored`)
-	cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental")
+	options.AddConfigFlag(cmd.Flags(), &cfgPath)
 
 	cmd.Flags().BoolVarP(
 		&certsInSecrets, "store-certs-in-secrets", "s",

@@ -38,7 +38,7 @@ func (az *Cloud) CreateFileShare(shareName, accountName, accountType, accountKin
 		resourceGroup = az.resourceGroup
 	}
 
-	account, key, err := az.ensureStorageAccount(accountName, accountType, accountKind, resourceGroup, location, fileShareAccountNamePrefix)
+	account, key, err := az.EnsureStorageAccount(accountName, accountType, accountKind, resourceGroup, location, fileShareAccountNamePrefix)
 	if err != nil {
 		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}

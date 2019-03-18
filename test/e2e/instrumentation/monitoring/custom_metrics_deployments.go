@@ -18,9 +18,8 @@ package monitoring
 
 import (
 	"fmt"
-	"strings"
-
 	"os/exec"
+	"strings"
 
 	gcm "google.golang.org/api/monitoring/v3"
 	appsv1 "k8s.io/api/apps/v1"
@@ -31,10 +30,15 @@ import (
 )
 
 var (
-	CustomMetricName    = "foo"
-	UnusedMetricName    = "unused"
-	CustomMetricValue   = int64(448)
-	UnusedMetricValue   = int64(446)
+	// CustomMetricName is the metrics name used in test cases.
+	CustomMetricName = "foo"
+	// UnusedMetricName is the unused metrics name used in test cases.
+	UnusedMetricName = "unused"
+	// CustomMetricValue is the value for CustomMetricName.
+	CustomMetricValue = int64(448)
+	// UnusedMetricValue is the value for UnusedMetricName.
+	UnusedMetricValue = int64(446)
+	// StackdriverExporter is exporter name.
 	StackdriverExporter = "stackdriver-exporter"
 	// HPAPermissions is a ClusterRoleBinding that grants unauthenticated user permissions granted for
 	// HPA for testing purposes, i.e. it should grant permission to read custom metrics.
@@ -55,11 +59,16 @@ var (
 			},
 		},
 	}
+	// StagingDeploymentsLocation is the location where the adapter deployment files are stored.
 	StagingDeploymentsLocation = "https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/staging/"
+	// AdapterForOldResourceModel is file name for the old resource model.
 	AdapterForOldResourceModel = "adapter_old_resource_model.yaml"
+	// AdapterForNewResourceModel is file name for the new resource model.
 	AdapterForNewResourceModel = "adapter_new_resource_model.yaml"
-	AdapterDefault             = AdapterForOldResourceModel
-	ClusterAdminBinding        = "e2e-test-cluster-admin-binding"
+	// AdapterDefault is the default model.
+	AdapterDefault = AdapterForOldResourceModel
+	// ClusterAdminBinding is the cluster rolebinding name for test cases.
+	ClusterAdminBinding = "e2e-test-cluster-admin-binding"
 )
 
 // CustomMetricContainerSpec allows to specify a config for StackdriverExporterDeployment
@@ -273,8 +282,8 @@ func createClusterAdminBinding() error {
 }
 
 // CreateDescriptors creates descriptors for metrics: CustomMetricName and UnusedMetricName.
-func CreateDescriptors(service *gcm.Service, projectId string) error {
-	_, err := service.Projects.MetricDescriptors.Create(fmt.Sprintf("projects/%s", projectId), &gcm.MetricDescriptor{
+func CreateDescriptors(service *gcm.Service, projectID string) error {
+	_, err := service.Projects.MetricDescriptors.Create(fmt.Sprintf("projects/%s", projectID), &gcm.MetricDescriptor{
 		Name:       CustomMetricName,
 		ValueType:  "INT64",
 		Type:       "custom.googleapis.com/" + CustomMetricName,
@@ -283,7 +292,7 @@ func CreateDescriptors(service *gcm.Service, projectId string) error {
 	if err != nil {
 		return err
 	}
-	_, err = service.Projects.MetricDescriptors.Create(fmt.Sprintf("projects/%s", projectId), &gcm.MetricDescriptor{
+	_, err = service.Projects.MetricDescriptors.Create(fmt.Sprintf("projects/%s", projectID), &gcm.MetricDescriptor{
 		Name:       UnusedMetricName,
 		ValueType:  "INT64",
 		Type:       "custom.googleapis.com/" + UnusedMetricName,
@@ -294,12 +303,12 @@ func CreateDescriptors(service *gcm.Service, projectId string) error {
 
 // CleanupDescriptors deletes descriptors for metrics: CustomMetricName and UnusedMetricName.
 // TODO: Cleanup time series as well
-func CleanupDescriptors(service *gcm.Service, projectId string) {
-	_, err := service.Projects.MetricDescriptors.Delete(fmt.Sprintf("projects/%s/metricDescriptors/custom.googleapis.com/%s", projectId, CustomMetricName)).Do()
+func CleanupDescriptors(service *gcm.Service, projectID string) {
+	_, err := service.Projects.MetricDescriptors.Delete(fmt.Sprintf("projects/%s/metricDescriptors/custom.googleapis.com/%s", projectID, CustomMetricName)).Do()
 	if err != nil {
 		framework.Logf("Failed to delete descriptor for metric '%s': %v", CustomMetricName, err)
 	}
-	_, err = service.Projects.MetricDescriptors.Delete(fmt.Sprintf("projects/%s/metricDescriptors/custom.googleapis.com/%s", projectId, UnusedMetricName)).Do()
+	_, err = service.Projects.MetricDescriptors.Delete(fmt.Sprintf("projects/%s/metricDescriptors/custom.googleapis.com/%s", projectID, UnusedMetricName)).Do()
 	if err != nil {
 		framework.Logf("Failed to delete descriptor for metric '%s': %v", CustomMetricName, err)
 	}

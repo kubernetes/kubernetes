@@ -31,7 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
@@ -42,49 +45,86 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-// upgradeVariables holds variables needed for performing an upgrade or planning to do so
-// TODO - Restructure or rename upgradeVariables
-type upgradeVariables struct {
-	client        clientset.Interface
-	cfg           *kubeadmapi.InitConfiguration
-	versionGetter upgrade.VersionGetter
-	waiter        apiclient.Waiter
+func getK8sVersionFromUserInput(flags *applyPlanFlags, args []string, versionIsMandatory bool) (string, error) {
+	var userVersion string
+
+	// If the version is specified in config file, pick up that value.
+	if flags.cfgPath != "" {
+		// Note that cfg isn't preserved here, it's just an one-off to populate userVersion based on --config
+		cfg, err := configutil.LoadInitConfigurationFromFile(flags.cfgPath)
+		if err != nil {
+			return "", err
+		}
+
+		userVersion = cfg.KubernetesVersion
+	}
+
+	// the version arg is mandatory unless version is specified in the config file
+	if versionIsMandatory && userVersion == "" {
+		if err := cmdutil.ValidateExactArgNumber(args, []string{"version"}); err != nil {
+			return "", err
+		}
+	}
+
+	// If option was specified in both args and config file, args will overwrite the config file.
+	if len(args) == 1 {
+		userVersion = args[0]
+	}
+
+	return userVersion, nil
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (*upgradeVariables, error) {
+func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// Ensure the user is root
+	klog.V(1).Info("running preflight checks")
+	if err := runPreflightChecks(ignorePreflightErrorsSet); err != nil {
+		return nil, nil, nil, err
+	}
 
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
+		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
 
 	// Check if the cluster is self-hosted
 	if upgrade.IsControlPlaneSelfHosted(client) {
-		return nil, errors.Errorf("cannot upgrade a self-hosted control plane")
+		return nil, nil, nil, errors.New("cannot upgrade a self-hosted control plane")
 	}
 
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, flags.ignorePreflightErrorsSet); err != nil {
-		return nil, errors.Wrap(err, "[upgrade/health] FATAL")
+	if err := upgrade.CheckClusterHealth(client, ignorePreflightErrorsSet); err != nil {
+		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
 	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
-	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade/config", flags.cfgPath, false)
+
+	var cfg *kubeadmapi.InitConfiguration
+	if flags.cfgPath != "" {
+		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath)
+	} else {
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false)
+	}
+
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 			fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
 			fmt.Println("")
 			fmt.Println("[upgrade/config] Next steps:")
-			fmt.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your master.\n")
-			fmt.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your master.\n")
+			fmt.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
+			fmt.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
 			fmt.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
 			fmt.Println("")
 			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
-		return nil, errors.Wrap(err, "[upgrade/config] FATAL")
+		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
 	}
 
 	// If a new k8s version should be set, apply the change before printing the config
@@ -96,7 +136,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	if flags.featureGatesString != "" {
 		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
 		if err != nil {
-			return nil, errors.Wrap(err, "[upgrade/config] FATAL")
+			return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
 		}
 	}
 
@@ -105,7 +145,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		for _, m := range msg {
 			fmt.Printf("[upgrade/config] %s\n", m)
 		}
-		return nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
+		return nil, nil, nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
 
 	// If the user told us to print this information out; do it!
@@ -113,14 +153,8 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		printConfiguration(&cfg.ClusterConfiguration, os.Stdout)
 	}
 
-	return &upgradeVariables{
-		client: client,
-		cfg:    cfg,
-		// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
-		versionGetter: upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), newK8sVersion),
-		// Use the waiter conditionally based on the dryrunning variable
-		waiter: getWaiter(dryRun, client),
-	}, nil
+	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
+	return client, upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), cfg.KubernetesVersion), cfg, nil
 }
 
 // printConfiguration prints the external version of the API to yaml

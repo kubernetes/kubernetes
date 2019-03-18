@@ -13,6 +13,7 @@ go_library(
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/googleapis/gnostic/compiler:go_default_library",
+        "//vendor/github.com/json-iterator/go:go_default_library",
         "//vendor/github.com/munnerz/goautoneg:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/builder:go_default_library",

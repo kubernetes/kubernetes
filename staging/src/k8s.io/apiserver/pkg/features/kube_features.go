@@ -82,6 +82,31 @@ const (
 	// validation, merging, mutation can be tested without
 	// committing.
 	DryRun utilfeature.Feature = "DryRun"
+
+	// owner: @apelisse, @lavalamp
+	// alpha: v1.14
+	//
+	// Server-side apply. Merging happens on the server.
+	ServerSideApply utilfeature.Feature = "ServerSideApply"
+
+	// owner: @caesarxuchao
+	// alpha: v1.14
+	//
+	// Allow apiservers to expose the storage version hash in the discovery
+	// document.
+	StorageVersionHash utilfeature.Feature = "StorageVersionHash"
+
+	// owner: @ksubrmnn
+	// alpha: v1.14
+	//
+	// Allows kube-proxy to run in Overlay mode for Windows
+	WinOverlay utilfeature.Feature = "WinOverlay"
+
+	// owner: @ksubrmnn
+	// alpha: v1.14
+	//
+	// Allows kube-proxy to create DSR loadbalancers for Windows
+	WinDSR utilfeature.Feature = "WinDSR"
 )
 
 func init() {
@@ -99,4 +124,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 	DryRun:                  {Default: true, PreRelease: utilfeature.Beta},
+	ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
+	StorageVersionHash:      {Default: false, PreRelease: utilfeature.Alpha},
+	WinOverlay:              {Default: false, PreRelease: utilfeature.Alpha},
+	WinDSR:                  {Default: false, PreRelease: utilfeature.Alpha},
 }

@@ -48,6 +48,11 @@ func (in *CustomResourceConversion) DeepCopyInto(out *CustomResourceConversion) 
 		*out = new(WebhookClientConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ConversionReviewVersions != nil {
+		in, out := &in.ConversionReviewVersions, &out.ConversionReviewVersions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

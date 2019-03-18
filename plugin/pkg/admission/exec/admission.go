@@ -111,7 +111,7 @@ func (d *DenyExec) ValidateInitialization() error {
 }
 
 // Validate makes an admission decision based on the request attributes
-func (d *DenyExec) Validate(a admission.Attributes) (err error) {
+func (d *DenyExec) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	path := a.GetResource().Resource
 	if subresource := a.GetSubresource(); subresource != "" {
 		path = path + "/" + subresource

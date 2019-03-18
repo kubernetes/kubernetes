@@ -37,6 +37,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -141,7 +142,11 @@ func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
 	}
 
 	privateKeyPath := pathForKey(pkiPath, name)
-	if err := certutil.WriteKey(privateKeyPath, certutil.EncodePrivateKeyPEM(key)); err != nil {
+	encoded, err := keyutil.MarshalPrivateKeyToPEM(key)
+	if err != nil {
+		return errors.Wrapf(err, "unable to marshal private key to PEM")
+	}
+	if err := keyutil.WriteKey(privateKeyPath, encoded); err != nil {
 		return errors.Wrapf(err, "unable to write private key to file %s", privateKeyPath)
 	}
 
@@ -180,7 +185,7 @@ func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 		return err
 	}
 	publicKeyPath := pathForPublicKey(pkiPath, name)
-	if err := certutil.WriteKey(publicKeyPath, publicKeyBytes); err != nil {
+	if err := keyutil.WriteKey(publicKeyPath, publicKeyBytes); err != nil {
 		return errors.Wrapf(err, "unable to write public key to file %s", publicKeyPath)
 	}
 
@@ -258,7 +263,7 @@ func TryLoadKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, error) {
 	privateKeyPath := pathForKey(pkiPath, name)
 
 	// Parse the private key from a file
-	privKey, err := certutil.PrivateKeyFromFile(privateKeyPath)
+	privKey, err := keyutil.PrivateKeyFromFile(privateKeyPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't load the private key file %s", privateKeyPath)
 	}
@@ -297,7 +302,7 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 	privateKeyPath := pathForKey(pkiPath, name)
 
 	// Parse the private key from a file
-	privKey, err := certutil.PrivateKeyFromFile(privateKeyPath)
+	privKey, err := keyutil.PrivateKeyFromFile(privateKeyPath)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "couldn't load the private key file %s", privateKeyPath)
 	}
@@ -305,7 +310,7 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 	publicKeyPath := pathForPublicKey(pkiPath, name)
 
 	// Parse the public key from a file
-	pubKeys, err := certutil.PublicKeysFromFile(publicKeyPath)
+	pubKeys, err := keyutil.PublicKeysFromFile(publicKeyPath)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "couldn't load the public key file %s", publicKeyPath)
 	}

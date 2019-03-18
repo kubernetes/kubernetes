@@ -29,8 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	cmdwait "k8s.io/kubernetes/pkg/kubectl/cmd/wait"
@@ -71,6 +71,9 @@ var (
 		# Delete a pod using the type and name specified in pod.json.
 		kubectl delete -f ./pod.json
 
+		# Delete resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml.
+		kubectl delete -k dir
+
 		# Delete a pod based on the type and name in the JSON passed into stdin.
 		cat pod.json | kubectl delete -f -
 
@@ -93,14 +96,16 @@ var (
 type DeleteOptions struct {
 	resource.FilenameOptions
 
-	LabelSelector   string
-	FieldSelector   string
-	DeleteAll       bool
-	IgnoreNotFound  bool
-	Cascade         bool
-	DeleteNow       bool
-	ForceDeletion   bool
-	WaitForDeletion bool
+	LabelSelector       string
+	FieldSelector       string
+	DeleteAll           bool
+	DeleteAllNamespaces bool
+	IgnoreNotFound      bool
+	Cascade             bool
+	DeleteNow           bool
+	ForceDeletion       bool
+	WaitForDeletion     bool
+	Quiet               bool
 
 	GracePeriod int
 	Timeout     time.Duration
@@ -118,7 +123,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
 	cmd := &cobra.Command{
-		Use:                   "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
+		Use:                   "delete ([-f FILENAME] | [-k DIRECTORY] | TYPE [(NAME | -l label | --all)])",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Delete resources by filenames, stdin, resources and names, or by resources and label selector"),
 		Long:                  deleteLong,
@@ -170,6 +175,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
 		SelectAllParam(o.DeleteAll).
+		AllNamespaces(o.DeleteAllNamespaces).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
 		Do()
@@ -311,7 +317,9 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 		return nil, cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 
-	o.PrintObj(info)
+	if !o.Quiet {
+		o.PrintObj(info)
+	}
 	return deleteResponse, nil
 }
 

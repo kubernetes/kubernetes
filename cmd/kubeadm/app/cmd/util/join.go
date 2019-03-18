@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,12 +30,24 @@ import (
 )
 
 var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
-	`kubeadm join {{.MasterHostPort}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}`,
+	`kubeadm join {{.ControlPlaneHostPort}} --token {{.Token}} \
+    {{range $h := .CAPubKeyPins}}--discovery-token-ca-cert-hash {{$h}} {{end}}{{if .ControlPlane}}\
+    --experimental-control-plane {{if .CertificateKey}}--certificate-key {{.CertificateKey}}{{end}}{{end}}`,
 ))
 
-// GetJoinCommand returns the kubeadm join command for a given token and
+// GetJoinWorkerCommand returns the kubeadm join command for a given token and
 // and Kubernetes cluster (the current cluster in the kubeconfig file)
-func GetJoinCommand(kubeConfigFile string, token string, skipTokenPrint bool) (string, error) {
+func GetJoinWorkerCommand(kubeConfigFile, token string, skipTokenPrint bool) (string, error) {
+	return getJoinCommand(kubeConfigFile, token, "", false, skipTokenPrint, false)
+}
+
+// GetJoinControlPlaneCommand returns the kubeadm join command for a given token and
+// and Kubernetes cluster (the current cluster in the kubeconfig file)
+func GetJoinControlPlaneCommand(kubeConfigFile, token, key string, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
+	return getJoinCommand(kubeConfigFile, token, key, true, skipTokenPrint, skipCertificateKeyPrint)
+}
+
+func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
 	// load the kubeconfig file to get the CA certificate and endpoint
 	config, err := clientcmd.LoadFromFile(kubeConfigFile)
 	if err != nil {
@@ -71,13 +83,18 @@ func GetJoinCommand(kubeConfigFile string, token string, skipTokenPrint bool) (s
 	}
 
 	ctx := map[string]interface{}{
-		"Token":          token,
-		"CAPubKeyPins":   publicKeyPins,
-		"MasterHostPort": strings.Replace(clusterConfig.Server, "https://", "", -1),
+		"Token":                token,
+		"CAPubKeyPins":         publicKeyPins,
+		"ControlPlaneHostPort": strings.Replace(clusterConfig.Server, "https://", "", -1),
+		"CertificateKey":       key,
+		"ControlPlane":         controlPlane,
 	}
 
 	if skipTokenPrint {
 		ctx["Token"] = template.HTML("<value withheld>")
+	}
+	if skipCertificateKeyPrint {
+		ctx["CertificateKey"] = template.HTML("<value withheld>")
 	}
 
 	var out bytes.Buffer
