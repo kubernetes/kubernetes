@@ -206,7 +206,7 @@ func NewISCSIServer(cs clientset.Interface, namespace string) (config VolumeTest
 			"/srv/iscsi": "/srv/iscsi",
 		},
 		ServerReadyMessage: "iscsi target started",
-		ServerHostNetwork: true,
+		ServerHostNetwork:  true,
 	}
 	pod, ip = CreateStorageServer(cs, config)
 	// Make sure the client runs on the same node as server so we don't need to open any firewalls.
