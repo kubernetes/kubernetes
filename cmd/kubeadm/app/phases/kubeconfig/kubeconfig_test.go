@@ -512,14 +512,23 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		},
 	}
 
+	// creates CA, write to pkiDir and remove ca.key to get into external CA condition
 	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
-	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthorithy(t)
 	if err := pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.CACertAndKeyBaseName, caCert, caKey); err != nil {
 		t.Fatalf("failure while saving CA certificate and key: %v", err)
 	}
+	if err := os.Remove(filepath.Join(pkiDir, kubeadmconstants.CAKeyName)); err != nil {
+		t.Fatalf("failure while deleting ca.key: %v", err)
+	}
 
+	// create a valid config
 	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
+
+	// create a config with another CA
+	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthorithy(t)
 	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
+
+	// create a config with another server URL
 	configWithAnotherServerURL := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
 
 	tests := map[string]struct {
@@ -539,11 +548,21 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 			initConfig:    initConfig,
 			expectedError: true,
 		},
-		"some files are invalid": {
+		"some files have invalid CA": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
 				kubeadmconstants.KubeletKubeConfigFileName:           config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: configWithAnotherClusterCa,
+				kubeadmconstants.SchedulerKubeConfigFileName:         config,
+			},
+			initConfig:    initConfig,
+			expectedError: true,
+		},
+		"some files have invalid Server Url": {
+			filesToWrite: map[string]*clientcmdapi.Config{
+				kubeadmconstants.AdminKubeConfigFileName:             config,
+				kubeadmconstants.KubeletKubeConfigFileName:           config,
+				kubeadmconstants.ControllerManagerKubeConfigFileName: config,
 				kubeadmconstants.SchedulerKubeConfigFileName:         configWithAnotherServerURL,
 			},
 			initConfig:    initConfig,
@@ -567,7 +586,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 
 		for name, config := range test.filesToWrite {
 			if err := createKubeConfigFileIfNotExists(tmpdir, name, config); err != nil {
-				t.Errorf("createKubeConfigFileIfNotExists failed")
+				t.Errorf("createKubeConfigFileIfNotExists failed: %v", err)
 			}
 		}
 

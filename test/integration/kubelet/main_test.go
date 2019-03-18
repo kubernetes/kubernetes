@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package probe
+package kubelet
 
-// Result is a string used to handle the results for probing container readiness/livenss
-type Result string
+import (
+	"testing"
 
-const (
-	// Success Result
-	Success Result = "success"
-	// Warning Result. Logically success, but with additional debugging information attached.
-	Warning Result = "warning"
-	// Failure Result
-	Failure Result = "failure"
-	// Unknown Result
-	Unknown Result = "unknown"
+	"k8s.io/kubernetes/test/integration/framework"
 )
+
+func TestMain(m *testing.M) {
+	framework.EtcdMain(m.Run)
+}
