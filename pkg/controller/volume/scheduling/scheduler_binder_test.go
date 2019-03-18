@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package persistentvolume
+package scheduling
 
 import (
 	"context"
@@ -39,6 +39,8 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
+	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 )
 
 var (
@@ -97,7 +99,7 @@ var (
 
 type testEnv struct {
 	client               clientset.Interface
-	reactor              *volumeReactor
+	reactor              *pvtesting.VolumeReactor
 	binder               SchedulerVolumeBinder
 	internalBinder       *volumeBinder
 	internalNodeInformer coreinformers.NodeInformer
@@ -107,7 +109,7 @@ type testEnv struct {
 
 func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 	client := &fake.Clientset{}
-	reactor := newVolumeReactor(client, nil, nil, nil, nil)
+	reactor := pvtesting.NewVolumeReactor(client, nil, nil, nil)
 	// TODO refactor all tests to use real watch mechanism, see #72327
 	client.AddWatchReactor("*", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -238,11 +240,11 @@ func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs [
 	for _, pvc := range cachedPVCs {
 		internalPVCCache.add(pvc)
 		if apiPVCs == nil {
-			env.reactor.claims[pvc.Name] = pvc
+			env.reactor.AddClaim(pvc)
 		}
 	}
 	for _, pvc := range apiPVCs {
-		env.reactor.claims[pvc.Name] = pvc
+		env.reactor.AddClaim(pvc)
 	}
 }
 
@@ -251,11 +253,11 @@ func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.P
 	for _, pv := range cachedPVs {
 		internalPVCache.add(pv)
 		if apiPVs == nil {
-			env.reactor.volumes[pv.Name] = pv
+			env.reactor.AddVolume(pv)
 		}
 	}
 	for _, pv := range apiPVs {
-		env.reactor.volumes[pv.Name] = pv
+		env.reactor.AddVolume(pv)
 	}
 
 }
@@ -421,8 +423,8 @@ func (env *testEnv) validateAssume(t *testing.T, name string, pod *v1.Pod, bindi
 			t.Errorf("Test %q failed: GetPVC %q returned error: %v", name, pvcKey, err)
 			continue
 		}
-		if pvc.Annotations[annSelectedNode] != nodeLabelValue {
-			t.Errorf("Test %q failed: expected annSelectedNode of pvc %q to be %q, but got %q", name, pvcKey, nodeLabelValue, pvc.Annotations[annSelectedNode])
+		if pvc.Annotations[pvutil.AnnSelectedNode] != nodeLabelValue {
+			t.Errorf("Test %q failed: expected pvutil.AnnSelectedNode of pvc %q to be %q, but got %q", name, pvcKey, nodeLabelValue, pvc.Annotations[pvutil.AnnSelectedNode])
 		}
 	}
 }
@@ -447,8 +449,8 @@ func (env *testEnv) validateFailedAssume(t *testing.T, name string, pod *v1.Pod,
 			t.Errorf("Test %q failed: GetPVC %q returned error: %v", name, pvcKey, err)
 			continue
 		}
-		if pvc.Annotations[annSelectedNode] != "" {
-			t.Errorf("Test %q failed: expected annSelectedNode of pvc %q empty, but got %q", name, pvcKey, pvc.Annotations[annSelectedNode])
+		if pvc.Annotations[pvutil.AnnSelectedNode] != "" {
+			t.Errorf("Test %q failed: expected pvutil.AnnSelectedNode of pvc %q empty, but got %q", name, pvcKey, pvc.Annotations[pvutil.AnnSelectedNode])
 		}
 	}
 }
@@ -476,7 +478,7 @@ func (env *testEnv) validateBind(
 	}
 
 	// Check reactor for API updates
-	if err := env.reactor.checkVolumes(expectedAPIPVs); err != nil {
+	if err := env.reactor.CheckVolumes(expectedAPIPVs); err != nil {
 		t.Errorf("Test %q failed: API reactor validation failed: %v", name, err)
 	}
 }
@@ -504,7 +506,7 @@ func (env *testEnv) validateProvision(
 	}
 
 	// Check reactor for API updates
-	if err := env.reactor.checkClaims(expectedAPIPVCs); err != nil {
+	if err := env.reactor.CheckClaims(expectedAPIPVCs); err != nil {
 		t.Errorf("Test %q failed: API reactor validation failed: %v", name, err)
 	}
 }
@@ -543,10 +545,10 @@ func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVer
 
 	switch pvcBoundState {
 	case pvcSelectedNode:
-		metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, annSelectedNode, node)
+		metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnSelectedNode, node)
 		// don't fallthrough
 	case pvcBound:
-		metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, annBindCompleted, "yes")
+		metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "yes")
 		fallthrough
 	case pvcPrebound:
 		pvc.Spec.VolumeName = pvName
@@ -595,7 +597,7 @@ func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentV
 		},
 	}
 	if node != "" {
-		pv.Spec.NodeAffinity = getVolumeNodeAffinity(nodeLabelKey, node)
+		pv.Spec.NodeAffinity = pvutil.GetVolumeNodeAffinity(nodeLabelKey, node)
 	}
 
 	if boundToPVC != nil {
@@ -607,7 +609,7 @@ func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentV
 			Namespace:       boundToPVC.Namespace,
 			UID:             boundToPVC.UID,
 		}
-		metav1.SetMetaDataAnnotation(&pv.ObjectMeta, annBoundByController, "yes")
+		metav1.SetMetaDataAnnotation(&pv.ObjectMeta, pvutil.AnnBoundByController, "yes")
 	}
 
 	return pv
@@ -615,7 +617,7 @@ func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentV
 
 func pvcSetSelectedNode(pvc *v1.PersistentVolumeClaim, node string) *v1.PersistentVolumeClaim {
 	newPVC := pvc.DeepCopy()
-	metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, annSelectedNode, node)
+	metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, pvutil.AnnSelectedNode, node)
 	return newPVC
 }
 
@@ -691,7 +693,7 @@ func makeBinding(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) *bindin
 func addProvisionAnn(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 	res := pvc.DeepCopy()
 	// Add provision related annotations
-	metav1.SetMetaDataAnnotation(&res.ObjectMeta, annSelectedNode, nodeLabelValue)
+	metav1.SetMetaDataAnnotation(&res.ObjectMeta, pvutil.AnnSelectedNode, nodeLabelValue)
 
 	return res
 }
@@ -1488,7 +1490,7 @@ func TestBindPodVolumes(t *testing.T) {
 				// Update PVC to be fully bound to PV
 				newPVC := pvc.DeepCopy()
 				newPVC.Spec.VolumeName = pv.Name
-				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, annBindCompleted, "yes")
+				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, pvutil.AnnBindCompleted, "yes")
 				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(newPVC); err != nil {
 					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
 				}
@@ -1512,7 +1514,7 @@ func TestBindPodVolumes(t *testing.T) {
 					return
 				}
 				newPVC.Spec.VolumeName = dynamicPV.Name
-				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, annBindCompleted, "yes")
+				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, pvutil.AnnBindCompleted, "yes")
 				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(newPVC); err != nil {
 					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
 				}
@@ -1588,7 +1590,7 @@ func TestBindPodVolumes(t *testing.T) {
 				// Update PVC to be fully bound to a PV with a different node
 				newPVC := pvcs[0].DeepCopy()
 				newPVC.Spec.VolumeName = pvNode2.Name
-				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, annBindCompleted, "yes")
+				metav1.SetMetaDataAnnotation(&newPVC.ObjectMeta, pvutil.AnnBindCompleted, "yes")
 				if _, err := testEnv.client.CoreV1().PersistentVolumeClaims(newPVC.Namespace).Update(newPVC); err != nil {
 					t.Errorf("failed to update PVC %q: %v", newPVC.Name, err)
 				}

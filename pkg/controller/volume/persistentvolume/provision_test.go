@@ -213,7 +213,7 @@ func TestProvisionSync(t *testing.T) {
 				// Inject error to the first
 				// kubeclient.PersistentVolumes.Create() call. All other calls
 				// will succeed.
-				{"create", "persistentvolumes", errors.New("Mock creation error")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error")},
 			},
 			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
@@ -229,11 +229,11 @@ func TestProvisionSync(t *testing.T) {
 			[]pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
-				{"create", "persistentvolumes", errors.New("Mock creation error1")},
-				{"create", "persistentvolumes", errors.New("Mock creation error2")},
-				{"create", "persistentvolumes", errors.New("Mock creation error3")},
-				{"create", "persistentvolumes", errors.New("Mock creation error4")},
-				{"create", "persistentvolumes", errors.New("Mock creation error5")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error2")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error3")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error4")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error5")},
 			},
 			wrapTestWithPluginCalls(
 				nil,                                // recycle calls
@@ -254,11 +254,11 @@ func TestProvisionSync(t *testing.T) {
 			[]pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
-				{"create", "persistentvolumes", errors.New("Mock creation error1")},
-				{"create", "persistentvolumes", errors.New("Mock creation error2")},
-				{"create", "persistentvolumes", errors.New("Mock creation error3")},
-				{"create", "persistentvolumes", errors.New("Mock creation error4")},
-				{"create", "persistentvolumes", errors.New("Mock creation error5")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error2")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error3")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error4")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error5")},
 			},
 			// No deleteCalls are configured, which results into no deleter plugin available for the volume
 			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
@@ -275,11 +275,11 @@ func TestProvisionSync(t *testing.T) {
 			[]pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
-				{"create", "persistentvolumes", errors.New("Mock creation error1")},
-				{"create", "persistentvolumes", errors.New("Mock creation error2")},
-				{"create", "persistentvolumes", errors.New("Mock creation error3")},
-				{"create", "persistentvolumes", errors.New("Mock creation error4")},
-				{"create", "persistentvolumes", errors.New("Mock creation error5")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error2")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error3")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error4")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error5")},
 			},
 			wrapTestWithPluginCalls(
 				nil, // recycle calls
@@ -305,11 +305,11 @@ func TestProvisionSync(t *testing.T) {
 			[]pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
-				{"create", "persistentvolumes", errors.New("Mock creation error1")},
-				{"create", "persistentvolumes", errors.New("Mock creation error2")},
-				{"create", "persistentvolumes", errors.New("Mock creation error3")},
-				{"create", "persistentvolumes", errors.New("Mock creation error4")},
-				{"create", "persistentvolumes", errors.New("Mock creation error5")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error2")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error3")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error4")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error5")},
 			},
 			wrapTestWithPluginCalls(
 				nil, // recycle calls
@@ -399,8 +399,8 @@ func TestProvisionSync(t *testing.T) {
 			[]pvtesting.ReactorError{
 				// Inject errors to simulate crashed API server during
 				// kubeclient.PersistentVolumes.Create()
-				{"create", "persistentvolumes", errors.New("Mock creation error1")},
-				{"create", "persistentvolumes", apierrs.NewAlreadyExists(api.Resource("persistentvolumes"), "")},
+				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
+				{Verb: "create", Resource: "persistentvolumes", Error: apierrs.NewAlreadyExists(api.Resource("persistentvolumes"), "")},
 			},
 			wrapTestWithPluginCalls(
 				nil, // recycle calls
