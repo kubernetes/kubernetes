@@ -151,9 +151,7 @@ func getPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) map[string]v1
 		claim.Namespace = set.Namespace
 		if claim.Labels != nil {
 			for key, value := range set.Spec.Selector.MatchLabels {
-				if claim.Labels != nil {
-					claim.Labels[key] = value
-				}
+				claim.Labels[key] = value
 			}
 		} else {
 			claim.Labels = set.Spec.Selector.MatchLabels
