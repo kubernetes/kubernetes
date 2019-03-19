@@ -69,6 +69,8 @@ const (
 var (
 	// Master nodes are not added to standard load balancer by default.
 	defaultExcludeMasterFromStandardLB = true
+	// Outbound SNAT is enabled by default.
+	defaultDisableOutboundSNAT = false
 )
 
 // Azure implements PVLabeler.
@@ -138,6 +140,9 @@ type Config struct {
 	// ExcludeMasterFromStandardLB excludes master nodes from standard load balancer.
 	// If not set, it will be default to true.
 	ExcludeMasterFromStandardLB *bool `json:"excludeMasterFromStandardLB" yaml:"excludeMasterFromStandardLB"`
+	// DisableOutboundSNAT disables the outbound SNAT for public load balancer rules.
+	// It should only be set when loadBalancerSku is standard. If not set, it will be default to false.
+	DisableOutboundSNAT *bool `json:"disableOutboundSNAT" yaml:"disableOutboundSNAT"`
 
 	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
 	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount" yaml:"maximumLoadBalancerRuleCount"`
@@ -264,9 +269,20 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			config.CloudProviderRateLimitBucketWrite)
 	}
 
-	// Do not add master nodes to standard LB by default.
-	if config.ExcludeMasterFromStandardLB == nil {
-		config.ExcludeMasterFromStandardLB = &defaultExcludeMasterFromStandardLB
+	if strings.EqualFold(config.LoadBalancerSku, loadBalancerSkuStandard) {
+		// Do not add master nodes to standard LB by default.
+		if config.ExcludeMasterFromStandardLB == nil {
+			config.ExcludeMasterFromStandardLB = &defaultExcludeMasterFromStandardLB
+		}
+
+		// Enable outbound SNAT by default.
+		if config.DisableOutboundSNAT == nil {
+			config.DisableOutboundSNAT = &defaultDisableOutboundSNAT
+		}
+	} else {
+		if config.DisableOutboundSNAT != nil && *config.DisableOutboundSNAT {
+			return nil, fmt.Errorf("disableOutboundSNAT should only set when loadBalancerSku is standard")
+		}
 	}
 
 	azClientConfig := &azClientConfig{
