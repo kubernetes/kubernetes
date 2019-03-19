@@ -225,7 +225,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 		return err
 	}
 
-	// if --print-join-command was specified, print the full `kubeadm join` command
+	// if --print-join-command was specified, print a machine-readable full `kubeadm join` command
 	// otherwise, just print the token
 	if printJoinCommand {
 		skipTokenPrint := false
@@ -233,6 +233,8 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 		if err != nil {
 			return errors.Wrap(err, "failed to get join command")
 		}
+		joinCommand = strings.ReplaceAll(joinCommand, "\\\n", "")
+		joinCommand = strings.ReplaceAll(joinCommand, "\t", "")
 		fmt.Fprintln(out, joinCommand)
 	} else {
 		fmt.Fprintln(out, internalcfg.BootstrapTokens[0].Token.String())
