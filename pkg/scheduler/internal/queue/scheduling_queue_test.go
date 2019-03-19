@@ -647,7 +647,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			upm := newUnschedulablePodsMap()
+			upm := newUnschedulablePodsMap(nil)
 			for _, p := range test.podsToAdd {
 				upm.addOrUpdate(newPodInfoNoTimestamp(p))
 			}
