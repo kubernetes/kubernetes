@@ -63,11 +63,25 @@ var (
 		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 		  https://kubernetes.io/docs/concepts/cluster-administration/addons/
 
-		You can now join any number of machines by running the following on each node
-		as root:
-
-		  {{.joinCommand}}
-
+		{{if .ControlPlaneEndpoint -}}
+		{{if .UploadCerts -}}
+		You can now join any number of the control-plane node running the following command on each as root:
+					  
+		  {{.joinControlPlaneCommand}}
+					
+		Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
+		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use 
+		"kubeadm init phase upload-certs --experimental-upload-certs" to reload certs afterward.
+		  
+		{{else -}}
+		You can now join any number of control-plane nodes by copying certificate authorities 
+		and service account keys on each node and then running the following as root:
+				  
+		  {{.joinControlPlaneCommand}}	  
+		  
+		{{end}}{{end}}Then you can join any number of worker nodes by running the following on each as root:
+						  
+		{{.joinWorkerCommand}}
 		`)))
 )
 
@@ -509,14 +523,22 @@ func (d *initData) Tokens() []string {
 }
 
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {
-	joinCommand, err := cmdutil.GetJoinCommand(adminKubeConfigPath, token, i.certificateKey, i.skipTokenPrint, i.uploadCerts, i.skipCertificateKeyPrint)
+	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(adminKubeConfigPath, token, i.certificateKey, i.skipTokenPrint, i.skipCertificateKeyPrint)
 	if err != nil {
 		return err
 	}
 
-	ctx := map[string]string{
-		"KubeConfigPath": adminKubeConfigPath,
-		"joinCommand":    joinCommand,
+	joinWorkerCommand, err := cmdutil.GetJoinWorkerCommand(adminKubeConfigPath, token, i.skipTokenPrint)
+	if err != nil {
+		return err
+	}
+
+	ctx := map[string]interface{}{
+		"KubeConfigPath":          adminKubeConfigPath,
+		"ControlPlaneEndpoint":    i.Cfg().ControlPlaneEndpoint,
+		"UploadCerts":             i.uploadCerts,
+		"joinControlPlaneCommand": joinControlPlaneCommand,
+		"joinWorkerCommand":       joinWorkerCommand,
 	}
 
 	return initDoneTempl.Execute(out, ctx)

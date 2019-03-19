@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -130,7 +131,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	})
 
 	It("Should be able to deny custom resource creation", func() {
-		testcrd, err := framework.CreateTestCRD(f)
+		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
 		}
@@ -167,7 +168,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	})
 
 	It("Should mutate custom resource", func() {
-		testcrd, err := framework.CreateTestCRD(f)
+		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
 		}
@@ -185,7 +186,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	})
 
 	It("Should mutate custom resource with different stored version", func() {
-		testcrd, err := framework.CreateMultiVersionTestCRDWithV1Storage(f)
+		testcrd, err := crd.CreateMultiVersionTestCRDWithV1Storage(f)
 		if err != nil {
 			return
 		}
@@ -1186,7 +1187,7 @@ func cleanWebhookTest(client clientset.Interface, namespaceName string) {
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete(roleBindingName, nil)
 }
 
-func registerWebhookForCustomResource(f *framework.Framework, context *certContext, testcrd *framework.TestCrd) func() {
+func registerWebhookForCustomResource(f *framework.Framework, context *certContext, testcrd *crd.TestCrd) func() {
 	client := f.ClientSet
 	By("Registering the custom resource webhook via the AdmissionRegistration API")
 
@@ -1202,7 +1203,7 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create, v1beta1.Update},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{testcrd.ApiGroup},
+						APIGroups:   []string{testcrd.APIGroup},
 						APIVersions: testcrd.GetAPIVersions(),
 						Resources:   []string{testcrd.GetPluralName()},
 					},
@@ -1227,7 +1228,7 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 	}
 }
 
-func registerMutatingWebhookForCustomResource(f *framework.Framework, context *certContext, testcrd *framework.TestCrd) func() {
+func registerMutatingWebhookForCustomResource(f *framework.Framework, context *certContext, testcrd *crd.TestCrd) func() {
 	client := f.ClientSet
 	By("Registering the mutating webhook for a custom resource via the AdmissionRegistration API")
 
@@ -1243,7 +1244,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create, v1beta1.Update},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{testcrd.ApiGroup},
+						APIGroups:   []string{testcrd.APIGroup},
 						APIVersions: testcrd.GetAPIVersions(),
 						Resources:   []string{testcrd.GetPluralName()},
 					},
@@ -1262,7 +1263,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{testcrd.ApiGroup},
+						APIGroups:   []string{testcrd.APIGroup},
 						APIVersions: testcrd.GetAPIVersions(),
 						Resources:   []string{testcrd.GetPluralName()},
 					},
@@ -1338,7 +1339,7 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 	}
 }
 
-func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *framework.TestCrd) {
+func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.TestCrd) {
 	customResourceClient := testcrd.GetV1DynamicClient()
 	By("Creating a custom resource while v1 is storage version")
 	crName := "cr-instance-1"
@@ -1360,7 +1361,7 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *fram
 
 	By("Patching Custom Resource Definition to set v2 as storage")
 	apiVersionWithV2StoragePatch := fmt.Sprint(`{"spec": {"versions": [{"name": "v1", "storage": false, "served": true},{"name": "v2", "storage": true, "served": true}]}}`)
-	_, err = testcrd.ApiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(testcrd.Crd.Name, types.StrategicMergePatchType, []byte(apiVersionWithV2StoragePatch))
+	_, err = testcrd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(testcrd.Crd.Name, types.StrategicMergePatchType, []byte(apiVersionWithV2StoragePatch))
 	Expect(err).NotTo(HaveOccurred(), "failed to patch custom resource definition %s in namespace: %s", testcrd.Crd.Name, f.Namespace.Name)
 
 	By("Patching the custom resource while v2 is storage version")
@@ -1427,10 +1428,10 @@ func testCRDDenyWebhook(f *framework.Framework) {
 			Storage: true,
 		},
 	}
-	testcrd := &framework.TestCrd{
+	testcrd := &crd.TestCrd{
 		Name:     name,
 		Kind:     kind,
-		ApiGroup: group,
+		APIGroup: group,
 		Versions: apiVersions,
 	}
 
@@ -1453,7 +1454,7 @@ func testCRDDenyWebhook(f *framework.Framework) {
 			},
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:    testcrd.ApiGroup,
+			Group:    testcrd.APIGroup,
 			Versions: testcrd.Versions,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:   testcrd.GetPluralName(),

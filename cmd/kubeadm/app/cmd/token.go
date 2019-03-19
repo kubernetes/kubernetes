@@ -228,11 +228,8 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 	// if --print-join-command was specified, print the full `kubeadm join` command
 	// otherwise, just print the token
 	if printJoinCommand {
-		key := ""
 		skipTokenPrint := false
-		uploadCerts := false
-		skipCertificateKeyPrint := false
-		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), key, skipTokenPrint, uploadCerts, skipCertificateKeyPrint)
+		joinCommand, err := cmdutil.GetJoinWorkerCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), skipTokenPrint)
 		if err != nil {
 			return errors.Wrap(err, "failed to get join command")
 		}
