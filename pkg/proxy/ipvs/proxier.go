@@ -164,6 +164,7 @@ var ipvsModules = []string{
 	"ip_vs_wrr",
 	"ip_vs_sh",
 	"nf_conntrack_ipv4",
+	"nf_conntrack",
 }
 
 // In IPVS proxy mode, the following flags need to be set
@@ -511,8 +512,21 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 	wantModules.Insert(ipvsModules...)
 	loadModules.Insert(mods...)
 	modules := wantModules.Difference(loadModules).UnsortedList()
-	if len(modules) != 0 {
-		return false, fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", modules)
+	var missingMods []string
+	ConntrackiMissingCounter := 0
+	for _, mod := range modules {
+		if strings.Contains(mod, "nf_conntrack") {
+			ConntrackiMissingCounter++
+		} else {
+			missingMods = append(missingMods, mod)
+		}
+	}
+	if ConntrackiMissingCounter == 2 {
+		missingMods = append(missingMods, "nf_conntrack_ipv4(or nf_conntrack for Linux kernel 4.19 and later)")
+	}
+
+	if len(missingMods) != 0 {
+		return false, fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", missingMods)
 	}
 
 	// Check ipset version
