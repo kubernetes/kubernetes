@@ -433,6 +433,12 @@ const (
 	//
 	// Enables the OpenStack Cinder in-tree driver to OpenStack Cinder CSI Driver migration feature.
 	CSIMigrationOpenStack utilfeature.Feature = "CSIMigrationOpenStack"
+
+	// owner: @fanux
+	// alpha: v1.15
+	//
+	// Let kubelet support mount lxcfs files.
+	KubeletSupportLxcfs utilfeature.Feature = "KubeletSupportLxcfs"
 )
 
 func init() {
@@ -507,6 +513,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TTLAfterFinished:                            {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPodResources:                         {Default: false, PreRelease: utilfeature.Alpha},
 	WindowsGMSA:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	KubeletSupportLxcfs:                         {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
