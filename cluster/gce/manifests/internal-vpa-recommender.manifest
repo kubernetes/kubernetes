@@ -28,7 +28,7 @@
                     "--kubeconfig=/etc/srv/kubernetes/vpa-recommender/kubeconfig",
                     "--v=4",
                     "--logtostderr=true",
-                    "--leader-elect=true"
+                    "--leader-elect=true {{uas_params}}"
                 ],
                 "volumeMounts": [
                     {{cloud_config_mount}}

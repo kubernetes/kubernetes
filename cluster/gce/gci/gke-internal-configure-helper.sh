@@ -50,34 +50,26 @@ function add_vpa_admission_webhook_host {
 }
 
 function start_vertical_pod_autoscaler {
+  local -r manifests_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
+  mkdir -p "${manifests_dir}/vertical-pod-autoscaler"
   if [[ "${ENABLE_VERTICAL_POD_AUTOSCALER:-}" == "true" ]]; then
     echo "Start Vertical Pod Autoscaler (VPA)"
     generate_vertical_pod_autoscaler_admission_controller_certs
     add_vpa_admission_webhook_host
-
-    local -r manifests_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
-
-    mkdir -p "${manifests_dir}/vertical-pod-autoscaler"
 
     cp "${manifests_dir}/internal-vpa-crd.yaml" "${manifests_dir}/vertical-pod-autoscaler"
     cp "${manifests_dir}/internal-vpa-rbac.yaml" "${manifests_dir}/vertical-pod-autoscaler"
     setup-addon-manifests "addons" "vertical-pod-autoscaler"
 
     for component in admission-controller recommender updater; do
-      token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-      append_or_replace_prefixed_line /etc/srv/kubernetes/known_tokens.csv "${token}," "vpa-${component},uid:vpa-${component}"
-      create-vpa-kubeconfig vpa-${component} ${token}
-
-      # Prepare manifest
-      local src_file="${manifests_dir}/internal-vpa-${component}.manifest"
-
-      sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
-      sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
-      sed -i -e "s@{%.*%}@@g" "${src_file}"
-
-      cp "${src_file}" /etc/kubernetes/manifests
+      setup_vertical_pod_autoscaler_component ${component} ${manifests_dir}
     done
+  elif [[ "${ENABLE_UNIFIED_AUTOSCALING:-}" == "true" ]]; then
+    cp "${manifests_dir}/internal-kuba-rbac.yaml" "${manifests_dir}/vertical-pod-autoscaler"
+    setup-addon-manifests "addons" "vertical-pod-autoscaler"
 
+    echo "Start Kubernetes Adapter for Unified Autoscaler (KUBA)"
+    setup_vertical_pod_autoscaler_component "recommender" ${manifests_dir}
   fi
 }
 
@@ -94,6 +86,28 @@ function base64_decode_or_die {
     echo "==VPA enabled but ${variable_name} is not set=="
     exit 1
   fi
+}
+
+function setup_vertical_pod_autoscaler_component {
+  local component=$1
+  local manifests_dir=$2
+  token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  append_or_replace_prefixed_line /etc/srv/kubernetes/known_tokens.csv "${token}," "vpa-${component},uid:vpa-${component}"
+  create-vpa-kubeconfig vpa-${component} ${token}
+
+  # Prepare manifest
+  local src_file="${manifests_dir}/internal-vpa-${component}.manifest"
+
+  if [[ ${component} == "recommender" ]]; then
+    local uas_params="${VPA_UAS_PARAMS:-}"
+    sed -i -e "s@{{uas_params}}@${uas_params}@g" "${src_file}"
+  fi
+
+  sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
+  sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
+  sed -i -e "s@{%.*%}@@g" "${src_file}"
+
+  cp "${src_file}" /etc/kubernetes/manifests
 }
 
 function generate_vertical_pod_autoscaler_admission_controller_certs {
