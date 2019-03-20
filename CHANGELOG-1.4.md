@@ -1427,7 +1427,7 @@ binary | sha1 hash | md5 hash
 * Bump minimum API version for docker to 1.21 ([#27208](https://github.com/kubernetes/kubernetes/pull/27208), [@yujuhong](https://github.com/yujuhong))
 * Adding lock files for kubeconfig updating ([#28034](https://github.com/kubernetes/kubernetes/pull/28034), [@krousey](https://github.com/krousey))
 
-Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
+Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for other releases.
 
 Release notes of older releases can be found in:
 - [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.2.md)

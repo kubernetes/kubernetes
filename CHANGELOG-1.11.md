@@ -2433,3 +2433,17 @@ filename | sha256 hash
 * Added e2e test for watch ([#60331](https://github.com/kubernetes/kubernetes/pull/60331), [@jennybuckley](https://github.com/jennybuckley))
 * kubelet's --cni-bin-dir option now accepts multiple comma-separated CNI binary directory paths, which are search for CNI plugins in the given order. ([#58714](https://github.com/kubernetes/kubernetes/pull/58714), [@dcbw](https://github.com/dcbw))
 
+
+Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for other releases.
+
+Release notes of older releases can be found in:
+- [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.2.md)
+- [CHANGELOG-1.3.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.3.md)
+- [CHANGELOG-1.4.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.4.md)
+- [CHANGELOG-1.5.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.5.md)
+- [CHANGELOG-1.6.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.6.md)
+- [CHANGELOG-1.7.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.7.md)
+- [CHANGELOG-1.8.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.8.md)
+- [CHANGELOG-1.9.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.9.md)
+- [CHANGELOG-1.10.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.10.md)
+

@@ -3078,7 +3078,7 @@ filename | sha256 hash
 * The options passed to a flexvolume plugin's mount command now contains the pod name (`kubernetes.io/pod.name`), namespace (`kubernetes.io/pod.namespace`), uid (`kubernetes.io/pod.uid`), and service account name (`kubernetes.io/serviceAccount.name`). ([#39488](https://github.com/kubernetes/kubernetes/pull/39488), [@liggitt](https://github.com/liggitt))
 
 
-Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
+Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for other releases.
 
 Release notes of older releases can be found in:
 - [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.2.md)

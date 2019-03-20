@@ -964,7 +964,7 @@ binary | sha1 hash | md5 hash
 * update wide option output ([#22772](https://github.com/kubernetes/kubernetes/pull/22772), [@AdoHe](https://github.com/AdoHe))
 * Change scheduler logic from random to round-robin ([#22430](https://github.com/kubernetes/kubernetes/pull/22430), [@gmarek](https://github.com/gmarek))
 
-Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
+Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for other releases.
 
 Release notes of older releases can be found in:
 - [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.2.md)

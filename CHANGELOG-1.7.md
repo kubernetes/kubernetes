@@ -3282,7 +3282,7 @@ filename | sha256 hash
 * update the signing key for percona debian and ubuntu packages ([#41186](https://github.com/kubernetes/kubernetes/pull/41186), [@dixudx](https://github.com/dixudx))
 * fc: Drop multipath.conf snippet ([#36698](https://github.com/kubernetes/kubernetes/pull/36698), [@fabiand](https://github.com/fabiand))
 
-Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
+Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for other releases.
 
 Release notes of older releases can be found in:
 - [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.2.md)

@@ -1317,7 +1317,7 @@ binary | sha256 hash
 * Refactor to simplify the hard-traveled path of the KubeletConfiguration object ([#29216](https://github.com/kubernetes/kubernetes/pull/29216), [@mtaufen](https://github.com/mtaufen))
 * Fix overflow issue in controller-manager rate limiter ([#31396](https://github.com/kubernetes/kubernetes/pull/31396), [@foxish](https://github.com/foxish))
 
-Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
+Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for other releases.
 
 Release notes of older releases can be found in:
 - [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.2.md)
