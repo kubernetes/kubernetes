@@ -292,6 +292,9 @@ func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) {
 			set := index[indexValue]
 			if set != nil {
 				set.Delete(key)
+				if set.Len() == 0 {
+					delete(index, indexValue)
+				}
 			}
 		}
 	}
