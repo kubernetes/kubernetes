@@ -1032,9 +1032,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		for _, ip := range sourceRanges {
 			sourceAddressPrefixes = append(sourceAddressPrefixes, ip.String())
 		}
-		for _, serviceTag := range serviceTags {
-			sourceAddressPrefixes = append(sourceAddressPrefixes, serviceTag)
-		}
+		sourceAddressPrefixes = append(sourceAddressPrefixes, serviceTags...)
 	}
 	expectedSecurityRules := []network.SecurityRule{}
 
