@@ -151,10 +151,10 @@ define UPDATE_HELP_INFO
 endef
 .PHONY: update
 ifeq ($(PRINT_HELP),y)
-update: generated_files
+update:
 	@echo "$$UPDATE_HELP_INFO"
 else
-update:
+update: generated_files
 	CALLED_FROM_MAIN_MAKEFILE=1 hack/make-rules/update.sh
 endif
 
