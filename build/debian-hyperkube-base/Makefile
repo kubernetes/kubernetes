@@ -24,7 +24,7 @@ ARCH?=amd64
 CACHEBUST?=1
 
 BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.3.2
-CNI_VERSION=v0.6.0
+CNI_VERSION=v0.7.5
 
 TEMP_DIR:=$(shell mktemp -d)
 CNI_TARBALL=cni-plugins-$(ARCH)-$(CNI_VERSION).tgz

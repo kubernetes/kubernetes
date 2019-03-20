@@ -5,7 +5,7 @@ License: ASL 2.0
 Summary: Container Cluster Manager - Kubernetes Cluster Bootstrapping Tool
 Requires: kubelet >= 1.8.0
 Requires: kubectl >= 1.8.0
-Requires: kubernetes-cni >= 0.5.1
+Requires: kubernetes-cni >= 0.7.5
 
 URL: https://kubernetes.io
 
