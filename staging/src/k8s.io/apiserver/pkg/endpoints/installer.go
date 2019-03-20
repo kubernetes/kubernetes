@@ -63,6 +63,8 @@ type action struct {
 	Params        []*restful.Parameter // List of parameters associated with the action.
 	Namer         handlers.ScopeNamer
 	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
+
+	handler restful.RouteFunction
 }
 
 // An interface to see if one storage supports override its default verb for monitoring
@@ -420,24 +422,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		// Add actions at the resource path: /api/apiVersion/resource
-		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
-		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false, nil}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false, nil}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false, nil}, isCollectionDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false, nil}, allowWatchList)
 
 		// Add actions at the item path: /api/apiVersion/resource/{name}
-		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false}, isGetter)
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false, nil}, isGetter)
 		if getSubpath {
-			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false}, isGetter)
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false, nil}, isGetter)
 		}
-		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
-		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isGracefulDeleter)
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false, nil}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false, nil}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false, nil}, isGracefulDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false, nil}, isWatcher)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false, nil}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false, nil}, isConnecter && connectSubpath)
 	default:
 		namespaceParamName := "namespaces"
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -467,31 +469,31 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			SelfLinkPathSuffix: itemPathSuffix,
 		}
 
-		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
-		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false, nil}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false, nil}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false, nil}, isCollectionDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false}, allowWatchList)
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false, nil}, allowWatchList)
 
-		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false}, isGetter)
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false, nil}, isGetter)
 		if getSubpath {
-			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false}, isGetter)
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false, nil}, isGetter)
 		}
-		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
-		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isGracefulDeleter)
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false, nil}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false, nil}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false, nil}, isGracefulDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false, nil}, isWatcher)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false, nil}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false, nil}, isConnecter && connectSubpath)
 
 		// list or post across namespace.
 		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 		if !isSubresource {
-			actions = appendIf(actions, action{"LIST", resource, params, namer, true}, isLister)
+			actions = appendIf(actions, action{"LIST", resource, params, namer, true, nil}, isLister)
 			// DEPRECATED in 1.11
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true}, allowWatchList)
+			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true, nil}, allowWatchList)
 		}
 	}
 
@@ -563,6 +565,72 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		reqScope.FieldManager = fm
 	}
 
+	// construct handler for each action
+	for i, action := range actions {
+		var handler restful.RouteFunction
+		reqScope.Namer = action.Namer
+		verbOverrider, needOverride := storage.(StorageMetricsOverride)
+		requestScope := "cluster"
+		if apiResource.Namespaced {
+			requestScope = "namespace"
+		}
+		if strings.HasSuffix(action.Path, "/{path:*}") {
+			requestScope = "resource"
+		}
+		if action.AllNamespaces {
+			requestScope = "cluster"
+		}
+
+		switch action.Verb {
+		case "GET": // Get a resource.
+			if isGetterWithOptions {
+				handler = restfulGetResourceWithOptions(getterWithOptions, reqScope, isSubresource)
+			} else {
+				handler = restfulGetResource(getter, exporter, reqScope)
+			}
+
+			if needOverride {
+				// need change the reported verb
+				handler = metrics.InstrumentRouteFunc(verbOverrider.OverrideMetricsVerb(action.Verb), group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+			} else {
+				handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+			}
+
+			if a.enableAPIResponseCompression {
+				handler = genericfilters.RestfulWithCompression(handler)
+			}
+		case "LIST": // List all resources of a kind.
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+			if a.enableAPIResponseCompression {
+				handler = genericfilters.RestfulWithCompression(handler)
+			}
+		case "PUT": // Update a resource.
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulUpdateResource(updater, reqScope, admit))
+		case "PATCH": // Partially update a resource
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
+		case "POST": // Create a resource.
+			var handler restful.RouteFunction
+			if isNamedCreater {
+				handler = restfulCreateNamedResource(namedCreater, reqScope, admit)
+			} else {
+				handler = restfulCreateResource(creater, reqScope, admit)
+			}
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+		case "DELETE": // Delete a resource.
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
+		case "DELETECOLLECTION":
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
+		case "WATCH": // Watch a resource.
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+		case "WATCHLIST": // Watch all resources of a kind.
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+		case "CONNECT":
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
+		}
+
+		actions[i].handler = handler
+	}
+
 	if err := registerActionsToWebService(actions, ws); err != nil {
 		return nil, err
 	}
@@ -595,21 +663,16 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 		if producedObject == nil {
 			producedObject = defaultVersionedObject
 		}
-		reqScope.Namer = action.Namer
 
-		requestScope := "cluster"
 		var namespaced string
 		var operationSuffix string
 		if apiResource.Namespaced {
-			requestScope = "namespace"
 			namespaced = "Namespaced"
 		}
 		if strings.HasSuffix(action.Path, "/{path:*}") {
-			requestScope = "resource"
 			operationSuffix = operationSuffix + "WithPath"
 		}
 		if action.AllNamespaces {
-			requestScope = "cluster"
 			operationSuffix = operationSuffix + "ForAllNamespaces"
 			namespaced = ""
 		}
@@ -638,32 +701,13 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 			kind = fqParentKind.Kind
 		}
 
-		verbOverrider, needOverride := storage.(StorageMetricsOverride)
-
 		switch action.Verb {
 		case "GET": // Get a resource.
-			var handler restful.RouteFunction
-			if isGetterWithOptions {
-				handler = restfulGetResourceWithOptions(getterWithOptions, reqScope, isSubresource)
-			} else {
-				handler = restfulGetResource(getter, exporter, reqScope)
-			}
-
-			if needOverride {
-				// need change the reported verb
-				handler = metrics.InstrumentRouteFunc(verbOverrider.OverrideMetricsVerb(action.Verb), group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
-			} else {
-				handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
-			}
-
-			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler)
-			}
 			doc := "read the specified " + kind
 			if isSubresource {
 				doc = "read " + subresource + " of the specified " + kind
 			}
-			route := ws.GET(action.Path).To(handler).
+			route := ws.GET(action.Path).To(action.handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -687,11 +731,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 			if isSubresource {
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
-			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler)
-			}
-			route := ws.GET(action.Path).To(handler).
+			route := ws.GET(action.Path).To(action.handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -722,8 +762,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 			if isSubresource {
 				doc = "replace " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulUpdateResource(updater, reqScope, admit))
-			route := ws.PUT(action.Path).To(handler).
+			route := ws.PUT(action.Path).To(action.handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -752,8 +791,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
-			route := ws.PATCH(action.Path).To(handler).
+			route := ws.PATCH(action.Path).To(action.handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Consumes(supportedTypes...).
@@ -768,19 +806,12 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "POST": // Create a resource.
-			var handler restful.RouteFunction
-			if isNamedCreater {
-				handler = restfulCreateNamedResource(namedCreater, reqScope, admit)
-			} else {
-				handler = restfulCreateResource(creater, reqScope, admit)
-			}
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
 			article := GetArticleForNoun(kind, " ")
 			doc := "create" + article + kind
 			if isSubresource {
 				doc = "create " + subresource + " of" + article + kind
 			}
-			route := ws.POST(action.Path).To(handler).
+			route := ws.POST(action.Path).To(action.handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -803,8 +834,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 			if isSubresource {
 				doc = "delete " + subresource + " of" + article + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
-			route := ws.DELETE(action.Path).To(handler).
+			route := ws.DELETE(action.Path).To(action.handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -826,8 +856,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 			if isSubresource {
 				doc = "delete collection of " + subresource + " of a " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
-			route := ws.DELETE(action.Path).To(handler).
+			route := ws.DELETE(action.Path).To(action.handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -846,8 +875,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 				doc = "watch changes to " + subresource + " of an object of kind " + kind
 			}
 			doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
-			route := ws.GET(action.Path).To(handler).
+			route := ws.GET(action.Path).To(action.handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -866,8 +894,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 				doc = "watch individual changes to a list of " + subresource + " of " + kind
 			}
 			doc += ". deprecated: use the 'watch' parameter with a list operation instead."
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
-			route := ws.GET(action.Path).To(handler).
+			route := ws.GET(action.Path).To(action.handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List"+operationSuffix).
@@ -889,9 +916,8 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 				if isSubresource {
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
-				handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
 				route := ws.Method(method).Path(action.Path).
-					To(handler).
+					To(action.handler).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource) + operationSuffix).
 					Produces("*/*").
