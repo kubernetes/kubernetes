@@ -23,8 +23,6 @@ package nodelifecycle
 
 import (
 	"fmt"
-	"hash/fnv"
-	"io"
 	"sync"
 	"time"
 
@@ -1275,10 +1273,4 @@ func (nc *Controller) reconcileNodeLabels(nodeName string) error {
 		return fmt.Errorf("failed update labels for node %+v", node)
 	}
 	return nil
-}
-
-func hash(val string, max int) int {
-	hasher := fnv.New32a()
-	io.WriteString(hasher, val)
-	return int(hasher.Sum32()) % max
 }
