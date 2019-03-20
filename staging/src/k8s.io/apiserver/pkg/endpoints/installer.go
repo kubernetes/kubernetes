@@ -523,7 +523,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	allMediaTypes := append(mediaTypes, streamMediaTypes...)
 	ws.Produces(allMediaTypes...)
 
-	kubeVerbs := map[string]struct{}{}
 	reqScope := handlers.RequestScope{
 		Serializer:      a.group.Serializer,
 		ParameterCodec:  a.group.ParameterCodec,
@@ -631,7 +630,22 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions[i].handler = handler
 	}
 
-	if err := registerActionsToWebService(actions, ws); err != nil {
+	// If there is a subresource, kind should be the parent's kind.
+	if isSubresource {
+		parentStorage, ok := a.group.Storage[resource]
+		if !ok {
+			return nil, fmt.Errorf("missing parent storage: %q", resource)
+		}
+
+		fqParentKind, err := GetResourceKind(a.group.GroupVersion, parentStorage, a.group.Typer)
+		if err != nil {
+			return nil, err
+		}
+		kind = fqParentKind.Kind
+	}
+
+	kubeVerbs, err := registerActionsToWebService(actions, ws, apiResource.Namespaced, isSubresource, kind, subresource)
+	if err != nil {
 		return nil, err
 	}
 
@@ -657,7 +671,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	return &apiResource, nil
 }
 
-func registerActionsToWebService(actions []action, ws *restful.WebService) error {
+func registerActionsToWebService(actions []action, ws *restful.WebService, isNamespaced, isSubresource bool, kind, subresource string) (map[string]struct{}, error) {
+	kubeVerbs := map[string]struct{}{}
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
 		if producedObject == nil {
@@ -666,7 +681,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 
 		var namespaced string
 		var operationSuffix string
-		if apiResource.Namespaced {
+		if isNamespaced {
 			namespaced = "Namespaced"
 		}
 		if strings.HasSuffix(action.Path, "/{path:*}") {
@@ -686,20 +701,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 		}
 
 		routes := []*restful.RouteBuilder{}
-
-		// If there is a subresource, kind should be the parent's kind.
-		if isSubresource {
-			parentStorage, ok := a.group.Storage[resource]
-			if !ok {
-				return nil, fmt.Errorf("missing parent storage: %q", resource)
-			}
-
-			fqParentKind, err := GetResourceKind(a.group.GroupVersion, parentStorage, a.group.Typer)
-			if err != nil {
-				return nil, err
-			}
-			kind = fqParentKind.Kind
-		}
 
 		switch action.Verb {
 		case "GET": // Get a resource.
@@ -952,6 +953,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService) error
 		}
 		// Note: update GetAuthorizerAttributes() when adding a custom handler.
 	}
+	return kubeVerbs, nil
 }
 
 // indirectArbitraryPointer returns *ptrToObject for an arbitrary pointer
