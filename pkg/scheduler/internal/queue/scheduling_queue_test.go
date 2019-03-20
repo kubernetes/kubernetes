@@ -987,6 +987,48 @@ func TestHighProirotyFlushUnschedulableQLeftover(t *testing.T) {
 	}
 }
 
+type operation func(queue *PriorityQueue, pInfo *podInfo)
+
+var (
+	addPodActiveQ = func(queue *PriorityQueue, pInfo *podInfo) {
+		queue.lock.Lock()
+		queue.activeQ.Add(pInfo)
+		queue.lock.Unlock()
+	}
+	updatePodActiveQ = func(queue *PriorityQueue, pInfo *podInfo) {
+		queue.lock.Lock()
+		queue.activeQ.Update(pInfo)
+		queue.lock.Unlock()
+	}
+	addPodUnschedulableQ = func(queue *PriorityQueue, pInfo *podInfo) {
+		queue.lock.Lock()
+		// Update pod condition to unschedulable.
+		podutil.UpdatePodCondition(&pInfo.pod.Status, &v1.PodCondition{
+			Type:    v1.PodScheduled,
+			Status:  v1.ConditionFalse,
+			Reason:  v1.PodReasonUnschedulable,
+			Message: "fake scheduling failure",
+		})
+		queue.unschedulableQ.addOrUpdate(pInfo)
+		queue.lock.Unlock()
+	}
+	addPodBackoffQ = func(queue *PriorityQueue, pInfo *podInfo) {
+		queue.lock.Lock()
+		queue.podBackoffQ.Add(pInfo)
+		queue.lock.Unlock()
+	}
+	moveAllToActiveQ = func(queue *PriorityQueue, _ *podInfo) {
+		queue.MoveAllToActiveQueue()
+	}
+	backoffPod = func(queue *PriorityQueue, pInfo *podInfo) {
+		queue.backoffPod(pInfo.pod)
+	}
+	flushBackoffQ = func(queue *PriorityQueue, _ *podInfo) {
+		queue.clock.(*clock.FakeClock).Step(2 * time.Second)
+		queue.flushBackoffQCompleted()
+	}
+)
+
 // TestPodTimestamp tests the operations related to podInfo.
 func TestPodTimestamp(t *testing.T) {
 	pod1 := &v1.Pod{
@@ -1021,101 +1063,61 @@ func TestPodTimestamp(t *testing.T) {
 		timestamp: timestamp.Add(time.Second),
 	}
 
-	var queue *PriorityQueue
-	type operation = func()
-	addPodActiveQ := func(pInfo *podInfo) operation {
-		return func() {
-			queue.lock.Lock()
-			defer queue.lock.Unlock()
-			queue.activeQ.Add(pInfo)
-		}
-	}
-	updatePodActiveQ := func(pInfo *podInfo) operation {
-		return func() {
-			queue.lock.Lock()
-			defer queue.lock.Unlock()
-			queue.activeQ.Update(pInfo)
-		}
-	}
-	addPodUnschedulableQ := func(pInfo *podInfo) operation {
-		return func() {
-			queue.lock.Lock()
-			defer queue.lock.Unlock()
-			// Update pod condition to unschedulable.
-			podutil.UpdatePodCondition(&pInfo.pod.Status, &v1.PodCondition{
-				Type:    v1.PodScheduled,
-				Status:  v1.ConditionFalse,
-				Reason:  v1.PodReasonUnschedulable,
-				Message: "fake scheduling failure",
-			})
-			queue.unschedulableQ.addOrUpdate(pInfo)
-		}
-	}
-	addPodBackoffQ := func(pInfo *podInfo) operation {
-		return func() {
-			queue.lock.Lock()
-			defer queue.lock.Unlock()
-			queue.podBackoffQ.Add(pInfo)
-		}
-	}
-	moveAllToActiveQ := func() operation {
-		return func() {
-			queue.MoveAllToActiveQueue()
-		}
-	}
-	backoffPod := func(pInfo *podInfo) operation {
-		return func() {
-			queue.backoffPod(pInfo.pod)
-		}
-	}
-	flushBackoffQ := func() operation {
-		return func() {
-			queue.clock.(*clock.FakeClock).Step(2 * time.Second)
-			queue.flushBackoffQCompleted()
-		}
-	}
 	tests := []struct {
 		name       string
 		operations []operation
+		operants   []*podInfo
 		expected   []*podInfo
 	}{
 		{
 			name: "add two pod to activeQ and sort them by the timestamp",
 			operations: []operation{
-				addPodActiveQ(pInfo2), addPodActiveQ(pInfo1),
+				addPodActiveQ,
+				addPodActiveQ,
 			},
+			operants: []*podInfo{pInfo2, pInfo1},
 			expected: []*podInfo{pInfo1, pInfo2},
 		},
 		{
 			name: "update two pod to activeQ and sort them by the timestamp",
 			operations: []operation{
-				updatePodActiveQ(pInfo2), updatePodActiveQ(pInfo1),
+				updatePodActiveQ,
+				updatePodActiveQ,
 			},
+			operants: []*podInfo{pInfo2, pInfo1},
 			expected: []*podInfo{pInfo1, pInfo2},
 		},
 		{
 			name: "add two pod to unschedulableQ then move them to activeQ and sort them by the timestamp",
 			operations: []operation{
-				addPodUnschedulableQ(pInfo2), addPodUnschedulableQ(pInfo1), moveAllToActiveQ(),
+				addPodUnschedulableQ,
+				addPodUnschedulableQ,
+				moveAllToActiveQ,
 			},
+			operants: []*podInfo{pInfo2, pInfo1, nil},
 			expected: []*podInfo{pInfo1, pInfo2},
 		},
 		{
 			name: "add one pod to BackoffQ and move it to activeQ",
 			operations: []operation{
-				addPodActiveQ(pInfo2), addPodBackoffQ(pInfo1), backoffPod(pInfo1), flushBackoffQ(), moveAllToActiveQ(),
+				addPodActiveQ,
+				addPodBackoffQ,
+				backoffPod,
+				flushBackoffQ,
+				moveAllToActiveQ,
 			},
+			operants: []*podInfo{pInfo2, pInfo1, pInfo1, nil, nil},
 			expected: []*podInfo{pInfo1, pInfo2},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			queue = NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp))
+			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp))
 			var podInfoList []*podInfo
 
-			for _, op := range test.operations {
-				op()
+			for i, op := range test.operations {
+				op(queue, test.operants[i])
 			}
 
 			for i := 0; i < len(test.expected); i++ {
