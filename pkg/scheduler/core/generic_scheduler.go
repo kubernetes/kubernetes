@@ -803,7 +803,8 @@ func EqualPriorityMap(_ *v1.Pod, _ interface{}, nodeInfo *schedulernodeinfo.Node
 // 2. A node with minimum highest priority victim is picked.
 // 3. Ties are broken by sum of priorities of all victims.
 // 4. If there are still ties, node with the minimum number of victims is picked.
-// 5. If there are still ties, the first such node is picked (sort of randomly).
+// 5. If there are still ties, node with the latest start time of all highest priority victims is picked.
+// 6. If there are still ties, the first such node is picked (sort of randomly).
 // The 'minNodes1' and 'minNodes2' are being reused here to save the memory
 // allocation and garbage collection time.
 func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims) *v1.Node {
@@ -902,11 +903,44 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 			lenNodes2++
 		}
 	}
-	// At this point, even if there are more than one node with the same score,
-	// return the first one.
-	if lenNodes2 > 0 {
+	if lenNodes2 == 1 {
 		return minNodes2[0]
 	}
+
+	// There are a few nodes with same number of pods.
+	// Find the node that satisfies latest(earliestStartTime(all highest-priority pods on node))
+	latestStartTime := util.GetEarliestPodStartTime(nodesToVictims[minNodes2[0]])
+	if latestStartTime == nil {
+		// If the earliest start time of all pods on the 1st node is nil, just return it,
+		// which is not expected to happen.
+		klog.Errorf("earliestStartTime is nil for node %s. Should not reach here.", minNodes2[0])
+		return minNodes2[0]
+	}
+	lenNodes1 = 0
+	for i := 0; i < lenNodes2; i++ {
+		node := minNodes2[i]
+		// Get earliest start time of all pods on the current node.
+		earliestStartTimeOnNode := util.GetEarliestPodStartTime(nodesToVictims[node])
+		if earliestStartTimeOnNode == nil {
+			klog.Errorf("earliestStartTime is nil for node %s. Should not reach here.", node)
+			continue
+		}
+		if earliestStartTimeOnNode.After(latestStartTime.Time) {
+			latestStartTime = earliestStartTimeOnNode
+			lenNodes1 = 0
+		}
+		if earliestStartTimeOnNode.Equal(latestStartTime) {
+			minNodes1[lenNodes1] = node
+			lenNodes1++
+		}
+	}
+
+	// At this point, even if there are more than one node with the same score,
+	// return the first one.
+	if lenNodes1 > 0 {
+		return minNodes1[0]
+	}
+
 	klog.Errorf("Error in logic of node scoring for preemption. We should never reach here!")
 	return nil
 }
