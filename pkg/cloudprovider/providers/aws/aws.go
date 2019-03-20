@@ -2327,19 +2327,17 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	}
 	volumeName := KubernetesVolumeID("aws://" + aws.StringValue(response.AvailabilityZone) + "/" + string(awsID))
 
-	// AWS has a bad habbit of reporting success when creating a volume with
-	// encryption keys that either don't exists or have wrong permissions.
-	// Such volume lives for couple of seconds and then it's silently deleted
-	// by AWS. There is no other check to ensure that given KMS key is correct,
-	// because Kubernetes may have limited permissions to the key.
-	if len(volumeOptions.KmsKeyID) > 0 {
-		err := c.waitUntilVolumeAvailable(volumeName)
-		if err != nil {
-			if isAWSErrorVolumeNotFound(err) {
-				err = fmt.Errorf("failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key")
-			}
-			return "", err
+	err = c.waitUntilVolumeAvailable(volumeName)
+	if err != nil {
+		// AWS has a bad habbit of reporting success when creating a volume with
+		// encryption keys that either don't exists or have wrong permissions.
+		// Such volume lives for couple of seconds and then it's silently deleted
+		// by AWS. There is no other check to ensure that given KMS key is correct,
+		// because Kubernetes may have limited permissions to the key.
+		if isAWSErrorVolumeNotFound(err) {
+			err = fmt.Errorf("failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key")
 		}
+		return "", err
 	}
 
 	return volumeName, nil
