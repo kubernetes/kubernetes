@@ -297,7 +297,7 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock) *Priority
 		stop:             stop,
 		podBackoff:       util.CreatePodBackoffWithClock(1*time.Second, 10*time.Second, clock),
 		activeQ:          util.NewHeap(podInfoKeyFunc, activeQComp),
-		unschedulableQ:   newUnschedulablePodsMap(clock),
+		unschedulableQ:   newUnschedulablePodsMap(),
 		nominatedPods:    newNominatedPodMap(),
 		moveRequestCycle: -1,
 	}
@@ -818,7 +818,7 @@ func (u *UnschedulablePodsMap) clear() {
 }
 
 // newUnschedulablePodsMap initializes a new object of UnschedulablePodsMap.
-func newUnschedulablePodsMap(clock util.Clock) *UnschedulablePodsMap {
+func newUnschedulablePodsMap() *UnschedulablePodsMap {
 	return &UnschedulablePodsMap{
 		podInfoMap: make(map[string]*podInfo),
 		keyFunc:    util.GetPodFullName,
