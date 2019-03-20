@@ -344,6 +344,10 @@ func TestZones(t *testing.T) {
 	cfg, cleanup := configFromSim()
 	defer cleanup()
 
+	// Configure for SAML token auth
+	cfg.Global.User = localhostCert
+	cfg.Global.Password = localhostKey
+
 	// Create vSphere configuration object
 	vs, err := newControllerNode(cfg)
 	if err != nil {
@@ -382,8 +386,11 @@ func TestZones(t *testing.T) {
 
 	// Tag manager instance
 	m := tags.NewManager(rest.NewClient(vsi.conn.Client))
-	user := url.UserPassword(vsi.conn.Username, vsi.conn.Password)
-	if err = m.Login(ctx, user); err != nil {
+	signer, err := vsi.conn.Signer(ctx, vsi.conn.Client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = m.LoginByToken(m.WithSigner(ctx, signer)); err != nil {
 		t.Fatal(err)
 	}
 
