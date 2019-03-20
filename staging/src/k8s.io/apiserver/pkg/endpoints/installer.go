@@ -64,8 +64,9 @@ type action struct {
 	Namer         handlers.ScopeNamer
 	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
 
-	handler        restful.RouteFunction
-	producedObject interface{}
+	handler           restful.RouteFunction
+	producedObject    interface{}
+	producedMIMETypes []string
 }
 
 // An interface to see if one storage supports override its default verb for monitoring
@@ -423,24 +424,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		// Add actions at the resource path: /api/apiVersion/resource
-		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false, nil, nil}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false, nil, nil}, isCreater)
-		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false, nil, nil}, isCollectionDeleter)
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false, nil, nil, nil}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false, nil, nil, nil}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false, nil, nil, nil}, isCollectionDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false, nil, nil}, allowWatchList)
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false, nil, nil, nil}, allowWatchList)
 
 		// Add actions at the item path: /api/apiVersion/resource/{name}
-		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false, nil, nil}, isGetter)
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false, nil, nil, nil}, isGetter)
 		if getSubpath {
-			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil}, isGetter)
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil, nil}, isGetter)
 		}
-		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false, nil, nil}, isUpdater)
-		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false, nil, nil}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false, nil, nil}, isGracefulDeleter)
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false, nil, nil, nil}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false, nil, nil, nil}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false, nil, nil, nil}, isGracefulDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false, nil, nil}, isWatcher)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false, nil, nil}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false, nil, nil, nil}, isWatcher)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false, nil, nil, nil}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil, nil}, isConnecter && connectSubpath)
 	default:
 		namespaceParamName := "namespaces"
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -470,31 +471,31 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			SelfLinkPathSuffix: itemPathSuffix,
 		}
 
-		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false, nil, nil}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false, nil, nil}, isCreater)
-		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false, nil, nil}, isCollectionDeleter)
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false, nil, nil, nil}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false, nil, nil, nil}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false, nil, nil, nil}, isCollectionDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false, nil, nil}, allowWatchList)
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false, nil, nil, nil}, allowWatchList)
 
-		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false, nil, nil}, isGetter)
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false, nil, nil, nil}, isGetter)
 		if getSubpath {
-			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil}, isGetter)
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil, nil}, isGetter)
 		}
-		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false, nil, nil}, isUpdater)
-		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false, nil, nil}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false, nil, nil}, isGracefulDeleter)
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false, nil, nil, nil}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false, nil, nil, nil}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false, nil, nil, nil}, isGracefulDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false, nil, nil}, isWatcher)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false, nil, nil}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false, nil, nil, nil}, isWatcher)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false, nil, nil, nil}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil, nil}, isConnecter && connectSubpath)
 
 		// list or post across namespace.
 		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 		if !isSubresource {
-			actions = appendIf(actions, action{"LIST", resource, params, namer, true, nil, nil}, isLister)
+			actions = appendIf(actions, action{"LIST", resource, params, namer, true, nil, nil, nil}, isLister)
 			// DEPRECATED in 1.11
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true, nil, nil}, allowWatchList)
+			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true, nil, nil, nil}, allowWatchList)
 		}
 	}
 
@@ -649,6 +650,22 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions[i].producedObject = producedObject
 	}
 
+	// assign producedMIMETypes for each action
+	for i, action := range actions {
+		var producedMIMETypes []string
+		producedMIMETypes = append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)
+		switch action.Verb {
+		case "LIST":
+			producedMIMETypes = append(storageMeta.ProducesMIMETypes(action.Verb), allMediaTypes...)
+		case "WATCH", "WATCHLIST":
+			producedMIMETypes = allMediaTypes
+		case "CONNECT":
+			producedMIMETypes = []string{"*/*"}
+		}
+
+		actions[i].producedMIMETypes = producedMIMETypes
+	}
+
 	// If there is a subresource, kind should be the parent's kind.
 	if isSubresource {
 		parentStorage, ok := a.group.Storage[resource]
@@ -726,7 +743,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Writes(action.producedObject)
 			if isGetterWithOptions {
@@ -750,7 +767,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), allMediaTypes...)...).
+				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Writes(action.producedObject)
 			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
@@ -781,7 +798,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
 				// but currently go-restful can't handle multiple different objects being returned.
@@ -811,7 +828,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Consumes(supportedTypes...).
 				Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Reads(metav1.Patch{}).
 				Writes(action.producedObject)
@@ -830,7 +847,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
 				// but currently go-restful can't handle multiple different objects being returned.
@@ -853,7 +870,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(action.producedMIMETypes...).
 				Writes(action.producedObject).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Returns(http.StatusAccepted, "Accepted", action.producedObject)
@@ -875,7 +892,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(action.producedMIMETypes...).
 				Writes(action.producedObject).
 				Returns(http.StatusOK, "OK", action.producedObject)
 			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
@@ -894,7 +911,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(allMediaTypes...).
+				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Writes(action.producedObject)
 			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
@@ -913,7 +930,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List"+operationSuffix).
-				Produces(allMediaTypes...).
+				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Writes(action.producedObject)
 			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
@@ -935,7 +952,7 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 					To(action.handler).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource) + operationSuffix).
-					Produces("*/*").
+					Produces(action.producedMIMETypes...).
 					Consumes("*/*").
 					Writes(connectProducedObject)
 				if versionedConnectOptions != nil {
