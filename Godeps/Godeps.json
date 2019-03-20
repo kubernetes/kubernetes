@@ -1718,8 +1718,8 @@
 		},
 		{
 			"ImportPath": "github.com/fsnotify/fsnotify",
-			"Comment": "v1.3.1-1-gf12c6236fe7b5c",
-			"Rev": "f12c6236fe7b5cf6bcf30e5935d08cb079d78334"
+			"Comment": "v1.4.7",
+			"Rev": "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
