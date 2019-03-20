@@ -511,7 +511,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				set.Name,
 				replicas[target].Name)
 			err := ssc.podControl.DeleteStatefulPod(set, replicas[target])
-			status.CurrentReplicas--
+			if getPodRevision(replicas[target]) == currentRevision.Name {
+				status.CurrentReplicas--
+			}
 			return &status, err
 		}
 
