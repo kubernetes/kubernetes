@@ -562,6 +562,34 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		reqScope.FieldManager = fm
 	}
+
+	if err := registerActionsToWebService(actions, ws); err != nil {
+		return nil, err
+	}
+
+	apiResource.Verbs = make([]string, 0, len(kubeVerbs))
+	for kubeVerb := range kubeVerbs {
+		apiResource.Verbs = append(apiResource.Verbs, kubeVerb)
+	}
+	sort.Strings(apiResource.Verbs)
+
+	if shortNamesProvider, ok := storage.(rest.ShortNamesProvider); ok {
+		apiResource.ShortNames = shortNamesProvider.ShortNames()
+	}
+	if categoriesProvider, ok := storage.(rest.CategoriesProvider); ok {
+		apiResource.Categories = categoriesProvider.Categories()
+	}
+	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
+		gvk := gvkProvider.GroupVersionKind(a.group.GroupVersion)
+		apiResource.Group = gvk.Group
+		apiResource.Version = gvk.Version
+		apiResource.Kind = gvk.Kind
+	}
+
+	return &apiResource, nil
+}
+
+func registerActionsToWebService(actions []action, ws *restful.WebService) error {
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
 		if producedObject == nil {
@@ -898,27 +926,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		// Note: update GetAuthorizerAttributes() when adding a custom handler.
 	}
-
-	apiResource.Verbs = make([]string, 0, len(kubeVerbs))
-	for kubeVerb := range kubeVerbs {
-		apiResource.Verbs = append(apiResource.Verbs, kubeVerb)
-	}
-	sort.Strings(apiResource.Verbs)
-
-	if shortNamesProvider, ok := storage.(rest.ShortNamesProvider); ok {
-		apiResource.ShortNames = shortNamesProvider.ShortNames()
-	}
-	if categoriesProvider, ok := storage.(rest.CategoriesProvider); ok {
-		apiResource.Categories = categoriesProvider.Categories()
-	}
-	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
-		gvk := gvkProvider.GroupVersionKind(a.group.GroupVersion)
-		apiResource.Group = gvk.Group
-		apiResource.Version = gvk.Version
-		apiResource.Kind = gvk.Kind
-	}
-
-	return &apiResource, nil
 }
 
 // indirectArbitraryPointer returns *ptrToObject for an arbitrary pointer
