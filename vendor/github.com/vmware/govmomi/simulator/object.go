@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2017 VMware, Inc. All Rights Reserved.
+Copyright (c) 2017-2018 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,29 +18,34 @@ package simulator
 
 import (
 	"github.com/vmware/govmomi/vim25/methods"
-	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-func RenameTask(e mo.Entity, r *types.Rename_Task) soap.HasFault {
-	task := CreateTask(e, "rename", func(t *Task) (types.AnyType, types.BaseMethodFault) {
-		obj := Map.Get(r.This).(mo.Entity).Entity()
+func SetCustomValue(ctx *Context, req *types.SetCustomValue) soap.HasFault {
+	ctx.Caller = &req.This
+	body := &methods.SetCustomValueBody{}
 
-		if parent, ok := Map.Get(*obj.Parent).(*Folder); ok {
-			if Map.FindByName(r.NewName, parent.ChildEntity) != nil {
-				return nil, &types.InvalidArgument{InvalidProperty: "name"}
-			}
-		}
+	cfm := Map.CustomFieldsManager()
 
-		Map.Update(e, []types.PropertyChange{{Name: "name", Val: r.NewName}})
+	_, field := cfm.findByNameType(req.Key, req.This.Type)
+	if field == nil {
+		body.Fault_ = Fault("", &types.InvalidArgument{InvalidProperty: "key"})
+		return body
+	}
 
-		return nil, nil
+	res := cfm.SetField(ctx, &types.SetField{
+		This:   cfm.Reference(),
+		Entity: req.This,
+		Key:    field.Key,
+		Value:  req.Value,
 	})
 
-	return &methods.Rename_TaskBody{
-		Res: &types.Rename_TaskResponse{
-			Returnval: task.Run(),
-		},
+	if res.Fault() != nil {
+		body.Fault_ = res.Fault()
+		return body
 	}
+
+	body.Res = &types.SetCustomValueResponse{}
+	return body
 }

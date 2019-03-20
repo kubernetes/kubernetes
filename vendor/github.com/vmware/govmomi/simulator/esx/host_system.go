@@ -1730,7 +1730,7 @@ var HostSystem = mo.HostSystem{
 			OverallMemoryUsage:        1404,
 			DistributedCpuFairness:    0,
 			DistributedMemoryFairness: 0,
-			Uptime: 77229,
+			Uptime:                    77229,
 		},
 		OverallStatus:      "gray",
 		RebootRequired:     false,

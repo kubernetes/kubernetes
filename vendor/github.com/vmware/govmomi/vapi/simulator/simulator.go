@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/vmware/govmomi/vapi/internal"
@@ -33,12 +34,19 @@ import (
 	vim "github.com/vmware/govmomi/vim25/types"
 )
 
+type session struct {
+	User         string    `json:"user"`
+	Created      time.Time `json:"created_time"`
+	LastAccessed time.Time `json:"last_accessed_time"`
+}
+
 type handler struct {
 	*http.ServeMux
 	sync.Mutex
 	Category    map[string]*tags.Category
 	Tag         map[string]*tags.Tag
 	Association map[string]map[internal.AssociatedObject]bool
+	Session     map[string]*session
 }
 
 // New creates a vAPI simulator.
@@ -48,6 +56,7 @@ func New(u *url.URL, settings []vim.BaseOptionValue) (string, http.Handler) {
 		Category:    make(map[string]*tags.Category),
 		Tag:         make(map[string]*tags.Tag),
 		Association: make(map[string]map[internal.AssociatedObject]bool),
+		Session:     make(map[string]*session),
 	}
 
 	handlers := []struct {
@@ -60,6 +69,7 @@ func New(u *url.URL, settings []vim.BaseOptionValue) (string, http.Handler) {
 		{internal.TagPath, s.tag},
 		{internal.TagPath + "/", s.tagID},
 		{internal.AssociationPath, s.association},
+		{internal.AssociationPath + "/", s.associationID},
 	}
 
 	for i := range handlers {
@@ -68,11 +78,109 @@ func New(u *url.URL, settings []vim.BaseOptionValue) (string, http.Handler) {
 			s.Lock()
 			defer s.Unlock()
 
+			if !s.isAuthorized(r) {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
 			h.m(w, r)
 		})
 	}
 
 	return internal.Path + "/", s
+}
+
+func (s *handler) isAuthorized(r *http.Request) bool {
+	if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, internal.SessionPath) {
+		return true
+	}
+	id := r.Header.Get(internal.SessionCookieName)
+	if id == "" {
+		if cookie, err := r.Cookie(internal.SessionCookieName); err == nil {
+			id = cookie.Value
+			r.Header.Set(internal.SessionCookieName, id)
+		}
+	}
+	info, ok := s.Session[id]
+	if ok {
+		info.LastAccessed = time.Now()
+	}
+	return ok
+}
+
+func (s *handler) hasAuthorization(r *http.Request) (string, bool) {
+	u, p, ok := r.BasicAuth()
+	if ok { // user+pass auth
+		if u == "" || p == "" {
+			return u, false
+		}
+		return u, true
+	}
+	auth := r.Header.Get("Authorization")
+	return "TODO", strings.HasPrefix(auth, "SIGN ") // token auth
+}
+
+func (s *handler) findTag(e vim.VslmTagEntry) *tags.Tag {
+	for _, c := range s.Category {
+		if c.Name == e.ParentCategoryName {
+			for _, t := range s.Tag {
+				if t.Name == e.TagName && t.CategoryID == c.ID {
+					return t
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// AttachedObjects is meant for internal use via simulator.Registry.tagManager
+func (s *handler) AttachedObjects(tag vim.VslmTagEntry) ([]vim.ManagedObjectReference, vim.BaseMethodFault) {
+	t := s.findTag(tag)
+	if t == nil {
+		return nil, new(vim.NotFound)
+	}
+	var ids []vim.ManagedObjectReference
+	for id := range s.Association[t.ID] {
+		ids = append(ids, vim.ManagedObjectReference(id))
+	}
+	return ids, nil
+}
+
+// AttachedTags is meant for internal use via simulator.Registry.tagManager
+func (s *handler) AttachedTags(ref vim.ManagedObjectReference) ([]vim.VslmTagEntry, vim.BaseMethodFault) {
+	oid := internal.AssociatedObject(ref)
+	var tags []vim.VslmTagEntry
+	for id, objs := range s.Association {
+		if objs[oid] {
+			tag := s.Tag[id]
+			cat := s.Category[tag.CategoryID]
+			tags = append(tags, vim.VslmTagEntry{
+				TagName:            tag.Name,
+				ParentCategoryName: cat.Name,
+			})
+		}
+	}
+	return tags, nil
+}
+
+// AttachTag is meant for internal use via simulator.Registry.tagManager
+func (s *handler) AttachTag(ref vim.ManagedObjectReference, tag vim.VslmTagEntry) vim.BaseMethodFault {
+	t := s.findTag(tag)
+	if t == nil {
+		return new(vim.NotFound)
+	}
+	s.Association[t.ID][internal.AssociatedObject(ref)] = true
+	return nil
+}
+
+// DetachTag is meant for internal use via simulator.Registry.tagManager
+func (s *handler) DetachTag(id vim.ManagedObjectReference, tag vim.VslmTagEntry) vim.BaseMethodFault {
+	t := s.findTag(tag)
+	if t == nil {
+		return new(vim.NotFound)
+	}
+	delete(s.Association[t.ID], internal.AssociatedObject(id))
+	return nil
 }
 
 // ok responds with http.StatusOK and json encodes val if given.
@@ -136,23 +244,28 @@ func (s *handler) decode(r *http.Request, w http.ResponseWriter, val interface{}
 }
 
 func (s *handler) session(w http.ResponseWriter, r *http.Request) {
-	var id string
+	id := r.Header.Get(internal.SessionCookieName)
 
 	switch r.Method {
 	case http.MethodPost:
+		user, ok := s.hasAuthorization(r)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 		id = uuid.New().String()
-		// TODO: save session
+		now := time.Now()
+		s.Session[id] = &session{user, now, now}
 		http.SetCookie(w, &http.Cookie{
 			Name:  internal.SessionCookieName,
 			Value: id,
 		})
-		s.ok(w)
+		s.ok(w, id)
 	case http.MethodDelete:
-		// TODO: delete session
+		delete(s.Session, id)
 		s.ok(w)
 	case http.MethodGet:
-		// TODO: test is session is valid
-		s.ok(w, id)
+		s.ok(w, s.Session[id])
 	}
 }
 
@@ -161,8 +274,12 @@ func (s *handler) action(r *http.Request) string {
 }
 
 func (s *handler) id(r *http.Request) string {
-	id := path.Base(r.URL.Path)
-	return strings.TrimPrefix(id, "id:")
+	base := path.Base(r.URL.Path)
+	id := strings.TrimPrefix(base, "id:")
+	if id == base {
+		return "" // trigger 404 Not Found w/o id: prefix
+	}
+	return id
 }
 
 func newID(kind string) string {
@@ -321,21 +438,7 @@ func (s *handler) association(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if spec.TagID != "" {
-		if _, exists := s.Association[spec.TagID]; !exists {
-			log.Printf("association tag not found: %s", spec.TagID)
-			http.NotFound(w, r)
-			return
-		}
-	}
-
 	switch s.action(r) {
-	case "attach":
-		s.Association[spec.TagID][*spec.ObjectID] = true
-		s.ok(w)
-	case "detach":
-		delete(s.Association[spec.TagID], *spec.ObjectID)
-		s.ok(w)
 	case "list-attached-tags":
 		var ids []string
 		for id, objs := range s.Association {
@@ -344,9 +447,37 @@ func (s *handler) association(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		s.ok(w, ids)
+	}
+}
+
+func (s *handler) associationID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := s.id(r)
+	if _, exists := s.Association[id]; !exists {
+		log.Printf("association tag not found: %s", id)
+		http.NotFound(w, r)
+		return
+	}
+
+	var spec internal.Association
+	if !s.decode(r, w, &spec) {
+		return
+	}
+
+	switch s.action(r) {
+	case "attach":
+		s.Association[id][*spec.ObjectID] = true
+		s.ok(w)
+	case "detach":
+		delete(s.Association[id], *spec.ObjectID)
+		s.ok(w)
 	case "list-attached-objects":
 		var ids []internal.AssociatedObject
-		for id := range s.Association[spec.TagID] {
+		for id := range s.Association[id] {
 			ids = append(ids, id)
 		}
 		s.ok(w, ids)

@@ -57,10 +57,10 @@ func (o FileItem) File() types.OvfFile {
 }
 
 type LeaseUpdater struct {
-	lease *Lease
+	pos   int64 // Number of bytes (keep first to ensure 64 bit aligment)
+	total int64 // Total number of bytes (keep first to ensure 64 bit aligment)
 
-	pos   int64 // Number of bytes
-	total int64 // Total number of bytes
+	lease *Lease
 
 	done chan struct{} // When lease updater should stop
 
