@@ -565,12 +565,9 @@ staging/src/k8s.io/client-go/rest/fake
 staging/src/k8s.io/client-go/rest/watch
 staging/src/k8s.io/client-go/scale
 staging/src/k8s.io/client-go/scale/fake
-staging/src/k8s.io/client-go/scale/scheme
-staging/src/k8s.io/client-go/scale/scheme/appsint
 staging/src/k8s.io/client-go/scale/scheme/appsv1beta1
 staging/src/k8s.io/client-go/scale/scheme/appsv1beta2
 staging/src/k8s.io/client-go/scale/scheme/autoscalingv1
-staging/src/k8s.io/client-go/scale/scheme/extensionsint
 staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1
 staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1
 staging/src/k8s.io/client-go/testing
