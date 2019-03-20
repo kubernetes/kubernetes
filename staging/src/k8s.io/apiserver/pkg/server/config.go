@@ -614,9 +614,18 @@ func (s *SecureServingInfo) HostPort() (string, int, error) {
 }
 
 // AuthorizeClientBearerToken wraps the authenticator and authorizer in loopback authentication logic
-// if the loopback client config is specified AND it has a bearer token.
+// if the loopback client config is specified AND it has a bearer token. Note that if either authn or
+// authz is nil, this function won't add a token authenticator or authorizer.
 func AuthorizeClientBearerToken(loopback *restclient.Config, authn *AuthenticationInfo, authz *AuthorizationInfo) {
-	if loopback == nil || authn == nil || authz == nil || authn.Authenticator == nil && authz.Authorizer == nil || len(loopback.BearerToken) == 0 {
+	if loopback == nil || len(loopback.BearerToken) == 0 {
+		return
+	}
+	if authn == nil || authz == nil {
+		// prevent nil pointer panic
+	}
+	if authn.Authenticator == nil || authz.Authorizer == nil {
+		// authenticator or authorizer might be nil if we want to bypass authz/authn
+		// and we also do nothing in this case.
 		return
 	}
 
