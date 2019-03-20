@@ -79,12 +79,14 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
 }
 
-func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind) bool {
+func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind, mimeType, mimeSubType string) bool {
 	// TODO: this is temporary, replace with an abstraction calculated at endpoint installation time
 	if gvk.GroupVersion() == metav1beta1.SchemeGroupVersion {
 		switch gvk.Kind {
 		case "Table":
-			return scope.TableConvertor != nil
+			return scope.TableConvertor != nil &&
+				mimeType == "application" &&
+				(mimeSubType == "json" || mimeSubType == "yaml")
 		case "PartialObjectMetadata", "PartialObjectMetadataList":
 			// TODO: should delineate between lists and non-list endpoints
 			return true
@@ -172,7 +174,7 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	responsewriters.WriteObject(statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.w, r.req)
+	responsewriters.WriteObjectNegotiated(r.scope.Serializer, &r.scope, r.scope.Kind.GroupVersion(), r.w, r.req, statusCode, obj)
 }
 
 func (r *responder) Error(err error) {

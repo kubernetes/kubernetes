@@ -37,7 +37,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -64,6 +65,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	auditpolicy "k8s.io/apiserver/pkg/audit/policy"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
@@ -1805,8 +1807,30 @@ func TestGetTable(t *testing.T) {
 			statusCode: http.StatusNotAcceptable,
 		},
 		{
+			accept:     runtime.ContentTypeProtobuf + ";as=Table;v=v1beta1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
 			item:   true,
 			accept: runtime.ContentTypeJSON + ";as=Table;v=v1beta1;g=meta.k8s.io",
+			expected: &metav1beta1.Table{
+				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
+				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
+					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+				},
+				Rows: []metav1beta1.TableRow{
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+				},
+			},
+		},
+		{
+			item: true,
+			accept: strings.Join([]string{
+				runtime.ContentTypeProtobuf + ";as=Table;v=v1beta1;g=meta.k8s.io",
+				runtime.ContentTypeJSON + ";as=Table;v=v1beta1;g=meta.k8s.io",
+			}, ","),
 			expected: &metav1beta1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
@@ -1916,6 +1940,216 @@ func TestGetTable(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWatchTable(t *testing.T) {
+	obj := genericapitesting.Simple{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", ResourceVersion: "10", SelfLink: "/blah", CreationTimestamp: metav1.NewTime(time.Unix(1, 0)), UID: types.UID("abcdef0123")},
+		Other:      "foo",
+	}
+
+	m, err := meta.Accessor(&obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	partial := meta.AsPartialObjectMetadata(m)
+	partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+	encodedBody, err := runtime.Encode(metainternalversion.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the codec includes a trailing newline that is not present during decode
+	encodedBody = bytes.TrimSpace(encodedBody)
+
+	metaDoc := metav1.ObjectMeta{}.SwaggerDoc()
+
+	s := metainternalversion.Codecs.SupportedMediaTypes()[0].Serializer
+
+	tests := []struct {
+		accept string
+		params url.Values
+		send   func(w *watch.FakeWatcher)
+
+		expected    []*metav1.WatchEvent
+		contentType string
+		statusCode  int
+		item        bool
+	}{
+		{
+			accept:     runtime.ContentTypeJSON + ";as=Table;v=v1;g=meta.k8s.io",
+			statusCode: http.StatusNotAcceptable,
+		},
+		{
+			accept: runtime.ContentTypeJSON + ";as=Table;v=v1beta1;g=meta.k8s.io",
+			send: func(w *watch.FakeWatcher) {
+				w.Add(&obj)
+			},
+			expected: []*metav1.WatchEvent{
+				{
+					Type: "ADDED",
+					Object: runtime.RawExtension{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
+								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+							},
+							Rows: []metav1beta1.TableRow{
+								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+							},
+						}))),
+					},
+				},
+			},
+		},
+		{
+			accept: runtime.ContentTypeJSON + ";as=Table;v=v1beta1;g=meta.k8s.io",
+			send: func(w *watch.FakeWatcher) {
+				w.Add(&obj)
+				w.Modify(&obj)
+			},
+			expected: []*metav1.WatchEvent{
+				{
+					Type: "ADDED",
+					Object: runtime.RawExtension{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
+								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
+							},
+							Rows: []metav1beta1.TableRow{
+								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+							},
+						}))),
+					},
+				},
+				{
+					Type: "MODIFIED",
+					Object: runtime.RawExtension{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
+							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
+							Rows: []metav1beta1.TableRow{
+								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
+							},
+						}))),
+					},
+				},
+			},
+		},
+	}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			storage := map[string]rest.Storage{}
+			simpleStorage := SimpleRESTStorage{
+				item: obj,
+				list: []genericapitesting.Simple{obj},
+			}
+
+			selfLinker := &setTestSelfLinker{
+				t:           t,
+				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple",
+				namespace:   "default",
+			}
+			if test.item {
+				selfLinker.expectedSet += "/id"
+				selfLinker.name = "id"
+			}
+			storage["simple"] = &simpleStorage
+			handler := handleLinker(storage, selfLinker)
+			server := httptest.NewServer(handler)
+			defer server.Close()
+
+			var id string
+			if test.item {
+				id = "/id"
+			}
+			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.params == nil {
+				test.params = url.Values{}
+			}
+			if test.item {
+				test.params["fieldSelector"] = []string{fmt.Sprintf("metadata.name=%s", id)}
+			}
+			test.params["watch"] = []string{"1"}
+
+			u.RawQuery = test.params.Encode()
+			req := &http.Request{Method: "GET", URL: u}
+			req.Header = http.Header{}
+			req.Header.Set("Accept", test.accept)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.statusCode != 0 {
+				if resp.StatusCode != test.statusCode {
+					t.Fatalf("%d: unexpected response: %#v", i, resp)
+				}
+				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
+				if err != nil {
+					t.Fatalf("%d: unexpected body read error: %v", i, err)
+				}
+				gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+				if obj.GetObjectKind().GroupVersionKind() != gvk {
+					t.Fatalf("%d: unexpected error body: %#v", i, obj)
+				}
+				return
+			}
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("%d: unexpected response: %#v", i, resp)
+			}
+
+			go func() {
+				defer simpleStorage.fakeWatch.Stop()
+				test.send(simpleStorage.fakeWatch)
+			}()
+
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Logf("Body:\n%s", string(body))
+			d := watcher(resp.Header.Get("Content-Type"), ioutil.NopCloser(bytes.NewReader(body)))
+			var actual []*metav1.WatchEvent
+			for {
+				var event metav1.WatchEvent
+				_, _, err := d.Decode(nil, &event)
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				actual = append(actual, &event)
+			}
+			if !reflect.DeepEqual(test.expected, actual) {
+				for i := range test.expected {
+					if i >= len(actual) {
+						break
+					}
+					t.Logf("%s", diff.StringDiff(string(test.expected[i].Object.Raw), string(actual[i].Object.Raw)))
+				}
+				t.Fatalf("unexpected: %s", diff.ObjectReflectDiff(test.expected, actual))
+			}
+		})
+	}
+}
+
+func watcher(mediaType string, r io.ReadCloser) streaming.Decoder {
+	info, ok := runtime.SerializerInfoForMediaType(metainternalversion.Codecs.SupportedMediaTypes(), mediaType)
+	if !ok || info.StreamSerializer == nil {
+		panic(info)
+	}
+	streamSerializer := info.StreamSerializer
+	fr := streamSerializer.Framer.NewFrameReader(r)
+	d := streaming.NewDecoder(fr, streamSerializer.Serializer)
+	return d
 }
 
 func TestGetPartialObjectMetadata(t *testing.T) {
@@ -3618,7 +3852,7 @@ func (obj *UnregisteredAPIObject) DeepCopyObject() runtime.Object {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		responsewriters.WriteObjectNegotiated(codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		responsewriters.WriteObjectNegotiated(codecs, negotiation.DefaultEndpointRestrictions, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
 	// Decode error response behavior is dictated by
