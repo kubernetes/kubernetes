@@ -64,7 +64,8 @@ type action struct {
 	Namer         handlers.ScopeNamer
 	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
 
-	handler restful.RouteFunction
+	handler        restful.RouteFunction
+	producedObject interface{}
 }
 
 // An interface to see if one storage supports override its default verb for monitoring
@@ -422,24 +423,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		// Add actions at the resource path: /api/apiVersion/resource
-		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false, nil}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false, nil}, isCreater)
-		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false, nil}, isCollectionDeleter)
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false, nil, nil}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false, nil, nil}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false, nil, nil}, isCollectionDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false, nil}, allowWatchList)
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false, nil, nil}, allowWatchList)
 
 		// Add actions at the item path: /api/apiVersion/resource/{name}
-		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false, nil}, isGetter)
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false, nil, nil}, isGetter)
 		if getSubpath {
-			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false, nil}, isGetter)
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil}, isGetter)
 		}
-		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false, nil}, isUpdater)
-		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false, nil}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false, nil}, isGracefulDeleter)
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false, nil, nil}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false, nil, nil}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false, nil, nil}, isGracefulDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false, nil}, isWatcher)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false, nil}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false, nil}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false, nil, nil}, isWatcher)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false, nil, nil}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil}, isConnecter && connectSubpath)
 	default:
 		namespaceParamName := "namespaces"
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -469,31 +470,31 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			SelfLinkPathSuffix: itemPathSuffix,
 		}
 
-		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false, nil}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false, nil}, isCreater)
-		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false, nil}, isCollectionDeleter)
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false, nil, nil}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false, nil, nil}, isCreater)
+		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false, nil, nil}, isCollectionDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false, nil}, allowWatchList)
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer, false, nil, nil}, allowWatchList)
 
-		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false, nil}, isGetter)
+		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer, false, nil, nil}, isGetter)
 		if getSubpath {
-			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false, nil}, isGetter)
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil}, isGetter)
 		}
-		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false, nil}, isUpdater)
-		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false, nil}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false, nil}, isGracefulDeleter)
+		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false, nil, nil}, isUpdater)
+		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false, nil, nil}, isPatcher)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false, nil, nil}, isGracefulDeleter)
 		// DEPRECATED in 1.11
-		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false, nil}, isWatcher)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false, nil}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false, nil}, isConnecter && connectSubpath)
+		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false, nil, nil}, isWatcher)
+		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false, nil, nil}, isConnecter)
+		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false, nil, nil}, isConnecter && connectSubpath)
 
 		// list or post across namespace.
 		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 		if !isSubresource {
-			actions = appendIf(actions, action{"LIST", resource, params, namer, true, nil}, isLister)
+			actions = appendIf(actions, action{"LIST", resource, params, namer, true, nil, nil}, isLister)
 			// DEPRECATED in 1.11
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true, nil}, allowWatchList)
+			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true, nil, nil}, allowWatchList)
 		}
 	}
 
@@ -630,6 +631,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions[i].handler = handler
 	}
 
+	// assign producedObject for each action
+	for i, action := range actions {
+		producedObject := storageMeta.ProducesObject(action.Verb)
+		if producedObject == nil {
+			producedObject = defaultVersionedObject
+		}
+		switch action.Verb {
+		case "LIST":
+			producedObject = versionedList
+		case "DELETE", "DELECTCOLLECTION":
+			producedObject = versionedStatus
+		case "WATCH", "WATCHLIST":
+			producedObject = versionedWatchEvent
+		}
+
+		actions[i].producedObject = producedObject
+	}
+
 	// If there is a subresource, kind should be the parent's kind.
 	if isSubresource {
 		parentStorage, ok := a.group.Storage[resource]
@@ -644,7 +663,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		kind = fqParentKind.Kind
 	}
 
-	kubeVerbs, err := registerActionsToWebService(actions, ws, apiResource.Namespaced, isSubresource, kind, subresource)
+	kubeVerbs, err := registerActionsToWebService(actions, ws, apiResource.Namespaced, isSubresource, kind, subresource, storageMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -671,14 +690,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	return &apiResource, nil
 }
 
-func registerActionsToWebService(actions []action, ws *restful.WebService, isNamespaced, isSubresource bool, kind, subresource string) (map[string]struct{}, error) {
+func registerActionsToWebService(actions []action, ws *restful.WebService, isNamespaced, isSubresource bool, kind, subresource string, storageMeta rest.StorageMetadata) (map[string]struct{}, error) {
 	kubeVerbs := map[string]struct{}{}
 	for _, action := range actions {
-		producedObject := storageMeta.ProducesObject(action.Verb)
-		if producedObject == nil {
-			producedObject = defaultVersionedObject
-		}
-
 		var namespaced string
 		var operationSuffix string
 		if isNamespaced {
@@ -713,8 +727,8 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
-				Returns(http.StatusOK, "OK", producedObject).
-				Writes(producedObject)
+				Returns(http.StatusOK, "OK", action.producedObject).
+				Writes(action.producedObject)
 			if isGetterWithOptions {
 				if err := AddObjectParams(ws, route, versionedGetOptions); err != nil {
 					return nil, err
@@ -737,8 +751,8 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), allMediaTypes...)...).
-				Returns(http.StatusOK, "OK", versionedList).
-				Writes(versionedList)
+				Returns(http.StatusOK, "OK", action.producedObject).
+				Writes(action.producedObject)
 			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
 				return nil, err
 			}
@@ -768,12 +782,12 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
-				Returns(http.StatusOK, "OK", producedObject).
+				Returns(http.StatusOK, "OK", action.producedObject).
 				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
 				// but currently go-restful can't handle multiple different objects being returned.
-				Returns(http.StatusCreated, "Created", producedObject).
+				Returns(http.StatusCreated, "Created", action.producedObject).
 				Reads(defaultVersionedObject).
-				Writes(producedObject)
+				Writes(action.producedObject)
 			if err := AddObjectParams(ws, route, versionedUpdateOptions); err != nil {
 				return nil, err
 			}
@@ -798,9 +812,9 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Consumes(supportedTypes...).
 				Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
-				Returns(http.StatusOK, "OK", producedObject).
+				Returns(http.StatusOK, "OK", action.producedObject).
 				Reads(metav1.Patch{}).
-				Writes(producedObject)
+				Writes(action.producedObject)
 			if err := AddObjectParams(ws, route, versionedPatchOptions); err != nil {
 				return nil, err
 			}
@@ -817,13 +831,13 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
-				Returns(http.StatusOK, "OK", producedObject).
+				Returns(http.StatusOK, "OK", action.producedObject).
 				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
 				// but currently go-restful can't handle multiple different objects being returned.
-				Returns(http.StatusCreated, "Created", producedObject).
-				Returns(http.StatusAccepted, "Accepted", producedObject).
+				Returns(http.StatusCreated, "Created", action.producedObject).
+				Returns(http.StatusAccepted, "Accepted", action.producedObject).
 				Reads(defaultVersionedObject).
-				Writes(producedObject)
+				Writes(action.producedObject)
 			if err := AddObjectParams(ws, route, versionedCreateOptions); err != nil {
 				return nil, err
 			}
@@ -840,9 +854,9 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
-				Writes(versionedStatus).
-				Returns(http.StatusOK, "OK", versionedStatus).
-				Returns(http.StatusAccepted, "Accepted", versionedStatus)
+				Writes(action.producedObject).
+				Returns(http.StatusOK, "OK", action.producedObject).
+				Returns(http.StatusAccepted, "Accepted", action.producedObject)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 				route.ParameterNamed("body").Required(false)
@@ -862,8 +876,8 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
-				Writes(versionedStatus).
-				Returns(http.StatusOK, "OK", versionedStatus)
+				Writes(action.producedObject).
+				Returns(http.StatusOK, "OK", action.producedObject)
 			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
 				return nil, err
 			}
@@ -881,8 +895,8 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(allMediaTypes...).
-				Returns(http.StatusOK, "OK", versionedWatchEvent).
-				Writes(versionedWatchEvent)
+				Returns(http.StatusOK, "OK", action.producedObject).
+				Writes(action.producedObject)
 			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
 				return nil, err
 			}
@@ -900,8 +914,8 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List"+operationSuffix).
 				Produces(allMediaTypes...).
-				Returns(http.StatusOK, "OK", versionedWatchEvent).
-				Writes(versionedWatchEvent)
+				Returns(http.StatusOK, "OK", action.producedObject).
+				Writes(action.producedObject)
 			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
 				return nil, err
 			}
