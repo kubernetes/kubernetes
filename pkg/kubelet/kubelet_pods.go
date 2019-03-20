@@ -1220,7 +1220,6 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 
 // getPhase returns the phase of a pod given its container info.
 func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
-	initialized := 0
 	pendingInitialization := 0
 	failedInitialization := 0
 	for _, container := range spec.InitContainers {
@@ -1234,16 +1233,12 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 		case containerStatus.State.Running != nil:
 			pendingInitialization++
 		case containerStatus.State.Terminated != nil:
-			if containerStatus.State.Terminated.ExitCode == 0 {
-				initialized++
-			} else {
+			if containerStatus.State.Terminated.ExitCode != 0 {
 				failedInitialization++
 			}
 		case containerStatus.State.Waiting != nil:
 			if containerStatus.LastTerminationState.Terminated != nil {
-				if containerStatus.LastTerminationState.Terminated.ExitCode == 0 {
-					initialized++
-				} else {
+				if containerStatus.LastTerminationState.Terminated.ExitCode != 0 {
 					failedInitialization++
 				}
 			} else {
@@ -1258,7 +1253,6 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	running := 0
 	waiting := 0
 	stopped := 0
-	failed := 0
 	succeeded := 0
 	for _, container := range spec.Containers {
 		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
@@ -1274,8 +1268,6 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 			stopped++
 			if containerStatus.State.Terminated.ExitCode == 0 {
 				succeeded++
-			} else {
-				failed++
 			}
 		case containerStatus.State.Waiting != nil:
 			if containerStatus.LastTerminationState.Terminated != nil {
