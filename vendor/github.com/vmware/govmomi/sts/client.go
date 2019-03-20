@@ -70,7 +70,10 @@ type TokenRequest struct {
 	Lifetime    time.Duration    // Lifetime is the token's lifetime, defaults to 10m
 	Renewable   bool             // Renewable allows the issued token to be renewed
 	Delegatable bool             // Delegatable allows the issued token to be delegated (e.g. for use with ActAs)
-	Token       string           // Token for Renew request or Issue request ActAs identity
+	ActAs       bool             // ActAs allows to request an ActAs token based on the passed Token.
+	Token       string           // Token for Renew request or Issue request ActAs identity or to be exchanged.
+	KeyType     string           // KeyType for requested token (if not set will be decucted from Userinfo and Certificate options)
+	KeyID       string           // KeyID used for signing the requests
 }
 
 func (c *Client) newRequest(req TokenRequest, kind string, s *Signer) (internal.RequestSecurityToken, error) {
@@ -96,16 +99,27 @@ func (c *Client) newRequest(req TokenRequest, kind string, s *Signer) (internal.
 			OK: false,
 		},
 		Delegatable: req.Delegatable,
+		KeyType:     req.KeyType,
 	}
 
-	if req.Certificate == nil {
-		if req.Userinfo == nil {
-			return rst, errors.New("one of TokenRequest Certificate or Userinfo is required")
+	if req.KeyType == "" {
+		// Deduce KeyType based on Certificate nad Userinfo.
+		if req.Certificate == nil {
+			if req.Userinfo == nil {
+				return rst, errors.New("one of TokenRequest Certificate or Userinfo is required")
+			}
+			rst.KeyType = "http://docs.oasis-open.org/ws-sx/ws-trust/200512/Bearer"
+		} else {
+			rst.KeyType = "http://docs.oasis-open.org/ws-sx/ws-trust/200512/PublicKey"
+			// For HOK KeyID is required.
+			if req.KeyID == "" {
+				req.KeyID = newID()
+			}
 		}
-		rst.KeyType = "http://docs.oasis-open.org/ws-sx/ws-trust/200512/Bearer"
-	} else {
-		rst.KeyType = "http://docs.oasis-open.org/ws-sx/ws-trust/200512/PublicKey"
-		rst.UseKey = &internal.UseKey{Sig: newID()}
+	}
+
+	if req.KeyID != "" {
+		rst.UseKey = &internal.UseKey{Sig: req.KeyID}
 		s.keyID = rst.UseKey.Sig
 	}
 
@@ -131,6 +145,8 @@ func (s *Signer) setLifetime(lifetime *internal.Lifetime) error {
 func (c *Client) Issue(ctx context.Context, req TokenRequest) (*Signer, error) {
 	s := &Signer{
 		Certificate: req.Certificate,
+		keyID:       req.KeyID,
+		Token:       req.Token,
 		user:        req.Userinfo,
 	}
 
@@ -139,7 +155,7 @@ func (c *Client) Issue(ctx context.Context, req TokenRequest) (*Signer, error) {
 		return nil, err
 	}
 
-	if req.Token != "" {
+	if req.ActAs {
 		rst.ActAs = &internal.Target{
 			Token: req.Token,
 		}
