@@ -86,34 +86,27 @@ func (connection *VSphereConnection) Connect(ctx context.Context) error {
 	return nil
 }
 
-// login calls SessionManager.LoginByToken if certificate and private key are configured,
-// otherwise calls SessionManager.Login with user and password.
-func (connection *VSphereConnection) login(ctx context.Context, client *vim25.Client) error {
-	m := session.NewManager(client)
-	connection.credentialsLock.Lock()
-	defer connection.credentialsLock.Unlock()
-
+// Signer returns an sts.Signer for use with SAML token auth if connection is configured for such.
+// Returns nil if username/password auth is configured for the connection.
+func (connection *VSphereConnection) Signer(ctx context.Context, client *vim25.Client) (*sts.Signer, error) {
 	// TODO: Add separate fields for certificate and private-key.
 	// For now we can leave the config structs and validation as-is and
 	// decide to use LoginByToken if the username value is PEM encoded.
 	b, _ := pem.Decode([]byte(connection.Username))
 	if b == nil {
-		klog.V(3).Infof("SessionManager.Login with username '%s'", connection.Username)
-		return m.Login(ctx, neturl.UserPassword(connection.Username, connection.Password))
+		return nil, nil
 	}
-
-	klog.V(3).Infof("SessionManager.LoginByToken with certificate '%s'", connection.Username)
 
 	cert, err := tls.X509KeyPair([]byte(connection.Username), []byte(connection.Password))
 	if err != nil {
 		klog.Errorf("Failed to load X509 key pair. err: %+v", err)
-		return err
+		return nil, err
 	}
 
 	tokens, err := sts.NewClient(ctx, client)
 	if err != nil {
 		klog.Errorf("Failed to create STS client. err: %+v", err)
-		return err
+		return nil, err
 	}
 
 	req := sts.TokenRequest{
@@ -123,8 +116,30 @@ func (connection *VSphereConnection) login(ctx context.Context, client *vim25.Cl
 	signer, err := tokens.Issue(ctx, req)
 	if err != nil {
 		klog.Errorf("Failed to issue SAML token. err: %+v", err)
+		return nil, err
+	}
+
+	return signer, nil
+}
+
+// login calls SessionManager.LoginByToken if certificate and private key are configured,
+// otherwise calls SessionManager.Login with user and password.
+func (connection *VSphereConnection) login(ctx context.Context, client *vim25.Client) error {
+	m := session.NewManager(client)
+	connection.credentialsLock.Lock()
+	defer connection.credentialsLock.Unlock()
+
+	signer, err := connection.Signer(ctx, client)
+	if err != nil {
 		return err
 	}
+
+	if signer == nil {
+		klog.V(3).Infof("SessionManager.Login with username %q", connection.Username)
+		return m.Login(ctx, neturl.UserPassword(connection.Username, connection.Password))
+	}
+
+	klog.V(3).Infof("SessionManager.LoginByToken with certificate %q", connection.Username)
 
 	header := soap.Header{Security: signer}
 
