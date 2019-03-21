@@ -490,10 +490,12 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(framework.VerifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 	})
 
-	// TODO: Run this test against the userspace proxy and nodes
-	// configured with a default deny firewall to validate that the
-	// proxy whitelists NodePort traffic.
-	ginkgo.It("should be able to create a functioning NodePort service", func() {
+	/*
+		Release : v1.16
+		Testname: Service, NodePort Service
+		Description: Create a Nodeport service, create a pod and access it via the NodePort and verify that the NodePort is locked and functioning.
+	*/
+	framework.ConformanceIt("should be able to create a functioning NodePort service", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
