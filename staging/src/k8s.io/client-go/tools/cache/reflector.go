@@ -192,6 +192,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			if r.WatchListPageSize != 0 {
 				pager.PageSize = r.WatchListPageSize
 			}
+			// Pager falls back to full list if paginated list calls fail due to an "Expired" error.
 			list, err = pager.List(context.Background(), options)
 			close(listCh)
 		}()

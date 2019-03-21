@@ -242,7 +242,13 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 // NewIntegrationTestMasterConfig returns the master config appropriate for most integration tests.
 func NewIntegrationTestMasterConfig() *master.Config {
-	masterConfig := NewMasterConfig()
+	return NewIntegrationTestMasterConfigWithOptions(&MasterConfigOptions{})
+}
+
+// NewIntegrationTestMasterConfigWithOptions returns the master config appropriate for most integration tests
+// configured with the provided options.
+func NewIntegrationTestMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
+	masterConfig := NewMasterConfigWithOptions(opts)
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 
@@ -252,13 +258,32 @@ func NewIntegrationTestMasterConfig() *master.Config {
 	return masterConfig
 }
 
-// NewMasterConfig returns a basic master config.
-func NewMasterConfig() *master.Config {
+// MasterConfigOptions are the configurable options for a new integration test master config.
+type MasterConfigOptions struct {
+	EtcdOptions *options.EtcdOptions
+}
+
+// DefaultEtcdOptions are the default EtcdOptions for use with integration tests.
+func DefaultEtcdOptions() *options.EtcdOptions {
 	// This causes the integration tests to exercise the etcd
 	// prefix code, so please don't change without ensuring
 	// sufficient coverage in other ways.
 	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), nil))
 	etcdOptions.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
+	return etcdOptions
+}
+
+// NewMasterConfig returns a basic master config.
+func NewMasterConfig() *master.Config {
+	return NewMasterConfigWithOptions(&MasterConfigOptions{})
+}
+
+// NewMasterConfigWithOptions returns a basic master config configured with the provided options.
+func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
+	etcdOptions := DefaultEtcdOptions()
+	if opts.EtcdOptions != nil {
+		etcdOptions = opts.EtcdOptions
+	}
 
 	info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(legacyscheme.Scheme, info)

@@ -65,8 +65,16 @@ func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server
 	return setupWithResources(t, groupVersions, nil)
 }
 
+func setupWithOptions(t *testing.T, opts *framework.MasterConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+	return setupWithResourcesWithOptions(t, opts, groupVersions, nil)
+}
+
 func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	return setupWithResourcesWithOptions(t, &framework.MasterConfigOptions{}, groupVersions, resources)
+}
+
+func setupWithResourcesWithOptions(t *testing.T, opts *framework.MasterConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(opts)
 	if len(groupVersions) > 0 || len(resources) > 0 {
 		resourceConfig := master.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
@@ -187,6 +195,62 @@ func Test202StatusCode(t *testing.T) {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
 	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 202)
+}
+
+func TestListResourceVersion0(t *testing.T) {
+	var testcases = []struct {
+		name              string
+		watchCacheEnabled bool
+	}{
+		{
+			name:              "watchCacheOn",
+			watchCacheEnabled: true,
+		},
+		{
+			name:              "watchCacheOff",
+			watchCacheEnabled: false,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
+			etcdOptions := framework.DefaultEtcdOptions()
+			etcdOptions.EnableWatchCache = tc.watchCacheEnabled
+			s, clientSet, closeFn := setupWithOptions(t, &framework.MasterConfigOptions{EtcdOptions: etcdOptions})
+			defer closeFn()
+
+			ns := framework.CreateTestingNamespace("list-paging", s, t)
+			defer framework.DeleteTestingNamespace(ns, s, t)
+
+			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
+
+			for i := 0; i < 10; i++ {
+				rs := newRS(ns.Name)
+				rs.Name = fmt.Sprintf("test-%d", i)
+				if _, err := rsClient.Create(rs); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			pagerFn := func(opts metav1.ListOptions) (runtime.Object, error) {
+				return rsClient.List(opts)
+			}
+
+			p := pager.New(pager.SimplePageFunc(pagerFn))
+			p.PageSize = 3
+			listObj, err := p.List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
+			if err != nil {
+				t.Fatalf("Unexpected list error: %v", err)
+			}
+			items, err := meta.ExtractList(listObj)
+			if err != nil {
+				t.Fatalf("Failed to extract list from %v", listObj)
+			}
+			if len(items) != 10 {
+				t.Errorf("Expected list size of 10 but got %d", len(items))
+			}
+		})
+	}
 }
 
 func TestAPIListChunking(t *testing.T) {
