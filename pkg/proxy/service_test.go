@@ -156,7 +156,7 @@ func TestServiceToServiceMap(t *testing.T) {
 			}),
 			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("ns2", "cluster-ip", "p1"): makeTestServiceInfo("172.16.55.4", 1234, "UDP", 0, func(info *BaseServiceInfo) {
-					info.Annotations["kube-proxy.kubernetes.io/ipvs-scheduler"] = "lc"
+					info.annotations["kube-proxy.kubernetes.io/ipvs-scheduler"] = "lc"
 				}),
 			},
 		},
@@ -392,7 +392,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svcInfo.protocol != expectedInfo.protocol ||
 				svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
 				!sets.NewString(svcInfo.externalIPs...).Equal(sets.NewString(expectedInfo.externalIPs...)) ||
-				!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) {
+				!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) ||
 				len(svcInfo.annotations) > 0 && !reflect.DeepEqual(svcInfo.annotations, expectedInfo.annotations) {
 				t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
 			}

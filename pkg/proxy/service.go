@@ -108,7 +108,7 @@ func (info *BaseServiceInfo) ExternalIPStrings() []string {
 
 // GetAnnotationsis part of ServicePort interface.
 func (info *BaseServiceInfo) GetAnnotations() map[string]string {
-	return info.Annotations
+	return info.annotations
 }
 
 // LoadBalancerIPStrings is part of ServicePort interface.
@@ -179,7 +179,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 
 	for k, v := range service.ObjectMeta.Annotations {
 		if strings.HasPrefix(k, "kube-proxy.kubernetes.io/") {
-			info.Annotations[k] = v
+			info.annotations[k] = v
 		}
 	}
 	return info
