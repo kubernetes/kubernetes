@@ -91,22 +91,28 @@ func getSelectors(pod *v1.Pod, sl algorithm.ServiceLister, cl algorithm.Controll
 
 	if rcs, err := cl.GetPodControllers(pod); err == nil {
 		for _, rc := range rcs {
-			selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
+			if *rc.Spec.Replicas > 0 {
+				selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
+			}
 		}
 	}
 
 	if rss, err := rsl.GetPodReplicaSets(pod); err == nil {
 		for _, rs := range rss {
-			if selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
-				selectors = append(selectors, selector)
+			if *rs.Spec.Replicas > 0 {
+				if selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
+					selectors = append(selectors, selector)
+				}
 			}
 		}
 	}
 
 	if sss, err := ssl.GetPodStatefulSets(pod); err == nil {
 		for _, ss := range sss {
-			if selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector); err == nil {
-				selectors = append(selectors, selector)
+			if *ss.Spec.Replicas > 0 {
+				if selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector); err == nil {
+					selectors = append(selectors, selector)
+				}
 			}
 		}
 	}
