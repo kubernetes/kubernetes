@@ -473,12 +473,10 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 				return
 			}
 			if fits {
+				filtered[filteredLen] = g.nodeInfoSnapshot.NodeInfoMap[nodeName].Node()
 				length := atomic.AddInt32(&filteredLen, 1)
-				if length > numNodesToFind {
+				if length >= numNodesToFind {
 					cancel()
-					atomic.AddInt32(&filteredLen, -1)
-				} else {
-					filtered[length-1] = g.nodeInfoSnapshot.NodeInfoMap[nodeName].Node()
 				}
 			} else {
 				predicateResultLock.Lock()
