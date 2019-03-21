@@ -20,8 +20,6 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-IFS=" " read -r -a staging_repos <<< "$(ls "${KUBE_ROOT}/staging/src/k8s.io/")"
-
 expected_filenames=(
   .github/PULL_REQUEST_TEMPLATE.md
   code-of-conduct.md
@@ -36,7 +34,8 @@ exceptions=(
 )
 
 RESULT=0
-for repo in "${staging_repos[@]}"; do
+for full_repo_path in "${KUBE_ROOT}"/staging/src/k8s.io/*; do
+  repo=$(basename "${full_repo_path}")
   for filename in "${expected_filenames[@]}"; do
     if echo " ${exceptions[*]} " | grep -F " ${repo}/${filename} " >/dev/null; then
       continue
