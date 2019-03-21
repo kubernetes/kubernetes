@@ -534,8 +534,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	for _, action := range actions {
-		var handler restful.RouteFunction
-		verbOverrider, needOverride := storage.(StorageMetricsOverride)
 		requestScope := "cluster"
 		if apiResource.Namespaced {
 			requestScope = "namespace"
@@ -547,32 +545,25 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			requestScope = "cluster"
 		}
 
+		var handler restful.RouteFunction
+		verb := action.Verb
 		switch action.Verb {
-		case "GET": // Get a resource.
+		case "GET":
 			if isGetterWithOptions {
 				handler = restfulGetResourceWithOptions(getterWithOptions, reqScope, isSubresource)
 			} else {
 				handler = restfulGetResource(getter, exporter, reqScope)
 			}
-
+			verbOverrider, needOverride := storage.(StorageMetricsOverride)
 			if needOverride {
 				// need change the reported verb
-				handler = metrics.InstrumentRouteFunc(verbOverrider.OverrideMetricsVerb(action.Verb), group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
-			} else {
-				handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+				verb = verbOverrider.OverrideMetricsVerb(action.Verb)
 			}
-
-			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler)
-			}
-		case "LIST": // List all resources of a kind.
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
-			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler)
-			}
-		case "PUT": // Update a resource.
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulUpdateResource(updater, reqScope, admit))
-		case "PATCH": // Partially update a resource
+		case "LIST":
+			handler = restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout)
+		case "PUT":
+			handler = restfulUpdateResource(updater, reqScope, admit)
+		case "PATCH":
 			supportedTypes := []string{
 				string(types.JSONPatchType),
 				string(types.MergePatchType),
@@ -581,27 +572,30 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
 			}
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
-		case "POST": // Create a resource.
-			var handler restful.RouteFunction
+			handler = restfulPatchResource(patcher, reqScope, admit, supportedTypes)
+		case "POST":
 			if isNamedCreater {
 				handler = restfulCreateNamedResource(namedCreater, reqScope, admit)
 			} else {
 				handler = restfulCreateResource(creater, reqScope, admit)
 			}
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
-		case "DELETE": // Delete a resource.
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
+		case "DELETE":
+			handler = restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit)
 		case "DELETECOLLECTION":
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
-		case "WATCH": // Watch a resource.
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
-		case "WATCHLIST": // Watch all resources of a kind.
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			handler = restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit)
+		case "WATCH", "WATCHLIST":
+			handler = restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout)
 		case "CONNECT":
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
+			handler = restfulConnectResource(connecter, reqScope, admit, path, isSubresource)
 		}
-
+		// instrument handler
+		handler = metrics.InstrumentRouteFunc(verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+		switch action.Verb {
+		case "GET", "LIST":
+			if a.enableAPIResponseCompression {
+				handler = genericfilters.RestfulWithCompression(handler)
+			}
+		}
 		action.handler = handler
 	}
 
