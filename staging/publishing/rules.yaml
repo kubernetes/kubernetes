@@ -179,22 +179,6 @@ rules:
       branch: master
     - repository: client-go
       branch: master
-- destination: csi-api
-  library: true
-  branches:
-  - source:
-      branch: master
-      dir: staging/src/k8s.io/csi-api
-    name: master
-    dependencies:
-    - repository: apimachinery
-      branch: master
-    - repository: api
-      branch: master
-    - repository: client-go
-      branch: master
-    - repository: apiextensions-apiserver
-      branch: master
 - destination: cli-runtime
   library: true
   branches:

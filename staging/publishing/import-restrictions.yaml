@@ -202,15 +202,6 @@
   - k8s.io/client-go
   - k8s.io/node-api
 
-- baseImportPath: "./vendor/k8s.io/csi-api/"
-  allowedImports:
-  - k8s.io/api
-  - k8s.io/apimachinery
-  - k8s.io/apiextensions-apiserver
-  - k8s.io/client-go
-  - k8s.io/csi-api
-  - k8s.io/klog
-
 - baseImportPath: "./vendor/k8s.io/csi-translation-lib/"
   allowedImports:
   - k8s.io/api
