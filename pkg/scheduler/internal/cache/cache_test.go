@@ -1078,7 +1078,7 @@ func TestNodeOperators(t *testing.T) {
 
 		// Case 2: dump cached nodes successfully.
 		cachedNodes := NewNodeInfoSnapshot()
-		cache.UpdateNodeInfoSnapshot(&cachedNodes)
+		cache.UpdateNodeInfoSnapshot(cachedNodes)
 		newNode, found := cachedNodes.NodeInfoMap[node.Name]
 		if !found || len(cachedNodes.NodeInfoMap) != 1 {
 			t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes, cache.nodes)
@@ -1180,7 +1180,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	}
 
 	var cache *schedulerCache
-	var snapshot NodeInfoSnapshot
+	var snapshot *NodeInfoSnapshot
 	type operation = func()
 
 	addNode := func(i int) operation {
@@ -1215,8 +1215,8 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	}
 	updateSnapshot := func() operation {
 		return func() {
-			cache.UpdateNodeInfoSnapshot(&snapshot)
-			if err := compareCacheWithNodeInfoSnapshot(cache, &snapshot); err != nil {
+			cache.UpdateNodeInfoSnapshot(snapshot)
+			if err := compareCacheWithNodeInfoSnapshot(cache, snapshot); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1356,8 +1356,8 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 			}
 
 			// Always update the snapshot at the end of operations and compare it.
-			cache.UpdateNodeInfoSnapshot(&snapshot)
-			if err := compareCacheWithNodeInfoSnapshot(cache, &snapshot); err != nil {
+			cache.UpdateNodeInfoSnapshot(snapshot)
+			if err := compareCacheWithNodeInfoSnapshot(cache, snapshot); err != nil {
 				t.Error(err)
 			}
 		})
@@ -1391,7 +1391,7 @@ func BenchmarkUpdate1kNodes30kPods(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		cachedNodes := NewNodeInfoSnapshot()
-		cache.UpdateNodeInfoSnapshot(&cachedNodes)
+		cache.UpdateNodeInfoSnapshot(cachedNodes)
 	}
 }
 

@@ -49,7 +49,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -73,6 +73,7 @@ func createConfiguratorWithPodInformer(
 	clientSet clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	informerFactory informers.SharedInformerFactory,
+	pluginRegistry schedulerframework.Registry,
 	stopCh <-chan struct{},
 ) factory.Configurator {
 	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
@@ -88,6 +89,7 @@ func createConfiguratorWithPodInformer(
 		ServiceInformer:                informerFactory.Core().V1().Services(),
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+		Registry:                       pluginRegistry,
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
@@ -146,7 +148,7 @@ func initTestScheduler(
 ) *testContext {
 	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
 	// feature gate is enabled at the same time.
-	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, nil, false, time.Second)
+	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, schedulerframework.NewRegistry(), false, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -156,7 +158,7 @@ func initTestSchedulerWithOptions(
 	context *testContext,
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
-	pluginSet plugins.PluginSet,
+	pluginRegistry schedulerframework.Registry,
 	disablePreemption bool,
 	resyncPeriod time.Duration,
 ) *testContext {
@@ -173,7 +175,7 @@ func initTestSchedulerWithOptions(
 	}
 
 	context.schedulerConfigFactory = createConfiguratorWithPodInformer(
-		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory, context.stopCh)
+		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory, pluginRegistry, context.stopCh)
 
 	var err error
 
@@ -206,11 +208,6 @@ func initTestSchedulerWithOptions(
 	if setPodInformer {
 		go podInformer.Informer().Run(context.schedulerConfig.StopEverything)
 		controller.WaitForCacheSync("scheduler", context.schedulerConfig.StopEverything, podInformer.Informer().HasSynced)
-	}
-
-	// Set pluginSet if provided. DefaultPluginSet is used if this is not specified.
-	if pluginSet != nil {
-		context.schedulerConfig.PluginSet = pluginSet
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -259,7 +256,8 @@ func initTest(t *testing.T, nsPrefix string) *testContext {
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *testContext {
 	return initTestSchedulerWithOptions(
-		t, initTestMaster(t, nsPrefix, nil), true, nil, nil, true, time.Second)
+		t, initTestMaster(t, nsPrefix, nil), true, nil,
+		schedulerframework.NewRegistry(), true, time.Second)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,35 +14,42 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package examples
+package prebind
 
 import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // StatelessPrebindExample is an example of a simple plugin that has no state
 // and implements only one hook for prebind.
 type StatelessPrebindExample struct{}
 
-var _ = plugins.PrebindPlugin(StatelessPrebindExample{})
+var _ = framework.PrebindPlugin(StatelessPrebindExample{})
+
+// Name is the name of the plugin used in Registry and configurations.
+const Name = "stateless-prebind-plugin-example"
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (sr StatelessPrebindExample) Name() string {
-	return "stateless-prebind-plugin-example"
+	return Name
 }
 
 // Prebind is the functions invoked by the framework at "prebind" extension point.
-func (sr StatelessPrebindExample) Prebind(ps plugins.PluginSet, pod *v1.Pod, nodeName string) (bool, error) {
+func (sr StatelessPrebindExample) Prebind(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
-		return false, fmt.Errorf("pod cannot be nil")
+		return framework.NewStatus(framework.Error, fmt.Sprintf("pod cannot be nil"))
 	}
-	return true, nil
+	if pod.Namespace != "foo" {
+		return framework.NewStatus(framework.Unschedulable, "only pods from 'foo' namespace are allowed")
+	}
+	return nil
 }
 
-// NewStatelessPrebindExample initializes a new plugin and returns it.
-func NewStatelessPrebindExample() *StatelessPrebindExample {
-	return &StatelessPrebindExample{}
+// New initializes a new plugin and returns it.
+func New(_ *runtime.Unknown, _ framework.Framework) (framework.Plugin, error) {
+	return &StatelessPrebindExample{}, nil
 }
