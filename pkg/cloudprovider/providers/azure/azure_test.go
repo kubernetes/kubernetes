@@ -1669,7 +1669,8 @@ func validateEmptyConfig(t *testing.T, config string) {
 func TestGetZone(t *testing.T) {
 	cloud := &Cloud{
 		Config: Config{
-			Location: "eastus",
+			Location:            "eastus",
+			UseInstanceMetadata: true,
 		},
 	}
 	testcases := []struct {
