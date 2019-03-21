@@ -646,68 +646,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		action.handler = handler
 	}
 
-	// assign readSample for each action
+	// complete actions
 	for _, action := range actions {
-		switch action.Verb {
-		case "PUT", "POST":
-			action.readSample = defaultVersionedObject
-		case "DELETE":
-			action.readSample = versionedDeleterObject
-		case "PATCH":
-			action.readSample = metav1.Patch{}
-		}
-	}
+		// assign producedMIMETypes
+		producedMIMETypes := append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)
+		action = action.assignProducedMIMETypes(producedMIMETypes, allMediaTypes)
 
-	// assign writeSample for each action
-	for _, action := range actions {
+		// assign consumedMIMETypes
+		action = action.assignConsumedMIMETypes()
+
+		// assign writeSample
 		writeSample := storageMeta.ProducesObject(action.Verb)
 		if writeSample == nil {
 			writeSample = defaultVersionedObject
 		}
-		switch action.Verb {
-		case "LIST":
-			writeSample = versionedList
-		case "DELETE", "DELECTCOLLECTION":
-			writeSample = versionedStatus
-		case "WATCH", "WATCHLIST":
-			writeSample = versionedWatchEvent
-		}
+		action = action.assignWriteSample(writeSample, versionedList, versionedStatus, versionedWatchEvent)
 
-		action.writeSample = writeSample
-	}
-
-	// assign consumedMIMETypes for each action
-	for _, action := range actions {
-		switch action.Verb {
-		case "PATCH": // Partially update a resource
-			supportedTypes := []string{
-				string(types.JSONPatchType),
-				string(types.MergePatchType),
-				string(types.StrategicMergePatchType),
-			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
-			}
-			action.consumedMIMETypes = supportedTypes
-		case "CONNECT":
-			action.consumedMIMETypes = []string{"*/*"}
-		}
-	}
-
-	// assign producedMIMETypes for each action
-	for _, action := range actions {
-		var producedMIMETypes []string
-		producedMIMETypes = append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)
-		switch action.Verb {
-		case "LIST":
-			producedMIMETypes = append(storageMeta.ProducesMIMETypes(action.Verb), allMediaTypes...)
-		case "WATCH", "WATCHLIST":
-			producedMIMETypes = allMediaTypes
-		case "CONNECT":
-			producedMIMETypes = []string{"*/*"}
-		}
-
-		action.producedMIMETypes = producedMIMETypes
+		// assign readSample
+		action = action.assignReadSample(defaultVersionedObject, versionedDeleterObject)
 	}
 
 	// add object params for each action
@@ -836,6 +792,63 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	return &apiResource, nil
+}
+
+func (a *action) assignConsumedMIMETypes() *action {
+	switch a.Verb {
+	case "PATCH": // Partially update a resource
+		supportedTypes := []string{
+			string(types.JSONPatchType),
+			string(types.MergePatchType),
+			string(types.StrategicMergePatchType),
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
+		}
+		a.consumedMIMETypes = supportedTypes
+	case "CONNECT":
+		a.consumedMIMETypes = []string{"*/*"}
+	}
+	return a
+}
+
+func (a *action) assignProducedMIMETypes(producedMIMETypes, allMediaTypes []string) *action {
+	switch a.Verb {
+	case "LIST":
+		producedMIMETypes = append(producedMIMETypes, allMediaTypes...)
+	case "WATCH", "WATCHLIST":
+		producedMIMETypes = allMediaTypes
+	case "CONNECT":
+		producedMIMETypes = []string{"*/*"}
+	}
+	a.producedMIMETypes = producedMIMETypes
+	return a
+}
+
+func (a *action) assignWriteSample(writeSample, versionedList, versionedStatus, versionedWatchEvent interface{}) *action {
+	switch a.Verb {
+	case "LIST":
+		writeSample = versionedList
+	case "DELETE", "DELECTCOLLECTION":
+		writeSample = versionedStatus
+	case "WATCH", "WATCHLIST":
+		writeSample = versionedWatchEvent
+	}
+
+	a.writeSample = writeSample
+	return a
+}
+
+func (a *action) assignReadSample(defaultVersionedObject, versionedDeleterObject interface{}) *action {
+	switch a.Verb {
+	case "PUT", "POST":
+		a.readSample = defaultVersionedObject
+	case "DELETE":
+		a.readSample = versionedDeleterObject
+	case "PATCH":
+		a.readSample = metav1.Patch{}
+	}
+	return a
 }
 
 func registerActionsToWebService(action *action, ws *restful.WebService, isNamespaced, isSubresource, isLister, isWatcher, isGracefulDeleter bool, kind, subresource string) ([]*restful.RouteBuilder, error) {
