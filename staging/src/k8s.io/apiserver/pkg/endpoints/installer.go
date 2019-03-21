@@ -407,15 +407,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var namer handlers.ContextBasedNaming
+	var resourcePath, itemPath string
+	var resourceParams, nameParams, proxyParams []*restful.Parameter
 	// Get the list of actions for the given scope.
 	switch {
 	case !namespaceScoped:
 		// Handle non-namespace scoped resources like nodes.
-		resourcePath := resource
-		resourceParams := params
-		itemPath := resourcePath + "/{name}"
-		nameParams := append(params, nameParam)
-		proxyParams := append(nameParams, pathParam)
+		resourcePath = resource
+		resourceParams = params
+		itemPath = resourcePath + "/{name}"
+		nameParams = append(params, nameParam)
+		proxyParams = append(nameParams, pathParam)
 		suffix := ""
 		if isSubresource {
 			suffix = "/" + subresource
@@ -432,27 +434,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			SelfLinkPathPrefix: gpath.Join(a.prefix, resource) + "/",
 			SelfLinkPathSuffix: suffix,
 		}
-
-		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
-		// Add actions at the resource path: /api/apiVersion/resource
-		actions = appendIf(actions, newAction("LIST", resourcePath, resourceParams, false), isLister)
-		actions = appendIf(actions, newAction("POST", resourcePath, resourceParams, false), isCreater)
-		actions = appendIf(actions, newAction("DELETECOLLECTION", resourcePath, resourceParams, false), isCollectionDeleter)
-		// DEPRECATED in 1.11
-		actions = appendIf(actions, newAction("WATCHLIST", "watch/"+resourcePath, resourceParams, false), allowWatchList)
-
-		// Add actions at the item path: /api/apiVersion/resource/{name}
-		actions = appendIf(actions, newAction("GET", itemPath, nameParams, false), isGetter)
-		if getSubpath {
-			actions = appendIf(actions, newAction("GET", itemPath+"/{path:*}", proxyParams, false), isGetter)
-		}
-		actions = appendIf(actions, newAction("PUT", itemPath, nameParams, false), isUpdater)
-		actions = appendIf(actions, newAction("PATCH", itemPath, nameParams, false), isPatcher)
-		actions = appendIf(actions, newAction("DELETE", itemPath, nameParams, false), isGracefulDeleter)
-		// DEPRECATED in 1.11
-		actions = appendIf(actions, newAction("WATCH", "watch/"+itemPath, nameParams, false), isWatcher)
-		actions = appendIf(actions, newAction("CONNECT", itemPath, nameParams, false), isConnecter)
-		actions = appendIf(actions, newAction("CONNECT", itemPath+"/{path:*}", proxyParams, false), isConnecter && connectSubpath)
 	default:
 		namespaceParamName := "namespaces"
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -460,11 +441,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		namespacedPath := namespaceParamName + "/{namespace}/" + resource
 		namespaceParams := []*restful.Parameter{namespaceParam}
 
-		resourcePath := namespacedPath
-		resourceParams := namespaceParams
-		itemPath := namespacedPath + "/{name}"
-		nameParams := append(namespaceParams, nameParam)
-		proxyParams := append(nameParams, pathParam)
+		resourcePath = namespacedPath
+		resourceParams = namespaceParams
+		itemPath = namespacedPath + "/{name}"
+		nameParams = append(namespaceParams, nameParam)
+		proxyParams = append(nameParams, pathParam)
 		itemPathSuffix := ""
 		if isSubresource {
 			itemPathSuffix = "/" + subresource
@@ -482,24 +463,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			SelfLinkPathSuffix: itemPathSuffix,
 		}
 
-		actions = appendIf(actions, newAction("LIST", resourcePath, resourceParams, false), isLister)
-		actions = appendIf(actions, newAction("POST", resourcePath, resourceParams, false), isCreater)
-		actions = appendIf(actions, newAction("DELETECOLLECTION", resourcePath, resourceParams, false), isCollectionDeleter)
-		// DEPRECATED in 1.11
-		actions = appendIf(actions, newAction("WATCHLIST", "watch/"+resourcePath, resourceParams, false), allowWatchList)
-
-		actions = appendIf(actions, newAction("GET", itemPath, nameParams, false), isGetter)
-		if getSubpath {
-			actions = appendIf(actions, newAction("GET", itemPath+"/{path:*}", proxyParams, false), isGetter)
-		}
-		actions = appendIf(actions, newAction("PUT", itemPath, nameParams, false), isUpdater)
-		actions = appendIf(actions, newAction("PATCH", itemPath, nameParams, false), isPatcher)
-		actions = appendIf(actions, newAction("DELETE", itemPath, nameParams, false), isGracefulDeleter)
-		// DEPRECATED in 1.11
-		actions = appendIf(actions, newAction("WATCH", "watch/"+itemPath, nameParams, false), isWatcher)
-		actions = appendIf(actions, newAction("CONNECT", itemPath, nameParams, false), isConnecter)
-		actions = appendIf(actions, newAction("CONNECT", itemPath+"/{path:*}", proxyParams, false), isConnecter && connectSubpath)
-
 		// list or post across namespace.
 		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
@@ -509,6 +472,28 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, newAction("WATCHLIST", "watch/"+resource, params, true), allowWatchList)
 		}
 	}
+
+	// Handler for standard REST verbs (GET, PUT, POST and DELETE).
+	// Add actions at the resource path: /api/apiVersion/resource
+	actions = appendIf(actions, newAction("LIST", resourcePath, resourceParams, false), isLister)
+	actions = appendIf(actions, newAction("POST", resourcePath, resourceParams, false), isCreater)
+	actions = appendIf(actions, newAction("DELETECOLLECTION", resourcePath, resourceParams, false), isCollectionDeleter)
+
+	// DEPRECATED in 1.11
+	actions = appendIf(actions, newAction("WATCHLIST", "watch/"+resourcePath, resourceParams, false), allowWatchList)
+
+	// Add actions at the item path: /api/apiVersion/resource/{name}
+	actions = appendIf(actions, newAction("GET", itemPath, nameParams, false), isGetter)
+	if getSubpath {
+		actions = appendIf(actions, newAction("GET", itemPath+"/{path:*}", proxyParams, false), isGetter)
+	}
+	actions = appendIf(actions, newAction("PUT", itemPath, nameParams, false), isUpdater)
+	actions = appendIf(actions, newAction("PATCH", itemPath, nameParams, false), isPatcher)
+	actions = appendIf(actions, newAction("DELETE", itemPath, nameParams, false), isGracefulDeleter)
+	// DEPRECATED in 1.11
+	actions = appendIf(actions, newAction("WATCH", "watch/"+itemPath, nameParams, false), isWatcher)
+	actions = appendIf(actions, newAction("CONNECT", itemPath, nameParams, false), isConnecter)
+	actions = appendIf(actions, newAction("CONNECT", itemPath+"/{path:*}", proxyParams, false), isConnecter && connectSubpath)
 
 	// Create Routes for the actions.
 	// TODO: Add status documentation using Returns()
