@@ -818,6 +818,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 	framework.KubeDescribe("GlusterDynamicProvisioner", func() {
 		It("should create and delete persistent volumes [fast]", func() {
+			framework.SkipIfProviderIs("gke")
 			By("creating a Gluster DP server Pod")
 			pod := startGlusterDpServerPod(c, ns)
 			serverUrl := "http://" + pod.Status.PodIP + ":8081"
