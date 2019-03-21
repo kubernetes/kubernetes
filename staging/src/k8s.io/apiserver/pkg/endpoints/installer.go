@@ -609,6 +609,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "PUT": // Update a resource.
 			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulUpdateResource(updater, reqScope, admit))
 		case "PATCH": // Partially update a resource
+			supportedTypes := []string{
+				string(types.JSONPatchType),
+				string(types.MergePatchType),
+				string(types.StrategicMergePatchType),
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
+			}
 			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
 		case "POST": // Create a resource.
 			var handler restful.RouteFunction
@@ -753,10 +761,22 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		kind = fqParentKind.Kind
 	}
-
-	kubeVerbs, err := registerActionsToWebService(actions, ws, apiResource.Namespaced, isSubresource, kind, subresource, storageMeta)
-	if err != nil {
-		return nil, err
+	kubeVerbs := map[string]struct{}{}
+	for _, action := range actions {
+		routes, err := registerActionsToWebService(action, ws, apiResource.Namespaced, isSubresource, isLister, isWatcher, isGracefulDeleter, kind, subresource, storageMeta, connecter, kubeVerbs)
+		if err != nil {
+			return nil, err
+		}
+		for _, route := range routes {
+			route.Metadata(ROUTE_META_GVK, metav1.GroupVersionKind{
+				Group:   reqScope.Kind.Group,
+				Version: reqScope.Kind.Version,
+				Kind:    reqScope.Kind.Kind,
+			})
+			route.Metadata(ROUTE_META_ACTION, strings.ToLower(action.Verb))
+			ws.Route(route)
+		}
+		// Note: update GetAuthorizerAttributes() when adding a custom handler.
 	}
 
 	apiResource.Verbs = make([]string, 0, len(kubeVerbs))
@@ -781,245 +801,232 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	return &apiResource, nil
 }
 
-func registerActionsToWebService(actions []action, ws *restful.WebService, isNamespaced, isSubresource bool, kind, subresource string, storageMeta rest.StorageMetadata) (map[string]struct{}, error) {
-	kubeVerbs := map[string]struct{}{}
-	for _, action := range actions {
-		var namespaced string
-		var operationSuffix string
-		if isNamespaced {
-			namespaced = "Namespaced"
-		}
-		if strings.HasSuffix(action.Path, "/{path:*}") {
-			operationSuffix = operationSuffix + "WithPath"
-		}
-		if action.AllNamespaces {
-			operationSuffix = operationSuffix + "ForAllNamespaces"
-			namespaced = ""
-		}
-
-		if kubeVerb, found := toDiscoveryKubeVerb[action.Verb]; found {
-			if len(kubeVerb) != 0 {
-				kubeVerbs[kubeVerb] = struct{}{}
-			}
-		} else {
-			return nil, fmt.Errorf("unknown action verb for discovery: %s", action.Verb)
-		}
-
-		routes := []*restful.RouteBuilder{}
-
-		switch action.Verb {
-		case "GET": // Get a resource.
-			doc := "read the specified " + kind
-			if isSubresource {
-				doc = "read " + subresource + " of the specified " + kind
-			}
-			route := ws.GET(action.Path).To(action.handler).
-				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(action.producedMIMETypes...).
-				Returns(http.StatusOK, "OK", action.producedObject).
-				Writes(action.producedObject)
-			addParams(route, action.Params)
-			routes = append(routes, route)
-		case "LIST": // List all resources of a kind.
-			doc := "list objects of kind " + kind
-			if isSubresource {
-				doc = "list " + subresource + " of objects of kind " + kind
-			}
-			route := ws.GET(action.Path).To(action.handler).
-				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(action.producedMIMETypes...).
-				Returns(http.StatusOK, "OK", action.producedObject).
-				Writes(action.producedObject)
-			switch {
-			case isLister && isWatcher:
-				doc := "list or watch objects of kind " + kind
-				if isSubresource {
-					doc = "list or watch " + subresource + " of objects of kind " + kind
-				}
-				route.Doc(doc)
-			case isWatcher:
-				doc := "watch objects of kind " + kind
-				if isSubresource {
-					doc = "watch " + subresource + "of objects of kind " + kind
-				}
-				route.Doc(doc)
-			}
-			addParams(route, action.Params)
-			routes = append(routes, route)
-		case "PUT": // Update a resource.
-			doc := "replace the specified " + kind
-			if isSubresource {
-				doc = "replace " + subresource + " of the specified " + kind
-			}
-			route := ws.PUT(action.Path).To(action.handler).
-				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(action.producedMIMETypes...).
-				Returns(http.StatusOK, "OK", action.producedObject).
-				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
-				// but currently go-restful can't handle multiple different objects being returned.
-				Returns(http.StatusCreated, "Created", action.producedObject).
-				Reads(action.readObject).
-				Writes(action.producedObject)
-			addParams(route, action.Params)
-			routes = append(routes, route)
-		case "PATCH": // Partially update a resource
-			doc := "partially update the specified " + kind
-			if isSubresource {
-				doc = "partially update " + subresource + " of the specified " + kind
-			}
-			supportedTypes := []string{
-				string(types.JSONPatchType),
-				string(types.MergePatchType),
-				string(types.StrategicMergePatchType),
-			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
-			}
-			route := ws.PATCH(action.Path).To(action.handler).
-				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Consumes(supportedTypes...).
-				Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(action.producedMIMETypes...).
-				Returns(http.StatusOK, "OK", action.producedObject).
-				Reads(action.readObject).
-				Writes(action.producedObject)
-			addParams(route, action.Params)
-			routes = append(routes, route)
-		case "POST": // Create a resource.
-			article := GetArticleForNoun(kind, " ")
-			doc := "create" + article + kind
-			if isSubresource {
-				doc = "create " + subresource + " of" + article + kind
-			}
-			route := ws.POST(action.Path).To(action.handler).
-				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(action.producedMIMETypes...).
-				Returns(http.StatusOK, "OK", action.producedObject).
-				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
-				// but currently go-restful can't handle multiple different objects being returned.
-				Returns(http.StatusCreated, "Created", action.producedObject).
-				Returns(http.StatusAccepted, "Accepted", action.producedObject).
-				Reads(action.readObject).
-				Writes(action.producedObject)
-			addParams(route, action.Params)
-			routes = append(routes, route)
-		case "DELETE": // Delete a resource.
-			article := GetArticleForNoun(kind, " ")
-			doc := "delete" + article + kind
-			if isSubresource {
-				doc = "delete " + subresource + " of" + article + kind
-			}
-			route := ws.DELETE(action.Path).To(action.handler).
-				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(action.producedMIMETypes...).
-				Writes(action.producedObject).
-				Returns(http.StatusOK, "OK", action.producedObject).
-				Returns(http.StatusAccepted, "Accepted", action.producedObject)
-			if isGracefulDeleter {
-				route.Reads(action.readObject)
-				route.ParameterNamed("body").Required(false)
-			}
-			addParams(route, action.Params)
-			routes = append(routes, route)
-		case "DELETECOLLECTION":
-			doc := "delete collection of " + kind
-			if isSubresource {
-				doc = "delete collection of " + subresource + " of a " + kind
-			}
-			route := ws.DELETE(action.Path).To(action.handler).
-				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(action.producedMIMETypes...).
-				Writes(action.producedObject).
-				Returns(http.StatusOK, "OK", action.producedObject)
-			addParams(route, action.Params)
-			routes = append(routes, route)
-		// deprecated in 1.11
-		case "WATCH": // Watch a resource.
-			doc := "watch changes to an object of kind " + kind
-			if isSubresource {
-				doc = "watch changes to " + subresource + " of an object of kind " + kind
-			}
-			doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
-			route := ws.GET(action.Path).To(action.handler).
-				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("watch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(action.producedMIMETypes...).
-				Returns(http.StatusOK, "OK", action.producedObject).
-				Writes(action.producedObject)
-			addParams(route, action.Params)
-			routes = append(routes, route)
-		// deprecated in 1.11
-		case "WATCHLIST": // Watch all resources of a kind.
-			doc := "watch individual changes to a list of " + kind
-			if isSubresource {
-				doc = "watch individual changes to a list of " + subresource + " of " + kind
-			}
-			doc += ". deprecated: use the 'watch' parameter with a list operation instead."
-			route := ws.GET(action.Path).To(action.handler).
-				Doc(doc).
-				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List"+operationSuffix).
-				Produces(action.producedMIMETypes...).
-				Returns(http.StatusOK, "OK", action.producedObject).
-				Writes(action.producedObject)
-			addParams(route, action.Params)
-			routes = append(routes, route)
-		case "CONNECT":
-			for _, method := range connecter.ConnectMethods() {
-				connectProducedObject := storageMeta.ProducesObject(method)
-				if connectProducedObject == nil {
-					connectProducedObject = "string"
-				}
-				doc := "connect " + method + " requests to " + kind
-				if isSubresource {
-					doc = "connect " + method + " requests to " + subresource + " of " + kind
-				}
-				route := ws.Method(method).Path(action.Path).
-					To(action.handler).
-					Doc(doc).
-					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource) + operationSuffix).
-					Produces(action.producedMIMETypes...).
-					Consumes("*/*").
-					Writes(connectProducedObject)
-				addParams(route, action.Params)
-				routes = append(routes, route)
-
-				// transform ConnectMethods to kube verbs
-				if kubeVerb, found := toDiscoveryKubeVerb[method]; found {
-					if len(kubeVerb) != 0 {
-						kubeVerbs[kubeVerb] = struct{}{}
-					}
-				}
-			}
-		default:
-			return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
-		}
-		for _, route := range routes {
-			route.Metadata(ROUTE_META_GVK, metav1.GroupVersionKind{
-				Group:   reqScope.Kind.Group,
-				Version: reqScope.Kind.Version,
-				Kind:    reqScope.Kind.Kind,
-			})
-			route.Metadata(ROUTE_META_ACTION, strings.ToLower(action.Verb))
-			ws.Route(route)
-		}
-		// Note: update GetAuthorizerAttributes() when adding a custom handler.
+func registerActionsToWebService(action action, ws *restful.WebService, isNamespaced, isSubresource, isLister, isWatcher, isGracefulDeleter bool, kind, subresource string, storageMeta rest.StorageMetadata, connecter rest.Connecter, kubeVerbs map[string]struct{}) ([]*restful.RouteBuilder, error) {
+	var namespaced string
+	var operationSuffix string
+	if isNamespaced {
+		namespaced = "Namespaced"
 	}
-	return kubeVerbs, nil
+	if strings.HasSuffix(action.Path, "/{path:*}") {
+		operationSuffix = operationSuffix + "WithPath"
+	}
+	if action.AllNamespaces {
+		operationSuffix = operationSuffix + "ForAllNamespaces"
+		namespaced = ""
+	}
+
+	if kubeVerb, found := toDiscoveryKubeVerb[action.Verb]; found {
+		if len(kubeVerb) != 0 {
+			kubeVerbs[kubeVerb] = struct{}{}
+		}
+	} else {
+		return nil, fmt.Errorf("unknown action verb for discovery: %s", action.Verb)
+	}
+
+	routes := []*restful.RouteBuilder{}
+
+	switch action.Verb {
+	case "GET": // Get a resource.
+		doc := "read the specified " + kind
+		if isSubresource {
+			doc = "read " + subresource + " of the specified " + kind
+		}
+		route := ws.GET(action.Path).To(action.handler).
+			Doc(doc).
+			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+			Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+			Produces(action.producedMIMETypes...).
+			Returns(http.StatusOK, "OK", action.producedObject).
+			Writes(action.producedObject)
+		addParams(route, action.Params)
+		routes = append(routes, route)
+	case "LIST": // List all resources of a kind.
+		doc := "list objects of kind " + kind
+		if isSubresource {
+			doc = "list " + subresource + " of objects of kind " + kind
+		}
+		route := ws.GET(action.Path).To(action.handler).
+			Doc(doc).
+			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+			Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+			Produces(action.producedMIMETypes...).
+			Returns(http.StatusOK, "OK", action.producedObject).
+			Writes(action.producedObject)
+		switch {
+		case isLister && isWatcher:
+			doc := "list or watch objects of kind " + kind
+			if isSubresource {
+				doc = "list or watch " + subresource + " of objects of kind " + kind
+			}
+			route.Doc(doc)
+		case isWatcher:
+			doc := "watch objects of kind " + kind
+			if isSubresource {
+				doc = "watch " + subresource + "of objects of kind " + kind
+			}
+			route.Doc(doc)
+		}
+		addParams(route, action.Params)
+		routes = append(routes, route)
+	case "PUT": // Update a resource.
+		doc := "replace the specified " + kind
+		if isSubresource {
+			doc = "replace " + subresource + " of the specified " + kind
+		}
+		route := ws.PUT(action.Path).To(action.handler).
+			Doc(doc).
+			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+			Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+			Produces(action.producedMIMETypes...).
+			Returns(http.StatusOK, "OK", action.producedObject).
+			// TODO: in some cases, the API may return a v1.Status instead of the versioned object
+			// but currently go-restful can't handle multiple different objects being returned.
+			Returns(http.StatusCreated, "Created", action.producedObject).
+			Reads(action.readObject).
+			Writes(action.producedObject)
+		addParams(route, action.Params)
+		routes = append(routes, route)
+	case "PATCH": // Partially update a resource
+		doc := "partially update the specified " + kind
+		if isSubresource {
+			doc = "partially update " + subresource + " of the specified " + kind
+		}
+		supportedTypes := []string{
+			string(types.JSONPatchType),
+			string(types.MergePatchType),
+			string(types.StrategicMergePatchType),
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
+		}
+		route := ws.PATCH(action.Path).To(action.handler).
+			Doc(doc).
+			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+			Consumes(supportedTypes...).
+			Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+			Produces(action.producedMIMETypes...).
+			Returns(http.StatusOK, "OK", action.producedObject).
+			Reads(action.readObject).
+			Writes(action.producedObject)
+		addParams(route, action.Params)
+		routes = append(routes, route)
+	case "POST": // Create a resource.
+		article := GetArticleForNoun(kind, " ")
+		doc := "create" + article + kind
+		if isSubresource {
+			doc = "create " + subresource + " of" + article + kind
+		}
+		route := ws.POST(action.Path).To(action.handler).
+			Doc(doc).
+			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+			Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+			Produces(action.producedMIMETypes...).
+			Returns(http.StatusOK, "OK", action.producedObject).
+			// TODO: in some cases, the API may return a v1.Status instead of the versioned object
+			// but currently go-restful can't handle multiple different objects being returned.
+			Returns(http.StatusCreated, "Created", action.producedObject).
+			Returns(http.StatusAccepted, "Accepted", action.producedObject).
+			Reads(action.readObject).
+			Writes(action.producedObject)
+		addParams(route, action.Params)
+		routes = append(routes, route)
+	case "DELETE": // Delete a resource.
+		article := GetArticleForNoun(kind, " ")
+		doc := "delete" + article + kind
+		if isSubresource {
+			doc = "delete " + subresource + " of" + article + kind
+		}
+		route := ws.DELETE(action.Path).To(action.handler).
+			Doc(doc).
+			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+			Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+			Produces(action.producedMIMETypes...).
+			Writes(action.producedObject).
+			Returns(http.StatusOK, "OK", action.producedObject).
+			Returns(http.StatusAccepted, "Accepted", action.producedObject)
+		if isGracefulDeleter {
+			route.Reads(action.readObject)
+			route.ParameterNamed("body").Required(false)
+		}
+		addParams(route, action.Params)
+		routes = append(routes, route)
+	case "DELETECOLLECTION":
+		doc := "delete collection of " + kind
+		if isSubresource {
+			doc = "delete collection of " + subresource + " of a " + kind
+		}
+		route := ws.DELETE(action.Path).To(action.handler).
+			Doc(doc).
+			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+			Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+			Produces(action.producedMIMETypes...).
+			Writes(action.producedObject).
+			Returns(http.StatusOK, "OK", action.producedObject)
+		addParams(route, action.Params)
+		routes = append(routes, route)
+	// deprecated in 1.11
+	case "WATCH": // Watch a resource.
+		doc := "watch changes to an object of kind " + kind
+		if isSubresource {
+			doc = "watch changes to " + subresource + " of an object of kind " + kind
+		}
+		doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
+		route := ws.GET(action.Path).To(action.handler).
+			Doc(doc).
+			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+			Operation("watch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
+			Produces(action.producedMIMETypes...).
+			Returns(http.StatusOK, "OK", action.producedObject).
+			Writes(action.producedObject)
+		addParams(route, action.Params)
+		routes = append(routes, route)
+	// deprecated in 1.11
+	case "WATCHLIST": // Watch all resources of a kind.
+		doc := "watch individual changes to a list of " + kind
+		if isSubresource {
+			doc = "watch individual changes to a list of " + subresource + " of " + kind
+		}
+		doc += ". deprecated: use the 'watch' parameter with a list operation instead."
+		route := ws.GET(action.Path).To(action.handler).
+			Doc(doc).
+			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+			Operation("watch"+namespaced+kind+strings.Title(subresource)+"List"+operationSuffix).
+			Produces(action.producedMIMETypes...).
+			Returns(http.StatusOK, "OK", action.producedObject).
+			Writes(action.producedObject)
+		addParams(route, action.Params)
+		routes = append(routes, route)
+	case "CONNECT":
+		for _, method := range connecter.ConnectMethods() {
+			connectProducedObject := storageMeta.ProducesObject(method)
+			if connectProducedObject == nil {
+				connectProducedObject = "string"
+			}
+			doc := "connect " + method + " requests to " + kind
+			if isSubresource {
+				doc = "connect " + method + " requests to " + subresource + " of " + kind
+			}
+			route := ws.Method(method).Path(action.Path).
+				To(action.handler).
+				Doc(doc).
+				Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource) + operationSuffix).
+				Produces(action.producedMIMETypes...).
+				Consumes("*/*").
+				Writes(connectProducedObject)
+			addParams(route, action.Params)
+			routes = append(routes, route)
+
+			// transform ConnectMethods to kube verbs
+			if kubeVerb, found := toDiscoveryKubeVerb[method]; found {
+				if len(kubeVerb) != 0 {
+					kubeVerbs[kubeVerb] = struct{}{}
+				}
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
+	}
+	return routes, nil
 }
 
 // indirectArbitraryPointer returns *ptrToObject for an arbitrary pointer
