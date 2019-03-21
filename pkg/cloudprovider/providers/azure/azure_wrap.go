@@ -290,3 +290,11 @@ func (az *Cloud) useStandardLoadBalancer() bool {
 func (az *Cloud) excludeMasterNodesFromStandardLB() bool {
 	return az.ExcludeMasterFromStandardLB != nil && *az.ExcludeMasterFromStandardLB
 }
+
+func (az *Cloud) disableLoadBalancerOutboundSNAT() bool {
+	if !az.useStandardLoadBalancer() || az.DisableOutboundSNAT == nil {
+		return false
+	}
+
+	return *az.DisableOutboundSNAT
+}
