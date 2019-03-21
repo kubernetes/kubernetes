@@ -7,7 +7,7 @@ Summary: Container Cluster Manager - Kubernetes Node Agent
 URL: https://kubernetes.io
 
 Requires: iptables >= 1.4.21
-Requires: kubernetes-cni >= 0.5.1
+Requires: kubernetes-cni >= 0.7.5
 Requires: socat
 Requires: util-linux
 Requires: ethtool
