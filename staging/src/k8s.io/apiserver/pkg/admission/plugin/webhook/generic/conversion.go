@@ -43,6 +43,8 @@ func (c *convertor) ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind
 	if err != nil {
 		return nil, err
 	}
+	// Explicitly set the GVK
+	out.GetObjectKind().SetGroupVersionKind(gvk)
 	return out, nil
 }
 
