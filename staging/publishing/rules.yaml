@@ -87,6 +87,8 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: code-generator
+      branch: master
 - destination: sample-apiserver
   branches:
   - source:
@@ -178,6 +180,8 @@ rules:
     - repository: api
       branch: master
     - repository: client-go
+      branch: master
+    - repository: code-generator
       branch: master
 - destination: cli-runtime
   library: true
@@ -306,6 +310,8 @@ rules:
     - repository: apimachinery
       branch: master
     - repository: client-go
+      branch: master
+    - repository: code-generator
       branch: master
 - destination: csi-translation-lib
   library: true
