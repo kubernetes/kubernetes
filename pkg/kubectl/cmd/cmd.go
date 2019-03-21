@@ -380,7 +380,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// a.k.a. change all "_" to "-". e.g. glog package
 	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 
-	kubeConfigFlags := genericclioptions.NewConfigFlags()
+	kubeConfigFlags := genericclioptions.NewConfigFlags().WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())
