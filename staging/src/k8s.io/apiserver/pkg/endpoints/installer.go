@@ -531,51 +531,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	allMediaTypes := append(mediaTypes, streamMediaTypes...)
 	ws.Produces(allMediaTypes...)
 
-	reqScope := handlers.RequestScope{
-		Serializer:      a.group.Serializer,
-		ParameterCodec:  a.group.ParameterCodec,
-		Creater:         a.group.Creater,
-		Convertor:       a.group.Convertor,
-		Defaulter:       a.group.Defaulter,
-		Typer:           a.group.Typer,
-		UnsafeConvertor: a.group.UnsafeConvertor,
-		Authorizer:      a.group.Authorizer,
-
-		// TODO: Check for the interface on storage
-		TableConvertor: tableProvider,
-
-		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
-		Resource:    a.group.GroupVersion.WithResource(resource),
-		Subresource: subresource,
-		Kind:        fqKindToRegister,
-
-		HubGroupVersion: schema.GroupVersion{Group: fqKindToRegister.Group, Version: runtime.APIVersionInternal},
-
-		MetaGroupVersion: metav1.SchemeGroupVersion,
-
-		MaxRequestBodyBytes: a.group.MaxRequestBodyBytes,
-	}
-	if a.group.MetaGroupVersion != nil {
-		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
-	}
-	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		fm, err := fieldmanager.NewFieldManager(
-			a.group.OpenAPIModels,
-			a.group.UnsafeConvertor,
-			a.group.Defaulter,
-			fqKindToRegister.GroupVersion(),
-			reqScope.HubGroupVersion,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create field manager: %v", err)
-		}
-		reqScope.FieldManager = fm
+	reqScope, err := a.constructRequestScope(fqKindToRegister, tableProvider, resource, subresource, namer)
+	if err != nil {
+		return nil, err
 	}
 
 	// construct handler for each action
 	for _, action := range actions {
 		var handler restful.RouteFunction
-		reqScope.Namer = namer
 		verbOverrider, needOverride := storage.(StorageMetricsOverride)
 		requestScope := "cluster"
 		if apiResource.Namespaced {
@@ -792,6 +755,52 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	return &apiResource, nil
+}
+
+func (a *APIInstaller) constructRequestScope(fqKindToRegister schema.GroupVersionKind, tableProvider rest.TableConvertor, resource, subresource string, namer handlers.ContextBasedNaming) (handlers.RequestScope, error) {
+	reqScope := handlers.RequestScope{
+		Serializer:      a.group.Serializer,
+		ParameterCodec:  a.group.ParameterCodec,
+		Creater:         a.group.Creater,
+		Convertor:       a.group.Convertor,
+		Defaulter:       a.group.Defaulter,
+		Typer:           a.group.Typer,
+		UnsafeConvertor: a.group.UnsafeConvertor,
+		Authorizer:      a.group.Authorizer,
+
+		// TODO: Check for the interface on storage
+		TableConvertor: tableProvider,
+
+		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
+		Resource:    a.group.GroupVersion.WithResource(resource),
+		Subresource: subresource,
+		Kind:        fqKindToRegister,
+
+		HubGroupVersion: schema.GroupVersion{Group: fqKindToRegister.Group, Version: runtime.APIVersionInternal},
+
+		MetaGroupVersion: metav1.SchemeGroupVersion,
+
+		MaxRequestBodyBytes: a.group.MaxRequestBodyBytes,
+	}
+	if a.group.MetaGroupVersion != nil {
+		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
+	}
+	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		fm, err := fieldmanager.NewFieldManager(
+			a.group.OpenAPIModels,
+			a.group.UnsafeConvertor,
+			a.group.Defaulter,
+			fqKindToRegister.GroupVersion(),
+			reqScope.HubGroupVersion,
+		)
+		if err != nil {
+			return handlers.RequestScope{}, fmt.Errorf("failed to create field manager: %v", err)
+		}
+		reqScope.FieldManager = fm
+	}
+	reqScope.Namer = namer
+
+	return reqScope, nil
 }
 
 func (a *action) assignConsumedMIMETypes() *action {
