@@ -75,8 +75,8 @@ type action struct {
 	producedMIMETypes []string
 }
 
-func newAction(verb, path string, params []*restful.Parameter, allNamespaces bool, additionalReturnStatusCodes ...int) action {
-	a := action{
+func newAction(verb, path string, params []*restful.Parameter, allNamespaces bool, additionalReturnStatusCodes ...int) *action {
+	a := &action{
 		Verb:          verb,
 		Path:          path,
 		Params:        params,
@@ -392,7 +392,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
 
 	params := []*restful.Parameter{}
-	actions := []action{}
+	actions := []*action{}
 
 	var resourceKind string
 	kindProvider, ok := storage.(rest.KindProvider)
@@ -573,7 +573,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	// construct handler for each action
-	for i, action := range actions {
+	for _, action := range actions {
 		var handler restful.RouteFunction
 		reqScope.Namer = namer
 		verbOverrider, needOverride := storage.(StorageMetricsOverride)
@@ -643,23 +643,23 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
 		}
 
-		actions[i].handler = handler
+		action.handler = handler
 	}
 
 	// assign readSample for each action
-	for i, action := range actions {
+	for _, action := range actions {
 		switch action.Verb {
 		case "PUT", "POST":
-			actions[i].readSample = defaultVersionedObject
+			action.readSample = defaultVersionedObject
 		case "DELETE":
-			actions[i].readSample = versionedDeleterObject
+			action.readSample = versionedDeleterObject
 		case "PATCH":
-			actions[i].readSample = metav1.Patch{}
+			action.readSample = metav1.Patch{}
 		}
 	}
 
 	// assign writeSample for each action
-	for i, action := range actions {
+	for _, action := range actions {
 		writeSample := storageMeta.ProducesObject(action.Verb)
 		if writeSample == nil {
 			writeSample = defaultVersionedObject
@@ -673,11 +673,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			writeSample = versionedWatchEvent
 		}
 
-		actions[i].writeSample = writeSample
+		action.writeSample = writeSample
 	}
 
 	// assign consumedMIMETypes for each action
-	for i, action := range actions {
+	for _, action := range actions {
 		switch action.Verb {
 		case "PATCH": // Partially update a resource
 			supportedTypes := []string{
@@ -688,14 +688,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
 			}
-			actions[i].consumedMIMETypes = supportedTypes
+			action.consumedMIMETypes = supportedTypes
 		case "CONNECT":
-			actions[i].consumedMIMETypes = []string{"*/*"}
+			action.consumedMIMETypes = []string{"*/*"}
 		}
 	}
 
 	// assign producedMIMETypes for each action
-	for i, action := range actions {
+	for _, action := range actions {
 		var producedMIMETypes []string
 		producedMIMETypes = append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)
 		switch action.Verb {
@@ -707,11 +707,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			producedMIMETypes = []string{"*/*"}
 		}
 
-		actions[i].producedMIMETypes = producedMIMETypes
+		action.producedMIMETypes = producedMIMETypes
 	}
 
 	// add object params for each action
-	for i, action := range actions {
+	for _, action := range actions {
 		switch action.Verb {
 		case "GET":
 			if isGetterWithOptions {
@@ -719,46 +719,46 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				if err != nil {
 					return nil, err
 				}
-				actions[i].Params = append(actions[i].Params, params...)
+				action.Params = append(action.Params, params...)
 			}
 			if isExporter {
 				params, err := addObjectParams(ws, versionedExportOptions)
 				if err != nil {
 					return nil, err
 				}
-				actions[i].Params = append(actions[i].Params, params...)
+				action.Params = append(action.Params, params...)
 			}
 		case "LIST", "DELETECOLLECTION", "WATCH", "WATCHLIST":
 			params, err := addObjectParams(ws, versionedListOptions)
 			if err != nil {
 				return nil, err
 			}
-			actions[i].Params = append(actions[i].Params, params...)
+			action.Params = append(action.Params, params...)
 		case "PUT":
 			params, err := addObjectParams(ws, versionedUpdateOptions)
 			if err != nil {
 				return nil, err
 			}
-			actions[i].Params = append(actions[i].Params, params...)
+			action.Params = append(action.Params, params...)
 		case "PATCH":
 			params, err := addObjectParams(ws, versionedPatchOptions)
 			if err != nil {
 				return nil, err
 			}
-			actions[i].Params = append(actions[i].Params, params...)
+			action.Params = append(action.Params, params...)
 		case "POST":
 			params, err := addObjectParams(ws, versionedCreateOptions)
 			if err != nil {
 				return nil, err
 			}
-			actions[i].Params = append(actions[i].Params, params...)
+			action.Params = append(action.Params, params...)
 		case "DELETE":
 			if isGracefulDeleter {
 				params, err := addObjectParams(ws, versionedDeleteOptions)
 				if err != nil {
 					return nil, err
 				}
-				actions[i].Params = append(actions[i].Params, params...)
+				action.Params = append(action.Params, params...)
 			}
 		case "CONNECT":
 			if versionedConnectOptions != nil {
@@ -766,7 +766,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				if err != nil {
 					return nil, err
 				}
-				actions[i].Params = append(actions[i].Params, params...)
+				action.Params = append(action.Params, params...)
 			}
 		}
 	}
@@ -838,7 +838,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	return &apiResource, nil
 }
 
-func registerActionsToWebService(action action, ws *restful.WebService, isNamespaced, isSubresource, isLister, isWatcher, isGracefulDeleter bool, kind, subresource string) ([]*restful.RouteBuilder, error) {
+func registerActionsToWebService(action *action, ws *restful.WebService, isNamespaced, isSubresource, isLister, isWatcher, isGracefulDeleter bool, kind, subresource string) ([]*restful.RouteBuilder, error) {
 	var namespaced string
 	var operationSuffix string
 	if isNamespaced {
@@ -969,7 +969,7 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 	return routes, nil
 }
 
-func registerCONNECTToWebService(action action, ws *restful.WebService, isNamespaced, isSubresource, isLister, isWatcher, isGracefulDeleter bool, kind, subresource string, storageMeta rest.StorageMetadata, connecter rest.Connecter, kubeVerbs map[string]struct{}) ([]*restful.RouteBuilder, error) {
+func registerCONNECTToWebService(action *action, ws *restful.WebService, isNamespaced, isSubresource, isLister, isWatcher, isGracefulDeleter bool, kind, subresource string, storageMeta rest.StorageMetadata, connecter rest.Connecter, kubeVerbs map[string]struct{}) ([]*restful.RouteBuilder, error) {
 	var namespaced string
 	var operationSuffix string
 	if isNamespaced {
@@ -1018,7 +1018,7 @@ func indirectArbitraryPointer(ptrToObject interface{}) interface{} {
 	return reflect.Indirect(reflect.ValueOf(ptrToObject)).Interface()
 }
 
-func appendIf(actions []action, a action, shouldAppend bool) []action {
+func appendIf(actions []*action, a *action, shouldAppend bool) []*action {
 	if shouldAppend {
 		actions = append(actions, a)
 	}
