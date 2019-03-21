@@ -474,7 +474,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 
 		// list or post across namespace.
-		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
+		// E.g. LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 		if !isSubresource {
 			actions = appendIf(actions, newAction("LIST", resource, params, true), isLister)
@@ -505,7 +505,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	actions = appendIf(actions, newAction("CONNECT", itemPath, nameParams, false), isConnecter)
 	actions = appendIf(actions, newAction("CONNECT", itemPath+"/{path:*}", proxyParams, false), isConnecter && connectSubpath)
 
-	// Create Routes for the actions.
 	// TODO: Add status documentation using Returns()
 	// Errors (see api/errors/errors.go as well as go-restful router):
 	// http.StatusNotFound, http.StatusMethodNotAllowed,
@@ -527,16 +526,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, fmt.Errorf("all serializers in the group Serializer must have MediaTypeType and MediaTypeSubType set: %s", s.MediaType)
 		}
 	}
-	mediaTypes, streamMediaTypes := negotiation.MediaTypesForSerializer(a.group.Serializer)
-	allMediaTypes := append(mediaTypes, streamMediaTypes...)
-	ws.Produces(allMediaTypes...)
 
+	// construct handler for each action
 	reqScope, err := a.constructRequestScope(fqKindToRegister, tableProvider, resource, subresource, namer)
 	if err != nil {
 		return nil, err
 	}
 
-	// construct handler for each action
 	for _, action := range actions {
 		var handler restful.RouteFunction
 		verbOverrider, needOverride := storage.(StorageMetricsOverride)
@@ -612,6 +608,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// complete actions
 	for _, action := range actions {
 		// assign producedMIMETypes
+		mediaTypes, streamMediaTypes := negotiation.MediaTypesForSerializer(a.group.Serializer)
+		allMediaTypes := append(mediaTypes, streamMediaTypes...)
 		producedMIMETypes := append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)
 		action = action.assignProducedMIMETypes(producedMIMETypes, allMediaTypes)
 
@@ -704,6 +702,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		kind = fqParentKind.Kind
 	}
 	kubeVerbs := map[string]struct{}{}
+	// Create Routes for the actions.
 	for _, action := range actions {
 		if kubeVerb, found := toDiscoveryKubeVerb[action.Verb]; found {
 			if len(kubeVerb) != 0 {
