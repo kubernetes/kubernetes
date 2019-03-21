@@ -666,6 +666,67 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions[i].producedMIMETypes = producedMIMETypes
 	}
 
+	// add object params for each action
+	for i, action := range actions {
+		switch action.Verb {
+		case "GET":
+			if isGetterWithOptions {
+				params, err := addObjectParams(ws, versionedGetOptions)
+				if err != nil {
+					return nil, err
+				}
+				actions[i].Params = append(actions[i].Params, params...)
+			}
+			if isExporter {
+				params, err := addObjectParams(ws, versionedExportOptions)
+				if err != nil {
+					return nil, err
+				}
+				actions[i].Params = append(actions[i].Params, params...)
+			}
+		case "LIST", "DELETECOLLECTION", "WATCH", "WATCHLIST":
+			params, err := addObjectParams(ws, versionedListOptions)
+			if err != nil {
+				return nil, err
+			}
+			actions[i].Params = append(actions[i].Params, params...)
+		case "PUT":
+			params, err := addObjectParams(ws, versionedUpdateOptions)
+			if err != nil {
+				return nil, err
+			}
+			actions[i].Params = append(actions[i].Params, params...)
+		case "PATCH":
+			params, err := addObjectParams(ws, versionedPatchOptions)
+			if err != nil {
+				return nil, err
+			}
+			actions[i].Params = append(actions[i].Params, params...)
+		case "POST":
+			params, err := addObjectParams(ws, versionedCreateOptions)
+			if err != nil {
+				return nil, err
+			}
+			actions[i].Params = append(actions[i].Params, params...)
+		case "DELETE":
+			if isGracefulDeleter {
+				params, err := addObjectParams(ws, versionedDeleteOptions)
+				if err != nil {
+					return nil, err
+				}
+				actions[i].Params = append(actions[i].Params, params...)
+			}
+		case "CONNECT":
+			if versionedConnectOptions != nil {
+				params, err := addObjectParams(ws, versionedConnectOptions)
+				if err != nil {
+					return nil, err
+				}
+				actions[i].Params = append(actions[i].Params, params...)
+			}
+		}
+	}
+
 	// If there is a subresource, kind should be the parent's kind.
 	if isSubresource {
 		parentStorage, ok := a.group.Storage[resource]
@@ -746,16 +807,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Writes(action.producedObject)
-			if isGetterWithOptions {
-				if err := AddObjectParams(ws, route, versionedGetOptions); err != nil {
-					return nil, err
-				}
-			}
-			if isExporter {
-				if err := AddObjectParams(ws, route, versionedExportOptions); err != nil {
-					return nil, err
-				}
-			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "LIST": // List all resources of a kind.
@@ -770,9 +821,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Writes(action.producedObject)
-			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
-				return nil, err
-			}
 			switch {
 			case isLister && isWatcher:
 				doc := "list or watch objects of kind " + kind
@@ -805,9 +853,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Returns(http.StatusCreated, "Created", action.producedObject).
 				Reads(defaultVersionedObject).
 				Writes(action.producedObject)
-			if err := AddObjectParams(ws, route, versionedUpdateOptions); err != nil {
-				return nil, err
-			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "PATCH": // Partially update a resource
@@ -832,9 +877,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Reads(metav1.Patch{}).
 				Writes(action.producedObject)
-			if err := AddObjectParams(ws, route, versionedPatchOptions); err != nil {
-				return nil, err
-			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "POST": // Create a resource.
@@ -855,9 +897,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Returns(http.StatusAccepted, "Accepted", action.producedObject).
 				Reads(defaultVersionedObject).
 				Writes(action.producedObject)
-			if err := AddObjectParams(ws, route, versionedCreateOptions); err != nil {
-				return nil, err
-			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "DELETE": // Delete a resource.
@@ -877,9 +916,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 				route.ParameterNamed("body").Required(false)
-				if err := AddObjectParams(ws, route, versionedDeleteOptions); err != nil {
-					return nil, err
-				}
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
@@ -895,9 +931,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Produces(action.producedMIMETypes...).
 				Writes(action.producedObject).
 				Returns(http.StatusOK, "OK", action.producedObject)
-			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
-				return nil, err
-			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		// deprecated in 1.11
@@ -914,9 +947,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Writes(action.producedObject)
-			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
-				return nil, err
-			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		// deprecated in 1.11
@@ -933,9 +963,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 				Produces(action.producedMIMETypes...).
 				Returns(http.StatusOK, "OK", action.producedObject).
 				Writes(action.producedObject)
-			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
-				return nil, err
-			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "CONNECT":
@@ -955,11 +982,6 @@ func registerActionsToWebService(actions []action, ws *restful.WebService, isNam
 					Produces(action.producedMIMETypes...).
 					Consumes("*/*").
 					Writes(connectProducedObject)
-				if versionedConnectOptions != nil {
-					if err := AddObjectParams(ws, route, versionedConnectOptions); err != nil {
-						return nil, err
-					}
-				}
 				addParams(route, action.Params)
 				routes = append(routes, route)
 
@@ -1052,6 +1074,56 @@ func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 		}
 	}
 	return nil
+}
+
+// addObjectParams converts a runtime.Object into a set of go-restful Param() definitions on the route.
+// The object must be a pointer to a struct; only fields at the top level of the struct that are not
+// themselves interfaces or structs are used; only fields with a json tag that is non empty (the standard
+// Go JSON behavior for omitting a field) become query parameters. The name of the query parameter is
+// the JSON field name. If a description struct tag is set on the field, that description is used on the
+// query parameter. In essence, it converts a standard JSON top level object into a query param schema.
+func addObjectParams(ws *restful.WebService, obj interface{}) ([]*restful.Parameter, error) {
+	params := []*restful.Parameter{}
+	sv, err := conversion.EnforcePtr(obj)
+	if err != nil {
+		return nil, err
+	}
+	st := sv.Type()
+	switch st.Kind() {
+	case reflect.Struct:
+		for i := 0; i < st.NumField(); i++ {
+			name := st.Field(i).Name
+			sf, ok := st.FieldByName(name)
+			if !ok {
+				continue
+			}
+			switch sf.Type.Kind() {
+			case reflect.Interface, reflect.Struct:
+			case reflect.Ptr:
+				// TODO: This is a hack to let metav1.Time through. This needs to be fixed in a more generic way eventually. bug #36191
+				if (sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct) && strings.TrimPrefix(sf.Type.String(), "*") != "metav1.Time" {
+					continue
+				}
+				fallthrough
+			default:
+				jsonTag := sf.Tag.Get("json")
+				if len(jsonTag) == 0 {
+					continue
+				}
+				jsonName := strings.SplitN(jsonTag, ",", 2)[0]
+				if len(jsonName) == 0 {
+					continue
+				}
+
+				var desc string
+				if docable, ok := obj.(documentable); ok {
+					desc = docable.SwaggerDoc()[jsonName]
+				}
+				params = append(params, ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.String())))
+			}
+		}
+	}
+	return params, nil
 }
 
 // TODO: this is incomplete, expand as needed.
