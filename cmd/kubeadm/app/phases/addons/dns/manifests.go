@@ -213,6 +213,42 @@ spec:
     k8s-app: kube-dns
 `
 
+	// CoreDNSService is the coredns Service manifest
+	CoreDNSService = `
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "CoreDNS"
+  name: kube-dns
+  namespace: kube-system
+  annotations:
+    prometheus.io/port: "9153"
+    prometheus.io/scrape: "true"
+  # Without this resourceVersion value, an update of the Service between versions will yield:
+  #   Service "kube-dns" is invalid: metadata.resourceVersion: Invalid value: "": must be specified for an update
+  resourceVersion: "0"
+spec:
+  clusterIP: {{ .DNSIP }}
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+    targetPort: 53
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+    targetPort: 53
+  - name: metrics
+    port: 9153
+    protocol: TCP
+    targetPort: 9153
+  selector:
+    k8s-app: kube-dns
+`
+
 	// CoreDNSDeployment is the CoreDNS Deployment manifest
 	CoreDNSDeployment = `
 apiVersion: apps/v1
@@ -222,6 +258,7 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kube-dns
+    kubernetes.io/name: "CoreDNS"
 spec:
   replicas: 2
   strategy:
@@ -235,6 +272,8 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: coredns
