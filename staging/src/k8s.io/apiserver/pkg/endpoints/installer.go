@@ -859,21 +859,6 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 		}
 		method = "GET"
 		operation = "read"
-		route = ws.Method(method).Path(action.Path).To(action.handler).
-			Doc(doc).
-			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-			Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
-			Produces(action.producedMIMETypes...).
-			Returns(http.StatusOK, "OK", action.producedObject).
-			Writes(action.producedObject)
-		if action.readObject != nil {
-			route.Reads(action.readObject)
-		}
-		if action.consumedMIMETypes != nil {
-			route.Consumes(action.consumedMIMETypes...)
-		}
-		addParams(route, action.Params)
-		routes = append(routes, route)
 	case "LIST": // List all resources of a kind.
 		doc = "list objects of kind " + kind
 		if isSubresource {
@@ -883,33 +868,16 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 		operation = "list"
 		switch {
 		case isLister && isWatcher:
-			doc := "list or watch objects of kind " + kind
+			doc = "list or watch objects of kind " + kind
 			if isSubresource {
 				doc = "list or watch " + subresource + " of objects of kind " + kind
 			}
-			route.Doc(doc)
 		case isWatcher:
-			doc := "watch objects of kind " + kind
+			doc = "watch objects of kind " + kind
 			if isSubresource {
 				doc = "watch " + subresource + "of objects of kind " + kind
 			}
-			route.Doc(doc)
 		}
-		route = ws.Method(method).Path(action.Path).To(action.handler).
-			Doc(doc).
-			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-			Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
-			Produces(action.producedMIMETypes...).
-			Returns(http.StatusOK, "OK", action.producedObject).
-			Writes(action.producedObject)
-		if action.readObject != nil {
-			route.Reads(action.readObject)
-		}
-		if action.consumedMIMETypes != nil {
-			route.Consumes(action.consumedMIMETypes...)
-		}
-		addParams(route, action.Params)
-		routes = append(routes, route)
 	case "PUT": // Update a resource.
 		doc = "replace the specified " + kind
 		if isSubresource {
@@ -917,24 +885,6 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 		}
 		method = "PUT"
 		operation = "replace"
-		// // TODO: in some cases, the API may return a v1.Status instead of the versioned object
-		// // but currently go-restful can't handle multiple different objects being returned.
-		// Returns(http.StatusCreated, "Created", action.producedObject)
-		route = ws.Method(method).Path(action.Path).To(action.handler).
-			Doc(doc).
-			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-			Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
-			Produces(action.producedMIMETypes...).
-			Returns(http.StatusOK, "OK", action.producedObject).
-			Writes(action.producedObject)
-		if action.readObject != nil {
-			route.Reads(action.readObject)
-		}
-		if action.consumedMIMETypes != nil {
-			route.Consumes(action.consumedMIMETypes...)
-		}
-		addParams(route, action.Params)
-		routes = append(routes, route)
 	case "PATCH": // Partially update a resource
 		doc = "partially update the specified " + kind
 		if isSubresource {
@@ -942,21 +892,6 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 		}
 		method = "PATCH"
 		operation = "patch"
-		route = ws.Method(method).Path(action.Path).To(action.handler).
-			Doc(doc).
-			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-			Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
-			Produces(action.producedMIMETypes...).
-			Returns(http.StatusOK, "OK", action.producedObject).
-			Writes(action.producedObject)
-		if action.readObject != nil {
-			route.Reads(action.readObject)
-		}
-		if action.consumedMIMETypes != nil {
-			route.Consumes(action.consumedMIMETypes...)
-		}
-		addParams(route, action.Params)
-		routes = append(routes, route)
 	case "POST": // Create a resource.
 		article := GetArticleForNoun(kind, " ")
 		doc = "create" + article + kind
@@ -965,25 +900,6 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 		}
 		method = "POST"
 		operation = "create"
-		// // TODO: in some cases, the API may return a v1.Status instead of the versioned object
-		// // but currently go-restful can't handle multiple different objects being returned.
-		// Returns(http.StatusCreated, "Created", action.producedObject).
-		// Returns(http.StatusAccepted, "Accepted", action.producedObject).
-		route = ws.Method(method).Path(action.Path).To(action.handler).
-			Doc(doc).
-			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-			Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
-			Produces(action.producedMIMETypes...).
-			Returns(http.StatusOK, "OK", action.producedObject).
-			Writes(action.producedObject)
-		if action.readObject != nil {
-			route.Reads(action.readObject)
-		}
-		if action.consumedMIMETypes != nil {
-			route.Consumes(action.consumedMIMETypes...)
-		}
-		addParams(route, action.Params)
-		routes = append(routes, route)
 	case "DELETE": // Delete a resource.
 		article := GetArticleForNoun(kind, " ")
 		doc = "delete" + article + kind
@@ -992,26 +908,6 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 		}
 		method = "DELETE"
 		operation = "delete"
-		// Returns(http.StatusAccepted, "Accepted", action.producedObject)
-		route = ws.Method(method).Path(action.Path).To(action.handler).
-			Doc(doc).
-			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-			Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
-			Produces(action.producedMIMETypes...).
-			Returns(http.StatusOK, "OK", action.producedObject).
-			Writes(action.producedObject)
-		if action.readObject != nil {
-			route.Reads(action.readObject)
-		}
-		if action.consumedMIMETypes != nil {
-			route.Consumes(action.consumedMIMETypes...)
-		}
-		if isGracefulDeleter {
-			route.Reads(action.readObject)
-			route.ParameterNamed("body").Required(false)
-		}
-		addParams(route, action.Params)
-		routes = append(routes, route)
 	case "DELETECOLLECTION":
 		doc = "delete collection of " + kind
 		if isSubresource {
@@ -1019,21 +915,6 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 		}
 		method = "DELETE"
 		operation = "deletecollection"
-		route = ws.Method(method).Path(action.Path).To(action.handler).
-			Doc(doc).
-			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-			Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
-			Produces(action.producedMIMETypes...).
-			Returns(http.StatusOK, "OK", action.producedObject).
-			Writes(action.producedObject)
-		if action.readObject != nil {
-			route.Reads(action.readObject)
-		}
-		if action.consumedMIMETypes != nil {
-			route.Consumes(action.consumedMIMETypes...)
-		}
-		addParams(route, action.Params)
-		routes = append(routes, route)
 	// deprecated in 1.11
 	case "WATCH": // Watch a resource.
 		doc = "watch changes to an object of kind " + kind
@@ -1043,21 +924,6 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 		doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
 		method = "GET"
 		operation = "watch"
-		route = ws.Method(method).Path(action.Path).To(action.handler).
-			Doc(doc).
-			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-			Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
-			Produces(action.producedMIMETypes...).
-			Returns(http.StatusOK, "OK", action.producedObject).
-			Writes(action.producedObject)
-		if action.readObject != nil {
-			route.Reads(action.readObject)
-		}
-		if action.consumedMIMETypes != nil {
-			route.Consumes(action.consumedMIMETypes...)
-		}
-		addParams(route, action.Params)
-		routes = append(routes, route)
 	// deprecated in 1.11
 	case "WATCHLIST": // Watch all resources of a kind.
 		doc = "watch individual changes to a list of " + kind
@@ -1067,24 +933,48 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 		doc += ". deprecated: use the 'watch' parameter with a list operation instead."
 		method = "GET"
 		operation = "watch"
-		route = ws.Method(method).Path(action.Path).To(action.handler).
-			Doc(doc).
-			Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-			Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
-			Produces(action.producedMIMETypes...).
-			Returns(http.StatusOK, "OK", action.producedObject).
-			Writes(action.producedObject)
-		if action.readObject != nil {
-			route.Reads(action.readObject)
-		}
-		if action.consumedMIMETypes != nil {
-			route.Consumes(action.consumedMIMETypes...)
-		}
-		addParams(route, action.Params)
-		routes = append(routes, route)
 	default:
 		return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
 	}
+
+	route = ws.Method(method).Path(action.Path).To(action.handler).
+		Doc(doc).
+		Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+		Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
+		Produces(action.producedMIMETypes...).
+		Returns(http.StatusOK, "OK", action.producedObject).
+		Writes(action.producedObject)
+	if action.readObject != nil {
+		if action.Verb == "DELETE" {
+			if isGracefulDeleter {
+				route.Reads(action.readObject)
+				route.ParameterNamed("body").Required(false)
+			}
+		} else {
+			route.Reads(action.readObject)
+		}
+	}
+	if action.consumedMIMETypes != nil {
+		route.Consumes(action.consumedMIMETypes...)
+	}
+	addParams(route, action.Params)
+
+	// additional return codes for specific verbs
+	switch action.Verb {
+	case "PUT":
+		// TODO: in some cases, the API may return a v1.Status instead of the versioned object
+		// but currently go-restful can't handle multiple different objects being returned.
+		route.Returns(http.StatusCreated, "Created", action.producedObject)
+	case "POST":
+		// TODO: in some cases, the API may return a v1.Status instead of the versioned object
+		// but currently go-restful can't handle multiple different objects being returned.
+		route.Returns(http.StatusCreated, "Created", action.producedObject).
+			Returns(http.StatusAccepted, "Accepted", action.producedObject)
+	case "DELETE":
+		route.Returns(http.StatusAccepted, "Accepted", action.producedObject)
+	}
+
+	routes = append(routes, route)
 	return routes, nil
 }
 
