@@ -25,7 +25,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 func TestModifyContainerConfig(t *testing.T) {

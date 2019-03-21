@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -11,7 +6,9 @@ go_library(
         "api.pb.go",
         "constants.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cri-api/pkg/apis/runtime/v1alpha2",
+    importpath = "k8s.io/cri-api/pkg/apis/runtime/v1alpha2",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
@@ -32,4 +29,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

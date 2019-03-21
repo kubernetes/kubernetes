@@ -1141,3 +1141,10 @@ rules:
         branch: release-1.14
       - repository: cloud-provider
         branch: release-1.14
+- destination: cri-api
+  library: true
+  branches:
+    - source:
+        branch: master
+        dir: staging/src/k8s.io/cri-api
+      name: master

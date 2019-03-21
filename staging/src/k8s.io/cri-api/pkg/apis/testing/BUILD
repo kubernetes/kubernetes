@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -12,10 +7,11 @@ go_library(
         "fake_runtime_service.go",
         "utils.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cri-api/pkg/apis/testing",
+    importpath = "k8s.io/cri-api/pkg/apis/testing",
+    visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
-        "//pkg/kubelet/util/sliceutils:go_default_library",
+        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
@@ -31,4 +27,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

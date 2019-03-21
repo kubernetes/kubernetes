@@ -27,8 +27,8 @@ import (
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"k8s.io/klog"
 
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 func DefaultMemorySwap() int64 {

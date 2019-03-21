@@ -19,7 +19,7 @@ package testing
 import (
 	"fmt"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 func BuildContainerName(metadata *runtimeapi.ContainerMetadata, sandboxID string) string {

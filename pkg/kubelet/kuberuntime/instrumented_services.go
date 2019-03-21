@@ -19,8 +19,8 @@ package kuberuntime
 import (
 	"time"
 
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 

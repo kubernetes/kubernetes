@@ -29,8 +29,8 @@ import (
 	"k8s.io/klog"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/security/apparmor"
