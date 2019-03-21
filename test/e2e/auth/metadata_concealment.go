@@ -55,10 +55,10 @@ var _ = SIGDescribe("Metadata Concealment", func() {
 			},
 		}
 		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create job (%s:%s)", f.Namespace.Name, job.Name)
 
 		By("Ensuring job reaches completions")
-		err = framework.WaitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, int32(1))
-		Expect(err).NotTo(HaveOccurred())
+		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, int32(1))
+		Expect(err).NotTo(HaveOccurred(), "failed to ensure job completion (%s:%s)", f.Namespace.Name, job.Name)
 	})
 })

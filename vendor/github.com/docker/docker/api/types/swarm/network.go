@@ -62,6 +62,8 @@ const (
 	PortConfigProtocolTCP PortConfigProtocol = "tcp"
 	// PortConfigProtocolUDP UDP
 	PortConfigProtocolUDP PortConfigProtocol = "udp"
+	// PortConfigProtocolSCTP SCTP
+	PortConfigProtocolSCTP PortConfigProtocol = "sctp"
 )
 
 // EndpointVirtualIP represents the virtual ip of a port.

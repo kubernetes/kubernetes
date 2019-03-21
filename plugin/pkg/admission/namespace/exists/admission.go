@@ -23,11 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	informers "k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 // PluginName indicates name of admission plugin.
@@ -45,16 +45,16 @@ func Register(plugins *admission.Plugins) {
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
 type Exists struct {
 	*admission.Handler
-	client          internalclientset.Interface
-	namespaceLister corelisters.NamespaceLister
+	client          kubernetes.Interface
+	namespaceLister corev1listers.NamespaceLister
 }
 
 var _ admission.ValidationInterface = &Exists{}
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&Exists{})
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&Exists{})
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Exists{})
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Exists{})
 
 // Validate makes an admission decision based on the request attributes
-func (e *Exists) Validate(a admission.Attributes) error {
+func (e *Exists) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
@@ -75,7 +75,7 @@ func (e *Exists) Validate(a admission.Attributes) error {
 	}
 
 	// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-	_, err = e.client.Core().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
+	_, err = e.client.CoreV1().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return err
@@ -93,14 +93,14 @@ func NewExists() *Exists {
 	}
 }
 
-// SetInternalKubeClientSet implements the WantsInternalKubeClientSet interface.
-func (e *Exists) SetInternalKubeClientSet(client internalclientset.Interface) {
+// SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.
+func (e *Exists) SetExternalKubeClientSet(client kubernetes.Interface) {
 	e.client = client
 }
 
-// SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
-func (e *Exists) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	namespaceInformer := f.Core().InternalVersion().Namespaces()
+// SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
+func (e *Exists) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	namespaceInformer := f.Core().V1().Namespaces()
 	e.namespaceLister = namespaceInformer.Lister()
 	e.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }

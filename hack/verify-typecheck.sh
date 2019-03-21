@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2018 The Kubernetes Authors.
 #
@@ -18,16 +18,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::verify_go_version
 
 cd "${KUBE_ROOT}"
 
-if [[ ! -f test/e2e/generated/bindata.go ]]; then
-  make --no-print-directory -C "${KUBE_ROOT}" verify_generated_files
-fi
+make --no-print-directory -C "${KUBE_ROOT}" generated_files
 
 ret=0
 go run test/typecheck/main.go "$@" || ret=$?

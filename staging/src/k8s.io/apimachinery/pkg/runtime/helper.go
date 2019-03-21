@@ -87,7 +87,7 @@ func Field(v reflect.Value, fieldName string, dest interface{}) error {
 	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), destValue.Type())
 }
 
-// fieldPtr puts the address of fieldName, which must be a member of v,
+// FieldPtr puts the address of fieldName, which must be a member of v,
 // into dest, which must be an address of a variable to which this field's
 // address can be assigned.
 func FieldPtr(v reflect.Value, fieldName string, dest interface{}) error {

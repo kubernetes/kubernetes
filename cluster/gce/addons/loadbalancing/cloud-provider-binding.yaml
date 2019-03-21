@@ -3,12 +3,12 @@ kind: RoleBinding
 metadata:
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
-  name: cloud-provider
+  name: gce:cloud-provider
   namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: cloud-provider
+  name: gce:cloud-provider
 subjects:
 - kind: ServiceAccount
   name: cloud-provider
@@ -19,11 +19,11 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
-  name: cloud-provider
+  name: gce:cloud-provider
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cloud-provider
+  name: gce:cloud-provider
 subjects:
 - kind: ServiceAccount
   name: cloud-provider

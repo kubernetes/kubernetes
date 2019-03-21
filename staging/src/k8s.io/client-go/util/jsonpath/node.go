@@ -80,7 +80,7 @@ func (l *ListNode) append(n Node) {
 }
 
 func (l *ListNode) String() string {
-	return fmt.Sprintf("%s", l.Type())
+	return l.Type().String()
 }
 
 // TextNode holds plain text.
@@ -130,8 +130,9 @@ func (f *IdentifierNode) String() string {
 
 // ParamsEntry holds param information for ArrayNode
 type ParamsEntry struct {
-	Value int
-	Known bool // whether the value is known when parse it
+	Value   int
+	Known   bool // whether the value is known when parse it
+	Derived bool
 }
 
 // ArrayNode holds start, end, step information for array index selection
@@ -210,7 +211,7 @@ func newWildcard() *WildcardNode {
 }
 
 func (i *WildcardNode) String() string {
-	return fmt.Sprintf("%s", i.Type())
+	return i.Type().String()
 }
 
 // RecursiveNode means a recursive descent operator
@@ -223,7 +224,7 @@ func newRecursive() *RecursiveNode {
 }
 
 func (r *RecursiveNode) String() string {
-	return fmt.Sprintf("%s", r.Type())
+	return r.Type().String()
 }
 
 // UnionNode is union of ListNode
@@ -237,7 +238,7 @@ func newUnion(nodes []*ListNode) *UnionNode {
 }
 
 func (u *UnionNode) String() string {
-	return fmt.Sprintf("%s", u.Type())
+	return u.Type().String()
 }
 
 // BoolNode holds bool value

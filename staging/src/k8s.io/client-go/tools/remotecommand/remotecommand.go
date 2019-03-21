@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
@@ -30,8 +30,8 @@ import (
 	spdy "k8s.io/client-go/transport/spdy"
 )
 
-// StreamOptions holds information pertaining to the current streaming session: supported stream
-// protocols, input/output streams, if the client is requesting a TTY, and a terminal size queue to
+// StreamOptions holds information pertaining to the current streaming session:
+// input/output streams, if the client is requesting a TTY, and a terminal size queue to
 // support terminal resizing.
 type StreamOptions struct {
 	Stdin             io.Reader
@@ -132,7 +132,7 @@ func (e *streamExecutor) Stream(options StreamOptions) error {
 	case remotecommand.StreamProtocolV2Name:
 		streamer = newStreamProtocolV2(options)
 	case "":
-		glog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
+		klog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
 		fallthrough
 	case remotecommand.StreamProtocolV1Name:
 		streamer = newStreamProtocolV1(options)

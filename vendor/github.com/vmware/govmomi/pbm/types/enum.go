@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2017 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2018 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -152,6 +152,20 @@ func init() {
 	types.Add("pbm:PbmObjectType", reflect.TypeOf((*PbmObjectType)(nil)).Elem())
 }
 
+type PbmOperation string
+
+const (
+	PbmOperationCREATE      = PbmOperation("CREATE")
+	PbmOperationREGISTER    = PbmOperation("REGISTER")
+	PbmOperationRECONFIGURE = PbmOperation("RECONFIGURE")
+	PbmOperationMIGRATE     = PbmOperation("MIGRATE")
+	PbmOperationCLONE       = PbmOperation("CLONE")
+)
+
+func init() {
+	types.Add("pbm:PbmOperation", reflect.TypeOf((*PbmOperation)(nil)).Elem())
+}
+
 type PbmProfileCategoryEnum string
 
 const (
@@ -179,6 +193,7 @@ type PbmSystemCreatedProfileType string
 const (
 	PbmSystemCreatedProfileTypeVsanDefaultProfile = PbmSystemCreatedProfileType("VsanDefaultProfile")
 	PbmSystemCreatedProfileTypeVVolDefaultProfile = PbmSystemCreatedProfileType("VVolDefaultProfile")
+	PbmSystemCreatedProfileTypePmemDefaultProfile = PbmSystemCreatedProfileType("PmemDefaultProfile")
 )
 
 func init() {

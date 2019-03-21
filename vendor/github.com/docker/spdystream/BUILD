@@ -9,6 +9,7 @@ go_library(
         "stream.go",
         "utils.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/spdystream",
     importpath = "github.com/docker/spdystream",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/docker/spdystream/spdy:go_default_library"],

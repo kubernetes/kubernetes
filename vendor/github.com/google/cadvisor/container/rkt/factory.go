@@ -23,7 +23,7 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/manager/watcher"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const RktNamespace = "rkt"
@@ -35,7 +35,7 @@ type rktFactory struct {
 
 	fsInfo fs.FsInfo
 
-	ignoreMetrics container.MetricSet
+	includedMetrics container.MetricSet
 
 	rktPath string
 }
@@ -54,7 +54,7 @@ func (self *rktFactory) NewContainerHandler(name string, inHostNamespace bool) (
 	if !inHostNamespace {
 		rootFs = "/rootfs"
 	}
-	return newRktContainerHandler(name, client, self.rktPath, self.cgroupSubsystems, self.machineInfoFactory, self.fsInfo, rootFs, self.ignoreMetrics)
+	return newRktContainerHandler(name, client, self.rktPath, self.cgroupSubsystems, self.machineInfoFactory, self.fsInfo, rootFs, self.includedMetrics)
 }
 
 func (self *rktFactory) CanHandleAndAccept(name string) (bool, bool, error) {
@@ -67,7 +67,7 @@ func (self *rktFactory) DebugInfo() map[string][]string {
 	return map[string][]string{}
 }
 
-func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics container.MetricSet) error {
+func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics container.MetricSet) error {
 	_, err := Client()
 	if err != nil {
 		return fmt.Errorf("unable to communicate with Rkt api service: %v", err)
@@ -78,7 +78,7 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, igno
 		return fmt.Errorf("unable to get the RktPath variable %v", err)
 	}
 
-	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
+	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(includedMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
@@ -86,12 +86,12 @@ func Register(machineInfoFactory info.MachineInfoFactory, fsInfo fs.FsInfo, igno
 		return fmt.Errorf("failed to find supported cgroup mounts for the raw factory")
 	}
 
-	glog.V(1).Infof("Registering Rkt factory")
+	klog.V(1).Infof("Registering Rkt factory")
 	factory := &rktFactory{
 		machineInfoFactory: machineInfoFactory,
 		fsInfo:             fsInfo,
 		cgroupSubsystems:   &cgroupSubsystems,
-		ignoreMetrics:      ignoreMetrics,
+		includedMetrics:    includedMetrics,
 		rktPath:            rktPath,
 	}
 	container.RegisterContainerHandlerFactory(factory, []watcher.ContainerWatchSource{watcher.Rkt})

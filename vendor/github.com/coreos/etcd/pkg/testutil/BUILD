@@ -9,6 +9,7 @@ go_library(
         "recorder.go",
         "testutil.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/pkg/testutil",
     importpath = "github.com/coreos/etcd/pkg/testutil",
     visibility = ["//visibility:public"],
 )

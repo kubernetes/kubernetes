@@ -62,7 +62,7 @@ func (c *FakeServiceAccounts) List(opts v1.ListOptions) (result *core.ServiceAcc
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.ServiceAccountList{}
+	list := &core.ServiceAccountList{ListMeta: obj.(*core.ServiceAccountList).ListMeta}
 	for _, item := range obj.(*core.ServiceAccountList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -119,7 +119,7 @@ func (c *FakeServiceAccounts) DeleteCollection(options *v1.DeleteOptions, listOp
 // Patch applies the patch and returns the patched serviceAccount.
 func (c *FakeServiceAccounts) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ServiceAccount, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, data, subresources...), &core.ServiceAccount{})
+		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, pt, data, subresources...), &core.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err

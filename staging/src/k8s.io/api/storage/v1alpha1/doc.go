@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
+// +k8s:protobuf-gen=package
 // +groupName=storage.k8s.io
 // +k8s:openapi-gen=true
+
 package v1alpha1 // import "k8s.io/api/storage/v1alpha1"

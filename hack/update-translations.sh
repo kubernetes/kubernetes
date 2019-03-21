@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -23,7 +23,7 @@ generate_pot="false"
 generate_mo="false"
 
 while getopts "hf:xg" opt; do
-  case $opt in
+  case ${opt} in
     h)
       echo "$0 [-f files] [-x] [-g]"
       echo " -f <file-path>: Files to process"
@@ -78,10 +78,10 @@ fi
 if [[ "${generate_mo}" == "true" ]]; then
   echo "Generating .po and .mo files"
   for x in translations/*/*/*/*.po; do
-    msgcat -s $x > tmp.po
-    mv tmp.po $x
-    echo "generating .mo file for: $x"
-    msgfmt $x -o "$(dirname $x)/$(basename $x .po).mo"
+    msgcat -s ${x} > tmp.po
+    mv tmp.po ${x}
+    echo "generating .mo file for: ${x}"
+    msgfmt ${x} -o "$(dirname ${x})/$(basename ${x} .po).mo"
   done
 fi
 

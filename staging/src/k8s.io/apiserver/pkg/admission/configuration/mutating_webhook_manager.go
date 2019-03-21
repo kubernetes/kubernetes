@@ -24,21 +24,27 @@ import (
 	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	admissionregistrationinformers "k8s.io/client-go/informers/admissionregistration/v1beta1"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	"k8s.io/client-go/informers"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
 	"k8s.io/client-go/tools/cache"
 )
 
-// MutatingWebhookConfigurationManager collects the mutating webhook objects so that they can be called.
-type MutatingWebhookConfigurationManager struct {
+// mutatingWebhookConfigurationManager collects the mutating webhook objects so that they can be called.
+type mutatingWebhookConfigurationManager struct {
 	configuration *atomic.Value
 	lister        admissionregistrationlisters.MutatingWebhookConfigurationLister
+	hasSynced     func() bool
 }
 
-func NewMutatingWebhookConfigurationManager(informer admissionregistrationinformers.MutatingWebhookConfigurationInformer) *MutatingWebhookConfigurationManager {
-	manager := &MutatingWebhookConfigurationManager{
+var _ generic.Source = &mutatingWebhookConfigurationManager{}
+
+func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
+	informer := f.Admissionregistration().V1beta1().MutatingWebhookConfigurations()
+	manager := &mutatingWebhookConfigurationManager{
 		configuration: &atomic.Value{},
 		lister:        informer.Lister(),
+		hasSynced:     informer.Informer().HasSynced,
 	}
 
 	// Start with an empty list
@@ -55,11 +61,15 @@ func NewMutatingWebhookConfigurationManager(informer admissionregistrationinform
 }
 
 // Webhooks returns the merged MutatingWebhookConfiguration.
-func (m *MutatingWebhookConfigurationManager) Webhooks() *v1beta1.MutatingWebhookConfiguration {
-	return m.configuration.Load().(*v1beta1.MutatingWebhookConfiguration)
+func (m *mutatingWebhookConfigurationManager) Webhooks() []v1beta1.Webhook {
+	return m.configuration.Load().(*v1beta1.MutatingWebhookConfiguration).Webhooks
 }
 
-func (m *MutatingWebhookConfigurationManager) updateConfiguration() {
+func (m *mutatingWebhookConfigurationManager) HasSynced() bool {
+	return m.hasSynced()
+}
+
+func (m *mutatingWebhookConfigurationManager) updateConfiguration() {
 	configurations, err := m.lister.List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error updating configuration: %v", err))

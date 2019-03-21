@@ -23,9 +23,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -39,7 +39,7 @@ type containerGC struct {
 }
 
 // NewContainerGC creates a new containerGC.
-func NewContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager) *containerGC {
+func newContainerGC(client internalapi.RuntimeService, podStateProvider podStateProvider, manager *kubeGenericRuntimeManager) *containerGC {
 	return &containerGC{
 		client:           client,
 		manager:          manager,
@@ -55,6 +55,9 @@ type containerGCInfo struct {
 	name string
 	// Creation time for the container.
 	createTime time.Time
+	// If true, the container is in unknown state. Garbage collector should try
+	// to stop containers before removal.
+	unknown bool
 }
 
 // sandboxGCInfo is the internal information kept for sandboxes being considered for GC.
@@ -122,8 +125,21 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	for i := len(containers) - 1; i >= numToKeep; i-- {
+		if containers[i].unknown {
+			// Containers in known state could be running, we should try
+			// to stop it before removal.
+			id := kubecontainer.ContainerID{
+				Type: cgc.manager.runtimeName,
+				ID:   containers[i].id,
+			}
+			message := "Container is in unknown state, try killing it before removal"
+			if err := cgc.manager.killContainer(nil, id, containers[i].name, message, nil); err != nil {
+				klog.Errorf("Failed to stop container %q: %v", containers[i].id, err)
+				continue
+			}
+		}
 		if err := cgc.manager.removeContainer(containers[i].id); err != nil {
-			glog.Errorf("Failed to remove container %q: %v", containers[i].id, err)
+			klog.Errorf("Failed to remove container %q: %v", containers[i].id, err)
 		}
 	}
 
@@ -145,16 +161,16 @@ func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemo
 
 // removeSandbox removes the sandbox by sandboxID.
 func (cgc *containerGC) removeSandbox(sandboxID string) {
-	glog.V(4).Infof("Removing sandbox %q", sandboxID)
+	klog.V(4).Infof("Removing sandbox %q", sandboxID)
 	// In normal cases, kubelet should've already called StopPodSandbox before
 	// GC kicks in. To guard against the rare cases where this is not true, try
 	// stopping the sandbox before removing it.
 	if err := cgc.client.StopPodSandbox(sandboxID); err != nil {
-		glog.Errorf("Failed to stop sandbox %q before removing: %v", sandboxID, err)
+		klog.Errorf("Failed to stop sandbox %q before removing: %v", sandboxID, err)
 		return
 	}
 	if err := cgc.client.RemovePodSandbox(sandboxID); err != nil {
-		glog.Errorf("Failed to remove sandbox %q: %v", sandboxID, err)
+		klog.Errorf("Failed to remove sandbox %q: %v", sandboxID, err)
 	}
 }
 
@@ -184,6 +200,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			id:         container.Id,
 			name:       container.Metadata.Name,
 			createTime: createdAt,
+			unknown:    container.State == runtimeapi.ContainerState_CONTAINER_UNKNOWN,
 		}
 		key := evictUnit{
 			uid:  labeledInfo.PodUID,
@@ -322,13 +339,13 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 		}
 		for _, dir := range dirs {
 			name := dir.Name()
-			podUID := types.UID(name)
+			podUID := parsePodUIDFromLogsDirectory(name)
 			if !cgc.podStateProvider.IsPodDeleted(podUID) {
 				continue
 			}
 			err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, name))
 			if err != nil {
-				glog.Errorf("Failed to remove pod logs directory %q: %v", name, err)
+				klog.Errorf("Failed to remove pod logs directory %q: %v", name, err)
 			}
 		}
 	}
@@ -340,7 +357,7 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 		if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) {
 			err := osInterface.Remove(logSymlink)
 			if err != nil {
-				glog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
+				klog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
 			}
 		}
 	}

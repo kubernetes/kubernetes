@@ -75,27 +75,27 @@ type pluginHandlerWithMetrics struct {
 }
 
 // Admit performs a mutating admission control check and emit metrics.
-func (p pluginHandlerWithMetrics) Admit(a admission.Attributes) error {
+func (p pluginHandlerWithMetrics) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	mutatingHandler, ok := p.Interface.(admission.MutationInterface)
 	if !ok {
 		return nil
 	}
 
 	start := time.Now()
-	err := mutatingHandler.Admit(a)
+	err := mutatingHandler.Admit(a, o)
 	p.observer(time.Since(start), err != nil, a, stepAdmit, p.extraLabels...)
 	return err
 }
 
 // Validate performs a non-mutating admission control check and emits metrics.
-func (p pluginHandlerWithMetrics) Validate(a admission.Attributes) error {
+func (p pluginHandlerWithMetrics) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	validatingHandler, ok := p.Interface.(admission.ValidationInterface)
 	if !ok {
 		return nil
 	}
 
 	start := time.Now()
-	err := validatingHandler.Validate(a)
+	err := validatingHandler.Validate(a, o)
 	p.observer(time.Since(start), err != nil, a, stepValidate, p.extraLabels...)
 	return err
 }
@@ -112,17 +112,17 @@ func newAdmissionMetrics() *AdmissionMetrics {
 	// Admission metrics for a step of the admission flow. The entire admission flow is broken down into a series of steps
 	// Each step is identified by a distinct type label value.
 	step := newMetricSet("step",
-		[]string{"type", "operation", "group", "version", "resource", "subresource", "rejected"},
+		[]string{"type", "operation", "rejected"},
 		"Admission sub-step %s, broken out for each operation and API resource and step type (validate or admit).", true)
 
 	// Built-in admission controller metrics. Each admission controller is identified by name.
 	controller := newMetricSet("controller",
-		[]string{"name", "type", "operation", "group", "version", "resource", "subresource", "rejected"},
+		[]string{"name", "type", "operation", "rejected"},
 		"Admission controller %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
 
 	// Admission webhook metrics. Each webhook is identified by name.
 	webhook := newMetricSet("webhook",
-		[]string{"name", "type", "operation", "group", "version", "resource", "subresource", "rejected"},
+		[]string{"name", "type", "operation", "rejected"},
 		"Admission webhook %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
 
 	step.mustRegister()
@@ -139,20 +139,17 @@ func (m *AdmissionMetrics) reset() {
 
 // ObserveAdmissionStep records admission related metrics for a admission step, identified by step type.
 func (m *AdmissionMetrics) ObserveAdmissionStep(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	gvr := attr.GetResource()
-	m.step.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
+	m.step.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
 }
 
 // ObserveAdmissionController records admission related metrics for a built-in admission controller, identified by it's plugin handler name.
 func (m *AdmissionMetrics) ObserveAdmissionController(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	gvr := attr.GetResource()
-	m.controller.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
+	m.controller.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
 }
 
 // ObserveWebhook records admission related metrics for a admission webhook.
 func (m *AdmissionMetrics) ObserveWebhook(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	gvr := attr.GetResource()
-	m.webhook.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
+	m.webhook.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
 }
 
 type metricSet struct {
@@ -167,8 +164,8 @@ func newMetricSet(name string, labels []string, helpTemplate string, hasSummary 
 			prometheus.SummaryOpts{
 				Namespace: namespace,
 				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_admission_latencies_seconds_summary", name),
-				Help:      fmt.Sprintf(helpTemplate, "latency summary"),
+				Name:      fmt.Sprintf("%s_admission_duration_seconds_summary", name),
+				Help:      fmt.Sprintf(helpTemplate, "latency summary in seconds"),
 				MaxAge:    latencySummaryMaxAge,
 			},
 			labels,
@@ -180,8 +177,8 @@ func newMetricSet(name string, labels []string, helpTemplate string, hasSummary 
 			prometheus.HistogramOpts{
 				Namespace: namespace,
 				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_admission_latencies_seconds", name),
-				Help:      fmt.Sprintf(helpTemplate, "latency histogram"),
+				Name:      fmt.Sprintf("%s_admission_duration_seconds", name),
+				Help:      fmt.Sprintf(helpTemplate, "latency histogram in seconds"),
 				Buckets:   latencyBuckets,
 			},
 			labels,
@@ -209,9 +206,9 @@ func (m *metricSet) reset() {
 
 // Observe records an observed admission event to all metrics in the metricSet.
 func (m *metricSet) observe(elapsed time.Duration, labels ...string) {
-	elapsedMicroseconds := float64(elapsed / time.Microsecond)
-	m.latencies.WithLabelValues(labels...).Observe(elapsedMicroseconds)
+	elapsedSeconds := elapsed.Seconds()
+	m.latencies.WithLabelValues(labels...).Observe(elapsedSeconds)
 	if m.latenciesSummary != nil {
-		m.latenciesSummary.WithLabelValues(labels...).Observe(elapsedMicroseconds)
+		m.latenciesSummary.WithLabelValues(labels...).Observe(elapsedSeconds)
 	}
 }

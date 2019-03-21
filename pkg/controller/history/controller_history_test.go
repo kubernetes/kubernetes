@@ -27,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -39,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	core "k8s.io/client-go/testing"
+	"time"
 )
 
 func TestRealHistory_ListControllerRevisions(t *testing.T) {
@@ -257,8 +259,8 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 		history := NewHistory(client, informer.Lister())
 
 		var collisionCount int32
-		for i := range test.existing {
-			_, err := history.CreateControllerRevision(test.existing[i].parent, test.existing[i].revision, &collisionCount)
+		for _, item := range test.existing {
+			_, err := client.AppsV1().ControllerRevisions(item.parent.GetNamespace()).Create(item.revision)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -279,12 +281,12 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 				t.Errorf("%s: on name collision wanted new name %s got %s", test.name, expectedName, created.Name)
 			}
 
-			// Second name collision should have incremented collisionCount to 2
+			// Second name collision will be caused by an identical revision, so no need to do anything
 			_, err = history.CreateControllerRevision(test.parent, test.revision, &collisionCount)
 			if err != nil {
 				t.Errorf("%s: %s", test.name, err)
 			}
-			if collisionCount != 2 {
+			if collisionCount != 1 {
 				t.Errorf("%s: on second name collision wanted collisionCount 1 got %d", test.name, collisionCount)
 			}
 		}
@@ -301,7 +303,16 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+
+	// Create a new revision with the same name and hash label as an existing revision, but with
+	// a different template. This could happen as a result of a hash collision, but in this test
+	// this situation is created by setting name and hash label to values known to be in use by
+	// an existing revision.
+	modTemplate := ss1.Spec.Template.DeepCopy()
+	modTemplate.Labels["foo"] = "not_bar"
+	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(modTemplate), 2, ss1.Status.CollisionCount)
+	ss1Rev2.Name = ss1Rev1.Name
+	ss1Rev2.Labels[ControllerRevisionHashLabel] = ss1Rev1.Labels[ControllerRevisionHashLabel]
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +357,7 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 			}{
 				{
 					parent:   ss1,
-					revision: ss1Rev1,
+					revision: ss1Rev2,
 				},
 			},
 			rename: true,
@@ -966,7 +977,7 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 				if err != nil {
 					return true, nil, err
 				}
-				patched, err := testapi.Apps.Converter().ConvertToVersion(obj, apps.SchemeGroupVersion)
+				patched, err := legacyscheme.Scheme.ConvertToVersion(obj, apps.SchemeGroupVersion)
 				if err != nil {
 					return true, nil, err
 				}
@@ -1217,7 +1228,7 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 				if err != nil {
 					return true, nil, err
 				}
-				patched, err := testapi.Apps.Converter().ConvertToVersion(obj, apps.SchemeGroupVersion)
+				patched, err := legacyscheme.Scheme.ConvertToVersion(obj, apps.SchemeGroupVersion)
 				if err != nil {
 					return true, nil, err
 				}
@@ -1535,12 +1546,14 @@ func TestSortControllerRevisions(t *testing.T) {
 		want      []string
 	}
 	testFn := func(test *testcase, t *testing.T) {
-		SortControllerRevisions(test.revisions)
-		for i := range test.revisions {
-			if test.revisions[i].Name != test.want[i] {
-				t.Errorf("%s: want %s at %d got %s", test.name, test.want[i], i, test.revisions[i].Name)
+		t.Run(test.name, func(t *testing.T) {
+			SortControllerRevisions(test.revisions)
+			for i := range test.revisions {
+				if test.revisions[i].Name != test.want[i] {
+					t.Errorf("%s: want %s at %d got %s", test.name, test.want[i], i, test.revisions[i].Name)
+				}
 			}
-		}
+		})
 	}
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss1.Status.CollisionCount = new(int32)
@@ -1549,17 +1562,32 @@ func TestSortControllerRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	ss1Rev1.Namespace = ss1.Namespace
 	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	ss1Rev2.Namespace = ss1.Namespace
 	ss1Rev3, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ss1Rev3.Namespace = ss1.Namespace
+
+	ss1Rev3Time2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss1Rev3Time2.Namespace = ss1.Namespace
+	ss1Rev3Time2.CreationTimestamp = metav1.Time{Time: ss1Rev3.CreationTimestamp.Add(time.Second)}
+
+	ss1Rev3Time2Name2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss1Rev3Time2Name2.Namespace = ss1.Namespace
+	ss1Rev3Time2Name2.CreationTimestamp = metav1.Time{Time: ss1Rev3.CreationTimestamp.Add(time.Second)}
 
 	tests := []testcase{
 		{
@@ -1576,6 +1604,11 @@ func TestSortControllerRevisions(t *testing.T) {
 			name:      "reversed",
 			revisions: []*apps.ControllerRevision{ss1Rev3, ss1Rev2, ss1Rev1},
 			want:      []string{ss1Rev1.Name, ss1Rev2.Name, ss1Rev3.Name},
+		},
+		{
+			name:      "with ties",
+			revisions: []*apps.ControllerRevision{ss1Rev3, ss1Rev3Time2, ss1Rev2, ss1Rev1},
+			want:      []string{ss1Rev1.Name, ss1Rev2.Name, ss1Rev3.Name, ss1Rev3Time2.Name, ss1Rev3Time2Name2.Name},
 		},
 		{
 			name:      "empty",

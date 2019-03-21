@@ -79,7 +79,7 @@ func (l *tlsKeepaliveListener) Accept() (c net.Conn, err error) {
 	kac.SetKeepAlive(true)
 	kac.SetKeepAlivePeriod(30 * time.Second)
 	c = tls.Server(c, l.config)
-	return
+	return c, nil
 }
 
 // NewListener creates a Listener which accepts connections from an inner

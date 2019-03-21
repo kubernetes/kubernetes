@@ -48,6 +48,8 @@ type Config struct {
 	Thresholds []evictionapi.Threshold
 	// KernelMemcgNotification if true will integrate with the kernel memcg notification to determine if memory thresholds are crossed.
 	KernelMemcgNotification bool
+	// PodCgroupRoot is the cgroup which contains all pods.
+	PodCgroupRoot string
 }
 
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
@@ -92,6 +94,10 @@ type ContainerGC interface {
 // gracePeriodOverride - the grace period override to use instead of what is on the pod spec
 type KillPodFunc func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error
 
+// MirrorPodFunc returns the mirror pod for the given static pod and
+// whether it was known to the pod manager.
+type MirrorPodFunc func(*v1.Pod) (*v1.Pod, bool)
+
 // ActivePodsFunc returns pods bound to the kubelet that are active (i.e. non-terminal state)
 type ActivePodsFunc func() []*v1.Pod
 
@@ -129,20 +135,30 @@ type nodeReclaimFunc func() error
 // nodeReclaimFuncs is an ordered list of nodeReclaimFunc
 type nodeReclaimFuncs []nodeReclaimFunc
 
-// thresholdNotifierHandlerFunc is a function that takes action in response to a crossed threshold
-type thresholdNotifierHandlerFunc func(thresholdDescription string)
-
-// ThresholdStopCh is an interface for a channel which is closed to stop waiting goroutines.
-// Implementations of ThresholdStopCh must correctly handle concurrent calls to all functions.
-type ThresholdStopCh interface {
-	// Reset closes the channel if it can be closed, and returns true if it was closed.
-	// Reset also creates a new channel.
-	Reset() bool
-	// Ch returns the channel that is closed when Reset() is called
-	Ch() <-chan struct{}
+// CgroupNotifier generates events from cgroup events
+type CgroupNotifier interface {
+	// Start causes the CgroupNotifier to begin notifying on the eventCh
+	Start(eventCh chan<- struct{})
+	// Stop stops all processes and cleans up file descriptors associated with the CgroupNotifier
+	Stop()
 }
 
-// ThresholdNotifier notifies the user when an attribute crosses a threshold value
+// NotifierFactory creates CgroupNotifer
+type NotifierFactory interface {
+	// NewCgroupNotifier creates a CgroupNotifier that creates events when the threshold
+	// on the attribute in the cgroup specified by the path is crossed.
+	NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error)
+}
+
+// ThresholdNotifier manages CgroupNotifiers based on memory eviction thresholds, and performs a function
+// when memory eviction thresholds are crossed
 type ThresholdNotifier interface {
-	Start(ThresholdStopCh)
+	// Start calls the notifier function when the CgroupNotifier notifies the ThresholdNotifier that an event occurred
+	Start()
+	// UpdateThreshold updates the memory cgroup threshold based on the metrics provided.
+	// Calling UpdateThreshold with recent metrics allows the ThresholdNotifier to trigger at the
+	// eviction threshold more accurately
+	UpdateThreshold(summary *statsapi.Summary) error
+	// Description produces a relevant string describing the Memory Threshold Notifier
+	Description() string
 }

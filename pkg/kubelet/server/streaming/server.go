@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -38,7 +39,7 @@ import (
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
 
-// The library interface to serve the stream requests.
+// Server is the library interface to serve the stream requests.
 type Server interface {
 	http.Handler
 
@@ -58,7 +59,7 @@ type Server interface {
 	Stop() error
 }
 
-// The interface to execute the commands and provide the streams.
+// Runtime is the interface to execute the commands and provide the streams.
 type Runtime interface {
 	Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 	Attach(containerID string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
@@ -71,6 +72,7 @@ type Config struct {
 	Addr string
 	// The optional base URL for constructing streaming URLs. If empty, the baseURL will be
 	// constructed from the serve address.
+	// Note that for port "0", the URL port will be set to actual port in use.
 	BaseURL *url.URL
 
 	// How long to leave idle connections open for.
@@ -101,6 +103,7 @@ var DefaultConfig = Config{
 	SupportedPortForwardProtocols:   portforward.SupportedProtocols,
 }
 
+// NewServer creates a new Server for stream requests.
 // TODO(tallclair): Add auth(n/z) interface & handling.
 func NewServer(config Config, runtime Runtime) (Server, error) {
 	s := &server{
@@ -233,11 +236,16 @@ func (s *server) Start(stayUp bool) error {
 		return errors.New("stayUp=false is not yet implemented")
 	}
 
-	if s.config.TLSConfig != nil {
-		return s.server.ListenAndServeTLS("", "") // Use certs from TLSConfig.
-	} else {
-		return s.server.ListenAndServe()
+	listener, err := net.Listen("tcp", s.config.Addr)
+	if err != nil {
+		return err
 	}
+	// Use the actual address as baseURL host. This handles the "0" port case.
+	s.config.BaseURL.Host = listener.Addr().String()
+	if s.config.TLSConfig != nil {
+		return s.server.ServeTLS(listener, "", "") // Use certs from TLSConfig.
+	}
+	return s.server.Serve(listener)
 }
 
 func (s *server) Stop() error {

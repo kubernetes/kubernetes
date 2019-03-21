@@ -15,6 +15,7 @@
 package naming
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -23,8 +24,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/naming"
 	"google.golang.org/grpc/status"
-
-	"golang.org/x/net/context"
 )
 
 var ErrWatcherClosed = fmt.Errorf("naming: watch closed")

@@ -30,7 +30,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 const (
@@ -49,12 +49,20 @@ type HTTPExtender struct {
 	client           *http.Client
 	nodeCacheCapable bool
 	managedResources sets.String
+	ignorable        bool
 }
 
 func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, error) {
 	var cfg restclient.Config
 	if config.TLSConfig != nil {
-		cfg.TLSClientConfig = *config.TLSConfig
+		cfg.TLSClientConfig.Insecure = config.TLSConfig.Insecure
+		cfg.TLSClientConfig.ServerName = config.TLSConfig.ServerName
+		cfg.TLSClientConfig.CertFile = config.TLSConfig.CertFile
+		cfg.TLSClientConfig.KeyFile = config.TLSConfig.KeyFile
+		cfg.TLSClientConfig.CAFile = config.TLSConfig.CAFile
+		cfg.TLSClientConfig.CertData = config.TLSConfig.CertData
+		cfg.TLSClientConfig.KeyData = config.TLSConfig.KeyData
+		cfg.TLSClientConfig.CAData = config.TLSConfig.CAData
 	}
 	if config.EnableHTTPS {
 		hasCA := len(cfg.CAFile) > 0 || len(cfg.CAData) > 0
@@ -102,11 +110,23 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 		client:           client,
 		nodeCacheCapable: config.NodeCacheCapable,
 		managedResources: managedResources,
+		ignorable:        config.Ignorable,
 	}, nil
 }
 
-// SupportsPreemption returns if a extender support preemption.
-// A extender should have preempt verb defined and enabled its own node cache.
+// Name returns extenderURL to identify the extender.
+func (h *HTTPExtender) Name() string {
+	return h.extenderURL
+}
+
+// IsIgnorable returns true indicates scheduling should not fail when this extender
+// is unavailable
+func (h *HTTPExtender) IsIgnorable() bool {
+	return h.ignorable
+}
+
+// SupportsPreemption returns true if an extender supports preemption.
+// An extender should have preempt verb defined and enabled its own node cache.
 func (h *HTTPExtender) SupportsPreemption() bool {
 	return len(h.preemptVerb) > 0
 }
@@ -115,7 +135,7 @@ func (h *HTTPExtender) SupportsPreemption() bool {
 func (h *HTTPExtender) ProcessPreemption(
 	pod *v1.Pod,
 	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
 	var (
 		result schedulerapi.ExtenderPreemptionResult
@@ -130,7 +150,7 @@ func (h *HTTPExtender) ProcessPreemption(
 		// If extender has cached node info, pass NodeNameToMetaVictims in args.
 		nodeNameToMetaVictims := convertToNodeNameToMetaVictims(nodeToVictims)
 		args = &schedulerapi.ExtenderPreemptionArgs{
-			Pod: pod,
+			Pod:                   pod,
 			NodeNameToMetaVictims: nodeNameToMetaVictims,
 		}
 	} else {
@@ -147,18 +167,19 @@ func (h *HTTPExtender) ProcessPreemption(
 
 	// Extender will always return NodeNameToMetaVictims.
 	// So let's convert it to NodeToVictims by using NodeNameToInfo.
-	nodeToVictims, err := h.convertToNodeToVictims(result.NodeNameToMetaVictims, nodeNameToInfo)
+	newNodeToVictims, err := h.convertToNodeToVictims(result.NodeNameToMetaVictims, nodeNameToInfo)
 	if err != nil {
 		return nil, err
 	}
-	return nodeToVictims, nil
+	// Do not override nodeToVictims
+	return newNodeToVictims, nil
 }
 
 // convertToNodeToVictims converts "nodeNameToMetaVictims" from object identifiers,
 // such as UIDs and names, to object pointers.
 func (h *HTTPExtender) convertToNodeToVictims(
 	nodeNameToMetaVictims map[string]*schedulerapi.MetaVictims,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
 	nodeToVictims := map[*v1.Node]*schedulerapi.Victims{}
 	for nodeName, metaVictims := range nodeNameToMetaVictims {
@@ -184,8 +205,8 @@ func (h *HTTPExtender) convertToNodeToVictims(
 func (h *HTTPExtender) convertPodUIDToPod(
 	metaPod *schedulerapi.MetaPod,
 	nodeName string,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo) (*v1.Pod, error) {
-	var nodeInfo *schedulercache.NodeInfo
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) (*v1.Pod, error) {
+	var nodeInfo *schedulernodeinfo.NodeInfo
 	if nodeInfo, ok := nodeNameToInfo[nodeName]; ok {
 		for _, pod := range nodeInfo.Pods() {
 			if string(pod.UID) == metaPod.UID {
@@ -236,7 +257,7 @@ func convertToNodeNameToVictims(
 // the list of failed nodes and failure reasons.
 func (h *HTTPExtender) Filter(
 	pod *v1.Pod,
-	nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodes []*v1.Node, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 ) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
 	var (
 		result     schedulerapi.ExtenderFilterResult

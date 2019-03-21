@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 //TODO:
@@ -56,6 +56,13 @@ type Storage interface {
 	// New returns an empty object that can be used with Create and Update after request data has been put into it.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	New() runtime.Object
+}
+
+// Scoper indicates what scope the resource is at. It must be specified.
+// It is usually provided automatically based on your strategy.
+type Scoper interface {
+	// NamespaceScoped returns true if the storage is namespaced
+	NamespaceScoped() bool
 }
 
 // KindProvider specifies a different kind for its API than for its internal storage.  This is necessary for external
@@ -91,7 +98,7 @@ type Lister interface {
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	NewList() runtime.Object
 	// List selects resources in the storage which match to the selector. 'options' can be nil.
-	List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error)
+	List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error)
 }
 
 // Exporter is an object that knows how to strip a RESTful resource for export. A store should implement this interface
@@ -101,7 +108,7 @@ type Exporter interface {
 	// Export an object.  Fields that are not user specified (e.g. Status, ObjectMeta.ResourceVersion) are stripped out
 	// Returns the stripped object.  If 'exact' is true, fields that are specific to the cluster (e.g. namespace) are
 	// retained, otherwise they are stripped also.
-	Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error)
+	Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error)
 }
 
 // Getter is an object that can retrieve a named RESTful resource.
@@ -109,7 +116,7 @@ type Getter interface {
 	// Get finds a resource in the storage by name and returns it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
-	Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
+	Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
 }
 
 // GetterWithOptions is an object that retrieve a named RESTful resource and takes
@@ -122,7 +129,7 @@ type GetterWithOptions interface {
 	// The options object passed to it is of the same type returned by the NewGetOptions
 	// method.
 	// TODO: Pass metav1.GetOptions.
-	Get(ctx genericapirequest.Context, name string, options runtime.Object) (runtime.Object, error)
+	Get(ctx context.Context, name string, options runtime.Object) (runtime.Object, error)
 
 	// NewGetOptions returns an empty options object that will be used to pass
 	// options to the Get method. It may return a bool and a string, if true, the
@@ -134,7 +141,7 @@ type GetterWithOptions interface {
 }
 
 type TableConvertor interface {
-	ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error)
+	ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error)
 }
 
 // GracefulDeleter knows how to pass deletion options to allow delayed deletion of a
@@ -149,7 +156,7 @@ type GracefulDeleter interface {
 	// information about deletion.
 	// It also returns a boolean which is set to true if the resource was instantly
 	// deleted or false if it will be deleted asynchronously.
-	Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error)
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error)
 }
 
 // CollectionDeleter is an object that can delete a collection
@@ -160,7 +167,7 @@ type CollectionDeleter interface {
 	// them or return an invalid request error.
 	// DeleteCollection may not be atomic - i.e. it may delete some objects and still
 	// return an error after it. On success, returns a list of deleted objects.
-	DeleteCollection(ctx genericapirequest.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error)
+	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error)
 }
 
 // Creater is an object that can create an instance of a RESTful object.
@@ -169,9 +176,8 @@ type Creater interface {
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	New() runtime.Object
 
-	// Create creates a new version of a resource. If includeUninitialized is set, the object may be returned
-	// without completing initialization.
-	Create(ctx genericapirequest.Context, obj runtime.Object, createValidation ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error)
+	// Create creates a new version of a resource.
+	Create(ctx context.Context, obj runtime.Object, createValidation ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error)
 }
 
 // NamedCreater is an object that can create an instance of a RESTful object using a name parameter.
@@ -182,9 +188,8 @@ type NamedCreater interface {
 
 	// Create creates a new version of a resource. It expects a name parameter from the path.
 	// This is needed for create operations on subresources which include the name of the parent
-	// resource in the path. If includeUninitialized is set, the object may be returned without
-	// completing initialization.
-	Create(ctx genericapirequest.Context, name string, obj runtime.Object, createValidation ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error)
+	// resource in the path.
+	Create(ctx context.Context, name string, obj runtime.Object, createValidation ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error)
 }
 
 // UpdatedObjectInfo provides information about an updated object to an Updater.
@@ -197,7 +202,7 @@ type UpdatedObjectInfo interface {
 
 	// UpdatedObject returns the updated object, given a context and old object.
 	// The only time an empty oldObj should be passed in is if a "create on update" is occurring (there is no oldObj).
-	UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object) (newObj runtime.Object, err error)
+	UpdatedObject(ctx context.Context, oldObj runtime.Object) (newObj runtime.Object, err error)
 }
 
 // ValidateObjectFunc is a function to act on a given object. An error may be returned
@@ -229,14 +234,14 @@ type Updater interface {
 	// Update finds a resource in the storage and updates it. Some implementations
 	// may allow updates creates the object - they should set the created boolean
 	// to true.
-	Update(ctx genericapirequest.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc) (runtime.Object, bool, error)
+	Update(ctx context.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater is a storage object that must support both create and update.
 // Go prevents embedded interfaces that implement the same method.
 type CreaterUpdater interface {
 	Creater
-	Update(ctx genericapirequest.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc) (runtime.Object, bool, error)
+	Update(ctx context.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater must satisfy the Updater interface.
@@ -255,7 +260,7 @@ type Watcher interface {
 	// are supported; an error should be returned if 'field' tries to select on a field that
 	// isn't supported. 'resourceVersion' allows for continuing/starting a watch at a
 	// particular version.
-	Watch(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 }
 
 // StandardStorage is an interface covering the common verbs. Provided for testing whether a
@@ -272,7 +277,7 @@ type StandardStorage interface {
 // Redirector know how to return a remote resource's location.
 type Redirector interface {
 	// ResourceLocation should return the remote location of the given resource, and an optional transport to use to request it, or an error.
-	ResourceLocation(ctx genericapirequest.Context, id string) (remoteLocation *url.URL, transport http.RoundTripper, err error)
+	ResourceLocation(ctx context.Context, id string) (remoteLocation *url.URL, transport http.RoundTripper, err error)
 }
 
 // Responder abstracts the normal response behavior for a REST method and is passed to callers that
@@ -292,7 +297,7 @@ type Connecter interface {
 	// code and body, so the ServeHTTP method should exit after invoking the responder. The Handler will
 	// be used for a single API request and then discarded. The Responder is guaranteed to write to the
 	// same http.ResponseWriter passed to ServeHTTP.
-	Connect(ctx genericapirequest.Context, id string, options runtime.Object, r Responder) (http.Handler, error)
+	Connect(ctx context.Context, id string, options runtime.Object, r Responder) (http.Handler, error)
 
 	// NewConnectOptions returns an empty options object that will be used to pass
 	// options to the Connect method. If nil, then a nil options object is passed to
@@ -313,7 +318,7 @@ type ResourceStreamer interface {
 	// the caller may return a flag indicating whether the result should be flushed as writes occur
 	// and a content type string that indicates the type of the stream.
 	// If a null stream is returned, a StatusNoContent response wil be generated.
-	InputStream(apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, mimeType string, err error)
+	InputStream(ctx context.Context, apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, mimeType string, err error)
 }
 
 // StorageMetadata is an optional interface that callers can implement to provide additional
@@ -328,18 +333,11 @@ type StorageMetadata interface {
 	ProducesObject(verb string) interface{}
 }
 
-// +k8s:deepcopy-gen=true
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// ConnectRequest is an object passed to admission control for Connect operations
-type ConnectRequest struct {
-	// Name is the name of the object on which the connect request was made
-	Name string
-
-	// Options is the options object passed to the connect request. See the NewConnectOptions method on Connecter
-	Options runtime.Object
-
-	// ResourcePath is the path for the resource in the REST server (ie. "pods/proxy")
-	ResourcePath string
+// StorageVersionProvider is an optional interface that a storage object can
+// implement if it wishes to disclose its storage version.
+type StorageVersionProvider interface {
+	// StorageVersion returns a group versioner, which will outputs the gvk
+	// an object will be converted to before persisted in etcd, given a
+	// list of kinds the object might belong to.
+	StorageVersion() runtime.GroupVersioner
 }
-
-func (obj *ConnectRequest) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }

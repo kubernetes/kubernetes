@@ -320,9 +320,9 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 
 			// Verify newly and previously created files present on the volume mounted on the pod
 			By("Verify newly Created file and previously created files present on volume mounted on pod-A")
-			verifyFilesExistOnVSphereVolume(ns, podA.Name, podAFiles)
+			verifyFilesExistOnVSphereVolume(ns, podA.Name, podAFiles...)
 			By("Verify newly Created file and previously created files present on volume mounted on pod-B")
-			verifyFilesExistOnVSphereVolume(ns, podB.Name, podBFiles)
+			verifyFilesExistOnVSphereVolume(ns, podB.Name, podBFiles...)
 
 			By("Deleting pod-A")
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podA), "Failed to delete pod ", podA.Name)
@@ -378,7 +378,7 @@ func createAndVerifyFilesOnVolume(namespace string, podname string, newEmptyfile
 
 	// Verify newly and previously created files present on the volume mounted on the pod
 	By(fmt.Sprintf("Verify newly Created file and previously created files present on volume mounted on: %v", podname))
-	verifyFilesExistOnVSphereVolume(namespace, podname, filesToCheck)
+	verifyFilesExistOnVSphereVolume(namespace, podname, filesToCheck...)
 }
 
 func deletePodAndWaitForVolumeToDetach(f *framework.Framework, c clientset.Interface, pod *v1.Pod, nodeName string, volumePaths []string) {

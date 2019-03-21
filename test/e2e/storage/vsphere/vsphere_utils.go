@@ -19,30 +19,31 @@ package vsphere
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	vim25types "github.com/vmware/govmomi/vim25/types"
-	vimtypes "github.com/vmware/govmomi/vim25/types"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -234,7 +235,7 @@ func verifyContentOfVSpherePV(client clientset.Interface, pvc *v1.PersistentVolu
 	framework.Logf("Successfully verified content of the volume")
 }
 
-func getVSphereStorageClassSpec(name string, scParameters map[string]string) *storage.StorageClass {
+func getVSphereStorageClassSpec(name string, scParameters map[string]string, zones []string) *storage.StorageClass {
 	var sc *storage.StorageClass
 
 	sc = &storage.StorageClass{
@@ -249,18 +250,25 @@ func getVSphereStorageClassSpec(name string, scParameters map[string]string) *st
 	if scParameters != nil {
 		sc.Parameters = scParameters
 	}
+	if zones != nil {
+		term := v1.TopologySelectorTerm{
+			MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+				{
+					Key:    v1.LabelZoneFailureDomain,
+					Values: zones,
+				},
+			},
+		}
+		sc.AllowedTopologies = append(sc.AllowedTopologies, term)
+	}
 	return sc
 }
 
-func getVSphereClaimSpecWithStorageClassAnnotation(ns string, diskSize string, storageclass *storage.StorageClass) *v1.PersistentVolumeClaim {
-	scAnnotation := make(map[string]string)
-	scAnnotation[v1.BetaStorageClassAnnotation] = storageclass.Name
-
+func getVSphereClaimSpecWithStorageClass(ns string, diskSize string, storageclass *storage.StorageClass) *v1.PersistentVolumeClaim {
 	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
-			Annotations:  scAnnotation,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{
@@ -271,6 +279,7 @@ func getVSphereClaimSpecWithStorageClassAnnotation(ns string, diskSize string, s
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse(diskSize),
 				},
 			},
+			StorageClassName: &(storageclass.Name),
 		},
 	}
 	return claim
@@ -290,7 +299,7 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					VolumeMounts: []v1.VolumeMount{
@@ -355,7 +364,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 			Containers: []v1.Container{
 				{
 					Name:         "vsphere-e2e-container-" + string(uuid.NewUUID()),
-					Image:        "busybox",
+					Image:        imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:      commands,
 					VolumeMounts: volumeMounts,
 				},
@@ -371,7 +380,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 	return pod
 }
 
-func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths []string) {
+func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths ...string) {
 	for _, filePath := range filePaths {
 		_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
@@ -398,6 +407,39 @@ func verifyVSphereVolumesAccessible(c clientset.Interface, pod *v1.Pod, persiste
 		filepath := filepath.Join("/mnt/", fmt.Sprintf("volume%v", index+1), "/emptyFile.txt")
 		_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/touch", filepath}, "", time.Minute)
 		Expect(err).NotTo(HaveOccurred())
+	}
+}
+
+// verify volumes are created on one of the specified zones
+func verifyVolumeCreationOnRightZone(persistentvolumes []*v1.PersistentVolume, nodeName string, zones []string) {
+	for _, pv := range persistentvolumes {
+		volumePath := pv.Spec.VsphereVolume.VolumePath
+		// Extract datastoreName from the volume path in the pv spec
+		// For example : "vsanDatastore" is extracted from "[vsanDatastore] 25d8b159-948c-4b73-e499-02001ad1b044/volume.vmdk"
+		datastorePathObj, _ := getDatastorePathObjFromVMDiskPath(volumePath)
+		datastoreName := datastorePathObj.Datastore
+		nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodeName)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		// Get the datastore object reference from the datastore name
+		datastoreRef, err := nodeInfo.VSphere.GetDatastoreRefFromName(ctx, nodeInfo.DataCenterRef, datastoreName)
+		if err != nil {
+			Expect(err).NotTo(HaveOccurred())
+		}
+		// Find common datastores among the specified zones
+		var datastoreCountMap = make(map[string]int)
+		numZones := len(zones)
+		var commonDatastores []string
+		for _, zone := range zones {
+			datastoreInZone := TestContext.NodeMapper.GetDatastoresInZone(nodeInfo.VSphere.Config.Hostname, zone)
+			for _, datastore := range datastoreInZone {
+				datastoreCountMap[datastore] = datastoreCountMap[datastore] + 1
+				if datastoreCountMap[datastore] == numZones {
+					commonDatastores = append(commonDatastores, datastore)
+				}
+			}
+		}
+		Expect(commonDatastores).To(ContainElement(datastoreRef.Value), "PV was created in an unsupported zone.")
 	}
 }
 
@@ -480,7 +522,7 @@ func getVirtualDiskPage83Data(ctx context.Context, dc *object.Datacenter, diskPa
 	diskUUID, err := vdm.QueryVirtualDiskUuid(ctx, diskPath, dc)
 
 	if err != nil {
-		glog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
+		klog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
 		return "", err
 	}
 	diskUUID = formatVirtualDiskUUID(diskUUID)
@@ -619,7 +661,7 @@ func poweroffNodeVM(nodeName string, vm *object.VirtualMachine) {
 
 	_, err := vm.PowerOff(ctx)
 	Expect(err).NotTo(HaveOccurred())
-	err = vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOff)
+	err = vm.WaitForPowerState(ctx, vim25types.VirtualMachinePowerStatePoweredOff)
 	Expect(err).NotTo(HaveOccurred(), "Unable to power off the node")
 }
 
@@ -631,7 +673,7 @@ func poweronNodeVM(nodeName string, vm *object.VirtualMachine) {
 	framework.Logf("Powering on node VM %s", nodeName)
 
 	vm.PowerOn(ctx)
-	err := vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOn)
+	err := vm.WaitForPowerState(ctx, vim25types.VirtualMachinePowerStatePoweredOn)
 	Expect(err).NotTo(HaveOccurred(), "Unable to power on the node")
 }
 
@@ -749,7 +791,75 @@ func GetReadySchedulableNodeInfos() []*NodeInfo {
 // and it's associated NodeInfo object is returned.
 func GetReadySchedulableRandomNodeInfo() *NodeInfo {
 	nodesInfo := GetReadySchedulableNodeInfos()
-	rand.Seed(time.Now().Unix())
 	Expect(nodesInfo).NotTo(BeEmpty())
 	return nodesInfo[rand.Int()%len(nodesInfo)]
+}
+
+// invokeVCenterServiceControl invokes the given command for the given service
+// via service-control on the given vCenter host over SSH.
+func invokeVCenterServiceControl(command, service, host string) error {
+	sshCmd := fmt.Sprintf("service-control --%s %s", command, service)
+	framework.Logf("Invoking command %v on vCenter host %v", sshCmd, host)
+	result, err := framework.SSH(sshCmd, host, framework.TestContext.Provider)
+	if err != nil || result.Code != 0 {
+		framework.LogSSHResult(result)
+		return fmt.Errorf("couldn't execute command: %s on vCenter host: %v", sshCmd, err)
+	}
+	return nil
+}
+
+// expectVolumeToBeAttached checks if the given Volume is attached to the given
+// Node, else fails.
+func expectVolumeToBeAttached(nodeName, volumePath string) {
+	isAttached, err := diskIsAttached(volumePath, nodeName)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
+}
+
+// expectVolumesToBeAttached checks if the given Volumes are attached to the
+// corresponding set of Nodes, else fails.
+func expectVolumesToBeAttached(pods []*v1.Pod, volumePaths []string) {
+	for i, pod := range pods {
+		nodeName := pod.Spec.NodeName
+		volumePath := volumePaths[i]
+		By(fmt.Sprintf("Verifying that volume %v is attached to node %v", volumePath, nodeName))
+		expectVolumeToBeAttached(nodeName, volumePath)
+	}
+}
+
+// expectFilesToBeAccessible checks if the given files are accessible on the
+// corresponding set of Nodes, else fails.
+func expectFilesToBeAccessible(namespace string, pods []*v1.Pod, filePaths []string) {
+	for i, pod := range pods {
+		podName := pod.Name
+		filePath := filePaths[i]
+		By(fmt.Sprintf("Verifying that file %v is accessible on pod %v", filePath, podName))
+		verifyFilesExistOnVSphereVolume(namespace, podName, filePath)
+	}
+}
+
+// writeContentToPodFile writes the given content to the specified file.
+func writeContentToPodFile(namespace, podName, filePath, content string) error {
+	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("echo '%s' > %s", content, filePath))
+	return err
+}
+
+// expectFileContentToMatch checks if a given file contains the specified
+// content, else fails.
+func expectFileContentToMatch(namespace, podName, filePath, content string) {
+	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("grep '%s' %s", content, filePath))
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to match content of file: %q on the pod: %q", filePath, podName))
+}
+
+// expectFileContentsToMatch checks if the given contents match the ones present
+// in corresponding files on respective Pods, else fails.
+func expectFileContentsToMatch(namespace string, pods []*v1.Pod, filePaths []string, contents []string) {
+	for i, pod := range pods {
+		podName := pod.Name
+		filePath := filePaths[i]
+		By(fmt.Sprintf("Matching file content for %v on pod %v", filePath, podName))
+		expectFileContentToMatch(namespace, podName, filePath, contents[i])
+	}
 }

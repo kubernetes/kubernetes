@@ -38,17 +38,3 @@ type Info struct {
 	// VfsOpts represents per super block options.
 	VfsOpts string
 }
-
-type byMountpoint []*Info
-
-func (by byMountpoint) Len() int {
-	return len(by)
-}
-
-func (by byMountpoint) Less(i, j int) bool {
-	return by[i].Mountpoint < by[j].Mountpoint
-}
-
-func (by byMountpoint) Swap(i, j int) {
-	by[i], by[j] = by[j], by[i]
-}

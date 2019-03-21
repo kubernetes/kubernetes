@@ -20,22 +20,21 @@ import (
 	"reflect"
 	"testing"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestPriorityMetadata(t *testing.T) {
-	nonZeroReqs := &schedulercache.Resource{}
+	nonZeroReqs := &schedulernodeinfo.Resource{}
 	nonZeroReqs.MilliCPU = priorityutil.DefaultMilliCPURequest
 	nonZeroReqs.Memory = priorityutil.DefaultMemoryRequest
 
-	specifiedReqs := &schedulercache.Resource{}
+	specifiedReqs := &schedulernodeinfo.Resource{}
 	specifiedReqs.MilliCPU = 200
 	specifiedReqs.Memory = 2000
 
@@ -117,13 +116,13 @@ func TestPriorityMetadata(t *testing.T) {
 	}
 	tests := []struct {
 		pod      *v1.Pod
-		test     string
+		name     string
 		expected interface{}
 	}{
 		{
 			pod:      nil,
 			expected: nil,
-			test:     "pod is nil , priorityMetadata is nil",
+			name:     "pod is nil , priorityMetadata is nil",
 		},
 		{
 			pod: podWithTolerationsAndAffinity,
@@ -132,7 +131,7 @@ func TestPriorityMetadata(t *testing.T) {
 				podTolerations: tolerations,
 				affinity:       podAffinity,
 			},
-			test: "Produce a priorityMetadata with default requests",
+			name: "Produce a priorityMetadata with default requests",
 		},
 		{
 			pod: podWithTolerationsAndRequests,
@@ -141,7 +140,7 @@ func TestPriorityMetadata(t *testing.T) {
 				podTolerations: tolerations,
 				affinity:       nil,
 			},
-			test: "Produce a priorityMetadata with specified requests",
+			name: "Produce a priorityMetadata with specified requests",
 		},
 		{
 			pod: podWithAffinityAndRequests,
@@ -150,18 +149,20 @@ func TestPriorityMetadata(t *testing.T) {
 				podTolerations: nil,
 				affinity:       podAffinity,
 			},
-			test: "Produce a priorityMetadata with specified requests",
+			name: "Produce a priorityMetadata with specified requests",
 		},
 	}
-	mataDataProducer := NewPriorityMetadataFactory(
+	metaDataProducer := NewPriorityMetadataFactory(
 		schedulertesting.FakeServiceLister([]*v1.Service{}),
 		schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
-		schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
+		schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
 		schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
 	for _, test := range tests {
-		ptData := mataDataProducer(test.pod, nil)
-		if !reflect.DeepEqual(test.expected, ptData) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expected, ptData)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			ptData := metaDataProducer(test.pod, nil)
+			if !reflect.DeepEqual(test.expected, ptData) {
+				t.Errorf("expected %#v, got %#v", test.expected, ptData)
+			}
+		})
 	}
 }

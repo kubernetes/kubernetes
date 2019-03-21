@@ -25,6 +25,8 @@ go_library(
         "license_manager.go",
         "model.go",
         "option_manager.go",
+        "os_unix.go",
+        "os_windows.go",
         "performance_manager.go",
         "portgroup.go",
         "property_collector.go",
@@ -42,42 +44,8 @@ go_library(
         "view_manager.go",
         "virtual_disk_manager.go",
         "virtual_machine.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "os_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/simulator",
     importpath = "github.com/vmware/govmomi/simulator",
     visibility = ["//visibility:public"],
     deps = [

@@ -33,10 +33,11 @@ import (
 
 var (
 	dumpTree = flag.Bool("dump", false, "print AST")
-	dumpJson = flag.Bool("json", false, "output test list as JSON")
+	dumpJSON = flag.Bool("json", false, "output test list as JSON")
 	warn     = flag.Bool("warn", false, "print warnings")
 )
 
+// Test holds test locations, package names, and test names.
 type Test struct {
 	Loc      string
 	Name     string
@@ -262,7 +263,7 @@ func main() {
 			log.Fatalf("Error walking: %v", err)
 		}
 	}
-	if *dumpJson {
+	if *dumpJSON {
 		json, err := json.Marshal(tests.tests)
 		if err != nil {
 			log.Fatal(err)

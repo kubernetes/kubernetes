@@ -53,19 +53,18 @@ func (u *UnstructuredList) EachListItem(fn func(runtime.Object) error) error {
 }
 
 // UnstructuredContent returns a map contain an overlay of the Items field onto
-// the Object field. Items always overwrites overlay. Changing "items" in the
-// returned object will affect items in the underlying Items field, but changing
-// the "items" slice itself will have no effect.
-// TODO: expose SetUnstructuredContent on runtime.Unstructured that allows
-// items to be changed.
+// the Object field. Items always overwrites overlay.
 func (u *UnstructuredList) UnstructuredContent() map[string]interface{} {
-	out := u.Object
-	if out == nil {
-		out = make(map[string]interface{})
+	out := make(map[string]interface{}, len(u.Object)+1)
+
+	// shallow copy every property
+	for k, v := range u.Object {
+		out[k] = v
 	}
+
 	items := make([]interface{}, len(u.Items))
 	for i, item := range u.Items {
-		items[i] = item.Object
+		items[i] = item.UnstructuredContent()
 	}
 	out["items"] = items
 	return out

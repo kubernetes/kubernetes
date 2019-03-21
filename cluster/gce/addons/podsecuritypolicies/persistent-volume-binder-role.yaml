@@ -11,7 +11,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
 - apiGroups:
-  - extensions
+  - policy
   resourceNames:
   - gce.persistent-volume-binder
   resources:

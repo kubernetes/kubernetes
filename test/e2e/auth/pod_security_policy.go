@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -32,13 +31,16 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
+	utilpointer "k8s.io/utils/pointer"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+const nobodyUser = int64(65534)
 
 var _ = SIGDescribe("PodSecurityPolicy", func() {
 	f := framework.NewDefaultFramework("podsecuritypolicy")
@@ -74,75 +76,35 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 
 	It("should forbid pod creation when no PSP is available", func() {
 		By("Running a restricted pod")
-		_, err := c.CoreV1().Pods(ns).Create(restrictedPod(f, "restricted"))
+		_, err := c.CoreV1().Pods(ns).Create(restrictedPod("restricted"))
 		expectForbidden(err)
-	})
-
-	// TODO: merge tests for extensions/policy API groups when PSP will be completely moved out of the extensions
-
-	It("should enforce the restricted extensions.PodSecurityPolicy", func() {
-		By("Creating & Binding a restricted policy for the test service account")
-		_, cleanup := createAndBindPSP(f, restrictedPSP("restrictive"))
-		defer cleanup()
-
-		By("Running a restricted pod")
-		pod, err := c.CoreV1().Pods(ns).Create(restrictedPod(f, "allowed"))
-		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, pod.Name, pod.Namespace))
-
-		testPrivilegedPods(f, func(pod *v1.Pod) {
-			_, err := c.CoreV1().Pods(ns).Create(pod)
-			expectForbidden(err)
-		})
 	})
 
 	It("should enforce the restricted policy.PodSecurityPolicy", func() {
 		By("Creating & Binding a restricted policy for the test service account")
-		_, cleanup := createAndBindPSPInPolicy(f, restrictedPSPInPolicy("restrictive"))
+		_, cleanup := createAndBindPSP(f, restrictedPSP("restrictive"))
 		defer cleanup()
 
 		By("Running a restricted pod")
-		pod, err := c.CoreV1().Pods(ns).Create(restrictedPod(f, "allowed"))
+		pod, err := c.CoreV1().Pods(ns).Create(restrictedPod("allowed"))
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, pod.Name, pod.Namespace))
 
-		testPrivilegedPods(f, func(pod *v1.Pod) {
+		testPrivilegedPods(func(pod *v1.Pod) {
 			_, err := c.CoreV1().Pods(ns).Create(pod)
 			expectForbidden(err)
-		})
-	})
-
-	It("should allow pods under the privileged extensions.PodSecurityPolicy", func() {
-		By("Creating & Binding a privileged policy for the test service account")
-		// Ensure that the permissive policy is used even in the presence of the restricted policy.
-		_, cleanup := createAndBindPSP(f, restrictedPSP("restrictive"))
-		defer cleanup()
-		expectedPSP, cleanup := createAndBindPSP(f, framework.PrivilegedPSP("permissive"))
-		defer cleanup()
-
-		testPrivilegedPods(f, func(pod *v1.Pod) {
-			p, err := c.CoreV1().Pods(ns).Create(pod)
-			framework.ExpectNoError(err)
-			framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, p.Name, p.Namespace))
-
-			// Verify expected PSP was used.
-			p, err = c.CoreV1().Pods(ns).Get(p.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			validated, found := p.Annotations[psputil.ValidatedPSPAnnotation]
-			Expect(found).To(BeTrue(), "PSP annotation not found")
-			Expect(validated).To(Equal(expectedPSP.Name), "Unexpected validated PSP")
 		})
 	})
 
 	It("should allow pods under the privileged policy.PodSecurityPolicy", func() {
 		By("Creating & Binding a privileged policy for the test service account")
 		// Ensure that the permissive policy is used even in the presence of the restricted policy.
-		_, cleanup := createAndBindPSPInPolicy(f, restrictedPSPInPolicy("restrictive"))
+		_, cleanup := createAndBindPSP(f, restrictedPSP("restrictive"))
 		defer cleanup()
-		expectedPSP, cleanup := createAndBindPSPInPolicy(f, privilegedPSPInPolicy("permissive"))
+		expectedPSP, cleanup := createAndBindPSP(f, privilegedPSP("permissive"))
 		defer cleanup()
 
-		testPrivilegedPods(f, func(pod *v1.Pod) {
+		testPrivilegedPods(func(pod *v1.Pod) {
 			p, err := c.CoreV1().Pods(ns).Create(pod)
 			framework.ExpectNoError(err)
 			framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, p.Name, p.Namespace))
@@ -162,16 +124,16 @@ func expectForbidden(err error) {
 	Expect(apierrs.IsForbidden(err)).To(BeTrue(), "should be forbidden error")
 }
 
-func testPrivilegedPods(f *framework.Framework, tester func(pod *v1.Pod)) {
+func testPrivilegedPods(tester func(pod *v1.Pod)) {
 	By("Running a privileged pod", func() {
-		privileged := restrictedPod(f, "privileged")
+		privileged := restrictedPod("privileged")
 		privileged.Spec.Containers[0].SecurityContext.Privileged = boolPtr(true)
 		privileged.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 		tester(privileged)
 	})
 
 	By("Running a HostPath pod", func() {
-		hostpath := restrictedPod(f, "hostpath")
+		hostpath := restrictedPod("hostpath")
 		hostpath.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{
 			Name:      "hp",
 			MountPath: "/hp",
@@ -186,26 +148,26 @@ func testPrivilegedPods(f *framework.Framework, tester func(pod *v1.Pod)) {
 	})
 
 	By("Running a HostNetwork pod", func() {
-		hostnet := restrictedPod(f, "hostnet")
+		hostnet := restrictedPod("hostnet")
 		hostnet.Spec.HostNetwork = true
 		tester(hostnet)
 	})
 
 	By("Running a HostPID pod", func() {
-		hostpid := restrictedPod(f, "hostpid")
+		hostpid := restrictedPod("hostpid")
 		hostpid.Spec.HostPID = true
 		tester(hostpid)
 	})
 
 	By("Running a HostIPC pod", func() {
-		hostipc := restrictedPod(f, "hostipc")
+		hostipc := restrictedPod("hostipc")
 		hostipc.Spec.HostIPC = true
 		tester(hostipc)
 	})
 
 	if common.IsAppArmorSupported() {
 		By("Running a custom AppArmor profile pod", func() {
-			aa := restrictedPod(f, "apparmor")
+			aa := restrictedPod("apparmor")
 			// Every node is expected to have the docker-default profile.
 			aa.Annotations[apparmor.ContainerAnnotationKeyPrefix+"pause"] = "localhost/docker-default"
 			tester(aa)
@@ -213,64 +175,38 @@ func testPrivilegedPods(f *framework.Framework, tester func(pod *v1.Pod)) {
 	}
 
 	By("Running an unconfined Seccomp pod", func() {
-		unconfined := restrictedPod(f, "seccomp")
+		unconfined := restrictedPod("seccomp")
 		unconfined.Annotations[v1.SeccompPodAnnotationKey] = "unconfined"
 		tester(unconfined)
 	})
 
 	By("Running a SYS_ADMIN pod", func() {
-		sysadmin := restrictedPod(f, "sysadmin")
+		sysadmin := restrictedPod("sysadmin")
 		sysadmin.Spec.Containers[0].SecurityContext.Capabilities = &v1.Capabilities{
 			Add: []v1.Capability{"SYS_ADMIN"},
 		}
 		sysadmin.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 		tester(sysadmin)
 	})
+
+	By("Running a RunAsGroup pod", func() {
+		sysadmin := restrictedPod("runasgroup")
+		gid := int64(0)
+		sysadmin.Spec.Containers[0].SecurityContext.RunAsGroup = &gid
+		tester(sysadmin)
+	})
+
+	By("Running a RunAsUser pod", func() {
+		sysadmin := restrictedPod("runasuser")
+		uid := int64(0)
+		sysadmin.Spec.Containers[0].SecurityContext.RunAsUser = &uid
+		tester(sysadmin)
+	})
+
 }
 
-func createAndBindPSP(f *framework.Framework, pspTemplate *extensionsv1beta1.PodSecurityPolicy) (psp *extensionsv1beta1.PodSecurityPolicy, cleanup func()) {
-	// Create the PodSecurityPolicy object.
-	psp = pspTemplate.DeepCopy()
-	// Add the namespace to the name to ensure uniqueness and tie it to the namespace.
-	ns := f.Namespace.Name
-	name := fmt.Sprintf("%s-%s", ns, psp.Name)
-	psp.Name = name
-	psp, err := f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().Create(psp)
-	framework.ExpectNoError(err, "Failed to create PSP")
-
-	// Create the Role to bind it to the namespace.
-	_, err = f.ClientSet.RbacV1beta1().Roles(ns).Create(&rbacv1beta1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Rules: []rbacv1beta1.PolicyRule{{
-			APIGroups:     []string{"extensions"},
-			Resources:     []string{"podsecuritypolicies"},
-			ResourceNames: []string{name},
-			Verbs:         []string{"use"},
-		}},
-	})
-	framework.ExpectNoError(err, "Failed to create PSP role")
-
-	// Bind the role to the namespace.
-	framework.BindRoleInNamespace(f.ClientSet.RbacV1beta1(), name, ns, rbacv1beta1.Subject{
-		Kind:      rbacv1beta1.ServiceAccountKind,
-		Namespace: ns,
-		Name:      "default",
-	})
-	framework.ExpectNoError(framework.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
-		serviceaccount.MakeUsername(ns, "default"), ns, "use", name,
-		schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}, true))
-
-	return psp, func() {
-		// Cleanup non-namespaced PSP object.
-		f.ClientSet.ExtensionsV1beta1().PodSecurityPolicies().Delete(name, &metav1.DeleteOptions{})
-	}
-}
-
-// createAndBindPSPInPolicy creates a PSP in the policy API group (unlike createAndBindPSP()).
-// TODO: merge these functions when PSP will be completely moved out of the extensions
-func createAndBindPSPInPolicy(f *framework.Framework, pspTemplate *policy.PodSecurityPolicy) (psp *policy.PodSecurityPolicy, cleanup func()) {
+// createAndBindPSP creates a PSP in the policy API group.
+func createAndBindPSP(f *framework.Framework, pspTemplate *policy.PodSecurityPolicy) (psp *policy.PodSecurityPolicy, cleanup func()) {
 	// Create the PodSecurityPolicy object.
 	psp = pspTemplate.DeepCopy()
 	// Add the namespace to the name to ensure uniqueness and tie it to the namespace.
@@ -310,22 +246,23 @@ func createAndBindPSPInPolicy(f *framework.Framework, pspTemplate *policy.PodSec
 	}
 }
 
-func restrictedPod(f *framework.Framework, name string) *v1.Pod {
+func restrictedPod(name string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				v1.SeccompPodAnnotationKey:                      "docker/default",
+				v1.SeccompPodAnnotationKey:                      v1.SeccompProfileRuntimeDefault,
 				apparmor.ContainerAnnotationKeyPrefix + "pause": apparmor.ProfileRuntimeDefault,
 			},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:  "pause",
-				Image: framework.GetPauseImageName(f.ClientSet),
+				Image: imageutils.GetPauseImageName(),
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: boolPtr(false),
-					RunAsUser:                intPtr(65534),
+					RunAsUser:                utilpointer.Int64Ptr(nobodyUser),
+					RunAsGroup:               utilpointer.Int64Ptr(nobodyUser),
 				},
 			}},
 		},
@@ -333,8 +270,7 @@ func restrictedPod(f *framework.Framework, name string) *v1.Pod {
 }
 
 // privilegedPSPInPolicy creates a PodSecurityPolicy (in the "policy" API Group) that allows everything.
-// TODO: replace by PrivilegedPSP when PSP will be completely moved out of the extensions
-func privilegedPSPInPolicy(name string) *policy.PodSecurityPolicy {
+func privilegedPSP(name string) *policy.PodSecurityPolicy {
 	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -352,6 +288,9 @@ func privilegedPSPInPolicy(name string) *policy.PodSecurityPolicy {
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyRunAsAny,
 			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyRunAsAny,
+			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,
 			},
@@ -367,14 +306,13 @@ func privilegedPSPInPolicy(name string) *policy.PodSecurityPolicy {
 }
 
 // restrictedPSPInPolicy creates a PodSecurityPolicy (in the "policy" API Group) that is most strict.
-// TODO: replace by restrictedPSP when PSP will be completely moved out of the extensions
-func restrictedPSPInPolicy(name string) *policy.PodSecurityPolicy {
+func restrictedPSP(name string) *policy.PodSecurityPolicy {
 	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  "docker/default",
-				seccomp.DefaultProfileAnnotationKey:   "docker/default",
+				seccomp.AllowedProfilesAnnotationKey:  v1.SeccompProfileRuntimeDefault,
+				seccomp.DefaultProfileAnnotationKey:   v1.SeccompProfileRuntimeDefault,
 				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
 				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
 			},
@@ -408,6 +346,11 @@ func restrictedPSPInPolicy(name string) *policy.PodSecurityPolicy {
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyMustRunAsNonRoot,
 			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyMustRunAs,
+				Ranges: []policy.IDRange{
+					{Min: nobodyUser, Max: nobodyUser}},
+			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,
 			},
@@ -422,65 +365,6 @@ func restrictedPSPInPolicy(name string) *policy.PodSecurityPolicy {
 	}
 }
 
-// restrictedPSP creates a PodSecurityPolicy that is most strict.
-func restrictedPSP(name string) *extensionsv1beta1.PodSecurityPolicy {
-	return &extensionsv1beta1.PodSecurityPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  "docker/default",
-				seccomp.DefaultProfileAnnotationKey:   "docker/default",
-				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
-				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
-			},
-		},
-		Spec: extensionsv1beta1.PodSecurityPolicySpec{
-			Privileged:               false,
-			AllowPrivilegeEscalation: utilpointer.BoolPtr(false),
-			RequiredDropCapabilities: []v1.Capability{
-				"AUDIT_WRITE",
-				"CHOWN",
-				"DAC_OVERRIDE",
-				"FOWNER",
-				"FSETID",
-				"KILL",
-				"MKNOD",
-				"NET_RAW",
-				"SETGID",
-				"SETUID",
-				"SYS_CHROOT",
-			},
-			Volumes: []extensionsv1beta1.FSType{
-				extensionsv1beta1.ConfigMap,
-				extensionsv1beta1.EmptyDir,
-				extensionsv1beta1.PersistentVolumeClaim,
-				"projected",
-				extensionsv1beta1.Secret,
-			},
-			HostNetwork: false,
-			HostIPC:     false,
-			HostPID:     false,
-			RunAsUser: extensionsv1beta1.RunAsUserStrategyOptions{
-				Rule: extensionsv1beta1.RunAsUserStrategyMustRunAsNonRoot,
-			},
-			SELinux: extensionsv1beta1.SELinuxStrategyOptions{
-				Rule: extensionsv1beta1.SELinuxStrategyRunAsAny,
-			},
-			SupplementalGroups: extensionsv1beta1.SupplementalGroupsStrategyOptions{
-				Rule: extensionsv1beta1.SupplementalGroupsStrategyRunAsAny,
-			},
-			FSGroup: extensionsv1beta1.FSGroupStrategyOptions{
-				Rule: extensionsv1beta1.FSGroupStrategyRunAsAny,
-			},
-			ReadOnlyRootFilesystem: false,
-		},
-	}
-}
-
 func boolPtr(b bool) *bool {
 	return &b
-}
-
-func intPtr(i int64) *int64 {
-	return &i
 }

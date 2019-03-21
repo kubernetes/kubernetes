@@ -22,12 +22,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
+	"k8s.io/klog"
 )
 
 // IsNotFound return true if err is NotFoundError or DefaultNotFoundError
@@ -140,7 +140,7 @@ func GetPathFromVMDiskPath(vmDiskPath string) string {
 	datastorePathObj := new(object.DatastorePath)
 	isSuccess := datastorePathObj.FromString(vmDiskPath)
 	if !isSuccess {
-		glog.Errorf("Failed to parse vmDiskPath: %s", vmDiskPath)
+		klog.Errorf("Failed to parse vmDiskPath: %s", vmDiskPath)
 		return ""
 	}
 	return datastorePathObj.Path
@@ -151,7 +151,7 @@ func GetDatastorePathObjFromVMDiskPath(vmDiskPath string) (*object.DatastorePath
 	datastorePathObj := new(object.DatastorePath)
 	isSuccess := datastorePathObj.FromString(vmDiskPath)
 	if !isSuccess {
-		glog.Errorf("Failed to parse volPath: %s", vmDiskPath)
+		klog.Errorf("Failed to parse volPath: %s", vmDiskPath)
 		return nil, fmt.Errorf("Failed to parse volPath: %s", vmDiskPath)
 	}
 	return datastorePathObj, nil
@@ -170,6 +170,15 @@ func IsManagedObjectNotFoundError(err error) bool {
 		_, isManagedObjectNotFoundError = soap.ToSoapFault(err).VimFault().(types.ManagedObjectNotFound)
 	}
 	return isManagedObjectNotFoundError
+}
+
+// IsInvalidCredentialsError returns true if error is of type InvalidLogin
+func IsInvalidCredentialsError(err error) bool {
+	isInvalidCredentialsError := false
+	if soap.IsSoapFault(err) {
+		_, isInvalidCredentialsError = soap.ToSoapFault(err).VimFault().(types.InvalidLogin)
+	}
+	return isInvalidCredentialsError
 }
 
 // VerifyVolumePathsForVM verifies if the volume paths (volPaths) are attached to VM.

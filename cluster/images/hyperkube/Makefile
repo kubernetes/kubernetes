@@ -20,9 +20,9 @@
 REGISTRY?=staging-k8s.gcr.io
 ARCH?=amd64
 OUT_DIR?=_output
-HYPERKUBE_BIN?=$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/hyperkube
+HYPERKUBE_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/hyperkube
 
-BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.10
+BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.12.1
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 
 all: build
@@ -33,14 +33,12 @@ ifndef VERSION
     $(error VERSION is undefined)
 endif
 	cp -r ./* ${TEMP_DIR}
-	cp ../../../${HYPERKUBE_BIN} ${TEMP_DIR}
+	cp ${HYPERKUBE_BIN} ${TEMP_DIR}
 
 	chmod a+rx ${TEMP_DIR}/hyperkube
 
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 
-	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	docker build --pull -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
 

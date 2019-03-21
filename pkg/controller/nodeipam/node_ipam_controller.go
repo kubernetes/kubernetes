@@ -20,7 +20,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -32,7 +32,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	nodesync "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/sync"
@@ -58,8 +58,7 @@ const (
 
 // Controller is the controller that manages node ipam state.
 type Controller struct {
-	allocateNodeCIDRs bool
-	allocatorType     ipam.CIDRAllocatorType
+	allocatorType ipam.CIDRAllocatorType
 
 	cloud       cloudprovider.Interface
 	clusterCIDR *net.IPNet
@@ -88,74 +87,70 @@ func NewNodeIpamController(
 	clusterCIDR *net.IPNet,
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSize int,
-	allocateNodeCIDRs bool,
 	allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
 
 	if kubeClient == nil {
-		glog.Fatalf("kubeClient is nil when starting Controller")
+		klog.Fatalf("kubeClient is nil when starting Controller")
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartLogging(klog.Infof)
 
-	glog.V(0).Infof("Sending events to api server.")
+	klog.Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(
 		&v1core.EventSinkImpl{
-			Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events(""),
+			Interface: kubeClient.CoreV1().Events(""),
 		})
 
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("node_ipam_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
-	if allocateNodeCIDRs {
+	if allocatorType != ipam.CloudAllocatorType {
+		// Cloud CIDR allocator does not rely on clusterCIDR or nodeCIDRMaskSize for allocation.
 		if clusterCIDR == nil {
-			glog.Fatal("Controller: Must specify clusterCIDR if allocateNodeCIDRs == true.")
+			klog.Fatal("Controller: Must specify --cluster-cidr if --allocate-node-cidrs is set")
 		}
-		mask := clusterCIDR.Mask
-		if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSize {
-			glog.Fatal("Controller: Invalid clusterCIDR, mask size of clusterCIDR must be less than nodeCIDRMaskSize.")
+		if maskSize, _ := clusterCIDR.Mask.Size(); maskSize > nodeCIDRMaskSize {
+			klog.Fatal("Controller: Invalid --cluster-cidr, mask size of cluster CIDR must be less than --node-cidr-mask-size")
 		}
 	}
 
 	ic := &Controller{
-		cloud:             cloud,
-		kubeClient:        kubeClient,
-		lookupIP:          net.LookupIP,
-		clusterCIDR:       clusterCIDR,
-		serviceCIDR:       serviceCIDR,
-		allocateNodeCIDRs: allocateNodeCIDRs,
-		allocatorType:     allocatorType,
+		cloud:         cloud,
+		kubeClient:    kubeClient,
+		lookupIP:      net.LookupIP,
+		clusterCIDR:   clusterCIDR,
+		serviceCIDR:   serviceCIDR,
+		allocatorType: allocatorType,
 	}
 
 	// TODO: Abstract this check into a generic controller manager should run method.
-	if ic.allocateNodeCIDRs {
-		if ic.allocatorType == ipam.IPAMFromClusterAllocatorType || ic.allocatorType == ipam.IPAMFromCloudAllocatorType {
-			cfg := &ipam.Config{
-				Resync:       ipamResyncInterval,
-				MaxBackoff:   ipamMaxBackoff,
-				InitialRetry: ipamInitialBackoff,
-			}
-			switch ic.allocatorType {
-			case ipam.IPAMFromClusterAllocatorType:
-				cfg.Mode = nodesync.SyncFromCluster
-			case ipam.IPAMFromCloudAllocatorType:
-				cfg.Mode = nodesync.SyncFromCloud
-			}
-			ipamc, err := ipam.NewController(cfg, kubeClient, cloud, clusterCIDR, serviceCIDR, nodeCIDRMaskSize)
-			if err != nil {
-				glog.Fatalf("Error creating ipam controller: %v", err)
-			}
-			if err := ipamc.Start(nodeInformer); err != nil {
-				glog.Fatalf("Error trying to Init(): %v", err)
-			}
-		} else {
-			var err error
-			ic.cidrAllocator, err = ipam.New(
-				kubeClient, cloud, nodeInformer, ic.allocatorType, ic.clusterCIDR, ic.serviceCIDR, nodeCIDRMaskSize)
-			if err != nil {
-				return nil, err
-			}
+	if ic.allocatorType == ipam.IPAMFromClusterAllocatorType || ic.allocatorType == ipam.IPAMFromCloudAllocatorType {
+		cfg := &ipam.Config{
+			Resync:       ipamResyncInterval,
+			MaxBackoff:   ipamMaxBackoff,
+			InitialRetry: ipamInitialBackoff,
+		}
+		switch ic.allocatorType {
+		case ipam.IPAMFromClusterAllocatorType:
+			cfg.Mode = nodesync.SyncFromCluster
+		case ipam.IPAMFromCloudAllocatorType:
+			cfg.Mode = nodesync.SyncFromCloud
+		}
+		ipamc, err := ipam.NewController(cfg, kubeClient, cloud, clusterCIDR, serviceCIDR, nodeCIDRMaskSize)
+		if err != nil {
+			klog.Fatalf("Error creating ipam controller: %v", err)
+		}
+		if err := ipamc.Start(nodeInformer); err != nil {
+			klog.Fatalf("Error trying to Init(): %v", err)
+		}
+	} else {
+		var err error
+		ic.cidrAllocator, err = ipam.New(
+			kubeClient, cloud, nodeInformer, ic.allocatorType, ic.clusterCIDR, ic.serviceCIDR, nodeCIDRMaskSize)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -169,18 +164,15 @@ func NewNodeIpamController(
 func (nc *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	glog.Infof("Starting ipam controller")
-	defer glog.Infof("Shutting down ipam controller")
+	klog.Infof("Starting ipam controller")
+	defer klog.Infof("Shutting down ipam controller")
 
 	if !controller.WaitForCacheSync("node", stopCh, nc.nodeInformerSynced) {
 		return
 	}
 
-	// TODO: Abstract this check into a generic controller manager should run method.
-	if nc.allocateNodeCIDRs {
-		if nc.allocatorType != ipam.IPAMFromClusterAllocatorType && nc.allocatorType != ipam.IPAMFromCloudAllocatorType {
-			go nc.cidrAllocator.Run(stopCh)
-		}
+	if nc.allocatorType != ipam.IPAMFromClusterAllocatorType && nc.allocatorType != ipam.IPAMFromCloudAllocatorType {
+		go nc.cidrAllocator.Run(stopCh)
 	}
 
 	<-stopCh

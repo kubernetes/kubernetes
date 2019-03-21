@@ -19,10 +19,11 @@ package install
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	testapigroupfuzzer "k8s.io/apimachinery/pkg/apis/testapigroup/fuzzer"
 )
 
 func TestRoundTrip(t *testing.T) {
 	roundtrip.RoundTripTestForAPIGroup(t, Install, testapigroupfuzzer.Funcs)
+	roundtrip.RoundTripProtobufTestForAPIGroup(t, Install, testapigroupfuzzer.Funcs)
 }

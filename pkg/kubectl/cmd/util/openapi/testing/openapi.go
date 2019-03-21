@@ -17,86 +17,17 @@ limitations under the License.
 package testing
 
 import (
-	"io/ioutil"
-	"os"
-	"sync"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/util/proto/testing"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-
-	yaml "gopkg.in/yaml.v2"
-
-	"github.com/googleapis/gnostic/OpenAPIv2"
-	"github.com/googleapis/gnostic/compiler"
 )
-
-// Fake opens and returns a openapi swagger from a file Path. It will
-// parse only once and then return the same copy everytime.
-type Fake struct {
-	Path string
-
-	once     sync.Once
-	document *openapi_v2.Document
-	err      error
-}
-
-// OpenAPISchema returns the openapi document and a potential error.
-func (f *Fake) OpenAPISchema() (*openapi_v2.Document, error) {
-	f.once.Do(func() {
-		_, err := os.Stat(f.Path)
-		if err != nil {
-			f.err = err
-			return
-		}
-		spec, err := ioutil.ReadFile(f.Path)
-		if err != nil {
-			f.err = err
-			return
-		}
-		var info yaml.MapSlice
-		err = yaml.Unmarshal(spec, &info)
-		if err != nil {
-			f.err = err
-			return
-		}
-		f.document, f.err = openapi_v2.NewDocument(info, compiler.NewContext("$root", nil))
-	})
-	return f.document, f.err
-}
-
-// FakeClient implements a dummy OpenAPISchemaInterface that uses the
-// fake OpenAPI schema given as a parameter, and count the number of
-// call to the function.
-type FakeClient struct {
-	Calls int
-	Err   error
-
-	fake *Fake
-}
-
-// NewFakeClient creates a new FakeClient from the given Fake.
-func NewFakeClient(f *Fake) *FakeClient {
-	return &FakeClient{fake: f}
-}
-
-// OpenAPISchema returns a OpenAPI Document as returned by the fake, but
-// it also counts the number of calls.
-func (f *FakeClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	f.Calls = f.Calls + 1
-
-	if f.Err != nil {
-		return nil, f.Err
-	}
-
-	return f.fake.OpenAPISchema()
-}
 
 // FakeResources is a wrapper to directly load the openapi schema from a
 // file, and get the schema for given GVK. This is only for test since
 // it's assuming that the file is there and everything will go fine.
 type FakeResources struct {
-	fake Fake
+	fake testing.Fake
 }
 
 var _ openapi.Resources = &FakeResources{}
@@ -104,7 +35,7 @@ var _ openapi.Resources = &FakeResources{}
 // NewFakeResources creates a new FakeResources.
 func NewFakeResources(path string) *FakeResources {
 	return &FakeResources{
-		fake: Fake{Path: path},
+		fake: testing.Fake{Path: path},
 	}
 }
 

@@ -22,8 +22,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -31,12 +32,11 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/client-go/informers"
+	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	psp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
@@ -61,7 +61,7 @@ type PodSecurityPolicyPlugin struct {
 	strategyFactory  psp.StrategyFactory
 	failOnNoPolicies bool
 	authz            authorizer.Authorizer
-	lister           extensionslisters.PodSecurityPolicyLister
+	lister           policylisters.PodSecurityPolicyLister
 }
 
 // SetAuthorizer sets the authorizer.
@@ -83,7 +83,8 @@ func (plugin *PodSecurityPolicyPlugin) ValidateInitialization() error {
 var _ admission.MutationInterface = &PodSecurityPolicyPlugin{}
 var _ admission.ValidationInterface = &PodSecurityPolicyPlugin{}
 var _ genericadmissioninit.WantsAuthorizer = &PodSecurityPolicyPlugin{}
-var _ kubeapiserveradmission.WantsInternalKubeInformerFactory = &PodSecurityPolicyPlugin{}
+var _ genericadmissioninit.WantsExternalKubeInformerFactory = &PodSecurityPolicyPlugin{}
+var auditKeyPrefix = strings.ToLower(PluginName) + "." + policy.GroupName + ".k8s.io"
 
 // newPlugin creates a new PSP admission plugin.
 func newPlugin(strategyFactory psp.StrategyFactory, failOnNoPolicies bool) *PodSecurityPolicyPlugin {
@@ -94,8 +95,8 @@ func newPlugin(strategyFactory psp.StrategyFactory, failOnNoPolicies bool) *PodS
 	}
 }
 
-func (a *PodSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	podSecurityPolicyInformer := f.Extensions().InternalVersion().PodSecurityPolicies()
+func (a *PodSecurityPolicyPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	podSecurityPolicyInformer := f.Policy().V1beta1().PodSecurityPolicies()
 	a.lister = podSecurityPolicyInformer.Lister()
 	a.SetReadyFunc(podSecurityPolicyInformer.Informer().HasSynced)
 }
@@ -108,7 +109,7 @@ func (a *PodSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.Sha
 // 3.  Try to generate and validate a PSP with providers.  If we find one then admit the pod
 //     with the validated PSP.  If we don't find any reject the pod and give all errors from the
 //     failed attempts.
-func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
+func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if ignore, err := shouldIgnore(a); err != nil {
 		return err
 	} else if ignore {
@@ -131,20 +132,24 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 	if allowedPod != nil {
 		*pod = *allowedPod
 		// annotate and accept the pod
-		glog.V(4).Infof("pod %s (generate: %s) in namespace %s validated against provider %s", pod.Name, pod.GenerateName, a.GetNamespace(), pspName)
+		klog.V(4).Infof("pod %s (generate: %s) in namespace %s validated against provider %s", pod.Name, pod.GenerateName, a.GetNamespace(), pspName)
 		if pod.ObjectMeta.Annotations == nil {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
 		pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation] = pspName
+		key := auditKeyPrefix + "/" + "admit-policy"
+		if err := a.AddAnnotation(key, pspName); err != nil {
+			klog.Warningf("failed to set admission audit annotation %s to %s: %v", key, pspName, err)
+		}
 		return nil
 	}
 
 	// we didn't validate against any provider, reject the pod and give the errors for each attempt
-	glog.V(4).Infof("unable to validate pod %s (generate: %s) in namespace %s against any pod security policy: %v", pod.Name, pod.GenerateName, a.GetNamespace(), validationErrs)
+	klog.V(4).Infof("unable to validate pod %s (generate: %s) in namespace %s against any pod security policy: %v", pod.Name, pod.GenerateName, a.GetNamespace(), validationErrs)
 	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any pod security policy: %v", validationErrs))
 }
 
-func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
+func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if ignore, err := shouldIgnore(a); err != nil {
 		return err
 	} else if ignore {
@@ -154,16 +159,20 @@ func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
 	pod := a.GetObject().(*api.Pod)
 
 	// compute the context. Mutation is not allowed. ValidatedPSPAnnotation is used as a hint to gain same speed-up.
-	allowedPod, _, validationErrs, err := c.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
+	allowedPod, pspName, validationErrs, err := c.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
 	if apiequality.Semantic.DeepEqual(pod, allowedPod) {
+		key := auditKeyPrefix + "/" + "validate-policy"
+		if err := a.AddAnnotation(key, pspName); err != nil {
+			klog.Warningf("failed to set admission audit annotation %s to %s: %v", key, pspName, err)
+		}
 		return nil
 	}
 
 	// we didn't validate against any provider, reject the pod and give the errors for each attempt
-	glog.V(4).Infof("unable to validate pod %s (generate: %s) in namespace %s against any pod security policy: %v", pod.Name, pod.GenerateName, a.GetNamespace(), validationErrs)
+	klog.V(4).Infof("unable to validate pod %s (generate: %s) in namespace %s against any pod security policy: %v", pod.Name, pod.GenerateName, a.GetNamespace(), validationErrs)
 	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any pod security policy: %v", validationErrs))
 }
 
@@ -198,7 +207,7 @@ func shouldIgnore(a admission.Attributes) (bool, error) {
 // saved in kubernetes.io/psp annotation. This psp is usually the one we are looking for.
 func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes, pod *api.Pod, specMutationAllowed bool, validatedPSPHint string) (*api.Pod, string, field.ErrorList, error) {
 	// get all constraints that are usable by the user
-	glog.V(4).Infof("getting pod security policies for pod %s (generate: %s)", pod.Name, pod.GenerateName)
+	klog.V(4).Infof("getting pod security policies for pod %s (generate: %s)", pod.Name, pod.GenerateName)
 	var saInfo user.Info
 	if len(pod.Spec.ServiceAccountName) > 0 {
 		saInfo = serviceaccount.UserInfo(a.GetNamespace(), pod.Spec.ServiceAccountName, "")
@@ -232,7 +241,7 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 
 	providers, errs := c.createProvidersFromPolicies(policies, pod.Namespace)
 	for _, err := range errs {
-		glog.V(4).Infof("provider creation error: %v", err)
+		klog.V(4).Infof("provider creation error: %v", err)
 	}
 
 	if len(providers) == 0 {
@@ -249,7 +258,7 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 	for _, provider := range providers {
 		podCopy := pod.DeepCopy()
 
-		if errs := assignSecurityContext(provider, podCopy, field.NewPath(fmt.Sprintf("provider %s: ", provider.GetPSPName()))); len(errs) > 0 {
+		if errs := assignSecurityContext(provider, podCopy); len(errs) > 0 {
 			validationErrs[provider.GetPSPName()] = errs
 			continue
 		}
@@ -294,7 +303,7 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 // assignSecurityContext creates a security context for each container in the pod
 // and validates that the sc falls within the psp constraints.  All containers must validate against
 // the same psp or is not considered valid.
-func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.Path) field.ErrorList {
+func assignSecurityContext(provider psp.Provider, pod *api.Pod) field.ErrorList {
 	errs := field.ErrorList{}
 
 	err := provider.DefaultPodSecurityContext(pod)
@@ -302,7 +311,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 		errs = append(errs, field.Invalid(field.NewPath("spec", "securityContext"), pod.Spec.SecurityContext, err.Error()))
 	}
 
-	errs = append(errs, provider.ValidatePod(pod, field.NewPath("spec", "securityContext"))...)
+	errs = append(errs, provider.ValidatePod(pod)...)
 
 	for i := range pod.Spec.InitContainers {
 		err := provider.DefaultContainerSecurityContext(pod, &pod.Spec.InitContainers[i])
@@ -310,7 +319,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 			errs = append(errs, field.Invalid(field.NewPath("spec", "initContainers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
 		}
-		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i).Child("securityContext"))...)
+		errs = append(errs, provider.ValidateContainer(pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i))...)
 	}
 
 	for i := range pod.Spec.Containers {
@@ -319,7 +328,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 			errs = append(errs, field.Invalid(field.NewPath("spec", "containers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
 		}
-		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i).Child("securityContext"))...)
+		errs = append(errs, provider.ValidateContainer(pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i))...)
 	}
 
 	if len(errs) > 0 {
@@ -329,7 +338,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 }
 
 // createProvidersFromPolicies creates providers from the constraints supplied.
-func (c *PodSecurityPolicyPlugin) createProvidersFromPolicies(psps []*extensions.PodSecurityPolicy, namespace string) ([]psp.Provider, []error) {
+func (c *PodSecurityPolicyPlugin) createProvidersFromPolicies(psps []*policyv1beta1.PodSecurityPolicy, namespace string) ([]psp.Provider, []error) {
 	var (
 		// collected providers
 		providers []psp.Provider
@@ -370,7 +379,7 @@ func authorizedForPolicyInAPIGroup(info user.Info, namespace, policyName, apiGro
 	attr := buildAttributes(info, namespace, policyName, apiGroupName)
 	decision, reason, err := authz.Authorize(attr)
 	if err != nil {
-		glog.V(5).Infof("cannot authorize for policy: %v,%v", reason, err)
+		klog.V(5).Infof("cannot authorize for policy: %v,%v", reason, err)
 	}
 	return (decision == authorizer.DecisionAllow)
 }

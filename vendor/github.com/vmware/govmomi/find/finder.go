@@ -716,7 +716,7 @@ func (f *Finder) HostSystem(ctx context.Context, path string) (*object.HostSyste
 }
 
 func (f *Finder) DefaultHostSystem(ctx context.Context) (*object.HostSystem, error) {
-	hs, err := f.HostSystem(ctx, "*/*")
+	hs, err := f.HostSystem(ctx, "*")
 	if err != nil {
 		return nil, toDefaultError(err)
 	}

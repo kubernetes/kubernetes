@@ -15,12 +15,17 @@
 package v3election
 
 import (
-	"golang.org/x/net/context"
+	"context"
+	"errors"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/clientv3/concurrency"
 	epb "github.com/coreos/etcd/etcdserver/api/v3election/v3electionpb"
 )
+
+// ErrMissingLeaderKey is returned when election API request
+// is missing the "leader" field.
+var ErrMissingLeaderKey = errors.New(`"leader" field must be provided`)
 
 type electionServer struct {
 	c *clientv3.Client
@@ -51,6 +56,9 @@ func (es *electionServer) Campaign(ctx context.Context, req *epb.CampaignRequest
 }
 
 func (es *electionServer) Proclaim(ctx context.Context, req *epb.ProclaimRequest) (*epb.ProclaimResponse, error) {
+	if req.Leader == nil {
+		return nil, ErrMissingLeaderKey
+	}
 	s, err := es.session(ctx, req.Leader.Lease)
 	if err != nil {
 		return nil, err
@@ -98,6 +106,9 @@ func (es *electionServer) Leader(ctx context.Context, req *epb.LeaderRequest) (*
 }
 
 func (es *electionServer) Resign(ctx context.Context, req *epb.ResignRequest) (*epb.ResignResponse, error) {
+	if req.Leader == nil {
+		return nil, ErrMissingLeaderKey
+	}
 	s, err := es.session(ctx, req.Leader.Lease)
 	if err != nil {
 		return nil, err

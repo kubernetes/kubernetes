@@ -76,9 +76,10 @@ type ListMeta struct {
 	// continue may be set if the user set a limit on the number of items returned, and indicates that
 	// the server has more data available. The value is opaque and may be used to issue another request
 	// to the endpoint that served this list to retrieve the next set of available objects. Continuing a
-	// list may not be possible if the server configuration has changed or more than a few minutes have
-	// passed. The resourceVersion field returned when using this continue value will be identical to
-	// the value in the first response.
+	// consistent list may not be possible if the server configuration has changed or more than a few
+	// minutes have passed. The resourceVersion field returned when using this continue value will be
+	// identical to the value in the first response, unless you have received this token from an error
+	// message.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,3,opt,name=continue"`
 }
 
@@ -234,6 +235,8 @@ type ObjectMeta struct {
 	// When an object is created, the system will populate this list with the current set of initializers.
 	// Only privileged users may set or modify this list. Once it is empty, it may not be modified further
 	// by any user.
+	//
+	// DEPRECATED - initializers are an alpha field and will be removed in v1.15.
 	Initializers *Initializers `json:"initializers,omitempty" protobuf:"bytes,16,opt,name=initializers"`
 
 	// Must be empty before the object is deleted from the registry. Each entry
@@ -249,6 +252,19 @@ type ObjectMeta struct {
 	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
+
+	// ManagedFields maps workflow-id and version to the set of fields
+	// that are managed by that workflow. This is mostly for internal
+	// housekeeping, and users typically shouldn't need to set or
+	// understand this field. A workflow can be the user's name, a
+	// controller's name, or the name of a specific apply path like
+	// "ci-cd". The set of fields is always in the version that the
+	// workflow used when modifying the object.
+	//
+	// This field is alpha and can be changed or removed without notice.
+	//
+	// +optional
+	ManagedFields []ManagedFieldsEntry `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
 }
 
 // Initializers tracks the progress of initialization.
@@ -285,8 +301,8 @@ const (
 )
 
 // OwnerReference contains enough information to let you identify an owning
-// object. Currently, an owning object must be in the same namespace, so there
-// is no namespace field.
+// object. An owning object must be in the same namespace as the dependent, or
+// be cluster-scoped, so there is no namespace field.
 type OwnerReference struct {
 	// API version of the referent.
 	APIVersion string `json:"apiVersion" protobuf:"bytes,5,opt,name=apiVersion"`
@@ -326,9 +342,9 @@ type ListOptions struct {
 	// Defaults to everything.
 	// +optional
 	FieldSelector string `json:"fieldSelector,omitempty" protobuf:"bytes,2,opt,name=fieldSelector"`
-	// If true, partially initialized resources are included in the response.
-	// +optional
-	IncludeUninitialized bool `json:"includeUninitialized,omitempty" protobuf:"varint,6,opt,name=includeUninitialized"`
+
+	// +k8s:deprecated=includeUninitialized,protobuf=6
+
 	// Watch for changes to the described resources and return them as a stream of
 	// add, update, and remove notifications. Specify resourceVersion.
 	// +optional
@@ -363,25 +379,34 @@ type ListOptions struct {
 	// updated during a chunked list the version of the object that was present at the time the first list
 	// result was calculated is returned.
 	Limit int64 `json:"limit,omitempty" protobuf:"varint,7,opt,name=limit"`
-	// The continue option should be set when retrieving more results from the server. Since this value
-	// is server defined, clients may only use the continue value from a previous query result with
-	// identical query parameters (except for the value of continue) and the server may reject a continue
-	// value it does not recognize. If the specified continue value is no longer valid whether due to
-	// expiration (generally five to fifteen minutes) or a configuration change on the server the server
-	// will respond with a 410 ResourceExpired error indicating the client must restart their list without
-	// the continue field. This field is not supported when watch is true. Clients may start a watch from
-	// the last resourceVersion value returned by the server and not miss any modifications.
+	// The continue option should be set when retrieving more results from the server. Since this value is
+	// server defined, clients may only use the continue value from a previous query result with identical
+	// query parameters (except for the value of continue) and the server may reject a continue value it
+	// does not recognize. If the specified continue value is no longer valid whether due to expiration
+	// (generally five to fifteen minutes) or a configuration change on the server, the server will
+	// respond with a 410 ResourceExpired error together with a continue token. If the client needs a
+	// consistent list, it must restart their list without the continue field. Otherwise, the client may
+	// send another list request with the token received with the 410 error, the server will respond with
+	// a list starting from the next key, but from the latest snapshot, which is inconsistent from the
+	// previous list results - objects that are created, modified, or deleted after the first list request
+	// will be included in the response, as long as their keys are after the "next key".
+	//
+	// This field is not supported when watch is true. Clients may start a watch from the last
+	// resourceVersion value returned by the server and not miss any modifications.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,8,opt,name=continue"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ExportOptions is the query options to the standard REST get call.
+// Deprecated. Planned for removal in 1.18.
 type ExportOptions struct {
 	TypeMeta `json:",inline"`
 	// Should this value be exported.  Export strips fields that a user can not specify.
+	// Deprecated. Planned for removal in 1.18.
 	Export bool `json:"export" protobuf:"varint,1,opt,name=export"`
 	// Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.
+	// Deprecated. Planned for removal in 1.18.
 	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
 }
 
@@ -395,9 +420,7 @@ type GetOptions struct {
 	// - if it's 0, then we simply return what we currently have in cache, no guarantee;
 	// - if set to non zero, then the result is at least as fresh as given rv.
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,1,opt,name=resourceVersion"`
-	// If true, partially initialized resources are included in the response.
-	// +optional
-	IncludeUninitialized bool `json:"includeUninitialized,omitempty" protobuf:"varint,2,opt,name=includeUninitialized"`
+	// +k8s:deprecated=includeUninitialized,protobuf=2
 }
 
 // DeletionPropagation decides if a deletion will propagate to the dependents of
@@ -416,6 +439,12 @@ const (
 	// finalizer on the object, and sets its deletionTimestamp.  This policy is
 	// cascading, i.e., the dependents will be deleted with Foreground.
 	DeletePropagationForeground DeletionPropagation = "Foreground"
+)
+
+const (
+	// DryRunAll means to complete all processing stages, but don't
+	// persist changes to storage.
+	DryRunAll = "All"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -453,6 +482,92 @@ type DeleteOptions struct {
 	// foreground.
 	// +optional
 	PropagationPolicy *DeletionPropagation `json:"propagationPolicy,omitempty" protobuf:"varint,4,opt,name=propagationPolicy"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CreateOptions may be provided when creating an API object.
+type CreateOptions struct {
+	TypeMeta `json:",inline"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
+	// +k8s:deprecated=includeUninitialized,protobuf=2
+
+	// fieldManager is a name associated with the actor or entity
+	// that is making these changes. The value must be less than or
+	// 128 characters long, and only contain printable characters,
+	// as defined by https://golang.org/pkg/unicode/#IsPrint.
+	// +optional
+	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,3,name=fieldManager"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PatchOptions may be provided when patching an API object.
+// PatchOptions is meant to be a superset of UpdateOptions.
+type PatchOptions struct {
+	TypeMeta `json:",inline"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
+
+	// Force is going to "force" Apply requests. It means user will
+	// re-acquire conflicting fields owned by other people. Force
+	// flag must be unset for non-apply patch requests.
+	// +optional
+	Force *bool `json:"force,omitempty" protobuf:"varint,2,opt,name=force"`
+
+	// fieldManager is a name associated with the actor or entity
+	// that is making these changes. The value must be less than or
+	// 128 characters long, and only contain printable characters,
+	// as defined by https://golang.org/pkg/unicode/#IsPrint. This
+	// field is required for apply requests
+	// (application/apply-patch) but optional for non-apply patch
+	// types (JsonPatch, MergePatch, StrategicMergePatch).
+	// +optional
+	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,3,name=fieldManager"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UpdateOptions may be provided when updating an API object.
+// All fields in UpdateOptions should also be present in PatchOptions.
+type UpdateOptions struct {
+	TypeMeta `json:",inline"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
+
+	// fieldManager is a name associated with the actor or entity
+	// that is making these changes. The value must be less than or
+	// 128 characters long, and only contain printable characters,
+	// as defined by https://golang.org/pkg/unicode/#IsPrint.
+	// +optional
+	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,2,name=fieldManager"`
 }
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
@@ -460,6 +575,9 @@ type Preconditions struct {
 	// Specifies the target UID.
 	// +optional
 	UID *types.UID `json:"uid,omitempty" protobuf:"bytes,1,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
+	// Specifies the target ResourceVersion
+	// +optional
+	ResourceVersion *string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -658,6 +776,10 @@ const (
 	// Status code 406
 	StatusReasonNotAcceptable StatusReason = "NotAcceptable"
 
+	// StatusReasonRequestEntityTooLarge means that the request entity is too large.
+	// Status code 413
+	StatusReasonRequestEntityTooLarge StatusReason = "RequestEntityTooLarge"
+
 	// StatusReasonUnsupportedMediaType means that the content type sent by the client is not acceptable
 	// to the server - for instance, attempting to send protobuf for a resource that supports only json and yaml.
 	// API calls that return UnsupportedMediaType can never succeed.
@@ -733,6 +855,9 @@ const (
 	// without the expected return type. The presence of this cause indicates the error may be
 	// due to an intervening proxy or the server software malfunctioning.
 	CauseTypeUnexpectedServerResponse CauseType = "UnexpectedServerResponse"
+	// FieldManagerConflict is used to report when another client claims to manage this field,
+	// It should only be returned for a request using server-side apply.
+	CauseTypeFieldManagerConflict CauseType = "FieldManagerConflict"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -799,7 +924,8 @@ type APIGroup struct {
 	// The server returns only those CIDRs that it thinks that the client can match.
 	// For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
 	// Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
-	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" protobuf:"bytes,4,rep,name=serverAddressByClientCIDRs"`
+	// +optional
+	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs,omitempty" protobuf:"bytes,4,rep,name=serverAddressByClientCIDRs"`
 }
 
 // ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.
@@ -846,6 +972,15 @@ type APIResource struct {
 	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,5,rep,name=shortNames"`
 	// categories is a list of the grouped resources this resource belongs to (e.g. 'all')
 	Categories []string `json:"categories,omitempty" protobuf:"bytes,7,rep,name=categories"`
+	// The hash value of the storage version, the version this resource is
+	// converted to when written to the data store. Value must be treated
+	// as opaque by clients. Only equality comparison on the value is valid.
+	// This is an alpha feature and may change or be removed in the future.
+	// The field is populated by the apiserver only if the
+	// StorageVersionHash feature gate is enabled.
+	// This field will remain optional even if it graduates.
+	// +optional
+	StorageVersionHash string `json:"storageVersionHash,omitempty" protobuf:"bytes,10,opt,name=storageVersionHash"`
 }
 
 // Verbs masks the value so protobuf can generate
@@ -947,3 +1082,49 @@ const (
 	LabelSelectorOpExists       LabelSelectorOperator = "Exists"
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
 )
+
+// ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource
+// that the fieldset applies to.
+type ManagedFieldsEntry struct {
+	// Manager is an identifier of the workflow managing these fields.
+	Manager string `json:"manager,omitempty" protobuf:"bytes,1,opt,name=manager"`
+	// Operation is the type of operation which lead to this ManagedFieldsEntry being created.
+	// The only valid values for this field are 'Apply' and 'Update'.
+	Operation ManagedFieldsOperationType `json:"operation,omitempty" protobuf:"bytes,2,opt,name=operation,casttype=ManagedFieldsOperationType"`
+	// APIVersion defines the version of this resource that this field set
+	// applies to. The format is "group/version" just like the top-level
+	// APIVersion field. It is necessary to track the version of a field
+	// set because it cannot be automatically converted.
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
+	// Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
+	// +optional
+	Time *Time `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
+	// Fields identifies a set of fields.
+	// +optional
+	Fields *Fields `json:"fields,omitempty" protobuf:"bytes,5,opt,name=fields,casttype=Fields"`
+}
+
+// ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.
+type ManagedFieldsOperationType string
+
+const (
+	ManagedFieldsOperationApply  ManagedFieldsOperationType = "Apply"
+	ManagedFieldsOperationUpdate ManagedFieldsOperationType = "Update"
+)
+
+// Fields stores a set of fields in a data structure like a Trie.
+// To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff
+type Fields struct {
+	// Map stores a set of fields in a data structure like a Trie.
+	//
+	// Each key is either a '.' representing the field itself, and will always map to an empty set,
+	// or a string representing a sub-field or item. The string will follow one of these four formats:
+	// 'f:<name>', where <name> is the name of a field in a struct, or key in a map
+	// 'v:<value>', where <value> is the exact json formatted value of a list item
+	// 'i:<index>', where <index> is position of a item in a list
+	// 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values
+	// If a key maps to an empty Fields value, the field that key represents is part of the set.
+	//
+	// The exact format is defined in k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal
+	Map map[string]Fields `json:",inline" protobuf:"bytes,1,rep,name=map"`
+}

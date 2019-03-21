@@ -17,12 +17,9 @@ limitations under the License.
 package storage
 
 import (
-	"os"
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,8 +33,6 @@ import (
 var (
 	v1GroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
 
-	registry       = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
-	announce       = make(announced.APIGroupFactoryRegistry)
 	scheme         = runtime.NewScheme()
 	codecs         = serializer.NewCodecFactory(scheme)
 	parameterCodec = runtime.NewParameterCodec(scheme)
@@ -53,7 +48,7 @@ func init() {
 		&metav1.APIResourceList{},
 	)
 
-	exampleinstall.Install(announce, registry, scheme)
+	exampleinstall.Install(scheme)
 }
 
 type fakeNegotiater struct {
@@ -94,7 +89,7 @@ func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Decoder, gv runtime
 
 func TestConfigurableStorageFactory(t *testing.T) {
 	ns := &fakeNegotiater{types: []string{"test/test"}}
-	f := NewDefaultStorageFactory(storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(registry), NewResourceConfig(), nil)
+	f := NewDefaultStorageFactory(storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
 	f.AddCohabitatingResources(example.Resource("test"), schema.GroupResource{Resource: "test2", Group: "2"})
 	called := false
 	testEncoderChain := func(e runtime.Encoder) runtime.Encoder {
@@ -109,7 +104,7 @@ func TestConfigurableStorageFactory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Prefix != "/prefix_for_test" || !reflect.DeepEqual(config.ServerList, []string{"/server2"}) {
+	if config.Prefix != "/prefix_for_test" || !reflect.DeepEqual(config.Transport.ServerList, []string{"/server2"}) {
 		t.Errorf("unexpected config %#v", config)
 	}
 	if !called {
@@ -118,9 +113,7 @@ func TestConfigurableStorageFactory(t *testing.T) {
 }
 
 func TestUpdateEtcdOverrides(t *testing.T) {
-	registry := registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
-	announced := make(announced.APIGroupFactoryRegistry)
-	exampleinstall.Install(announced, registry, scheme)
+	exampleinstall.Install(scheme)
 
 	testCases := []struct {
 		resource schema.GroupResource
@@ -143,10 +136,12 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 	defaultEtcdLocation := []string{"http://127.0.0.1"}
 	for i, test := range testCases {
 		defaultConfig := storagebackend.Config{
-			Prefix:     "/registry",
-			ServerList: defaultEtcdLocation,
+			Prefix: "/registry",
+			Transport: storagebackend.TransportConfig{
+				ServerList: defaultEtcdLocation,
+			},
 		}
-		storageFactory := NewDefaultStorageFactory(defaultConfig, "", codecs, NewDefaultResourceEncodingConfig(registry), NewResourceConfig(), nil)
+		storageFactory := NewDefaultStorageFactory(defaultConfig, "", codecs, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
 
 		var err error
@@ -155,8 +150,8 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(config.ServerList, test.servers) {
-			t.Errorf("%d: expected %v, got %v", i, test.servers, config.ServerList)
+		if !reflect.DeepEqual(config.Transport.ServerList, test.servers) {
+			t.Errorf("%d: expected %v, got %v", i, test.servers, config.Transport.ServerList)
 			continue
 		}
 
@@ -165,8 +160,8 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(config.ServerList, defaultEtcdLocation) {
-			t.Errorf("%d: expected %v, got %v", i, defaultEtcdLocation, config.ServerList)
+		if !reflect.DeepEqual(config.Transport.ServerList, defaultEtcdLocation) {
+			t.Errorf("%d: expected %v, got %v", i, defaultEtcdLocation, config.Transport.ServerList)
 			continue
 		}
 

@@ -9,6 +9,7 @@ go_library(
         "reasons.go",
         "warning.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/pquerna/cachecontrol/cacheobject",
     importpath = "github.com/pquerna/cachecontrol/cacheobject",
     visibility = ["//visibility:public"],
 )

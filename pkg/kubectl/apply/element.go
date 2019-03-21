@@ -153,12 +153,6 @@ func (mk MergeKeys) GetMergeKeyValue(i interface{}) (MergeKeyValue, error) {
 
 type source int
 
-const (
-	recorded source = iota
-	local
-	remote
-)
-
 // CombinedPrimitiveSlice implements a slice of primitives
 type CombinedPrimitiveSlice struct {
 	Items []*PrimitiveListItem
@@ -415,4 +409,9 @@ func (e HasElementData) HasLocal() bool {
 // HasRemote implements Element.HasRemote
 func (e HasElementData) HasRemote() bool {
 	return e.remoteSet
+}
+
+// ConflictDetector defines the capability to detect conflict. An element can examine remote/recorded value to detect conflict.
+type ConflictDetector interface {
+	HasConflict() error
 }

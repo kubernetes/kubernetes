@@ -86,6 +86,9 @@ func SetObjectDefaults_PodPreset(in *v1alpha1.PodPreset) {
 						}
 					}
 				}
+				if b.ServiceAccountToken != nil {
+					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {

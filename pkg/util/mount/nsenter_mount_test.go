@@ -21,9 +21,11 @@ package mount
 import (
 	"io/ioutil"
 	"os"
-	"path"
-	"strconv"
+	"os/user"
+	"path/filepath"
 	"testing"
+
+	"k8s.io/utils/nsenter"
 )
 
 func TestParseFindMnt(t *testing.T) {
@@ -72,120 +74,357 @@ func TestParseFindMnt(t *testing.T) {
 	}
 }
 
-func TestGetPidOnHost(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "get_pid_on_host_tests")
-	if err != nil {
-		t.Fatalf(err.Error())
+func newFakeNsenterMounter(tmpdir string, t *testing.T) (mounter *NsenterMounter, rootfsPath string, varlibPath string, err error) {
+	rootfsPath = filepath.Join(tmpdir, "rootfs")
+	if err := os.Mkdir(rootfsPath, 0755); err != nil {
+		return nil, "", "", err
 	}
-	defer os.RemoveAll(tempDir)
+	ne, err := nsenter.NewFakeNsenter(rootfsPath)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	varlibPath = filepath.Join(tmpdir, "/var/lib/kubelet")
+	if err := os.MkdirAll(varlibPath, 0755); err != nil {
+		return nil, "", "", err
+	}
+
+	return NewNsenterMounter(varlibPath, ne), rootfsPath, varlibPath, nil
+}
+
+func TestNsenterExistsFile(t *testing.T) {
+	var isRoot bool
+	usr, err := user.Current()
+	if err == nil {
+		isRoot = usr.Username == "root"
+	} else {
+		switch err.(type) {
+		case user.UnknownUserIdError:
+			// Root should be always known, this is some random UID
+			isRoot = false
+		default:
+			t.Fatal(err)
+		}
+	}
 
 	tests := []struct {
-		name        string
-		procFile    string
-		expectedPid int
-		expectError bool
+		name           string
+		prepare        func(base, rootfs string) (string, error)
+		expectedOutput bool
+		expectError    bool
 	}{
 		{
-			name: "valid status file",
-			procFile: `Name:	cat
-Umask:	0002
-State:	R (running)
-Tgid:	15041
-Ngid:	0
-Pid:	15041
-PPid:	22699
-TracerPid:	0
-Uid:	1000	1000	1000	1000
-Gid:	1000	1000	1000	1000
-FDSize:	256
-Groups:	10 135 156 157 158 973 984 1000 1001
-NStgid:	15041
-NSpid:	15041
-NSpgid:	15041
-NSsid:	22699
-VmPeak:	  115016 kB
-VmSize:	  115016 kB
-VmLck:	       0 kB
-VmPin:	       0 kB
-VmHWM:	     816 kB
-VmRSS:	     816 kB
-RssAnon:	      64 kB
-RssFile:	     752 kB
-RssShmem:	       0 kB
-VmData:	     312 kB
-VmStk:	     136 kB
-VmExe:	      32 kB
-VmLib:	    2060 kB
-VmPTE:	      44 kB
-VmPMD:	      12 kB
-VmSwap:	       0 kB
-HugetlbPages:	       0 kB
-Threads:	1
-SigQ:	2/60752
-SigPnd:	0000000000000000
-ShdPnd:	0000000000000000
-SigBlk:	0000000000000000
-SigIgn:	0000000000000000
-SigCgt:	0000000000000000
-CapInh:	0000000000000000
-CapPrm:	0000000000000000
-CapEff:	0000000000000000
-CapBnd:	0000003fffffffff
-CapAmb:	0000000000000000
-NoNewPrivs:	0
-Seccomp:	0
-Cpus_allowed:	ff
-Cpus_allowed_list:	0-7
-Mems_allowed:	00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000001
-Mems_allowed_list:	0
-voluntary_ctxt_switches:	0
-nonvoluntary_ctxt_switches:	0
-`,
-			expectedPid: 15041,
+			name: "simple existing file",
+			prepare: func(base, rootfs string) (string, error) {
+				// On the host: /base/file
+				path := filepath.Join(base, "file")
+				if err := ioutil.WriteFile(path, []byte{}, 0644); err != nil {
+					return "", err
+				}
+				// In kubelet: /rootfs/base/file
+				if _, err := writeRootfsFile(rootfs, path, 0644); err != nil {
+					return "", err
+				}
+				return path, nil
+			},
+			expectedOutput: true,
 		},
 		{
-			name: "no Pid:",
-			procFile: `Name:	cat
-Umask:	0002
-State:	R (running)
-Tgid:	15041
-Ngid:	0
-PPid:	22699
-`,
-			expectedPid: 0,
-			expectError: true,
+			name: "simple non-existing file",
+			prepare: func(base, rootfs string) (string, error) {
+				path := filepath.Join(base, "file")
+				return path, nil
+			},
+			expectedOutput: false,
 		},
 		{
-			name: "invalid Pid:",
-			procFile: `Name:	cat
-Umask:	0002
-State:	R (running)
-Tgid:	15041
-Ngid:	0
-Pid:	invalid
-PPid:	22699
-`,
-			expectedPid: 0,
-			expectError: true,
+			name: "simple non-accessible file",
+			prepare: func(base, rootfs string) (string, error) {
+				// On the host:
+				// create /base/dir/file, then make the dir inaccessible
+				dir := filepath.Join(base, "dir")
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					return "", err
+				}
+				path := filepath.Join(dir, "file")
+				if err := ioutil.WriteFile(path, []byte{}, 0); err != nil {
+					return "", err
+				}
+				if err := os.Chmod(dir, 0644); err != nil {
+					return "", err
+				}
+
+				// In kubelet: do the same with /rootfs/base/dir/file
+				rootfsPath, err := writeRootfsFile(rootfs, path, 0777)
+				if err != nil {
+					return "", err
+				}
+				rootfsDir := filepath.Dir(rootfsPath)
+				if err := os.Chmod(rootfsDir, 0644); err != nil {
+					return "", err
+				}
+
+				return path, nil
+			},
+			expectedOutput: isRoot,  // ExistsPath success when running as root
+			expectError:    !isRoot, // ExistsPath must fail when running as not-root
+		},
+		{
+			name: "relative symlink to existing file",
+			prepare: func(base, rootfs string) (string, error) {
+				// On the host: /base/link -> file
+				file := filepath.Join(base, "file")
+				if err := ioutil.WriteFile(file, []byte{}, 0); err != nil {
+					return "", err
+				}
+				path := filepath.Join(base, "link")
+				if err := os.Symlink("file", path); err != nil {
+					return "", err
+				}
+				// In kubelet: /rootfs/base/file
+				if _, err := writeRootfsFile(rootfs, file, 0644); err != nil {
+					return "", err
+				}
+				return path, nil
+			},
+			expectedOutput: true,
+		},
+		{
+			name: "absolute symlink to existing file",
+			prepare: func(base, rootfs string) (string, error) {
+				// On the host: /base/link -> /base/file
+				file := filepath.Join(base, "file")
+				if err := ioutil.WriteFile(file, []byte{}, 0); err != nil {
+					return "", err
+				}
+				path := filepath.Join(base, "link")
+				if err := os.Symlink(file, path); err != nil {
+					return "", err
+				}
+				// In kubelet: /rootfs/base/file
+				if _, err := writeRootfsFile(rootfs, file, 0644); err != nil {
+					return "", err
+				}
+
+				return path, nil
+			},
+			expectedOutput: true,
+		},
+		{
+			name: "relative symlink to non-existing file",
+			prepare: func(base, rootfs string) (string, error) {
+				path := filepath.Join(base, "link")
+				if err := os.Symlink("file", path); err != nil {
+					return "", err
+				}
+				return path, nil
+			},
+			expectedOutput: false,
+		},
+		{
+			name: "absolute symlink to non-existing file",
+			prepare: func(base, rootfs string) (string, error) {
+				file := filepath.Join(base, "file")
+				path := filepath.Join(base, "link")
+				if err := os.Symlink(file, path); err != nil {
+					return "", err
+				}
+				return path, nil
+			},
+			expectedOutput: false,
+		},
+		{
+			name: "symlink loop",
+			prepare: func(base, rootfs string) (string, error) {
+				path := filepath.Join(base, "link")
+				if err := os.Symlink(path, path); err != nil {
+					return "", err
+				}
+				return path, nil
+			},
+			expectedOutput: false,
+			// TODO: realpath -m is not able to detect symlink loop. Should we care?
+			expectError: false,
 		},
 	}
 
-	for i, test := range tests {
-		filename := path.Join(tempDir, strconv.Itoa(i))
-		err := ioutil.WriteFile(filename, []byte(test.procFile), 0666)
+	for _, test := range tests {
+		tmpdir, err := ioutil.TempDir("", "nsenter-exists-file")
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Error(err)
+			continue
 		}
-		mounter := NsenterMounter{}
-		pid, err := mounter.getPidOnHost(filename)
+		defer os.RemoveAll(tmpdir)
+
+		testBase := filepath.Join(tmpdir, "base")
+		if err := os.Mkdir(testBase, 0755); err != nil {
+			t.Error(err)
+			continue
+		}
+
+		mounter, rootfs, _, err := newFakeNsenterMounter(tmpdir, t)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		path, err := test.prepare(testBase, rootfs)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		out, err := mounter.ExistsPath(path)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error: %s", test.name, err)
 		}
 		if err == nil && test.expectError {
 			t.Errorf("Test %q: expected error, got none", test.name)
 		}
-		if pid != test.expectedPid {
-			t.Errorf("Test %q: expected pid %d, got %d", test.name, test.expectedPid, pid)
+
+		if out != test.expectedOutput {
+			t.Errorf("Test %q: expected return value %v, got %v", test.name, test.expectedOutput, out)
 		}
 	}
+}
+
+func TestNsenterGetMode(t *testing.T) {
+	tests := []struct {
+		name         string
+		prepare      func(base, rootfs string) (string, error)
+		expectedMode os.FileMode
+		expectError  bool
+	}{
+		{
+			name: "simple file",
+			prepare: func(base, rootfs string) (string, error) {
+				// On the host: /base/file
+				path := filepath.Join(base, "file")
+				if err := ioutil.WriteFile(path, []byte{}, 0644); err != nil {
+					return "", err
+				}
+
+				// Prepare a different file as /rootfs/base/file (="the host
+				// visible from container") to check that NsEnterMounter calls
+				// stat on this file and not on /base/file.
+				// Visible from kubelet: /rootfs/base/file
+				if _, err := writeRootfsFile(rootfs, path, 0777); err != nil {
+					return "", err
+				}
+
+				return path, nil
+			},
+			expectedMode: 0777,
+		},
+		{
+			name: "non-existing file",
+			prepare: func(base, rootfs string) (string, error) {
+				path := filepath.Join(base, "file")
+				return path, nil
+			},
+			expectedMode: 0,
+			expectError:  true,
+		},
+		{
+			name: "absolute symlink to existing file",
+			prepare: func(base, rootfs string) (string, error) {
+				// On the host: /base/link -> /base/file
+				file := filepath.Join(base, "file")
+				if err := ioutil.WriteFile(file, []byte{}, 0644); err != nil {
+					return "", err
+				}
+				path := filepath.Join(base, "link")
+				if err := os.Symlink(file, path); err != nil {
+					return "", err
+				}
+
+				// Visible from kubelet:
+				// /rootfs/base/file
+				if _, err := writeRootfsFile(rootfs, file, 0747); err != nil {
+					return "", err
+				}
+
+				return path, nil
+			},
+			expectedMode: 0747,
+		},
+		{
+			name: "relative symlink to existing file",
+			prepare: func(base, rootfs string) (string, error) {
+				// On the host: /base/link -> file
+				file := filepath.Join(base, "file")
+				if err := ioutil.WriteFile(file, []byte{}, 0741); err != nil {
+					return "", err
+				}
+				path := filepath.Join(base, "link")
+				if err := os.Symlink("file", path); err != nil {
+					return "", err
+				}
+
+				// Visible from kubelet:
+				// /rootfs/base/file
+				if _, err := writeRootfsFile(rootfs, file, 0647); err != nil {
+					return "", err
+				}
+
+				return path, nil
+			},
+			expectedMode: 0647,
+		},
+	}
+
+	for _, test := range tests {
+		tmpdir, err := ioutil.TempDir("", "nsenter-get-mode-")
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		defer os.RemoveAll(tmpdir)
+
+		testBase := filepath.Join(tmpdir, "base")
+		if err := os.Mkdir(testBase, 0755); err != nil {
+			t.Error(err)
+			continue
+		}
+
+		mounter, rootfs, _, err := newFakeNsenterMounter(tmpdir, t)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		path, err := test.prepare(testBase, rootfs)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		mode, err := mounter.GetMode(path)
+		if err != nil && !test.expectError {
+			t.Errorf("Test %q: unexpected error: %s", test.name, err)
+		}
+		if err == nil && test.expectError {
+			t.Errorf("Test %q: expected error, got none", test.name)
+		}
+
+		if mode != test.expectedMode {
+			t.Errorf("Test %q: expected return value %v, got %v", test.name, test.expectedMode, mode)
+		}
+	}
+}
+
+func writeRootfsFile(rootfs, path string, mode os.FileMode) (string, error) {
+	fullPath := filepath.Join(rootfs, path)
+	dir := filepath.Dir(fullPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	if err := ioutil.WriteFile(fullPath, []byte{}, mode); err != nil {
+		return "", err
+	}
+	// Use chmod, io.WriteFile is affected by umask
+	if err := os.Chmod(fullPath, mode); err != nil {
+		return "", err
+	}
+	return fullPath, nil
 }

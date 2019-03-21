@@ -19,6 +19,8 @@ package apiserver
 import (
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -55,6 +57,9 @@ func newService(namespace, name string) *v1.Service {
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{
+				{Port: 443},
+			},
 		},
 	}
 }
@@ -108,6 +113,27 @@ func TestSync(t *testing.T) {
 				Status:  apiregistration.ConditionFalse,
 				Reason:  "ServiceNotFound",
 				Message: `service/bar in "foo" is not present`,
+			},
+		},
+		{
+			name:           "service on bad port",
+			apiServiceName: "remote.group",
+			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services: []*v1.Service{{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeClusterIP,
+					Ports: []v1.ServicePort{
+						{Port: 6443},
+					},
+				},
+			}},
+			endpoints: []*v1.Endpoints{newEndpointsWithAddress("foo", "bar")},
+			expectedAvailability: apiregistration.APIServiceCondition{
+				Type:    apiregistration.Available,
+				Status:  apiregistration.ConditionFalse,
+				Reason:  "ServicePortError",
+				Message: `service/bar in "foo" is not listening on port 443`,
 			},
 		},
 		{
@@ -202,5 +228,26 @@ func TestSync(t *testing.T) {
 		if e, a := tc.expectedAvailability.Message, condition.Message; e != a {
 			t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
 		}
+		if condition.LastTransitionTime.IsZero() {
+			t.Error("expected lastTransitionTime to be non-zero")
+		}
 	}
+}
+
+func TestUpdateAPIServiceStatus(t *testing.T) {
+	foo := &apiregistration.APIService{Status: apiregistration.APIServiceStatus{Conditions: []apiregistration.APIServiceCondition{{Type: "foo"}}}}
+	bar := &apiregistration.APIService{Status: apiregistration.APIServiceStatus{Conditions: []apiregistration.APIServiceCondition{{Type: "bar"}}}}
+
+	fakeClient := fake.NewSimpleClientset()
+	updateAPIServiceStatus(fakeClient.Apiregistration(), foo, foo)
+	if e, a := 0, len(fakeClient.Actions()); e != a {
+		t.Error(spew.Sdump(fakeClient.Actions()))
+	}
+
+	fakeClient.ClearActions()
+	updateAPIServiceStatus(fakeClient.Apiregistration(), foo, bar)
+	if e, a := 1, len(fakeClient.Actions()); e != a {
+		t.Error(spew.Sdump(fakeClient.Actions()))
+	}
+
 }

@@ -82,6 +82,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 						}
 					}
 				}
+				if b.ServiceAccountToken != nil {
+					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
@@ -129,6 +132,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 				}
 			}
 		}
+		if a.SecurityContext != nil {
+			v1.SetDefaults_SecurityContext(a.SecurityContext)
+		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -170,6 +176,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.SecurityContext != nil {
+			v1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }
@@ -226,6 +235,9 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 						}
 					}
 				}
+				if b.ServiceAccountToken != nil {
+					v1.SetDefaults_ServiceAccountTokenProjection(b.ServiceAccountToken)
+				}
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
@@ -273,6 +285,9 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 				}
 			}
 		}
+		if a.SecurityContext != nil {
+			v1.SetDefaults_SecurityContext(a.SecurityContext)
+		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -314,6 +329,9 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
+		}
+		if a.SecurityContext != nil {
+			v1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 	for i := range in.Spec.VolumeClaimTemplates {

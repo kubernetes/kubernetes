@@ -19,7 +19,6 @@ limitations under the License.
 package clientset
 
 import (
-	glog "github.com/golang/glog"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -31,8 +30,6 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	ApiregistrationV1beta1() apiregistrationv1beta1.ApiregistrationV1beta1Interface
 	ApiregistrationV1() apiregistrationv1.ApiregistrationV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Apiregistration() apiregistrationv1.ApiregistrationV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -50,12 +47,6 @@ func (c *Clientset) ApiregistrationV1beta1() apiregistrationv1beta1.Apiregistrat
 
 // ApiregistrationV1 retrieves the ApiregistrationV1Client
 func (c *Clientset) ApiregistrationV1() apiregistrationv1.ApiregistrationV1Interface {
-	return c.apiregistrationV1
-}
-
-// Deprecated: Apiregistration retrieves the default version of ApiregistrationClient.
-// Please explicitly pick a version.
-func (c *Clientset) Apiregistration() apiregistrationv1.ApiregistrationV1Interface {
 	return c.apiregistrationV1
 }
 
@@ -86,7 +77,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
-		glog.Errorf("failed to create the DiscoveryClient: %v", err)
 		return nil, err
 	}
 	return &cs, nil

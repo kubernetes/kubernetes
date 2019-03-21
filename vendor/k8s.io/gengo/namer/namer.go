@@ -23,6 +23,17 @@ import (
 	"k8s.io/gengo/types"
 )
 
+const (
+	// GoSeperator is used to split go import paths.
+	// Forward slash is used instead of filepath.Seperator because it is the
+	// only universally-accepted path delimiter and the only delimiter not
+	// potentially forbidden by Go compilers. (In particular gc does not allow
+	// the use of backslashes in import paths.)
+	// See https://golang.org/ref/spec#Import_declarations.
+	// See also https://github.com/kubernetes/gengo/issues/83#issuecomment-367040772.
+	GoSeperator = "/"
+)
+
 // Returns whether a name is a private Go name.
 func IsPrivateGoName(name string) bool {
 	return len(name) == 0 || strings.ToLower(name[:1]) == name[:1]
@@ -187,7 +198,7 @@ var (
 
 // filters out unwanted directory names and sanitizes remaining names.
 func (ns *NameStrategy) filterDirs(path string) []string {
-	allDirs := strings.Split(path, string(filepath.Separator))
+	allDirs := strings.Split(path, GoSeperator)
 	dirs := make([]string, 0, len(allDirs))
 	for _, p := range allDirs {
 		if ns.IgnoreWords == nil || !ns.IgnoreWords[p] {

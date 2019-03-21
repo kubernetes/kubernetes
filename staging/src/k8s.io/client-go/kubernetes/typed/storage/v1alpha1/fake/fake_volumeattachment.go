@@ -59,7 +59,7 @@ func (c *FakeVolumeAttachments) List(opts v1.ListOptions) (result *v1alpha1.Volu
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.VolumeAttachmentList{}
+	list := &v1alpha1.VolumeAttachmentList{ListMeta: obj.(*v1alpha1.VolumeAttachmentList).ListMeta}
 	for _, item := range obj.(*v1alpha1.VolumeAttachmentList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -123,7 +123,7 @@ func (c *FakeVolumeAttachments) DeleteCollection(options *v1.DeleteOptions, list
 // Patch applies the patch and returns the patched volumeAttachment.
 func (c *FakeVolumeAttachments) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.VolumeAttachment, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, name, data, subresources...), &v1alpha1.VolumeAttachment{})
+		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, name, pt, data, subresources...), &v1alpha1.VolumeAttachment{})
 	if obj == nil {
 		return nil, err
 	}

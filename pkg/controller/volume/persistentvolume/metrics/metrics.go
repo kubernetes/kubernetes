@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/api/core/v1"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/klog"
 )
 
 const (
@@ -56,6 +56,8 @@ type PVCLister interface {
 func Register(pvLister PVLister, pvcLister PVCLister) {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(newPVAndPVCCountCollector(pvLister, pvcLister))
+		prometheus.MustRegister(volumeOperationMetric)
+		prometheus.MustRegister(volumeOperationErrorsMetric)
 	})
 }
 
@@ -89,6 +91,19 @@ var (
 		prometheus.BuildFQName("", pvControllerSubsystem, unboundPVCKey),
 		"Gauge measuring number of persistent volume claim currently unbound",
 		[]string{namespaceLabel}, nil)
+
+	volumeOperationMetric = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "volume_operation_total_seconds",
+			Help: "Total volume operation time",
+		},
+		[]string{"plugin_name", "operation_name"})
+	volumeOperationErrorsMetric = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "volume_operation_total_errors",
+			Help: "Total volume operation erros",
+		},
+		[]string{"plugin_name", "operation_name"})
 )
 
 func (collector *pvAndPVCCountCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -124,7 +139,7 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- prometheus.Metric) 
 			float64(number),
 			storageClassName)
 		if err != nil {
-			glog.Warningf("Create bound pv number metric failed: %v", err)
+			klog.Warningf("Create bound pv number metric failed: %v", err)
 			continue
 		}
 		ch <- metric
@@ -136,7 +151,7 @@ func (collector *pvAndPVCCountCollector) pvCollect(ch chan<- prometheus.Metric) 
 			float64(number),
 			storageClassName)
 		if err != nil {
-			glog.Warningf("Create unbound pv number metric failed: %v", err)
+			klog.Warningf("Create unbound pv number metric failed: %v", err)
 			continue
 		}
 		ch <- metric
@@ -164,7 +179,7 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- prometheus.Metric)
 			float64(number),
 			namespace)
 		if err != nil {
-			glog.Warningf("Create bound pvc number metric failed: %v", err)
+			klog.Warningf("Create bound pvc number metric failed: %v", err)
 			continue
 		}
 		ch <- metric
@@ -176,9 +191,21 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- prometheus.Metric)
 			float64(number),
 			namespace)
 		if err != nil {
-			glog.Warningf("Create unbound pvc number metric failed: %v", err)
+			klog.Warningf("Create unbound pvc number metric failed: %v", err)
 			continue
 		}
 		ch <- metric
 	}
+}
+
+// RecordVolumeOperationMetric records the latency and errors of volume operations.
+func RecordVolumeOperationMetric(pluginName, opName string, timeTaken float64, err error) {
+	if pluginName == "" {
+		pluginName = "N/A"
+	}
+	if err != nil {
+		volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
+		return
+	}
+	volumeOperationMetric.WithLabelValues(pluginName, opName).Observe(timeTaken)
 }

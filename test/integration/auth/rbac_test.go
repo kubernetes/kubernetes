@@ -17,28 +17,35 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
-
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	externalclientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -70,6 +77,12 @@ func clientsetForToken(user string, config *restclient.Config) (clientset.Interf
 	configCopy := *config
 	configCopy.BearerToken = user
 	return clientset.NewForConfigOrDie(&configCopy), externalclientset.NewForConfigOrDie(&configCopy)
+}
+
+func crdClientsetForToken(user string, config *restclient.Config) apiextensionsclient.Interface {
+	configCopy := *config
+	configCopy.BearerToken = user
+	return apiextensionsclient.NewForConfigOrDie(&configCopy)
 }
 
 type testRESTOptionsGetter struct {
@@ -220,6 +233,15 @@ var (
   }
 }
 `
+	aLimitRange = `
+{
+  "apiVersion": "v1",
+  "kind": "LimitRange",
+  "metadata": {
+    "name": "a"%s
+  }
+}
+`
 	podNamespace = `
 {
   "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
@@ -247,6 +269,15 @@ var (
   }
 }
 `
+	limitRangeNamespace = `
+{
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "kind": "Namespace",
+  "metadata": {
+	"name": "limitrange-namespace"%s
+  }
+}
+`
 )
 
 // Declare some PolicyRules beforehand.
@@ -257,6 +288,8 @@ var (
 )
 
 func TestRBAC(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
 	superUser := "admin/system:masters"
 
 	tests := []struct {
@@ -409,6 +442,74 @@ func TestRBAC(t *testing.T) {
 				{superUser, "DELETE", "rbac.authorization.k8s.io", "rolebindings", "job-namespace", "pi", "", http.StatusOK},
 			},
 		},
+		{
+			bootstrapRoles: bootstrapRoles{
+				clusterRoles: []rbacapi.ClusterRole{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
+						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "update-limitranges"},
+						Rules: []rbacapi.PolicyRule{
+							rbacapi.NewRule("update").Groups("").Resources("limitranges").RuleOrDie(),
+						},
+					},
+				},
+				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "update-limitranges"},
+						Subjects: []rbacapi.Subject{
+							{Kind: "User", Name: "limitrange-updater"},
+						},
+						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "update-limitranges"},
+					},
+				},
+			},
+			requests: []request{
+				// Create the namespace used later in the test
+				{superUser, "POST", "", "namespaces", "", "", limitRangeNamespace, http.StatusCreated},
+
+				{"limitrange-updater", "PUT", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusForbidden},
+				{superUser, "PUT", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusCreated},
+				{superUser, "PUT", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
+				{"limitrange-updater", "PUT", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
+			},
+		},
+		{
+			bootstrapRoles: bootstrapRoles{
+				clusterRoles: []rbacapi.ClusterRole{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
+						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
+						Rules: []rbacapi.PolicyRule{
+							rbacapi.NewRule("patch").Groups("").Resources("limitranges").RuleOrDie(),
+						},
+					},
+				},
+				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
+						Subjects: []rbacapi.Subject{
+							{Kind: "User", Name: "limitrange-patcher"},
+						},
+						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "patch-limitranges"},
+					},
+				},
+			},
+			requests: []request{
+				// Create the namespace used later in the test
+				{superUser, "POST", "", "namespaces", "", "", limitRangeNamespace, http.StatusCreated},
+
+				{"limitrange-patcher", "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusForbidden},
+				{superUser, "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusCreated},
+				{superUser, "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
+				{"limitrange-patcher", "PATCH", "", "limitranges", "limitrange-namespace", "a", aLimitRange, http.StatusOK},
+			},
+		},
 	}
 
 	for i, tc := range tests {
@@ -424,8 +525,11 @@ func TestRBAC(t *testing.T) {
 			"job-writer-namespace":             {Name: "job-writer-namespace"},
 			"nonescalating-rolebinding-writer": {Name: "nonescalating-rolebinding-writer"},
 			"pod-reader":                       {Name: "pod-reader"},
+			"limitrange-updater":               {Name: "limitrange-updater"},
+			"limitrange-patcher":               {Name: "limitrange-patcher"},
 			"user-with-no-permissions":         {Name: "user-with-no-permissions"},
 		}))
+		masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 		_, s, closeFn := framework.RunAMaster(masterConfig)
 		defer closeFn()
 
@@ -460,6 +564,14 @@ func TestRBAC(t *testing.T) {
 			}
 
 			req, err := http.NewRequest(r.verb, s.URL+path, body)
+			if r.verb == "PATCH" {
+				// For patch operations, use the apply content type
+				req.Header.Add("Content-Type", string(types.ApplyPatchType))
+				q := req.URL.Query()
+				q.Add("fieldManager", "rbac_test")
+				req.URL.RawQuery = q.Encode()
+			}
+
 			if err != nil {
 				t.Fatalf("failed to create request: %v", err)
 			}
@@ -492,7 +604,7 @@ func TestRBAC(t *testing.T) {
 					//
 					//    go test -v -tags integration -run RBAC -args -v 10
 					//
-					glog.V(8).Infof("case %d, req %d: %s\n%s\n", i, j, reqDump, respDump)
+					klog.V(8).Infof("case %d, req %d: %s\n%s\n", i, j, reqDump, respDump)
 					t.Errorf("case %d, req %d: %s expected %q got %q", i, j, r, statusCode(r.expectedStatus), statusCode(resp.StatusCode))
 				}
 
@@ -530,7 +642,9 @@ func TestBootstrapping(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	_, err = watch.Until(30*time.Second, watcher, func(event watch.Event) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
 		if event.Type != watch.Added {
 			return false, nil
 		}
@@ -561,4 +675,92 @@ func TestBootstrapping(t *testing.T) {
 		t.Error(err)
 	}
 	t.Errorf("error bootstrapping roles: %s", string(healthBytes))
+}
+
+// TestDiscoveryUpgradeBootstrapping is primarily meant to test the behavior of
+// primePublicInfoClusterRoleBinding in storage_rbac.go during cluster upgrades.
+func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
+	var tearDownFn func()
+	defer func() {
+		if tearDownFn != nil {
+			tearDownFn()
+		}
+	}()
+
+	superUser := "admin/system:masters"
+
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(masterConfig)
+	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+		superUser: {Name: "admin", Groups: []string{"system:masters"}},
+	}))
+	_, s, tearDownFn := framework.RunAMaster(masterConfig)
+
+	client := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+
+	// Modify the default RBAC discovery ClusterRoleBidnings to look more like the defaults that
+	// existed prior to v1.14, but with user modifications.
+	t.Logf("Modifying default `system:discovery` ClusterRoleBinding")
+	discRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
+	discRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
+	discRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
+	discRoleBinding.Subjects = []rbacapi.Subject{
+		{
+			Name:     "system:authenticated",
+			Kind:     "Group",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+	if discRoleBinding, err = client.Rbac().ClusterRoleBindings().Update(discRoleBinding); err != nil {
+		t.Fatalf("Failed to update `system:discovery` ClusterRoleBinding: %v", err)
+	}
+	t.Logf("Modifying default `system:basic-user` ClusterRoleBinding")
+	basicUserRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
+	basicUserRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
+	basicUserRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
+	if basicUserRoleBinding, err = client.Rbac().ClusterRoleBindings().Update(basicUserRoleBinding); err != nil {
+		t.Fatalf("Failed to update `system:basic-user` ClusterRoleBinding: %v", err)
+	}
+	t.Logf("Deleting default `system:public-info-viewer` ClusterRoleBinding")
+	if err = client.Rbac().ClusterRoleBindings().Delete("system:public-info-viewer", &metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("Failed to delete `system:public-info-viewer` ClusterRoleBinding: %v", err)
+	}
+
+	// Stop the first API server.
+	tearDownFn()
+	tearDownFn = nil
+
+	// Check that upgraded API servers inherit `system:public-info-viewer` settings from
+	// `system:discovery`, and respect auto-reconciliation annotations.
+	_, s, tearDownFn = framework.RunAMaster(masterConfig)
+
+	client = clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+
+	newDiscRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get `system:discovery` ClusterRoleBinding: %v", err)
+	}
+	if !reflect.DeepEqual(newDiscRoleBinding, discRoleBinding) {
+		t.Errorf("`system:discovery` should have been unmodified. Wanted: %v, got %v", discRoleBinding, newDiscRoleBinding)
+	}
+	newBasicUserRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get `system:basic-user` ClusterRoleBinding: %v", err)
+	}
+	if !reflect.DeepEqual(newBasicUserRoleBinding, basicUserRoleBinding) {
+		t.Errorf("`system:basic-user` should have been unmodified. Wanted: %v, got %v", basicUserRoleBinding, newBasicUserRoleBinding)
+	}
+	publicInfoViewerRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:public-info-viewer", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get `system:public-info-viewer` ClusterRoleBinding: %v", err)
+	}
+	if publicInfoViewerRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] != "false" {
+		t.Errorf("publicInfoViewerRoleBinding.Annotations[\"rbac.authorization.kubernetes.io/autoupdate\"] should be %v, got %v", publicInfoViewerRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"], "false")
+	}
+	if publicInfoViewerRoleBinding.Annotations["rbac-discovery-upgrade-test"] != "pass" {
+		t.Errorf("publicInfoViewerRoleBinding.Annotations[\"rbac-discovery-upgrade-test\"] should be %v, got %v", publicInfoViewerRoleBinding.Annotations["rbac-discovery-upgrade-test"], "pass")
+	}
+	if !reflect.DeepEqual(publicInfoViewerRoleBinding.Subjects, newDiscRoleBinding.Subjects) {
+		t.Errorf("`system:public-info-viewer` should have inherited Subjects from `system:discovery` Wanted: %v, got %v", newDiscRoleBinding.Subjects, publicInfoViewerRoleBinding.Subjects)
+	}
 }

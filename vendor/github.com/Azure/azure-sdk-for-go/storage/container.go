@@ -16,7 +16,6 @@ package storage
 
 import (
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -95,11 +94,12 @@ func (c *Container) GetSASURI(options ContainerSASOptions) (string, error) {
 // ContainerProperties contains various properties of a container returned from
 // various endpoints like ListContainers.
 type ContainerProperties struct {
-	LastModified  string `xml:"Last-Modified"`
-	Etag          string `xml:"Etag"`
-	LeaseStatus   string `xml:"LeaseStatus"`
-	LeaseState    string `xml:"LeaseState"`
-	LeaseDuration string `xml:"LeaseDuration"`
+	LastModified  string              `xml:"Last-Modified"`
+	Etag          string              `xml:"Etag"`
+	LeaseStatus   string              `xml:"LeaseStatus"`
+	LeaseState    string              `xml:"LeaseState"`
+	LeaseDuration string              `xml:"LeaseDuration"`
+	PublicAccess  ContainerAccessType `xml:"PublicAccess"`
 }
 
 // ContainerListResponse contains the response fields from
@@ -258,8 +258,8 @@ func (c *Container) Create(options *CreateContainerOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusCreated})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusCreated})
 }
 
 // CreateIfNotExists creates a blob container if it does not exist. Returns
@@ -267,15 +267,15 @@ func (c *Container) Create(options *CreateContainerOptions) error {
 func (c *Container) CreateIfNotExists(options *CreateContainerOptions) (bool, error) {
 	resp, err := c.create(options)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusCreated || resp.statusCode == http.StatusConflict {
-			return resp.statusCode == http.StatusCreated, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
+			return resp.StatusCode == http.StatusCreated, nil
 		}
 	}
 	return false, err
 }
 
-func (c *Container) create(options *CreateContainerOptions) (*storageResponse, error) {
+func (c *Container) create(options *CreateContainerOptions) (*http.Response, error) {
 	query := url.Values{"restype": {"container"}}
 	headers := c.bsc.client.getStandardHeaders()
 	headers = c.bsc.client.addMetadataToHeaders(headers, c.Metadata)
@@ -307,9 +307,9 @@ func (c *Container) Exists() (bool, error) {
 
 	resp, err := c.bsc.client.exec(http.MethodHead, uri, headers, nil, c.bsc.auth)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusOK || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusOK, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusOK, nil
 		}
 	}
 	return false, err
@@ -349,13 +349,8 @@ func (c *Container) SetPermissions(permissions ContainerPermissions, options *Se
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.body)
-
-	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
-		return errors.New("Unable to set permissions")
-	}
-
-	return nil
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusOK})
 }
 
 // GetContainerPermissionOptions includes options for a get container permissions operation
@@ -385,14 +380,14 @@ func (c *Container) GetPermissions(options *GetContainerPermissionOptions) (*Con
 	if err != nil {
 		return nil, err
 	}
-	defer resp.body.Close()
+	defer resp.Body.Close()
 
 	var ap AccessPolicy
-	err = xmlUnmarshal(resp.body, &ap.SignedIdentifiersList)
+	err = xmlUnmarshal(resp.Body, &ap.SignedIdentifiersList)
 	if err != nil {
 		return nil, err
 	}
-	return buildAccessPolicy(ap, &resp.headers), nil
+	return buildAccessPolicy(ap, &resp.Header), nil
 }
 
 func buildAccessPolicy(ap AccessPolicy, headers *http.Header) *ContainerPermissions {
@@ -436,8 +431,8 @@ func (c *Container) Delete(options *DeleteContainerOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusAccepted})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusAccepted})
 }
 
 // DeleteIfExists deletes the container with given name on the storage
@@ -449,15 +444,15 @@ func (c *Container) Delete(options *DeleteContainerOptions) error {
 func (c *Container) DeleteIfExists(options *DeleteContainerOptions) (bool, error) {
 	resp, err := c.delete(options)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusAccepted || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusAccepted, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusAccepted, nil
 		}
 	}
 	return false, err
 }
 
-func (c *Container) delete(options *DeleteContainerOptions) (*storageResponse, error) {
+func (c *Container) delete(options *DeleteContainerOptions) (*http.Response, error) {
 	query := url.Values{"restype": {"container"}}
 	headers := c.bsc.client.getStandardHeaders()
 
@@ -497,9 +492,9 @@ func (c *Container) ListBlobs(params ListBlobsParameters) (BlobListResponse, err
 	if err != nil {
 		return out, err
 	}
-	defer resp.body.Close()
+	defer resp.Body.Close()
 
-	err = xmlUnmarshal(resp.body, &out)
+	err = xmlUnmarshal(resp.Body, &out)
 	for i := range out.Blobs {
 		out.Blobs[i].Container = c
 	}
@@ -540,8 +535,8 @@ func (c *Container) SetMetadata(options *ContainerMetadataOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusOK})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusOK})
 }
 
 // GetMetadata returns all user-defined metadata for the specified container.
@@ -568,12 +563,12 @@ func (c *Container) GetMetadata(options *ContainerMetadataOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	defer drainRespBody(resp)
+	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
 	}
 
-	c.writeMetadata(resp.headers)
+	c.writeMetadata(resp.Header)
 	return nil
 }
 
@@ -611,4 +606,35 @@ func (capd *ContainerAccessPolicy) generateContainerPermissions() (permissions s
 	}
 
 	return permissions
+}
+
+// GetProperties updated the properties of the container.
+//
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/get-container-properties
+func (c *Container) GetProperties() error {
+	params := url.Values{
+		"restype": {"container"},
+	}
+	headers := c.bsc.client.getStandardHeaders()
+
+	uri := c.bsc.client.getEndpoint(blobServiceName, c.buildPath(), params)
+
+	resp, err := c.bsc.client.exec(http.MethodGet, uri, headers, nil, c.bsc.auth)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
+		return err
+	}
+
+	// update properties
+	c.Properties.Etag = resp.Header.Get(headerEtag)
+	c.Properties.LeaseStatus = resp.Header.Get("x-ms-lease-status")
+	c.Properties.LeaseState = resp.Header.Get("x-ms-lease-state")
+	c.Properties.LeaseDuration = resp.Header.Get("x-ms-lease-duration")
+	c.Properties.LastModified = resp.Header.Get("Last-Modified")
+	c.Properties.PublicAccess = ContainerAccessType(resp.Header.Get(ContainerAccessHeader))
+
+	return nil
 }

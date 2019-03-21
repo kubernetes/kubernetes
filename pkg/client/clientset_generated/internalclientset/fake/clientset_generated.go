@@ -29,6 +29,8 @@ import (
 	fakeadmissionregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion/fake"
 	appsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	fakeappsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion/fake"
+	auditregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/auditregistration/internalversion"
+	fakeauditregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/auditregistration/internalversion/fake"
 	authenticationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
 	fakeauthenticationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion/fake"
 	authorizationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
@@ -39,6 +41,8 @@ import (
 	fakebatchinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion/fake"
 	certificatesinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
 	fakecertificatesinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion/fake"
+	coordinationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/coordination/internalversion"
+	fakecoordinationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/coordination/internalversion/fake"
 	coreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	fakecoreinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion/fake"
 	eventsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/events/internalversion"
@@ -47,6 +51,8 @@ import (
 	fakeextensionsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion/fake"
 	networkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion"
 	fakenetworkinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/networking/internalversion/fake"
+	nodeinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/node/internalversion"
+	fakenodeinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/node/internalversion/fake"
 	policyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	fakepolicyinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion/fake"
 	rbacinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
@@ -71,9 +77,10 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	fakePtr := testing.Fake{}
-	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o))
-	fakePtr.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
+	cs := &Clientset{}
+	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
+	cs.AddReactor("*", "*", testing.ObjectReaction(o))
+	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
 		watch, err := o.Watch(gvr, ns)
@@ -83,7 +90,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		return true, watch, nil
 	})
 
-	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: &fakePtr}}
+	return cs
 }
 
 // Clientset implements clientset.Interface. Meant to be embedded into a
@@ -115,6 +122,11 @@ func (c *Clientset) Apps() appsinternalversion.AppsInterface {
 	return &fakeappsinternalversion.FakeApps{Fake: &c.Fake}
 }
 
+// Auditregistration retrieves the AuditregistrationClient
+func (c *Clientset) Auditregistration() auditregistrationinternalversion.AuditregistrationInterface {
+	return &fakeauditregistrationinternalversion.FakeAuditregistration{Fake: &c.Fake}
+}
+
 // Authentication retrieves the AuthenticationClient
 func (c *Clientset) Authentication() authenticationinternalversion.AuthenticationInterface {
 	return &fakeauthenticationinternalversion.FakeAuthentication{Fake: &c.Fake}
@@ -140,6 +152,11 @@ func (c *Clientset) Certificates() certificatesinternalversion.CertificatesInter
 	return &fakecertificatesinternalversion.FakeCertificates{Fake: &c.Fake}
 }
 
+// Coordination retrieves the CoordinationClient
+func (c *Clientset) Coordination() coordinationinternalversion.CoordinationInterface {
+	return &fakecoordinationinternalversion.FakeCoordination{Fake: &c.Fake}
+}
+
 // Events retrieves the EventsClient
 func (c *Clientset) Events() eventsinternalversion.EventsInterface {
 	return &fakeeventsinternalversion.FakeEvents{Fake: &c.Fake}
@@ -153,6 +170,11 @@ func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
 // Networking retrieves the NetworkingClient
 func (c *Clientset) Networking() networkinginternalversion.NetworkingInterface {
 	return &fakenetworkinginternalversion.FakeNetworking{Fake: &c.Fake}
+}
+
+// Node retrieves the NodeClient
+func (c *Clientset) Node() nodeinternalversion.NodeInterface {
+	return &fakenodeinternalversion.FakeNode{Fake: &c.Fake}
 }
 
 // Policy retrieves the PolicyClient

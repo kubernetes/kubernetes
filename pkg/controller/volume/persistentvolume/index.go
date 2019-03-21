@@ -158,13 +158,13 @@ func findMatchingVolume(
 
 		volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
 
-		// check if volumeModes do not match (Alpha and feature gate protected)
-		isMisMatch, err := checkVolumeModeMisMatches(&claim.Spec, &volume.Spec)
+		// check if volumeModes do not match (feature gate protected)
+		isMismatch, err := checkVolumeModeMismatches(&claim.Spec, &volume.Spec)
 		if err != nil {
 			return nil, fmt.Errorf("error checking if volumeMode was a mismatch: %v", err)
 		}
 		// filter out mismatching volumeModes
-		if isMisMatch {
+		if isMismatch {
 			continue
 		}
 
@@ -185,7 +185,7 @@ func findMatchingVolume(
 			}
 		}
 
-		if isVolumeBoundToClaim(volume, claim) {
+		if IsVolumeBoundToClaim(volume, claim) {
 			// this claim and volume are pre-bound; return
 			// the volume if the size request is satisfied,
 			// otherwise continue searching for a match
@@ -211,11 +211,18 @@ func findMatchingVolume(
 		}
 
 		// filter out:
+		// - volumes in non-available phase
 		// - volumes bound to another claim
 		// - volumes whose labels don't match the claim's selector, if specified
 		// - volumes in Class that is not requested
 		// - volumes whose NodeAffinity does not match the node
-		if volume.Spec.ClaimRef != nil {
+		if volume.Status.Phase != v1.VolumeAvailable {
+			// We ignore volumes in non-available phase, because volumes that
+			// satisfies matching criteria will be updated to available, binding
+			// them now has high chance of encountering unnecessary failures
+			// due to API conflicts.
+			continue
+		} else if volume.Spec.ClaimRef != nil {
 			continue
 		} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 			continue
@@ -251,25 +258,24 @@ func findMatchingVolume(
 	return nil, nil
 }
 
-// checkVolumeModeMatches is a convenience method that checks volumeMode for PersistentVolume
-// and PersistentVolumeClaims along with making sure that the Alpha feature gate BlockVolume is
-// enabled.
-// This is Alpha and could change in the future.
-func checkVolumeModeMisMatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		if pvSpec.VolumeMode != nil && pvcSpec.VolumeMode != nil {
-			requestedVolumeMode := *pvcSpec.VolumeMode
-			pvVolumeMode := *pvSpec.VolumeMode
-			return requestedVolumeMode != pvVolumeMode, nil
-		} else {
-			// This also should retrun an error, this means that
-			// the defaulting has failed.
-			return true, fmt.Errorf("api defaulting for volumeMode failed")
-		}
-	} else {
-		// feature gate is disabled
+// checkVolumeModeMismatches is a convenience method that checks volumeMode for PersistentVolume
+// and PersistentVolumeClaims
+func checkVolumeModeMismatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		return false, nil
 	}
+
+	// In HA upgrades, we cannot guarantee that the apiserver is on a version >= controller-manager.
+	// So we default a nil volumeMode to filesystem
+	requestedVolumeMode := v1.PersistentVolumeFilesystem
+	if pvcSpec.VolumeMode != nil {
+		requestedVolumeMode = *pvcSpec.VolumeMode
+	}
+	pvVolumeMode := v1.PersistentVolumeFilesystem
+	if pvSpec.VolumeMode != nil {
+		pvVolumeMode = *pvSpec.VolumeMode
+	}
+	return requestedVolumeMode != pvVolumeMode, nil
 }
 
 // findBestMatchForClaim is a convenience method that finds a volume by the claim's AccessModes and requests for Storage

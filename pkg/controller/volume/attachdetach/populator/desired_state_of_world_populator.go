@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -92,7 +92,7 @@ func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
 		// findAndAddActivePods is called periodically, independently of the main
 		// populator loop.
 		if time.Since(dswp.timeOfLastListPods) < dswp.listPodsRetryDuration {
-			glog.V(5).Infof(
+			klog.V(5).Infof(
 				"Skipping findAndAddActivePods(). Not permitted until %v (listPodsRetryDuration %v).",
 				dswp.timeOfLastListPods.Add(dswp.listPodsRetryDuration),
 				dswp.listPodsRetryDuration)
@@ -109,7 +109,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 	for dswPodUID, dswPodToAdd := range dswp.desiredStateOfWorld.GetPodToAdd() {
 		dswPodKey, err := kcache.MetaNamespaceKeyFunc(dswPodToAdd.Pod)
 		if err != nil {
-			glog.Errorf("MetaNamespaceKeyFunc failed for pod %q (UID %q) with: %v", dswPodKey, dswPodUID, err)
+			klog.Errorf("MetaNamespaceKeyFunc failed for pod %q (UID %q) with: %v", dswPodKey, dswPodUID, err)
 			continue
 		}
 
@@ -124,7 +124,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		case errors.IsNotFound(err):
 			// if we can't find the pod, we need to delete it below
 		case err != nil:
-			glog.Errorf("podLister Get failed for pod %q (UID %q) with %v", dswPodKey, dswPodUID, err)
+			klog.Errorf("podLister Get failed for pod %q (UID %q) with %v", dswPodKey, dswPodUID, err)
 			continue
 		default:
 			volumeActionFlag := util.DetermineVolumeAction(
@@ -136,7 +136,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 				informerPodUID := volutil.GetUniquePodName(informerPod)
 				// Check whether the unique identifier of the pod from dsw matches the one retrieved from pod informer
 				if informerPodUID == dswPodUID {
-					glog.V(10).Infof("Verified pod %q (UID %q) from dsw exists in pod informer.", dswPodKey, dswPodUID)
+					klog.V(10).Infof("Verified pod %q (UID %q) from dsw exists in pod informer.", dswPodKey, dswPodUID)
 					continue
 				}
 			}
@@ -144,7 +144,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 		// the pod from dsw does not exist in pod informer, or it does not match the unique identifier retrieved
 		// from the informer, delete it from dsw
-		glog.V(1).Infof("Removing pod %q (UID %q) from dsw because it does not exist in pod informer.", dswPodKey, dswPodUID)
+		klog.V(1).Infof("Removing pod %q (UID %q) from dsw because it does not exist in pod informer.", dswPodKey, dswPodUID)
 		dswp.desiredStateOfWorld.DeletePod(dswPodUID, dswPodToAdd.VolumeName, dswPodToAdd.NodeName)
 	}
 }
@@ -152,7 +152,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
 	pods, err := dswp.podLister.List(labels.Everything())
 	if err != nil {
-		glog.Errorf("podLister List failed: %v", err)
+		klog.Errorf("podLister List failed: %v", err)
 		return
 	}
 	dswp.timeOfLastListPods = time.Now()

@@ -2,7 +2,7 @@
 
 This is a small util app to serve your hostname on TCP and/or UDP.  Useful for testing.
 
-The `serve_hostname` Makefile supports multiple architectures, which means it may cross-compile and build an docker image easily.
+The `serve_hostname` Makefile supports multiple architectures, which means it may cross-compile and build a docker image easily.
 Arch-specific busybox images serve as base images.
 
 If you are releasing a new version, please bump the `TAG` value in the `Makefile` before building the images.

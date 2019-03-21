@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,20 +23,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"github.com/lithammer/dedent"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
-
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
 )
 
@@ -45,9 +45,11 @@ func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
 
-	// Creates a Master Configuration pointing to the pkidir folder
-	cfg := &kubeadmapi.MasterConfiguration{
-		CertificatesDir: tmpdir,
+	// Creates an InitConfiguration pointing to the pkidir folder
+	cfg := &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			CertificatesDir: tmpdir,
+		},
 	}
 
 	// Executes getKubeConfigSpecs
@@ -64,94 +66,90 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 	// Adds a pki folder with a ca certs to the temp folder
 	pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
 
-	// Creates a Master Configuration pointing to the pkidir folder
-	cfg := &kubeadmapi.MasterConfiguration{
-		API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-		CertificatesDir: pkidir,
-		NodeName:        "valid-node-name",
-	}
-
-	// Creates a Master Configuration pointing to the pkidir folder
-	cfgDNS := &kubeadmapi.MasterConfiguration{
-		API:             kubeadmapi.API{ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
-		CertificatesDir: pkidir,
-		NodeName:        "valid-node-name",
-	}
-
-	// Executes getKubeConfigSpecs
-	specs, err := getKubeConfigSpecs(cfg)
-	if err != nil {
-		t.Fatal("getKubeConfigSpecs failed!")
-	}
-
-	// Executes getKubeConfigSpecs
-	specsDNS, err := getKubeConfigSpecs(cfgDNS)
-	if err != nil {
-		t.Fatal("getKubeConfigSpecs failed!")
-	}
-
-	var assertions = []struct {
-		kubeConfigFile string
-		clientName     string
-		organizations  []string
-	}{
+	// Creates InitConfigurations pointing to the pkidir folder
+	cfgs := []*kubeadmapi.InitConfiguration{
 		{
-			kubeConfigFile: kubeadmconstants.AdminKubeConfigFileName,
-			clientName:     "kubernetes-admin",
-			organizations:  []string{kubeadmconstants.MastersGroup},
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				CertificatesDir: pkidir,
+			},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			kubeConfigFile: kubeadmconstants.KubeletKubeConfigFileName,
-			clientName:     fmt.Sprintf("system:node:%s", cfg.NodeName),
-			organizations:  []string{kubeadmconstants.NodesGroup},
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				ControlPlaneEndpoint: "api.k8s.io",
+				CertificatesDir:      pkidir,
+			},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			kubeConfigFile: kubeadmconstants.ControllerManagerKubeConfigFileName,
-			clientName:     kubeadmconstants.ControllerManagerUser,
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				ControlPlaneEndpoint: "api.k8s.io:4321",
+				CertificatesDir:      pkidir,
+			},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			kubeConfigFile: kubeadmconstants.SchedulerKubeConfigFileName,
-			clientName:     kubeadmconstants.SchedulerUser,
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				ControlPlaneEndpoint: "api.k8s.io",
+				CertificatesDir:      pkidir,
+			},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
+		},
+		{
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				ControlPlaneEndpoint: "api.k8s.io:4321",
+				CertificatesDir:      pkidir,
+			},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 	}
 
-	for _, assertion := range assertions {
-
-		// assert the spec for the kubeConfigFile exists
-		if spec, ok := specs[assertion.kubeConfigFile]; ok {
-
-			// Assert clientName
-			if spec.ClientName != assertion.clientName {
-				t.Errorf("getKubeConfigSpecs for %s clientName is %s, expected %s", assertion.kubeConfigFile, spec.ClientName, assertion.clientName)
-			}
-
-			// Assert Organizations
-			if spec.ClientCertAuth == nil || !reflect.DeepEqual(spec.ClientCertAuth.Organizations, assertion.organizations) {
-				t.Errorf("getKubeConfigSpecs for %s Organizations is %v, expected %v", assertion.kubeConfigFile, spec.ClientCertAuth.Organizations, assertion.organizations)
-			}
-
-			// Asserts MasterConfiguration values injected into spec
-			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
-			if err != nil {
-				t.Error(err)
-			}
-			if spec.APIServer != masterEndpoint {
-				t.Errorf("getKubeConfigSpecs didn't injected cfg.APIServer endpoint into spec for %s", assertion.kubeConfigFile)
-			}
-
-			// Asserts CA certs and CA keys loaded into specs
-			if spec.CACert == nil {
-				t.Errorf("getKubeConfigSpecs didn't loaded CACert into spec for %s!", assertion.kubeConfigFile)
-			}
-			if spec.ClientCertAuth == nil || spec.ClientCertAuth.CAKey == nil {
-				t.Errorf("getKubeConfigSpecs didn't loaded CAKey into spec for %s!", assertion.kubeConfigFile)
-			}
-		} else {
-			t.Errorf("getKubeConfigSpecs didn't create spec for %s ", assertion.kubeConfigFile)
+	for _, cfg := range cfgs {
+		var assertions = []struct {
+			kubeConfigFile string
+			clientName     string
+			organizations  []string
+		}{
+			{
+				kubeConfigFile: kubeadmconstants.AdminKubeConfigFileName,
+				clientName:     "kubernetes-admin",
+				organizations:  []string{kubeadmconstants.SystemPrivilegedGroup},
+			},
+			{
+				kubeConfigFile: kubeadmconstants.KubeletKubeConfigFileName,
+				clientName:     fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
+				organizations:  []string{kubeadmconstants.NodesGroup},
+			},
+			{
+				kubeConfigFile: kubeadmconstants.ControllerManagerKubeConfigFileName,
+				clientName:     kubeadmconstants.ControllerManagerUser,
+			},
+			{
+				kubeConfigFile: kubeadmconstants.SchedulerKubeConfigFileName,
+				clientName:     kubeadmconstants.SchedulerUser,
+			},
 		}
 
-		// assert the spec for the kubeConfigFile exists
-		if spec, ok := specsDNS[assertion.kubeConfigFile]; ok {
+		for _, assertion := range assertions {
+			// Executes getKubeConfigSpecs
+			specs, err := getKubeConfigSpecs(cfg)
+			if err != nil {
+				t.Fatal("getKubeConfigSpecs failed!")
+			}
+
+			var spec *kubeConfigSpec
+			var ok bool
+
+			// assert the spec for the kubeConfigFile exists
+			if spec, ok = specs[assertion.kubeConfigFile]; !ok {
+				t.Errorf("getKubeConfigSpecs didn't create spec for %s ", assertion.kubeConfigFile)
+				continue
+			}
 
 			// Assert clientName
 			if spec.ClientName != assertion.clientName {
@@ -163,12 +161,12 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 				t.Errorf("getKubeConfigSpecs for %s Organizations is %v, expected %v", assertion.kubeConfigFile, spec.ClientCertAuth.Organizations, assertion.organizations)
 			}
 
-			// Asserts MasterConfiguration values injected into spec
-			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfgDNS)
+			// Asserts InitConfiguration values injected into spec
+			controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 			if err != nil {
 				t.Error(err)
 			}
-			if spec.APIServer != masterEndpoint {
+			if spec.APIServer != controlPlaneEndpoint {
 				t.Errorf("getKubeConfigSpecs didn't injected cfg.APIServer endpoint into spec for %s", assertion.kubeConfigFile)
 			}
 
@@ -179,8 +177,6 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			if spec.ClientCertAuth == nil || spec.ClientCertAuth.CAKey == nil {
 				t.Errorf("getKubeConfigSpecs didn't loaded CAKey into spec for %s!", assertion.kubeConfigFile)
 			}
-		} else {
-			t.Errorf("getKubeConfigSpecs didn't create spec for %s ", assertion.kubeConfigFile)
 		}
 	}
 }
@@ -190,7 +186,7 @@ func TestBuildKubeConfigFromSpecWithClientAuth(t *testing.T) {
 	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
 
 	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec with a ClientAuth
-	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "myClientName", "myOrg1", "myOrg2")
+	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "myClientName", "test-cluster", "myOrg1", "myOrg2")
 
 	// Asserts spec data are propagated to the kubeconfig
 	kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
@@ -202,7 +198,7 @@ func TestBuildKubeConfigFromSpecWithTokenAuth(t *testing.T) {
 	caCert, _ := certstestutil.SetupCertificateAuthorithy(t)
 
 	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec with a Token
-	config := setupdKubeConfigWithTokenAuth(t, caCert, "https://1.2.3.4:1234", "myClientName", "123456")
+	config := setupdKubeConfigWithTokenAuth(t, caCert, "https://1.2.3.4:1234", "myClientName", "123456", "test-cluster")
 
 	// Asserts spec data are propagated to the kubeconfig
 	kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
@@ -216,9 +212,9 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthorithy(t)
 
 	// build kubeconfigs (to be used to test kubeconfigs equality/not equality)
-	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "myOrg1", "myOrg2")
-	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "myOrg1", "myOrg2")
-	configWithAnotherClusterAddress := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://3.4.5.6:3456", "myOrg1", "myOrg2")
+	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
+	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
+	configWithAnotherClusterAddress := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://3.4.5.6:3456", "myOrg1", "test-cluster", "myOrg2")
 
 	var tests = []struct {
 		existingKubeConfig *clientcmdapi.Config
@@ -256,7 +252,7 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 			}
 		}
 
-		// Writes the KubeConfig file to disk
+		// Writes the kubeconfig file to disk
 		err := createKubeConfigFileIfNotExists(tmpdir, "test.conf", test.kubeConfig)
 		if test.expectedError && err == nil {
 			t.Errorf("createKubeConfigFileIfNotExists didn't failed when expected to fail")
@@ -272,12 +268,12 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 
 func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 	var tests = []struct {
-		createKubeConfigFunction func(outDir string, cfg *kubeadmapi.MasterConfiguration) error
+		createKubeConfigFunction func(outDir string, cfg *kubeadmapi.InitConfiguration) error
 		expectedFiles            []string
 		expectedError            bool
 	}{
 		{ // Test createKubeConfigFiles fails for unknown kubeconfig is requested
-			createKubeConfigFunction: func(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+			createKubeConfigFunction: func(outDir string, cfg *kubeadmapi.InitConfiguration) error {
 				return createKubeConfigFiles(outDir, cfg, "unknown.conf")
 			},
 			expectedError: true,
@@ -291,21 +287,13 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 				kubeadmconstants.SchedulerKubeConfigFileName,
 			},
 		},
-		{ // Test CreateAdminKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateAdminKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.AdminKubeConfigFileName},
-		},
-		{ // Test CreateKubeletKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateKubeletKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.KubeletKubeConfigFileName},
-		},
-		{ // Test CreateControllerManagerKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateControllerManagerKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.ControllerManagerKubeConfigFileName},
-		},
-		{ // Test createKubeConfigFile (wrapper to createKubeConfigFile)
-			createKubeConfigFunction: CreateSchedulerKubeConfigFile,
-			expectedFiles:            []string{kubeadmconstants.SchedulerKubeConfigFileName},
+		{ // Test CreateJoinControlPlaneKubeConfigFiles (wrapper to createKubeConfigFile)
+			createKubeConfigFunction: CreateJoinControlPlaneKubeConfigFiles,
+			expectedFiles: []string{
+				kubeadmconstants.AdminKubeConfigFileName,
+				kubeadmconstants.ControllerManagerKubeConfigFileName,
+				kubeadmconstants.SchedulerKubeConfigFileName,
+			},
 		},
 	}
 
@@ -317,10 +305,12 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 		// Adds a pki folder with a ca certs to the temp folder
 		pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
 
-		// Creates a Master Configuration pointing to the pkidir folder
-		cfg := &kubeadmapi.MasterConfiguration{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-			CertificatesDir: pkidir,
+		// Creates an InitConfiguration pointing to the pkidir folder
+		cfg := &kubeadmapi.InitConfiguration{
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				CertificatesDir: pkidir,
+			},
 		}
 
 		// Execs the createKubeConfigFunction
@@ -345,9 +335,11 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
 
-	// Creates a Master Configuration pointing to the tmpdir folder
-	cfg := &kubeadmapi.MasterConfiguration{
-		CertificatesDir: tmpdir,
+	// Creates an InitConfiguration pointing to the tmpdir folder
+	cfg := &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			CertificatesDir: tmpdir,
+		},
 	}
 
 	var tests = []struct {
@@ -355,7 +347,7 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 	}{
 		{ // Test WriteKubeConfigWithClientCert
 			writeKubeConfigFunction: func(out io.Writer) error {
-				return WriteKubeConfigWithClientCert(out, cfg, "myUser")
+				return WriteKubeConfigWithClientCert(out, cfg, "myUser", []string{"myOrg"})
 			},
 		},
 		{ // Test WriteKubeConfigWithToken
@@ -390,10 +382,12 @@ func TestWriteKubeConfig(t *testing.T) {
 		t.Fatalf("couldn't retrieve ca cert: %v", err)
 	}
 
-	// Creates a Master Configuration pointing to the pkidir folder
-	cfg := &kubeadmapi.MasterConfiguration{
-		API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-		CertificatesDir: pkidir,
+	// Creates an InitConfiguration pointing to the pkidir folder
+	cfg := &kubeadmapi.InitConfiguration{
+		LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			CertificatesDir: pkidir,
+		},
 	}
 
 	var tests = []struct {
@@ -403,7 +397,7 @@ func TestWriteKubeConfig(t *testing.T) {
 	}{
 		{ // Test WriteKubeConfigWithClientCert
 			writeKubeConfigFunction: func(out io.Writer) error {
-				return WriteKubeConfigWithClientCert(out, cfg, "myUser")
+				return WriteKubeConfigWithClientCert(out, cfg, "myUser", []string{"myOrg"})
 			},
 			withClientCert: true,
 		},
@@ -446,8 +440,171 @@ func TestWriteKubeConfig(t *testing.T) {
 	}
 }
 
+func TestValidateKubeConfig(t *testing.T) {
+	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
+	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthorithy(t)
+
+	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
+	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
+	configWithAnotherServerURL := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
+
+	tests := map[string]struct {
+		existingKubeConfig *clientcmdapi.Config
+		kubeConfig         *clientcmdapi.Config
+		expectedError      bool
+	}{
+		"kubeconfig don't exist": {
+			kubeConfig:    config,
+			expectedError: true,
+		},
+		"kubeconfig exist and has invalid ca": {
+			existingKubeConfig: configWithAnotherClusterCa,
+			kubeConfig:         config,
+			expectedError:      true,
+		},
+		"kubeconfig exist and has invalid server url": {
+			existingKubeConfig: configWithAnotherServerURL,
+			kubeConfig:         config,
+			expectedError:      true,
+		},
+		"kubeconfig exist and is valid": {
+			existingKubeConfig: config,
+			kubeConfig:         config,
+			expectedError:      false,
+		},
+	}
+
+	for name, test := range tests {
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+
+		if test.existingKubeConfig != nil {
+			if err := createKubeConfigFileIfNotExists(tmpdir, "test.conf", test.existingKubeConfig); err != nil {
+				t.Errorf("createKubeConfigFileIfNotExists failed")
+			}
+		}
+
+		err := validateKubeConfig(tmpdir, "test.conf", test.kubeConfig)
+		if (err != nil) != test.expectedError {
+			t.Fatalf(dedent.Dedent(
+				"validateKubeConfig failed\n%s\nexpected error: %t\n\tgot: %t\nerror: %v"),
+				name,
+				test.expectedError,
+				(err != nil),
+				err,
+			)
+		}
+	}
+}
+
+func TestValidateKubeconfigsForExternalCA(t *testing.T) {
+	tmpDir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	pkiDir := filepath.Join(tmpDir, "pki")
+
+	initConfig := &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			CertificatesDir: pkiDir,
+		},
+		LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+			BindPort:         1234,
+			AdvertiseAddress: "1.2.3.4",
+		},
+	}
+
+	// creates CA, write to pkiDir and remove ca.key to get into external CA condition
+	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
+	if err := pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.CACertAndKeyBaseName, caCert, caKey); err != nil {
+		t.Fatalf("failure while saving CA certificate and key: %v", err)
+	}
+	if err := os.Remove(filepath.Join(pkiDir, kubeadmconstants.CAKeyName)); err != nil {
+		t.Fatalf("failure while deleting ca.key: %v", err)
+	}
+
+	// create a valid config
+	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
+
+	// create a config with another CA
+	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthorithy(t)
+	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
+
+	// create a config with another server URL
+	configWithAnotherServerURL := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
+
+	tests := map[string]struct {
+		filesToWrite  map[string]*clientcmdapi.Config
+		initConfig    *kubeadmapi.InitConfiguration
+		expectedError bool
+	}{
+		"files don't exist": {
+			initConfig:    initConfig,
+			expectedError: true,
+		},
+		"some files don't exist": {
+			filesToWrite: map[string]*clientcmdapi.Config{
+				kubeadmconstants.AdminKubeConfigFileName:   config,
+				kubeadmconstants.KubeletKubeConfigFileName: config,
+			},
+			initConfig:    initConfig,
+			expectedError: true,
+		},
+		"some files have invalid CA": {
+			filesToWrite: map[string]*clientcmdapi.Config{
+				kubeadmconstants.AdminKubeConfigFileName:             config,
+				kubeadmconstants.KubeletKubeConfigFileName:           config,
+				kubeadmconstants.ControllerManagerKubeConfigFileName: configWithAnotherClusterCa,
+				kubeadmconstants.SchedulerKubeConfigFileName:         config,
+			},
+			initConfig:    initConfig,
+			expectedError: true,
+		},
+		"some files have invalid Server Url": {
+			filesToWrite: map[string]*clientcmdapi.Config{
+				kubeadmconstants.AdminKubeConfigFileName:             config,
+				kubeadmconstants.KubeletKubeConfigFileName:           config,
+				kubeadmconstants.ControllerManagerKubeConfigFileName: config,
+				kubeadmconstants.SchedulerKubeConfigFileName:         configWithAnotherServerURL,
+			},
+			initConfig:    initConfig,
+			expectedError: true,
+		},
+		"all files are valid": {
+			filesToWrite: map[string]*clientcmdapi.Config{
+				kubeadmconstants.AdminKubeConfigFileName:             config,
+				kubeadmconstants.KubeletKubeConfigFileName:           config,
+				kubeadmconstants.ControllerManagerKubeConfigFileName: config,
+				kubeadmconstants.SchedulerKubeConfigFileName:         config,
+			},
+			initConfig:    initConfig,
+			expectedError: false,
+		},
+	}
+
+	for name, test := range tests {
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+
+		for name, config := range test.filesToWrite {
+			if err := createKubeConfigFileIfNotExists(tmpdir, name, config); err != nil {
+				t.Errorf("createKubeConfigFileIfNotExists failed: %v", err)
+			}
+		}
+
+		err := ValidateKubeconfigsForExternalCA(tmpdir, test.initConfig)
+		if (err != nil) != test.expectedError {
+			t.Fatalf(dedent.Dedent(
+				"ValidateKubeconfigsForExternalCA failed\n%s\nexpected error: %t\n\tgot: %t\nerror: %v"),
+				name,
+				test.expectedError,
+				(err != nil),
+				err,
+			)
+		}
+	}
+}
+
 // setupdKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With ClientAuth
-func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey, APIServer, clientName string, organizations ...string) *clientcmdapi.Config {
+func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey, APIServer, clientName, clustername string, organizations ...string) *clientcmdapi.Config {
 	spec := &kubeConfigSpec{
 		CACert:     caCert,
 		APIServer:  APIServer,
@@ -458,7 +615,7 @@ func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKe
 		},
 	}
 
-	config, err := buildKubeConfigFromSpec(spec)
+	config, err := buildKubeConfigFromSpec(spec, clustername)
 	if err != nil {
 		t.Fatal("buildKubeConfigFromSpec failed!")
 	}
@@ -467,7 +624,7 @@ func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKe
 }
 
 // setupdKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With Token
-func setupdKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, APIServer, clientName, token string) *clientcmdapi.Config {
+func setupdKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, APIServer, clientName, token, clustername string) *clientcmdapi.Config {
 	spec := &kubeConfigSpec{
 		CACert:     caCert,
 		APIServer:  APIServer,
@@ -477,7 +634,7 @@ func setupdKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, APISe
 		},
 	}
 
-	config, err := buildKubeConfigFromSpec(spec)
+	config, err := buildKubeConfigFromSpec(spec, clustername)
 	if err != nil {
 		t.Fatal("buildKubeConfigFromSpec failed!")
 	}

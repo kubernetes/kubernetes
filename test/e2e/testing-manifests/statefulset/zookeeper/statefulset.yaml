@@ -15,7 +15,7 @@ spec:
     spec:
       initContainers:
       - name: install
-        image: k8s.gcr.io/zookeeper-install-3.5.0-alpha:e2e
+        image: gcr.io/kubernetes-e2e-test-images/pets/zookeeper-installer:1.3
         imagePullPolicy: Always
         args:
         - "--install-into=/opt"
@@ -47,7 +47,7 @@ spec:
           mountPath: "/tmp/zookeeper"
       containers:
       - name: zk
-        image: java:openjdk-8-jre
+        image: openjdk:8-jre
         ports:
         - containerPort: 2888
           name: peer

@@ -18,9 +18,9 @@ go_library(
         "states.go",
         "utilities.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-ansiterm",
     importpath = "github.com/Azure/go-ansiterm",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/sirupsen/logrus:go_default_library"],
 )
 
 filegroup(

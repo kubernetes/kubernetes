@@ -24,6 +24,7 @@ go_library(
         "tcpip.go",
         "transport.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/ssh",
     importpath = "golang.org/x/crypto/ssh",
     visibility = ["//visibility:public"],
     deps = [

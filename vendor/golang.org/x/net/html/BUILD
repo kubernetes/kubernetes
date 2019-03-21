@@ -14,6 +14,7 @@ go_library(
         "render.go",
         "token.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/net/html",
     importpath = "golang.org/x/net/html",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/net/html/atom:go_default_library"],
@@ -31,6 +32,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/golang.org/x/net/html/atom:all-srcs",
+        "//vendor/golang.org/x/net/html/charset:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

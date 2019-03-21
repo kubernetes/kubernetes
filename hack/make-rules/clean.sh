@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -24,7 +24,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 CLEAN_PATTERNS=(
   "_tmp"
   "doc_tmp"
-  ".*/zz_generated.openapi.go"
+  "((?!staging\/src\/k8s\.io\/apiextensions-apiserver\/pkg\/generated\/openapi).)*/zz_generated.openapi.go"
   "test/e2e/generated/bindata.go"
 )
 

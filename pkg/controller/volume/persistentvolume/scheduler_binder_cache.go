@@ -28,60 +28,138 @@ import (
 type PodBindingCache interface {
 	// UpdateBindings will update the cache with the given bindings for the
 	// pod and node.
-	UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo)
+	UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo, provisionings []*v1.PersistentVolumeClaim)
 
-	// DeleteBindings will remove all cached bindings for the given pod.
-	DeleteBindings(pod *v1.Pod)
+	// ClearBindings will clear the cached bindings for the given pod and node.
+	ClearBindings(pod *v1.Pod, node string)
 
 	// GetBindings will return the cached bindings for the given pod and node.
+	// A nil return value means that the entry was not found. An empty slice
+	// means that no binding operations are needed.
 	GetBindings(pod *v1.Pod, node string) []*bindingInfo
+
+	// A nil return value means that the entry was not found. An empty slice
+	// means that no provisioning operations are needed.
+	GetProvisionedPVCs(pod *v1.Pod, node string) []*v1.PersistentVolumeClaim
+
+	// GetDecisions will return all cached decisions for the given pod.
+	GetDecisions(pod *v1.Pod) nodeDecisions
+
+	// DeleteBindings will remove all cached bindings and provisionings for the given pod.
+	// TODO: separate the func if it is needed to delete bindings/provisionings individually
+	DeleteBindings(pod *v1.Pod)
 }
 
 type podBindingCache struct {
-	mutex sync.Mutex
+	// synchronizes bindingDecisions
+	rwMutex sync.RWMutex
 
 	// Key = pod name
-	// Value = nodeBindings
-	bindings map[string]nodeBindings
+	// Value = nodeDecisions
+	bindingDecisions map[string]nodeDecisions
 }
 
 // Key = nodeName
-// Value = array of bindingInfo
-type nodeBindings map[string][]*bindingInfo
+// Value = bindings & provisioned PVCs of the node
+type nodeDecisions map[string]nodeDecision
+
+// A decision includes bindingInfo and provisioned PVCs of the node
+type nodeDecision struct {
+	bindings      []*bindingInfo
+	provisionings []*v1.PersistentVolumeClaim
+}
 
 func NewPodBindingCache() PodBindingCache {
-	return &podBindingCache{bindings: map[string]nodeBindings{}}
+	return &podBindingCache{bindingDecisions: map[string]nodeDecisions{}}
 }
 
-func (c *podBindingCache) DeleteBindings(pod *v1.Pod) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
+func (c *podBindingCache) GetDecisions(pod *v1.Pod) nodeDecisions {
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 	podName := getPodName(pod)
-	delete(c.bindings, podName)
-}
-
-func (c *podBindingCache) UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	podName := getPodName(pod)
-	nodeBinding, ok := c.bindings[podName]
-	if !ok {
-		nodeBinding = nodeBindings{}
-		c.bindings[podName] = nodeBinding
-	}
-	nodeBinding[node] = bindings
-}
-
-func (c *podBindingCache) GetBindings(pod *v1.Pod, node string) []*bindingInfo {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	podName := getPodName(pod)
-	nodeBindings, ok := c.bindings[podName]
+	decisions, ok := c.bindingDecisions[podName]
 	if !ok {
 		return nil
 	}
-	return nodeBindings[node]
+	return decisions
+}
+
+func (c *podBindingCache) DeleteBindings(pod *v1.Pod) {
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+
+	podName := getPodName(pod)
+
+	if _, ok := c.bindingDecisions[podName]; ok {
+		delete(c.bindingDecisions, podName)
+		VolumeBindingRequestSchedulerBinderCache.WithLabelValues("delete").Inc()
+	}
+}
+
+func (c *podBindingCache) UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo, pvcs []*v1.PersistentVolumeClaim) {
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+
+	podName := getPodName(pod)
+	decisions, ok := c.bindingDecisions[podName]
+	if !ok {
+		decisions = nodeDecisions{}
+		c.bindingDecisions[podName] = decisions
+	}
+	decision, ok := decisions[node]
+	if !ok {
+		decision = nodeDecision{
+			bindings:      bindings,
+			provisionings: pvcs,
+		}
+		VolumeBindingRequestSchedulerBinderCache.WithLabelValues("add").Inc()
+	} else {
+		decision.bindings = bindings
+		decision.provisionings = pvcs
+	}
+	decisions[node] = decision
+}
+
+func (c *podBindingCache) GetBindings(pod *v1.Pod, node string) []*bindingInfo {
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
+
+	podName := getPodName(pod)
+	decisions, ok := c.bindingDecisions[podName]
+	if !ok {
+		return nil
+	}
+	decision, ok := decisions[node]
+	if !ok {
+		return nil
+	}
+	return decision.bindings
+}
+
+func (c *podBindingCache) GetProvisionedPVCs(pod *v1.Pod, node string) []*v1.PersistentVolumeClaim {
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
+
+	podName := getPodName(pod)
+	decisions, ok := c.bindingDecisions[podName]
+	if !ok {
+		return nil
+	}
+	decision, ok := decisions[node]
+	if !ok {
+		return nil
+	}
+	return decision.provisionings
+}
+
+func (c *podBindingCache) ClearBindings(pod *v1.Pod, node string) {
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+
+	podName := getPodName(pod)
+	decisions, ok := c.bindingDecisions[podName]
+	if !ok {
+		return
+	}
+	delete(decisions, node)
 }

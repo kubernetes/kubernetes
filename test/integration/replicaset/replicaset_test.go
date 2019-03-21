@@ -112,32 +112,6 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 	}
 }
 
-// verifyRemainingObjects verifies if the number of the remaining replica
-// sets and pods are rsNum and podNum. It returns error if the
-// communication with the API server fails.
-func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rsNum, podNum int) (bool, error) {
-	rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(namespace)
-	podClient := clientSet.CoreV1().Pods(namespace)
-	pods, err := podClient.List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list pods: %v", err)
-	}
-	var ret = true
-	if len(pods.Items) != podNum {
-		ret = false
-		t.Logf("expect %d pods, got %d pods", podNum, len(pods.Items))
-	}
-	rss, err := rsClient.List(metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("Failed to list replica sets: %v", err)
-	}
-	if len(rss.Items) != rsNum {
-		ret = false
-		t.Logf("expect %d RSs, got %d RSs", rsNum, len(rss.Items))
-	}
-	return ret, nil
-}
-
 func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
@@ -361,14 +335,12 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 
 func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *apps.ReplicaSet, replicas int32) {
 	ns := rs.Namespace
-	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns)
+	rsClient := c.AppsV1().ReplicaSets(ns)
 	newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain rs %s: %v", rs.Name, err)
 	}
-	kind := "ReplicaSet"
-	scaleClient := c.ExtensionsV1beta1().Scales(ns)
-	scale, err := scaleClient.Get(kind, rs.Name)
+	scale, err := c.AppsV1().ReplicaSets(ns).GetScale(rs.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain scale subresource for rs %s: %v", rs.Name, err)
 	}
@@ -377,12 +349,12 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *a
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		scale, err := scaleClient.Get(kind, rs.Name)
+		scale, err := c.AppsV1().ReplicaSets(ns).GetScale(rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		scale.Spec.Replicas = replicas
-		_, err = scaleClient.Update(kind, scale)
+		_, err = c.AppsV1().ReplicaSets(ns).UpdateScale(rs.Name, scale)
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to set .Spec.Replicas of scale subresource for rs %s: %v", rs.Name, err)
@@ -476,12 +448,14 @@ func TestAdoption(t *testing.T) {
 				if err != nil {
 					return false, err
 				}
-				if e, a := tc.expectedOwnerReferences(rs), updatedPod.OwnerReferences; reflect.DeepEqual(e, a) {
+
+				e, a := tc.expectedOwnerReferences(rs), updatedPod.OwnerReferences
+				if reflect.DeepEqual(e, a) {
 					return true, nil
-				} else {
-					t.Logf("ownerReferences don't match, expect %v, got %v", e, a)
-					return false, nil
 				}
+
+				t.Logf("ownerReferences don't match, expect %v, got %v", e, a)
+				return false, nil
 			}); err != nil {
 				t.Fatalf("test %q failed: %v", tc.name, err)
 			}
@@ -499,6 +473,7 @@ func TestRSSelectorImmutability(t *testing.T) {
 	createRSsPods(t, clientSet, []*apps.ReplicaSet{rs}, []*v1.Pod{})
 
 	// test to ensure extensions/v1beta1 selector is mutable
+	// TODO: remove the extensions/v1beta1 portion of the test once we stop serving extensions/v1beta1
 	newSelectorLabels := map[string]string{"changed_name_extensions_v1beta1": "changed_test_extensions_v1beta1"}
 	rsExt, err := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(rs.Name, metav1.GetOptions{})
 	if err != nil {
@@ -665,7 +640,7 @@ func TestOverlappingRSs(t *testing.T) {
 
 	// Expect both RSs have .status.replicas = .spec.replicas
 	for i := 0; i < 2; i++ {
-		newRS, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(fmt.Sprintf("rs-%d", i+1), metav1.GetOptions{})
+		newRS, err := c.AppsV1().ReplicaSets(ns.Name).Get(fmt.Sprintf("rs-%d", i+1), metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to obtain rs rs-%d: %v", i+1, err)
 		}
@@ -823,7 +798,7 @@ func TestReadyAndAvailableReplicas(t *testing.T) {
 	// by setting LastTransitionTime to more than 3600 seconds ago
 	setPodsReadyCondition(t, c, thirdPodList, v1.ConditionTrue, time.Now().Add(-120*time.Minute))
 
-	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns.Name)
+	rsClient := c.AppsV1().ReplicaSets(ns.Name)
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
 		if err != nil {

@@ -27,18 +27,20 @@ import (
 // can be used for anything that DeviceAllocator user wants.
 // Only the relevant part of device name should be in the map, e.g. "ba" for
 // "/dev/xvdba".
-type ExistingDevices map[mountDevice]awsVolumeID
+type ExistingDevices map[mountDevice]EBSVolumeID
 
-// On AWS, we should assign new (not yet used) device names to attached volumes.
-// If we reuse a previously used name, we may get the volume "attaching" forever,
-// see https://aws.amazon.com/premiumsupport/knowledge-center/ebs-stuck-attaching/.
 // DeviceAllocator finds available device name, taking into account already
 // assigned device names from ExistingDevices map. It tries to find the next
 // device name to the previously assigned one (from previous DeviceAllocator
 // call), so all available device names are used eventually and it minimizes
 // device name reuse.
+//
 // All these allocations are in-memory, nothing is written to / read from
 // /dev directory.
+//
+// On AWS, we should assign new (not yet used) device names to attached volumes.
+// If we reuse a previously used name, we may get the volume "attaching" forever,
+// see https://aws.amazon.com/premiumsupport/knowledge-center/ebs-stuck-attaching/.
 type DeviceAllocator interface {
 	// GetNext returns a free device name or error when there is no free device
 	// name. Only the device suffix is returned, e.g. "ba" for "/dev/xvdba".
@@ -74,9 +76,9 @@ func (p devicePairList) Len() int           { return len(p) }
 func (p devicePairList) Less(i, j int) bool { return p[i].deviceIndex < p[j].deviceIndex }
 func (p devicePairList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-// Allocates device names according to scheme ba..bz, ca..cz
-// it moves along the ring and always picks next device until
-// device list is exhausted.
+// NewDeviceAllocator allocates device names according to scheme ba..bz, ca..cz
+// it moves along the ring and always picks next device until device list is
+// exhausted.
 func NewDeviceAllocator() DeviceAllocator {
 	possibleDevices := make(map[mountDevice]int)
 	for _, firstChar := range []rune{'b', 'c'} {

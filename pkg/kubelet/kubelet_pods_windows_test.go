@@ -1,5 +1,3 @@
-// +build windows
-
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -25,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 func TestMakeMountsWindows(t *testing.T) {
@@ -50,6 +49,21 @@ func TestMakeMountsWindows(t *testing.T) {
 				Name:      "disk5",
 				ReadOnly:  false,
 			},
+			{
+				MountPath: `\mnt\path6`,
+				Name:      "disk6",
+				ReadOnly:  false,
+			},
+			{
+				MountPath: `/mnt/path7`,
+				Name:      "disk7",
+				ReadOnly:  false,
+			},
+			{
+				MountPath: `\\.\pipe\pipe1`,
+				Name:      "pipe1",
+				ReadOnly:  false,
+			},
 		},
 	}
 
@@ -57,6 +71,9 @@ func TestMakeMountsWindows(t *testing.T) {
 		"disk":  kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "c:/mnt/disk"}},
 		"disk4": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "c:/mnt/host"}},
 		"disk5": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "c:/var/lib/kubelet/podID/volumes/empty/disk5"}},
+		"disk6": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: `/mnt/disk6`}},
+		"disk7": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: `\mnt\disk7`}},
+		"pipe1": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: `\\.\pipe\pipe1`}},
 	}
 
 	pod := v1.Pod{
@@ -66,7 +83,8 @@ func TestMakeMountsWindows(t *testing.T) {
 	}
 
 	fm := &mount.FakeMounter{}
-	mounts, _, _ := makeMounts(&pod, "/pod", &container, "fakepodname", "", "", podVolumes, fm)
+	fsp := &subpath.FakeSubpath{}
+	mounts, _, _ := makeMounts(&pod, "/pod", &container, "fakepodname", "", "", podVolumes, fm, fsp, nil)
 
 	expectedMounts := []kubecontainer.Mount{
 		{
@@ -94,6 +112,27 @@ func TestMakeMountsWindows(t *testing.T) {
 			Name:           "disk5",
 			ContainerPath:  "c:/mnt/path5",
 			HostPath:       "c:/var/lib/kubelet/podID/volumes/empty/disk5",
+			ReadOnly:       false,
+			SELinuxRelabel: false,
+		},
+		{
+			Name:           "disk6",
+			ContainerPath:  `c:\mnt\path6`,
+			HostPath:       `c:/mnt/disk6`,
+			ReadOnly:       false,
+			SELinuxRelabel: false,
+		},
+		{
+			Name:           "disk7",
+			ContainerPath:  `c:/mnt/path7`,
+			HostPath:       `c:\mnt\disk7`,
+			ReadOnly:       false,
+			SELinuxRelabel: false,
+		},
+		{
+			Name:           "pipe1",
+			ContainerPath:  `\\.\pipe\pipe1`,
+			HostPath:       `\\.\pipe\pipe1`,
 			ReadOnly:       false,
 			SELinuxRelabel: false,
 		},

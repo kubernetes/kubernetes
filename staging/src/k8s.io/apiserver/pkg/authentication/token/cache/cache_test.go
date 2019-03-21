@@ -21,10 +21,11 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apiserver/pkg/authentication/user"
-
 	"github.com/pborman/uuid"
+
+	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 func TestSimpleCache(t *testing.T) {
@@ -36,11 +37,11 @@ func BenchmarkSimpleCache(b *testing.B) {
 }
 
 func TestStripedCache(t *testing.T) {
-	testCache(newStripedCache(32, fnvKeyFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), t)
+	testCache(newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), t)
 }
 
 func BenchmarkStripedCache(b *testing.B) {
-	benchmarkCache(newStripedCache(32, fnvKeyFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), b)
+	benchmarkCache(newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), b)
 }
 
 func benchmarkCache(cache cache, b *testing.B) {
@@ -71,8 +72,8 @@ func testCache(cache cache, t *testing.T) {
 		t.Errorf("Expected null, false, got %#v, %v", result, ok)
 	}
 
-	record1 := &cacheRecord{user: &user.DefaultInfo{Name: "bob"}}
-	record2 := &cacheRecord{user: &user.DefaultInfo{Name: "alice"}}
+	record1 := &cacheRecord{resp: &authenticator.Response{User: &user.DefaultInfo{Name: "bob"}}}
+	record2 := &cacheRecord{resp: &authenticator.Response{User: &user.DefaultInfo{Name: "alice"}}}
 
 	// when empty, record is stored
 	cache.set("foo", record1, time.Hour)

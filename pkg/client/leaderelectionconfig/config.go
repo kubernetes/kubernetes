@@ -20,29 +20,17 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 const (
+	// DefaultLeaseDuration defines a default duration of lease.
+	// TODO: This constant should move to the k8s.io/component-base/config package
 	DefaultLeaseDuration = 15 * time.Second
-	DefaultRenewDeadline = 10 * time.Second
-	DefaultRetryPeriod   = 2 * time.Second
 )
 
-func DefaultLeaderElectionConfiguration() componentconfig.LeaderElectionConfiguration {
-	return componentconfig.LeaderElectionConfiguration{
-		LeaderElect:   false,
-		LeaseDuration: metav1.Duration{Duration: DefaultLeaseDuration},
-		RenewDeadline: metav1.Duration{Duration: DefaultRenewDeadline},
-		RetryPeriod:   metav1.Duration{Duration: DefaultRetryPeriod},
-		ResourceLock:  rl.EndpointsResourceLock,
-	}
-}
-
-// BindFlags binds the common LeaderElectionCLIConfig flags to a flagset
-func BindFlags(l *componentconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
+// BindFlags binds the LeaderElectionConfiguration struct fields to a flagset
+func BindFlags(l *componentbaseconfig.LeaderElectionConfiguration, fs *pflag.FlagSet) {
 	fs.BoolVar(&l.LeaderElect, "leader-elect", l.LeaderElect, ""+
 		"Start a leader election client and gain leadership before "+
 		"executing the main loop. Enable this when running replicated "+

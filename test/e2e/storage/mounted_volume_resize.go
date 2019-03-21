@@ -21,8 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,10 +31,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("Mounted volume expand [Feature:ExpandPersistentVolumes] [Slow]", func() {
+var _ = utils.SIGDescribe("Mounted volume expand", func() {
 	var (
 		c                 clientset.Interface
 		ns                string
@@ -72,11 +73,13 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:ExpandPersistentVolume
 			isNodeLabeled = true
 		}
 
-		test := storageClassTest{
-			name:      "default",
-			claimSize: "2Gi",
+		test := testsuites.StorageClassTest{
+			Name:                 "default",
+			ClaimSize:            "2Gi",
+			AllowVolumeExpansion: true,
+			DelayBinding:         true,
 		}
-		resizableSc, err = createResizableStorageClass(test, ns, "resizing", c)
+		resizableSc, err = createStorageClass(test, ns, "resizing", c)
 		Expect(err).NotTo(HaveOccurred(), "Error creating resizable storage class")
 		Expect(*resizableSc.AllowVolumeExpansion).To(BeTrue())
 
@@ -105,15 +108,21 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:ExpandPersistentVolume
 	})
 
 	It("Should verify mounted devices can be resized", func() {
-		By("Waiting for PVC to be in bound phase")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
+
+		// The reason we use a node selector is because we do not want pod to move to different node when pod is deleted.
+		// Keeping pod on same node reproduces the scenario that volume might already be mounted when resize is attempted.
+		// We should consider adding a unit test that exercises this better.
+		By("Creating a deployment with selected PVC")
+		deployment, err := framework.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
+		Expect(err).NotTo(HaveOccurred(), "Failed creating deployment %v", err)
+		defer c.AppsV1().Deployments(ns).Delete(deployment.Name, &metav1.DeleteOptions{})
+
+		// PVC should be bound at this point
+		By("Checking for bound PVC")
 		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
 		Expect(len(pvs)).To(Equal(1))
-
-		By("Creating a deployment with the provisioned volume")
-		deployment, err := framework.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
-		defer c.ExtensionsV1beta1().Deployments(ns).Delete(deployment.Name, &metav1.DeleteOptions{})
 
 		By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
@@ -127,7 +136,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:ExpandPersistentVolume
 		}
 
 		By("Waiting for cloudprovider resize to finish")
-		err = waitForControllerVolumeResize(pvc, c)
+		err = waitForControllerVolumeResize(pvc, c, totalResizeWaitPeriod)
 		Expect(err).NotTo(HaveOccurred(), "While waiting for pvc resize to finish")
 
 		By("Getting a pod from deployment")
@@ -152,7 +161,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:ExpandPersistentVolume
 	})
 })
 
-func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *extensions.Deployment) (v1.Pod, error) {
+func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *apps.Deployment) (v1.Pod, error) {
 	var runningPod v1.Pod
 	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 		podList, err := framework.GetPodsForDeployment(client, deployment)

@@ -17,17 +17,17 @@ limitations under the License.
 package upgrade
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -130,10 +130,12 @@ func TestRollbackFiles(t *testing.T) {
 }
 
 func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
-	cfg := &kubeadmapi.MasterConfiguration{
-		API:        kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-		Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-		NodeName:   "test-node",
+	cfg := &kubeadmapi.InitConfiguration{
+		LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+		},
+		NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "test-node"},
 	}
 
 	for desc, test := range map[string]struct {
@@ -148,37 +150,37 @@ func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
 			expected:       true,
 		},
 	} {
-		caCert, caKey, err := certsphase.NewCACertAndKey()
-		if err != nil {
-			t.Fatalf("failed creation of ca cert and key: %v", err)
-		}
-		caCert.NotBefore = caCert.NotBefore.Add(-test.adjustedExpiry).UTC()
-		apiCert, apiKey, err := certsphase.NewAPIServerCertAndKey(cfg, caCert, caKey)
-		if err != nil {
-			t.Fatalf("Test %s: failed creation of cert and key: %v", desc, err)
-		}
+		t.Run(desc, func(t *testing.T) {
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
+			cfg.CertificatesDir = tmpdir
 
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
-
-		if err := pkiutil.WriteCertAndKey(tmpdir, constants.APIServerCertAndKeyBaseName, apiCert, apiKey); err != nil {
-			t.Fatalf("Test %s: failure while saving %s certificate and key: %v", desc, constants.APIServerCertAndKeyBaseName, err)
-		}
-
-		certAndKey := []string{filepath.Join(tmpdir, constants.APIServerCertName), filepath.Join(tmpdir, constants.APIServerKeyName)}
-		for _, path := range certAndKey {
-			if _, err := os.Stat(path); os.IsNotExist(err) {
-				t.Fatalf("Test %s: %s not exist: %v", desc, path, err)
+			caCert, caKey, err := certsphase.KubeadmCertRootCA.CreateAsCA(cfg)
+			if err != nil {
+				t.Fatalf("failed creation of ca cert and key: %v", err)
 			}
-		}
+			caCert.NotBefore = caCert.NotBefore.Add(-test.adjustedExpiry).UTC()
 
-		shouldBackup, err := shouldBackupAPIServerCertAndKey(tmpdir)
-		if err != nil {
-			t.Fatalf("Test %s: failed to check shouldBackupAPIServerCertAndKey: %v", desc, err)
-		}
+			err = certsphase.KubeadmCertAPIServer.CreateFromCA(cfg, caCert, caKey)
+			if err != nil {
+				t.Fatalf("Test %s: failed creation of cert and key: %v", desc, err)
+			}
 
-		if shouldBackup != test.expected {
-			t.Fatalf("Test %s: shouldBackupAPIServerCertAndKey expected %v, got %v", desc, test.expected, shouldBackup)
-		}
+			certAndKey := []string{filepath.Join(tmpdir, constants.APIServerCertName), filepath.Join(tmpdir, constants.APIServerKeyName)}
+			for _, path := range certAndKey {
+				if _, err := os.Stat(path); os.IsNotExist(err) {
+					t.Fatalf("Test %s: %s not exist: %v", desc, path, err)
+				}
+			}
+
+			shouldBackup, err := shouldBackupAPIServerCertAndKey(tmpdir)
+			if err != nil {
+				t.Fatalf("Test %s: failed to check shouldBackupAPIServerCertAndKey: %v", desc, err)
+			}
+
+			if shouldBackup != test.expected {
+				t.Fatalf("Test %s: shouldBackupAPIServerCertAndKey expected %v, got %v", desc, test.expected, shouldBackup)
+			}
+		})
 	}
 }

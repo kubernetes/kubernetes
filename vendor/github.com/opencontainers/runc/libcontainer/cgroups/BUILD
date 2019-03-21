@@ -2,44 +2,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "cgroups.go",
-            "stats.go",
-            "utils.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "cgroups_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "cgroups_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "cgroups.go",
+        "cgroups_unsupported.go",
+        "stats.go",
+        "utils.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/cgroups",
     importpath = "github.com/opencontainers/runc/libcontainer/cgroups",
     visibility = ["//visibility:public"],
     deps = select({

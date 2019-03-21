@@ -62,7 +62,7 @@ func (c *FakeRoles) List(opts v1.ListOptions) (result *rbac.RoleList, err error)
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rbac.RoleList{}
+	list := &rbac.RoleList{ListMeta: obj.(*rbac.RoleList).ListMeta}
 	for _, item := range obj.(*rbac.RoleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -119,7 +119,7 @@ func (c *FakeRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 // Patch applies the patch and returns the patched role.
 func (c *FakeRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.Role, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, name, data, subresources...), &rbac.Role{})
+		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, name, pt, data, subresources...), &rbac.Role{})
 
 	if obj == nil {
 		return nil, err

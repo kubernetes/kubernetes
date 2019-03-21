@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -30,7 +30,7 @@ set -o xtrace
 # is an incoming variable Jenkins provides us for this job's scratch
 # space.
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
-export PATH=$PATH:/usr/local/go/bin
+export PATH=${PATH}:/usr/local/go/bin
 
 # Skip gcloud update checking
 export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true

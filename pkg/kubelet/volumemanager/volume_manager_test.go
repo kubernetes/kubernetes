@@ -55,7 +55,8 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+	cpm := podtest.NewMockCheckpointManager()
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
 
 	node, pod, pv, claim := createObjects()
 	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
@@ -97,7 +98,8 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+	cpm := podtest.NewMockCheckpointManager()
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
 
 	node, pod, pv, claim := createObjects()
 	claim.Status = v1.PersistentVolumeClaimStatus{
@@ -135,7 +137,8 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+	cpm := podtest.NewMockCheckpointManager()
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
 
 	node, pod, _, claim := createObjects()
 
@@ -164,6 +167,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 	}
 
 	for _, tc := range cases {
+		fs := v1.PersistentVolumeFilesystem
 		pv := &v1.PersistentVolume{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pvA",
@@ -180,6 +184,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 				ClaimRef: &v1.ObjectReference{
 					Name: claim.ObjectMeta.Name,
 				},
+				VolumeMode: &fs,
 			},
 		}
 		kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
@@ -243,11 +248,10 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 		Status: v1.NodeStatus{
 			VolumesAttached: []v1.AttachedVolume{
 				{
-					Name:       "fake/pvA",
+					Name:       "fake/fake-device",
 					DevicePath: "fake/path",
 				},
 			}},
-		Spec: v1.NodeSpec{ExternalID: testHostname},
 	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -271,6 +275,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 			},
 		},
 	}
+	fs := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pvA",
@@ -284,6 +289,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 			ClaimRef: &v1.ObjectReference{
 				Name: "claimA",
 			},
+			VolumeMode: &fs,
 		},
 	}
 	claim := &v1.PersistentVolumeClaim{

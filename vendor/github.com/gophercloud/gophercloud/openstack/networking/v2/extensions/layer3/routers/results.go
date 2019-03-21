@@ -16,7 +16,7 @@ type GatewayInfo struct {
 // ExternalFixedIP is the IP address and subnet ID of the external gateway of a
 // router.
 type ExternalFixedIP struct {
-	IPAddress string `json:"ip_address"`
+	IPAddress string `json:"ip_address,omitempty"`
 	SubnetID  string `json:"subnet_id"`
 }
 
@@ -51,12 +51,18 @@ type Router struct {
 	// unique.
 	Name string `json:"name"`
 
+	// Description for the router.
+	Description string `json:"description"`
+
 	// ID is the unique identifier for the router.
 	ID string `json:"id"`
 
-	// TenantID is the owner of the router. Only admin users can specify a tenant
-	// identifier other than its own.
+	// TenantID is the project owner of the router. Only admin users can
+	// specify a project identifier other than its own.
 	TenantID string `json:"tenant_id"`
+
+	// ProjectID is the project owner of the router.
+	ProjectID string `json:"project_id"`
 
 	// Routes are a collection of static routes that the router will host.
 	Routes []Route `json:"routes"`
@@ -64,6 +70,9 @@ type Router struct {
 	// Availability zone hints groups network nodes that run services like DHCP, L3, FW, and others.
 	// Used to make network resources highly available.
 	AvailabilityZoneHints []string `json:"availability_zone_hints"`
+
+	// Tags optionally set via extensions/attributestags
+	Tags []string `json:"tags"`
 }
 
 // RouterPage is the page returned by a pager when traversing over a

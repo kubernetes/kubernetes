@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/errors"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
@@ -41,6 +42,13 @@ func NewFileToPrint(realPath, printPath string) FileToPrint {
 		RealPath:  realPath,
 		PrintPath: printPath,
 	}
+}
+
+// PrintDryRunFile is a helper method around PrintDryRunFiles
+func PrintDryRunFile(fileName, realDir, printDir string, w io.Writer) error {
+	return PrintDryRunFiles([]FileToPrint{
+		NewFileToPrint(filepath.Join(realDir, fileName), filepath.Join(printDir, fileName)),
+	}, w)
 }
 
 // PrintDryRunFiles prints the contents of the FileToPrints given to it to the writer w
@@ -68,7 +76,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 		fmt.Fprintf(w, "[dryrun] Would write file %q with content:\n", outputFilePath)
 		apiclient.PrintBytesWithLinePrefix(w, fileBytes, "\t")
 	}
-	return errors.NewAggregate(errs)
+	return errorsutil.NewAggregate(errs)
 }
 
 // Waiter is an implementation of apiclient.Waiter that should be used for dry-running
@@ -81,7 +89,7 @@ func NewWaiter() apiclient.Waiter {
 
 // WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
 func (w *Waiter) WaitForAPI() error {
-	fmt.Println("[dryrun] Would wait for the API Server's /healthz endpoint to return 'ok'")
+	fmt.Println("[dryrun] Would wait for the API Server's /healthz endpoint to return 'ok'")
 	return nil
 }
 
@@ -99,15 +107,19 @@ func (w *Waiter) WaitForPodToDisappear(podName string) error {
 
 // WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 func (w *Waiter) WaitForHealthyKubelet(_ time.Duration, healthzEndpoint string) error {
-	fmt.Printf("[dryrun] Would make sure the kubelet %q endpoint is healthy\n", healthzEndpoint)
+	fmt.Printf("[dryrun] Would make sure the kubelet %q endpoint is healthy\n", healthzEndpoint)
+	return nil
+}
+
+// WaitForKubeletAndFunc is a wrapper for WaitForHealthyKubelet that also blocks for a function
+func (w *Waiter) WaitForKubeletAndFunc(f func() error) error {
 	return nil
 }
 
 // SetTimeout is a no-op; we don't wait in this implementation
 func (w *Waiter) SetTimeout(_ time.Duration) {}
 
-// WaitForStaticPodControlPlaneHashes returns an empty hash for all control plane images; WaitForStaticPodControlPlaneHashChange won't block in any case
-// but the empty strings there are needed
+// WaitForStaticPodControlPlaneHashes returns an empty hash for all control plane images;
 func (w *Waiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]string, error) {
 	return map[string]string{
 		constants.KubeAPIServer:         "",
@@ -122,7 +134,7 @@ func (w *Waiter) WaitForStaticPodSingleHash(_ string, _ string) (string, error) 
 	return "", nil
 }
 
-// WaitForStaticPodControlPlaneHashChange returns a dummy nil error in order for the flow to just continue as we're dryrunning
-func (w *Waiter) WaitForStaticPodControlPlaneHashChange(_, _, _ string) error {
+// WaitForStaticPodHashChange returns a dummy nil error in order for the flow to just continue as we're dryrunning
+func (w *Waiter) WaitForStaticPodHashChange(_, _, _ string) error {
 	return nil
 }

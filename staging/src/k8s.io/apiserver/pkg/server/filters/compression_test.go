@@ -42,17 +42,13 @@ func TestCompression(t *testing.T) {
 
 	responseData := []byte("1234")
 
-	requestContextMapper := request.NewRequestContextMapper()
-
 	for _, test := range tests {
 		handler := WithCompression(
 			http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				w.Write(responseData)
 			}),
-			requestContextMapper,
 		)
-		handler = filters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
-		handler = request.WithRequestContext(handler, requestContextMapper)
+		handler = filters.WithRequestInfo(handler, newTestRequestInfoResolver())
 		server := httptest.NewServer(handler)
 		defer server.Close()
 		client := http.Client{

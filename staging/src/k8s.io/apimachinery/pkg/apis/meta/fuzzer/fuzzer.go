@@ -23,11 +23,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/resource"
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
-	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -181,16 +181,42 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.Kind = ""
 		},
 		func(j *metav1.ObjectMeta, c fuzz.Continue) {
-			j.Name = c.RandString()
+			c.FuzzNoCustom(j)
+
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.SelfLink = c.RandString()
 			j.UID = types.UID(c.RandString())
-			j.GenerateName = c.RandString()
 
 			var sec, nsec int64
 			c.Fuzz(&sec)
 			c.Fuzz(&nsec)
 			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
+
+			if j.DeletionTimestamp != nil {
+				c.Fuzz(&sec)
+				c.Fuzz(&nsec)
+				t := metav1.Unix(sec, nsec).Rfc3339Copy()
+				j.DeletionTimestamp = &t
+			}
+
+			if len(j.Labels) == 0 {
+				j.Labels = nil
+			} else {
+				delete(j.Labels, "")
+			}
+			if len(j.Annotations) == 0 {
+				j.Annotations = nil
+			} else {
+				delete(j.Annotations, "")
+			}
+			if len(j.OwnerReferences) == 0 {
+				j.OwnerReferences = nil
+			}
+			if len(j.Finalizers) == 0 {
+				j.Finalizers = nil
+			}
+		},
+		func(j *metav1.Initializers, c fuzz.Continue) {
+			j = nil
 		},
 		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
@@ -247,11 +273,23 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				sort.Slice(j.MatchExpressions, func(a, b int) bool { return j.MatchExpressions[a].Key < j.MatchExpressions[b].Key })
 			}
 		},
+		func(j *metav1.ManagedFieldsEntry, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+			if j.Fields != nil && len(j.Fields.Map) == 0 {
+				j.Fields = nil
+			}
+		},
 	}
 }
 
-func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
+func v1beta1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(r *metav1beta1.TableOptions, c fuzz.Continue) {
+			c.FuzzNoCustom(r)
+			// NoHeaders is not serialized to the wire but is allowed within the versioned
+			// type because we don't use meta internal types in the client and API server.
+			r.NoHeaders = false
+		},
 		func(r *metav1beta1.TableRow, c fuzz.Continue) {
 			c.Fuzz(&r.Object)
 			c.Fuzz(&r.Conditions)
@@ -268,7 +306,7 @@ func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				case 0:
 					r.Cells[i] = c.RandString()
 				case 1:
-					r.Cells[i] = c.Uint64()
+					r.Cells[i] = c.Int63()
 				case 2:
 					r.Cells[i] = c.RandBool()
 				case 3:
@@ -280,7 +318,7 @@ func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				case 4:
 					x := make([]interface{}, c.Intn(10))
 					for i := range x {
-						x[i] = c.Uint64()
+						x[i] = c.Int63()
 					}
 					r.Cells[i] = x
 				default:
@@ -294,5 +332,5 @@ func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 var Funcs = fuzzer.MergeFuzzerFuncs(
 	genericFuzzerFuncs,
 	v1FuzzerFuncs,
-	v1alpha1FuzzerFuncs,
+	v1beta1FuzzerFuncs,
 )

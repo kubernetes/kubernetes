@@ -2,12 +2,11 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 
 	"github.com/docker/docker/api/types/swarm"
-	"golang.org/x/net/context"
 )
 
 // SecretInspectWithRaw returns the secret information with raw data
@@ -15,12 +14,12 @@ func (cli *Client) SecretInspectWithRaw(ctx context.Context, id string) (swarm.S
 	if err := cli.NewVersionError("1.25", "secret inspect"); err != nil {
 		return swarm.Secret{}, nil, err
 	}
+	if id == "" {
+		return swarm.Secret{}, nil, objectNotFoundError{object: "secret", id: id}
+	}
 	resp, err := cli.get(ctx, "/secrets/"+id, nil, nil)
 	if err != nil {
-		if resp.statusCode == http.StatusNotFound {
-			return swarm.Secret{}, nil, secretNotFoundError{id}
-		}
-		return swarm.Secret{}, nil, err
+		return swarm.Secret{}, nil, wrapResponseError(err, resp, "secret", id)
 	}
 	defer ensureReaderClosed(resp)
 

@@ -1,12 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - bowei
-- dnardo
 - freehan
-- nicksardo
 - mrhohn
+- jingax10
 reviewers:
 - bowei
-- dnardo
 - freehan
-- nicksardo
 - mrhohn
+- jingax10

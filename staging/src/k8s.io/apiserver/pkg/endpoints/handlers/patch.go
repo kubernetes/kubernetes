@@ -17,16 +17,18 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/evanphx/json-patch"
-	"github.com/golang/glog"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,19 +38,33 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utiltrace "k8s.io/utils/trace"
 )
 
-// PatchResource returns a function that will handle a resource patch
-// TODO: Eventually PatchResource should just use GuaranteedUpdate and this routine should be a bit cleaner
-func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, converter runtime.ObjectConvertor, patchTypes []string) http.HandlerFunc {
+const (
+	// maximum number of operations a single json patch may contain.
+	maxJSONPatchOperations = 10000
+)
+
+// PatchResource returns a function that will handle a resource patch.
+func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Patch " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
+
+		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
+			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
+			return
+		}
 
 		// Do this first, otherwise name extraction can fail for unrecognized content types
 		// TODO: handle this in negotiation
@@ -76,56 +92,128 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
-		versionedObj, err := converter.ConvertToVersion(r.New(), scope.Kind.GroupVersion())
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
 
-		patchJS, err := readBody(req)
+		patchBytes, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+
+		options := &metav1.PatchOptions{}
+		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+			err = errors.NewBadRequest(err.Error())
+			scope.err(err, w, req)
+			return
+		}
+		if errs := validation.ValidatePatchOptions(options, patchType); len(errs) > 0 {
+			err := errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "PatchOptions"}, "", errs)
 			scope.err(err, w, req)
 			return
 		}
 
 		ae := request.AuditEventFrom(ctx)
-		audit.LogRequestPatch(ae, patchJS)
+		admit = admission.WithAudit(admit, ae)
+
+		audit.LogRequestPatch(ae, patchBytes)
 		trace.Step("Recorded the audit event")
 
-		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
+		baseContentType := runtime.ContentTypeJSON
+		if patchType == types.ApplyPatchType {
+			baseContentType = runtime.ContentTypeYAML
+		}
+		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer.SupportedMediaTypes(), baseContentType)
 		if !ok {
-			scope.err(fmt.Errorf("no serializer defined for JSON"), w, req)
+			scope.err(fmt.Errorf("no serializer defined for %v", baseContentType), w, req)
 			return
 		}
 		gv := scope.Kind.GroupVersion()
+
 		codec := runtime.NewCodec(
 			scope.Serializer.EncoderForVersion(s.Serializer, gv),
-			scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
+			scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion),
 		)
 
 		userInfo, _ := request.UserFrom(ctx)
-		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
-		updateMutation := func(updatedObject runtime.Object, currentObject runtime.Object) error {
-			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && admit.Handles(admission.Update) {
-				return mutatingAdmission.Admit(admission.NewAttributesRecord(updatedObject, currentObject, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
-			}
-			return nil
+		staticCreateAttributes := admission.NewAttributesRecord(
+			nil,
+			nil,
+			scope.Kind,
+			namespace,
+			name,
+			scope.Resource,
+			scope.Subresource,
+			admission.Create,
+			dryrun.IsDryRun(options.DryRun),
+			userInfo)
+		staticUpdateAttributes := admission.NewAttributesRecord(
+			nil,
+			nil,
+			scope.Kind,
+			namespace,
+			name,
+			scope.Resource,
+			scope.Subresource,
+			admission.Update,
+			dryrun.IsDryRun(options.DryRun),
+			userInfo,
+		)
+
+		mutatingAdmission, _ := admit.(admission.MutationInterface)
+		createAuthorizerAttributes := authorizer.AttributesRecord{
+			User:            userInfo,
+			ResourceRequest: true,
+			Path:            req.URL.Path,
+			Verb:            "create",
+			APIGroup:        scope.Resource.Group,
+			APIVersion:      scope.Resource.Version,
+			Resource:        scope.Resource.Resource,
+			Subresource:     scope.Subresource,
+			Namespace:       namespace,
+			Name:            name,
 		}
 
-		result, err := patchResource(
-			ctx,
-			updateMutation,
-			rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
-			rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
-			timeout, versionedObj,
-			r,
-			name,
-			patchType,
-			patchJS,
-			scope.Namer, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec, trace)
+		p := patcher{
+			namer:           scope.Namer,
+			creater:         scope.Creater,
+			defaulter:       scope.Defaulter,
+			typer:           scope.Typer,
+			unsafeConvertor: scope.UnsafeConvertor,
+			kind:            scope.Kind,
+			resource:        scope.Resource,
+			subresource:     scope.Subresource,
+			dryRun:          dryrun.IsDryRun(options.DryRun),
+
+			objectInterfaces: &scope,
+
+			hubGroupVersion: scope.HubGroupVersion,
+
+			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes, &scope), scope.Authorizer, createAuthorizerAttributes),
+			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes, &scope),
+			admissionCheck:   mutatingAdmission,
+
+			codec: codec,
+
+			timeout: timeout,
+			options: options,
+
+			restPatcher: r,
+			name:        name,
+			patchType:   patchType,
+			patchBytes:  patchBytes,
+			userAgent:   req.UserAgent(),
+
+			trace: trace,
+		}
+
+		result, wasCreated, err := p.patchResource(ctx, scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -143,306 +231,211 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 		trace.Step("Self-link added")
 
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		status := http.StatusOK
+		if wasCreated {
+			status = http.StatusCreated
+		}
+		scope.Trace = trace
+		transformResponseObject(ctx, scope, req, w, status, outputMediaType, result)
 	}
 }
 
 type mutateObjectUpdateFunc func(obj, old runtime.Object) error
 
-// patchResource divides PatchResource for easier unit testing
-func patchResource(
-	ctx request.Context,
-	updateMutation mutateObjectUpdateFunc,
-	createValidation rest.ValidateObjectFunc,
-	updateValidation rest.ValidateObjectUpdateFunc,
-	timeout time.Duration,
-	versionedObj runtime.Object,
-	patcher rest.Patcher,
-	name string,
-	patchType types.PatchType,
-	patchJS []byte,
-	namer ScopeNamer,
-	creater runtime.ObjectCreater,
-	defaulter runtime.ObjectDefaulter,
-	unsafeConvertor runtime.ObjectConvertor,
-	kind schema.GroupVersionKind,
-	resource schema.GroupVersionResource,
-	codec runtime.Codec,
-	trace *utiltrace.Trace,
-) (runtime.Object, error) {
+// patcher breaks the process of patch application and retries into smaller
+// pieces of functionality.
+// TODO: Use builder pattern to construct this object?
+// TODO: As part of that effort, some aspects of PatchResource above could be
+// moved into this type.
+type patcher struct {
+	// Pieces of RequestScope
+	namer           ScopeNamer
+	creater         runtime.ObjectCreater
+	defaulter       runtime.ObjectDefaulter
+	typer           runtime.ObjectTyper
+	unsafeConvertor runtime.ObjectConvertor
+	resource        schema.GroupVersionResource
+	kind            schema.GroupVersionKind
+	subresource     string
+	dryRun          bool
 
-	namespace := request.NamespaceValue(ctx)
+	objectInterfaces admission.ObjectInterfaces
 
-	var (
-		originalObjJS           []byte
-		originalPatchedObjJS    []byte
-		originalObjMap          map[string]interface{}
-		getOriginalPatchMap     func() (map[string]interface{}, error)
-		lastConflictErr         error
-		originalResourceVersion string
-	)
+	hubGroupVersion schema.GroupVersion
 
-	// applyPatch is called every time GuaranteedUpdate asks for the updated object,
-	// and is given the currently persisted object as input.
-	applyPatch := func(_ request.Context, _, currentObject runtime.Object) (runtime.Object, error) {
-		// Make sure we actually have a persisted currentObject
-		trace.Step("About to apply patch")
-		if hasUID, err := hasUID(currentObject); err != nil {
-			return nil, err
-		} else if !hasUID {
-			return nil, errors.NewNotFound(resource.GroupResource(), name)
-		}
+	// Validation functions
+	createValidation rest.ValidateObjectFunc
+	updateValidation rest.ValidateObjectUpdateFunc
+	admissionCheck   admission.MutationInterface
 
-		currentResourceVersion := ""
-		if currentMetadata, err := meta.Accessor(currentObject); err == nil {
-			currentResourceVersion = currentMetadata.GetResourceVersion()
-		}
+	codec runtime.Codec
 
-		switch {
-		case originalObjJS == nil && originalObjMap == nil:
-			// first time through,
-			// 1. apply the patch
-			// 2. save the original and patched to detect whether there were conflicting changes on retries
+	timeout time.Duration
+	options *metav1.PatchOptions
 
-			originalResourceVersion = currentResourceVersion
-			objToUpdate := patcher.New()
+	// Operation information
+	restPatcher rest.Patcher
+	name        string
+	patchType   types.PatchType
+	patchBytes  []byte
+	userAgent   string
 
-			// For performance reasons, in case of strategicpatch, we avoid json
-			// marshaling and unmarshaling and operate just on map[string]interface{}.
-			// In case of other patch types, we still have to operate on JSON
-			// representations.
-			switch patchType {
-			case types.JSONPatchType, types.MergePatchType:
-				originalJS, patchedJS, err := patchObjectJSON(patchType, codec, currentObject, patchJS, objToUpdate, versionedObj)
-				if err != nil {
-					return nil, interpretPatchError(err)
-				}
-				originalObjJS, originalPatchedObjJS = originalJS, patchedJS
+	trace *utiltrace.Trace
 
-				// Make a getter that can return a fresh strategic patch map if needed for conflict retries
-				// We have to rebuild it each time we need it, because the map gets mutated when being applied
-				var originalPatchBytes []byte
-				getOriginalPatchMap = func() (map[string]interface{}, error) {
-					if originalPatchBytes == nil {
-						// Compute once
-						originalPatchBytes, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
-						if err != nil {
-							return nil, interpretPatchError(err)
-						}
-					}
-					// Return a fresh map every time
-					originalPatchMap := make(map[string]interface{})
-					if err := json.Unmarshal(originalPatchBytes, &originalPatchMap); err != nil {
-						return nil, errors.NewBadRequest(err.Error())
-					}
-					return originalPatchMap, nil
-				}
-
-			case types.StrategicMergePatchType:
-				// Since the patch is applied on versioned objects, we need to convert the
-				// current object to versioned representation first.
-				currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
-				if err != nil {
-					return nil, err
-				}
-				versionedObjToUpdate, err := creater.New(kind)
-				if err != nil {
-					return nil, err
-				}
-				// Capture the original object map and patch for possible retries.
-				originalMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(currentVersionedObject)
-				if err != nil {
-					return nil, err
-				}
-				if err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj); err != nil {
-					return nil, err
-				}
-				// Convert the object back to unversioned.
-				gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-				unversionedObjToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
-				if err != nil {
-					return nil, err
-				}
-				objToUpdate = unversionedObjToUpdate
-				// Store unstructured representation for possible retries.
-				originalObjMap = originalMap
-				// Make a getter that can return a fresh strategic patch map if needed for conflict retries
-				// We have to rebuild it each time we need it, because the map gets mutated when being applied
-				getOriginalPatchMap = func() (map[string]interface{}, error) {
-					patchMap := make(map[string]interface{})
-					if err := json.Unmarshal(patchJS, &patchMap); err != nil {
-						return nil, errors.NewBadRequest(err.Error())
-					}
-					return patchMap, nil
-				}
-			}
-			if err := checkName(objToUpdate, name, namespace, namer); err != nil {
-				return nil, err
-			}
-			return objToUpdate, nil
-
-		default:
-			// on a conflict,
-			// 1. build a strategic merge patch from originalJS and the patchedJS.  Different patch types can
-			//    be specified, but a strategic merge patch should be expressive enough handle them.  Build the
-			//    patch with this type to handle those cases.
-			// 2. build a strategic merge patch from originalJS and the currentJS
-			// 3. ensure no conflicts between the two patches
-			// 4. apply the #1 patch to the currentJS object
-
-			// Since the patch is applied on versioned objects, we need to convert the
-			// current object to versioned representation first.
-			currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
-			if err != nil {
-				return nil, err
-			}
-			currentObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(currentVersionedObject)
-			if err != nil {
-				return nil, err
-			}
-
-			var currentPatchMap map[string]interface{}
-			if originalObjMap != nil {
-				var err error
-				currentPatchMap, err = strategicpatch.CreateTwoWayMergeMapPatch(originalObjMap, currentObjMap, versionedObj)
-				if err != nil {
-					return nil, interpretPatchError(err)
-				}
-			} else {
-				// Compute current patch.
-				currentObjJS, err := runtime.Encode(codec, currentObject)
-				if err != nil {
-					return nil, err
-				}
-				currentPatch, err := strategicpatch.CreateTwoWayMergePatch(originalObjJS, currentObjJS, versionedObj)
-				if err != nil {
-					return nil, interpretPatchError(err)
-				}
-				currentPatchMap = make(map[string]interface{})
-				if err := json.Unmarshal(currentPatch, &currentPatchMap); err != nil {
-					return nil, errors.NewBadRequest(err.Error())
-				}
-			}
-
-			// Get a fresh copy of the original strategic patch each time through, since applying it mutates the map
-			originalPatchMap, err := getOriginalPatchMap()
-			if err != nil {
-				return nil, err
-			}
-
-			hasConflicts, err := mergepatch.HasConflicts(originalPatchMap, currentPatchMap)
-			if err != nil {
-				return nil, err
-			}
-
-			if hasConflicts {
-				diff1, _ := json.Marshal(currentPatchMap)
-				diff2, _ := json.Marshal(originalPatchMap)
-				patchDiffErr := fmt.Errorf("there is a meaningful conflict (firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
-				glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict(firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", name, originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
-
-				// Return the last conflict error we got if we have one
-				if lastConflictErr != nil {
-					return nil, lastConflictErr
-				}
-				// Otherwise manufacture one of our own
-				return nil, errors.NewConflict(resource.GroupResource(), name, patchDiffErr)
-			}
-
-			versionedObjToUpdate, err := creater.New(kind)
-			if err != nil {
-				return nil, err
-			}
-			if err := applyPatchToObject(codec, defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
-				return nil, err
-			}
-			// Convert the object back to unversioned.
-			gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-			objToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
-			if err != nil {
-				return nil, err
-			}
-
-			return objToUpdate, nil
-		}
-	}
-
-	// applyAdmission is called every time GuaranteedUpdate asks for the updated object,
-	// and is given the currently persisted object and the patched object as input.
-	applyAdmission := func(ctx request.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
-		trace.Step("About to check admission control")
-		return patchedObject, updateMutation(patchedObject, currentObject)
-	}
-	updatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, applyPatch, applyAdmission)
-
-	return finishRequest(timeout, func() (runtime.Object, error) {
-		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo, createValidation, updateValidation)
-		for i := 0; i < MaxRetryWhenPatchConflicts && (errors.IsConflict(updateErr)); i++ {
-			lastConflictErr = updateErr
-			updateObject, _, updateErr = patcher.Update(ctx, name, updatedObjectInfo, createValidation, updateValidation)
-		}
-		return updateObject, updateErr
-	})
+	// Set at invocation-time (by applyPatch) and immutable thereafter
+	namespace         string
+	updatedObjectInfo rest.UpdatedObjectInfo
+	mechanism         patchMechanism
+	forceAllowCreate  bool
 }
 
-// patchObjectJSON patches the <originalObject> with <patchJS> and stores
-// the result in <objToUpdate>.
-// Currently it also returns the original and patched objects serialized to
-// JSONs (this may not be needed once we can apply patches at the
-// map[string]interface{} level).
-func patchObjectJSON(
-	patchType types.PatchType,
-	codec runtime.Codec,
-	originalObject runtime.Object,
-	patchJS []byte,
-	objToUpdate runtime.Object,
-	versionedObj runtime.Object,
-) (originalObjJS []byte, patchedObjJS []byte, retErr error) {
-	js, err := runtime.Encode(codec, originalObject)
-	if err != nil {
-		return nil, nil, err
-	}
-	originalObjJS = js
+type patchMechanism interface {
+	applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error)
+	createNewObject() (runtime.Object, error)
+}
 
-	switch patchType {
+type jsonPatcher struct {
+	*patcher
+
+	fieldManager *fieldmanager.FieldManager
+}
+
+func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
+	// Encode will convert & return a versioned object in JSON.
+	currentObjJS, err := runtime.Encode(p.codec, currentObject)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply the patch.
+	patchedObjJS, err := p.applyJSPatch(currentObjJS)
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct the resulting typed, unversioned object.
+	objToUpdate := p.restPatcher.New()
+	if err := runtime.DecodeInto(p.codec, patchedObjJS, objToUpdate); err != nil {
+		return nil, err
+	}
+
+	if p.fieldManager != nil {
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent)); err != nil {
+			return nil, fmt.Errorf("failed to update object (json PATCH for %v) managed fields: %v", p.kind, err)
+		}
+	}
+	return objToUpdate, nil
+}
+
+func (p *jsonPatcher) createNewObject() (runtime.Object, error) {
+	return nil, errors.NewNotFound(p.resource.GroupResource(), p.name)
+}
+
+// applyJSPatch applies the patch. Input and output objects must both have
+// the external version, since that is what the patch must have been constructed against.
+func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr error) {
+	switch p.patchType {
 	case types.JSONPatchType:
-		patchObj, err := jsonpatch.DecodePatch(patchJS)
+		patchObj, err := jsonpatch.DecodePatch(p.patchBytes)
 		if err != nil {
-			return nil, nil, err
+			return nil, errors.NewBadRequest(err.Error())
 		}
-		if patchedObjJS, err = patchObj.Apply(originalObjJS); err != nil {
-			return nil, nil, err
+		if len(patchObj) > maxJSONPatchOperations {
+			return nil, errors.NewRequestEntityTooLargeError(
+				fmt.Sprintf("The allowed maximum operations in a JSON patch is %d, got %d",
+					maxJSONPatchOperations, len(patchObj)))
 		}
+		patchedJS, err := patchObj.Apply(versionedJS)
+		if err != nil {
+			return nil, errors.NewGenericServerResponse(http.StatusUnprocessableEntity, "", schema.GroupResource{}, "", err.Error(), 0, false)
+		}
+		return patchedJS, nil
 	case types.MergePatchType:
-		if patchedObjJS, err = jsonpatch.MergePatch(originalObjJS, patchJS); err != nil {
-			return nil, nil, err
-		}
-	case types.StrategicMergePatchType:
-		if patchedObjJS, err = strategicpatch.StrategicMergePatch(originalObjJS, patchJS, versionedObj); err != nil {
-			return nil, nil, err
-		}
+		return jsonpatch.MergePatch(versionedJS, p.patchBytes)
 	default:
 		// only here as a safety net - go-restful filters content-type
-		return nil, nil, fmt.Errorf("unknown Content-Type header for patch: %v", patchType)
+		return nil, fmt.Errorf("unknown Content-Type header for patch: %v", p.patchType)
 	}
-	if err := runtime.DecodeInto(codec, patchedObjJS, objToUpdate); err != nil {
-		return nil, nil, err
-	}
-	return
 }
 
-// strategicPatchObject applies a strategic merge patch of <patchJS> to
+type smpPatcher struct {
+	*patcher
+
+	// Schema
+	schemaReferenceObj runtime.Object
+	fieldManager       *fieldmanager.FieldManager
+}
+
+func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
+	// Since the patch is applied on versioned objects, we need to convert the
+	// current object to versioned representation first.
+	currentVersionedObject, err := p.unsafeConvertor.ConvertToVersion(currentObject, p.kind.GroupVersion())
+	if err != nil {
+		return nil, err
+	}
+	versionedObjToUpdate, err := p.creater.New(p.kind)
+	if err != nil {
+		return nil, err
+	}
+	if err := strategicPatchObject(p.defaulter, currentVersionedObject, p.patchBytes, versionedObjToUpdate, p.schemaReferenceObj); err != nil {
+		return nil, err
+	}
+	// Convert the object back to the hub version
+	newObj, err := p.unsafeConvertor.ConvertToVersion(versionedObjToUpdate, p.hubGroupVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	if p.fieldManager != nil {
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, managerOrUserAgent(p.options.FieldManager, p.userAgent)); err != nil {
+			return nil, fmt.Errorf("failed to update object (smp PATCH for %v) managed fields: %v", p.kind, err)
+		}
+	}
+	return newObj, nil
+}
+
+func (p *smpPatcher) createNewObject() (runtime.Object, error) {
+	return nil, errors.NewNotFound(p.resource.GroupResource(), p.name)
+}
+
+type applyPatcher struct {
+	patch        []byte
+	options      *metav1.PatchOptions
+	creater      runtime.ObjectCreater
+	kind         schema.GroupVersionKind
+	fieldManager *fieldmanager.FieldManager
+}
+
+func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Object, error) {
+	force := false
+	if p.options.Force != nil {
+		force = *p.options.Force
+	}
+	if p.fieldManager == nil {
+		panic("FieldManager must be installed to run apply")
+	}
+	return p.fieldManager.Apply(obj, p.patch, p.options.FieldManager, force)
+}
+
+func (p *applyPatcher) createNewObject() (runtime.Object, error) {
+	obj, err := p.creater.New(p.kind)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new object: %v", obj)
+	}
+	return p.applyPatchToCurrentObject(obj)
+}
+
+// strategicPatchObject applies a strategic merge patch of <patchBytes> to
 // <originalObject> and stores the result in <objToUpdate>.
 // It additionally returns the map[string]interface{} representation of the
-// <originalObject> and <patchJS>.
+// <originalObject> and <patchBytes>.
 // NOTE: Both <originalObject> and <objToUpdate> are supposed to be versioned.
 func strategicPatchObject(
-	codec runtime.Codec,
 	defaulter runtime.ObjectDefaulter,
 	originalObject runtime.Object,
-	patchJS []byte,
+	patchBytes []byte,
 	objToUpdate runtime.Object,
-	versionedObj runtime.Object,
+	schemaReferenceObj runtime.Object,
 ) error {
 	originalObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(originalObject)
 	if err != nil {
@@ -450,30 +443,140 @@ func strategicPatchObject(
 	}
 
 	patchMap := make(map[string]interface{})
-	if err := json.Unmarshal(patchJS, &patchMap); err != nil {
+	if err := json.Unmarshal(patchBytes, &patchMap); err != nil {
 		return errors.NewBadRequest(err.Error())
 	}
 
-	if err := applyPatchToObject(codec, defaulter, originalObjMap, patchMap, objToUpdate, versionedObj); err != nil {
+	if err := applyPatchToObject(defaulter, originalObjMap, patchMap, objToUpdate, schemaReferenceObj); err != nil {
 		return err
 	}
 	return nil
+}
+
+// applyPatch is called every time GuaranteedUpdate asks for the updated object,
+// and is given the currently persisted object as input.
+// TODO: rename this function because the name implies it is related to applyPatcher
+func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
+	// Make sure we actually have a persisted currentObject
+	p.trace.Step("About to apply patch")
+	currentObjectHasUID, err := hasUID(currentObject)
+	if err != nil {
+		return nil, err
+	} else if !currentObjectHasUID {
+		objToUpdate, patchErr = p.mechanism.createNewObject()
+	} else {
+		objToUpdate, patchErr = p.mechanism.applyPatchToCurrentObject(currentObject)
+	}
+
+	if patchErr != nil {
+		return nil, patchErr
+	}
+
+	objToUpdateHasUID, err := hasUID(objToUpdate)
+	if err != nil {
+		return nil, err
+	}
+	if objToUpdateHasUID && !currentObjectHasUID {
+		accessor, err := meta.Accessor(objToUpdate)
+		if err != nil {
+			return nil, err
+		}
+		return nil, errors.NewConflict(p.resource.GroupResource(), p.name, fmt.Errorf("uid mismatch: the provided object specified uid %s, and no existing object was found", accessor.GetUID()))
+	}
+
+	if err := checkName(objToUpdate, p.name, p.namespace, p.namer); err != nil {
+		return nil, err
+	}
+	return objToUpdate, nil
+}
+
+func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation) admission.Attributes {
+	userInfo, _ := request.UserFrom(ctx)
+	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, p.dryRun, userInfo)
+}
+
+// applyAdmission is called every time GuaranteedUpdate asks for the updated object,
+// and is given the currently persisted object and the patched object as input.
+// TODO: rename this function because the name implies it is related to applyPatcher
+func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
+	p.trace.Step("About to check admission control")
+	var operation admission.Operation
+	if hasUID, err := hasUID(currentObject); err != nil {
+		return nil, err
+	} else if !hasUID {
+		operation = admission.Create
+		currentObject = nil
+	} else {
+		operation = admission.Update
+	}
+	if p.admissionCheck != nil && p.admissionCheck.Handles(operation) {
+		attributes := p.admissionAttributes(ctx, patchedObject, currentObject, operation)
+		return patchedObject, p.admissionCheck.Admit(attributes, p.objectInterfaces)
+	}
+	return patchedObject, nil
+}
+
+// patchResource divides PatchResource for easier unit testing
+func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtime.Object, bool, error) {
+	p.namespace = request.NamespaceValue(ctx)
+	switch p.patchType {
+	case types.JSONPatchType, types.MergePatchType:
+		p.mechanism = &jsonPatcher{
+			patcher:      p,
+			fieldManager: scope.FieldManager,
+		}
+	case types.StrategicMergePatchType:
+		schemaReferenceObj, err := p.unsafeConvertor.ConvertToVersion(p.restPatcher.New(), p.kind.GroupVersion())
+		if err != nil {
+			return nil, false, err
+		}
+		p.mechanism = &smpPatcher{
+			patcher:            p,
+			schemaReferenceObj: schemaReferenceObj,
+			fieldManager:       scope.FieldManager,
+		}
+	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
+	case types.ApplyPatchType:
+		p.mechanism = &applyPatcher{
+			fieldManager: scope.FieldManager,
+			patch:        p.patchBytes,
+			options:      p.options,
+			creater:      p.creater,
+			kind:         p.kind,
+		}
+		p.forceAllowCreate = true
+	default:
+		return nil, false, fmt.Errorf("%v: unimplemented patch type", p.patchType)
+	}
+
+	wasCreated := false
+	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
+	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
+		// TODO: Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
+		options, err := patchToUpdateOptions(p.options)
+		if err != nil {
+			return nil, err
+		}
+		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, p.forceAllowCreate, options)
+		wasCreated = created
+		return updateObject, updateErr
+	})
+	return result, wasCreated, err
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to
 // <originalMap> and stores the result in <objToUpdate>.
 // NOTE: <objToUpdate> must be a versioned object.
 func applyPatchToObject(
-	codec runtime.Codec,
 	defaulter runtime.ObjectDefaulter,
 	originalMap map[string]interface{},
 	patchMap map[string]interface{},
 	objToUpdate runtime.Object,
-	versionedObj runtime.Object,
+	schemaReferenceObj runtime.Object,
 ) error {
-	patchedObjMap, err := strategicpatch.StrategicMergeMapPatch(originalMap, patchMap, versionedObj)
+	patchedObjMap, err := strategicpatch.StrategicMergeMapPatch(originalMap, patchMap, schemaReferenceObj)
 	if err != nil {
-		return interpretPatchError(err)
+		return interpretStrategicMergePatchError(err)
 	}
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
@@ -486,8 +589,8 @@ func applyPatchToObject(
 	return nil
 }
 
-// interpretPatchError interprets the error type and returns an error with appropriate HTTP code.
-func interpretPatchError(err error) error {
+// interpretStrategicMergePatchError interprets the error type and returns an error with appropriate HTTP code.
+func interpretStrategicMergePatchError(err error) error {
 	switch err {
 	case mergepatch.ErrBadJSONDoc, mergepatch.ErrBadPatchFormatForPrimitiveList, mergepatch.ErrBadPatchFormatForRetainKeys, mergepatch.ErrBadPatchFormatForSetElementOrderList, mergepatch.ErrUnsupportedStrategicMergePatchFormat:
 		return errors.NewBadRequest(err.Error())
@@ -496,4 +599,14 @@ func interpretPatchError(err error) error {
 	default:
 		return err
 	}
+}
+
+func patchToUpdateOptions(po *metav1.PatchOptions) (*metav1.UpdateOptions, error) {
+	b, err := json.Marshal(po)
+	if err != nil {
+		return nil, err
+	}
+	uo := metav1.UpdateOptions{}
+	err = json.Unmarshal(b, &uo)
+	return &uo, err
 }

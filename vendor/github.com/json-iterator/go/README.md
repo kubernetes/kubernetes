@@ -8,6 +8,8 @@
 
 A high-performance 100% compatible drop-in replacement of "encoding/json"
 
+You can also use thrift like JSON using [thrift-iterator](https://github.com/thrift-iterator/go)
+
 ```
 Go开发者们请加入我们，滴滴出行平台技术部 taowen@didichuxing.com
 ```
@@ -28,6 +30,9 @@ Raw Result (easyjson requires static code generation)
 | std encode | 2213 ns/op | 712 B/op | 5 allocs/op |
 | easyjson encode | 883 ns/op | 576 B/op | 3 allocs/op |
 | jsoniter encode | 837 ns/op | 384 B/op | 4 allocs/op |
+
+Always benchmark with your own workload. 
+The result depends heavily on the data input.
 
 # Usage
 

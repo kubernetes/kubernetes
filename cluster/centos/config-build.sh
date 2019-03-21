@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -31,16 +31,22 @@ ETCD_VERSION=${ETCD_VERSION:-"3.0.9"}
 # Define k8s version to use.
 K8S_VERSION=${K8S_VERSION:-"1.3.7"}
 
+# shellcheck disable=2034 # Variables sourced in other scripts executed from the same shell
 DOCKER_DOWNLOAD_URL=\
 "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz"
 
+# shellcheck disable=2034 # Variables sourced in other scripts executed from the same shell
 FLANNEL_DOWNLOAD_URL=\
 "https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-v${FLANNEL_VERSION}-linux-amd64.tar.gz"
 
+# shellcheck disable=2034 # Variables sourced in other scripts executed from the same shell
 ETCD_DOWNLOAD_URL=\
 "https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"
 
+# shellcheck disable=2034 # Variables sourced in other scripts executed from the same shell
 K8S_CLIENT_DOWNLOAD_URL=\
 "https://dl.k8s.io/v${K8S_VERSION}/kubernetes-client-linux-amd64.tar.gz"
+
+# shellcheck disable=2034 # Variables sourced in other scripts executed from the same shell
 K8S_SERVER_DOWNLOAD_URL=\
 "https://dl.k8s.io/v${K8S_VERSION}/kubernetes-server-linux-amd64.tar.gz"

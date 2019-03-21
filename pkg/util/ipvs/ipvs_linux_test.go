@@ -147,6 +147,30 @@ func Test_toVirtualServer(t *testing.T) {
 			false,
 			"",
 		},
+		{
+			libipvs.Service{
+				Protocol:      syscall.IPPROTO_SCTP,
+				Port:          80,
+				FWMark:        0,
+				SchedName:     "",
+				Flags:         uint32(FlagPersistent + FlagHashed),
+				Timeout:       0,
+				Netmask:       0xffffffff,
+				AddressFamily: syscall.AF_INET,
+				Address:       nil,
+				PEName:        "",
+			},
+			VirtualServer{
+				Address:   net.ParseIP("0.0.0.0"),
+				Protocol:  "SCTP",
+				Port:      80,
+				Scheduler: "",
+				Flags:     ServiceFlags(FlagPersistent),
+				Timeout:   0,
+			},
+			false,
+			"",
+		},
 	}
 
 	for i := range Tests {
@@ -306,7 +330,7 @@ func Test_toRealServer(t *testing.T) {
 	for i := range Tests {
 		got, err := toRealServer(&Tests[i].ipvsDestination)
 		if err != nil {
-			t.Errorf("case %d unexpected error: %d", i, err)
+			t.Errorf("case %d unexpected error: %v", i, err)
 		}
 		if !reflect.DeepEqual(*got, Tests[i].realServer) {
 			t.Errorf("case %d Failed to translate Destination - got %#v, want %#v", i, *got, Tests[i].realServer)
@@ -349,7 +373,7 @@ func Test_toIPVSDestination(t *testing.T) {
 	for i := range Tests {
 		got, err := toIPVSDestination(&Tests[i].realServer)
 		if err != nil {
-			t.Errorf("case %d unexpected error: %d", i, err)
+			t.Errorf("case %d unexpected error: %v", i, err)
 		}
 		if !reflect.DeepEqual(*got, Tests[i].ipvsDestination) {
 			t.Errorf("case %d failed to translate Destination - got %#v, want %#v", i, *got, Tests[i].ipvsDestination)
@@ -359,10 +383,10 @@ func Test_toIPVSDestination(t *testing.T) {
 
 func Test_stringToProtocol(t *testing.T) {
 	tests := []string{
-		"TCP", "UDP", "ICMP",
+		"TCP", "UDP", "ICMP", "SCTP",
 	}
 	expected := []uint16{
-		uint16(syscall.IPPROTO_TCP), uint16(syscall.IPPROTO_UDP), uint16(0),
+		uint16(syscall.IPPROTO_TCP), uint16(syscall.IPPROTO_UDP), uint16(0), uint16(syscall.IPPROTO_SCTP),
 	}
 	for i := range tests {
 		got := stringToProtocol(tests[i])
@@ -375,10 +399,10 @@ func Test_stringToProtocol(t *testing.T) {
 
 func Test_protocolToString(t *testing.T) {
 	tests := []Protocol{
-		syscall.IPPROTO_TCP, syscall.IPPROTO_UDP, Protocol(0),
+		syscall.IPPROTO_TCP, syscall.IPPROTO_UDP, Protocol(0), syscall.IPPROTO_SCTP,
 	}
 	expected := []string{
-		"TCP", "UDP", "",
+		"TCP", "UDP", "", "SCTP",
 	}
 	for i := range tests {
 		got := protocolToString(tests[i])

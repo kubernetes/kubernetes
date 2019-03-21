@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	storage_v1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -69,7 +69,7 @@ func NewFilteredStorageClassInformer(client kubernetes.Interface, resyncPeriod t
 				return client.StorageV1beta1().StorageClasses().Watch(options)
 			},
 		},
-		&storage_v1beta1.StorageClass{},
+		&storagev1beta1.StorageClass{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *storageClassInformer) defaultInformer(client kubernetes.Interface, resy
 }
 
 func (f *storageClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storage_v1beta1.StorageClass{}, f.defaultInformer)
+	return f.factory.InformerFor(&storagev1beta1.StorageClass{}, f.defaultInformer)
 }
 
 func (f *storageClassInformer) Lister() v1beta1.StorageClassLister {

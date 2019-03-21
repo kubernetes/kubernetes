@@ -1,10 +1,9 @@
 package client
 
 import (
+	"context"
 	"io"
 	"net/url"
-
-	"golang.org/x/net/context"
 )
 
 // ContainerExport retrieves the raw contents of a container

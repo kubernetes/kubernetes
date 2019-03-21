@@ -21,37 +21,34 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/evanphx/json-patch"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-
+	"github.com/spf13/pflag"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
 
 const (
-	ApplyAnnotationsFlag     = "save-config"
-	DefaultErrorExitCode     = 1
-	IncludeUninitializedFlag = "include-uninitialized"
+	ApplyAnnotationsFlag = "save-config"
+	DefaultErrorExitCode = 1
 )
 
 type debugError interface {
@@ -89,10 +86,10 @@ func DefaultBehaviorOnFatal() {
 }
 
 // fatal prints the message (if provided) and then exits. If V(2) or greater,
-// glog.Fatal is invoked for extended information.
+// klog.Fatal is invoked for extended information.
 func fatal(msg string, code int) {
-	if glog.V(2) {
-		glog.FatalDepth(2, msg)
+	if klog.V(2) {
+		klog.FatalDepth(2, msg)
 	}
 	if len(msg) > 0 {
 		// add newline if needed
@@ -190,13 +187,13 @@ func statusCausesToAggrError(scs []metav1.StatusCause) utilerrors.Aggregate {
 
 // StandardErrorMessage translates common errors into a human readable message, or returns
 // false if the error is not one of the recognized types. It may also log extended
-// information to glog.
+// information to klog.
 //
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
 func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
-		glog.V(4).Infof(debugErr.DebugError())
+		klog.V(4).Infof(debugErr.DebugError())
 	}
 	status, isStatus := err.(kerrors.APIStatus)
 	switch {
@@ -214,7 +211,7 @@ func StandardErrorMessage(err error) (string, bool) {
 	}
 	switch t := err.(type) {
 	case *url.Error:
-		glog.V(4).Infof("Connection error: %s %s: %v", t.Op, t.URL, t.Err)
+		klog.V(4).Infof("Connection error: %s %s: %v", t.Op, t.URL, t.Err)
 		switch {
 		case strings.Contains(t.Err.Error(), "connection refused"):
 			host := t.URL
@@ -291,27 +288,17 @@ func messageForError(err error) string {
 
 func UsageErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	msg := fmt.Sprintf(format, args...)
-	return fmt.Errorf("%s\nSee '%s -h' for help and examples.", msg, cmd.CommandPath())
+	return fmt.Errorf("%s\nSee '%s -h' for help and examples", msg, cmd.CommandPath())
 }
 
-func IsFilenameSliceEmpty(filenames []string) bool {
-	return len(filenames) == 0
-}
-
-// Whether this cmd need watching objects.
-func isWatch(cmd *cobra.Command) bool {
-	if w, err := cmd.Flags().GetBool("watch"); err == nil && w {
-		return true
-	}
-
-	wo, err := cmd.Flags().GetBool("watch-only")
-	return err == nil && wo
+func IsFilenameSliceEmpty(filenames []string, directory string) bool {
+	return len(filenames) == 0 && directory == ""
 }
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
 	s, err := cmd.Flags().GetString(flag)
 	if err != nil {
-		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
@@ -320,7 +307,7 @@ func GetFlagString(cmd *cobra.Command, flag string) string {
 func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringSlice(flag)
 	if err != nil {
-		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
@@ -329,24 +316,15 @@ func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 func GetFlagStringArray(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringArray(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
-}
-
-// GetWideFlag is used to determine if "-o wide" is used
-func GetWideFlag(cmd *cobra.Command) bool {
-	f := cmd.Flags().Lookup("output")
-	if f != nil && f.Value != nil && f.Value.String() == "wide" {
-		return true
-	}
-	return false
 }
 
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	b, err := cmd.Flags().GetBool(flag)
 	if err != nil {
-		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return b
 }
@@ -355,7 +333,7 @@ func GetFlagBool(cmd *cobra.Command, flag string) bool {
 func GetFlagInt(cmd *cobra.Command, flag string) int {
 	i, err := cmd.Flags().GetInt(flag)
 	if err != nil {
-		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return i
 }
@@ -364,7 +342,7 @@ func GetFlagInt(cmd *cobra.Command, flag string) int {
 func GetFlagInt32(cmd *cobra.Command, flag string) int32 {
 	i, err := cmd.Flags().GetInt32(flag)
 	if err != nil {
-		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return i
 }
@@ -373,7 +351,7 @@ func GetFlagInt32(cmd *cobra.Command, flag string) int32 {
 func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 	i, err := cmd.Flags().GetInt64(flag)
 	if err != nil {
-		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return i
 }
@@ -381,7 +359,7 @@ func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	d, err := cmd.Flags().GetDuration(flag)
 	if err != nil {
-		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return d
 }
@@ -403,8 +381,23 @@ func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
 }
 
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, "Filename, directory, or URL to files "+usage)
+	AddJsonFilenameFlag(cmd.Flags(), &options.Filenames, "Filename, directory, or URL to files "+usage)
+	AddKustomizeFlag(cmd.Flags(), &options.Kustomize)
 	cmd.Flags().BoolVarP(&options.Recursive, "recursive", "R", options.Recursive, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
+}
+
+func AddJsonFilenameFlag(flags *pflag.FlagSet, value *[]string, usage string) {
+	flags.StringSliceVarP(value, "filename", "f", *value, usage)
+	annotations := make([]string, 0, len(resource.FileExtensions))
+	for _, ext := range resource.FileExtensions {
+		annotations = append(annotations, strings.TrimLeft(ext, "."))
+	}
+	flags.SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
+}
+
+// AddKustomizeFlag adds kustomize flag to a command
+func AddKustomizeFlag(flags *pflag.FlagSet, value *string) {
+	flags.StringVarP(value, "kustomize", "k", *value, "Process the kustomization directory. This flag can't be used together with -f or -R.")
 }
 
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
@@ -412,8 +405,15 @@ func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 }
 
+func AddServerSideApplyFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("experimental-server-side", false, "If true, apply runs in the server instead of the client. This is an alpha feature and flag.")
+	cmd.Flags().Bool("experimental-force-conflicts", false, "If true, server-side apply will force the changes against conflicts. This is an alpha feature and flag.")
+	cmd.Flags().String("experimental-field-manager", "kubectl", "Name of the manager used to track field ownership. This is an alpha feature and flag.")
+}
+
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool(IncludeUninitializedFlag, false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
+	cmd.Flags().Bool("include-uninitialized", false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
+	cmd.Flags().MarkDeprecated("include-uninitialized", "The Initializers feature has been removed. This flag is now a no-op, and will be removed in v1.15")
 }
 
 func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {
@@ -437,19 +437,6 @@ func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 
 type ValidateOptions struct {
 	EnableValidation bool
-}
-
-func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
-	data, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(data) == 0 {
-		return nil, fmt.Errorf("Read from %s but no data found", source)
-	}
-
-	return data, nil
 }
 
 // Merge requires JSON serialization
@@ -497,110 +484,20 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 	return nil
 }
 
-// UpdateObject updates resource object with updateFn
-func UpdateObject(info *resource.Info, codec runtime.Codec, updateFn func(runtime.Object) error) (runtime.Object, error) {
-	helper := resource.NewHelper(info.Client, info.Mapping)
-
-	if err := updateFn(info.Object); err != nil {
-		return nil, err
-	}
-
-	// Update the annotation used by kubectl apply
-	if err := kubectl.UpdateApplyAnnotation(info, codec); err != nil {
-		return nil, err
-	}
-
-	if _, err := helper.Replace(info.Namespace, info.Name, true, info.Object); err != nil {
-		return nil, err
-	}
-
-	return info.Object, nil
+func GetServerSideApplyFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "experimental-server-side")
 }
 
-func AddRecordFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
+func GetForceConflictsFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "experimental-force-conflicts")
 }
 
-func AddRecordVarFlag(cmd *cobra.Command, record *bool) {
-	cmd.Flags().BoolVar(record, "record", *record, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
-}
-
-func GetRecordFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "record")
+func GetFieldManagerFlag(cmd *cobra.Command) string {
+	return GetFlagString(cmd, "experimental-field-manager")
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {
 	return GetFlagBool(cmd, "dry-run")
-}
-
-// RecordChangeCause annotate change-cause to input runtime object.
-func RecordChangeCause(obj runtime.Object, changeCause string) error {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return err
-	}
-	annotations := accessor.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	annotations[kubectl.ChangeCauseAnnotation] = changeCause
-	accessor.SetAnnotations(annotations)
-	return nil
-}
-
-// ChangeResourcePatch creates a patch between the origin input resource info
-// and the annotated with change-cause input resource info.
-func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, types.PatchType, error) {
-	// Get a versioned object
-	obj, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
-	if err != nil {
-		return nil, types.StrategicMergePatchType, err
-	}
-
-	oldData, err := json.Marshal(obj)
-	if err != nil {
-		return nil, types.StrategicMergePatchType, err
-	}
-	if err := RecordChangeCause(obj, changeCause); err != nil {
-		return nil, types.StrategicMergePatchType, err
-	}
-	newData, err := json.Marshal(obj)
-	if err != nil {
-		return nil, types.StrategicMergePatchType, err
-	}
-
-	switch obj := obj.(type) {
-	case *unstructured.Unstructured:
-		patch, err := jsonpatch.CreateMergePatch(oldData, newData)
-		return patch, types.MergePatchType, err
-	default:
-		patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
-		return patch, types.StrategicMergePatchType, err
-	}
-}
-
-// ContainsChangeCause checks if input resource info contains change-cause annotation.
-func ContainsChangeCause(info *resource.Info) bool {
-	annotations, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
-	if err != nil {
-		return false
-	}
-	return len(annotations[kubectl.ChangeCauseAnnotation]) > 0
-}
-
-// ShouldRecord checks if we should record current change cause
-func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
-	return GetRecordFlag(cmd) || (ContainsChangeCause(info) && !cmd.Flags().Changed("record"))
-}
-
-func AddInclude3rdPartyFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("include-extended-apis", true, "If true, include definitions of new APIs via calls to the API server. [default true]")
-	cmd.Flags().MarkDeprecated("include-extended-apis", "No longer required.")
-}
-
-func AddInclude3rdPartyVarFlags(cmd *cobra.Command, include3rdParty *bool) {
-	cmd.Flags().BoolVar(include3rdParty, "include-extended-apis", *include3rdParty, "If true, include definitions of new APIs via calls to the API server. [default true]")
-	cmd.Flags().MarkDeprecated("include-extended-apis", "No longer required.")
 }
 
 // GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args
@@ -662,31 +559,6 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 	return
 }
 
-// MustPrintWithKinds determines if printer is dealing
-// with multiple resource kinds, in which case it will
-// return true, indicating resource kind will be
-// included as part of printer output
-func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *kubectl.RuntimeSort) bool {
-	var lastMap *meta.RESTMapping
-
-	for ix := range objs {
-		var mapping *meta.RESTMapping
-		if sorter != nil {
-			mapping = infos[sorter.OriginalPosition(ix)].Mapping
-		} else {
-			mapping = infos[ix].Mapping
-		}
-
-		// display "kind" only if we have mixed resources
-		if lastMap != nil && mapping.Resource != lastMap.Resource {
-			return true
-		}
-		lastMap = mapping
-	}
-
-	return false
-}
-
 // IsSiblingCommandExists receives a pointer to a cobra command and a target string.
 // Returns true if the target string is found in the list of sibling commands.
 func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
@@ -717,22 +589,6 @@ func RequireNoArguments(c *cobra.Command, args []string) {
 	}
 }
 
-// OutputsRawFormat determines if a command's output format is machine parsable
-// or returns false if it is human readable (name, wide, etc.)
-func OutputsRawFormat(cmd *cobra.Command) bool {
-	output := GetFlagString(cmd, "output")
-	if output == "json" ||
-		output == "yaml" ||
-		output == "go-template" ||
-		output == "go-template-file" ||
-		output == "jsonpath" ||
-		output == "jsonpath-file" {
-		return true
-	}
-
-	return false
-}
-
 // StripComments will transform a YAML file into JSON, thus dropping any comments
 // in it. Note that if the given file has a syntax error, the transformation will
 // fail and we will manually drop all comments from the file.
@@ -761,24 +617,43 @@ func ManualStrip(file []byte) []byte {
 	return stripped
 }
 
-// ShouldIncludeUninitialized identifies whether to include uninitialized objects.
-// includeUninitialized is the default value.
-// Assume we can parse `all` and `selector` from cmd.
-func ShouldIncludeUninitialized(cmd *cobra.Command, includeUninitialized bool) bool {
-	shouldIncludeUninitialized := includeUninitialized
-	if cmd.Flags().Lookup("all") != nil && GetFlagBool(cmd, "all") {
-		// include the uninitialized objects by default
-		// unless explicitly set --include-uninitialized=false
-		shouldIncludeUninitialized = true
+// ScaleClientFunc provides a ScalesGetter
+type ScaleClientFunc func(genericclioptions.RESTClientGetter) (scale.ScalesGetter, error)
+
+// ScaleClientFn gives a way to easily override the function for unit testing if needed.
+var ScaleClientFn ScaleClientFunc = scaleClient
+
+// scaleClient gives you back scale getter
+func scaleClient(restClientGetter genericclioptions.RESTClientGetter) (scale.ScalesGetter, error) {
+	discoveryClient, err := restClientGetter.ToDiscoveryClient()
+	if err != nil {
+		return nil, err
 	}
-	if cmd.Flags().Lookup("selector") != nil && GetFlagString(cmd, "selector") != "" {
-		// does not include the uninitialized objects by default
-		// unless explicitly set --include-uninitialized=true
-		shouldIncludeUninitialized = false
+
+	clientConfig, err := restClientGetter.ToRESTConfig()
+	if err != nil {
+		return nil, err
 	}
-	if cmd.Flags().Changed(IncludeUninitializedFlag) {
-		// get explicit value
-		shouldIncludeUninitialized = GetFlagBool(cmd, IncludeUninitializedFlag)
+
+	setKubernetesDefaults(clientConfig)
+	restClient, err := rest.RESTClientFor(clientConfig)
+	if err != nil {
+		return nil, err
 	}
-	return shouldIncludeUninitialized
+	resolver := scale.NewDiscoveryScaleKindResolver(discoveryClient)
+	mapper, err := restClientGetter.ToRESTMapper()
+	if err != nil {
+		return nil, err
+	}
+
+	return scale.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
+}
+
+func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
+	fmt.Fprintf(cmdErr, "WARNING: New generator %q specified, "+
+		"but it isn't available. "+
+		"Falling back to %q.\n",
+		newGeneratorName,
+		oldGeneratorName,
+	)
 }

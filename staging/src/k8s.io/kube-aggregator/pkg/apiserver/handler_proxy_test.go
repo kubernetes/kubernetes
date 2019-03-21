@@ -42,45 +42,41 @@ type targetHTTPHandler struct {
 	called  bool
 	headers map[string][]string
 	path    string
+	host    string
 }
 
 func (d *targetHTTPHandler) Reset() {
 	d.path = ""
 	d.called = false
 	d.headers = nil
+	d.host = ""
 }
 
 func (d *targetHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.path = r.URL.Path
 	d.called = true
 	d.headers = r.Header
+	d.host = r.Host
 	w.WriteHeader(http.StatusOK)
 }
 
-type fakeRequestContextMapper struct {
-	user user.Info
-}
-
-func (m *fakeRequestContextMapper) Get(req *http.Request) (genericapirequest.Context, bool) {
-	ctx := genericapirequest.NewContext()
-	if m.user != nil {
-		ctx = genericapirequest.WithUser(ctx, m.user)
-	}
-
-	resolver := &genericapirequest.RequestInfoFactory{
-		APIPrefixes:          sets.NewString("api", "apis"),
-		GrouplessAPIPrefixes: sets.NewString("api"),
-	}
-	info, err := resolver.NewRequestInfo(req)
-	if err == nil {
-		ctx = genericapirequest.WithRequestInfo(ctx, info)
-	}
-
-	return ctx, true
-}
-
-func (*fakeRequestContextMapper) Update(req *http.Request, context genericapirequest.Context) error {
-	return nil
+func contextHandler(handler http.Handler, user user.Info) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		if user != nil {
+			ctx = genericapirequest.WithUser(ctx, user)
+		}
+		resolver := &genericapirequest.RequestInfoFactory{
+			APIPrefixes:          sets.NewString("api", "apis"),
+			GrouplessAPIPrefixes: sets.NewString("api"),
+		}
+		info, err := resolver.NewRequestInfo(req)
+		if err == nil {
+			ctx = genericapirequest.WithRequestInfo(ctx, info)
+		}
+		req = req.WithContext(ctx)
+		handler.ServeHTTP(w, req)
+	})
 }
 
 type mockedRouter struct {
@@ -280,8 +276,7 @@ func TestProxyHandler(t *testing.T) {
 				serviceResolver: serviceResolver,
 				proxyTransport:  &http.Transport{},
 			}
-			handler.contextMapper = &fakeRequestContextMapper{user: tc.user}
-			server := httptest.NewServer(handler)
+			server := httptest.NewServer(contextHandler(handler, tc.user))
 			defer server.Close()
 
 			if tc.apiService != nil {
@@ -321,6 +316,10 @@ func TestProxyHandler(t *testing.T) {
 				t.Errorf("%s: expected %v, got %v", name, e, a)
 				return
 			}
+			if e, a := targetServer.Listener.Addr().String(), target.host; tc.expectedCalled && !reflect.DeepEqual(e, a) {
+				t.Errorf("%s: expected %v, got %v", name, e, a)
+				return
+			}
 		}()
 	}
 }
@@ -352,9 +351,9 @@ func TestProxyUpgrade(t *testing.T) {
 			APIService: &apiregistration.APIService{
 				Spec: apiregistration.APIServiceSpec{
 					InsecureSkipTLSVerify: true,
-					Group:   "mygroup",
-					Version: "v1",
-					Service: &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns"},
+					Group:                 "mygroup",
+					Version:               "v1",
+					Service:               &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns"},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -400,12 +399,12 @@ func TestProxyUpgrade(t *testing.T) {
 			}))
 
 			backendServer := httptest.NewUnstartedServer(backendHandler)
-			if cert, err := tls.X509KeyPair(svcCrt, svcKey); err != nil {
+			cert, err := tls.X509KeyPair(svcCrt, svcKey)
+			if err != nil {
 				t.Errorf("https (valid hostname): %v", err)
 				return
-			} else {
-				backendServer.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
 			}
+			backendServer.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
 			backendServer.StartTLS()
 			defer backendServer.Close()
 
@@ -417,12 +416,11 @@ func TestProxyUpgrade(t *testing.T) {
 
 			serverURL, _ := url.Parse(backendServer.URL)
 			proxyHandler := &proxyHandler{
-				contextMapper:   &fakeRequestContextMapper{user: &user.DefaultInfo{Name: "username"}},
 				serviceResolver: &mockedRouter{destinationHost: serverURL.Host},
 				proxyTransport:  &http.Transport{},
 			}
 			proxyHandler.updateAPIService(tc.APIService)
-			aggregator := httptest.NewServer(proxyHandler)
+			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: "username"}))
 			defer aggregator.Close()
 
 			ws, err := websocket.Dial("ws://"+aggregator.Listener.Addr().String()+path, "", "http://127.0.0.1/")

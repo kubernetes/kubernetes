@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,236 +17,170 @@ limitations under the License.
 package storage
 
 import (
-	"math/rand"
-	"time"
-
-	"k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-
+	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
-const (
-	csiExternalAttacherImage    string = "quay.io/k8scsi/csi-attacher:v0.2.0"
-	csiExternalProvisionerImage string = "quay.io/k8scsi/csi-provisioner:v0.2.0"
-	csiDriverRegistrarImage     string = "quay.io/k8scsi/driver-registrar:v0.2.0"
-)
-
-func csiServiceAccount(
-	client clientset.Interface,
-	config framework.VolumeTestConfig,
-	teardown bool,
-) *v1.ServiceAccount {
-	serviceAccountName := config.Prefix + "-service-account"
-	serviceAccountClient := client.CoreV1().ServiceAccounts(config.Namespace)
-	sa := &v1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: serviceAccountName,
-		},
-	}
-
-	serviceAccountClient.Delete(sa.GetName(), &metav1.DeleteOptions{})
-	err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
-		_, err := serviceAccountClient.Get(sa.GetName(), metav1.GetOptions{})
-		return apierrs.IsNotFound(err), nil
-	})
-	framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
-
-	if teardown {
-		return nil
-	}
-
-	ret, err := serviceAccountClient.Create(sa)
-	if err != nil {
-		framework.ExpectNoError(err, "Failed to create %s service account: %v", sa.GetName(), err)
-	}
-
-	return ret
+// List of testDrivers to be executed in below loop
+var csiTestDrivers = []func() testsuites.TestDriver{
+	drivers.InitHostPathCSIDriver,
+	drivers.InitGcePDCSIDriver,
+	drivers.InitGcePDExternalCSIDriver,
+	drivers.InitHostPathV0CSIDriver,
+	// Don't run tests with mock driver (drivers.InitMockCSIDriver), it does not provide persistent storage.
 }
 
-func csiClusterRole(
-	client clientset.Interface,
-	config framework.VolumeTestConfig,
-	teardown bool,
-) *rbacv1.ClusterRole {
-	clusterRoleClient := client.RbacV1().ClusterRoles()
-	role := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Prefix + "-cluster-role",
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{""},
-				Resources: []string{"persistentvolumes"},
-				Verbs:     []string{"create", "delete", "get", "list", "watch", "update"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"persistentvolumeclaims"},
-				Verbs:     []string{"get", "list", "watch", "update"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"events"},
-				Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"secrets"},
-				Verbs:     []string{"get", "list"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"nodes"},
-				Verbs:     []string{"get", "list", "watch", "update"},
-			},
-			{
-				APIGroups: []string{"storage.k8s.io"},
-				Resources: []string{"volumeattachments"},
-				Verbs:     []string{"get", "list", "watch", "update"},
-			},
-			{
-				APIGroups: []string{"storage.k8s.io"},
-				Resources: []string{"storageclasses"},
-				Verbs:     []string{"get", "list", "watch"},
-			},
-		},
-	}
-
-	clusterRoleClient.Delete(role.GetName(), &metav1.DeleteOptions{})
-	err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
-		_, err := clusterRoleClient.Get(role.GetName(), metav1.GetOptions{})
-		return apierrs.IsNotFound(err), nil
-	})
-	framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
-
-	if teardown {
-		return nil
-	}
-
-	ret, err := clusterRoleClient.Create(role)
-	if err != nil {
-		framework.ExpectNoError(err, "Failed to create %s cluster role: %v", role.GetName(), err)
-	}
-
-	return ret
+// List of testSuites to be executed in below loop
+var csiTestSuites = []func() testsuites.TestSuite{
+	testsuites.InitVolumesTestSuite,
+	testsuites.InitVolumeIOTestSuite,
+	testsuites.InitVolumeModeTestSuite,
+	testsuites.InitSubPathTestSuite,
+	testsuites.InitProvisioningTestSuite,
+	testsuites.InitSnapshottableTestSuite,
 }
 
-func csiClusterRoleBinding(
-	client clientset.Interface,
-	config framework.VolumeTestConfig,
-	teardown bool,
-	sa *v1.ServiceAccount,
-	clusterRole *rbacv1.ClusterRole,
-) *rbacv1.ClusterRoleBinding {
-	clusterRoleBindingClient := client.RbacV1().ClusterRoleBindings()
-	binding := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Prefix + "-role-binding",
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      sa.GetName(),
-				Namespace: sa.GetNamespace(),
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			Kind:     "ClusterRole",
-			Name:     clusterRole.GetName(),
-			APIGroup: "rbac.authorization.k8s.io",
-		},
+// This executes testSuites for csi volumes.
+var _ = utils.SIGDescribe("CSI Volumes", func() {
+	for _, initDriver := range csiTestDrivers {
+		curDriver := initDriver()
+
+		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
+			testsuites.DefineTestSuite(curDriver, csiTestSuites)
+		})
 	}
 
-	clusterRoleBindingClient.Delete(binding.GetName(), &metav1.DeleteOptions{})
-	err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
-		_, err := clusterRoleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
-		return apierrs.IsNotFound(err), nil
-	})
-	framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
-
-	if teardown {
-		return nil
-	}
-
-	ret, err := clusterRoleBindingClient.Create(binding)
-	if err != nil {
-		framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
-	}
-
-	return ret
-}
-
-var _ = utils.SIGDescribe("CSI Volumes [Flaky]", func() {
-	f := framework.NewDefaultFramework("csi-mock-plugin")
-
-	var (
-		cs     clientset.Interface
-		ns     *v1.Namespace
-		node   v1.Node
-		config framework.VolumeTestConfig
-	)
-
-	BeforeEach(func() {
-		cs = f.ClientSet
-		ns = f.Namespace
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		node = nodes.Items[rand.Intn(len(nodes.Items))]
-		config = framework.VolumeTestConfig{
-			Namespace:         ns.Name,
-			Prefix:            "csi",
-			ClientNodeName:    node.Name,
-			ServerNodeName:    node.Name,
-			WaitForCompletion: true,
-		}
-	})
-
-	// Create one of these for each of the drivers to be tested
-	// CSI hostPath driver test
-	Describe("Sanity CSI plugin test using hostPath CSI driver", func() {
-
+	// TODO: PD CSI driver needs to be serial because it uses a fixed name. Address as part of #71289
+	Context("CSI Topology test using GCE PD driver [Serial]", func() {
+		f := framework.NewDefaultFramework("csitopology")
+		driver := drivers.InitGcePDCSIDriver().(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
 		var (
-			clusterRole    *rbacv1.ClusterRole
-			serviceAccount *v1.ServiceAccount
+			config      *testsuites.PerTestConfig
+			testCleanup func()
 		)
-
 		BeforeEach(func() {
-			By("deploying csi hostpath driver")
-			clusterRole = csiClusterRole(cs, config, false)
-			serviceAccount = csiServiceAccount(cs, config, false)
-			csiClusterRoleBinding(cs, config, false, serviceAccount, clusterRole)
-			csiHostPathPod(cs, config, false, f, serviceAccount)
+			config, testCleanup = driver.PrepareTest(f)
 		})
 
 		AfterEach(func() {
-			By("uninstalling csi hostpath driver")
-			csiHostPathPod(cs, config, true, f, serviceAccount)
-			csiClusterRoleBinding(cs, config, true, serviceAccount, clusterRole)
-			serviceAccount = csiServiceAccount(cs, config, true)
-			clusterRole = csiClusterRole(cs, config, true)
+			if testCleanup != nil {
+				testCleanup()
+			}
 		})
 
-		It("should provision storage with a hostPath CSI driver", func() {
-			t := storageClassTest{
-				name:         "csi-hostpath",
-				provisioner:  "csi-hostpath",
-				parameters:   map[string]string{},
-				claimSize:    "1Gi",
-				expectedSize: "1Gi",
-				nodeName:     node.Name,
-			}
+		It("should provision zonal PD with immediate volume binding and AllowedTopologies set and mount the volume to a pod", func() {
+			suffix := "topology-positive"
+			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), false /* delayBinding */, true /* allowedTopologies */)
+		})
 
-			claim := newClaim(t, ns.GetName(), "")
-			class := newStorageClass(t, ns.GetName(), "")
-			claim.Spec.StorageClassName = &class.ObjectMeta.Name
-			testDynamicProvisioning(t, cs, claim, class)
+		It("should provision zonal PD with delayed volume binding and mount the volume to a pod", func() {
+			suffix := "delayed"
+			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */, false /* allowedTopologies */)
+		})
+
+		It("should provision zonal PD with delayed volume binding and AllowedTopologies set and mount the volume to a pod", func() {
+			suffix := "delayed-topology-positive"
+			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */, true /* allowedTopologies */)
+		})
+
+		It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with immediate volume binding", func() {
+			framework.SkipUnlessMultizone(config.Framework.ClientSet)
+			suffix := "topology-negative"
+			testTopologyNegative(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), false /* delayBinding */)
+		})
+
+		It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with delayed volume binding", func() {
+			framework.SkipUnlessMultizone(config.Framework.ClientSet)
+			suffix := "delayed-topology-negative"
+			testTopologyNegative(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */)
 		})
 	})
 })
+
+func testTopologyPositive(cs clientset.Interface, suffix, namespace string, delayBinding, allowedTopologies bool) {
+	test := createGCEPDStorageClassTest()
+	test.DelayBinding = delayBinding
+
+	class := newStorageClass(test, namespace, suffix)
+	if allowedTopologies {
+		topoZone := getRandomClusterZone(cs)
+		addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, topoZone)
+	}
+	test.Client = cs
+	test.Claim = newClaim(test, namespace, suffix)
+	test.Claim.Spec.StorageClassName = &class.Name
+	test.Class = class
+
+	if delayBinding {
+		_, node := test.TestBindingWaitForFirstConsumer(nil /* node selector */, false /* expect unschedulable */)
+		Expect(node).ToNot(BeNil(), "Unexpected nil node found")
+	} else {
+		test.TestDynamicProvisioning()
+	}
+}
+
+func testTopologyNegative(cs clientset.Interface, suffix, namespace string, delayBinding bool) {
+	framework.SkipUnlessMultizone(cs)
+
+	// Use different zones for pod and PV
+	zones, err := framework.GetClusterZones(cs)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(zones.Len()).To(BeNumerically(">=", 2))
+	zonesList := zones.UnsortedList()
+	podZoneIndex := rand.Intn(zones.Len())
+	podZone := zonesList[podZoneIndex]
+	pvZone := zonesList[(podZoneIndex+1)%zones.Len()]
+
+	test := createGCEPDStorageClassTest()
+	test.DelayBinding = delayBinding
+	nodeSelector := map[string]string{v1.LabelZoneFailureDomain: podZone}
+
+	test.Client = cs
+	test.Class = newStorageClass(test, namespace, suffix)
+	addSingleCSIZoneAllowedTopologyToStorageClass(cs, test.Class, pvZone)
+	test.Claim = newClaim(test, namespace, suffix)
+	test.Claim.Spec.StorageClassName = &test.Class.Name
+	if delayBinding {
+		test.TestBindingWaitForFirstConsumer(nodeSelector, true /* expect unschedulable */)
+	} else {
+		test.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+			// Ensure that a pod cannot be scheduled in an unsuitable zone.
+			pod := testsuites.StartInPodWithVolume(cs, namespace, claim.Name, "pvc-tester-unschedulable", "sleep 100000",
+				testsuites.NodeSelection{Selector: nodeSelector})
+			defer testsuites.StopPod(cs, pod)
+			framework.ExpectNoError(framework.WaitForPodNameUnschedulableInNamespace(cs, pod.Name, pod.Namespace), "pod should be unschedulable")
+		}
+		test.TestDynamicProvisioning()
+	}
+}
+
+func addSingleCSIZoneAllowedTopologyToStorageClass(c clientset.Interface, sc *storagev1.StorageClass, zone string) {
+	term := v1.TopologySelectorTerm{
+		MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+			{
+				Key:    drivers.GCEPDCSIZoneTopologyKey,
+				Values: []string{zone},
+			},
+		},
+	}
+	sc.AllowedTopologies = append(sc.AllowedTopologies, term)
+}
+
+func createGCEPDStorageClassTest() testsuites.StorageClassTest {
+	return testsuites.StorageClassTest{
+		Name:         drivers.GCEPDCSIProvisionerName,
+		Provisioner:  drivers.GCEPDCSIProvisionerName,
+		Parameters:   map[string]string{"type": "pd-standard"},
+		ClaimSize:    "5Gi",
+		ExpectedSize: "5Gi",
+	}
+}

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2018 The Kubernetes Authors.
 #
@@ -68,7 +68,7 @@ function detect-k8s-subnetwork() {
 #   REGION
 function set-allow-subnet-cidr-routes-overlap() {
   local allow_subnet_cidr_routes_overlap
-  allow_subnet_cidr_routes_overlap=$(gcloud beta compute networks subnets \
+  allow_subnet_cidr_routes_overlap=$(gcloud compute networks subnets \
     describe ${IP_ALIAS_SUBNETWORK} --project=${PROJECT} --region=${REGION} \
     --format='value(allowSubnetCidrRoutesOverlap)')
   local allow_overlap=$1
@@ -78,7 +78,7 @@ function set-allow-subnet-cidr-routes-overlap() {
   fi
 
   echo "Setting subnet \"${IP_ALIAS_SUBNETWORK}\" allowSubnetCidrRoutesOverlap to $1"
-  local fingerprint=$(gcloud beta compute networks subnets describe \
+  local fingerprint=$(gcloud compute networks subnets describe \
     ${IP_ALIAS_SUBNETWORK} --project=${PROJECT} --region=${REGION} \
     --format='value(fingerprint)')
   local access_token=$(gcloud auth print-access-token)
@@ -100,7 +100,7 @@ function set-allow-subnet-cidr-routes-overlap() {
 #   CLUSTER_IP_RANGE
 #   SERVICE_CLUSTER_IP_RANGE
 function add-k8s-subnet-secondary-ranges() {
-  local secondary_ranges=$(gcloud beta compute networks subnets describe "${IP_ALIAS_SUBNETWORK}" \
+  local secondary_ranges=$(gcloud compute networks subnets describe "${IP_ALIAS_SUBNETWORK}" \
     --project="${PROJECT}" --region="${REGION}" \
     --format='value(secondaryIpRanges)')
   if [[ "${secondary_ranges}" =~ "pods-default" && "${secondary_ranges}" =~ "services-default" ]]; then
@@ -109,7 +109,7 @@ function add-k8s-subnet-secondary-ranges() {
   fi
 
   echo "Adding secondary ranges: pods-default (${CLUSTER_IP_RANGE}), services-default (${SERVICE_CLUSTER_IP_RANGE})"
-  until gcloud beta compute networks subnets update ${IP_ALIAS_SUBNETWORK} \
+  until gcloud compute networks subnets update ${IP_ALIAS_SUBNETWORK} \
     --project=${PROJECT} --region=${REGION} \
     --add-secondary-ranges="pods-default=${CLUSTER_IP_RANGE},services-default=${SERVICE_CLUSTER_IP_RANGE}"; do
     printf "."
@@ -161,8 +161,8 @@ export KUBE_GCE_ENABLE_IP_ALIASES=true
 export SECONDARY_RANGE_NAME="pods-default"
 export STORAGE_BACKEND="etcd3"
 export STORAGE_MEDIA_TYPE="application/vnd.kubernetes.protobuf"
-export ETCD_IMAGE=3.1.12
-export ETCD_VERSION=3.1.12
+export ETCD_IMAGE=3.3.10-0
+export ETCD_VERSION=3.3.10
 
 # Upgrade master with updated kube envs
 ${KUBE_ROOT}/cluster/gce/upgrade.sh -M -l

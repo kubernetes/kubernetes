@@ -6,6 +6,7 @@ go_library(
         "version.go",
         "versioned.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/image-spec/specs-go",
     importpath = "github.com/opencontainers/image-spec/specs-go",
     visibility = ["//visibility:public"],
 )

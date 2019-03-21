@@ -32,17 +32,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -64,17 +66,18 @@ const (
 	// containers in the pod and marks it "Running", till the kubelet stops all
 	// containers and deletes the pod from the apiserver.
 	// This field is deprecated. v1.Service.PublishNotReadyAddresses will replace it
-	// subsequent releases.
+	// subsequent releases.  It will be removed no sooner than 1.13.
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
-)
-
-var (
-	keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartLogging(klog.Infof)
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
+
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.CoreV1().RESTClient().GetRateLimiter())
 	}
@@ -105,12 +108,18 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
+	e.triggerTimeTracker = NewTriggerTimeTracker()
+	e.eventBroadcaster = broadcaster
+	e.eventRecorder = recorder
+
 	return e
 }
 
 // EndpointController manages selector-based service endpoints.
 type EndpointController struct {
-	client clientset.Interface
+	client           clientset.Interface
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
 
 	// serviceLister is able to list/get services and is populated by the shared informer passed to
 	// NewEndpointController.
@@ -142,6 +151,10 @@ type EndpointController struct {
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
 	workerLoopPeriod time.Duration
+
+	// triggerTimeTracker is an util used to compute and export the EndpointsLastChangeTriggerTime
+	// annotation.
+	triggerTimeTracker *TriggerTimeTracker
 }
 
 // Run will not return until stopCh is closed. workers determines how many
@@ -150,8 +163,8 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer e.queue.ShutDown()
 
-	glog.Infof("Starting endpoint controller")
-	defer glog.Infof("Shutting down endpoint controller")
+	klog.Infof("Starting endpoint controller")
+	defer klog.Infof("Shutting down endpoint controller")
 
 	if !controller.WaitForCacheSync("endpoint", stopCh, e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
@@ -178,7 +191,7 @@ func (e *EndpointController) getPodServiceMemberships(pod *v1.Pod) (sets.String,
 		return set, nil
 	}
 	for i := range services {
-		key, err := keyFunc(services[i])
+		key, err := controller.KeyFunc(services[i])
 		if err != nil {
 			return nil, err
 		}
@@ -328,13 +341,13 @@ func (e *EndpointController) deletePod(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %#v", obj))
 		return
 	}
-	glog.V(4).Infof("Enqueuing services of deleted pod %s/%s having final state unrecorded", pod.Namespace, pod.Name)
+	klog.V(4).Infof("Enqueuing services of deleted pod %s/%s having final state unrecorded", pod.Namespace, pod.Name)
 	e.addPod(pod)
 }
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
 func (e *EndpointController) enqueueService(obj interface{}) {
-	key, err := keyFunc(obj)
+	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
@@ -372,12 +385,12 @@ func (e *EndpointController) handleErr(err error, key interface{}) {
 	}
 
 	if e.queue.NumRequeues(key) < maxRetries {
-		glog.V(2).Infof("Error syncing endpoints for service %q: %v", key, err)
+		klog.V(2).Infof("Error syncing endpoints for service %q, retrying. Error: %v", key, err)
 		e.queue.AddRateLimited(key)
 		return
 	}
 
-	glog.Warningf("Dropping service %q out of the queue: %v", key, err)
+	klog.Warningf("Dropping service %q out of the queue: %v", key, err)
 	e.queue.Forget(key)
 	utilruntime.HandleError(err)
 }
@@ -385,7 +398,7 @@ func (e *EndpointController) handleErr(err error, key interface{}) {
 func (e *EndpointController) syncService(key string) error {
 	startTime := time.Now()
 	defer func() {
-		glog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Now().Sub(startTime))
+		klog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -403,6 +416,7 @@ func (e *EndpointController) syncService(key string) error {
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
+		e.triggerTimeTracker.DeleteEndpoints(namespace, name)
 		return nil
 	}
 
@@ -412,7 +426,7 @@ func (e *EndpointController) syncService(key string) error {
 		return nil
 	}
 
-	glog.V(5).Infof("About to update endpoints for service %q", key)
+	klog.V(5).Infof("About to update endpoints for service %q", key)
 	pods, err := e.podLister.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelectorPreValidated())
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is
@@ -420,7 +434,8 @@ func (e *EndpointController) syncService(key string) error {
 		return err
 	}
 
-	var tolerateUnreadyEndpoints bool
+	// If the user specified the older (deprecated) annotation, we have to respect it.
+	tolerateUnreadyEndpoints := service.Spec.PublishNotReadyAddresses
 	if v, ok := service.Annotations[TolerateUnreadyEndpointsAnnotation]; ok {
 		b, err := strconv.ParseBool(v)
 		if err == nil {
@@ -430,17 +445,23 @@ func (e *EndpointController) syncService(key string) error {
 		}
 	}
 
+	// We call ComputeEndpointsLastChangeTriggerTime here to make sure that the state of the trigger
+	// time tracker gets updated even if the sync turns out to be no-op and we don't update the
+	// endpoints object.
+	endpointsLastChangeTriggerTime := e.triggerTimeTracker.
+		ComputeEndpointsLastChangeTriggerTime(namespace, name, service, pods)
+
 	subsets := []v1.EndpointSubset{}
-	var totalReadyEps int = 0
-	var totalNotReadyEps int = 0
+	var totalReadyEps int
+	var totalNotReadyEps int
 
 	for _, pod := range pods {
 		if len(pod.Status.PodIP) == 0 {
-			glog.V(5).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
+			klog.V(5).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
 			continue
 		}
 		if !tolerateUnreadyEndpoints && pod.DeletionTimestamp != nil {
-			glog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
+			klog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
 			continue
 		}
 
@@ -454,8 +475,8 @@ func (e *EndpointController) syncService(key string) error {
 		// Allow headless service not to have ports.
 		if len(service.Spec.Ports) == 0 {
 			if service.Spec.ClusterIP == api.ClusterIPNone {
-				epp := v1.EndpointPort{Port: 0, Protocol: v1.ProtocolTCP}
-				subsets, totalReadyEps, totalNotReadyEps = addEndpointSubset(subsets, pod, epa, epp, tolerateUnreadyEndpoints)
+				subsets, totalReadyEps, totalNotReadyEps = addEndpointSubset(subsets, pod, epa, nil, tolerateUnreadyEndpoints)
+				// No need to repack subsets for headless service without ports.
 			}
 		} else {
 			for i := range service.Spec.Ports {
@@ -465,12 +486,12 @@ func (e *EndpointController) syncService(key string) error {
 				portProto := servicePort.Protocol
 				portNum, err := podutil.FindPort(pod, servicePort)
 				if err != nil {
-					glog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
+					klog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 					continue
 				}
 
 				var readyEps, notReadyEps int
-				epp := v1.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
+				epp := &v1.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
 				subsets, readyEps, notReadyEps = addEndpointSubset(subsets, pod, epa, epp, tolerateUnreadyEndpoints)
 				totalReadyEps = totalReadyEps + readyEps
 				totalNotReadyEps = totalNotReadyEps + notReadyEps
@@ -499,7 +520,7 @@ func (e *EndpointController) syncService(key string) error {
 	if !createEndpoints &&
 		apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, subsets) &&
 		apiequality.Semantic.DeepEqual(currentEndpoints.Labels, service.Labels) {
-		glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
+		klog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return nil
 	}
 	newEndpoints := currentEndpoints.DeepCopy()
@@ -509,7 +530,14 @@ func (e *EndpointController) syncService(key string) error {
 		newEndpoints.Annotations = make(map[string]string)
 	}
 
-	glog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
+	if !endpointsLastChangeTriggerTime.IsZero() {
+		newEndpoints.Annotations[v1.EndpointsLastChangeTriggerTime] =
+			endpointsLastChangeTriggerTime.Format(time.RFC3339Nano)
+	} else { // No new trigger time, clear the annotation.
+		delete(newEndpoints.Annotations, v1.EndpointsLastChangeTriggerTime)
+	}
+
+	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
 		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(newEndpoints)
@@ -523,8 +551,15 @@ func (e *EndpointController) syncService(key string) error {
 			// 1. namespace is terminating, endpoint creation is not allowed by default.
 			// 2. policy is misconfigured, in which case no service would function anywhere.
 			// Given the frequency of 1, we log at a lower level.
-			glog.V(5).Infof("Forbidden from creating endpoints: %v", err)
+			klog.V(5).Infof("Forbidden from creating endpoints: %v", err)
 		}
+
+		if createEndpoints {
+			e.eventRecorder.Eventf(newEndpoints, v1.EventTypeWarning, "FailedToCreateEndpoint", "Failed to create endpoint for service %v/%v: %v", service.Namespace, service.Name, err)
+		} else {
+			e.eventRecorder.Eventf(newEndpoints, v1.EventTypeWarning, "FailedToUpdateEndpoint", "Failed to update endpoint %v/%v: %v", service.Namespace, service.Name, err)
+		}
+
 		return err
 	}
 	return nil
@@ -551,7 +586,7 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 			// as leader-election only have endpoints without service
 			continue
 		}
-		key, err := keyFunc(ep)
+		key, err := controller.KeyFunc(ep)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep))
 			continue
@@ -561,20 +596,24 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 }
 
 func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
-	epp v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
-	var readyEps int = 0
-	var notReadyEps int = 0
+	epp *v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
+	var readyEps int
+	var notReadyEps int
+	ports := []v1.EndpointPort{}
+	if epp != nil {
+		ports = append(ports, *epp)
+	}
 	if tolerateUnreadyEndpoints || podutil.IsPodReady(pod) {
 		subsets = append(subsets, v1.EndpointSubset{
 			Addresses: []v1.EndpointAddress{epa},
-			Ports:     []v1.EndpointPort{epp},
+			Ports:     ports,
 		})
 		readyEps++
 	} else if shouldPodBeInEndpoints(pod) {
-		glog.V(5).Infof("Pod is out of service: %s/%s", pod.Namespace, pod.Name)
+		klog.V(5).Infof("Pod is out of service: %s/%s", pod.Namespace, pod.Name)
 		subsets = append(subsets, v1.EndpointSubset{
 			NotReadyAddresses: []v1.EndpointAddress{epa},
-			Ports:             []v1.EndpointPort{epp},
+			Ports:             ports,
 		})
 		notReadyEps++
 	}

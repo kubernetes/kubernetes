@@ -122,7 +122,7 @@ func (f Filter) MatchPropertyList(props []types.DynamicProperty) bool {
 		}
 	}
 
-	return true
+	return len(f) == len(props) // false if a property such as VM "guest" is unset
 }
 
 // MatchObjectContent returns a list of ObjectContent.Obj where the ObjectContent.PropSet matches the Filter.

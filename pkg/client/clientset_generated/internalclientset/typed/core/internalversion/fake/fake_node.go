@@ -59,7 +59,7 @@ func (c *FakeNodes) List(opts v1.ListOptions) (result *core.NodeList, err error)
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.NodeList{}
+	list := &core.NodeList{ListMeta: obj.(*core.NodeList).ListMeta}
 	for _, item := range obj.(*core.NodeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -123,7 +123,7 @@ func (c *FakeNodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 // Patch applies the patch and returns the patched node.
 func (c *FakeNodes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Node, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, name, data, subresources...), &core.Node{})
+		Invokes(testing.NewRootPatchSubresourceAction(nodesResource, name, pt, data, subresources...), &core.Node{})
 	if obj == nil {
 		return nil, err
 	}

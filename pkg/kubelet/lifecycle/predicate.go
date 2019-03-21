@@ -19,24 +19,23 @@ package lifecycle
 import (
 	"fmt"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
 
-type pluginResourceUpdateFuncType func(*schedulercache.NodeInfo, *PodAdmitAttributes) error
+type pluginResourceUpdateFuncType func(*schedulernodeinfo.NodeInfo, *PodAdmitAttributes) error
 
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
 type AdmissionFailureHandler interface {
-	HandleAdmissionFailure(pod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error)
+	HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []predicates.PredicateFailureReason) (bool, []predicates.PredicateFailureReason, error)
 }
 
 type predicateAdmitHandler struct {
@@ -58,21 +57,21 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
-		glog.Errorf("Cannot get Node info: %v", err)
+		klog.Errorf("Cannot get Node info: %v", err)
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  "InvalidNodeInfo",
 			Message: "Kubelet cannot get node info.",
 		}
 	}
-	pod := attrs.Pod
+	admitPod := attrs.Pod
 	pods := attrs.OtherPods
-	nodeInfo := schedulercache.NewNodeInfo(pods...)
+	nodeInfo := schedulernodeinfo.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
 		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
-		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  "UnexpectedAdmissionError",
@@ -88,12 +87,12 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// node-level extended resource it requires is not found, then kubelet will
 	// not fail admission while it should. This issue will be addressed with
 	// the Resource Class API in the future.
-	podWithoutMissingExtendedResources := removeMissingExtendedResources(pod, nodeInfo)
+	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
 	fit, reasons, err := predicates.GeneralPredicates(podWithoutMissingExtendedResources, nil, nodeInfo)
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
-		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
 		return PodAdmitResult{
 			Admit:   fit,
 			Reason:  "UnexpectedAdmissionError",
@@ -101,10 +100,10 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 	if !fit {
-		fit, reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(pod, reasons)
+		fit, reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(admitPod, reasons)
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
-			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  "UnexpectedAdmissionError",
@@ -117,7 +116,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		var message string
 		if len(reasons) == 0 {
 			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
-			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  "UnknownReason",
@@ -130,19 +129,19 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		case *predicates.PredicateFailureError:
 			reason = re.PredicateName
 			message = re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
 		case *predicates.InsufficientResourceError:
 			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
 			message = re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
 		case *predicates.FailureReason:
 			reason = re.GetReason()
 			message = fmt.Sprintf("Failure: %s", re.GetReason())
-			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
 		default:
 			reason = "UnexpectedPredicateFailureType"
 			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
-			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
 		}
 		return PodAdmitResult{
 			Admit:   fit,
@@ -155,7 +154,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 }
 
-func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) *v1.Pod {
+func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *v1.Pod {
 	podCopy := pod.DeepCopy()
 	for i, c := range pod.Spec.Containers {
 		// We only handle requests in Requests but not Limits because the

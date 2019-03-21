@@ -148,10 +148,12 @@ func (MetricStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ObjectMetricSource = map[string]string{
-	"":            "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
-	"target":      "target is the described Kubernetes object.",
-	"metricName":  "metricName is the name of the metric in question.",
-	"targetValue": "targetValue is the target value of the metric (as a quantity).",
+	"":             "ObjectMetricSource indicates how to scale on a metric describing a kubernetes object (for example, hits-per-second on an Ingress object).",
+	"target":       "target is the described Kubernetes object.",
+	"metricName":   "metricName is the name of the metric in question.",
+	"targetValue":  "targetValue is the target value of the metric (as a quantity).",
+	"selector":     "selector is the string-encoded form of a standard kubernetes label selector for the given metric. When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping When unset, just the metricName will be used to gather metrics.",
+	"averageValue": "averageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
 }
 
 func (ObjectMetricSource) SwaggerDoc() map[string]string {
@@ -163,6 +165,8 @@ var map_ObjectMetricStatus = map[string]string{
 	"target":       "target is the described Kubernetes object.",
 	"metricName":   "metricName is the name of the metric in question.",
 	"currentValue": "currentValue is the current value of the metric (as a quantity).",
+	"selector":     "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set in the ObjectMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping. When unset, just the metricName will be used to gather metrics.",
+	"averageValue": "averageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
 }
 
 func (ObjectMetricStatus) SwaggerDoc() map[string]string {
@@ -173,6 +177,7 @@ var map_PodsMetricSource = map[string]string{
 	"":                   "PodsMetricSource indicates how to scale on a metric describing each pod in the current scale target (for example, transactions-processed-per-second). The values will be averaged together before being compared to the target value.",
 	"metricName":         "metricName is the name of the metric in question",
 	"targetAverageValue": "targetAverageValue is the target value of the average of the metric across all relevant pods (as a quantity)",
+	"selector":           "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping When unset, just the metricName will be used to gather metrics.",
 }
 
 func (PodsMetricSource) SwaggerDoc() map[string]string {
@@ -183,6 +188,7 @@ var map_PodsMetricStatus = map[string]string{
 	"":                    "PodsMetricStatus indicates the current value of a metric describing each pod in the current scale target (for example, transactions-processed-per-second).",
 	"metricName":          "metricName is the name of the metric in question",
 	"currentAverageValue": "currentAverageValue is the current value of the average of the metric across all relevant pods (as a quantity)",
+	"selector":            "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set in the PodsMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping. When unset, just the metricName will be used to gather metrics.",
 }
 
 func (PodsMetricStatus) SwaggerDoc() map[string]string {
@@ -190,8 +196,8 @@ func (PodsMetricStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceMetricSource = map[string]string{
-	"":     "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
-	"name": "name is the name of the resource in question.",
+	"":                         "ResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  The values will be averaged together before being compared to the target.  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.  Only one \"target\" type should be set.",
+	"name":                     "name is the name of the resource in question.",
 	"targetAverageUtilization": "targetAverageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
 	"targetAverageValue":       "targetAverageValue is the target value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type.",
 }
@@ -201,8 +207,8 @@ func (ResourceMetricSource) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceMetricStatus = map[string]string{
-	"":     "ResourceMetricStatus indicates the current value of a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
-	"name": "name is the name of the resource in question.",
+	"":                          "ResourceMetricStatus indicates the current value of a resource metric known to Kubernetes, as specified in requests and limits, describing each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+	"name":                      "name is the name of the resource in question.",
 	"currentAverageUtilization": "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.  It will only be present if `targetAverageValue` was set in the corresponding metric specification.",
 	"currentAverageValue":       "currentAverageValue is the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification.",
 }

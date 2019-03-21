@@ -19,79 +19,84 @@ package scheduler
 // This file tests the Taint feature.
 
 import (
-	"net/http"
-	"net/http/httptest"
-	"reflect"
+	"fmt"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
-	"k8s.io/kubernetes/test/integration/framework"
 )
 
-// TestTaintNodeByCondition verifies:
-//   1. MemoryPressure Toleration is added to non-BestEffort Pod by PodTolerationRestriction
-//   2. NodeController taints nodes by node condition
-//   3. Scheduler allows pod to tolerate node condition taints, e.g. network unavailable
+func newPod(nsName, name string, req, limit v1.ResourceList) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: nsName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "busybox",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: req,
+						Limits:   limit,
+					},
+				},
+			},
+		},
+	}
+}
+
+// TestTaintNodeByCondition tests related cases for TaintNodeByCondition feature.
 func TestTaintNodeByCondition(t *testing.T) {
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
 	// Enable TaintNodeByCondition
-	utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
-
-	// Build clientset and informers for controllers.
-	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, time.Second)
-
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	informers := informers.NewSharedInformerFactory(clientset, time.Second)
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 
 	// Build PodToleration Admission.
 	admission := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
-	kubeadmission.WantsInternalKubeClientSet(admission).SetInternalKubeClientSet(internalClientset)
-	kubeadmission.WantsInternalKubeInformerFactory(admission).SetInternalKubeInformerFactory(internalInformers)
 
-	// Start master with admission.
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.AdmissionControl = admission
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
-	defer closeFn()
+	context := initTestMaster(t, "default", admission)
 
-	nsName := "default"
-	controllerCh := make(chan struct{})
-	defer close(controllerCh)
+	// Build clientset and informers for controllers.
+	externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
+		QPS:           -1,
+		Host:          context.httpServer.URL,
+		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
+
+	admission.SetExternalKubeClientSet(externalClientset)
+	admission.SetExternalKubeInformerFactory(externalInformers)
+
+	// Apply feature gates to enable TaintNodesByCondition
+	algorithmprovider.ApplyFeatureGates()
+
+	context = initTestScheduler(t, context, false, nil)
+	cs := context.clientSet
+	informers := context.informerFactory
+	nsName := context.ns.Name
 
 	// Start NodeLifecycleController for taint.
 	nc, err := nodelifecycle.NewNodeLifecycleController(
+		informers.Coordination().V1beta1().Leases(),
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
-		informers.Extensions().V1beta1().DaemonSets(),
-		nil, // CloudProvider
-		clientset,
-		time.Second, // Node monitor grace period
+		informers.Apps().V1().DaemonSets(),
+		cs,
+		time.Hour,   // Node monitor grace period
 		time.Second, // Node startup grace period
 		time.Second, // Node monitor period
 		time.Second, // Pod eviction timeout
@@ -107,126 +112,284 @@ func TestTaintNodeByCondition(t *testing.T) {
 		t.Errorf("Failed to create node controller: %v", err)
 		return
 	}
-	go nc.Run(controllerCh)
-
-	// Apply feature gates to enable TaintNodesByCondition
-	algorithmprovider.ApplyFeatureGates()
-
-	// Start scheduler
-	configurator := factory.NewConfigFactory(
-		v1.DefaultSchedulerName,
-		clientset,
-		informers.Core().V1().Nodes(),
-		informers.Core().V1().Pods(),
-		informers.Core().V1().PersistentVolumes(),
-		informers.Core().V1().PersistentVolumeClaims(),
-		informers.Core().V1().ReplicationControllers(),
-		informers.Extensions().V1beta1().ReplicaSets(),
-		informers.Apps().V1beta1().StatefulSets(),
-		informers.Core().V1().Services(),
-		informers.Policy().V1beta1().PodDisruptionBudgets(),
-		informers.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		true, // Enable EqualCache by default.
-	)
-
-	sched, err := scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {
-		cfg.StopEverything = controllerCh
-		cfg.Recorder = &record.FakeRecorder{}
-	})
-	if err != nil {
-		t.Errorf("Failed to create scheduler: %v.", err)
-		return
-	}
-	go sched.Run()
+	go nc.Run(context.stopCh)
 
 	// Waiting for all controller sync.
-	informers.Start(controllerCh)
-	internalInformers.Start(controllerCh)
-
-	informers.WaitForCacheSync(controllerCh)
-	internalInformers.WaitForCacheSync(controllerCh)
+	externalInformers.Start(context.stopCh)
+	externalInformers.WaitForCacheSync(context.stopCh)
+	informers.Start(context.stopCh)
+	informers.WaitForCacheSync(context.stopCh)
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.
 	// -------------------------------------------
-	memoryPressureToleration := v1.Toleration{
-		Key:      algorithm.TaintNodeMemoryPressure,
+	nodeRes := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("4000m"),
+		v1.ResourceMemory: resource.MustParse("16Gi"),
+		v1.ResourcePods:   resource.MustParse("110"),
+	}
+
+	podRes := v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("100m"),
+		v1.ResourceMemory: resource.MustParse("100Mi"),
+	}
+
+	notReadyToleration := v1.Toleration{
+		Key:      schedulerapi.TaintNodeNotReady,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	}
 
-	// Case 1: Add MememoryPressure Toleration for non-BestEffort pod.
-	burstablePod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "burstable-pod",
-			Namespace: nsName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+	unschedulableToleration := v1.Toleration{
+		Key:      schedulerapi.TaintNodeUnschedulable,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	}
+
+	memoryPressureToleration := v1.Toleration{
+		Key:      schedulerapi.TaintNodeMemoryPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	}
+
+	diskPressureToleration := v1.Toleration{
+		Key:      schedulerapi.TaintNodeDiskPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	}
+
+	networkUnavailableToleration := v1.Toleration{
+		Key:      schedulerapi.TaintNodeNetworkUnavailable,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	}
+
+	pidPressureToleration := v1.Toleration{
+		Key:      schedulerapi.TaintNodePIDPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	}
+
+	bestEffortPod := newPod(nsName, "besteffort-pod", nil, nil)
+	burstablePod := newPod(nsName, "burstable-pod", podRes, nil)
+	guaranteePod := newPod(nsName, "guarantee-pod", podRes, podRes)
+
+	type podCase struct {
+		pod         *v1.Pod
+		tolerations []v1.Toleration
+		fits        bool
+	}
+
+	// switch to table driven testings
+	tests := []struct {
+		name           string
+		existingTaints []v1.Taint
+		nodeConditions []v1.NodeCondition
+		unschedulable  bool
+		expectedTaints []v1.Taint
+		pods           []podCase
+	}{
+		{
+			name: "not-ready node",
+			nodeConditions: []v1.NodeCondition{
 				{
-					Name:  "busybox",
-					Image: "busybox",
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU: resource.MustParse("100m"),
-						},
+					Type:   v1.NodeReady,
+					Status: v1.ConditionFalse,
+				},
+			},
+			expectedTaints: []v1.Taint{
+				{
+					Key:    schedulerapi.TaintNodeNotReady,
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			pods: []podCase{
+				{
+					pod:  bestEffortPod,
+					fits: false,
+				},
+				{
+					pod:  burstablePod,
+					fits: false,
+				},
+				{
+					pod:  guaranteePod,
+					fits: false,
+				},
+				{
+					pod:         bestEffortPod,
+					tolerations: []v1.Toleration{notReadyToleration},
+					fits:        true,
+				},
+			},
+		},
+		{
+			name:          "unschedulable node",
+			unschedulable: true, // node.spec.unschedulable = true
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedTaints: []v1.Taint{
+				{
+					Key:    schedulerapi.TaintNodeUnschedulable,
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			pods: []podCase{
+				{
+					pod:  bestEffortPod,
+					fits: false,
+				},
+				{
+					pod:  burstablePod,
+					fits: false,
+				},
+				{
+					pod:  guaranteePod,
+					fits: false,
+				},
+				{
+					pod:         bestEffortPod,
+					tolerations: []v1.Toleration{unschedulableToleration},
+					fits:        true,
+				},
+			},
+		},
+		{
+			name: "memory pressure node",
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeMemoryPressure,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedTaints: []v1.Taint{
+				{
+					Key:    schedulerapi.TaintNodeMemoryPressure,
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			// In MemoryPressure condition, both Burstable and Guarantee pods are scheduled;
+			// BestEffort pod with toleration are also scheduled.
+			pods: []podCase{
+				{
+					pod:  bestEffortPod,
+					fits: false,
+				},
+				{
+					pod:         bestEffortPod,
+					tolerations: []v1.Toleration{memoryPressureToleration},
+					fits:        true,
+				},
+				{
+					pod:         bestEffortPod,
+					tolerations: []v1.Toleration{diskPressureToleration},
+					fits:        false,
+				},
+				{
+					pod:  burstablePod,
+					fits: true,
+				},
+				{
+					pod:  guaranteePod,
+					fits: true,
+				},
+			},
+		},
+		{
+			name: "disk pressure node",
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeDiskPressure,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedTaints: []v1.Taint{
+				{
+					Key:    schedulerapi.TaintNodeDiskPressure,
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			// In DiskPressure condition, only pods with toleration can be scheduled.
+			pods: []podCase{
+				{
+					pod:  bestEffortPod,
+					fits: false,
+				},
+				{
+					pod:  burstablePod,
+					fits: false,
+				},
+				{
+					pod:  guaranteePod,
+					fits: false,
+				},
+				{
+					pod:         bestEffortPod,
+					tolerations: []v1.Toleration{diskPressureToleration},
+					fits:        true,
+				},
+				{
+					pod:         bestEffortPod,
+					tolerations: []v1.Toleration{memoryPressureToleration},
+					fits:        false,
+				},
+			},
+		},
+		{
+			name: "network unavailable and node is ready",
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeNetworkUnavailable,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedTaints: []v1.Taint{
+				{
+					Key:    schedulerapi.TaintNodeNetworkUnavailable,
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			pods: []podCase{
+				{
+					pod:  bestEffortPod,
+					fits: false,
+				},
+				{
+					pod:  burstablePod,
+					fits: false,
+				},
+				{
+					pod:  guaranteePod,
+					fits: false,
+				},
+				{
+					pod: burstablePod,
+					tolerations: []v1.Toleration{
+						networkUnavailableToleration,
 					},
+					fits: true,
 				},
 			},
 		},
-	}
-
-	burstablePodInServ, err := clientset.CoreV1().Pods(nsName).Create(burstablePod)
-	if err != nil {
-		t.Errorf("Case 1: Failed to create pod: %v", err)
-	} else if !reflect.DeepEqual(burstablePodInServ.Spec.Tolerations, []v1.Toleration{memoryPressureToleration}) {
-		t.Errorf("Case 1: Unexpected toleration of non-BestEffort pod, expected: %+v, got: %v",
-			[]v1.Toleration{memoryPressureToleration},
-			burstablePodInServ.Spec.Tolerations)
-	}
-
-	// Case 2: No MemoryPressure Toleration for BestEffort pod.
-	besteffortPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "best-effort-pod",
-			Namespace: nsName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "busybox",
-					Image: "busybox",
-				},
-			},
-		},
-	}
-
-	besteffortPodInServ, err := clientset.CoreV1().Pods(nsName).Create(besteffortPod)
-	if err != nil {
-		t.Errorf("Case 2: Failed to create pod: %v", err)
-	} else if len(besteffortPodInServ.Spec.Tolerations) != 0 {
-		t.Errorf("Case 2: Unexpected toleration # of BestEffort pod, expected: 0, got: %v",
-			len(besteffortPodInServ.Spec.Tolerations))
-	}
-
-	// Case 3: Taint Node by NetworkUnavailable condition.
-	networkUnavailableNode := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-1",
-		},
-		Status: v1.NodeStatus{
-			Capacity: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("4000m"),
-				v1.ResourceMemory: resource.MustParse("16Gi"),
-				v1.ResourcePods:   resource.MustParse("110"),
-			},
-			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("4000m"),
-				v1.ResourceMemory: resource.MustParse("16Gi"),
-				v1.ResourcePods:   resource.MustParse("110"),
-			},
-			Conditions: []v1.NodeCondition{
+		{
+			name: "network unavailable and node is not ready",
+			nodeConditions: []v1.NodeCondition{
 				{
 					Type:   v1.NodeNetworkUnavailable,
 					Status: v1.ConditionTrue,
@@ -236,116 +399,175 @@ func TestTaintNodeByCondition(t *testing.T) {
 					Status: v1.ConditionFalse,
 				},
 			},
-		},
-	}
-
-	nodeInformerCh := make(chan bool)
-	nodeInformer := informers.Core().V1().Nodes().Informer()
-	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(old, cur interface{}) {
-			curNode := cur.(*v1.Node)
-			if curNode.Name != "node-1" {
-				return
-			}
-			for _, taint := range curNode.Spec.Taints {
-				if taint.Key == algorithm.TaintNodeNetworkUnavailable &&
-					taint.Effect == v1.TaintEffectNoSchedule {
-					nodeInformerCh <- true
-					break
-				}
-			}
-		},
-	})
-
-	if _, err := clientset.CoreV1().Nodes().Create(networkUnavailableNode); err != nil {
-		t.Errorf("Case 3: Failed to create node: %v", err)
-	} else {
-		select {
-		case <-time.After(60 * time.Second):
-			t.Errorf("Case 3: Failed to taint node after 60s.")
-		case <-nodeInformerCh:
-		}
-	}
-
-	// Case 4: Schedule Pod with NetworkUnavailable toleration.
-	networkDaemonPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "network-daemon-pod",
-			Namespace: nsName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+			expectedTaints: []v1.Taint{
 				{
-					Name:  "busybox",
-					Image: "busybox",
+					Key:    schedulerapi.TaintNodeNetworkUnavailable,
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    schedulerapi.TaintNodeNotReady,
+					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
-			Tolerations: []v1.Toleration{
+			pods: []podCase{
 				{
-					Key:      algorithm.TaintNodeNetworkUnavailable,
-					Operator: v1.TolerationOpExists,
-					Effect:   v1.TaintEffectNoSchedule,
+					pod:  bestEffortPod,
+					fits: false,
+				},
+				{
+					pod:  burstablePod,
+					fits: false,
+				},
+				{
+					pod:  guaranteePod,
+					fits: false,
+				},
+				{
+					pod: burstablePod,
+					tolerations: []v1.Toleration{
+						networkUnavailableToleration,
+					},
+					fits: false,
+				},
+				{
+					pod: burstablePod,
+					tolerations: []v1.Toleration{
+						networkUnavailableToleration,
+						notReadyToleration,
+					},
+					fits: true,
 				},
 			},
 		},
-	}
-
-	if _, err := clientset.CoreV1().Pods(nsName).Create(networkDaemonPod); err != nil {
-		t.Errorf("Case 4: Failed to create pod for network daemon: %v", err)
-	} else {
-		if err := waitForPodToScheduleWithTimeout(clientset, networkDaemonPod, time.Second*60); err != nil {
-			t.Errorf("Case 4: Failed to schedule network daemon pod in 60s.")
-		}
-	}
-
-	// Case 5: Taint node by unschedulable condition
-	unschedulableNode := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "node-2",
-		},
-		Spec: v1.NodeSpec{
-			Unschedulable: true,
-		},
-		Status: v1.NodeStatus{
-			Capacity: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("4000m"),
-				v1.ResourceMemory: resource.MustParse("16Gi"),
-				v1.ResourcePods:   resource.MustParse("110"),
+		{
+			name: "pid pressure node",
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodePIDPressure,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
 			},
-			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("4000m"),
-				v1.ResourceMemory: resource.MustParse("16Gi"),
-				v1.ResourcePods:   resource.MustParse("110"),
+			expectedTaints: []v1.Taint{
+				{
+					Key:    schedulerapi.TaintNodePIDPressure,
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			pods: []podCase{
+				{
+					pod:  bestEffortPod,
+					fits: false,
+				},
+				{
+					pod:  burstablePod,
+					fits: false,
+				},
+				{
+					pod:  guaranteePod,
+					fits: false,
+				},
+				{
+					pod:         bestEffortPod,
+					tolerations: []v1.Toleration{pidPressureToleration},
+					fits:        true,
+				},
+			},
+		},
+		{
+			name: "multi taints on node",
+			nodeConditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodePIDPressure,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   v1.NodeMemoryPressure,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   v1.NodeDiskPressure,
+					Status: v1.ConditionTrue,
+				},
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expectedTaints: []v1.Taint{
+				{
+					Key:    schedulerapi.TaintNodeDiskPressure,
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    schedulerapi.TaintNodeMemoryPressure,
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    schedulerapi.TaintNodePIDPressure,
+					Effect: v1.TaintEffectNoSchedule,
+				},
 			},
 		},
 	}
 
-	nodeInformerCh2 := make(chan bool)
-	nodeInformer2 := informers.Core().V1().Nodes().Informer()
-	nodeInformer2.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(old, cur interface{}) {
-			curNode := cur.(*v1.Node)
-			if curNode.Name != "node-2" {
-				return
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-1",
+				},
+				Spec: v1.NodeSpec{
+					Unschedulable: test.unschedulable,
+					Taints:        test.existingTaints,
+				},
+				Status: v1.NodeStatus{
+					Capacity:    nodeRes,
+					Allocatable: nodeRes,
+					Conditions:  test.nodeConditions,
+				},
 			}
 
-			for _, taint := range curNode.Spec.Taints {
-				if taint.Key == algorithm.TaintNodeUnschedulable &&
-					taint.Effect == v1.TaintEffectNoSchedule {
-					nodeInformerCh2 <- true
-					break
+			if _, err := cs.CoreV1().Nodes().Create(node); err != nil {
+				t.Errorf("Failed to create node, err: %v", err)
+			}
+			if err := waitForNodeTaints(cs, node, test.expectedTaints); err != nil {
+				t.Errorf("Failed to taint node <%s>, err: %v", node.Name, err)
+			}
+
+			var pods []*v1.Pod
+			for i, p := range test.pods {
+				pod := p.pod.DeepCopy()
+				pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+				pod.Spec.Tolerations = p.tolerations
+
+				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
+				if err != nil {
+					t.Fatalf("Failed to create pod %s/%s, error: %v",
+						pod.Namespace, pod.Name, err)
+				}
+
+				pods = append(pods, createdPod)
+
+				if p.fits {
+					if err := waitForPodToSchedule(cs, createdPod); err != nil {
+						t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
+							pod.Namespace, pod.Name, err)
+					}
+				} else {
+					if err := waitForPodUnschedulable(cs, createdPod); err != nil {
+						t.Errorf("Unschedulable pod %s/%s gets scheduled on the node, err: %v",
+							pod.Namespace, pod.Name, err)
+					}
 				}
 			}
-		},
-	})
 
-	if _, err := clientset.CoreV1().Nodes().Create(unschedulableNode); err != nil {
-		t.Errorf("Case 5: Failed to create node: %v", err)
-	} else {
-		select {
-		case <-time.After(60 * time.Second):
-			t.Errorf("Case 5: Failed to taint node after 60s.")
-		case <-nodeInformerCh2:
-		}
+			cleanupPods(cs, t, pods)
+			cleanupNodes(cs, t)
+			waitForSchedulerCacheCleanup(context.scheduler, t)
+		})
 	}
 }

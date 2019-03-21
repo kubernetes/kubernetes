@@ -3,7 +3,6 @@ package netlink
 import (
 	"fmt"
 	"net"
-	"time"
 )
 
 // XfrmStateAlgo represents the algorithm to use for the ipsec encryption.
@@ -68,19 +67,6 @@ type XfrmStateLimits struct {
 	TimeUseHard uint64
 }
 
-// XfrmStateStats represents the current number of bytes/packets
-// processed by this State, the State's installation and first use
-// time and the replay window counters.
-type XfrmStateStats struct {
-	ReplayWindow uint32
-	Replay       uint32
-	Failed       uint32
-	Bytes        uint64
-	Packets      uint64
-	AddTime      uint64
-	UseTime      uint64
-}
-
 // XfrmState represents the state of an ipsec policy. It optionally
 // contains an XfrmStateAlgo for encryption and one for authentication.
 type XfrmState struct {
@@ -92,7 +78,6 @@ type XfrmState struct {
 	Reqid        int
 	ReplayWindow int
 	Limits       XfrmStateLimits
-	Statistics   XfrmStateStats
 	Mark         *XfrmMark
 	Auth         *XfrmStateAlgo
 	Crypt        *XfrmStateAlgo
@@ -109,16 +94,10 @@ func (sa XfrmState) Print(stats bool) string {
 	if !stats {
 		return sa.String()
 	}
-	at := time.Unix(int64(sa.Statistics.AddTime), 0).Format(time.UnixDate)
-	ut := "-"
-	if sa.Statistics.UseTime > 0 {
-		ut = time.Unix(int64(sa.Statistics.UseTime), 0).Format(time.UnixDate)
-	}
-	return fmt.Sprintf("%s, ByteSoft: %s, ByteHard: %s, PacketSoft: %s, PacketHard: %s, TimeSoft: %d, TimeHard: %d, TimeUseSoft: %d, TimeUseHard: %d, Bytes: %d, Packets: %d, "+
-		"AddTime: %s, UseTime: %s, ReplayWindow: %d, Replay: %d, Failed: %d",
+
+	return fmt.Sprintf("%s, ByteSoft: %s, ByteHard: %s, PacketSoft: %s, PacketHard: %s, TimeSoft: %d, TimeHard: %d, TimeUseSoft: %d, TimeUseHard: %d",
 		sa.String(), printLimit(sa.Limits.ByteSoft), printLimit(sa.Limits.ByteHard), printLimit(sa.Limits.PacketSoft), printLimit(sa.Limits.PacketHard),
-		sa.Limits.TimeSoft, sa.Limits.TimeHard, sa.Limits.TimeUseSoft, sa.Limits.TimeUseHard, sa.Statistics.Bytes, sa.Statistics.Packets, at, ut,
-		sa.Statistics.ReplayWindow, sa.Statistics.Replay, sa.Statistics.Failed)
+		sa.Limits.TimeSoft, sa.Limits.TimeHard, sa.Limits.TimeUseSoft, sa.Limits.TimeUseHard)
 }
 
 func printLimit(lmt uint64) string {

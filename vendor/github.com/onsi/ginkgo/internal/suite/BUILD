@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["suite.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/suite",
     importpath = "github.com/onsi/ginkgo/internal/suite",
     visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
     deps = [

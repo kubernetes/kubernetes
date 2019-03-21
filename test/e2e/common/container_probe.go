@@ -18,13 +18,16 @@ package common
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -37,7 +40,7 @@ const (
 	probTestContainerName       = "test-webserver"
 	probTestInitialDelaySeconds = 15
 
-	defaultObservationTimeout = time.Minute * 2
+	defaultObservationTimeout = time.Minute * 4
 )
 
 var _ = framework.KubeDescribe("Probing container", func() {
@@ -50,11 +53,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		    Testname: pods-readiness-probe-initial-delay
-		    Description: Make sure that pod with readiness probe should not be
-			ready before initial delay and never restart.
+		Release : v1.9
+		Testname: Pod readiness probe, with initial delay
+		Description: Create a Pod that is configured with a initial delay set on the readiness probe. Check the Pod Start time to compare to the initial delay. The Pod MUST be ready only after the specified initial delay.
 	*/
-	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart ", func() {
+	framework.ConformanceIt("with readiness probe should not be ready before initial delay and never restart [NodeConformance]", func() {
 		p := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
 		f.WaitForPodReady(p.Name)
 
@@ -82,11 +85,12 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		    Testname: pods-readiness-probe-failure
-		    Description: Make sure that pod with readiness probe that fails should
-			never be ready and never restart.
+		Release : v1.9
+		Testname: Pod readiness probe, failure
+		Description: Create a Pod with a readiness probe that fails consistently. When this Pod is created,
+			then the Pod MUST never be ready, never be running and restart count MUST be zero.
 	*/
-	framework.ConformanceIt("with readiness probe that fails should never be ready and never restart ", func() {
+	framework.ConformanceIt("with readiness probe that fails should never be ready and never restart [NodeConformance]", func() {
 		p := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
 		Consistently(func() (bool, error) {
 			p, err := podClient.Get(p.Name, metav1.GetOptions{})
@@ -107,11 +111,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		    Testname: pods-cat-liveness-probe-restarted
-		    Description: Make sure the pod is restarted with a cat /tmp/health
-			liveness probe.
+		Release : v1.9
+		Testname: Pod liveness probe, using local file, restart
+		Description: Create a Pod with liveness probe that uses ExecAction handler to cat /temp/health file. The Container deletes the file /temp/health after 10 second, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
-	framework.ConformanceIt("should be restarted with a exec \"cat /tmp/health\" liveness probe", func() {
+	framework.ConformanceIt("should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-exec",
@@ -121,7 +125,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "liveness",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; rm -rf /tmp/health; sleep 600"},
 						LivenessProbe: &v1.Probe{
 							Handler: v1.Handler{
@@ -139,11 +143,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		    Testname: pods-cat-liveness-probe-not-restarted
-		    Description: Make sure the pod is not restarted with a cat /tmp/health
-			liveness probe.
+		Release : v1.9
+		Testname: Pod liveness probe, using local file, no restart
+		Description:  Pod is created with liveness probe that uses ‘exec’ command to cat /temp/health file. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
-	framework.ConformanceIt("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe", func() {
+	framework.ConformanceIt("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-exec",
@@ -153,7 +157,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "liveness",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"},
 						LivenessProbe: &v1.Probe{
 							Handler: v1.Handler{
@@ -171,11 +175,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		    Testname: pods-http-liveness-probe-restarted
-		    Description: Make sure when http liveness probe fails, the pod should
-			be restarted.
+		Release : v1.9
+		Testname: Pod liveness probe, using http endpoint, restart
+		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
-	framework.ConformanceIt("should be restarted with a /healthz http liveness probe ", func() {
+	framework.ConformanceIt("should be restarted with a /healthz http liveness probe [NodeConformance]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-http",
@@ -203,13 +207,12 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}, 1, defaultObservationTimeout)
 	})
 
-	// Slow by design (5 min)
 	/*
-		    Testname: pods-restart-count
-		    Description: Make sure when a pod gets restarted, its start count
-			should increase.
+		Release : v1.9
+		Testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
+		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1. The liveness probe must fail again after restart once the http handler for /healthz enpoind on the Pod returns an http error after 10 seconds from the start. Restart counts MUST increment everytime health check fails, measure upto 5 restart.
 	*/
-	framework.ConformanceIt("should have monotonically increasing restart count  [Slow]", func() {
+	framework.ConformanceIt("should have monotonically increasing restart count [NodeConformance]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-http",
@@ -238,11 +241,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		    Testname: pods-http-liveness-probe-not-restarted
-		    Description: Make sure when http liveness probe succeeds, the pod
-			should not be restarted.
+		Release : v1.9
+		Testname: Pod liveness probe, using http endpoint, failure
+		Description: A Pod is created with liveness probe on http endpoint ‘/’. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
 	*/
-	framework.ConformanceIt("should *not* be restarted with a /healthz http liveness probe ", func() {
+	framework.ConformanceIt("should *not* be restarted with a /healthz http liveness probe [NodeConformance]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "liveness-http",
@@ -252,7 +255,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "liveness",
-						Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+						Image: imageutils.GetE2EImage(imageutils.Nginx),
 						Ports: []v1.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &v1.Probe{
 							Handler: v1.Handler{
@@ -272,11 +275,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		    Testname: pods-docker-liveness-probe-timeout
-		    Description: Make sure that the pod is restarted with a docker exec
-			liveness probe with timeout.
+		Release : v1.9
+		Testname: Pod liveness probe, docker exec, restart
+		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call  does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
-	framework.ConformanceIt("should be restarted with a docker exec liveness probe with timeout ", func() {
+	It("should be restarted with a docker exec liveness probe with timeout ", func() {
 		// TODO: enable this test once the default exec handler supports timeout.
 		framework.Skipf("The default exec handler, dockertools.NativeExecHandler, does not support timeouts due to a limitation in the Docker Remote API")
 		runLivenessTest(f, &v1.Pod{
@@ -288,7 +291,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "liveness",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh", "-c", "sleep 600"},
 						LivenessProbe: &v1.Probe{
 							Handler: v1.Handler{
@@ -304,6 +307,82 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				},
 			},
 		}, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Release : v1.14
+		Testname: Pod http liveness probe, redirected to a local address
+		Description: A Pod is created with liveness probe on http endpoint /redirect?loc=healthz. The http handler on the /redirect will redirect to the /healthz endpoint, which will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1.
+	*/
+	It("should be restarted with a local redirect http liveness probe", func() {
+		runLivenessTest(f, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "liveness-http-redirect",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "liveness",
+						Image:   imageutils.GetE2EImage(imageutils.Liveness),
+						Command: []string{"/server"},
+						LivenessProbe: &v1.Probe{
+							Handler: v1.Handler{
+								HTTPGet: &v1.HTTPGetAction{
+									Path: "/redirect?loc=" + url.QueryEscape("/healthz"),
+									Port: intstr.FromInt(8080),
+								},
+							},
+							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
+						},
+					},
+				},
+			},
+		}, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Release : v1.14
+		Testname: Pod http liveness probe, redirected to a non-local address
+		Description: A Pod is created with liveness probe on http endpoint /redirect with a redirect to http://0.0.0.0/. The http handler on the /redirect should not follow the redirect, but instead treat it as a success and generate an event.
+	*/
+	It("should *not* be restarted with a non-local redirect http liveness probe", func() {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "liveness-http-redirect",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "liveness",
+						Image:   imageutils.GetE2EImage(imageutils.Liveness),
+						Command: []string{"/server"},
+						LivenessProbe: &v1.Probe{
+							Handler: v1.Handler{
+								HTTPGet: &v1.HTTPGetAction{
+									Path: "/redirect?loc=" + url.QueryEscape("http://0.0.0.0/"),
+									Port: intstr.FromInt(8080),
+								},
+							},
+							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
+						},
+					},
+				},
+			},
+		}
+		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+		// Expect an event of type "ProbeWarning".
+		expectedEvent := fields.Set{
+			"involvedObject.kind":      "Pod",
+			"involvedObject.name":      pod.Name,
+			"involvedObject.namespace": f.Namespace.Name,
+			"reason":                   events.ContainerProbeWarning,
+		}.AsSelector().String()
+		framework.ExpectNoError(framework.WaitTimeoutForPodEvent(
+			f.ClientSet, pod.Name, f.Namespace.Name, expectedEvent, "0.0.0.0", framework.PodEventTimeout))
 	})
 })
 

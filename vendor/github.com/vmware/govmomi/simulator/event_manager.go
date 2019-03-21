@@ -63,17 +63,14 @@ func NewEventManager(ref types.ManagedObjectReference) object.Reference {
 	}
 }
 
-func (m *EventManager) CreateCollectorForEvents(ctx *Context, req *types.CreateCollectorForEvents) soap.HasFault {
-	body := new(methods.CreateCollectorForEventsBody)
+func (m *EventManager) createCollector(ctx *Context, req *types.CreateCollectorForEvents) (*EventHistoryCollector, *soap.Fault) {
 	size, err := validatePageSize(req.Filter.MaxCount)
 	if err != nil {
-		body.Fault_ = err
-		return body
+		return nil, err
 	}
 
 	if len(m.collectors) >= int(m.MaxCollector) {
-		body.Fault_ = Fault("Too many event collectors to create", new(types.InvalidState))
-		return body
+		return nil, Fault("Too many event collectors to create", new(types.InvalidState))
 	}
 
 	collector := &EventHistoryCollector{
@@ -83,11 +80,43 @@ func (m *EventManager) CreateCollectorForEvents(ctx *Context, req *types.CreateC
 	collector.Filter = req.Filter
 	collector.fillPage(size)
 
+	return collector, nil
+}
+
+func (m *EventManager) CreateCollectorForEvents(ctx *Context, req *types.CreateCollectorForEvents) soap.HasFault {
+	body := new(methods.CreateCollectorForEventsBody)
+	collector, err := m.createCollector(ctx, req)
+	if err != nil {
+		body.Fault_ = err
+		return body
+	}
+
 	ref := ctx.Session.Put(collector).Reference()
 	m.collectors[ref] = collector
 
 	body.Res = &types.CreateCollectorForEventsResponse{
 		Returnval: ref,
+	}
+
+	return body
+}
+
+func (m *EventManager) QueryEvents(ctx *Context, req *types.QueryEvents) soap.HasFault {
+	if Map.IsESX() {
+		return &methods.QueryEventsBody{
+			Fault_: Fault("", new(types.NotImplemented)),
+		}
+	}
+
+	body := new(methods.QueryEventsBody)
+	collector, err := m.createCollector(ctx, &types.CreateCollectorForEvents{Filter: req.Filter})
+	if err != nil {
+		body.Fault_ = err
+		return body
+	}
+
+	body.Res = &types.QueryEventsResponse{
+		Returnval: collector.GetLatestPage(),
 	}
 
 	return body
@@ -128,15 +157,18 @@ func (m *EventManager) PostEvent(ctx *Context, req *types.PostEvent) soap.HasFau
 	event.CreatedTime = time.Now()
 	event.UserName = ctx.Session.UserName
 
-	m.page = m.page.Next()
+	m.page = m.page.Prev()
 	m.page.Value = req.EventToPost
 	m.formatMessage(req.EventToPost)
 
 	for _, c := range m.collectors {
-		if c.eventMatches(req.EventToPost) {
-			c.page = c.page.Next()
-			c.page.Value = event
-		}
+		ctx.WithLock(c, func() {
+			if c.eventMatches(req.EventToPost) {
+				c.page = c.page.Prev()
+				c.page.Value = req.EventToPost
+				Map.Update(c, []types.PropertyChange{{Name: "latestPage", Val: c.GetLatestPage()}})
+			}
+		})
 	}
 
 	return &methods.PostEventBody{
@@ -372,15 +404,23 @@ func (c *EventHistoryCollector) DestroyCollector(ctx *Context, req *types.Destro
 	}
 }
 
-func (c *EventHistoryCollector) Get() mo.Reference {
-	clone := *c
+func (c *EventHistoryCollector) GetLatestPage() []types.BaseEvent {
+	var latestPage []types.BaseEvent
 
 	c.page.Do(func(val interface{}) {
 		if val == nil {
 			return
 		}
-		clone.LatestPage = append(clone.LatestPage, val.(types.BaseEvent))
+		latestPage = append(latestPage, val.(types.BaseEvent))
 	})
+
+	return latestPage
+}
+
+func (c *EventHistoryCollector) Get() mo.Reference {
+	clone := *c
+
+	clone.LatestPage = clone.GetLatestPage()
 
 	return &clone
 }

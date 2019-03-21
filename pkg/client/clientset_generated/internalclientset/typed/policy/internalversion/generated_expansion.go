@@ -19,3 +19,5 @@ limitations under the License.
 package internalversion
 
 type PodDisruptionBudgetExpansion interface{}
+
+type PodSecurityPolicyExpansion interface{}

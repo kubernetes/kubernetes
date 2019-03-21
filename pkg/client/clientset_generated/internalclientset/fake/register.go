@@ -23,17 +23,21 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	admissionregistrationinternalversion "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	appsinternalversion "k8s.io/kubernetes/pkg/apis/apps"
+	auditregistrationinternalversion "k8s.io/kubernetes/pkg/apis/auditregistration"
 	authenticationinternalversion "k8s.io/kubernetes/pkg/apis/authentication"
 	authorizationinternalversion "k8s.io/kubernetes/pkg/apis/authorization"
 	autoscalinginternalversion "k8s.io/kubernetes/pkg/apis/autoscaling"
 	batchinternalversion "k8s.io/kubernetes/pkg/apis/batch"
 	certificatesinternalversion "k8s.io/kubernetes/pkg/apis/certificates"
+	coordinationinternalversion "k8s.io/kubernetes/pkg/apis/coordination"
 	coreinternalversion "k8s.io/kubernetes/pkg/apis/core"
 	eventsinternalversion "k8s.io/kubernetes/pkg/apis/events"
 	extensionsinternalversion "k8s.io/kubernetes/pkg/apis/extensions"
 	networkinginternalversion "k8s.io/kubernetes/pkg/apis/networking"
+	nodeinternalversion "k8s.io/kubernetes/pkg/apis/node"
 	policyinternalversion "k8s.io/kubernetes/pkg/apis/policy"
 	rbacinternalversion "k8s.io/kubernetes/pkg/apis/rbac"
 	schedulinginternalversion "k8s.io/kubernetes/pkg/apis/scheduling"
@@ -44,10 +48,26 @@ import (
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 var parameterCodec = runtime.NewParameterCodec(scheme)
-
-func init() {
-	v1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
-	AddToScheme(scheme)
+var localSchemeBuilder = runtime.SchemeBuilder{
+	admissionregistrationinternalversion.AddToScheme,
+	coreinternalversion.AddToScheme,
+	appsinternalversion.AddToScheme,
+	auditregistrationinternalversion.AddToScheme,
+	authenticationinternalversion.AddToScheme,
+	authorizationinternalversion.AddToScheme,
+	autoscalinginternalversion.AddToScheme,
+	batchinternalversion.AddToScheme,
+	certificatesinternalversion.AddToScheme,
+	coordinationinternalversion.AddToScheme,
+	eventsinternalversion.AddToScheme,
+	extensionsinternalversion.AddToScheme,
+	networkinginternalversion.AddToScheme,
+	nodeinternalversion.AddToScheme,
+	policyinternalversion.AddToScheme,
+	rbacinternalversion.AddToScheme,
+	schedulinginternalversion.AddToScheme,
+	settingsinternalversion.AddToScheme,
+	storageinternalversion.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition
@@ -60,25 +80,13 @@ func init() {
 //   )
 //
 //   kclientset, _ := kubernetes.NewForConfig(c)
-//   aggregatorclientsetscheme.AddToScheme(clientsetscheme.Scheme)
+//   _ = aggregatorclientsetscheme.AddToScheme(clientsetscheme.Scheme)
 //
 // After this, RawExtensions in Kubernetes types will serialize kube-aggregator types
 // correctly.
-func AddToScheme(scheme *runtime.Scheme) {
-	admissionregistrationinternalversion.AddToScheme(scheme)
-	coreinternalversion.AddToScheme(scheme)
-	appsinternalversion.AddToScheme(scheme)
-	authenticationinternalversion.AddToScheme(scheme)
-	authorizationinternalversion.AddToScheme(scheme)
-	autoscalinginternalversion.AddToScheme(scheme)
-	batchinternalversion.AddToScheme(scheme)
-	certificatesinternalversion.AddToScheme(scheme)
-	eventsinternalversion.AddToScheme(scheme)
-	extensionsinternalversion.AddToScheme(scheme)
-	networkinginternalversion.AddToScheme(scheme)
-	policyinternalversion.AddToScheme(scheme)
-	rbacinternalversion.AddToScheme(scheme)
-	schedulinginternalversion.AddToScheme(scheme)
-	settingsinternalversion.AddToScheme(scheme)
-	storageinternalversion.AddToScheme(scheme)
+var AddToScheme = localSchemeBuilder.AddToScheme
+
+func init() {
+	v1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
+	utilruntime.Must(AddToScheme(scheme))
 }

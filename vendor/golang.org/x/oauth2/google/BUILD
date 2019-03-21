@@ -9,6 +9,7 @@ go_library(
         "jwt.go",
         "sdk.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/oauth2/google",
     importpath = "golang.org/x/oauth2/google",
     visibility = ["//visibility:public"],
     deps = [

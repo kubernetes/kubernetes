@@ -209,3 +209,19 @@ func (m VirtualDiskManager) QueryVirtualDiskUuid(ctx context.Context, name strin
 
 	return res.Returnval, nil
 }
+
+func (m VirtualDiskManager) SetVirtualDiskUuid(ctx context.Context, name string, dc *Datacenter, uuid string) error {
+	req := types.SetVirtualDiskUuid{
+		This: m.Reference(),
+		Name: name,
+		Uuid: uuid,
+	}
+
+	if dc != nil {
+		ref := dc.Reference()
+		req.Datacenter = &ref
+	}
+
+	_, err := methods.SetVirtualDiskUuid(ctx, m.c, &req)
+	return err
+}

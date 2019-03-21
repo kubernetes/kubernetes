@@ -42,7 +42,7 @@ func Dialer(address string, timeout time.Duration) (net.Conn, error) {
 		close(stopC)
 		go func() {
 			dr := <-synC
-			if dr != nil {
+			if dr != nil && dr.c != nil {
 				dr.c.Close()
 			}
 		}()

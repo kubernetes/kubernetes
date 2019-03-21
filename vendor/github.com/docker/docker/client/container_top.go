@@ -1,12 +1,12 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
-	"golang.org/x/net/context"
 )
 
 // ContainerTop shows process information from within a container.

@@ -6,53 +6,12 @@ go_library(
         "inmem_socket.go",
         "proxy.go",
         "sockets.go",
+        "sockets_unix.go",
+        "sockets_windows.go",
         "tcp_socket.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "sockets_unix.go",
-            "unix_socket.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "sockets_unix.go",
-            "unix_socket.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "sockets_unix.go",
-            "unix_socket.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "sockets_unix.go",
-            "unix_socket.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "sockets_unix.go",
-            "unix_socket.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "sockets_unix.go",
-            "unix_socket.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "sockets_unix.go",
-            "unix_socket.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "sockets_unix.go",
-            "unix_socket.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "sockets_unix.go",
-            "unix_socket.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "sockets_unix.go",
-            "unix_socket.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "sockets_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "unix_socket.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/go-connections/sockets",
     importpath = "github.com/docker/go-connections/sockets",
     visibility = ["//visibility:public"],
     deps = [

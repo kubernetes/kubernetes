@@ -53,13 +53,13 @@ func (b *Blob) leaseCommonPut(headers map[string]string, expectedStatus int, opt
 	if err != nil {
 		return nil, err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err := checkRespCode(resp.statusCode, []int{expectedStatus}); err != nil {
+	if err := checkRespCode(resp, []int{expectedStatus}); err != nil {
 		return nil, err
 	}
 
-	return resp.headers, nil
+	return resp.Header, nil
 }
 
 // LeaseOptions includes options for all operations regarding leasing blobs

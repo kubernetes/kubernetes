@@ -33,15 +33,48 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta2_Scale_To_scheme_Scale,
-		Convert_scheme_Scale_To_v1beta2_Scale,
-		Convert_v1beta2_ScaleSpec_To_scheme_ScaleSpec,
-		Convert_scheme_ScaleSpec_To_v1beta2_ScaleSpec,
-		Convert_v1beta2_ScaleStatus_To_scheme_ScaleStatus,
-		Convert_scheme_ScaleStatus_To_v1beta2_ScaleStatus,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta2.Scale)(nil), (*scheme.Scale)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_Scale_To_scheme_Scale(a.(*v1beta2.Scale), b.(*scheme.Scale), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheme.Scale)(nil), (*v1beta2.Scale)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheme_Scale_To_v1beta2_Scale(a.(*scheme.Scale), b.(*v1beta2.Scale), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta2.ScaleSpec)(nil), (*scheme.ScaleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_ScaleSpec_To_scheme_ScaleSpec(a.(*v1beta2.ScaleSpec), b.(*scheme.ScaleSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheme.ScaleSpec)(nil), (*v1beta2.ScaleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheme_ScaleSpec_To_v1beta2_ScaleSpec(a.(*scheme.ScaleSpec), b.(*v1beta2.ScaleSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta2.ScaleStatus)(nil), (*scheme.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_ScaleStatus_To_scheme_ScaleStatus(a.(*v1beta2.ScaleStatus), b.(*scheme.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheme.ScaleStatus)(nil), (*v1beta2.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheme_ScaleStatus_To_v1beta2_ScaleStatus(a.(*scheme.ScaleStatus), b.(*v1beta2.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*scheme.ScaleStatus)(nil), (*v1beta2.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheme_ScaleStatus_To_v1beta2_ScaleStatus(a.(*scheme.ScaleStatus), b.(*v1beta2.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta2.ScaleStatus)(nil), (*scheme.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta2_ScaleStatus_To_scheme_ScaleStatus(a.(*v1beta2.ScaleStatus), b.(*scheme.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta2_Scale_To_scheme_Scale(in *v1beta2.Scale, out *scheme.Scale, s conversion.Scope) error {

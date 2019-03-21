@@ -62,7 +62,7 @@ func (c *FakePodDisruptionBudgets) List(opts v1.ListOptions) (result *v1beta1.Po
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.PodDisruptionBudgetList{}
+	list := &v1beta1.PodDisruptionBudgetList{ListMeta: obj.(*v1beta1.PodDisruptionBudgetList).ListMeta}
 	for _, item := range obj.(*v1beta1.PodDisruptionBudgetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -131,7 +131,7 @@ func (c *FakePodDisruptionBudgets) DeleteCollection(options *v1.DeleteOptions, l
 // Patch applies the patch and returns the patched podDisruptionBudget.
 func (c *FakePodDisruptionBudgets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(poddisruptionbudgetsResource, c.ns, name, data, subresources...), &v1beta1.PodDisruptionBudget{})
+		Invokes(testing.NewPatchSubresourceAction(poddisruptionbudgetsResource, c.ns, name, pt, data, subresources...), &v1beta1.PodDisruptionBudget{})
 
 	if obj == nil {
 		return nil, err

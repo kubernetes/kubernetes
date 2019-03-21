@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -35,11 +34,10 @@ import (
 
 func TestNewWithDelegate(t *testing.T) {
 	delegateConfig := NewConfig(codecs)
+	delegateConfig.ExternalAddress = "192.168.10.4:443"
 	delegateConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	delegateConfig.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	delegateConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	delegateConfig.LoopbackClientConfig = &rest.Config{}
-	delegateConfig.SwaggerConfig = DefaultSwaggerConfig()
 	clientset := fake.NewSimpleClientset()
 	if clientset == nil {
 		t.Fatal("unable to create fake client set")
@@ -50,7 +48,7 @@ func TestNewWithDelegate(t *testing.T) {
 	}))
 
 	sharedInformers := informers.NewSharedInformerFactory(clientset, delegateConfig.LoopbackClientConfig.Timeout)
-	delegateServer, err := delegateConfig.Complete(sharedInformers).New("test", EmptyDelegate)
+	delegateServer, err := delegateConfig.Complete(sharedInformers).New("test", NewEmptyDelegate())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +56,9 @@ func TestNewWithDelegate(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	})
 
-	delegateServer.AddPostStartHook("delegate-post-start-hook", func(context PostStartHookContext) error {
+	delegatePostStartHookChan := make(chan struct{})
+	delegateServer.AddPostStartHookOrDie("delegate-post-start-hook", func(context PostStartHookContext) error {
+		defer close(delegatePostStartHookChan)
 		return nil
 	})
 
@@ -66,11 +66,10 @@ func TestNewWithDelegate(t *testing.T) {
 	delegateServer.PrepareRun()
 
 	wrappingConfig := NewConfig(codecs)
+	wrappingConfig.ExternalAddress = "192.168.10.4:443"
 	wrappingConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	wrappingConfig.RequestContextMapper = genericapirequest.NewRequestContextMapper()
 	wrappingConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
-	wrappingConfig.SwaggerConfig = DefaultSwaggerConfig()
 
 	wrappingConfig.HealthzChecks = append(wrappingConfig.HealthzChecks, healthz.NamedCheck("wrapping-health", func(r *http.Request) error {
 		return fmt.Errorf("wrapping failed healthcheck")
@@ -85,7 +84,9 @@ func TestNewWithDelegate(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 
-	wrappingServer.AddPostStartHook("wrapping-post-start-hook", func(context PostStartHookContext) error {
+	wrappingPostStartHookChan := make(chan struct{})
+	wrappingServer.AddPostStartHookOrDie("wrapping-post-start-hook", func(context PostStartHookContext) error {
+		defer close(wrappingPostStartHookChan)
 		return nil
 	})
 
@@ -97,6 +98,10 @@ func TestNewWithDelegate(t *testing.T) {
 	server := httptest.NewServer(wrappingServer.Handler)
 	defer server.Close()
 
+	// Wait for the hooks to finish before checking the response
+	<-delegatePostStartHookChan
+	<-wrappingPostStartHookChan
+
 	checkPath(server.URL, http.StatusOK, `{
   "paths": [
     "/apis",
@@ -104,16 +109,17 @@ func TestNewWithDelegate(t *testing.T) {
     "/foo",
     "/healthz",
     "/healthz/delegate-health",
+    "/healthz/log",
     "/healthz/ping",
     "/healthz/poststarthook/delegate-post-start-hook",
     "/healthz/poststarthook/generic-apiserver-start-informers",
     "/healthz/poststarthook/wrapping-post-start-hook",
     "/healthz/wrapping-health",
-    "/metrics",
-    "/swaggerapi"
+    "/metrics"
   ]
 }`, t)
 	checkPath(server.URL+"/healthz", http.StatusInternalServerError, `[+]ping ok
+[+]log ok
 [-]wrapping-health failed: reason withheld
 [-]delegate-health failed: reason withheld
 [+]poststarthook/generic-apiserver-start-informers ok

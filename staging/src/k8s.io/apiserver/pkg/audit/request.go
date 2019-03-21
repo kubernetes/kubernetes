@@ -20,13 +20,13 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"reflect"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
+	"k8s.io/klog"
 
-	"reflect"
-
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,14 +37,19 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
+const (
+	maxUserAgentLength      = 1024
+	userAgentTruncateSuffix = "...TRUNCATED"
+)
+
 func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	ev := &auditinternal.Event{
 		RequestReceivedTimestamp: metav1.NewMicroTime(time.Now()),
-		Verb:       attribs.GetVerb(),
-		RequestURI: req.URL.RequestURI(),
+		Verb:                     attribs.GetVerb(),
+		RequestURI:               req.URL.RequestURI(),
+		UserAgent:                maybeTruncateUserAgent(req),
+		Level:                    level,
 	}
-
-	ev.Level = level
 
 	// prefer the id from the headers. If not available, create a new one.
 	// TODO(audit): do we want to forbid the header for non-front-proxy users?
@@ -112,8 +117,9 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 	if ae.ObjectRef == nil {
 		ae.ObjectRef = &auditinternal.ObjectReference{}
 	}
-	if acc, ok := obj.(metav1.ObjectMetaAccessor); ok {
-		meta := acc.GetObjectMeta()
+
+	// meta.Accessor is more general than ObjectMetaAccessor, but if it fails, we can just skip setting these bits
+	if meta, err := meta.Accessor(obj); err == nil {
 		if len(ae.ObjectRef.Namespace) == 0 {
 			ae.ObjectRef.Namespace = meta.GetNamespace()
 		}
@@ -147,7 +153,7 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 	ae.RequestObject, err = encodeObject(obj, gvr.GroupVersion(), s)
 	if err != nil {
 		// TODO(audit): add error slice to audit event struct
-		glog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
+		klog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
 		return
 	}
 }
@@ -171,7 +177,12 @@ func LogResponseObject(ae *auditinternal.Event, obj runtime.Object, gv schema.Gr
 		return
 	}
 	if status, ok := obj.(*metav1.Status); ok {
-		ae.ResponseStatus = status
+		// selectively copy the bounded fields.
+		ae.ResponseStatus = &metav1.Status{
+			Status: status.Status,
+			Reason: status.Reason,
+			Code:   status.Code,
+		}
 	}
 
 	if ae.Level.Less(auditinternal.LevelRequestResponse) {
@@ -181,7 +192,7 @@ func LogResponseObject(ae *auditinternal.Event, obj runtime.Object, gv schema.Gr
 	var err error
 	ae.ResponseObject, err = encodeObject(obj, gv, s)
 	if err != nil {
-		glog.Warningf("Audit failed for %q response: %v", reflect.TypeOf(obj).Name(), err)
+		klog.Warningf("Audit failed for %q response: %v", reflect.TypeOf(obj).Name(), err)
 	}
 }
 
@@ -213,7 +224,7 @@ func LogAnnotation(ae *auditinternal.Event, key, value string) {
 		ae.Annotations = make(map[string]string)
 	}
 	if v, ok := ae.Annotations[key]; ok && v != value {
-		glog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
+		klog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
 		return
 	}
 	ae.Annotations[key] = value
@@ -227,4 +238,14 @@ func LogAnnotations(ae *auditinternal.Event, annotations map[string]string) {
 	for key, value := range annotations {
 		LogAnnotation(ae, key, value)
 	}
+}
+
+// truncate User-Agent if too long, otherwise return it directly.
+func maybeTruncateUserAgent(req *http.Request) string {
+	ua := req.UserAgent()
+	if len(ua) > maxUserAgentLength {
+		ua = ua[:maxUserAgentLength] + userAgentTruncateSuffix
+	}
+
+	return ua
 }

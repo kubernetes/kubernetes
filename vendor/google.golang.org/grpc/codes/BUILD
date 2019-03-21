@@ -6,6 +6,7 @@ go_library(
         "code_string.go",
         "codes.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/grpc/codes",
     importpath = "google.golang.org/grpc/codes",
     visibility = ["//visibility:public"],
 )

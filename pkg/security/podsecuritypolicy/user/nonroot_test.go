@@ -17,8 +17,8 @@ limitations under the License.
 package user
 
 import (
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	api "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"testing"
 )
 
@@ -27,14 +27,14 @@ func TestNonRootOptions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewRunAsNonRoot %v", err)
 	}
-	_, err = NewRunAsNonRoot(&extensions.RunAsUserStrategyOptions{})
+	_, err = NewRunAsNonRoot(&policy.RunAsUserStrategyOptions{})
 	if err != nil {
 		t.Errorf("unexpected error initializing NewRunAsNonRoot %v", err)
 	}
 }
 
 func TestNonRootGenerate(t *testing.T) {
-	s, err := NewRunAsNonRoot(&extensions.RunAsUserStrategyOptions{})
+	s, err := NewRunAsNonRoot(&policy.RunAsUserStrategyOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewRunAsNonRoot %v", err)
 	}
@@ -52,7 +52,7 @@ func TestNonRootValidate(t *testing.T) {
 	badUID := int64(0)
 	untrue := false
 	unfalse := true
-	s, err := NewRunAsNonRoot(&extensions.RunAsUserStrategyOptions{})
+	s, err := NewRunAsNonRoot(&policy.RunAsUserStrategyOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewMustRunAs %v", err)
 	}

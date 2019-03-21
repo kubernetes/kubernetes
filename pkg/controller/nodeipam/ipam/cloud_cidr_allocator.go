@@ -18,12 +18,14 @@ package ipam
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,16 +35,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
@@ -58,7 +58,7 @@ type nodeProcessingInfo struct {
 // merely takes the assignment and updates the node spec.
 type cloudCIDRAllocator struct {
 	client clientset.Interface
-	cloud  *gce.GCECloud
+	cloud  *gce.Cloud
 
 	// nodeLister is able to list/get nodes and is populated by the shared informer passed to
 	// NewCloudCIDRAllocator.
@@ -83,16 +83,16 @@ var _ CIDRAllocator = (*cloudCIDRAllocator)(nil)
 // NewCloudCIDRAllocator creates a new cloud CIDR allocator.
 func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer) (CIDRAllocator, error) {
 	if client == nil {
-		glog.Fatalf("kubeClient is nil when starting NodeController")
+		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
-	eventBroadcaster.StartLogging(glog.Infof)
-	glog.V(0).Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster.StartLogging(klog.Infof)
+	klog.V(0).Infof("Sending events to api server.")
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
-	gceCloud, ok := cloud.(*gce.GCECloud)
+	gceCloud, ok := cloud.(*gce.Cloud)
 	if !ok {
 		err := fmt.Errorf("cloudCIDRAllocator does not support %v provider", cloud.ProviderName())
 		return nil, err
@@ -116,8 +116,8 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 			}
 			// Even if PodCIDR is assigned, but NetworkUnavailable condition is
 			// set to true, we need to process the node to set the condition.
-			networkUnavailableTaint := &v1.Taint{Key: algorithm.TaintNodeNetworkUnavailable, Effect: v1.TaintEffectNoSchedule}
-			_, cond := v1node.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
+			networkUnavailableTaint := &v1.Taint{Key: schedulerapi.TaintNodeNetworkUnavailable, Effect: v1.TaintEffectNoSchedule}
+			_, cond := nodeutil.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
 			if cond == nil || cond.Status != v1.ConditionFalse || utiltaints.TaintExists(newNode.Spec.Taints, networkUnavailableTaint) {
 				return ca.AllocateOrOccupyCIDR(newNode)
 			}
@@ -126,15 +126,15 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 		DeleteFunc: nodeutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
 	})
 
-	glog.V(0).Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
+	klog.V(0).Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
 	return ca, nil
 }
 
 func (ca *cloudCIDRAllocator) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	glog.Infof("Starting cloud CIDR allocator")
-	defer glog.Infof("Shutting down cloud CIDR allocator")
+	klog.Infof("Starting cloud CIDR allocator")
+	defer klog.Infof("Shutting down cloud CIDR allocator")
 
 	if !controller.WaitForCacheSync("cidrallocator", stopCh, ca.nodesSynced) {
 		return
@@ -152,17 +152,22 @@ func (ca *cloudCIDRAllocator) worker(stopChan <-chan struct{}) {
 		select {
 		case workItem, ok := <-ca.nodeUpdateChannel:
 			if !ok {
-				glog.Warning("Channel nodeCIDRUpdateChannel was unexpectedly closed")
+				klog.Warning("Channel nodeCIDRUpdateChannel was unexpectedly closed")
 				return
 			}
-			if err := ca.updateCIDRAllocation(workItem); err != nil {
-				if ca.canRetry(workItem) {
-					time.AfterFunc(updateRetryTimeout, func() {
+			if err := ca.updateCIDRAllocation(workItem); err == nil {
+				klog.V(3).Infof("Updated CIDR for %q", workItem)
+			} else {
+				klog.Errorf("Error updating CIDR for %q: %v", workItem, err)
+				if canRetry, timeout := ca.retryParams(workItem); canRetry {
+					klog.V(2).Infof("Retrying update for %q after %v", workItem, timeout)
+					time.AfterFunc(timeout, func() {
 						// Requeue the failed node for update again.
 						ca.nodeUpdateChannel <- workItem
 					})
 					continue
 				}
+				klog.Errorf("Exceeded retry count for %q, dropping from queue", workItem)
 			}
 			ca.removeNodeFromProcessing(workItem)
 		case <-stopChan:
@@ -181,15 +186,34 @@ func (ca *cloudCIDRAllocator) insertNodeToProcessing(nodeName string) bool {
 	return true
 }
 
-func (ca *cloudCIDRAllocator) canRetry(nodeName string) bool {
+func (ca *cloudCIDRAllocator) retryParams(nodeName string) (bool, time.Duration) {
 	ca.lock.Lock()
 	defer ca.lock.Unlock()
-	count := ca.nodesInProcessing[nodeName].retries + 1
+
+	entry, ok := ca.nodesInProcessing[nodeName]
+	if !ok {
+		klog.Errorf("Cannot get retryParams for %q as entry does not exist", nodeName)
+		return false, 0
+	}
+
+	count := entry.retries + 1
 	if count > updateMaxRetries {
-		return false
+		return false, 0
 	}
 	ca.nodesInProcessing[nodeName].retries = count
-	return true
+
+	return true, nodeUpdateRetryTimeout(count)
+}
+
+func nodeUpdateRetryTimeout(count int) time.Duration {
+	timeout := updateRetryTimeout
+	for i := 0; i < count && timeout < maxUpdateRetryTimeout; i++ {
+		timeout *= 2
+	}
+	if timeout > maxUpdateRetryTimeout {
+		timeout = maxUpdateRetryTimeout
+	}
+	return time.Duration(timeout.Nanoseconds()/2 + rand.Int63n(timeout.Nanoseconds()))
 }
 
 func (ca *cloudCIDRAllocator) removeNodeFromProcessing(nodeName string) {
@@ -206,11 +230,11 @@ func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 		return nil
 	}
 	if !ca.insertNodeToProcessing(node.Name) {
-		glog.V(2).Infof("Node %v is already in a process of CIDR assignment.", node.Name)
+		klog.V(2).Infof("Node %v is already in a process of CIDR assignment.", node.Name)
 		return nil
 	}
 
-	glog.V(4).Infof("Putting node %s into the work queue", node.Name)
+	klog.V(4).Infof("Putting node %s into the work queue", node.Name)
 	ca.nodeUpdateChannel <- node.Name
 	return nil
 }
@@ -222,7 +246,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 		if errors.IsNotFound(err) {
 			return nil // node no longer available, skip processing
 		}
-		glog.Errorf("Failed while getting node %v for updating Node.Spec.PodCIDR: %v", nodeName, err)
+		klog.Errorf("Failed while getting node %v for updating Node.Spec.PodCIDR: %v", nodeName, err)
 		return err
 	}
 
@@ -242,11 +266,11 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 	podCIDR := cidr.String()
 
 	if node.Spec.PodCIDR == podCIDR {
-		glog.V(4).Infof("Node %v already has allocated CIDR %v. It matches the proposed one.", node.Name, podCIDR)
+		klog.V(4).Infof("Node %v already has allocated CIDR %v. It matches the proposed one.", node.Name, podCIDR)
 		// We don't return here, in order to set the NetworkUnavailable condition later below.
 	} else {
 		if node.Spec.PodCIDR != "" {
-			glog.Errorf("PodCIDR being reassigned! Node %v spec has %v, but cloud provider has assigned %v", node.Name, node.Spec.PodCIDR, podCIDR)
+			klog.Errorf("PodCIDR being reassigned! Node %v spec has %v, but cloud provider has assigned %v", node.Name, node.Spec.PodCIDR, podCIDR)
 			// We fall through and set the CIDR despite this error. This
 			// implements the same logic as implemented in the
 			// rangeAllocator.
@@ -255,14 +279,14 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 		}
 		for i := 0; i < cidrUpdateRetries; i++ {
 			if err = utilnode.PatchNodeCIDR(ca.client, types.NodeName(node.Name), podCIDR); err == nil {
-				glog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
+				klog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
 				break
 			}
 		}
 	}
 	if err != nil {
 		nodeutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
-		glog.Errorf("Failed to update node %v PodCIDR to %v after multiple attempts: %v", node.Name, podCIDR, err)
+		klog.Errorf("Failed to update node %v PodCIDR to %v after multiple attempts: %v", node.Name, podCIDR, err)
 		return err
 	}
 
@@ -274,13 +298,13 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(nodeName string) error {
 		LastTransitionTime: metav1.Now(),
 	})
 	if err != nil {
-		glog.Errorf("Error setting route status for node %v: %v", node.Name, err)
+		klog.Errorf("Error setting route status for node %v: %v", node.Name, err)
 	}
 	return err
 }
 
 func (ca *cloudCIDRAllocator) ReleaseCIDR(node *v1.Node) error {
-	glog.V(2).Infof("Node %v PodCIDR (%v) will be released by external cloud provider (not managed by controller)",
+	klog.V(2).Infof("Node %v PodCIDR (%v) will be released by external cloud provider (not managed by controller)",
 		node.Name, node.Spec.PodCIDR)
 	return nil
 }

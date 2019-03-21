@@ -36,6 +36,10 @@ func (c *FakePolicy) PodDisruptionBudgets(namespace string) internalversion.PodD
 	return &FakePodDisruptionBudgets{c, namespace}
 }
 
+func (c *FakePolicy) PodSecurityPolicies() internalversion.PodSecurityPolicyInterface {
+	return &FakePodSecurityPolicies{c}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakePolicy) RESTClient() rest.Interface {

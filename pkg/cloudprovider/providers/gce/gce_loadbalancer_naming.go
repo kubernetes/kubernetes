@@ -22,16 +22,21 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
 // Internal Load Balancer
 
 // Instance groups remain legacy named to stay consistent with ingress
 func makeInstanceGroupName(clusterID string) string {
-	return fmt.Sprintf("k8s-ig--%s", clusterID)
+	prefix := "k8s-ig"
+	// clusterID might be empty for legacy clusters
+	if clusterID == "" {
+		return prefix
+	}
+	return fmt.Sprintf("%s--%s", prefix, clusterID)
 }
 
 func makeBackendServiceName(loadBalancerName, clusterID string, shared bool, scheme cloud.LbScheme, protocol v1.Protocol, svcAffinity v1.ServiceAffinity) string {

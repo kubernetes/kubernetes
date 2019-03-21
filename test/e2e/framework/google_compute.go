@@ -35,8 +35,12 @@ func lookupClusterImageSources() (string, string, error) {
 	gcloudf := func(argv ...string) ([]string, error) {
 		args := []string{"compute"}
 		args = append(args, argv...)
-		args = append(args, "--project", TestContext.CloudConfig.ProjectID,
-			"--zone", TestContext.CloudConfig.Zone)
+		args = append(args, "--project", TestContext.CloudConfig.ProjectID)
+		if TestContext.CloudConfig.MultiMaster {
+			args = append(args, "--region", TestContext.CloudConfig.Region)
+		} else {
+			args = append(args, "--zone", TestContext.CloudConfig.Zone)
+		}
 		outputBytes, err := exec.Command("gcloud", args...).CombinedOutput()
 		str := strings.Replace(string(outputBytes), ",", "\n", -1)
 		str = strings.Replace(str, ";", "\n", -1)
@@ -141,6 +145,28 @@ func CreateManagedInstanceGroup(size int64, zone, template string) error {
 	return nil
 }
 
+func GetManagedInstanceGroupTemplateName(zone string) (string, error) {
+	// TODO(verult): make this hit the compute API directly instead of
+	// shelling out to gcloud. Use InstanceGroupManager to get Instance Template name.
+
+	stdout, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
+		"list",
+		fmt.Sprintf("--filter=name:%s", TestContext.CloudConfig.NodeInstanceGroup),
+		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--zones=%s", zone),
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("gcloud compute instance-groups managed list call failed with err: %v", err)
+	}
+
+	templateName, err := parseInstanceTemplateName(stdout)
+	if err != nil {
+		return "", fmt.Errorf("error parsing gcloud output: %v", err)
+	}
+	return templateName, nil
+}
+
 func DeleteManagedInstanceGroup(zone string) error {
 	// TODO(verult): make this hit the compute API directly instead of
 	// shelling out to gcloud.
@@ -153,4 +179,30 @@ func DeleteManagedInstanceGroup(zone string) error {
 		return fmt.Errorf("gcloud compute instance-groups managed delete call failed with err: %v", err)
 	}
 	return nil
+}
+
+func parseInstanceTemplateName(gcloudOutput string) (string, error) {
+	const templateNameField = "INSTANCE_TEMPLATE"
+
+	lines := strings.Split(gcloudOutput, "\n")
+	if len(lines) <= 1 { // Empty output or only contains column names
+		return "", fmt.Errorf("the list is empty")
+	}
+
+	// Otherwise, there should be exactly 1 entry, i.e. 2 lines
+	fieldNames := strings.Fields(lines[0])
+	instanceTemplateColumn := 0
+	for instanceTemplateColumn < len(fieldNames) &&
+		fieldNames[instanceTemplateColumn] != templateNameField {
+		instanceTemplateColumn++
+	}
+
+	if instanceTemplateColumn == len(fieldNames) {
+		return "", fmt.Errorf("the list does not contain instance template information")
+	}
+
+	fields := strings.Fields(lines[1])
+	instanceTemplateName := fields[instanceTemplateColumn]
+
+	return instanceTemplateName, nil
 }

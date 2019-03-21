@@ -29,13 +29,9 @@ import (
 
 func TestAuthenticateRequest(t *testing.T) {
 	success := make(chan struct{})
-	contextMapper := genericapirequest.NewRequestContextMapper()
 	auth := WithAuthentication(
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
-			ctx, ok := contextMapper.Get(req)
-			if ctx == nil || !ok {
-				t.Errorf("no context stored on contextMapper: %#v", contextMapper)
-			}
+			ctx := req.Context()
 			user, ok := genericapirequest.UserFrom(ctx)
 			if user == nil || !ok {
 				t.Errorf("no user stored in context: %#v", ctx)
@@ -45,82 +41,59 @@ func TestAuthenticateRequest(t *testing.T) {
 			}
 			close(success)
 		}),
-		contextMapper,
-		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 			if req.Header.Get("Authorization") == "Something" {
-				return &user.DefaultInfo{Name: "user"}, true, nil
+				return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
 			}
 			return nil, false, errors.New("Authorization header is missing.")
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			t.Errorf("unexpected call to failed")
 		}),
+		nil,
 	)
 
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{Header: map[string][]string{"Authorization": {"Something"}}})
 
 	<-success
-	empty, err := genericapirequest.IsEmpty(contextMapper)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !empty {
-		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
-	}
 }
 
 func TestAuthenticateRequestFailed(t *testing.T) {
 	failed := make(chan struct{})
-	contextMapper := genericapirequest.NewRequestContextMapper()
 	auth := WithAuthentication(
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			t.Errorf("unexpected call to handler")
 		}),
-		contextMapper,
-		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 			return nil, false, nil
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			close(failed)
 		}),
+		nil,
 	)
 
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 
 	<-failed
-	empty, err := genericapirequest.IsEmpty(contextMapper)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !empty {
-		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
-	}
 }
 
 func TestAuthenticateRequestError(t *testing.T) {
 	failed := make(chan struct{})
-	contextMapper := genericapirequest.NewRequestContextMapper()
 	auth := WithAuthentication(
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			t.Errorf("unexpected call to handler")
 		}),
-		contextMapper,
-		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 			return nil, false, errors.New("failure")
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			close(failed)
 		}),
+		nil,
 	)
 
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 
 	<-failed
-	empty, err := genericapirequest.IsEmpty(contextMapper)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !empty {
-		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
-	}
 }

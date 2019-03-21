@@ -17,9 +17,6 @@ limitations under the License.
 package securitycontext
 
 import (
-	"fmt"
-	"strings"
-
 	"k8s.io/api/core/v1"
 )
 
@@ -47,53 +44,12 @@ func HasCapabilitiesRequest(container *v1.Container) bool {
 	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
 }
 
-const expectedSELinuxFields = 4
-
-// ParseSELinuxOptions parses a string containing a full SELinux context
-// (user, role, type, and level) into an SELinuxOptions object.  If the
-// context is malformed, an error is returned.
-func ParseSELinuxOptions(context string) (*v1.SELinuxOptions, error) {
-	fields := strings.SplitN(context, ":", expectedSELinuxFields)
-
-	if len(fields) != expectedSELinuxFields {
-		return nil, fmt.Errorf("expected %v fields in selinux; got %v (context: %v)", expectedSELinuxFields, len(fields), context)
-	}
-
-	return &v1.SELinuxOptions{
-		User:  fields[0],
-		Role:  fields[1],
-		Type:  fields[2],
-		Level: fields[3],
-	}, nil
-}
-
-// HasNonRootUID returns true if the runAsUser is set and is greater than 0.
-func HasRootUID(container *v1.Container) bool {
-	if container.SecurityContext == nil {
-		return false
-	}
-	if container.SecurityContext.RunAsUser == nil {
-		return false
-	}
-	return *container.SecurityContext.RunAsUser == 0
-}
-
-// HasRunAsUser determines if the sc's runAsUser field is set.
-func HasRunAsUser(container *v1.Container) bool {
-	return container.SecurityContext != nil && container.SecurityContext.RunAsUser != nil
-}
-
-// HasRootRunAsUser returns true if the run as user is set and it is set to 0.
-func HasRootRunAsUser(container *v1.Container) bool {
-	return HasRunAsUser(container) && HasRootUID(container)
-}
-
 func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {
 	effectiveSc := securityContextFromPodSecurityContext(pod)
 	containerSc := container.SecurityContext
 
 	if effectiveSc == nil && containerSc == nil {
-		return nil
+		return &v1.SecurityContext{}
 	}
 	if effectiveSc != nil && containerSc == nil {
 		return effectiveSc
@@ -142,6 +98,11 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 		*effectiveSc.AllowPrivilegeEscalation = *containerSc.AllowPrivilegeEscalation
 	}
 
+	if containerSc.ProcMount != nil {
+		effectiveSc.ProcMount = new(v1.ProcMountType)
+		*effectiveSc.ProcMount = *containerSc.ProcMount
+	}
+
 	return effectiveSc
 }
 
@@ -187,4 +148,53 @@ func AddNoNewPrivileges(sc *v1.SecurityContext) bool {
 
 	// handle the case where defaultAllowPrivilegeEscalation is false or the user explicitly set allowPrivilegeEscalation to true/false
 	return !*sc.AllowPrivilegeEscalation
+}
+
+var (
+	// These *must* be kept in sync with moby/moby.
+	// https://github.com/moby/moby/blob/master/oci/defaults.go#L116-L134
+	// @jessfraz will watch changes to those files upstream.
+	defaultMaskedPaths = []string{
+		"/proc/acpi",
+		"/proc/kcore",
+		"/proc/keys",
+		"/proc/latency_stats",
+		"/proc/timer_list",
+		"/proc/timer_stats",
+		"/proc/sched_debug",
+		"/proc/scsi",
+		"/sys/firmware",
+	}
+	defaultReadonlyPaths = []string{
+		"/proc/asound",
+		"/proc/bus",
+		"/proc/fs",
+		"/proc/irq",
+		"/proc/sys",
+		"/proc/sysrq-trigger",
+	}
+)
+
+// ConvertToRuntimeMaskedPaths converts the ProcMountType to the specified or default
+// masked paths.
+func ConvertToRuntimeMaskedPaths(opt *v1.ProcMountType) []string {
+	if opt != nil && *opt == v1.UnmaskedProcMount {
+		// Unmasked proc mount should have no paths set as masked.
+		return []string{}
+	}
+
+	// Otherwise, add the default masked paths to the runtime security context.
+	return defaultMaskedPaths
+}
+
+// ConvertToRuntimeReadonlyPaths converts the ProcMountType to the specified or default
+// readonly paths.
+func ConvertToRuntimeReadonlyPaths(opt *v1.ProcMountType) []string {
+	if opt != nil && *opt == v1.UnmaskedProcMount {
+		// Unmasked proc mount should have no paths set as readonly.
+		return []string{}
+	}
+
+	// Otherwise, add the default readonly paths to the runtime security context.
+	return defaultReadonlyPaths
 }

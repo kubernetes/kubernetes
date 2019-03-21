@@ -15,9 +15,10 @@
 package adapter
 
 import (
+	"context"
+
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -41,6 +42,14 @@ func (s *mts2mtc) Defragment(ctx context.Context, dr *pb.DefragmentRequest, opts
 
 func (s *mts2mtc) Hash(ctx context.Context, r *pb.HashRequest, opts ...grpc.CallOption) (*pb.HashResponse, error) {
 	return s.mts.Hash(ctx, r)
+}
+
+func (s *mts2mtc) HashKV(ctx context.Context, r *pb.HashKVRequest, opts ...grpc.CallOption) (*pb.HashKVResponse, error) {
+	return s.mts.HashKV(ctx, r)
+}
+
+func (s *mts2mtc) MoveLeader(ctx context.Context, r *pb.MoveLeaderRequest, opts ...grpc.CallOption) (*pb.MoveLeaderResponse, error) {
+	return s.mts.MoveLeader(ctx, r)
 }
 
 func (s *mts2mtc) Snapshot(ctx context.Context, in *pb.SnapshotRequest, opts ...grpc.CallOption) (pb.Maintenance_SnapshotClient, error) {

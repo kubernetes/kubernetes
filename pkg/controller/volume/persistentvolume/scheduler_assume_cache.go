@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -41,6 +41,9 @@ type AssumeCache interface {
 
 	// Get the object by name
 	Get(objName string) (interface{}, error)
+
+	// Get the API object by name
+	GetAPIObj(objName string) (interface{}, error)
 
 	// List all the objects in the cache
 	List(indexObj interface{}) []interface{}
@@ -83,7 +86,8 @@ func (e *errObjectName) Error() string {
 // Restore() sets the latest object pointer back to the informer object.
 // Get/List() always returns the latest object pointer.
 type assumeCache struct {
-	mutex sync.Mutex
+	// Synchronizes updates to store
+	rwMutex sync.RWMutex
 
 	// describes the object stored
 	description string
@@ -151,15 +155,37 @@ func (c *assumeCache) add(obj interface{}) {
 
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
-		glog.Errorf("add failed: %v", &errObjectName{err})
+		klog.Errorf("add failed: %v", &errObjectName{err})
 		return
 	}
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+
+	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
+		newVersion, err := c.getObjVersion(name, obj)
+		if err != nil {
+			klog.Errorf("add: couldn't get object version: %v", err)
+			return
+		}
+
+		storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
+		if err != nil {
+			klog.Errorf("add: couldn't get stored object version: %v", err)
+			return
+		}
+
+		// Only update object if version is newer.
+		// This is so we don't override assumed objects due to informer resync.
+		if newVersion <= storedVersion {
+			klog.V(10).Infof("Skip adding %v %v to assume cache because version %v is not newer than %v", c.description, name, newVersion, storedVersion)
+			return
+		}
+	}
 
 	objInfo := &objInfo{name: name, latestObj: obj, apiObj: obj}
 	c.store.Update(objInfo)
+	klog.V(10).Infof("Adding %v %v to assume cache: %+v ", c.description, name, obj)
 }
 
 func (c *assumeCache) update(oldObj interface{}, newObj interface{}) {
@@ -173,17 +199,17 @@ func (c *assumeCache) delete(obj interface{}) {
 
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
-		glog.Errorf("delete failed: %v", &errObjectName{err})
+		klog.Errorf("delete failed: %v", &errObjectName{err})
 		return
 	}
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	objInfo := &objInfo{name: name}
 	err = c.store.Delete(objInfo)
 	if err != nil {
-		glog.Errorf("delete: failed to delete %v %v: %v", c.description, name, err)
+		klog.Errorf("delete: failed to delete %v %v: %v", c.description, name, err)
 	}
 }
 
@@ -217,8 +243,8 @@ func (c *assumeCache) getObjInfo(name string) (*objInfo, error) {
 }
 
 func (c *assumeCache) Get(objName string) (interface{}, error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 
 	objInfo, err := c.getObjInfo(objName)
 	if err != nil {
@@ -227,21 +253,32 @@ func (c *assumeCache) Get(objName string) (interface{}, error) {
 	return objInfo.latestObj, nil
 }
 
+func (c *assumeCache) GetAPIObj(objName string) (interface{}, error) {
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
+
+	objInfo, err := c.getObjInfo(objName)
+	if err != nil {
+		return nil, err
+	}
+	return objInfo.apiObj, nil
+}
+
 func (c *assumeCache) List(indexObj interface{}) []interface{} {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 
 	allObjs := []interface{}{}
 	objs, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
 	if err != nil {
-		glog.Errorf("list index error: %v", err)
+		klog.Errorf("list index error: %v", err)
 		return nil
 	}
 
 	for _, obj := range objs {
 		objInfo, ok := obj.(*objInfo)
 		if !ok {
-			glog.Errorf("list error: %v", &errWrongType{"objInfo", obj})
+			klog.Errorf("list error: %v", &errWrongType{"objInfo", obj})
 			continue
 		}
 		allObjs = append(allObjs, objInfo.latestObj)
@@ -255,8 +292,8 @@ func (c *assumeCache) Assume(obj interface{}) error {
 		return &errObjectName{err}
 	}
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	objInfo, err := c.getObjInfo(name)
 	if err != nil {
@@ -274,26 +311,26 @@ func (c *assumeCache) Assume(obj interface{}) error {
 	}
 
 	if newVersion < storedVersion {
-		return fmt.Errorf("%v %q is out of sync", c.description, name)
+		return fmt.Errorf("%v %q is out of sync (stored: %d, assume: %d)", c.description, name, storedVersion, newVersion)
 	}
 
 	// Only update the cached object
 	objInfo.latestObj = obj
-	glog.V(4).Infof("Assumed %v %q, version %v", c.description, name, newVersion)
+	klog.V(4).Infof("Assumed %v %q, version %v", c.description, name, newVersion)
 	return nil
 }
 
 func (c *assumeCache) Restore(objName string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	objInfo, err := c.getObjInfo(objName)
 	if err != nil {
 		// This could be expected if object got deleted
-		glog.V(5).Infof("Restore %v %q warning: %v", c.description, objName, err)
+		klog.V(5).Infof("Restore %v %q warning: %v", c.description, objName, err)
 	} else {
 		objInfo.latestObj = objInfo.apiObj
-		glog.V(4).Infof("Restored %v %q", c.description, objName)
+		klog.V(4).Infof("Restored %v %q", c.description, objName)
 	}
 }
 
@@ -302,6 +339,7 @@ type PVAssumeCache interface {
 	AssumeCache
 
 	GetPV(pvName string) (*v1.PersistentVolume, error)
+	GetAPIPV(pvName string) (*v1.PersistentVolume, error)
 	ListPVs(storageClassName string) []*v1.PersistentVolume
 }
 
@@ -333,6 +371,18 @@ func (c *pvAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
+func (c *pvAssumeCache) GetAPIPV(pvName string) (*v1.PersistentVolume, error) {
+	obj, err := c.GetAPIObj(pvName)
+	if err != nil {
+		return nil, err
+	}
+	pv, ok := obj.(*v1.PersistentVolume)
+	if !ok {
+		return nil, &errWrongType{"v1.PersistentVolume", obj}
+	}
+	return pv, nil
+}
+
 func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume {
 	objs := c.List(&v1.PersistentVolume{
 		Spec: v1.PersistentVolumeSpec{
@@ -343,9 +393,52 @@ func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume 
 	for _, obj := range objs {
 		pv, ok := obj.(*v1.PersistentVolume)
 		if !ok {
-			glog.Errorf("ListPVs: %v", &errWrongType{"v1.PersistentVolume", obj})
+			klog.Errorf("ListPVs: %v", &errWrongType{"v1.PersistentVolume", obj})
 		}
 		pvs = append(pvs, pv)
 	}
 	return pvs
+}
+
+// PVCAssumeCache is a AssumeCache for PersistentVolumeClaim objects
+type PVCAssumeCache interface {
+	AssumeCache
+
+	// GetPVC returns the PVC from the cache with given pvcKey.
+	// pvcKey is the result of MetaNamespaceKeyFunc on PVC obj
+	GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
+	GetAPIPVC(pvcKey string) (*v1.PersistentVolumeClaim, error)
+}
+
+type pvcAssumeCache struct {
+	*assumeCache
+}
+
+func NewPVCAssumeCache(informer cache.SharedIndexInformer) PVCAssumeCache {
+	return &pvcAssumeCache{assumeCache: NewAssumeCache(informer, "v1.PersistentVolumeClaim", "namespace", cache.MetaNamespaceIndexFunc)}
+}
+
+func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
+	obj, err := c.Get(pvcKey)
+	if err != nil {
+		return nil, err
+	}
+
+	pvc, ok := obj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		return nil, &errWrongType{"v1.PersistentVolumeClaim", obj}
+	}
+	return pvc, nil
+}
+
+func (c *pvcAssumeCache) GetAPIPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
+	obj, err := c.GetAPIObj(pvcKey)
+	if err != nil {
+		return nil, err
+	}
+	pvc, ok := obj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		return nil, &errWrongType{"v1.PersistentVolumeClaim", obj}
+	}
+	return pvc, nil
 }

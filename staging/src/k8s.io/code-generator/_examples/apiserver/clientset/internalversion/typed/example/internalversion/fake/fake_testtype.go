@@ -62,7 +62,7 @@ func (c *FakeTestTypes) List(opts v1.ListOptions) (result *example.TestTypeList,
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &example.TestTypeList{}
+	list := &example.TestTypeList{ListMeta: obj.(*example.TestTypeList).ListMeta}
 	for _, item := range obj.(*example.TestTypeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -131,7 +131,7 @@ func (c *FakeTestTypes) DeleteCollection(options *v1.DeleteOptions, listOptions 
 // Patch applies the patch and returns the patched testType.
 func (c *FakeTestTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *example.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, data, subresources...), &example.TestType{})
+		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, pt, data, subresources...), &example.TestType{})
 
 	if obj == nil {
 		return nil, err

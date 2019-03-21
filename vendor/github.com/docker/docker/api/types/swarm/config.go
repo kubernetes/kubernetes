@@ -13,6 +13,10 @@ type Config struct {
 type ConfigSpec struct {
 	Annotations
 	Data []byte `json:",omitempty"`
+
+	// Templating controls whether and how to evaluate the config payload as
+	// a template. If it is not set, no templating is used.
+	Templating *Driver `json:",omitempty"`
 }
 
 // ConfigReferenceFileTarget is a file target in a config reference

@@ -199,21 +199,13 @@ func (in *SelfSubjectAccessReviewSpec) DeepCopyInto(out *SelfSubjectAccessReview
 	*out = *in
 	if in.ResourceAttributes != nil {
 		in, out := &in.ResourceAttributes, &out.ResourceAttributes
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ResourceAttributes)
-			**out = **in
-		}
+		*out = new(ResourceAttributes)
+		**out = **in
 	}
 	if in.NonResourceAttributes != nil {
 		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NonResourceAttributes)
-			**out = **in
-		}
+		*out = new(NonResourceAttributes)
+		**out = **in
 	}
 	return
 }
@@ -305,21 +297,13 @@ func (in *SubjectAccessReviewSpec) DeepCopyInto(out *SubjectAccessReviewSpec) {
 	*out = *in
 	if in.ResourceAttributes != nil {
 		in, out := &in.ResourceAttributes, &out.ResourceAttributes
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ResourceAttributes)
-			**out = **in
-		}
+		*out = new(ResourceAttributes)
+		**out = **in
 	}
 	if in.NonResourceAttributes != nil {
 		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(NonResourceAttributes)
-			**out = **in
-		}
+		*out = new(NonResourceAttributes)
+		**out = **in
 	}
 	if in.Groups != nil {
 		in, out := &in.Groups, &out.Groups
@@ -330,12 +314,15 @@ func (in *SubjectAccessReviewSpec) DeepCopyInto(out *SubjectAccessReviewSpec) {
 		in, out := &in.Extra, &out.Extra
 		*out = make(map[string]ExtraValue, len(*in))
 		for key, val := range *in {
+			var outVal []string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = make([]string, len(val))
-				copy((*out)[key], val)
+				in, out := &val, &outVal
+				*out = make(ExtraValue, len(*in))
+				copy(*out, *in)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	return

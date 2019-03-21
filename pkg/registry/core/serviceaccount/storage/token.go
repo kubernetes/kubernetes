@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	authenticationapiv1 "k8s.io/api/authentication/v1"
@@ -25,9 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	authenticationvalidation "k8s.io/kubernetes/pkg/apis/authentication/validation"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	token "k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -37,21 +40,35 @@ func (r *TokenREST) New() runtime.Object {
 }
 
 type TokenREST struct {
-	svcaccts getter
-	pods     getter
-	secrets  getter
-	issuer   token.TokenGenerator
-	auds     []string
+	svcaccts             getter
+	pods                 getter
+	secrets              getter
+	issuer               token.TokenGenerator
+	auds                 authenticator.Audiences
+	maxExpirationSeconds int64
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
+var _ = rest.GroupVersionKindProvider(&TokenREST{})
 
-func (r *TokenREST) Create(ctx genericapirequest.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
-	if err := createValidation(obj); err != nil {
-		return nil, err
+var gvk = schema.GroupVersionKind{
+	Group:   authenticationapiv1.SchemeGroupVersion.Group,
+	Version: authenticationapiv1.SchemeGroupVersion.Version,
+	Kind:    "TokenRequest",
+}
+
+func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
 	}
 
 	out := obj.(*authenticationapi.TokenRequest)
+
+	if errs := authenticationvalidation.ValidateTokenRequest(out); len(errs) != 0 {
+		return nil, errors.NewInvalid(gvk.GroupKind(), "", errs)
+	}
 
 	svcacctObj, err := r.svcaccts.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
@@ -70,17 +87,19 @@ func (r *TokenREST) Create(ctx genericapirequest.Context, name string, obj runti
 		gvk := schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind)
 		switch {
 		case gvk.Group == "" && gvk.Kind == "Pod":
-			podObj, err := r.pods.Get(ctx, ref.Name, &metav1.GetOptions{})
+			newCtx := newContext(ctx, "pods", ref.Name, gvk)
+			podObj, err := r.pods.Get(newCtx, ref.Name, &metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
 			pod = podObj.(*api.Pod)
 			if name != pod.Spec.ServiceAccountName {
-				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with serviceaccount %q", name, pod.Spec.ServiceAccountName))
+				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with different serviceaccount name.", name))
 			}
 			uid = pod.UID
 		case gvk.Group == "" && gvk.Kind == "Secret":
-			secretObj, err := r.secrets.Get(ctx, ref.Name, &metav1.GetOptions{})
+			newCtx := newContext(ctx, "secrets", ref.Name, gvk)
+			secretObj, err := r.secrets.Get(newCtx, ref.Name, &metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -90,12 +109,18 @@ func (r *TokenREST) Create(ctx genericapirequest.Context, name string, obj runti
 			return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token to object of type %s", gvk.String()))
 		}
 		if ref.UID != "" && uid != ref.UID {
-			return nil, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, ref.Name, fmt.Errorf("the UID in the bound object reference (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", ref.UID, uid))
+			return nil, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, ref.Name, fmt.Errorf("the UID in the bound object reference (%s) does not match the UID in record. The object might have been deleted and then recreated", ref.UID))
 		}
 	}
 	if len(out.Spec.Audiences) == 0 {
 		out.Spec.Audiences = r.auds
 	}
+
+	if r.maxExpirationSeconds > 0 && out.Spec.ExpirationSeconds > r.maxExpirationSeconds {
+		//only positive value is valid
+		out.Spec.ExpirationSeconds = r.maxExpirationSeconds
+	}
+
 	sc, pc := token.Claims(*svcacct, pod, secret, out.Spec.ExpirationSeconds, out.Spec.Audiences)
 	tokdata, err := r.issuer.GenerateToken(sc, pc)
 	if err != nil {
@@ -109,14 +134,29 @@ func (r *TokenREST) Create(ctx genericapirequest.Context, name string, obj runti
 	return out, nil
 }
 
-func (r *TokenREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
-	return schema.GroupVersionKind{
-		Group:   authenticationapiv1.SchemeGroupVersion.Group,
-		Version: authenticationapiv1.SchemeGroupVersion.Version,
-		Kind:    "TokenRequest",
-	}
+func (r *TokenREST) GroupVersionKind(schema.GroupVersion) schema.GroupVersionKind {
+	return gvk
 }
 
 type getter interface {
-	Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
+	Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
+}
+
+// newContext return a copy of ctx in which new RequestInfo is set
+func newContext(ctx context.Context, resource, name string, gvk schema.GroupVersionKind) context.Context {
+	oldInfo, found := genericapirequest.RequestInfoFrom(ctx)
+	if !found {
+		return ctx
+	}
+	newInfo := genericapirequest.RequestInfo{
+		IsResourceRequest: true,
+		Verb:              "get",
+		Namespace:         oldInfo.Namespace,
+		Resource:          resource,
+		Name:              name,
+		Parts:             []string{resource, name},
+		APIGroup:          gvk.Group,
+		APIVersion:        gvk.Version,
+	}
+	return genericapirequest.WithRequestInfo(ctx, &newInfo)
 }

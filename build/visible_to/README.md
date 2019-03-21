@@ -115,7 +115,7 @@ visibility = ["//visible_to:client_foo,//visible_to:server_foo"],
 ```
 bazel build --check_visibility --nobuild \
     //cmd/... //pkg/... //plugin/... \
-    //third_party/... //examples/... //test/... //vendor/k8s.io/...
+    //third_party/... //test/... //vendor/k8s.io/...
 ```
 
 #### Who depends on target _q_?
@@ -157,7 +157,7 @@ q=//cmd/kubectl:kubectl
 bazel query "buildfiles(deps($q))" | \
     grep -v @bazel_tools | \
     grep -v @io_bazel_rules | \
-    grep -v @io_kubernetes_build | \
+    grep -v @io_k8s_repo_infra | \
     grep -v @local_config | \
     grep -v @local_jdk | \
     grep -v //visible_to: | \

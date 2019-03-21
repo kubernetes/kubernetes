@@ -19,108 +19,26 @@ package tls
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
-	"net"
 	"net/http"
-	"os"
-	"sync/atomic"
+	"strings"
 	"testing"
-	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
-	genericapiserver "k8s.io/apiserver/pkg/server"
-	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
-	client "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func runBasicSecureAPIServer(t *testing.T, ciphers []string) (uint32, error) {
-	certDir, _ := ioutil.TempDir("", "test-integration-tls")
-	defer os.RemoveAll(certDir)
-	_, defaultServiceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	kubeClientConfigValue := atomic.Value{}
-	var kubePort uint32
-
-	go func() {
-		listener, port, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		atomic.StoreUint32(&kubePort, uint32(port))
-
-		kubeAPIServerOptions := options.NewServerRunOptions()
-		kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
-		kubeAPIServerOptions.SecureServing.BindPort = port
-		kubeAPIServerOptions.SecureServing.Listener = listener
-		kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
-		kubeAPIServerOptions.SecureServing.CipherSuites = ciphers
-		kubeAPIServerOptions.InsecureServing.BindPort = 0
-		kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
-		kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
-
-		tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)
-		if err != nil {
-			t.Fatal(err)
-		}
-		kubeAPIServerConfig, sharedInformers, versionedInformers, _, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions, tunneler, proxyTransport)
-		if err != nil {
-			t.Fatal(err)
-		}
-		kubeAPIServerConfig.ExtraConfig.EnableCoreControllers = false
-		kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
-
-		kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, versionedInformers)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(wait.NeverStop); err != nil {
-			t.Log(err)
-		}
-		time.Sleep(100 * time.Millisecond)
-	}()
-
-	// Ensure server is ready
-	err := wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-		obj := kubeClientConfigValue.Load()
-		if obj == nil {
-			return false, nil
-		}
-		kubeClientConfig := kubeClientConfigValue.Load().(*rest.Config)
-		kubeClientConfig.ContentType = ""
-		kubeClientConfig.AcceptContentTypes = ""
-		kubeClient, err := client.NewForConfig(kubeClientConfig)
-		if err != nil {
-			// this happens because we race the API server start
-			t.Log(err)
-			return false, nil
-		}
-		if _, err := kubeClient.Discovery().ServerVersion(); err != nil {
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return 0, err
-	}
-
-	securePort := atomic.LoadUint32(&kubePort)
-	return securePort, nil
+func runBasicSecureAPIServer(t *testing.T, ciphers []string) (kubeapiservertesting.TearDownFunc, int) {
+	flags := []string{"--tls-cipher-suites", strings.Join(ciphers, ",")}
+	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
+	return testServer.TearDownFn, testServer.ServerOpts.SecureServing.BindPort
 }
 
 func TestAPICiphers(t *testing.T) {
 
 	basicServerCiphers := []string{"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305", "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305", "TLS_RSA_WITH_AES_128_CBC_SHA", "TLS_RSA_WITH_AES_256_CBC_SHA", "TLS_RSA_WITH_AES_128_GCM_SHA256", "TLS_RSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA", "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA", "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"}
 
-	kubePort, err := runBasicSecureAPIServer(t, basicServerCiphers)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	tearDown, port := runBasicSecureAPIServer(t, basicServerCiphers)
+	defer tearDown()
 	tests := []struct {
 		clientCiphers []uint16
 		expectedError bool
@@ -138,11 +56,11 @@ func TestAPICiphers(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		runTestAPICiphers(t, i, kubePort, test.clientCiphers, test.expectedError)
+		runTestAPICiphers(t, i, port, test.clientCiphers, test.expectedError)
 	}
 }
 
-func runTestAPICiphers(t *testing.T, testID int, kubePort uint32, clientCiphers []uint16, expectedError bool) {
+func runTestAPICiphers(t *testing.T, testID int, kubePort int, clientCiphers []uint16, expectedError bool) {
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
@@ -156,14 +74,13 @@ func runTestAPICiphers(t *testing.T, testID int, kubePort uint32, clientCiphers 
 		t.Fatal(err)
 	}
 	resp, err := client.Do(req)
+	if err == nil {
+		defer resp.Body.Close()
+	}
 
 	if expectedError == true && err == nil {
 		t.Fatalf("%d: expecting error for cipher test, client cipher is supported and it should't", testID)
 	} else if err != nil && expectedError == false {
 		t.Fatalf("%d: not expecting error by client with cipher failed: %+v", testID, err)
-	}
-
-	if err == nil {
-		defer resp.Body.Close()
 	}
 }

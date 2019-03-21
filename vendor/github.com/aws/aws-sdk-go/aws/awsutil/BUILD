@@ -9,6 +9,7 @@ go_library(
         "prettify.go",
         "string_value.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/aws/awsutil",
     importpath = "github.com/aws/aws-sdk-go/aws/awsutil",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/jmespath/go-jmespath:go_default_library"],

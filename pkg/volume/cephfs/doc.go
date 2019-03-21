@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package nfs contains the internal representation of Ceph file system
+// Package cephfs contains the internal representation of Ceph file system
 // (CephFS) volumes.
 package cephfs // import "k8s.io/kubernetes/pkg/volume/cephfs"

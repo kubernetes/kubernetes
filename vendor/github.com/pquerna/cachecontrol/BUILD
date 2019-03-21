@@ -6,6 +6,7 @@ go_library(
         "api.go",
         "doc.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/pquerna/cachecontrol",
     importpath = "github.com/pquerna/cachecontrol",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/pquerna/cachecontrol/cacheobject:go_default_library"],

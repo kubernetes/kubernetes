@@ -20,11 +20,10 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // ResourceLimitsPriorityMap is a priority function that increases score of input node by 1 if the node satisfies
@@ -34,7 +33,7 @@ import (
 // of the pod are satisfied, the node is assigned a score of 1.
 // Rationale of choosing the lowest score of 1 is that this is mainly selected to break ties between nodes that have
 // same scores assigned by one of least and most requested priority functions.
-func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
@@ -53,10 +52,10 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 		score = 1
 	}
 
-	if glog.V(10) {
-		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+	if klog.V(10) {
+		// We explicitly don't do klog.V(10).Infof() to avoid computing all the parameters if this is
 		// not logged. There is visible performance gain from it.
-		glog.Infof(
+		klog.Infof(
 			"%v -> %v: Resource Limits Priority, allocatable %d millicores %d memory bytes, pod limits %d millicores %d memory bytes, score %d",
 			pod.Name, node.Name,
 			allocatableResources.MilliCPU, allocatableResources.Memory,
@@ -71,7 +70,7 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 	}, nil
 }
 
-// computeScore return 1 if limit value is less than or equal to allocable
+// computeScore returns 1 if limit value is less than or equal to allocatable
 // value, otherwise it returns 0.
 func computeScore(limit, allocatable int64) int64 {
 	if limit != 0 && allocatable != 0 && limit <= allocatable {
@@ -83,45 +82,17 @@ func computeScore(limit, allocatable int64) int64 {
 // getResourceLimits computes resource limits for input pod.
 // The reason to create this new function is to be consistent with other
 // priority functions because most or perhaps all priority functions work
-// with schedulercache.Resource.
+// with schedulernodeinfo.Resource.
 // TODO: cache it as part of metadata passed to priority functions.
-func getResourceLimits(pod *v1.Pod) *schedulercache.Resource {
-	result := &schedulercache.Resource{}
+func getResourceLimits(pod *v1.Pod) *schedulernodeinfo.Resource {
+	result := &schedulernodeinfo.Resource{}
 	for _, container := range pod.Spec.Containers {
 		result.Add(container.Resources.Limits)
 	}
 
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
-		for rName, rQuantity := range container.Resources.Limits {
-			switch rName {
-			case v1.ResourceMemory:
-				if mem := rQuantity.Value(); mem > result.Memory {
-					result.Memory = mem
-				}
-			case v1.ResourceCPU:
-				if cpu := rQuantity.MilliValue(); cpu > result.MilliCPU {
-					result.MilliCPU = cpu
-				}
-				// keeping these resources though score computation in other priority functions and in this
-				// are only computed based on cpu and memory only.
-			case v1.ResourceEphemeralStorage:
-				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > result.EphemeralStorage {
-					result.EphemeralStorage = ephemeralStorage
-				}
-			case v1.ResourceNvidiaGPU:
-				if gpu := rQuantity.Value(); gpu > result.NvidiaGPU {
-					result.NvidiaGPU = gpu
-				}
-			default:
-				if v1helper.IsScalarResourceName(rName) {
-					value := rQuantity.Value()
-					if value > result.ScalarResources[rName] {
-						result.SetScalar(rName, value)
-					}
-				}
-			}
-		}
+		result.SetMaxResource(container.Resources.Limits)
 	}
 
 	return result

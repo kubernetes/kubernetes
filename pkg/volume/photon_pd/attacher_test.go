@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {
@@ -254,7 +254,7 @@ func (testcase *testcase) AttachDisk(ctx context.Context, diskName string, nodeN
 		return errors.New("Unexpected AttachDisk call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("AttachDisk call: %s, %s, returning %v", diskName, nodeName, expected.ret)
+	klog.V(4).Infof("AttachDisk call: %s, %s, returning %v", diskName, nodeName, expected.ret)
 
 	return expected.ret
 }
@@ -279,7 +279,7 @@ func (testcase *testcase) DetachDisk(ctx context.Context, diskName string, nodeN
 		return errors.New("Unexpected DetachDisk call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("DetachDisk call: %s, %s, returning %v", diskName, nodeName, expected.ret)
+	klog.V(4).Infof("DetachDisk call: %s, %s, returning %v", diskName, nodeName, expected.ret)
 
 	return expected.ret
 }
@@ -304,7 +304,7 @@ func (testcase *testcase) DiskIsAttached(ctx context.Context, diskName string, n
 		return false, errors.New("Unexpected DiskIsAttached call: wrong nodeName")
 	}
 
-	glog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)
+	klog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)
 
 	return expected.isAttached, expected.ret
 }

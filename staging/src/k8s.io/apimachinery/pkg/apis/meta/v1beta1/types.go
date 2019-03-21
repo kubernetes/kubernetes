@@ -66,8 +66,8 @@ type TableColumnDefinition struct {
 // TableRow is an individual row in a table.
 // +protobuf=false
 type TableRow struct {
-	// cells will be as wide as headers and may contain strings, numbers, booleans, simple maps, or lists, or
-	// null. See the type field of the column definition for a more detailed description.
+	// cells will be as wide as headers and may contain strings, numbers (float64 or int64), booleans, simple
+	// maps, or lists, or null. See the type field of the column definition for a more detailed description.
 	Cells []interface{} `json:"cells"`
 	// conditions describe additional status of a row that are relevant for a human user.
 	// +optional
@@ -133,6 +133,10 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TableOptions struct {
 	v1.TypeMeta `json:",inline"`
+
+	// NoHeaders is only exposed for internal callers.
+	NoHeaders bool `json:"-"`
+
 	// includeObject decides whether to include each object along with its columnar information.
 	// Specifying "None" will return no object, specifying "Object" will return the full object contents, and
 	// specifying "Metadata" (the default) will return the object's metadata in the PartialObjectMetadata kind

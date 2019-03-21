@@ -21,10 +21,10 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
@@ -32,22 +32,22 @@ import (
 // cases this helper will run that cannot be prevented from the scaling detection,
 // for example a resync of the deployment after it was scaled up. In those cases,
 // we shouldn't try to estimate any progress.
-func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet, d *extensions.Deployment) error {
+func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
 	newStatus := calculateStatus(allRSs, newRS, d)
 
 	// If there is no progressDeadlineSeconds set, remove any Progressing condition.
-	if d.Spec.ProgressDeadlineSeconds == nil {
-		util.RemoveDeploymentCondition(&newStatus, extensions.DeploymentProgressing)
+	if !util.HasProgressDeadline(d) {
+		util.RemoveDeploymentCondition(&newStatus, apps.DeploymentProgressing)
 	}
 
 	// If there is only one replica set that is active then that means we are not running
 	// a new rollout and this is a resync where we don't need to estimate any progress.
 	// In such a case, we should simply not estimate any progress for this deployment.
-	currentCond := util.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
+	currentCond := util.GetDeploymentCondition(d.Status, apps.DeploymentProgressing)
 	isCompleteDeployment := newStatus.Replicas == newStatus.UpdatedReplicas && currentCond != nil && currentCond.Reason == util.NewRSAvailableReason
 	// Check for progress only if there is a progress deadline set and the latest rollout
 	// hasn't completed yet.
-	if d.Spec.ProgressDeadlineSeconds != nil && !isCompleteDeployment {
+	if util.HasProgressDeadline(d) && !isCompleteDeployment {
 		switch {
 		case util.DeploymentComplete(d, &newStatus):
 			// Update the deployment conditions with a message for the new replica set that
@@ -56,7 +56,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 			if newRS != nil {
 				msg = fmt.Sprintf("ReplicaSet %q has successfully progressed.", newRS.Name)
 			}
-			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, util.NewRSAvailableReason, msg)
+			condition := util.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, util.NewRSAvailableReason, msg)
 			util.SetDeploymentCondition(&newStatus, *condition)
 
 		case util.DeploymentProgressing(d, &newStatus):
@@ -66,7 +66,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 			if newRS != nil {
 				msg = fmt.Sprintf("ReplicaSet %q is progressing.", newRS.Name)
 			}
-			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionTrue, util.ReplicaSetUpdatedReason, msg)
+			condition := util.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionTrue, util.ReplicaSetUpdatedReason, msg)
 			// Update the current Progressing condition or add a new one if it doesn't exist.
 			// If a Progressing condition with status=true already exists, we should update
 			// everything but lastTransitionTime. SetDeploymentCondition already does that but
@@ -78,7 +78,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 				if currentCond.Status == v1.ConditionTrue {
 					condition.LastTransitionTime = currentCond.LastTransitionTime
 				}
-				util.RemoveDeploymentCondition(&newStatus, extensions.DeploymentProgressing)
+				util.RemoveDeploymentCondition(&newStatus, apps.DeploymentProgressing)
 			}
 			util.SetDeploymentCondition(&newStatus, *condition)
 
@@ -89,7 +89,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 			if newRS != nil {
 				msg = fmt.Sprintf("ReplicaSet %q has timed out progressing.", newRS.Name)
 			}
-			condition := util.NewDeploymentCondition(extensions.DeploymentProgressing, v1.ConditionFalse, util.TimedOutReason, msg)
+			condition := util.NewDeploymentCondition(apps.DeploymentProgressing, v1.ConditionFalse, util.TimedOutReason, msg)
 			util.SetDeploymentCondition(&newStatus, *condition)
 		}
 	}
@@ -100,7 +100,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 		// There will be only one ReplicaFailure condition on the replica set.
 		util.SetDeploymentCondition(&newStatus, replicaFailureCond[0])
 	} else {
-		util.RemoveDeploymentCondition(&newStatus, extensions.DeploymentReplicaFailure)
+		util.RemoveDeploymentCondition(&newStatus, apps.DeploymentReplicaFailure)
 	}
 
 	// Do not update if there is nothing new to add.
@@ -112,17 +112,17 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 
 	newDeployment := d
 	newDeployment.Status = newStatus
-	_, err := dc.client.ExtensionsV1beta1().Deployments(newDeployment.Namespace).UpdateStatus(newDeployment)
+	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(newDeployment)
 	return err
 }
 
 // getReplicaFailures will convert replica failure conditions from replica sets
 // to deployment conditions.
-func (dc *DeploymentController) getReplicaFailures(allRSs []*extensions.ReplicaSet, newRS *extensions.ReplicaSet) []extensions.DeploymentCondition {
-	var conditions []extensions.DeploymentCondition
+func (dc *DeploymentController) getReplicaFailures(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet) []apps.DeploymentCondition {
+	var conditions []apps.DeploymentCondition
 	if newRS != nil {
 		for _, c := range newRS.Status.Conditions {
-			if c.Type != extensions.ReplicaSetReplicaFailure {
+			if c.Type != apps.ReplicaSetReplicaFailure {
 				continue
 			}
 			conditions = append(conditions, util.ReplicaSetToDeploymentCondition(c))
@@ -141,7 +141,7 @@ func (dc *DeploymentController) getReplicaFailures(allRSs []*extensions.ReplicaS
 		}
 
 		for _, c := range rs.Status.Conditions {
-			if c.Type != extensions.ReplicaSetReplicaFailure {
+			if c.Type != apps.ReplicaSetReplicaFailure {
 				continue
 			}
 			conditions = append(conditions, util.ReplicaSetToDeploymentCondition(c))
@@ -156,10 +156,10 @@ var nowFn = func() time.Time { return time.Now() }
 // requeueStuckDeployment checks whether the provided deployment needs to be synced for a progress
 // check. It returns the time after the deployment will be requeued for the progress check, 0 if it
 // will be requeued now, or -1 if it does not need to be requeued.
-func (dc *DeploymentController) requeueStuckDeployment(d *extensions.Deployment, newStatus extensions.DeploymentStatus) time.Duration {
-	currentCond := util.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
+func (dc *DeploymentController) requeueStuckDeployment(d *apps.Deployment, newStatus apps.DeploymentStatus) time.Duration {
+	currentCond := util.GetDeploymentCondition(d.Status, apps.DeploymentProgressing)
 	// Can't estimate progress if there is no deadline in the spec or progressing condition in the current status.
-	if d.Spec.ProgressDeadlineSeconds == nil || currentCond == nil {
+	if !util.HasProgressDeadline(d) || currentCond == nil {
 		return time.Duration(-1)
 	}
 	// No need to estimate progress if the rollout is complete or already timed out.
@@ -186,11 +186,11 @@ func (dc *DeploymentController) requeueStuckDeployment(d *extensions.Deployment,
 	// Make it ratelimited so we stay on the safe side, eventually the Deployment should
 	// transition either to a Complete or to a TimedOut condition.
 	if after < time.Second {
-		glog.V(4).Infof("Queueing up deployment %q for a progress check now", d.Name)
+		klog.V(4).Infof("Queueing up deployment %q for a progress check now", d.Name)
 		dc.enqueueRateLimited(d)
 		return time.Duration(0)
 	}
-	glog.V(4).Infof("Queueing up deployment %q for a progress check after %ds", d.Name, int(after.Seconds()))
+	klog.V(4).Infof("Queueing up deployment %q for a progress check after %ds", d.Name, int(after.Seconds()))
 	// Add a second to avoid milliseconds skew in AddAfter.
 	// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
 	dc.enqueueAfter(d, after+time.Second)

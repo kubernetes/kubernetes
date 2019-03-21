@@ -1,8 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- crassirostris
 - piosz
 - x13n
 reviewers:
-- crassirostris
 - piosz
 - x13n
+labels:
+- sig/gcp

@@ -19,8 +19,16 @@ limitations under the License.
 // Reads the pod configuration from file or a directory of files.
 package config
 
-import "errors"
+import (
+	"fmt"
 
-func (s *sourceFile) watch() error {
-	return errors.New("source file is unsupported in this build")
+	"k8s.io/klog"
+)
+
+func (s *sourceFile) startWatch() {
+	klog.Errorf("Watching source file is unsupported in this build")
+}
+
+func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
+	return fmt.Errorf("consuming watch event is unsupported in this build")
 }

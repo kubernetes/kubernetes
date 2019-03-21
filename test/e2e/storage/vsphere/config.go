@@ -19,10 +19,11 @@ package vsphere
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/gcfg.v1"
 	"io"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"os"
+
+	"gopkg.in/gcfg.v1"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -147,7 +148,7 @@ func populateInstanceMap(cfg *ConfigFile) (map[string]*VSphere, error) {
 			vcConfig.Password = cfg.Global.Password
 		}
 		if vcConfig.Username == "" {
-			msg := fmt.Sprintf("vcConfig.User is empty for vc %s!", vcServer)
+			msg := fmt.Sprintf("vcConfig.Username is empty for vc %s!", vcServer)
 			framework.Logf(msg)
 			return nil, errors.New(msg)
 		}

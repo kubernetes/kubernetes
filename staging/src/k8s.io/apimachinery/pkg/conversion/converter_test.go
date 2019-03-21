@@ -333,7 +333,7 @@ func TestConverter_IgnoredConversionNested(t *testing.T) {
 	}
 }
 
-func TestConverter_GeneratedConversionOverriden(t *testing.T) {
+func TestConverter_GeneratedConversionOverridden(t *testing.T) {
 	type A struct{}
 	type B struct{}
 	c := NewConverter(DefaultNameFunc)
@@ -355,7 +355,7 @@ func TestConverter_GeneratedConversionOverriden(t *testing.T) {
 	}
 }
 
-func TestConverter_WithConversionOverriden(t *testing.T) {
+func TestConverter_WithConversionOverridden(t *testing.T) {
 	type A struct{}
 	type B struct{}
 	c := NewConverter(DefaultNameFunc)
@@ -729,98 +729,6 @@ func TestConverter_flags(t *testing.T) {
 				t.Errorf("(%v, %v): unexpected non-error", i, j)
 				continue
 			}
-		}
-	}
-}
-
-func TestConverter_FieldRename(t *testing.T) {
-	type WeirdMeta struct {
-		Name string
-		Type string
-	}
-	type NameMeta struct {
-		Name string
-	}
-	type TypeMeta struct {
-		Type string
-	}
-	type A struct {
-		WeirdMeta
-	}
-	type B struct {
-		TypeMeta
-		NameMeta
-	}
-
-	c := NewConverter(DefaultNameFunc)
-	err := c.SetStructFieldCopy(WeirdMeta{}, "WeirdMeta", TypeMeta{}, "TypeMeta")
-	if err != nil {
-		t.Fatalf("unexpected error %v", err)
-	}
-	err = c.SetStructFieldCopy(WeirdMeta{}, "WeirdMeta", NameMeta{}, "NameMeta")
-	if err != nil {
-		t.Fatalf("unexpected error %v", err)
-	}
-	err = c.SetStructFieldCopy(TypeMeta{}, "TypeMeta", WeirdMeta{}, "WeirdMeta")
-	if err != nil {
-		t.Fatalf("unexpected error %v", err)
-	}
-	err = c.SetStructFieldCopy(NameMeta{}, "NameMeta", WeirdMeta{}, "WeirdMeta")
-	if err != nil {
-		t.Fatalf("unexpected error %v", err)
-	}
-	c.Debug = testLogger(t)
-
-	aVal := &A{
-		WeirdMeta: WeirdMeta{
-			Name: "Foo",
-			Type: "Bar",
-		},
-	}
-
-	bVal := &B{
-		TypeMeta: TypeMeta{"Bar"},
-		NameMeta: NameMeta{"Foo"},
-	}
-
-	table := map[string]struct {
-		from, to, expect interface{}
-		flags            FieldMatchingFlags
-	}{
-		"to": {
-			aVal,
-			&B{},
-			bVal,
-			AllowDifferentFieldTypeNames | SourceToDest | IgnoreMissingFields,
-		},
-		"from": {
-			bVal,
-			&A{},
-			aVal,
-			AllowDifferentFieldTypeNames | SourceToDest,
-		},
-		"toDestFirst": {
-			aVal,
-			&B{},
-			bVal,
-			AllowDifferentFieldTypeNames,
-		},
-		"fromDestFirst": {
-			bVal,
-			&A{},
-			aVal,
-			AllowDifferentFieldTypeNames | IgnoreMissingFields,
-		},
-	}
-
-	for name, item := range table {
-		err := c.Convert(item.from, item.to, item.flags, nil)
-		if err != nil {
-			t.Errorf("%v: unexpected error: %v", name, err)
-			continue
-		}
-		if e, a := item.expect, item.to; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: unexpected diff: %v", name, diff.ObjectDiff(e, a))
 		}
 	}
 }

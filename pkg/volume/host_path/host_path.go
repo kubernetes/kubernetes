@@ -83,6 +83,10 @@ func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.HostPath != nil)
 }
 
+func (plugin *hostPathPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *hostPathPlugin) RequiresRemount() bool {
 	return false
 }
@@ -132,7 +136,7 @@ func (plugin *hostPathPlugin) NewUnmounter(volName string, podUID types.UID) (vo
 // HostPath recycling only works in single node clusters and is meant for testing purposes only.
 func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
-		return fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
+		return fmt.Errorf("spec.PersistentVolume.Spec.HostPath is nil")
 	}
 
 	pod := plugin.config.RecyclerPodTemplate
@@ -265,7 +269,11 @@ type hostPathProvisioner struct {
 
 // Create for hostPath simply creates a local /tmp/hostpath_pv/%s directory as a new PersistentVolume.
 // This Provisioner is meant for development and testing only and WILL NOT WORK in a multi-node cluster.
-func (r *hostPathProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (r *hostPathProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
+	if util.CheckPersistentVolumeClaimModeBlock(r.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", r.plugin.GetPluginName())
+	}
+
 	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 
 	capacity := r.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -350,7 +358,8 @@ type fileTypeChecker struct {
 }
 
 func (ftc *fileTypeChecker) Exists() bool {
-	return ftc.mounter.ExistsPath(ftc.path)
+	exists, err := ftc.mounter.ExistsPath(ftc.path)
+	return exists && err == nil
 }
 
 func (ftc *fileTypeChecker) IsFile() bool {

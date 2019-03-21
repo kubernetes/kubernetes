@@ -22,7 +22,6 @@ const (
 
 	// different container runtimes
 	DockerContainerRuntime = "docker"
-	RktContainerRuntime    = "rkt"
 	RemoteContainerRuntime = "remote"
 
 	// User visible keys for managing node allocatable enforcement on the node.

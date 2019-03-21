@@ -19,7 +19,6 @@ package framework
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -62,43 +61,80 @@ func checkProfileGatheringPrerequisites() error {
 	return nil
 }
 
-func gatherProfileOfKind(profileBaseName, kind string) error {
+func getPortForComponent(componentName string) (int, error) {
+	switch componentName {
+	case "kube-apiserver":
+		return 8080, nil
+	case "kube-scheduler":
+		return 10251, nil
+	case "kube-controller-manager":
+		return 10252, nil
+	}
+	return -1, fmt.Errorf("Port for component %v unknown", componentName)
+}
+
+// Gathers profiles from a master component through SSH. E.g usages:
+//   - gatherProfile("kube-apiserver", "someTest", "heap")
+//   - gatherProfile("kube-scheduler", "someTest", "profile")
+//   - gatherProfile("kube-controller-manager", "someTest", "profile?seconds=20")
+//
+// We don't export this method but wrappers around it (see below).
+func gatherProfile(componentName, profileBaseName, profileKind string) error {
+	if err := checkProfileGatheringPrerequisites(); err != nil {
+		return fmt.Errorf("Profile gathering pre-requisite failed: %v", err)
+	}
+	profilePort, err := getPortForComponent(componentName)
+	if err != nil {
+		return fmt.Errorf("Profile gathering failed finding component port: %v", err)
+	}
+	if profileBaseName == "" {
+		profileBaseName = time.Now().Format(time.RFC3339)
+	}
+
 	// Get the profile data over SSH.
-	getCommand := fmt.Sprintf("curl -s localhost:8080/debug/pprof/%s", kind)
+	getCommand := fmt.Sprintf("curl -s localhost:%v/debug/pprof/%s", profilePort, profileKind)
 	sshResult, err := SSH(getCommand, GetMasterHost()+":22", TestContext.Provider)
 	if err != nil {
 		return fmt.Errorf("Failed to execute curl command on master through SSH: %v", err)
 	}
-	// Write the data to a temp file.
-	var tmpfile *os.File
-	tmpfile, err = ioutil.TempFile("", "apiserver-profile")
+
+	profilePrefix := componentName
+	switch {
+	case profileKind == "heap":
+		profilePrefix += "_MemoryProfile_"
+	case strings.HasPrefix(profileKind, "profile"):
+		profilePrefix += "_CPUProfile_"
+	default:
+		return fmt.Errorf("Unknown profile kind provided: %s", profileKind)
+	}
+
+	// Write the profile data to a file.
+	rawprofilePath := path.Join(getProfilesDirectoryPath(), profilePrefix+profileBaseName+".pprof")
+	rawprofile, err := os.Create(rawprofilePath)
 	if err != nil {
-		return fmt.Errorf("Failed to create temp file for profile data: %v", err)
+		return fmt.Errorf("Failed to create file for the profile graph: %v", err)
 	}
-	defer os.Remove(tmpfile.Name())
-	if _, err := tmpfile.Write([]byte(sshResult.Stdout)); err != nil {
-		return fmt.Errorf("Failed to write temp file with profile data: %v", err)
+	defer rawprofile.Close()
+
+	if _, err := rawprofile.Write([]byte(sshResult.Stdout)); err != nil {
+		return fmt.Errorf("Failed to write file with profile data: %v", err)
 	}
-	if err := tmpfile.Close(); err != nil {
-		return fmt.Errorf("Failed to close temp file: %v", err)
+	if err := rawprofile.Close(); err != nil {
+		return fmt.Errorf("Failed to close file: %v", err)
 	}
 	// Create a graph from the data and write it to a pdf file.
 	var cmd *exec.Cmd
-	var profilePrefix string
 	switch {
 	// TODO: Support other profile kinds if needed (e.g inuse_space, alloc_objects, mutex, etc)
-	case kind == "heap":
-		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", "--alloc_space", tmpfile.Name())
-		profilePrefix = "ApiserverMemoryProfile_"
-	case strings.HasPrefix(kind, "profile"):
-		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", tmpfile.Name())
-		profilePrefix = "ApiserverCPUProfile_"
+	case profileKind == "heap":
+		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", "--alloc_space", rawprofile.Name())
+	case strings.HasPrefix(profileKind, "profile"):
+		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", rawprofile.Name())
 	default:
-		return fmt.Errorf("Unknown profile kind provided: %s", kind)
+		return fmt.Errorf("Unknown profile kind provided: %s", profileKind)
 	}
 	outfilePath := path.Join(getProfilesDirectoryPath(), profilePrefix+profileBaseName+".pdf")
-	var outfile *os.File
-	outfile, err = os.Create(outfilePath)
+	outfile, err := os.Create(outfilePath)
 	if err != nil {
 		return fmt.Errorf("Failed to create file for the profile graph: %v", err)
 	}
@@ -117,67 +153,53 @@ func gatherProfileOfKind(profileBaseName, kind string) error {
 // finish before the parent goroutine itself finishes, we accept a sync.WaitGroup
 // argument in these functions. Typically you would use the following pattern:
 //
-// func TestFooBar() {
+// func TestFoo() {
 //		var wg sync.WaitGroup
 //		wg.Add(3)
-//		go framework.GatherApiserverCPUProfile(&wg, "doing_foo")
-//		go framework.GatherApiserverMemoryProfile(&wg, "doing_foo")
+//		go framework.GatherCPUProfile("kube-apiserver", "before_foo", &wg)
+//		go framework.GatherMemoryProfile("kube-apiserver", "before_foo", &wg)
 //		<<<< some code doing foo >>>>>>
-//		go framework.GatherApiserverCPUProfile(&wg, "doing_bar")
-//		<<<< some code doing bar >>>>>>
+//		go framework.GatherCPUProfile("kube-scheduler", "after_foo", &wg)
 //		wg.Wait()
 // }
 //
 // If you do not wish to exercise the waiting logic, pass a nil value for the
 // waitgroup argument instead. However, then you would be responsible for ensuring
-// that the function finishes.
+// that the function finishes. There's also a polling-based gatherer utility for
+// CPU profiles available below.
 
-func GatherApiserverCPUProfile(wg *sync.WaitGroup, profileBaseName string) {
-	GatherApiserverCPUProfileForNSeconds(wg, profileBaseName, DefaultCPUProfileSeconds)
+func GatherCPUProfile(componentName string, profileBaseName string, wg *sync.WaitGroup) {
+	GatherCPUProfileForSeconds(componentName, profileBaseName, DefaultCPUProfileSeconds, wg)
 }
 
-func GatherApiserverCPUProfileForNSeconds(wg *sync.WaitGroup, profileBaseName string, n int) {
+func GatherCPUProfileForSeconds(componentName string, profileBaseName string, seconds int, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
-	if err := checkProfileGatheringPrerequisites(); err != nil {
-		Logf("Profile gathering pre-requisite failed: %v", err)
-		return
-	}
-	if profileBaseName == "" {
-		profileBaseName = time.Now().Format(time.RFC3339)
-	}
-	if err := gatherProfileOfKind(profileBaseName, fmt.Sprintf("profile?seconds=%v", n)); err != nil {
-		Logf("Failed to gather apiserver CPU profile: %v", err)
+	if err := gatherProfile(componentName, profileBaseName, fmt.Sprintf("profile?seconds=%v", seconds)); err != nil {
+		Logf("Failed to gather %v CPU profile: %v", componentName, err)
 	}
 }
 
-func GatherApiserverMemoryProfile(wg *sync.WaitGroup, profileBaseName string) {
+func GatherMemoryProfile(componentName string, profileBaseName string, wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
-	if err := checkProfileGatheringPrerequisites(); err != nil {
-		Logf("Profile gathering pre-requisite failed: %v", err)
-		return
-	}
-	if profileBaseName == "" {
-		profileBaseName = time.Now().Format(time.RFC3339)
-	}
-	if err := gatherProfileOfKind(profileBaseName, "heap"); err != nil {
-		Logf("Failed to gather apiserver memory profile: %v", err)
+	if err := gatherProfile(componentName, profileBaseName, "heap"); err != nil {
+		Logf("Failed to gather %v memory profile: %v", componentName, err)
 	}
 }
 
-// StartApiserverCPUProfileGatherer is a polling-based gatherer of the apiserver's
-// CPU profile. It takes the delay b/w consecutive gatherings as an argument and
+// StartCPUProfileGatherer performs polling-based gathering of the component's CPU
+// profile. It takes the interval b/w consecutive gatherings as an argument and
 // starts the gathering goroutine. To stop the gatherer, close the returned channel.
-func StartApiserverCPUProfileGatherer(delay time.Duration) chan struct{} {
+func StartCPUProfileGatherer(componentName string, profileBaseName string, interval time.Duration) chan struct{} {
 	stopCh := make(chan struct{})
 	go func() {
 		for {
 			select {
-			case <-time.After(delay):
-				GatherApiserverCPUProfile(nil, "")
+			case <-time.After(interval):
+				GatherCPUProfile(componentName, profileBaseName+"_"+time.Now().Format(time.RFC3339), nil)
 			case <-stopCh:
 				return
 			}

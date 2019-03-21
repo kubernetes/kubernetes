@@ -21,11 +21,17 @@ package util
 import (
 	"fmt"
 	"net"
+	"net/url"
+	"strings"
+	"syscall"
 	"time"
+
+	"github.com/Microsoft/go-winio"
 )
 
 const (
-	tcpProtocol = "tcp"
+	tcpProtocol   = "tcp"
+	npipeProtocol = "npipe"
 )
 
 func CreateListener(endpoint string) (net.Listener, error) {
@@ -33,11 +39,17 @@ func CreateListener(endpoint string) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	if protocol != tcpProtocol {
-		return nil, fmt.Errorf("only support tcp endpoint")
-	}
 
-	return net.Listen(protocol, addr)
+	switch protocol {
+	case tcpProtocol:
+		return net.Listen(tcpProtocol, addr)
+
+	case npipeProtocol:
+		return winio.ListenPipe(addr, nil)
+
+	default:
+		return nil, fmt.Errorf("only support tcp and npipe endpoint")
+	}
 }
 
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
@@ -45,13 +57,71 @@ func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout tim
 	if err != nil {
 		return "", nil, err
 	}
-	if protocol != tcpProtocol {
-		return "", nil, fmt.Errorf("only support tcp endpoint")
+
+	if protocol == tcpProtocol {
+		return addr, tcpDial, nil
 	}
 
-	return addr, dial, nil
+	if protocol == npipeProtocol {
+		return addr, npipeDial, nil
+	}
+
+	return "", nil, fmt.Errorf("only support tcp and npipe endpoint")
 }
 
-func dial(addr string, timeout time.Duration) (net.Conn, error) {
+func tcpDial(addr string, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout(tcpProtocol, addr, timeout)
+}
+
+func npipeDial(addr string, timeout time.Duration) (net.Conn, error) {
+	return winio.DialPipe(addr, &timeout)
+}
+
+func parseEndpoint(endpoint string) (string, string, error) {
+	// url.Parse doesn't recognize \, so replace with / first.
+	endpoint = strings.Replace(endpoint, "\\", "/", -1)
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", "", err
+	}
+
+	if u.Scheme == "tcp" {
+		return "tcp", u.Host, nil
+	} else if u.Scheme == "npipe" {
+		if strings.HasPrefix(u.Path, "//./pipe") {
+			return "npipe", u.Path, nil
+		}
+
+		// fallback host if not provided.
+		host := u.Host
+		if host == "" {
+			host = "."
+		}
+		return "npipe", fmt.Sprintf("//%s%s", host, u.Path), nil
+	} else if u.Scheme == "" {
+		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
+	} else {
+		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
+	}
+}
+
+// LocalEndpoint returns the full path to a windows named pipe
+func LocalEndpoint(path, file string) string {
+	u := url.URL{
+		Scheme: npipeProtocol,
+		Path:   path,
+	}
+	return u.String() + "//./pipe/" + file
+}
+
+var tickCount = syscall.NewLazyDLL("kernel32.dll").NewProc("GetTickCount64")
+
+// GetBootTime returns the time at which the machine was started, truncated to the nearest second
+func GetBootTime() (time.Time, error) {
+	currentTime := time.Now()
+	output, _, err := tickCount.Call()
+	if errno, ok := err.(syscall.Errno); !ok || errno != 0 {
+		return time.Time{}, err
+	}
+	return currentTime.Add(-time.Duration(output) * time.Millisecond).Truncate(time.Second), nil
 }

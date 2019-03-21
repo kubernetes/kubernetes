@@ -38,11 +38,9 @@ const (
 	maxPerPodContainer = 1
 	maxTotalContainers = -1
 
-	defaultRuntimeRequestTimeoutDuration = 1 * time.Minute
-	defaultImagePullProgressDeadline     = 1 * time.Minute
-	garbageCollectDuration               = 3 * time.Minute
-	setupDuration                        = 10 * time.Minute
-	runtimePollInterval                  = 10 * time.Second
+	garbageCollectDuration = 3 * time.Minute
+	setupDuration          = 10 * time.Minute
+	runtimePollInterval    = 10 * time.Second
 )
 
 type testPodSpec struct {
@@ -71,7 +69,7 @@ type testRun struct {
 
 // GarbageCollect tests that the Kubelet conforms to the Kubelet Garbage Collection Policy, found here:
 // http://kubernetes.io/docs/admin/garbage-collection/
-var _ = framework.KubeDescribe("GarbageCollect [Serial]", func() {
+var _ = framework.KubeDescribe("GarbageCollect [Serial][NodeFeature:GarbageCollect]", func() {
 	f := framework.NewDefaultFramework("garbage-collect-test")
 	containerNamePrefix := "gc-test-container-"
 	podNamePrefix := "gc-test-pod-"

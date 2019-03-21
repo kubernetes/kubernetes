@@ -1,8 +1,14 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - mikedanese
+- janetkuo
+- k82cn
 reviewers:
 - janetkuo
 - lukaszo
 - mikedanese
 - tnozicka
 - k82cn
+labels:
+- sig/apps

@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
@@ -47,14 +48,8 @@ var (
 
 func init() {
 	Scheme = runtime.NewScheme()
-	if err := api.AddToScheme(Scheme); err != nil {
-		// Programmer error, detect immediately
-		panic(err)
-	}
-	if err := v1.AddToScheme(Scheme); err != nil {
-		// Programmer error, detect immediately
-		panic(err)
-	}
+	utilruntime.Must(api.AddToScheme(Scheme))
+	utilruntime.Must(v1.AddToScheme(Scheme))
 	yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, Scheme, Scheme)
 	Codec = versioning.NewDefaultingCodecForScheme(
 		Scheme,

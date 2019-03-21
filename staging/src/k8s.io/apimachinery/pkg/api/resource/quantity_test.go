@@ -24,7 +24,6 @@ import (
 	"unicode"
 
 	fuzz "github.com/google/gofuzz"
-	"github.com/spf13/pflag"
 
 	inf "gopkg.in/inf.v0"
 )
@@ -1056,21 +1055,6 @@ func TestCopy(t *testing.T) {
 	c.Set(6)
 	if q.Value() == 6 {
 		t.Errorf("Copy didn't")
-	}
-}
-
-func TestQFlagSet(t *testing.T) {
-	qf := qFlag{&Quantity{}}
-	qf.Set("1Ki")
-	if e, a := "1Ki", qf.String(); e != a {
-		t.Errorf("Unexpected result %v != %v", e, a)
-	}
-}
-
-func TestQFlagIsPFlag(t *testing.T) {
-	var pfv pflag.Value = qFlag{}
-	if e, a := "quantity", pfv.Type(); e != a {
-		t.Errorf("Unexpected result %v != %v", e, a)
 	}
 }
 

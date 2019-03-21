@@ -39,6 +39,60 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
+const (
+	testVolName    = "vol-1234"
+	testRBDImage   = "volume-a4b47414-a675-47dc-a9cc-c223f13439b0"
+	testRBDPool    = "volumes"
+	testGlobalPath = "plugins/kubernetes.io/rbd/volumeDevices/volumes-image-volume-a4b47414-a675-47dc-a9cc-c223f13439b0"
+)
+
+func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
+	// make our test path for fake GlobalMapPath
+	// /tmp symbolized our pluginDir
+	// /tmp/testGlobalPathXXXXX/plugins/kubernetes.io/rbd/volumeDevices/pdVol1
+	tmpVDir, err := utiltesting.MkTmpdir("rbdBlockTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	//deferred clean up
+	defer os.RemoveAll(tmpVDir)
+
+	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
+
+	//Bad Path
+	badspec, err := getVolumeSpecFromGlobalMapPath("", testVolName)
+	if badspec != nil || err == nil {
+		t.Fatalf("Expected not to get spec from GlobalMapPath but did")
+	}
+
+	// Good Path
+	spec, err := getVolumeSpecFromGlobalMapPath(expectedGlobalPath, testVolName)
+	if spec == nil || err != nil {
+		t.Fatalf("Failed to get spec from GlobalMapPath: %v", err)
+	}
+
+	if spec.PersistentVolume.Name != testVolName {
+		t.Errorf("Invalid spec name for GlobalMapPath spec: %s", spec.PersistentVolume.Name)
+	}
+
+	if spec.PersistentVolume.Spec.RBD.RBDPool != testRBDPool {
+		t.Errorf("Invalid RBDPool from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.RBD.RBDPool)
+	}
+
+	if spec.PersistentVolume.Spec.RBD.RBDImage != testRBDImage {
+		t.Errorf("Invalid RBDImage from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.RBD.RBDImage)
+	}
+
+	block := v1.PersistentVolumeBlock
+	specMode := spec.PersistentVolume.Spec.VolumeMode
+	if &specMode == nil {
+		t.Errorf("Invalid volumeMode from GlobalMapPath spec: %v - %v", &specMode, block)
+	}
+	if *specMode != block {
+		t.Errorf("Invalid volumeMode from GlobalMapPath spec: %v - %v", *specMode, block)
+	}
+}
+
 func TestCanSupport(t *testing.T) {
 	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
 	if err != nil {
@@ -329,6 +383,7 @@ func TestPlugin(t *testing.T) {
 					RBDPool:      "pool1",
 					RBDImage:     "image1",
 					FSType:       "ext4",
+					ReadOnly:     true,
 				},
 			},
 		}),
@@ -358,6 +413,7 @@ func TestPlugin(t *testing.T) {
 						FSType:       "ext4",
 					},
 				},
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
 			},
 		}, false),
 		root: tmpDir,
@@ -590,6 +646,64 @@ func TestConstructVolumeSpec(t *testing.T) {
 		}
 		if err = fakeMounter.Unmount(c.targetPath); err != nil {
 			t.Fatalf("Unmount device path %s failed: %v", c.targetPath, err)
+		}
+	}
+}
+
+func TestGetAccessModes(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/rbd")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	modes := plug.GetAccessModes()
+	for _, v := range modes {
+		if !volumetest.ContainsAccessMode(modes, v) {
+			t.Errorf("Expected AccessModeTypes: %s", v)
+		}
+	}
+}
+
+func TestRequiresRemount(t *testing.T) {
+	tmpDir, _ := utiltesting.MkTmpdir("rbd_test")
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plug, _ := plugMgr.FindPluginByName("kubernetes.io/rbd")
+	has := plug.RequiresRemount()
+	if has {
+		t.Errorf("Exepcted RequiresRemount to be false, got %t", has)
+	}
+}
+
+func TestGetRbdImageSize(t *testing.T) {
+	for i, c := range []struct {
+		Output     string
+		TargetSize int
+	}{
+		{
+			Output:     `{"name":"kubernetes-dynamic-pvc-18e7a4d9-050d-11e9-b905-548998f3478f","size":10737418240,"objects":2560,"order":22,"object_size":4194304,"block_name_prefix":"rbd_data.9f4ff7238e1f29","format":2}`,
+			TargetSize: 10240,
+		},
+		{
+			Output:     `{"name":"kubernetes-dynamic-pvc-070635bf-e33f-11e8-aab7-548998f3478f","size":1073741824,"objects":256,"order":22,"object_size":4194304,"block_name_prefix":"rbd_data.670ac4238e1f29","format":2}`,
+			TargetSize: 1024,
+		},
+	} {
+		size, err := getRbdImageSize([]byte(c.Output))
+		if err != nil {
+			t.Errorf("Case %d: getRbdImageSize failed: %v", i, err)
+			continue
+		}
+		if size != c.TargetSize {
+			t.Errorf("Case %d: unexpected size, wanted %d, got %d", i, c.TargetSize, size)
 		}
 	}
 }

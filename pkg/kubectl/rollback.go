@@ -19,31 +19,22 @@ package kubectl
 import (
 	"bytes"
 	"fmt"
-	"os"
-	"os/signal"
 	"sort"
-	"syscall"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
-	extv1beta1 "k8s.io/api/extensions/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/controller/daemon"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	"k8s.io/kubernetes/pkg/controller/statefulset"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
-	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 )
 
 const (
@@ -104,144 +95,159 @@ type DeploymentRollbacker struct {
 }
 
 func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
-	d, ok := obj.(*extensions.Deployment)
-	if !ok {
-		return "", fmt.Errorf("passed object is not a Deployment: %#v", obj)
+	if toRevision < 0 {
+		return "", revisionNotFoundErr(toRevision)
+	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return "", fmt.Errorf("failed to create accessor for kind %v: %s", obj.GetObjectKind(), err.Error())
+	}
+	name := accessor.GetName()
+	namespace := accessor.GetNamespace()
+
+	// TODO: Fix this after kubectl has been removed from core. It is not possible to convert the runtime.Object
+	// to the external appsv1 Deployment without round-tripping through an internal version of Deployment. We're
+	// currently getting rid of all internal versions of resources. So we specifically request the appsv1 version
+	// here. This follows the same pattern as for DaemonSet and StatefulSet.
+	deployment, err := r.c.AppsV1().Deployments(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve Deployment %s: %v", name, err)
+	}
+
+	rsForRevision, err := deploymentRevision(deployment, r.c, toRevision)
+	if err != nil {
+		return "", err
 	}
 	if dryRun {
-		return simpleDryRun(d, r.c, toRevision)
+		return printTemplate(&rsForRevision.Spec.Template)
 	}
-	if d.Spec.Paused {
-		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume deployment/%s' and try again", d.Name)
+	if deployment.Spec.Paused {
+		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume deployment/%s' and try again", name)
 	}
-	deploymentRollback := &extv1beta1.DeploymentRollback{
-		Name:               d.Name,
-		UpdatedAnnotations: updatedAnnotations,
-		RollbackTo: extv1beta1.RollbackConfig{
-			Revision: toRevision,
+
+	// Skip if the revision already matches current Deployment
+	if equalIgnoreHash(&rsForRevision.Spec.Template, &deployment.Spec.Template) {
+		return fmt.Sprintf("%s (current template already matches revision %d)", rollbackSkipped, toRevision), nil
+	}
+
+	// remove hash label before patching back into the deployment
+	delete(rsForRevision.Spec.Template.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
+
+	// compute deployment annotations
+	annotations := map[string]string{}
+	for k := range annotationsToSkip {
+		if v, ok := deployment.Annotations[k]; ok {
+			annotations[k] = v
+		}
+	}
+	for k, v := range rsForRevision.Annotations {
+		if !annotationsToSkip[k] {
+			annotations[k] = v
+		}
+	}
+
+	// make patch to restore
+	patchType, patch, err := getDeploymentPatch(&rsForRevision.Spec.Template, annotations)
+	if err != nil {
+		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
+	}
+
+	// Restore revision
+	if _, err = r.c.AppsV1().Deployments(namespace).Patch(name, patchType, patch); err != nil {
+		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
+	}
+	return rollbackSuccess, nil
+}
+
+// equalIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
+// We ignore pod-template-hash because:
+// 1. The hash result would be different upon podTemplateSpec API changes
+//    (e.g. the addition of a new field will cause the hash code to change)
+// 2. The deployment template won't have hash labels
+func equalIgnoreHash(template1, template2 *corev1.PodTemplateSpec) bool {
+	t1Copy := template1.DeepCopy()
+	t2Copy := template2.DeepCopy()
+	// Remove hash labels from template.Labels before comparing
+	delete(t1Copy.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
+	delete(t2Copy.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
+	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
+}
+
+// annotationsToSkip lists the annotations that should be preserved from the deployment and not
+// copied from the replicaset when rolling a deployment back
+var annotationsToSkip = map[string]bool{
+	corev1.LastAppliedConfigAnnotation:       true,
+	deploymentutil.RevisionAnnotation:        true,
+	deploymentutil.RevisionHistoryAnnotation: true,
+	deploymentutil.DesiredReplicasAnnotation: true,
+	deploymentutil.MaxReplicasAnnotation:     true,
+	appsv1.DeprecatedRollbackTo:              true,
+}
+
+// getPatch returns a patch that can be applied to restore a Deployment to a
+// previous version. If the returned error is nil the patch is valid.
+func getDeploymentPatch(podTemplate *corev1.PodTemplateSpec, annotations map[string]string) (types.PatchType, []byte, error) {
+	// Create a patch of the Deployment that replaces spec.template
+	patch, err := json.Marshal([]interface{}{
+		map[string]interface{}{
+			"op":    "replace",
+			"path":  "/spec/template",
+			"value": podTemplate,
 		},
-	}
-	result := ""
-
-	// Get current events
-	events, err := r.c.CoreV1().Events(d.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return result, err
-	}
-	// Do the rollback
-	if err := r.c.ExtensionsV1beta1().Deployments(d.Namespace).Rollback(deploymentRollback); err != nil {
-		return result, err
-	}
-	// Watch for the changes of events
-	watch, err := r.c.CoreV1().Events(d.Namespace).Watch(metav1.ListOptions{Watch: true, ResourceVersion: events.ResourceVersion})
-	if err != nil {
-		return result, err
-	}
-	result = watchRollbackEvent(watch)
-	return result, err
+		map[string]interface{}{
+			"op":    "replace",
+			"path":  "/metadata/annotations",
+			"value": annotations,
+		},
+	})
+	return types.JSONPatchType, patch, err
 }
 
-// watchRollbackEvent watches for rollback events and returns rollback result
-func watchRollbackEvent(w watch.Interface) string {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, os.Kill, syscall.SIGTERM)
-	for {
-		select {
-		case event, ok := <-w.ResultChan():
-			if !ok {
-				return ""
-			}
-			obj, ok := event.Object.(*api.Event)
-			if !ok {
-				w.Stop()
-				return ""
-			}
-			isRollback, result := isRollbackEvent(obj)
-			if isRollback {
-				w.Stop()
-				return result
-			}
-		case <-signals:
-			w.Stop()
-		}
-	}
-}
+func deploymentRevision(deployment *appsv1.Deployment, c kubernetes.Interface, toRevision int64) (revision *appsv1.ReplicaSet, err error) {
 
-// isRollbackEvent checks if the input event is about rollback, and returns true and
-// related result string back if it is.
-func isRollbackEvent(e *api.Event) (bool, string) {
-	rollbackEventReasons := []string{deploymentutil.RollbackRevisionNotFound, deploymentutil.RollbackTemplateUnchanged, deploymentutil.RollbackDone}
-	for _, reason := range rollbackEventReasons {
-		if e.Reason == reason {
-			if reason == deploymentutil.RollbackDone {
-				return true, rollbackSuccess
-			}
-			return true, fmt.Sprintf("%s (%s: %s)", rollbackSkipped, e.Reason, e.Message)
-		}
-	}
-	return false, ""
-}
-
-func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toRevision int64) (string, error) {
-	externalDeployment := &extv1beta1.Deployment{}
-	if err := legacyscheme.Scheme.Convert(deployment, externalDeployment, nil); err != nil {
-		return "", fmt.Errorf("failed to convert deployment, %v", err)
-	}
-
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(externalDeployment, c.ExtensionsV1beta1())
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.AppsV1())
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", deployment.Name, err)
+		return nil, fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", deployment.Name, err)
 	}
 	allRSs := allOldRSs
 	if newRS != nil {
 		allRSs = append(allRSs, newRS)
 	}
 
-	revisionToSpec := make(map[int64]*v1.PodTemplateSpec)
+	var (
+		latestReplicaSet   *appsv1.ReplicaSet
+		latestRevision     = int64(-1)
+		previousReplicaSet *appsv1.ReplicaSet
+		previousRevision   = int64(-1)
+	)
 	for _, rs := range allRSs {
-		v, err := deploymentutil.Revision(rs)
-		if err != nil {
-			continue
+		if v, err := deploymentutil.Revision(rs); err == nil {
+			if toRevision == 0 {
+				if latestRevision < v {
+					// newest one we've seen so far
+					previousRevision = latestRevision
+					previousReplicaSet = latestReplicaSet
+					latestRevision = v
+					latestReplicaSet = rs
+				} else if previousRevision < v {
+					// second newest one we've seen so far
+					previousRevision = v
+					previousReplicaSet = rs
+				}
+			} else if toRevision == v {
+				return rs, nil
+			}
 		}
-		revisionToSpec[v] = &rs.Spec.Template
-	}
-
-	if len(revisionToSpec) < 2 {
-		return "", fmt.Errorf("no rollout history found for deployment %q", deployment.Name)
 	}
 
 	if toRevision > 0 {
-		template, ok := revisionToSpec[toRevision]
-		if !ok {
-			return "", revisionNotFoundErr(toRevision)
-		}
-		buf := bytes.NewBuffer([]byte{})
-		internalTemplate := &api.PodTemplateSpec{}
-		if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-		}
-		w := printersinternal.NewPrefixWriter(buf)
-		printersinternal.DescribePodTemplate(internalTemplate, w)
-		return buf.String(), nil
+		return nil, revisionNotFoundErr(toRevision)
 	}
 
-	// Sort the revisionToSpec map by revision
-	revisions := make([]int64, 0, len(revisionToSpec))
-	for r := range revisionToSpec {
-		revisions = append(revisions, r)
+	if previousReplicaSet == nil {
+		return nil, fmt.Errorf("no rollout history found for deployment %q", deployment.Name)
 	}
-	sliceutil.SortInts64(revisions)
-
-	template, _ := revisionToSpec[revisions[len(revisions)-2]]
-	buf := bytes.NewBuffer([]byte{})
-	buf.WriteString("\n")
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-	}
-	w := printersinternal.NewPrefixWriter(buf)
-	printersinternal.DescribePodTemplate(internalTemplate, w)
-	return buf.String(), nil
+	return previousReplicaSet, nil
 }
 
 type DaemonSetRollbacker struct {
@@ -278,7 +284,7 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	}
 
 	// Skip if the revision already matches current DaemonSet
-	done, err := daemon.Match(ds, toHistory)
+	done, err := daemonSetMatch(ds, toHistory)
 	if err != nil {
 		return "", err
 	}
@@ -287,11 +293,47 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	}
 
 	// Restore revision
-	if _, err = r.c.ExtensionsV1beta1().DaemonSets(accessor.GetNamespace()).Patch(accessor.GetName(), types.StrategicMergePatchType, toHistory.Data.Raw); err != nil {
+	if _, err = r.c.AppsV1().DaemonSets(accessor.GetNamespace()).Patch(accessor.GetName(), types.StrategicMergePatchType, toHistory.Data.Raw); err != nil {
 		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
 	}
 
 	return rollbackSuccess, nil
+}
+
+// daemonMatch check if the given DaemonSet's template matches the template stored in the given history.
+func daemonSetMatch(ds *appsv1.DaemonSet, history *appsv1.ControllerRevision) (bool, error) {
+	patch, err := getDaemonSetPatch(ds)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(patch, history.Data.Raw), nil
+}
+
+// getPatch returns a strategic merge patch that can be applied to restore a Daemonset to a
+// previous version. If the returned error is nil the patch is valid. The current state that we save is just the
+// PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
+// recorded patches.
+func getDaemonSetPatch(ds *appsv1.DaemonSet) ([]byte, error) {
+	dsBytes, err := json.Marshal(ds)
+	if err != nil {
+		return nil, err
+	}
+	var raw map[string]interface{}
+	err = json.Unmarshal(dsBytes, &raw)
+	if err != nil {
+		return nil, err
+	}
+	objCopy := make(map[string]interface{})
+	specCopy := make(map[string]interface{})
+
+	// Create a patch of the DaemonSet that replaces spec.template
+	spec := raw["spec"].(map[string]interface{})
+	template := spec["template"].(map[string]interface{})
+	specCopy["template"] = template
+	template["$patch"] = "replace"
+	objCopy["spec"] = specCopy
+	patch, err := json.Marshal(objCopy)
+	return patch, err
 }
 
 type StatefulSetRollbacker struct {
@@ -321,7 +363,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	}
 
 	if dryRun {
-		appliedSS, err := statefulset.ApplyRevision(sts, toHistory)
+		appliedSS, err := applyRevision(sts, toHistory)
 		if err != nil {
 			return "", err
 		}
@@ -329,7 +371,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	}
 
 	// Skip if the revision already matches current StatefulSet
-	done, err := statefulset.Match(sts, toHistory)
+	done, err := statefulsetMatch(sts, toHistory)
 	if err != nil {
 		return "", err
 	}
@@ -343,6 +385,56 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	}
 
 	return rollbackSuccess, nil
+}
+
+var appsCodec = scheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion)
+
+// applyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
+// is nil, the returned StatefulSet is valid.
+func applyRevision(set *appsv1.StatefulSet, revision *appsv1.ControllerRevision) (*appsv1.StatefulSet, error) {
+	clone := set.DeepCopy()
+	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(appsCodec, clone)), revision.Data.Raw, clone)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(patched, clone)
+	if err != nil {
+		return nil, err
+	}
+	return clone, nil
+}
+
+// statefulsetMatch check if the given StatefulSet's template matches the template stored in the given history.
+func statefulsetMatch(ss *appsv1.StatefulSet, history *appsv1.ControllerRevision) (bool, error) {
+	patch, err := getStatefulSetPatch(ss)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(patch, history.Data.Raw), nil
+}
+
+// getStatefulSetPatch returns a strategic merge patch that can be applied to restore a StatefulSet to a
+// previous version. If the returned error is nil the patch is valid. The current state that we save is just the
+// PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
+// recorded patches.
+func getStatefulSetPatch(set *appsv1.StatefulSet) ([]byte, error) {
+	str, err := runtime.Encode(appsCodec, set)
+	if err != nil {
+		return nil, err
+	}
+	var raw map[string]interface{}
+	if err := json.Unmarshal([]byte(str), &raw); err != nil {
+		return nil, err
+	}
+	objCopy := make(map[string]interface{})
+	specCopy := make(map[string]interface{})
+	spec := raw["spec"].(map[string]interface{})
+	template := spec["template"].(map[string]interface{})
+	specCopy["template"] = template
+	template["$patch"] = "replace"
+	objCopy["spec"] = specCopy
+	patch, err := json.Marshal(objCopy)
+	return patch, err
 }
 
 // findHistory returns a controllerrevision of a specific revision from the given controllerrevisions.
@@ -372,15 +464,12 @@ func findHistory(toRevision int64, allHistory []*appsv1.ControllerRevision) *app
 }
 
 // printPodTemplate converts a given pod template into a human-readable string.
-func printPodTemplate(specTemplate *v1.PodTemplateSpec) (string, error) {
-	content := bytes.NewBuffer([]byte{})
-	w := printersinternal.NewPrefixWriter(content)
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(specTemplate, internalTemplate, nil); err != nil {
-		return "", fmt.Errorf("failed to convert podtemplate while printing: %v", err)
+func printPodTemplate(specTemplate *corev1.PodTemplateSpec) (string, error) {
+	podSpec, err := printTemplate(specTemplate)
+	if err != nil {
+		return "", err
 	}
-	printersinternal.DescribePodTemplate(internalTemplate, w)
-	return fmt.Sprintf("will roll back to %s", content.String()), nil
+	return fmt.Sprintf("will roll back to %s", podSpec), nil
 }
 
 func revisionNotFoundErr(r int64) error {

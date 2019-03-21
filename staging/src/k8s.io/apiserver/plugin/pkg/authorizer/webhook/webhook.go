@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	authorization "k8s.io/api/authorization/v1beta1"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -39,7 +39,11 @@ var (
 	groupVersions = []schema.GroupVersion{authorization.SchemeGroupVersion}
 )
 
-const retryBackoff = 500 * time.Millisecond
+const (
+	retryBackoff = 500 * time.Millisecond
+	// The maximum length of requester-controlled attributes to allow caching.
+	maxControlledAttrCacheSize = 10000
+)
 
 // Ensure Webhook implements the authorizer.Authorizer interface.
 var _ authorizer.Authorizer = (*WebhookAuthorizer)(nil)
@@ -189,14 +193,16 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision auth
 		})
 		if err != nil {
 			// An error here indicates bad configuration or an outage. Log for debugging.
-			glog.Errorf("Failed to make webhook authorizer request: %v", err)
+			klog.Errorf("Failed to make webhook authorizer request: %v", err)
 			return w.decisionOnError, "", err
 		}
 		r.Status = result.Status
-		if r.Status.Allowed {
-			w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
-		} else {
-			w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
+		if shouldCache(attr) {
+			if r.Status.Allowed {
+				w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
+			} else {
+				w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
+			}
 		}
 	}
 	switch {
@@ -234,24 +240,19 @@ func convertToSARExtra(extra map[string][]string) map[string]authorization.Extra
 	return ret
 }
 
-// NOTE: client-go doesn't provide a registry. client-go does registers the
-// authorization/v1beta1. We construct a registry that acknowledges
-// authorization/v1beta1 as an enabled version to pass a check enforced in
-// NewGenericWebhook.
-var registry = registered.NewOrDie("")
-
-func init() {
-	registry.RegisterVersions(groupVersions)
-	if err := registry.EnableVersions(groupVersions...); err != nil {
-		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
-	}
-}
-
 // subjectAccessReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a SubjectAccessReviewInterface that uses that client. Note that the client submits SubjectAccessReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string) (authorizationclient.SubjectAccessReviewInterface, error) {
-	gw, err := webhook.NewGenericWebhook(registry, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+	localScheme := runtime.NewScheme()
+	if err := scheme.AddToScheme(localScheme); err != nil {
+		return nil, err
+	}
+	if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
+		return nil, err
+	}
+
+	gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -266,4 +267,18 @@ func (t *subjectAccessReviewClient) Create(subjectAccessReview *authorization.Su
 	result := &authorization.SubjectAccessReview{}
 	err := t.w.RestClient.Post().Body(subjectAccessReview).Do().Into(result)
 	return result, err
+}
+
+// shouldCache determines whether it is safe to cache the given request attributes. If the
+// requester-controlled attributes are too large, this may be a DoS attempt, so we skip the cache.
+func shouldCache(attr authorizer.Attributes) bool {
+	controlledAttrSize := int64(len(attr.GetNamespace())) +
+		int64(len(attr.GetVerb())) +
+		int64(len(attr.GetAPIGroup())) +
+		int64(len(attr.GetAPIVersion())) +
+		int64(len(attr.GetResource())) +
+		int64(len(attr.GetSubresource())) +
+		int64(len(attr.GetName())) +
+		int64(len(attr.GetPath()))
+	return controlledAttrSize < maxControlledAttrCacheSize
 }

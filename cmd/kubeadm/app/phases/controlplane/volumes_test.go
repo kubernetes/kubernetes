@@ -26,7 +26,6 @@ import (
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 func TestGetEtcdCertVolumes(t *testing.T) {
@@ -234,7 +233,7 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actualVol, actualVolMount := getEtcdCertVolumes(kubeadmapi.Etcd{
+		actualVol, actualVolMount := getEtcdCertVolumes(&kubeadmapi.ExternalEtcd{
 			CAFile:   rt.ca,
 			CertFile: rt.cert,
 			KeyFile:  rt.key,
@@ -259,7 +258,6 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
-	hostPathFile := v1.HostPathFile
 	volMap := make(map[string]map[string]v1.Volume)
 	volMap[kubeadmconstants.KubeAPIServer] = map[string]v1.Volume{}
 	volMap[kubeadmconstants.KubeAPIServer]["k8s-certs"] = v1.Volume{
@@ -276,24 +274,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		VolumeSource: v1.VolumeSource{
 			HostPath: &v1.HostPathVolumeSource{
 				Path: "/etc/ssl/certs",
-				Type: &hostPathDirectoryOrCreate,
-			},
-		},
-	}
-	volMap[kubeadmconstants.KubeAPIServer]["audit"] = v1.Volume{
-		Name: "audit",
-		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{
-				Path: "/foo/bar/baz.yaml",
-				Type: &hostPathFile,
-			},
-		},
-	}
-	volMap[kubeadmconstants.KubeAPIServer]["audit-log"] = v1.Volume{
-		Name: "audit-log",
-		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{
-				Path: "/bar/foo",
 				Type: &hostPathDirectoryOrCreate,
 			},
 		},
@@ -347,16 +327,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		Name:      "ca-certs",
 		MountPath: "/etc/ssl/certs",
 		ReadOnly:  true,
-	}
-	volMountMap[kubeadmconstants.KubeAPIServer]["audit"] = v1.VolumeMount{
-		Name:      "audit",
-		MountPath: "/etc/kubernetes/audit/audit.yaml",
-		ReadOnly:  true,
-	}
-	volMountMap[kubeadmconstants.KubeAPIServer]["audit-log"] = v1.VolumeMount{
-		Name:      "audit-log",
-		MountPath: "/var/log/kubernetes/audit",
-		ReadOnly:  false,
 	}
 	volMountMap[kubeadmconstants.KubeControllerManager] = map[string]v1.VolumeMount{}
 	volMountMap[kubeadmconstants.KubeControllerManager]["k8s-certs"] = v1.VolumeMount{
@@ -502,33 +472,30 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		ReadOnly:  true,
 	}
 	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
 		vol      map[string]map[string]v1.Volume
 		volMount map[string]map[string]v1.VolumeMount
 	}{
 		{
 			// Should ignore files in /etc/ssl/certs
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd:            kubeadmapi.Etcd{},
-				FeatureGates:    map[string]bool{features.Auditing: true},
-				AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
-					Path:   "/foo/bar/baz.yaml",
-					LogDir: "/bar/foo",
-				},
 			},
 			vol:      volMap,
 			volMount: volMountMap,
 		},
 		{
 			// Should ignore files in /etc/ssl/certs and in CertificatesDir
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd: kubeadmapi.Etcd{
-					Endpoints: []string{"foo"},
-					CAFile:    "/etc/certs/etcd/my-etcd-ca.crt",
-					CertFile:  testCertsDir + "/etcd/my-etcd.crt",
-					KeyFile:   "/var/lib/etcd/certs/my-etcd.key",
+					External: &kubeadmapi.ExternalEtcd{
+						Endpoints: []string{"foo"},
+						CAFile:    "/etc/certs/etcd/my-etcd-ca.crt",
+						CertFile:  testCertsDir + "/etcd/my-etcd.crt",
+						KeyFile:   "/var/lib/etcd/certs/my-etcd.key",
+					},
 				},
 			},
 			vol:      volMap2,
@@ -542,9 +509,9 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	// set up tmp caCertsPkiVolumePath for testing
-	caCertsPkiVolumePath = fmt.Sprintf("%s/etc/pki", tmpdir)
-	defer func() { caCertsPkiVolumePath = "/etc/pki" }()
+	// set up tmp caCertsExtraVolumePaths for testing
+	caCertsExtraVolumePaths = []string{fmt.Sprintf("%s/etc/pki", tmpdir), fmt.Sprintf("%s/usr/share/ca-certificates", tmpdir)}
+	defer func() { caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates"} }()
 
 	for _, rt := range tests {
 		mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
@@ -555,9 +522,6 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		}
 		if _, ok := mounts.volumeMounts[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {
 			delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
-		}
-		if _, ok := mounts.volumeMounts[kubeadmconstants.KubeControllerManager][cloudConfigVolumeName]; ok {
-			delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], cloudConfigVolumeName)
 		}
 		if !reflect.DeepEqual(mounts.volumes, rt.vol) {
 			t.Errorf(
@@ -615,19 +579,35 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 	mounts.AddHostPathMounts("component", vols, volMounts)
 	hostPathMounts := []kubeadmapi.HostPathMount{
 		{
-			Name:      "foo",
-			HostPath:  "/tmp/qux",
-			MountPath: "/tmp/qux",
-			Writable:  false,
+			Name:      "foo-0",
+			HostPath:  "/tmp/qux-0",
+			MountPath: "/tmp/qux-0",
+			ReadOnly:  true,
+			PathType:  v1.HostPathFile,
 		},
 		{
-			Name:      "bar",
-			HostPath:  "/tmp/asd",
-			MountPath: "/tmp/asd",
-			Writable:  true,
+			Name:      "bar-0",
+			HostPath:  "/tmp/asd-0",
+			MountPath: "/tmp/asd-0",
+			ReadOnly:  false,
+			PathType:  v1.HostPathDirectory,
+		},
+		{
+			Name:      "foo-1",
+			HostPath:  "/tmp/qux-1",
+			MountPath: "/tmp/qux-1",
+			ReadOnly:  true,
+			PathType:  v1.HostPathFileOrCreate,
+		},
+		{
+			Name:      "bar-1",
+			HostPath:  "/tmp/asd-1",
+			MountPath: "/tmp/asd-1",
+			ReadOnly:  false,
+			PathType:  v1.HostPathDirectoryOrCreate,
 		},
 	}
-	mounts.AddExtraHostPathMounts("component", hostPathMounts, &hostPathDirectoryOrCreate)
+	mounts.AddExtraHostPathMounts("component", hostPathMounts)
 	for _, hostMount := range hostPathMounts {
 		volumeName := hostMount.Name
 		if _, ok := mounts.volumes["component"][volumeName]; !ok {
@@ -643,6 +623,9 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 		if _, ok := mounts.volumeMounts["component"][volumeName]; !ok {
 			t.Errorf("Expected to find volume mount %q", volumeName)
 		}
+		if *vol.HostPath.Type != v1.HostPathType(hostMount.PathType) {
+			t.Errorf("Expected to host path type %q", hostMount.PathType)
+		}
 		volMount, _ := mounts.volumeMounts["component"][volumeName]
 		if volMount.Name != volumeName {
 			t.Errorf("Expected volume mount name %q", volumeName)
@@ -650,8 +633,8 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 		if volMount.MountPath != hostMount.MountPath {
 			t.Errorf("Expected container path %q", hostMount.MountPath)
 		}
-		if volMount.ReadOnly != !hostMount.Writable {
-			t.Errorf("Expected volume writable setting %t", hostMount.Writable)
+		if volMount.ReadOnly != hostMount.ReadOnly {
+			t.Errorf("Expected volume readOnly setting %t", hostMount.ReadOnly)
 		}
 	}
 }

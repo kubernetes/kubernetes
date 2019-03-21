@@ -49,7 +49,31 @@ type Rule struct {
 	// Depending on the enclosing object, subresources might not be allowed.
 	// Required.
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
+
+	// scope specifies the scope of this rule.
+	// Valid values are "Cluster", "Namespaced", and "*"
+	// "Cluster" means that only cluster-scoped resources will match this rule.
+	// Namespace API objects are cluster-scoped.
+	// "Namespaced" means that only namespaced resources will match this rule.
+	// "*" means that there are no scope restrictions.
+	// Subresources match the scope of their parent resource.
+	// Default is "*".
+	//
+	// +optional
+	Scope *ScopeType `json:"scope,omitempty" protobuf:"bytes,4,rep,name=scope"`
 }
+
+type ScopeType string
+
+const (
+	// ClusterScope means that scope is limited to cluster-scoped objects.
+	// Namespace objects are cluster-scoped.
+	ClusterScope ScopeType = "Cluster"
+	// NamespacedScope means that scope is limited to namespaced objects.
+	NamespacedScope ScopeType = "Namespaced"
+	// AllScopes means that all scopes are included.
+	AllScopes ScopeType = "*"
+)
 
 type FailurePolicyType string
 
@@ -58,6 +82,22 @@ const (
 	Ignore FailurePolicyType = "Ignore"
 	// Fail means that an error calling the webhook causes the admission to fail.
 	Fail FailurePolicyType = "Fail"
+)
+
+type SideEffectClass string
+
+const (
+	// SideEffectClassUnknown means that no information is known about the side effects of calling the webhook.
+	// If a request with the dry-run attribute would trigger a call to this webhook, the request will instead fail.
+	SideEffectClassUnknown SideEffectClass = "Unknown"
+	// SideEffectClassNone means that calling the webhook will have no side effects.
+	SideEffectClassNone SideEffectClass = "None"
+	// SideEffectClassSome means that calling the webhook will possibly have side effects.
+	// If a request with the dry-run attribute would trigger a call to this webhook, the request will instead fail.
+	SideEffectClassSome SideEffectClass = "Some"
+	// SideEffectClassNoneOnDryRun means that calling the webhook will possibly have side effects, but if the
+	// request being reviewed has the dry-run attribute, the side effects will be suppressed.
+	SideEffectClassNoneOnDryRun SideEffectClass = "NoneOnDryRun"
 )
 
 // +genclient
@@ -191,6 +231,34 @@ type Webhook struct {
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
+
+	// SideEffects states whether this webhookk has side effects.
+	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
+	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
+	// rejected by a future step in the admission change and the side effects therefore need to be undone.
+	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
+	// sideEffects == Unknown or Some. Defaults to Unknown.
+	// +optional
+	SideEffects *SideEffectClass `json:"sideEffects,omitempty" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
+
+	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+	// the webhook call will be ignored or the API call will fail based on the
+	// failure policy.
+	// The timeout value must be between 1 and 30 seconds.
+	// Default to 30 seconds.
+	// +optional
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
+
+	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, validation will fail for this object.
+	// If a persisted webhook configuration specifies allowed versions and does not
+	// include any versions known to the API Server, calls to the webhook will fail
+	// and be subject to the failure policy.
+	// Default to `['v1beta1']`.
+	// +optional
+	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
@@ -221,7 +289,7 @@ const (
 // connection with the webhook
 type WebhookClientConfig struct {
 	// `url` gives the location of the webhook, in standard URL form
-	// (`[scheme://]host:port/path`). Exactly one of `url` or `service`
+	// (`scheme://host:port/path`). Exactly one of `url` or `service`
 	// must be specified.
 	//
 	// The `host` should not refer to a service running in the cluster; use
@@ -254,17 +322,15 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// If there is only one port open for the service, that port will be
-	// used. If there are multiple ports open, port 443 will be used if it
-	// is open, otherwise it is an error.
+	// Port 443 will be used if it is open, otherwise it is an error.
 	//
 	// +optional
-	Service *ServiceReference `json:"service" protobuf:"bytes,1,opt,name=service"`
+	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,1,opt,name=service"`
 
-	// `caBundle` is a PEM encoded CA bundle which will be used to validate
-	// the webhook's server certificate.
-	// Required.
-	CABundle []byte `json:"caBundle" protobuf:"bytes,2,opt,name=caBundle"`
+	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// If unspecified, system trust roots on the apiserver are used.
+	// +optional
+	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,2,opt,name=caBundle"`
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io

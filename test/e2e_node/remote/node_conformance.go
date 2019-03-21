@@ -25,9 +25,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
+	"k8s.io/kubernetes/test/utils"
 )
 
 // ConformanceRemote contains the specific functions in the node conformance test suite.
@@ -39,7 +40,7 @@ func InitConformanceRemote() TestSuite {
 
 // getConformanceDirectory gets node conformance test build directory.
 func getConformanceDirectory() (string, error) {
-	k8sRoot, err := builder.GetK8sRootDir()
+	k8sRoot, err := utils.GetK8sRootDir()
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +107,7 @@ func (c *ConformanceRemote) SetupTestPackage(tardir, systemSpecName string) erro
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := builder.GetK8sBuildOutputDir()
+	buildOutputDir, err := utils.GetK8sBuildOutputDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes build output directory %v", err)
 	}
@@ -205,13 +206,13 @@ func launchKubelet(host, workspace, results, testArgs string) error {
 			),
 		}
 	}
-	glog.V(2).Infof("Launch kubelet with command: %v", cmd)
+	klog.V(2).Infof("Launch kubelet with command: %v", cmd)
 	output, err := SSH(host, cmd...)
 	if err != nil {
 		return fmt.Errorf("failed to launch kubelet with command %v: error - %v output - %q",
 			cmd, err, output)
 	}
-	glog.Info("Successfully launch kubelet")
+	klog.Info("Successfully launch kubelet")
 	return nil
 }
 
@@ -220,12 +221,12 @@ const kubeletStopGracePeriod = 10 * time.Second
 
 // stopKubelet stops kubelet launcher and kubelet gracefully.
 func stopKubelet(host, workspace string) error {
-	glog.Info("Gracefully stop kubelet launcher")
+	klog.Info("Gracefully stop kubelet launcher")
 	if output, err := SSH(host, "pkill", conformanceTestBinary); err != nil {
 		return fmt.Errorf("failed to gracefully stop kubelet launcher: error - %v output - %q",
 			err, output)
 	}
-	glog.Info("Wait for kubelet launcher to stop")
+	klog.Info("Wait for kubelet launcher to stop")
 	stopped := false
 	for start := time.Now(); time.Since(start) < kubeletStopGracePeriod; time.Sleep(time.Second) {
 		// Check whether the process is still running.
@@ -241,13 +242,13 @@ func stopKubelet(host, workspace string) error {
 		}
 	}
 	if !stopped {
-		glog.Info("Forcibly stop kubelet")
+		klog.Info("Forcibly stop kubelet")
 		if output, err := SSH(host, "pkill", "-SIGKILL", conformanceTestBinary); err != nil {
 			return fmt.Errorf("failed to forcibly stop kubelet: error - %v output - %q",
 				err, output)
 		}
 	}
-	glog.Info("Successfully stop kubelet")
+	klog.Info("Successfully stop kubelet")
 	// Clean up the pod manifest path
 	podManifestPath := getPodPath(workspace)
 	if output, err := SSH(host, "rm", "-f", filepath.Join(workspace, podManifestPath)); err != nil {
@@ -258,7 +259,7 @@ func stopKubelet(host, workspace string) error {
 }
 
 // RunTest runs test on the node.
-func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, _, systemSpecName string, timeout time.Duration) (string, error) {
+func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, _, systemSpecName, extraEnvs string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
 	if err := setupCNI(host, workspace); err != nil {
 		return "", err
@@ -285,15 +286,15 @@ func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFi
 	defer func() {
 		if err := stopKubelet(host, workspace); err != nil {
 			// Only log an error if failed to stop kubelet because it is not critical.
-			glog.Errorf("failed to stop kubelet: %v", err)
+			klog.Errorf("failed to stop kubelet: %v", err)
 		}
 	}()
 
 	// Run the tests
-	glog.V(2).Infof("Starting tests on %q", host)
+	klog.V(2).Infof("Starting tests on %q", host)
 	podManifestPath := getPodPath(workspace)
-	cmd := fmt.Sprintf("'timeout -k 30s %fs docker run --rm --privileged=true --net=host -v /:/rootfs -v %s:%s -v %s:/var/result -e TEST_ARGS=--report-prefix=%s %s'",
-		timeout.Seconds(), podManifestPath, podManifestPath, results, junitFilePrefix, getConformanceTestImageName(systemSpecName))
+	cmd := fmt.Sprintf("'timeout -k 30s %fs docker run --rm --privileged=true --net=host -v /:/rootfs -v %s:%s -v %s:/var/result -e TEST_ARGS=--report-prefix=%s -e EXTRA_ENVS=%s %s'",
+		timeout.Seconds(), podManifestPath, podManifestPath, results, junitFilePrefix, extraEnvs, getConformanceTestImageName(systemSpecName))
 	testOutput, err := SSH(host, "sh", "-c", cmd)
 	if err != nil {
 		return testOutput, err

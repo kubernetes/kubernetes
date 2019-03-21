@@ -20,17 +20,25 @@ set -o pipefail
 
 TEST_ARGS=""
 RUN_PATTERN=".*"
+PROFILE_OPTS=""
 
 function usage() {
-  echo "usage: $0 [-h] [-d] [-r <pattern>] [-o <filename>]"
+  echo "usage: $0 <options>"
   echo " -h display this help message"
   echo " -d enable debug logs in tests"
   echo " -r <pattern> regex pattern to match for tests"
   echo " -o <filename> file to write JSON formatted results to"
+  echo " -p <id> enable cpu and memory profiles, output written to mem-<id>.out and cpu-<id>.out"
+  echo " -c enable custom test configuration"
+  echo " -a <name> allocator name, one of RangeAllocator, CloudAllocator, IPAMFromCluster, IPAMFromCloud"
+  echo " -k <num> api server qps for allocator"
+  echo " -n <num> number of nodes to simulate"
+  echo " -m <num> api server qps for node creation"
+  echo " -l <num> gce cloud endpoint qps"
   exit 1
 }
 
-while getopts ":hdr:o:" opt; do
+while getopts ":hdr:o:p:ca:k:n:m:l:" opt; do
   case ${opt} in
     d) TEST_ARGS="${TEST_ARGS} -v=6"
       ;;
@@ -38,20 +46,34 @@ while getopts ":hdr:o:" opt; do
       ;;
     o) TEST_ARGS="${TEST_ARGS} -log ${OPTARG}"
       ;;
-    h) ::usage
+    p) PROFILE_OPTS="-memprofile mem-${OPTARG}.out -cpuprofile cpu-${OPTARG}.out"
       ;;
-    \?) ::usage
+    c) TEST_ARGS="${TEST_ARGS} -custom"
+      ;;
+    a) TEST_ARGS="${TEST_ARGS} -allocator ${OPTARG}"
+      ;;
+    k) TEST_ARGS="${TEST_ARGS} -kube-qps ${OPTARG}"
+      ;;
+    n) TEST_ARGS="${TEST_ARGS} -num-nodes ${OPTARG}"
+      ;;
+    m) TEST_ARGS="${TEST_ARGS} -create-qps ${OPTARG}"
+      ;;
+    l) TEST_ARGS="${TEST_ARGS} -cloud-qps ${OPTARG}"
+      ;;
+    h) usage
+      ;;
+    \?) usage
       ;;
   esac
 done
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../../
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../../
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-DIR_BASENAME=$(dirname "${BASH_SOURCE}")
-pushd ${DIR_BASENAME}
+DIR_BASENAME=$(dirname "${BASH_SOURCE[0]}")
+pushd "${DIR_BASENAME}"
 
 cleanup() {
   popd 2> /dev/null
@@ -65,5 +87,5 @@ kube::etcd::start
 
 # Running IPAM tests. It might take a long time.
 kube::log::status "performance test (IPAM) start"
-go test -test.run=${RUN_PATTERN} -test.timeout=60m -test.short=false -v -args ${TEST_ARGS}
+go test "${PROFILE_OPTS}" -test.run="${RUN_PATTERN}" -test.timeout=60m -test.short=false -v -args "${TEST_ARGS}"
 kube::log::status "... IPAM tests finished."

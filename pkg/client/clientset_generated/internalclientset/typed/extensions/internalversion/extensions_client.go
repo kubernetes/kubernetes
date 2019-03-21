@@ -25,36 +25,11 @@ import (
 
 type ExtensionsInterface interface {
 	RESTClient() rest.Interface
-	DaemonSetsGetter
-	DeploymentsGetter
-	IngressesGetter
-	PodSecurityPoliciesGetter
-	ReplicaSetsGetter
 }
 
 // ExtensionsClient is used to interact with features provided by the extensions group.
 type ExtensionsClient struct {
 	restClient rest.Interface
-}
-
-func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
-	return newDaemonSets(c, namespace)
-}
-
-func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
-	return newDeployments(c, namespace)
-}
-
-func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
-	return newIngresses(c, namespace)
-}
-
-func (c *ExtensionsClient) PodSecurityPolicies() PodSecurityPolicyInterface {
-	return newPodSecurityPolicies(c)
-}
-
-func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
-	return newReplicaSets(c, namespace)
 }
 
 // NewForConfig creates a new ExtensionsClient for the given config.
@@ -86,17 +61,12 @@ func New(c rest.Interface) *ExtensionsClient {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	g, err := scheme.Registry.Group("extensions")
-	if err != nil {
-		return err
-	}
-
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		gv := g.GroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != scheme.Scheme.PrioritizedVersionsForGroup("extensions")[0].Group {
+		gv := scheme.Scheme.PrioritizedVersionsForGroup("extensions")[0]
 		config.GroupVersion = &gv
 	}
 	config.NegotiatedSerializer = scheme.Codecs

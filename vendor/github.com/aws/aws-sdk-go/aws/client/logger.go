@@ -44,22 +44,57 @@ func (reader *teeReaderCloser) Close() error {
 	return reader.Source.Close()
 }
 
+// LogHTTPRequestHandler is a SDK request handler to log the HTTP request sent
+// to a service. Will include the HTTP request body if the LogLevel of the
+// request matches LogDebugWithHTTPBody.
+var LogHTTPRequestHandler = request.NamedHandler{
+	Name: "awssdk.client.LogRequest",
+	Fn:   logRequest,
+}
+
 func logRequest(r *request.Request) {
 	logBody := r.Config.LogLevel.Matches(aws.LogDebugWithHTTPBody)
-	dumpedBody, err := httputil.DumpRequestOut(r.HTTPRequest, logBody)
+	bodySeekable := aws.IsReaderSeekable(r.Body)
+
+	b, err := httputil.DumpRequestOut(r.HTTPRequest, logBody)
 	if err != nil {
-		r.Config.Logger.Log(fmt.Sprintf(logReqErrMsg, r.ClientInfo.ServiceName, r.Operation.Name, err))
+		r.Config.Logger.Log(fmt.Sprintf(logReqErrMsg,
+			r.ClientInfo.ServiceName, r.Operation.Name, err))
 		return
 	}
 
 	if logBody {
+		if !bodySeekable {
+			r.SetReaderBody(aws.ReadSeekCloser(r.HTTPRequest.Body))
+		}
 		// Reset the request body because dumpRequest will re-wrap the r.HTTPRequest's
 		// Body as a NoOpCloser and will not be reset after read by the HTTP
 		// client reader.
 		r.ResetBody()
 	}
 
-	r.Config.Logger.Log(fmt.Sprintf(logReqMsg, r.ClientInfo.ServiceName, r.Operation.Name, string(dumpedBody)))
+	r.Config.Logger.Log(fmt.Sprintf(logReqMsg,
+		r.ClientInfo.ServiceName, r.Operation.Name, string(b)))
+}
+
+// LogHTTPRequestHeaderHandler is a SDK request handler to log the HTTP request sent
+// to a service. Will only log the HTTP request's headers. The request payload
+// will not be read.
+var LogHTTPRequestHeaderHandler = request.NamedHandler{
+	Name: "awssdk.client.LogRequestHeader",
+	Fn:   logRequestHeader,
+}
+
+func logRequestHeader(r *request.Request) {
+	b, err := httputil.DumpRequestOut(r.HTTPRequest, false)
+	if err != nil {
+		r.Config.Logger.Log(fmt.Sprintf(logReqErrMsg,
+			r.ClientInfo.ServiceName, r.Operation.Name, err))
+		return
+	}
+
+	r.Config.Logger.Log(fmt.Sprintf(logReqMsg,
+		r.ClientInfo.ServiceName, r.Operation.Name, string(b)))
 }
 
 const logRespMsg = `DEBUG: Response %s/%s Details:
@@ -72,27 +107,44 @@ const logRespErrMsg = `DEBUG ERROR: Response %s/%s:
 %s
 -----------------------------------------------------`
 
+// LogHTTPResponseHandler is a SDK request handler to log the HTTP response
+// received from a service. Will include the HTTP response body if the LogLevel
+// of the request matches LogDebugWithHTTPBody.
+var LogHTTPResponseHandler = request.NamedHandler{
+	Name: "awssdk.client.LogResponse",
+	Fn:   logResponse,
+}
+
 func logResponse(r *request.Request) {
 	lw := &logWriter{r.Config.Logger, bytes.NewBuffer(nil)}
-	r.HTTPResponse.Body = &teeReaderCloser{
-		Reader: io.TeeReader(r.HTTPResponse.Body, lw),
-		Source: r.HTTPResponse.Body,
+
+	logBody := r.Config.LogLevel.Matches(aws.LogDebugWithHTTPBody)
+	if logBody {
+		r.HTTPResponse.Body = &teeReaderCloser{
+			Reader: io.TeeReader(r.HTTPResponse.Body, lw),
+			Source: r.HTTPResponse.Body,
+		}
 	}
 
 	handlerFn := func(req *request.Request) {
-		body, err := httputil.DumpResponse(req.HTTPResponse, false)
+		b, err := httputil.DumpResponse(req.HTTPResponse, false)
 		if err != nil {
-			lw.Logger.Log(fmt.Sprintf(logRespErrMsg, req.ClientInfo.ServiceName, req.Operation.Name, err))
+			lw.Logger.Log(fmt.Sprintf(logRespErrMsg,
+				req.ClientInfo.ServiceName, req.Operation.Name, err))
 			return
 		}
 
-		b, err := ioutil.ReadAll(lw.buf)
-		if err != nil {
-			lw.Logger.Log(fmt.Sprintf(logRespErrMsg, req.ClientInfo.ServiceName, req.Operation.Name, err))
-			return
-		}
-		lw.Logger.Log(fmt.Sprintf(logRespMsg, req.ClientInfo.ServiceName, req.Operation.Name, string(body)))
-		if req.Config.LogLevel.Matches(aws.LogDebugWithHTTPBody) {
+		lw.Logger.Log(fmt.Sprintf(logRespMsg,
+			req.ClientInfo.ServiceName, req.Operation.Name, string(b)))
+
+		if logBody {
+			b, err := ioutil.ReadAll(lw.buf)
+			if err != nil {
+				lw.Logger.Log(fmt.Sprintf(logRespErrMsg,
+					req.ClientInfo.ServiceName, req.Operation.Name, err))
+				return
+			}
+
 			lw.Logger.Log(string(b))
 		}
 	}
@@ -105,4 +157,28 @@ func logResponse(r *request.Request) {
 	r.Handlers.UnmarshalError.SetBackNamed(request.NamedHandler{
 		Name: handlerName, Fn: handlerFn,
 	})
+}
+
+// LogHTTPResponseHeaderHandler is a SDK request handler to log the HTTP
+// response received from a service. Will only log the HTTP response's headers.
+// The response payload will not be read.
+var LogHTTPResponseHeaderHandler = request.NamedHandler{
+	Name: "awssdk.client.LogResponseHeader",
+	Fn:   logResponseHeader,
+}
+
+func logResponseHeader(r *request.Request) {
+	if r.Config.Logger == nil {
+		return
+	}
+
+	b, err := httputil.DumpResponse(r.HTTPResponse, false)
+	if err != nil {
+		r.Config.Logger.Log(fmt.Sprintf(logRespErrMsg,
+			r.ClientInfo.ServiceName, r.Operation.Name, err))
+		return
+	}
+
+	r.Config.Logger.Log(fmt.Sprintf(logRespMsg,
+		r.ClientInfo.ServiceName, r.Operation.Name, string(b)))
 }

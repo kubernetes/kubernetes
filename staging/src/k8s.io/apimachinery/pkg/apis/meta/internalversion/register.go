@@ -57,19 +57,22 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 	if err := scheme.AddIgnoredConversionType(&metav1.TypeMeta{}, &metav1.TypeMeta{}); err != nil {
 		return err
 	}
-	scheme.AddConversionFuncs(
+	err := scheme.AddConversionFuncs(
 		metav1.Convert_string_To_labels_Selector,
 		metav1.Convert_labels_Selector_To_string,
 
 		metav1.Convert_string_To_fields_Selector,
 		metav1.Convert_fields_Selector_To_string,
 
-		Convert_map_to_v1_LabelSelector,
-		Convert_v1_LabelSelector_to_map,
+		metav1.Convert_Map_string_To_string_To_v1_LabelSelector,
+		metav1.Convert_v1_LabelSelector_To_Map_string_To_string,
 
 		Convert_internalversion_ListOptions_To_v1_ListOptions,
 		Convert_v1_ListOptions_To_internalversion_ListOptions,
 	)
+	if err != nil {
+		return err
+	}
 	// ListOptions is the only options struct which needs conversion (it exposes labels and fields
 	// as selectors for convenience). The other types have only a single representation today.
 	scheme.AddKnownTypes(SchemeGroupVersion,
@@ -77,6 +80,8 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&metav1.GetOptions{},
 		&metav1.ExportOptions{},
 		&metav1.DeleteOptions{},
+		&metav1.CreateOptions{},
+		&metav1.UpdateOptions{},
 	)
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&metav1beta1.Table{},
@@ -91,7 +96,10 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&metav1beta1.PartialObjectMetadataList{},
 	)
 	// Allow delete options to be decoded across all version in this scheme (we may want to be more clever than this)
-	scheme.AddUnversionedTypes(SchemeGroupVersion, &metav1.DeleteOptions{})
+	scheme.AddUnversionedTypes(SchemeGroupVersion,
+		&metav1.DeleteOptions{},
+		&metav1.CreateOptions{},
+		&metav1.UpdateOptions{})
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	return nil
 }

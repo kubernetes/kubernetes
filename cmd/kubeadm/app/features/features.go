@@ -22,67 +22,50 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
-	// HighAvailability is alpha in v1.9
-	HighAvailability = "HighAvailability"
 
-	// CoreDNS is alpha in v1.9
+	// CoreDNS is GA in v1.11
 	CoreDNS = "CoreDNS"
-
-	// SelfHosting is alpha in v1.8 and v1.9
-	SelfHosting = "SelfHosting"
-
-	// StoreCertsInSecrets is alpha in v1.8 and v1.9
-	StoreCertsInSecrets = "StoreCertsInSecrets"
-
-	// DynamicKubeletConfig is alpha in v1.9
-	DynamicKubeletConfig = "DynamicKubeletConfig"
-
-	// Auditing is beta in 1.8
-	Auditing = "Auditing"
 )
 
-var v190 = version.MustParseSemantic("v1.9.0-alpha.1")
+var coreDNSMessage = "featureGates:CoreDNS has been removed in v1.13\n" +
+	"\tUse kubeadm-config to select which DNS addon to install."
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	SelfHosting:         {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
-	StoreCertsInSecrets: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
-	// We don't want to advertise this feature gate exists in v1.9 to avoid confusion as it is not yet working
-	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190, HiddenInHelpText: true},
-	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}, MinimumVersion: v190},
-	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
-	Auditing:             {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
+	CoreDNS: {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: coreDNSMessage},
 }
 
 // Feature represents a feature being gated
 type Feature struct {
 	utilfeature.FeatureSpec
-	MinimumVersion   *version.Version
-	HiddenInHelpText bool
+	MinimumVersion     *version.Version
+	HiddenInHelpText   bool
+	DeprecationMessage string
 }
 
 // FeatureList represents a list of feature gates
 type FeatureList map[string]Feature
 
-// ValidateVersion ensures that a feature gate list is compatible with the chosen kubernetes version
+// ValidateVersion ensures that a feature gate list is compatible with the chosen Kubernetes version
 func ValidateVersion(allFeatures FeatureList, requestedFeatures map[string]bool, requestedVersion string) error {
 	if requestedVersion == "" {
 		return nil
 	}
 	parsedExpVersion, err := version.ParseSemantic(requestedVersion)
 	if err != nil {
-		return fmt.Errorf("Error parsing version %s: %v", requestedVersion, err)
+		return errors.Wrapf(err, "error parsing version %s", requestedVersion)
 	}
 	for k := range requestedFeatures {
 		if minVersion := allFeatures[k].MinimumVersion; minVersion != nil {
 			if !parsedExpVersion.AtLeast(minVersion) {
-				return fmt.Errorf(
-					"the requested kubernetes version (%s) is incompatible with the %s feature gate, which needs %s as a minimum",
+				return errors.Errorf(
+					"the requested Kubernetes version (%s) is incompatible with the %s feature gate, which needs %s as a minimum",
 					requestedVersion, k, minVersion)
 			}
 		}
@@ -92,15 +75,18 @@ func ValidateVersion(allFeatures FeatureList, requestedFeatures map[string]bool,
 
 // Enabled indicates whether a feature name has been enabled
 func Enabled(featureList map[string]bool, featureName string) bool {
-	return featureList[string(featureName)]
+	if enabled, ok := featureList[string(featureName)]; ok {
+		return enabled
+	}
+	return InitFeatureGates[string(featureName)].Default
 }
 
 // Supports indicates whether a feature name is supported on the given
 // feature set
 func Supports(featureList FeatureList, featureName string) bool {
-	for k := range featureList {
+	for k, v := range featureList {
 		if featureName == string(k) {
-			return true
+			return v.PreRelease != utilfeature.Deprecated
 		}
 	}
 	return false
@@ -144,39 +130,50 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 
 		arr := strings.SplitN(s, "=", 2)
 		if len(arr) != 2 {
-			return nil, fmt.Errorf("missing bool value for feature-gate key:%s", s)
+			return nil, errors.Errorf("missing bool value for feature-gate key:%s", s)
 		}
 
 		k := strings.TrimSpace(arr[0])
 		v := strings.TrimSpace(arr[1])
 
-		if !Supports(*f, k) {
-			return nil, fmt.Errorf("unrecognized feature-gate key: %s", k)
+		featureSpec, ok := (*f)[k]
+		if !ok {
+			return nil, errors.Errorf("unrecognized feature-gate key: %s", k)
+		}
+
+		if featureSpec.PreRelease == utilfeature.Deprecated {
+			return nil, errors.Errorf("feature-gate key is deprecated: %s", k)
 		}
 
 		boolValue, err := strconv.ParseBool(v)
 		if err != nil {
-			return nil, fmt.Errorf("invalid value %v for feature-gate key: %s, use true|false instead", v, k)
+			return nil, errors.Errorf("invalid value %v for feature-gate key: %s, use true|false instead", v, k)
 		}
 		featureGate[k] = boolValue
 	}
 
-	ResolveFeatureGateDependencies(featureGate)
-
 	return featureGate, nil
 }
 
-// ResolveFeatureGateDependencies resolve dependencies between feature gates
-func ResolveFeatureGateDependencies(featureGate map[string]bool) {
+// CheckDeprecatedFlags takes a list of existing feature gate flags and validates against the current feature flag set.
+// It used during upgrades for ensuring consistency of feature gates used in an existing cluster, that might
+// be created with a previous version of kubeadm, with the set of features currently supported by kubeadm
+func CheckDeprecatedFlags(f *FeatureList, features map[string]bool) map[string]string {
+	deprecatedMsg := map[string]string{}
+	for k := range features {
+		featureSpec, ok := (*f)[k]
+		if !ok {
+			// This case should never happen, it is implemented only as a sentinel
+			// for removal of flags executed when flags are still in use (always before deprecate, then after one cycle remove)
+			deprecatedMsg[k] = fmt.Sprintf("Unknown feature gate flag: %s", k)
+		}
 
-	// if StoreCertsInSecrets enabled, SelfHosting should enabled
-	if Enabled(featureGate, StoreCertsInSecrets) {
-		featureGate[SelfHosting] = true
+		if featureSpec.PreRelease == utilfeature.Deprecated {
+			if _, ok := deprecatedMsg[k]; !ok {
+				deprecatedMsg[k] = featureSpec.DeprecationMessage
+			}
+		}
 	}
 
-	// if HighAvailability enabled, both StoreCertsInSecrets and SelfHosting should enabled
-	if Enabled(featureGate, HighAvailability) && !Enabled(featureGate, StoreCertsInSecrets) {
-		featureGate[SelfHosting] = true
-		featureGate[StoreCertsInSecrets] = true
-	}
+	return deprecatedMsg
 }

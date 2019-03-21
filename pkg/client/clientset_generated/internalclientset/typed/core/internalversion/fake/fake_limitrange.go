@@ -62,7 +62,7 @@ func (c *FakeLimitRanges) List(opts v1.ListOptions) (result *core.LimitRangeList
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.LimitRangeList{}
+	list := &core.LimitRangeList{ListMeta: obj.(*core.LimitRangeList).ListMeta}
 	for _, item := range obj.(*core.LimitRangeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -119,7 +119,7 @@ func (c *FakeLimitRanges) DeleteCollection(options *v1.DeleteOptions, listOption
 // Patch applies the patch and returns the patched limitRange.
 func (c *FakeLimitRanges) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.LimitRange, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, name, data, subresources...), &core.LimitRange{})
+		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, name, pt, data, subresources...), &core.LimitRange{})
 
 	if obj == nil {
 		return nil, err

@@ -1,19 +1,19 @@
 # Kubernetes-master
 
-[Kubernetes](http://kubernetes.io/) is an open source system for managing 
+[Kubernetes](http://kubernetes.io/) is an open source system for managing
 application containers across a cluster of hosts. The Kubernetes project was
-started by Google in 2014, combining the experience of running production 
+started by Google in 2014, combining the experience of running production
 workloads combined with best practices from the community.
 
 The Kubernetes project defines some new terms that may be unfamiliar to users
-or operators. For more information please refer to the concept guide in the 
+or operators. For more information please refer to the concept guide in the
 [getting started guide](https://kubernetes.io/docs/home/).
 
-This charm is an encapsulation of the Kubernetes master processes and the 
+This charm is an encapsulation of the Kubernetes master processes and the
 operations to run on any cloud for the entire lifecycle of the cluster.
 
 This charm is built from other charm layers using the Juju reactive framework.
-The other layers focus on specific subset of operations making this layer 
+The other layers focus on specific subset of operations making this layer
 specific to operations of Kubernetes master processes.
 
 # Deployment
@@ -23,15 +23,15 @@ charms to model a complete Kubernetes cluster. A Kubernetes cluster needs a
 distributed key value store such as [Etcd](https://coreos.com/etcd/) and the
 kubernetes-worker charm which delivers the Kubernetes node services. A cluster
 requires a Software Defined Network (SDN) and Transport Layer Security (TLS) so
-the components in a cluster communicate securely. 
+the components in a cluster communicate securely.
 
-Please take a look at the [Canonical Distribution of Kubernetes](https://jujucharms.com/canonical-kubernetes/) 
-or the [Kubernetes core](https://jujucharms.com/kubernetes-core/) bundles for 
+Please take a look at the [Canonical Distribution of Kubernetes](https://jujucharms.com/canonical-kubernetes/)
+or the [Kubernetes core](https://jujucharms.com/kubernetes-core/) bundles for
 examples of complete models of Kubernetes clusters.
 
 # Resources
 
-The kubernetes-master charm takes advantage of the [Juju Resources](https://jujucharms.com/docs/2.0/developer-resources) 
+The kubernetes-master charm takes advantage of the [Juju Resources](https://jujucharms.com/docs/2.0/developer-resources)
 feature to deliver the Kubernetes software.
 
 In deployments on public clouds the Charm Store provides the resource to the
@@ -40,9 +40,41 @@ firewall rules may not be able to contact the Charm Store. In these network
 restricted  environments the resource can be uploaded to the model by the Juju
 operator.
 
+#### Snap Refresh
+
+The kubernetes resources used by this charm are snap packages. When not
+specified during deployment, these resources come from the public store. By
+default, the `snapd` daemon will refresh all snaps installed from the store
+four (4) times per day. A charm configuration option is provided for operators
+to control this refresh frequency.
+
+>NOTE: this is a global configuration option and will affect the refresh
+time for all snaps installed on a system.
+
+Examples:
+
+```sh
+## refresh kubernetes-master snaps every tuesday
+juju config kubernetes-master snapd_refresh="tue"
+
+## refresh snaps at 11pm on the last (5th) friday of the month
+juju config kubernetes-master snapd_refresh="fri5,23:00"
+
+## delay the refresh as long as possible
+juju config kubernetes-master snapd_refresh="max"
+
+## use the system default refresh timer
+juju config kubernetes-master snapd_refresh=""
+```
+
+For more information on the possible values for `snapd_refresh`, see the
+*refresh.timer* section in the [system options][] documentation.
+
+[system options]: https://forum.snapcraft.io/t/system-options/87
+
 # Configuration
 
-This charm supports some configuration options to set up a Kubernetes cluster 
+This charm supports some configuration options to set up a Kubernetes cluster
 that works in your environment:
 
 #### dns_domain
@@ -61,14 +93,14 @@ Enable RBAC and Node authorisation.
 # DNS for the cluster
 
 The DNS add-on allows the pods to have a DNS names in addition to IP addresses.
-The Kubernetes cluster DNS server (based off the SkyDNS library) supports 
-forward lookups (A records), service lookups (SRV records) and reverse IP 
+The Kubernetes cluster DNS server (based off the SkyDNS library) supports
+forward lookups (A records), service lookups (SRV records) and reverse IP
 address lookups (PTR records). More information about the DNS can be obtained
 from the [Kubernetes DNS admin guide](http://kubernetes.io/docs/admin/dns/).
 
 # Actions
 
-The kubernetes-master charm models a few one time operations called 
+The kubernetes-master charm models a few one time operations called
 [Juju actions](https://jujucharms.com/docs/stable/actions) that can be run by
 Juju users.
 
@@ -80,7 +112,7 @@ requires a relation to the ceph-mon charm before it can create the volume.
 
 #### restart
 
-This action restarts the master processes `kube-apiserver`, 
+This action restarts the master processes `kube-apiserver`,
 `kube-controller-manager`, and `kube-scheduler` when the user needs a restart.
 
 # More information
@@ -93,7 +125,7 @@ This action restarts the master processes `kube-apiserver`,
 # Contact
 
 The kubernetes-master charm is free and open source operations created
-by the containers team at Canonical. 
+by the containers team at Canonical.
 
 Canonical also offers enterprise support and customization services. Please
 refer to the [Kubernetes product page](https://www.ubuntu.com/cloud/kubernetes)

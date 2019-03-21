@@ -19,7 +19,7 @@ limitations under the License.
 package upgrades
 
 import (
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -40,9 +40,6 @@ const (
 	// EtcdUpgrade indicates that only etcd is being upgraded (or migrated
 	// between storage versions).
 	EtcdUpgrade
-
-	// IngressUpgrade indicates that only ingress is being upgraded.
-	IngressUpgrade
 )
 
 // Test is an interface for upgrade tests.

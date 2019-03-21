@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // Factory is a function that returns an Interface for admission decisions.
@@ -75,13 +75,13 @@ func (ps *Plugins) Register(name string, plugin Factory) {
 	if ps.registry != nil {
 		_, found := ps.registry[name]
 		if found {
-			glog.Fatalf("Admission plugin %q was registered twice", name)
+			klog.Fatalf("Admission plugin %q was registered twice", name)
 		}
 	} else {
 		ps.registry = map[string]Factory{}
 	}
 
-	glog.V(1).Infof("Registered admission plugin %q", name)
+	klog.V(1).Infof("Registered admission plugin %q", name)
 	ps.registry[name] = plugin
 }
 
@@ -155,10 +155,10 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 		}
 	}
 	if len(mutationPlugins) != 0 {
-		glog.Infof("Loaded %d mutating admission controller(s) successfully in the following order: %s.", len(mutationPlugins), strings.Join(mutationPlugins, ","))
+		klog.Infof("Loaded %d mutating admission controller(s) successfully in the following order: %s.", len(mutationPlugins), strings.Join(mutationPlugins, ","))
 	}
 	if len(validationPlugins) != 0 {
-		glog.Infof("Loaded %d validating admission controller(s) successfully in the following order: %s.", len(validationPlugins), strings.Join(validationPlugins, ","))
+		klog.Infof("Loaded %d validating admission controller(s) successfully in the following order: %s.", len(validationPlugins), strings.Join(validationPlugins, ","))
 	}
 	return chainAdmissionHandler(handlers), nil
 }
@@ -166,22 +166,22 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 // InitPlugin creates an instance of the named interface.
 func (ps *Plugins) InitPlugin(name string, config io.Reader, pluginInitializer PluginInitializer) (Interface, error) {
 	if name == "" {
-		glog.Info("No admission plugin specified.")
+		klog.Info("No admission plugin specified.")
 		return nil, nil
 	}
 
 	plugin, found, err := ps.getPlugin(name, config)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't init admission plugin %q: %v", name, err)
+		return nil, fmt.Errorf("couldn't init admission plugin %q: %v", name, err)
 	}
 	if !found {
-		return nil, fmt.Errorf("Unknown admission plugin: %s", name)
+		return nil, fmt.Errorf("unknown admission plugin: %s", name)
 	}
 
 	pluginInitializer.Initialize(plugin)
 	// ensure that plugins have been properly initialized
 	if err := ValidateInitialization(plugin); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize admission plugin %q: %v", name, err)
 	}
 
 	return plugin, nil

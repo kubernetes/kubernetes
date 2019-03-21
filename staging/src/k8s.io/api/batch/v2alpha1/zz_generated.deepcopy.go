@@ -91,40 +91,24 @@ func (in *CronJobSpec) DeepCopyInto(out *CronJobSpec) {
 	*out = *in
 	if in.StartingDeadlineSeconds != nil {
 		in, out := &in.StartingDeadlineSeconds, &out.StartingDeadlineSeconds
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int64)
-			**out = **in
-		}
+		*out = new(int64)
+		**out = **in
 	}
 	if in.Suspend != nil {
 		in, out := &in.Suspend, &out.Suspend
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	in.JobTemplate.DeepCopyInto(&out.JobTemplate)
 	if in.SuccessfulJobsHistoryLimit != nil {
 		in, out := &in.SuccessfulJobsHistoryLimit, &out.SuccessfulJobsHistoryLimit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.FailedJobsHistoryLimit != nil {
 		in, out := &in.FailedJobsHistoryLimit, &out.FailedJobsHistoryLimit
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }
@@ -149,11 +133,7 @@ func (in *CronJobStatus) DeepCopyInto(out *CronJobStatus) {
 	}
 	if in.LastScheduleTime != nil {
 		in, out := &in.LastScheduleTime, &out.LastScheduleTime
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = (*in).DeepCopy()
-		}
+		*out = (*in).DeepCopy()
 	}
 	return
 }

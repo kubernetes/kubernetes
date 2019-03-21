@@ -26,6 +26,9 @@ import (
 type AppsInterface interface {
 	RESTClient() rest.Interface
 	ControllerRevisionsGetter
+	DaemonSetsGetter
+	DeploymentsGetter
+	ReplicaSetsGetter
 	StatefulSetsGetter
 }
 
@@ -36,6 +39,18 @@ type AppsClient struct {
 
 func (c *AppsClient) ControllerRevisions(namespace string) ControllerRevisionInterface {
 	return newControllerRevisions(c, namespace)
+}
+
+func (c *AppsClient) DaemonSets(namespace string) DaemonSetInterface {
+	return newDaemonSets(c, namespace)
+}
+
+func (c *AppsClient) Deployments(namespace string) DeploymentInterface {
+	return newDeployments(c, namespace)
+}
+
+func (c *AppsClient) ReplicaSets(namespace string) ReplicaSetInterface {
+	return newReplicaSets(c, namespace)
 }
 
 func (c *AppsClient) StatefulSets(namespace string) StatefulSetInterface {
@@ -71,17 +86,12 @@ func New(c rest.Interface) *AppsClient {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	g, err := scheme.Registry.Group("apps")
-	if err != nil {
-		return err
-	}
-
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		gv := g.GroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != scheme.Scheme.PrioritizedVersionsForGroup("apps")[0].Group {
+		gv := scheme.Scheme.PrioritizedVersionsForGroup("apps")[0]
 		config.GroupVersion = &gv
 	}
 	config.NegotiatedSerializer = scheme.Codecs

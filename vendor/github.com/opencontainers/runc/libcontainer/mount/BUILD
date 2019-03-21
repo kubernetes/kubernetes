@@ -4,13 +4,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "mount.go",
+        "mount_linux.go",
         "mountinfo.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "mount_linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/mount",
     importpath = "github.com/opencontainers/runc/libcontainer/mount",
     visibility = ["//visibility:public"],
 )

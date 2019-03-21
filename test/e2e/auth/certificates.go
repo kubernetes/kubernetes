@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1beta1client "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -38,7 +39,7 @@ var _ = SIGDescribe("Certificates API", func() {
 	It("should support building a client with a CSR", func() {
 		const commonName = "tester-csr"
 
-		pk, err := cert.NewPrivateKey()
+		pk, err := pkiutil.NewPrivateKey()
 		framework.ExpectNoError(err)
 
 		pkder := x509.MarshalPKCS1PrivateKey(pk)
@@ -91,9 +92,10 @@ var _ = SIGDescribe("Certificates API", func() {
 
 		framework.Logf("waiting for CSR to be signed")
 		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
-			csr, _ = csrs.Get(csrName, metav1.GetOptions{})
+			csr, err = csrs.Get(csrName, metav1.GetOptions{})
 			if err != nil {
-				return false, err
+				framework.Logf("error getting csr: %v", err)
+				return false, nil
 			}
 			if len(csr.Status.Certificate) == 0 {
 				framework.Logf("csr not signed yet")

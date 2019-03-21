@@ -51,11 +51,11 @@ func TestPackSubsets(t *testing.T) {
 		}, {
 			name:   "empty ports",
 			given:  []api.EndpointSubset{{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}},
-			expect: []api.EndpointSubset{},
+			expect: []api.EndpointSubset{{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: nil}},
 		}, {
 			name:   "empty ports",
 			given:  []api.EndpointSubset{{NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}},
-			expect: []api.EndpointSubset{},
+			expect: []api.EndpointSubset{{NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: nil}},
 		}, {
 			name: "one set, one ip, one port",
 			given: []api.EndpointSubset{{

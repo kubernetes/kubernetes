@@ -14,8 +14,13 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["transformer.go"],
+    srcs = [
+        "metrics.go",
+        "transformer.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/value",
     importpath = "k8s.io/apiserver/pkg/storage/value",
+    deps = ["//vendor/github.com/prometheus/client_golang/prometheus:go_default_library"],
 )
 
 filegroup(

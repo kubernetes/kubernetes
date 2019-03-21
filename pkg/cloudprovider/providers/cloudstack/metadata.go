@@ -25,11 +25,14 @@ import (
 	"net/http"
 
 	"github.com/d2g/dhcp4"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 )
+
+var _ cloudprovider.Instances = (*metadata)(nil)
+var _ cloudprovider.Zones = (*metadata)(nil)
 
 type metadata struct {
 	dhcpServer string
@@ -39,6 +42,7 @@ type metadata struct {
 type metadataType string
 
 const (
+	metadataTypeHostname     metadataType = "local-hostname"
 	metadataTypeExternalIP   metadataType = "public-ipv4"
 	metadataTypeInternalIP   metadataType = "local-ipv4"
 	metadataTypeInstanceID   metadataType = "instance-id"
@@ -58,20 +62,25 @@ func (m *metadata) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1
 		return nil, fmt.Errorf("could not get internal IP: %v", err)
 	}
 
-	return []v1.NodeAddress{
+	addresses := []v1.NodeAddress{
 		{Type: v1.NodeExternalIP, Address: externalIP},
 		{Type: v1.NodeInternalIP, Address: internalIP},
-	}, nil
+	}
+
+	hostname, err := m.get(metadataTypeHostname)
+	if err != nil {
+		return nil, fmt.Errorf("could not get hostname: %v", err)
+	}
+	if hostname != "" {
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
+	}
+
+	return addresses, nil
 }
 
 // NodeAddressesByProviderID returns the addresses of the specified instance.
 func (m *metadata) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	return nil, errors.New("NodeAddressesByProviderID not implemented")
-}
-
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (m *metadata) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	return m.InstanceID(ctx, name)
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
@@ -106,7 +115,7 @@ func (m *metadata) InstanceTypeByProviderID(ctx context.Context, providerID stri
 
 // AddSSHKeyToAllInstances is currently not implemented.
 func (m *metadata) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return errors.New("AddSSHKeyToAllInstances not implemented")
+	return cloudprovider.NotImplemented
 }
 
 // CurrentNodeName returns the name of the node we are currently running on.
@@ -117,6 +126,11 @@ func (m *metadata) CurrentNodeName(ctx context.Context, hostname string) (types.
 // InstanceExistsByProviderID returns if the instance still exists.
 func (m *metadata) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, errors.New("InstanceExistsByProviderID not implemented")
+}
+
+// InstanceShutdownByProviderID returns if the instance is shutdown.
+func (m *metadata) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
 }
 
 // GetZone returns the Zone containing the region that the program is running in.
@@ -132,7 +146,7 @@ func (m *metadata) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		m.zone = zoneName
 	}
 
-	glog.V(2).Infof("Current zone is %v", zone)
+	klog.V(2).Infof("Current zone is %v", zone)
 	zone.FailureDomain = m.zone
 	zone.Region = m.zone
 

@@ -1,14 +1,19 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
+  - bentheelder
   - cblecker
   - eparis
   - fejta
   - ixdy
   - jbeda
+  - juanvallejo
   - lavalamp
   - zmerlynn
   - sttts
   - gmarek
   - vishh
+  - spiffxp
 approvers:
   - cblecker
   - deads2k
@@ -26,3 +31,5 @@ approvers:
   - vishh
   - liggitt
   - soltysh # for sig-cli related stuff
+  - dims # for local-up-cluster related files
+  - spiffxp

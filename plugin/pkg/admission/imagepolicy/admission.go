@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/api/imagepolicy/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,6 +45,21 @@ import (
 
 // PluginName indicates name of admission plugin.
 const PluginName = "ImagePolicyWebhook"
+
+// AuditKeyPrefix is used as the prefix for all audit keys handled by this
+// pluggin. Some well known suffixes are listed below.
+var AuditKeyPrefix = strings.ToLower(PluginName) + ".image-policy.k8s.io/"
+
+const (
+	// ImagePolicyFailedOpenKeySuffix in an annotation indicates the image
+	// review failed open when the image policy webhook backend connection
+	// failed.
+	ImagePolicyFailedOpenKeySuffix string = "failed-open"
+
+	// ImagePolicyAuditRequiredKeySuffix in an annotation indicates the pod
+	// should be audited.
+	ImagePolicyAuditRequiredKeySuffix string = "audit-required"
+)
 
 var (
 	groupVersions = []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
@@ -95,25 +110,28 @@ func (a *Plugin) filterAnnotations(allAnnotations map[string]string) map[string]
 // Function to call on webhook failure; behavior determined by defaultAllow flag
 func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err error) error {
 	if err != nil {
-		glog.V(2).Infof("error contacting webhook backend: %s", err)
+		klog.V(2).Infof("error contacting webhook backend: %s", err)
 		if a.defaultAllow {
+			attributes.AddAnnotation(AuditKeyPrefix+ImagePolicyFailedOpenKeySuffix, "true")
+			// TODO(wteiken): Remove the annotation code for the 1.13 release
 			annotations := pod.GetAnnotations()
 			if annotations == nil {
 				annotations = make(map[string]string)
 			}
 			annotations[api.ImagePolicyFailedOpenKey] = "true"
 			pod.ObjectMeta.SetAnnotations(annotations)
-			glog.V(2).Infof("resource allowed in spite of webhook backend failure")
+
+			klog.V(2).Infof("resource allowed in spite of webhook backend failure")
 			return nil
 		}
-		glog.V(2).Infof("resource not allowed due to webhook backend failure ")
+		klog.V(2).Infof("resource not allowed due to webhook backend failure ")
 		return admission.NewForbidden(attributes, err)
 	}
 	return nil
 }
 
 // Validate makes an admission decision based on the request attributes
-func (a *Plugin) Validate(attributes admission.Attributes) (err error) {
+func (a *Plugin) Validate(attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if attributes.GetSubresource() != "" || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
@@ -174,13 +192,17 @@ func (a *Plugin) admitPod(pod *api.Pod, attributes admission.Attributes, review 
 		a.responseCache.Add(string(cacheKey), review.Status, a.statusTTL(review.Status))
 	}
 
+	for k, v := range review.Status.AuditAnnotations {
+		if err := attributes.AddAnnotation(AuditKeyPrefix+k, v); err != nil {
+			klog.Warningf("failed to set admission audit annotation %s to %s: %v", AuditKeyPrefix+k, v, err)
+		}
+	}
 	if !review.Status.Allowed {
 		if len(review.Status.Reason) > 0 {
 			return fmt.Errorf("image policy webhook backend denied one or more images: %s", review.Status.Reason)
 		}
 		return errors.New("one or more images rejected by webhook backend")
 	}
-
 	return nil
 }
 
@@ -239,7 +261,7 @@ func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
 		return nil, err
 	}
 
-	gw, err := webhook.NewGenericWebhook(legacyscheme.Registry, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff)
+	gw, err := webhook.NewGenericWebhook(legacyscheme.Scheme, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff)
 	if err != nil {
 		return nil, err
 	}

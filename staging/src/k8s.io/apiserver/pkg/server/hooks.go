@@ -20,8 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"runtime/debug"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -58,6 +59,9 @@ type PostStartHookProvider interface {
 
 type postStartHookEntry struct {
 	hook PostStartHookFunc
+	// originatingStack holds the stack that registered postStartHooks. This allows us to show a more helpful message
+	// for duplicate registration.
+	originatingStack string
 
 	// done will be closed when the postHook is finished
 	done chan struct{}
@@ -85,15 +89,18 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 	if s.postStartHooksCalled {
 		return fmt.Errorf("unable to add %q because PostStartHooks have already been called", name)
 	}
-	if _, exists := s.postStartHooks[name]; exists {
-		return fmt.Errorf("unable to add %q because it is already registered", name)
+	if postStartHook, exists := s.postStartHooks[name]; exists {
+		// this is programmer error, but it can be hard to debug
+		return fmt.Errorf("unable to add %q because it was already registered by: %s", name, postStartHook.originatingStack)
 	}
 
 	// done is closed when the poststarthook is finished.  This is used by the health check to be able to indicate
 	// that the poststarthook is finished
 	done := make(chan struct{})
-	s.AddHealthzChecks(postStartHookHealthz{name: "poststarthook/" + name, done: done})
-	s.postStartHooks[name] = postStartHookEntry{hook: hook, done: done}
+	if err := s.AddHealthzChecks(postStartHookHealthz{name: "poststarthook/" + name, done: done}); err != nil {
+		return err
+	}
+	s.postStartHooks[name] = postStartHookEntry{hook: hook, originatingStack: string(debug.Stack()), done: done}
 
 	return nil
 }
@@ -101,7 +108,7 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 // AddPostStartHookOrDie allows you to add a PostStartHook, but dies on failure
 func (s *GenericAPIServer) AddPostStartHookOrDie(name string, hook PostStartHookFunc) {
 	if err := s.AddPostStartHook(name, hook); err != nil {
-		glog.Fatalf("Error registering PostStartHook %q: %v", name, err)
+		klog.Fatalf("Error registering PostStartHook %q: %v", name, err)
 	}
 }
 
@@ -132,7 +139,7 @@ func (s *GenericAPIServer) AddPreShutdownHook(name string, hook PreShutdownHookF
 // AddPreShutdownHookOrDie allows you to add a PostStartHook, but dies on failure
 func (s *GenericAPIServer) AddPreShutdownHookOrDie(name string, hook PreShutdownHookFunc) {
 	if err := s.AddPreShutdownHook(name, hook); err != nil {
-		glog.Fatalf("Error registering PreShutdownHook %q: %v", name, err)
+		klog.Fatalf("Error registering PreShutdownHook %q: %v", name, err)
 	}
 }
 
@@ -185,7 +192,7 @@ func runPostStartHook(name string, entry postStartHookEntry, context PostStartHo
 	}()
 	// if the hook intentionally wants to kill server, let it.
 	if err != nil {
-		glog.Fatalf("PostStartHook %q failed: %v", name, err)
+		klog.Fatalf("PostStartHook %q failed: %v", name, err)
 	}
 	close(entry.done)
 }

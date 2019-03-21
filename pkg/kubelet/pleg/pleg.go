@@ -20,16 +20,20 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// PodLifeCycleEventType define the event type of pod life cycle events.
 type PodLifeCycleEventType string
 
 const (
+	// ContainerStarted - event type when the new state of container is running.
 	ContainerStarted PodLifeCycleEventType = "ContainerStarted"
-	ContainerDied    PodLifeCycleEventType = "ContainerDied"
+	// ContainerDied - event type when the new state of container is exited.
+	ContainerDied PodLifeCycleEventType = "ContainerDied"
+	// ContainerRemoved - event type when the old state of container is exited.
 	ContainerRemoved PodLifeCycleEventType = "ContainerRemoved"
 	// PodSync is used to trigger syncing of a pod when the observed change of
 	// the state of the pod cannot be captured by any single event above.
 	PodSync PodLifeCycleEventType = "PodSync"
-	// Do not use the events below because they are disabled in GenericPLEG.
+	// ContainerChanged - event type when the new state of container is unknown.
 	ContainerChanged PodLifeCycleEventType = "ContainerChanged"
 )
 
@@ -45,6 +49,7 @@ type PodLifecycleEvent struct {
 	Data interface{}
 }
 
+// PodLifecycleEventGenerator contains functions for generating pod life cycle events.
 type PodLifecycleEventGenerator interface {
 	Start()
 	Watch() chan *PodLifecycleEvent

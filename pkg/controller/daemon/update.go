@@ -19,9 +19,10 @@ package daemon
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"sort"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/apimachinery/pkg/util/rand"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
@@ -55,23 +55,23 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, hash string) 
 
 	// for oldPods delete all not running pods
 	var oldPodsToDelete []string
-	glog.V(4).Infof("Marking all unavailable old pods for deletion")
+	klog.V(4).Infof("Marking all unavailable old pods for deletion")
 	for _, pod := range oldUnavailablePods {
 		// Skip terminating pods. We won't delete them again
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		glog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
+		klog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
 		oldPodsToDelete = append(oldPodsToDelete, pod.Name)
 	}
 
-	glog.V(4).Infof("Marking old pods for deletion")
+	klog.V(4).Infof("Marking old pods for deletion")
 	for _, pod := range oldAvailablePods {
 		if numUnavailable >= maxUnavailable {
-			glog.V(4).Infof("Number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", numUnavailable, maxUnavailable)
+			klog.V(4).Infof("Number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", numUnavailable, maxUnavailable)
 			break
 		}
-		glog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
+		klog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
 		oldPodsToDelete = append(oldPodsToDelete, pod.Name)
 		numUnavailable++
 	}
@@ -178,7 +178,7 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 			continue
 		}
 		// Clean up
-		err := dsc.kubeClient.AppsV1beta1().ControllerRevisions(ds.Namespace).Delete(history.Name, nil)
+		err := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(history.Name, nil)
 		if err != nil {
 			return err
 		}
@@ -234,7 +234,7 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistor
 			}
 		}
 		// Remove duplicates
-		err = dsc.kubeClient.AppsV1beta1().ControllerRevisions(ds.Namespace).Delete(cur.Name, nil)
+		err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(cur.Name, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -261,7 +261,7 @@ func (dsc *DaemonSetsController) controlledHistories(ds *apps.DaemonSet) ([]*app
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+		fresh, err := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -316,8 +316,8 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 	if err != nil {
 		return nil, err
 	}
-	hash := fmt.Sprint(controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount))
-	name := ds.Name + "-" + rand.SafeEncodeString(hash)
+	hash := controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount)
+	name := ds.Name + "-" + hash
 	history := &apps.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
@@ -331,37 +331,41 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 	}
 
 	history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Create(history)
-	if errors.IsAlreadyExists(err) {
+	if outerErr := err; errors.IsAlreadyExists(outerErr) {
 		// TODO: Is it okay to get from historyLister?
 		existedHistory, getErr := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Get(name, metav1.GetOptions{})
 		if getErr != nil {
 			return nil, getErr
 		}
 		// Check if we already created it
-		done, err := Match(ds, existedHistory)
-		if err != nil {
-			return nil, err
+		done, matchErr := Match(ds, existedHistory)
+		if matchErr != nil {
+			return nil, matchErr
 		}
 		if done {
 			return existedHistory, nil
 		}
 
 		// Handle name collisions between different history
-		// TODO: Is it okay to get from dsLister?
-		currDS, getErr := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+		// Get the latest DaemonSet from the API server to make sure collision count is only increased when necessary
+		currDS, getErr := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
 		if getErr != nil {
 			return nil, getErr
+		}
+		// If the collision count used to compute hash was in fact stale, there's no need to bump collision count; retry again
+		if !reflect.DeepEqual(currDS.Status.CollisionCount, ds.Status.CollisionCount) {
+			return nil, fmt.Errorf("found a stale collision count (%d, expected %d) of DaemonSet %q while processing; will retry until it is updated", ds.Status.CollisionCount, currDS.Status.CollisionCount, ds.Name)
 		}
 		if currDS.Status.CollisionCount == nil {
 			currDS.Status.CollisionCount = new(int32)
 		}
 		*currDS.Status.CollisionCount++
-		_, updateErr := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).UpdateStatus(currDS)
+		_, updateErr := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).UpdateStatus(currDS)
 		if updateErr != nil {
 			return nil, updateErr
 		}
-		glog.V(2).Infof("Found a hash collision for DaemonSet %q - bumping collisionCount to %d to resolve it", ds.Name, *currDS.Status.CollisionCount)
-		return nil, err
+		klog.V(2).Infof("Found a hash collision for DaemonSet %q - bumping collisionCount to %d to resolve it", ds.Name, *currDS.Status.CollisionCount)
+		return nil, outerErr
 	}
 	return history, err
 }
@@ -389,7 +393,7 @@ func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *apps.DaemonSet, nodeToD
 }
 
 func (dsc *DaemonSetsController) getUnavailableNumbers(ds *apps.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod) (int, int, error) {
-	glog.V(4).Infof("Getting unavailable numbers")
+	klog.V(4).Infof("Getting unavailable numbers")
 	// TODO: get nodeList once in syncDaemonSet and pass it to other functions
 	nodeList, err := dsc.nodeLister.List(labels.Everything())
 	if err != nil {
@@ -428,7 +432,7 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *apps.DaemonSet, nodeT
 	if err != nil {
 		return -1, -1, fmt.Errorf("Invalid value for MaxUnavailable: %v", err)
 	}
-	glog.V(4).Infof(" DaemonSet %s/%s, maxUnavailable: %d, numUnavailable: %d", ds.Namespace, ds.Name, maxUnavailable, numUnavailable)
+	klog.V(4).Infof(" DaemonSet %s/%s, maxUnavailable: %d, numUnavailable: %d", ds.Namespace, ds.Name, maxUnavailable, numUnavailable)
 	return maxUnavailable, numUnavailable, nil
 }
 

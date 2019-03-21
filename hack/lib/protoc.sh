@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -83,7 +83,7 @@ function kube::protoc::format() {
 function kube::protoc::diff() {
   local ret=0
   diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr ${1} ${2} || ret=$?
-  if [[ $ret -ne 0 ]]; then
+  if [[ ${ret} -ne 0 ]]; then
     echo ${3}
     exit 1
   fi

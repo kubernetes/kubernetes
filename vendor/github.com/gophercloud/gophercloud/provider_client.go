@@ -3,6 +3,7 @@ package gophercloud
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -71,6 +72,10 @@ type ProviderClient struct {
 	// authentication functions for different Identity service versions.
 	ReauthFunc func() error
 
+	// IsThrowaway determines whether if this client is a throw-away client. It's a copy of user's provider client
+	// with the token and reauth func zeroed. Such client can be used to perform reauthorization.
+	IsThrowaway bool
+
 	mut *sync.RWMutex
 
 	reauthmut *reauthlock
@@ -78,19 +83,23 @@ type ProviderClient struct {
 
 type reauthlock struct {
 	sync.RWMutex
-	reauthing bool
+	reauthing    bool
+	reauthingErr error
+	done         *sync.Cond
 }
 
 // AuthenticatedHeaders returns a map of HTTP headers that are common for all
-// authenticated service requests.
+// authenticated service requests. Blocks if Reauthenticate is in progress.
 func (client *ProviderClient) AuthenticatedHeaders() (m map[string]string) {
+	if client.IsThrowaway {
+		return
+	}
 	if client.reauthmut != nil {
-		client.reauthmut.RLock()
-		if client.reauthmut.reauthing {
-			client.reauthmut.RUnlock()
-			return
+		client.reauthmut.Lock()
+		for client.reauthmut.reauthing {
+			client.reauthmut.done.Wait()
 		}
-		client.reauthmut.RUnlock()
+		client.reauthmut.Unlock()
 	}
 	t := client.Token()
 	if t == "" {
@@ -124,6 +133,52 @@ func (client *ProviderClient) SetToken(t string) {
 		defer client.mut.Unlock()
 	}
 	client.TokenID = t
+}
+
+// Reauthenticate calls client.ReauthFunc in a thread-safe way. If this is
+// called because of a 401 response, the caller may pass the previous token. In
+// this case, the reauthentication can be skipped if another thread has already
+// reauthenticated in the meantime. If no previous token is known, an empty
+// string should be passed instead to force unconditional reauthentication.
+func (client *ProviderClient) Reauthenticate(previousToken string) (err error) {
+	if client.ReauthFunc == nil {
+		return nil
+	}
+
+	if client.mut == nil {
+		return client.ReauthFunc()
+	}
+
+	client.reauthmut.Lock()
+	if client.reauthmut.reauthing {
+		for !client.reauthmut.reauthing {
+			client.reauthmut.done.Wait()
+		}
+		err = client.reauthmut.reauthingErr
+		client.reauthmut.Unlock()
+		return err
+	}
+	client.reauthmut.Unlock()
+
+	client.mut.Lock()
+	defer client.mut.Unlock()
+
+	client.reauthmut.Lock()
+	client.reauthmut.reauthing = true
+	client.reauthmut.done = sync.NewCond(client.reauthmut)
+	client.reauthmut.reauthingErr = nil
+	client.reauthmut.Unlock()
+
+	if previousToken == "" || client.TokenID == previousToken {
+		err = client.ReauthFunc()
+	}
+
+	client.reauthmut.Lock()
+	client.reauthmut.reauthing = false
+	client.reauthmut.reauthingErr = err
+	client.reauthmut.done.Broadcast()
+	client.reauthmut.Unlock()
+	return
 }
 
 // RequestOpts customizes the behavior of the provider.Request() method.
@@ -162,7 +217,7 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 	// io.ReadSeeker as-is. Default the content-type to application/json.
 	if options.JSONBody != nil {
 		if options.RawBody != nil {
-			panic("Please provide only one of JSONBody or RawBody to gophercloud.Request().")
+			return nil, errors.New("please provide only one of JSONBody or RawBody to gophercloud.Request()")
 		}
 
 		rendered, err := json.Marshal(options.JSONBody)
@@ -254,21 +309,7 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 			}
 		case http.StatusUnauthorized:
 			if client.ReauthFunc != nil {
-				if client.mut != nil {
-					client.mut.Lock()
-					client.reauthmut.Lock()
-					client.reauthmut.reauthing = true
-					client.reauthmut.Unlock()
-					if curtok := client.TokenID; curtok == prereqtok {
-						err = client.ReauthFunc()
-					}
-					client.reauthmut.Lock()
-					client.reauthmut.reauthing = false
-					client.reauthmut.Unlock()
-					client.mut.Unlock()
-				} else {
-					err = client.ReauthFunc()
-				}
+				err = client.Reauthenticate(prereqtok)
 				if err != nil {
 					e := &ErrUnableToReauthenticate{}
 					e.ErrOriginal = respErr
@@ -297,6 +338,11 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 			err = ErrDefault401{respErr}
 			if error401er, ok := errType.(Err401er); ok {
 				err = error401er.Error401(respErr)
+			}
+		case http.StatusForbidden:
+			err = ErrDefault403{respErr}
+			if error403er, ok := errType.(Err403er); ok {
+				err = error403er.Error403(respErr)
 			}
 		case http.StatusNotFound:
 			err = ErrDefault404{respErr}
@@ -357,7 +403,7 @@ func defaultOkCodes(method string) []int {
 	case method == "PUT":
 		return []int{201, 202}
 	case method == "PATCH":
-		return []int{200, 204}
+		return []int{200, 202, 204}
 	case method == "DELETE":
 		return []int{202, 204}
 	}

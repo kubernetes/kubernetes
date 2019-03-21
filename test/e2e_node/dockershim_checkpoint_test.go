@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -42,7 +43,7 @@ const (
 	testCheckpointContent = `{"version":"v1","name":"fluentd-gcp-v2.0-vmnqx","namespace":"kube-system","data":{},"checksum":1799154314}`
 )
 
-var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker]", func() {
+var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Docker]", func() {
 	f := framework.NewDefaultFramework("dockerhism-checkpoint-test")
 
 	BeforeEach(func() {
@@ -155,7 +156,7 @@ func runPodCheckpointTest(f *framework.Framework, podName string, twist func()) 
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Image: framework.GetPauseImageName(f.ClientSet),
+					Image: imageutils.GetPauseImageName(),
 					Name:  "pause-container",
 				},
 			},

@@ -18,12 +18,12 @@ package benchmark
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
 	testutils "k8s.io/kubernetes/test/utils"
 	"math"
 	"strconv"
@@ -49,10 +49,6 @@ var (
 	baseNodeTemplate = &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "sample-node-",
-		},
-		Spec: v1.NodeSpec{
-			// TODO: investigate why this is needed.
-			ExternalID: "foo",
 		},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
@@ -83,7 +79,7 @@ func TestSchedule100Node3KPods(t *testing.T) {
 	if min < threshold3K {
 		t.Errorf("Failing: Scheduling rate was too low for an interval, we saw rate of %v, which is the allowed minimum of %v ! ", min, threshold3K)
 	} else if min < warning3K {
-		fmt.Printf("Warning: pod scheduling throughput for 3k pods was slow for an interval... Saw a interval with very low (%v) scheduling rate!", min)
+		fmt.Printf("Warning: pod scheduling throughput for 3k pods was slow for an interval... Saw an interval with very low (%v) scheduling rate!", min)
 	} else {
 		fmt.Printf("Minimal observed throughput for 3k pod test: %v\n", min)
 	}
@@ -97,7 +93,7 @@ func TestSchedule100Node3KPods(t *testing.T) {
 // 	}
 // 	config := defaultSchedulerBenchmarkConfig(2000, 60000)
 // 	if min := schedulePods(config); min < threshold60K {
-// 		t.Errorf("To small pod scheduling throughput for 60k pods. Expected %v got %v", threshold60K, min)
+// 		t.Errorf("Too small pod scheduling throughput for 60k pods. Expected %v got %v", threshold60K, min)
 // 	} else {
 // 		fmt.Printf("Minimal observed throughput for 60k pod test: %v\n", min)
 // 	}
@@ -109,7 +105,7 @@ type testConfig struct {
 	numNodes                  int
 	mutatedNodeTemplate       *v1.Node
 	mutatedPodTemplate        *v1.Pod
-	schedulerSupportFunctions scheduler.Configurator
+	schedulerSupportFunctions factory.Configurator
 	destroyFunc               func()
 }
 
@@ -134,14 +130,14 @@ func schedulePods(config *testConfig) int32 {
 	prev := 0
 	// On startup there may be a latent period where NO scheduling occurs (qps = 0).
 	// We are interested in low scheduling rates (i.e. qps=2),
-	minQps := int32(math.MaxInt32)
+	minQPS := int32(math.MaxInt32)
 	start := time.Now()
 	// Bake in time for the first pod scheduling event.
 	for {
 		time.Sleep(50 * time.Millisecond)
 		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
 		if err != nil {
-			glog.Fatalf("%v", err)
+			klog.Fatalf("%v", err)
 		}
 		// 30,000 pods -> wait till @ least 300 are scheduled to start measuring.
 		// TODO Find out why sometimes there may be scheduling blips in the beginning.
@@ -159,23 +155,27 @@ func schedulePods(config *testConfig) int32 {
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
 		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
 		if err != nil {
-			glog.Fatalf("%v", err)
+			klog.Fatalf("%v", err)
 		}
 
 		// We will be completed when all pods are done being scheduled.
 		// return the worst-case-scenario interval that was seen during this time.
 		// Note this should never be low due to cold-start, so allow bake in sched time if necessary.
 		if len(scheduled) >= config.numPods {
+			consumed := int(time.Since(start) / time.Second)
+			if consumed <= 0 {
+				consumed = 1
+			}
 			fmt.Printf("Scheduled %v Pods in %v seconds (%v per second on average). min QPS was %v\n",
-				config.numPods, int(time.Since(start)/time.Second), config.numPods/int(time.Since(start)/time.Second), minQps)
-			return minQps
+				config.numPods, consumed, config.numPods/consumed, minQPS)
+			return minQPS
 		}
 
 		// There's no point in printing it for the last iteration, as the value is random
 		qps := len(scheduled) - prev
-		qpsStats[qps] += 1
-		if int32(qps) < minQps {
-			minQps = int32(qps)
+		qpsStats[qps]++
+		if int32(qps) < minQPS {
+			minQPS = int32(qps)
 		}
 		fmt.Printf("%ds\trate: %d\ttotal: %d (qps frequency: %v)\n", time.Since(start)/time.Second, qps, len(scheduled), qpsStats)
 		prev = len(scheduled)

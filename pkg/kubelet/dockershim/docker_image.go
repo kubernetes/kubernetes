@@ -25,7 +25,7 @@ import (
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/jsonmessage"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
@@ -52,7 +52,7 @@ func (ds *dockerService) ListImages(_ context.Context, r *runtimeapi.ListImagesR
 	for _, i := range images {
 		apiImage, err := imageToRuntimeAPIImage(&i)
 		if err != nil {
-			glog.V(5).Infof("Failed to convert docker API image %+v to runtime API image: %v", i, err)
+			klog.V(5).Infof("Failed to convert docker API image %+v to runtime API image: %v", i, err)
 			continue
 		}
 		result = append(result, apiImage)
@@ -120,24 +120,32 @@ func (ds *dockerService) RemoveImage(_ context.Context, r *runtimeapi.RemoveImag
 	// TODO: We assume image.Image is image ID here, which is true in the current implementation
 	// of kubelet, but we should still clarify this in CRI.
 	imageInspect, err := ds.client.InspectImageByID(image.Image)
-	if err == nil && imageInspect != nil && len(imageInspect.RepoTags) > 1 {
-		for _, tag := range imageInspect.RepoTags {
-			if _, err := ds.client.RemoveImage(tag, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil && !libdocker.IsImageNotFoundError(err) {
-				return nil, err
-			}
-		}
-		return &runtimeapi.RemoveImageResponse{}, nil
-	}
+
 	// dockerclient.InspectImageByID doesn't work with digest and repoTags,
 	// it is safe to continue removing it since there is another check below.
 	if err != nil && !libdocker.IsImageNotFoundError(err) {
 		return nil, err
 	}
 
-	_, err = ds.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true})
-	if err != nil && !libdocker.IsImageNotFoundError(err) {
-		return nil, err
+	if imageInspect == nil {
+		// image is nil, assuming it doesn't exist.
+		return &runtimeapi.RemoveImageResponse{}, nil
 	}
+
+	// An image can have different numbers of RepoTags and RepoDigests.
+	// Iterating over both of them plus the image ID ensures the image really got removed.
+	// It also prevents images from being deleted, which actually are deletable using this approach.
+	var images []string
+	images = append(images, imageInspect.RepoTags...)
+	images = append(images, imageInspect.RepoDigests...)
+	images = append(images, image.Image)
+
+	for _, image := range images {
+		if _, err := ds.client.RemoveImage(image, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil && !libdocker.IsImageNotFoundError(err) {
+			return nil, err
+		}
+	}
+
 	return &runtimeapi.RemoveImageResponse{}, nil
 }
 

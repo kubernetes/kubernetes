@@ -54,12 +54,6 @@ func selinuxLabelLevel(separator rune) string {
 	return fmt.Sprintf("label%clevel", separator)
 }
 
-// dockerLaelDisable returns the Docker security opt that disables SELinux for
-// the container.
-func selinuxLabelDisable(separator rune) string {
-	return fmt.Sprintf("label%cdisable", separator)
-}
-
 // addSELinuxOptions adds SELinux options to config using the given
 // separator.
 func addSELinuxOptions(config []string, selinuxOpts *runtimeapi.SELinuxOption, separator rune) []string {

@@ -1,17 +1,33 @@
-reviewers:
-  - brendandburns
-  - dchen1107
-  - jbeda
-  - lavalamp
-  - smarterclayton
-  - thockin
-approvers:
-  - bgrant0607
-  - brendandburns
-  - dchen1107
-  - jbeda
-  - monopole # To move code per kubernetes/community#598
-  - lavalamp
-  - smarterclayton
-  - thockin
-  - wojtek-t
+# See the OWNERS docs at https://go.k8s.io/owners
+
+filters:
+  ".*":
+    reviewers:
+      - brendandburns
+      - dchen1107
+      - jbeda
+      - lavalamp
+      - smarterclayton
+      - thockin
+      - liggitt
+    approvers:
+      - bgrant0607
+      - brendandburns
+      - dchen1107
+      - jbeda
+      - monopole # To move code per kubernetes/community#598
+      - lavalamp
+      - smarterclayton
+      - thockin
+      - wojtek-t
+      - liggitt
+
+  # Bazel build infrastructure changes often touch files throughout the tree
+  "\\.bzl$":
+    reviewers:
+      - ixdy
+    approvers:
+      - ixdy
+  "BUILD(\\.bazel)?$":
+    approvers:
+      - ixdy

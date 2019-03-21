@@ -19,7 +19,6 @@ package sysctl
 import (
 	"fmt"
 
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -31,7 +30,6 @@ const (
 	dockerMinimumAPIVersion = "1.24.0"
 
 	dockerTypeName = "docker"
-	rktTypeName    = "rkt"
 )
 
 // TODO: The admission logic in this file is runtime-dependent. It should be
@@ -72,14 +70,6 @@ func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, er
 				Message: "Docker API version before 1.24 does not support sysctls",
 			},
 		}, nil
-	case rktTypeName:
-		return &runtimeAdmitHandler{
-			result: lifecycle.PodAdmitResult{
-				Admit:   false,
-				Reason:  UnsupportedReason,
-				Message: "Rkt does not support sysctls",
-			},
-		}, nil
 	default:
 		// Return admit for other runtimes.
 		return &runtimeAdmitHandler{
@@ -92,17 +82,11 @@ func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, er
 
 // Admit checks whether the runtime supports sysctls.
 func (w *runtimeAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	sysctls, unsafeSysctls, err := v1helper.SysctlsFromPodAnnotations(attrs.Pod.Annotations)
-	if err != nil {
-		return lifecycle.PodAdmitResult{
-			Admit:   false,
-			Reason:  AnnotationInvalidReason,
-			Message: fmt.Sprintf("invalid sysctl annotation: %v", err),
-		}
-	}
+	if attrs.Pod.Spec.SecurityContext != nil {
 
-	if len(sysctls)+len(unsafeSysctls) > 0 {
-		return w.result
+		if len(attrs.Pod.Spec.SecurityContext.Sysctls) > 0 {
+			return w.result
+		}
 	}
 
 	return lifecycle.PodAdmitResult{

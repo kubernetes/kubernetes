@@ -1,5 +1,6 @@
 {{.Comment}}
 func {{.DocInfo.Name}}(t TestingT, {{.Params}}) {
+	if h, ok := t.(tHelper); ok { h.Helper() }
 	if !assert.{{.DocInfo.Name}}(t, {{.ForwardedParams}}) {
 		t.FailNow()
 	}

@@ -62,7 +62,7 @@ func (c *FakePersistentVolumeClaims) List(opts v1.ListOptions) (result *core.Per
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &core.PersistentVolumeClaimList{}
+	list := &core.PersistentVolumeClaimList{ListMeta: obj.(*core.PersistentVolumeClaimList).ListMeta}
 	for _, item := range obj.(*core.PersistentVolumeClaimList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -131,7 +131,7 @@ func (c *FakePersistentVolumeClaims) DeleteCollection(options *v1.DeleteOptions,
 // Patch applies the patch and returns the patched persistentVolumeClaim.
 func (c *FakePersistentVolumeClaims) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, data, subresources...), &core.PersistentVolumeClaim{})
+		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, pt, data, subresources...), &core.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err

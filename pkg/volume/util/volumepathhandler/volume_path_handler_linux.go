@@ -25,7 +25,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // AttachFileDevice takes a path to a regular file and makes it available as an
@@ -38,7 +38,7 @@ func (v VolumePathHandler) AttachFileDevice(path string) (string, error) {
 
 	// If no existing loop device for the path, create one
 	if blockDevicePath == "" {
-		glog.V(4).Infof("Creating device for path: %s", path)
+		klog.V(4).Infof("Creating device for path: %s", path)
 		blockDevicePath, err = makeLoopDevice(path)
 		if err != nil {
 			return "", err
@@ -61,7 +61,7 @@ func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
 	cmd := exec.Command(losetupPath, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Failed device discover command for path %s: %v %s", path, err, out)
+		klog.V(2).Infof("Failed device discover command for path %s: %v %s", path, err, out)
 		return "", err
 	}
 	return parseLosetupOutputForDevice(out)
@@ -72,7 +72,7 @@ func makeLoopDevice(path string) (string, error) {
 	cmd := exec.Command(losetupPath, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Failed device create command for path: %s %v %s ", path, err, out)
+		klog.V(2).Infof("Failed device create command for path: %s %v %s ", path, err, out)
 		return "", err
 	}
 	return parseLosetupOutputForDevice(out)
@@ -87,7 +87,7 @@ func (v VolumePathHandler) RemoveLoopDevice(device string) error {
 		if _, err := os.Stat(device); os.IsNotExist(err) {
 			return nil
 		}
-		glog.V(2).Infof("Failed to remove loopback device: %s: %v %s", device, err, out)
+		klog.V(2).Infof("Failed to remove loopback device: %s: %v %s", device, err, out)
 		return err
 	}
 	return nil

@@ -25,7 +25,6 @@ import (
 
 type AdmissionregistrationInterface interface {
 	RESTClient() rest.Interface
-	InitializerConfigurationsGetter
 	MutatingWebhookConfigurationsGetter
 	ValidatingWebhookConfigurationsGetter
 }
@@ -33,10 +32,6 @@ type AdmissionregistrationInterface interface {
 // AdmissionregistrationClient is used to interact with features provided by the admissionregistration.k8s.io group.
 type AdmissionregistrationClient struct {
 	restClient rest.Interface
-}
-
-func (c *AdmissionregistrationClient) InitializerConfigurations() InitializerConfigurationInterface {
-	return newInitializerConfigurations(c)
 }
 
 func (c *AdmissionregistrationClient) MutatingWebhookConfigurations() MutatingWebhookConfigurationInterface {
@@ -76,17 +71,12 @@ func New(c rest.Interface) *AdmissionregistrationClient {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	g, err := scheme.Registry.Group("admissionregistration.k8s.io")
-	if err != nil {
-		return err
-	}
-
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		gv := g.GroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != scheme.Scheme.PrioritizedVersionsForGroup("admissionregistration.k8s.io")[0].Group {
+		gv := scheme.Scheme.PrioritizedVersionsForGroup("admissionregistration.k8s.io")[0]
 		config.GroupVersion = &gv
 	}
 	config.NegotiatedSerializer = scheme.Codecs

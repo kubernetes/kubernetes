@@ -25,7 +25,7 @@ import (
 
 	"golang.org/x/oauth2/google"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -59,20 +59,20 @@ var (
 )
 
 var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
 
-	It("should have cluster metrics [Feature:StackdriverMonitoring]", func() {
+	ginkgo.It("should have cluster metrics [Feature:StackdriverMonitoring]", func() {
 		testStackdriverMonitoring(f, 1, 100, 200)
 	})
 
 })
 
 func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, perPodCPU int64) {
-	projectId := framework.TestContext.CloudConfig.ProjectID
+	projectID := framework.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
@@ -107,7 +107,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	rc.WaitForReplicas(pods, 15*time.Minute)
 
 	metricsMap := map[string]bool{}
-	pollingFunction := checkForMetrics(projectId, gcmService, time.Now(), metricsMap, allPodsCPU, perPodCPU)
+	pollingFunction := checkForMetrics(projectID, gcmService, time.Now(), metricsMap, allPodsCPU, perPodCPU)
 	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
 	if err != nil {
 		framework.Logf("Missing metrics: %+v\n", metricsMap)
@@ -115,7 +115,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	framework.ExpectNoError(err)
 }
 
-func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool, cpuUsed int, cpuLimit int64) func() (bool, error) {
+func checkForMetrics(projectID string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool, cpuUsed int, cpuLimit int64) func() (bool, error) {
 	return func() (bool, error) {
 		counter := 0
 		correctUtilization := false
@@ -124,7 +124,7 @@ func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time,
 		}
 		for _, metric := range stackdriverMetrics {
 			// TODO: check only for metrics from this cluster
-			ts, err := fetchTimeSeries(projectId, gcmService, metric, start, time.Now())
+			ts, err := fetchTimeSeries(projectID, gcmService, metric, start, time.Now())
 			framework.ExpectNoError(err)
 			if len(ts) > 0 {
 				counter = counter + 1
@@ -134,7 +134,7 @@ func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time,
 				framework.Logf("No timeseries for metric %v\n", metric)
 			}
 
-			var sum float64 = 0
+			var sum float64
 			switch metric {
 			case "cpu/utilization":
 				for _, t := range ts {
@@ -154,9 +154,8 @@ func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time,
 				framework.Logf("Most recent cpu/utilization sum*cpu/limit: %v\n", sum*float64(cpuLimit))
 				if math.Abs(sum*float64(cpuLimit)-float64(cpuUsed)) > tolerance*float64(cpuUsed) {
 					return false, nil
-				} else {
-					correctUtilization = true
 				}
+				correctUtilization = true
 			}
 		}
 		if counter < 9 || !correctUtilization {
@@ -166,14 +165,14 @@ func checkForMetrics(projectId string, gcmService *gcm.Service, start time.Time,
 	}
 }
 
-func createMetricFilter(metric string, container_name string) string {
+func createMetricFilter(metric string, containerName string) string {
 	return fmt.Sprintf(`metric.type="container.googleapis.com/container/%s" AND
-				resource.label.container_name="%s"`, metric, container_name)
+				resource.label.container_name="%s"`, metric, containerName)
 }
 
-func fetchTimeSeries(projectId string, gcmService *gcm.Service, metric string, start time.Time, end time.Time) ([]*gcm.TimeSeries, error) {
+func fetchTimeSeries(projectID string, gcmService *gcm.Service, metric string, start time.Time, end time.Time) ([]*gcm.TimeSeries, error) {
 	response, err := gcmService.Projects.TimeSeries.
-		List(fullProjectName(projectId)).
+		List(fullProjectName(projectID)).
 		Filter(createMetricFilter(metric, rcName)).
 		IntervalStartTime(start.Format(time.RFC3339)).
 		IntervalEndTime(end.Format(time.RFC3339)).

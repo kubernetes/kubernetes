@@ -106,12 +106,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	f := framework.NewDefaultFramework("network-partition")
 	var c clientset.Interface
 	var ns string
-	ignoreLabels := framework.ImagePullerLabels
 
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		_, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
+		_, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
 		Expect(err).NotTo(HaveOccurred())
 
 		// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
@@ -132,7 +131,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Expect to observe:
 			// 1. Node is marked NotReady after timeout by nodecontroller (40seconds)
 			// 2. All pods on node are marked NotReady shortly after #1
-			// 3. Node and pods return to Ready after connectivivty recovers
+			// 3. Node and pods return to Ready after connectivity recovers
 			It("All pods on the unreachable node should be marked as NotReady upon the node turn NotReady "+
 				"AND all pods should be mark back to Ready when the node get back to Ready before pod eviction timeout", func() {
 				By("choose a node - we will block all network traffic on this node")
@@ -197,11 +196,14 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				go controller.Run(stopCh)
 
 				By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
-				host := framework.GetNodeExternalIP(&node)
-				master := framework.GetMasterAddress(c)
+				host, err := framework.GetNodeExternalIP(&node)
+				framework.ExpectNoError(err)
+				masterAddresses := framework.GetAllMasterAddresses(c)
 				defer func() {
 					By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
-					framework.UnblockNetwork(host, master)
+					for _, masterAddress := range masterAddresses {
+						framework.UnblockNetwork(host, masterAddress)
+					}
 
 					if CurrentGinkgoTestDescription().Failed {
 						return
@@ -214,7 +216,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					}
 				}()
 
-				framework.BlockNetwork(host, master)
+				for _, masterAddress := range masterAddresses {
+					framework.BlockNetwork(host, masterAddress)
+				}
 
 				By("Expect to observe node and pod status change from Ready to NotReady after network partition")
 				expectNodeReadiness(false, newNode)
@@ -233,9 +237,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-net"
 			common.NewSVCByName(c, ns, name)
-			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
+			numNodes, err := framework.NumberOfRegisteredNodes(f.ClientSet)
+			framework.ExpectNoError(err)
+			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, nil)
-			err := framework.VerifyPods(c, ns, name, true, replicas)
+			err = framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
 			By("choose a node with at least one pod - we will block some network traffic on this node")
@@ -298,9 +304,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			gracePeriod := int64(30)
 
 			common.NewSVCByName(c, ns, name)
-			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
+			numNodes, err := framework.NumberOfRegisteredNodes(f.ClientSet)
+			framework.ExpectNoError(err)
+			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, &gracePeriod)
-			err := framework.VerifyPods(c, ns, name, true, replicas)
+			err = framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
 			By("choose a node with at least one pod - we will block some network traffic on this node")
@@ -371,10 +379,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			pst := framework.NewStatefulSetTester(c)
 
-			nn := framework.TestContext.CloudConfig.NumNodes
-			nodeNames, err := framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, nn)
+			nn, err := framework.NumberOfRegisteredNodes(f.ClientSet)
 			framework.ExpectNoError(err)
-			common.RestartNodes(f.ClientSet, nodeNames)
+			nodes, err := framework.CheckNodesReady(f.ClientSet, nn, framework.NodeReadyInitialTimeout)
+			framework.ExpectNoError(err)
+			common.RestartNodes(f.ClientSet, nodes)
 
 			By("waiting for pods to be running again")
 			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
@@ -569,11 +578,14 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				go controller.Run(stopCh)
 
 				By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
-				host := framework.GetNodeExternalIP(&node)
-				master := framework.GetMasterAddress(c)
+				host, err := framework.GetNodeExternalIP(&node)
+				framework.ExpectNoError(err)
+				masterAddresses := framework.GetAllMasterAddresses(c)
 				defer func() {
 					By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
-					framework.UnblockNetwork(host, master)
+					for _, masterAddress := range masterAddresses {
+						framework.UnblockNetwork(host, masterAddress)
+					}
 
 					if CurrentGinkgoTestDescription().Failed {
 						return
@@ -583,7 +595,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					expectNodeReadiness(true, newNode)
 				}()
 
-				framework.BlockNetwork(host, master)
+				for _, masterAddress := range masterAddresses {
+					framework.BlockNetwork(host, masterAddress)
+				}
 
 				By("Expect to observe node and pod status change from Ready to NotReady after network partition")
 				expectNodeReadiness(false, newNode)

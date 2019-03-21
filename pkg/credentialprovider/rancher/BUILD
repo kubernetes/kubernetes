@@ -25,8 +25,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/credentialprovider/rancher",
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/rancher/go-rancher/client:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

@@ -17,21 +17,19 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+export KUBE_ROOT
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# Ensure that we find the binaries we build before anything else.
+export GOBIN="${KUBE_OUTPUT_BINPATH}"
+PATH="${GOBIN}:${PATH}"
+
 # Install tools we need, but only from vendor/...
-cd ${KUBE_ROOT}
-go install ./vendor/github.com/client9/misspell/cmd/misspell
-if ! which misspell >/dev/null 2>&1; then
-    echo "Can't find misspell - is your GOPATH 'bin' in your PATH?" >&2
-    echo "  GOPATH: ${GOPATH}" >&2
-    echo "  PATH:   ${PATH}" >&2
-    exit 1
-fi
+go install k8s.io/kubernetes/vendor/github.com/client9/misspell/cmd/misspell
 
 # Spell checking
 # All the skipping files are defined in hack/.spelling_failures
 skipping_file="${KUBE_ROOT}/hack/.spelling_failures"
-failing_packages=$(echo `cat ${skipping_file}` | sed "s| | -e |g")
-git ls-files | grep -v -e ${failing_packages} | xargs misspell -i "Creater,creater,ect" -error -o stderr
+failing_packages=$(sed "s| | -e |g" "${skipping_file}")
+git ls-files | grep -v -e "${failing_packages}" | xargs misspell -i "Creater,creater,ect" -error -o stderr

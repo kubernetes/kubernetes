@@ -1,0 +1,21 @@
+apiEndpoint:
+  advertiseAddress: 192.168.2.2
+  bindPort: 6443
+apiVersion: kubeadm.k8s.io/v1alpha3
+caCertPath: /etc/kubernetes/pki/ca.crt
+controlPlane: true
+discoveryFile: ""
+discoveryTimeout: 5m0s
+discoveryToken: abcdef.0123456789abcdef
+discoveryTokenAPIServers:
+- kube-apiserver:6443
+discoveryTokenUnsafeSkipCAVerification: true
+kind: JoinConfiguration
+nodeRegistration:
+  criSocket: /var/run/dockershim.sock
+  name: control-plane-1
+  taints:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
+tlsBootstrapToken: abcdef.0123456789abcdef
+token: abcdef.0123456789abcdef

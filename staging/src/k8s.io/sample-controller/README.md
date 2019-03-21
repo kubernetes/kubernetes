@@ -3,6 +3,8 @@
 This repository implements a simple controller for watching Foo resources as
 defined with a CustomResourceDefinition (CRD).
 
+**Note:** go-get or vendor this package as `k8s.io/sample-controller`.
+
 This particular example demonstrates how to perform basic operations such as:
 
 * How to register a new custom resource (custom resource type) of type `Foo` using a CustomResourceDefinition.
@@ -23,6 +25,13 @@ Changes should not be made to these files manually, and when creating your own
 controller based off of this implementation you should not copy these files and
 instead run the `update-codegen` script to generate your own.
 
+## Details
+
+The sample controller uses [client-go library](https://github.com/kubernetes/client-go/tree/master/tools/cache) extensively.
+The details of interaction points of the sample controller with various mechanisms from this library are
+explained [here](docs/controller-client-go.md).
+
+
 ## Purpose
 
 This is an example of how to build a kube-like controller with a single type.
@@ -33,7 +42,10 @@ This is an example of how to build a kube-like controller with a single type.
 
 ```sh
 # assumes you have a working kubeconfig, not required if operating in-cluster
-$ go run *.go -kubeconfig=$HOME/.kube/config
+$ go get k8s.io/sample-controller
+$ cd $GOPATH/src/k8s.io/sample-controller
+$ go build -o sample-controller .
+$ ./sample-controller -kubeconfig=$HOME/.kube/config
 
 # create a CustomResourceDefinition
 $ kubectl create -f artifacts/examples/crd.yaml
@@ -79,17 +91,43 @@ type User struct {
 
 To validate custom resources, use the [`CustomResourceValidation`](https://kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions/#validation) feature.
 
-This feature is beta and enabled by default in v1.9. If you are using v1.8, enable the feature using
-the `CustomResourceValidation` feature gate on the [kube-apiserver](https://kubernetes.io/docs/admin/kube-apiserver):
+This feature is beta and enabled by default in v1.9.
+
+### Example
+
+The schema in [`crd-validation.yaml`](./artifacts/examples/crd-validation.yaml) applies the following validation on the custom resource:
+`spec.replicas` must be an integer and must have a minimum value of 1 and a maximum value of 10.
+
+In the above steps, use `crd-validation.yaml` to create the CRD:
 
 ```sh
---feature-gates=CustomResourceValidation=true
+# create a CustomResourceDefinition supporting validation
+$ kubectl create -f artifacts/examples/crd-validation.yaml
+```
+
+## Subresources
+
+Custom Resources support `/status` and `/scale` subresources as a [beta feature](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#subresources) in v1.11 and is enabled by default.
+This feature is [alpha](https://v1-10.docs.kubernetes.io/docs/tasks/access-kubernetes-api/extend-api-custom-resource-definitions/#subresources) in v1.10 and to enable it you need to set the `CustomResourceSubresources` feature gate on the [kube-apiserver](https://kubernetes.io/docs/admin/kube-apiserver):
+
+```sh
+--feature-gates=CustomResourceSubresources=true
 ```
 
 ### Example
 
-The schema in the [example CRD](./artifacts/examples/crd.yaml) applies the following validation on the custom resource:
-`spec.replicas` must be an integer and must have a minimum value of 1 and a maximum value of 10.
+The CRD in [`crd-status-subresource.yaml`](./artifacts/examples/crd-status-subresource.yaml) enables the `/status` subresource
+for custom resources.
+This means that [`UpdateStatus`](./controller.go#L330) can be used by the controller to update only the status part of the custom resource.
+
+To understand why only the status part of the custom resource should be updated, please refer to the [Kubernetes API conventions](https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status).
+
+In the above steps, use `crd-status-subresource.yaml` to create the CRD:
+
+```sh
+# create a CustomResourceDefinition supporting the status subresource
+$ kubectl create -f artifacts/examples/crd-status-subresource.yaml
+```
 
 ## Cleanup
 

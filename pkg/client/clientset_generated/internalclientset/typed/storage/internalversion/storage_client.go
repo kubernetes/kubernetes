@@ -25,6 +25,8 @@ import (
 
 type StorageInterface interface {
 	RESTClient() rest.Interface
+	CSIDriversGetter
+	CSINodesGetter
 	StorageClassesGetter
 	VolumeAttachmentsGetter
 }
@@ -32,6 +34,14 @@ type StorageInterface interface {
 // StorageClient is used to interact with features provided by the storage.k8s.io group.
 type StorageClient struct {
 	restClient rest.Interface
+}
+
+func (c *StorageClient) CSIDrivers() CSIDriverInterface {
+	return newCSIDrivers(c)
+}
+
+func (c *StorageClient) CSINodes() CSINodeInterface {
+	return newCSINodes(c)
 }
 
 func (c *StorageClient) StorageClasses() StorageClassInterface {
@@ -71,17 +81,12 @@ func New(c rest.Interface) *StorageClient {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	g, err := scheme.Registry.Group("storage.k8s.io")
-	if err != nil {
-		return err
-	}
-
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		gv := g.GroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != scheme.Scheme.PrioritizedVersionsForGroup("storage.k8s.io")[0].Group {
+		gv := scheme.Scheme.PrioritizedVersionsForGroup("storage.k8s.io")[0]
 		config.GroupVersion = &gv
 	}
 	config.NegotiatedSerializer = scheme.Codecs

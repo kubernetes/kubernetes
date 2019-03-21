@@ -152,6 +152,26 @@ func finalizeRootfs(config *configs.Config) (err error) {
 	return nil
 }
 
+// /tmp has to be mounted as private to allow MS_MOVE to work in all situations
+func prepareTmp(topTmpDir string) (string, error) {
+	tmpdir, err := ioutil.TempDir(topTmpDir, "runctop")
+	if err != nil {
+		return "", err
+	}
+	if err := unix.Mount(tmpdir, tmpdir, "bind", unix.MS_BIND, ""); err != nil {
+		return "", err
+	}
+	if err := unix.Mount("", tmpdir, "", uintptr(unix.MS_PRIVATE), ""); err != nil {
+		return "", err
+	}
+	return tmpdir, nil
+}
+
+func cleanupTmp(tmpdir string) error {
+	unix.Unmount(tmpdir, 0)
+	return os.RemoveAll(tmpdir)
+}
+
 func mountCmd(cmd configs.Command) error {
 	command := exec.Command(cmd.Path, cmd.Args[:]...)
 	command.Env = cmd.Env
@@ -199,7 +219,12 @@ func mountToRootfs(m *configs.Mount, rootfs, mountLabel string) error {
 			}
 		}
 		if copyUp {
-			tmpDir, err = ioutil.TempDir("/tmp", "runctmpdir")
+			tmpdir, err := prepareTmp("/tmp")
+			if err != nil {
+				return newSystemErrorWithCause(err, "tmpcopyup: failed to setup tmpdir")
+			}
+			defer cleanupTmp(tmpdir)
+			tmpDir, err = ioutil.TempDir(tmpdir, "runctmpdir")
 			if err != nil {
 				return newSystemErrorWithCause(err, "tmpcopyup: failed to create tmpdir")
 			}
@@ -396,6 +421,7 @@ func checkMountDestination(rootfs, dest string) error {
 		"/proc/stat",
 		"/proc/swaps",
 		"/proc/uptime",
+		"/proc/loadavg",
 		"/proc/net/dev",
 	}
 	for _, valid := range validDestinations {
@@ -412,7 +438,7 @@ func checkMountDestination(rootfs, dest string) error {
 		if err != nil {
 			return err
 		}
-		if path == "." || !strings.HasPrefix(path, "..") {
+		if path != "." && !strings.HasPrefix(path, "..") {
 			return fmt.Errorf("%q cannot be mounted because it is located inside %q", dest, invalid)
 		}
 	}
@@ -778,10 +804,10 @@ func remountReadonly(m *configs.Mount) error {
 // mounts ( proc/kcore ).
 // For files, maskPath bind mounts /dev/null over the top of the specified path.
 // For directories, maskPath mounts read-only tmpfs over the top of the specified path.
-func maskPath(path string) error {
+func maskPath(path string, mountLabel string) error {
 	if err := unix.Mount("/dev/null", path, "", unix.MS_BIND, ""); err != nil && !os.IsNotExist(err) {
 		if err == unix.ENOTDIR {
-			return unix.Mount("tmpfs", path, "tmpfs", unix.MS_RDONLY, "")
+			return unix.Mount("tmpfs", path, "tmpfs", unix.MS_RDONLY, label.FormatMountLabel("", mountLabel))
 		}
 		return err
 	}
@@ -802,10 +828,7 @@ func remount(m *configs.Mount, rootfs string) error {
 	if !strings.HasPrefix(dest, rootfs) {
 		dest = filepath.Join(rootfs, dest)
 	}
-	if err := unix.Mount(m.Source, dest, m.Device, uintptr(m.Flags|unix.MS_REMOUNT), ""); err != nil {
-		return err
-	}
-	return nil
+	return unix.Mount(m.Source, dest, m.Device, uintptr(m.Flags|unix.MS_REMOUNT), "")
 }
 
 // Do the mount operation followed by additional mounts required to take care

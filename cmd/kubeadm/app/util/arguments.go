@@ -18,21 +18,38 @@ package util
 
 import (
 	"fmt"
+	"sort"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
-// BuildArgumentListFromMap takes two string-string maps, one with the base arguments and one with optional override arguments
+// BuildArgumentListFromMap takes two string-string maps, one with the base arguments and one
+// with optional override arguments. In the return list override arguments will precede base
+// arguments
 func BuildArgumentListFromMap(baseArguments map[string]string, overrideArguments map[string]string) []string {
 	var command []string
-	for k, v := range overrideArguments {
-		// values of "" are allowed as well
-		command = append(command, fmt.Sprintf("--%s=%s", k, v))
-	}
+	var keys []string
+
+	argsMap := make(map[string]string)
+
 	for k, v := range baseArguments {
-		if _, overrideExists := overrideArguments[k]; !overrideExists {
-			command = append(command, fmt.Sprintf("--%s=%s", k, v))
-		}
+		argsMap[k] = v
 	}
+
+	for k, v := range overrideArguments {
+		argsMap[k] = v
+	}
+
+	for k := range argsMap {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+	for _, k := range keys {
+		command = append(command, fmt.Sprintf("--%s=%s", k, argsMap[k]))
+	}
+
 	return command
 }
 
@@ -74,10 +91,10 @@ func ReplaceArgument(command []string, argMutateFunc func(map[string]string) map
 // parseArgument parses the argument "--foo=bar" to "foo" and "bar"
 func parseArgument(arg string) (string, string, error) {
 	if !strings.HasPrefix(arg, "--") {
-		return "", "", fmt.Errorf("the argument should start with '--'")
+		return "", "", errors.New("the argument should start with '--'")
 	}
 	if !strings.Contains(arg, "=") {
-		return "", "", fmt.Errorf("the argument should have a '=' between the flag and the value")
+		return "", "", errors.New("the argument should have a '=' between the flag and the value")
 	}
 	// Remove the starting --
 	arg = strings.TrimPrefix(arg, "--")
@@ -86,10 +103,10 @@ func parseArgument(arg string) (string, string, error) {
 
 	// Make sure both a key and value is present
 	if len(keyvalSlice) != 2 {
-		return "", "", fmt.Errorf("the argument must have both a key and a value")
+		return "", "", errors.New("the argument must have both a key and a value")
 	}
 	if len(keyvalSlice[0]) == 0 {
-		return "", "", fmt.Errorf("the argument must have a key")
+		return "", "", errors.New("the argument must have a key")
 	}
 
 	return keyvalSlice[0], keyvalSlice[1], nil

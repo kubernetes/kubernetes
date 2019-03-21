@@ -7,42 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "resource_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "resource_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "resource_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "resource_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "resource_container_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "resource_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "resource_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "resource_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "resource_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "resource_container_unsupported.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "resource_container_unsupported.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "resource_container_linux.go",
+        "resource_container_unsupported.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/resourcecontainer",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

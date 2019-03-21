@@ -10,16 +10,16 @@ import (
 // list of known message types we want to send to bootstrap program
 // The number is randomly chosen to not conflict with known netlink types
 const (
-	InitMsg         uint16 = 62000
-	CloneFlagsAttr  uint16 = 27281
-	NsPathsAttr     uint16 = 27282
-	UidmapAttr      uint16 = 27283
-	GidmapAttr      uint16 = 27284
-	SetgroupAttr    uint16 = 27285
-	OomScoreAdjAttr uint16 = 27286
-	RootlessAttr    uint16 = 27287
-	UidmapPathAttr  uint16 = 27288
-	GidmapPathAttr  uint16 = 27289
+	InitMsg          uint16 = 62000
+	CloneFlagsAttr   uint16 = 27281
+	NsPathsAttr      uint16 = 27282
+	UidmapAttr       uint16 = 27283
+	GidmapAttr       uint16 = 27284
+	SetgroupAttr     uint16 = 27285
+	OomScoreAdjAttr  uint16 = 27286
+	RootlessEUIDAttr uint16 = 27287
+	UidmapPathAttr   uint16 = 27288
+	GidmapPathAttr   uint16 = 27289
 )
 
 type Int32msg struct {
@@ -77,13 +77,13 @@ func (msg *Boolmsg) Serialize() []byte {
 	native.PutUint16(buf[0:2], uint16(msg.Len()))
 	native.PutUint16(buf[2:4], msg.Type)
 	if msg.Value {
-		buf[4] = 1
+		native.PutUint32(buf[4:8], uint32(1))
 	} else {
-		buf[4] = 0
+		native.PutUint32(buf[4:8], uint32(0))
 	}
 	return buf
 }
 
 func (msg *Boolmsg) Len() int {
-	return unix.NLA_HDRLEN + 1
+	return unix.NLA_HDRLEN + 4 // alignment
 }

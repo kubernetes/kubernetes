@@ -14,6 +14,7 @@ go_library(
         "version1.go",
         "version4.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/pborman/uuid",
     importpath = "github.com/pborman/uuid",
     visibility = ["//visibility:public"],
 )

@@ -22,16 +22,16 @@ import (
 	"path"
 	gostrings "strings"
 
-	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -92,21 +92,25 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 	// If Quobyte is already mounted we don't need to check if the binary is installed
 	if mounter, err := plugin.newMounterInternal(spec, nil, plugin.host.GetMounter(plugin.GetPluginName())); err == nil {
 		qm, _ := mounter.(*quobyteMounter)
-		pluginDir := plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
+		pluginDir := plugin.host.GetPluginDir(utilstrings.EscapeQualifiedName(quobytePluginName))
 		if mounted, err := qm.pluginDirIsMounted(pluginDir); mounted && err == nil {
-			glog.V(4).Infof("quobyte: can support")
+			klog.V(4).Infof("quobyte: can support")
 			return true
 		}
 	} else {
-		glog.V(4).Infof("quobyte: Error: %v", err)
+		klog.V(4).Infof("quobyte: Error: %v", err)
 	}
 
 	exec := plugin.host.GetExec(plugin.GetPluginName())
 	if out, err := exec.Run("ls", "/sbin/mount.quobyte"); err == nil {
-		glog.V(4).Infof("quobyte: can support: %s", string(out))
+		klog.V(4).Infof("quobyte: can support: %s", string(out))
 		return true
 	}
 
+	return false
+}
+
+func (plugin *quobytePlugin) IsMigratedToCSI() bool {
 	return false
 }
 
@@ -234,7 +238,7 @@ func (mounter *quobyteMounter) CanMount() error {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (mounter *quobyteMounter) SetUp(fsGroup *int64) error {
-	pluginDir := mounter.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
+	pluginDir := mounter.plugin.host.GetPluginDir(utilstrings.EscapeQualifiedName(quobytePluginName))
 	return mounter.SetUpAt(pluginDir, fsGroup)
 }
 
@@ -250,6 +254,7 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	os.MkdirAll(dir, 0750)
 	var options []string
+	options = append(options, "allow-usermapping-in-volumename")
 	if mounter.readOnly {
 		options = append(options, "ro")
 	}
@@ -260,7 +265,7 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("quobyte: mount failed: %v", err)
 	}
 
-	glog.V(4).Infof("quobyte: mount set up: %s", dir)
+	klog.V(4).Infof("quobyte: mount set up: %s", dir)
 
 	return nil
 }
@@ -280,7 +285,7 @@ func (quobyteVolume *quobyte) GetPath() string {
 
 	// Quobyte has only one mount in the PluginDir where all Volumes are mounted
 	// The Quobyte client does a fixed-user mapping
-	pluginDir := quobyteVolume.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
+	pluginDir := quobyteVolume.plugin.host.GetPluginDir(utilstrings.EscapeQualifiedName(quobytePluginName))
 	return path.Join(pluginDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
 }
 
@@ -306,7 +311,7 @@ type quobyteVolumeDeleter struct {
 
 func (plugin *quobytePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Quobyte == nil {
-		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.Quobyte is nil")
+		return nil, fmt.Errorf("spec.PersistentVolume.Spec.Quobyte is nil")
 	}
 
 	return plugin.newDeleterInternal(spec)
@@ -326,6 +331,7 @@ func (plugin *quobytePlugin) newDeleterInternal(spec *volume.Spec) (volume.Delet
 				group:   source.Group,
 				volume:  source.Volume,
 				plugin:  plugin,
+				tenant:  source.Tenant,
 			},
 			registry: source.Registry,
 			readOnly: readOnly,
@@ -354,9 +360,13 @@ type quobyteVolumeProvisioner struct {
 	options volume.VolumeOptions
 }
 
-func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(provisioner.plugin.GetAccessModes(), provisioner.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", provisioner.options.PVC.Spec.AccessModes, provisioner.plugin.GetAccessModes())
+	}
+
+	if util.CheckPersistentVolumeClaimModeBlock(provisioner.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", provisioner.plugin.GetPluginName())
 	}
 
 	if provisioner.options.PVC.Spec.Selector != nil {
@@ -420,6 +430,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*v1.PersistentVolume, 
 		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
 	pv.Spec.MountOptions = provisioner.options.MountOptions
+	pv.Spec.PersistentVolumeSource.Quobyte.Tenant = provisioner.tenant
 	return pv, nil
 }
 

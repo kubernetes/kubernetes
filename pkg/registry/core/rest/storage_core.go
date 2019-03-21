@@ -25,10 +25,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -79,8 +80,10 @@ type LegacyRESTStorageProvider struct {
 	ServiceIPRange       net.IPNet
 	ServiceNodePortRange utilnet.PortRange
 
-	ServiceAccountIssuer       serviceaccount.TokenGenerator
-	ServiceAccountAPIAudiences []string
+	ServiceAccountIssuer        serviceaccount.TokenGenerator
+	ServiceAccountMaxExpiration time.Duration
+
+	APIAudiences authenticator.Audiences
 
 	LoopbackClientConfig *restclient.Config
 }
@@ -95,15 +98,15 @@ type LegacyRESTStorage struct {
 
 func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generic.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.APIGroupInfo{
-		GroupMeta:                    *legacyscheme.Registry.GroupOrDie(api.GroupName),
+		PrioritizedVersions:          legacyscheme.Scheme.PrioritizedVersionsForGroup(""),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		Scheme:               legacyscheme.Scheme,
-		ParameterCodec:       legacyscheme.ParameterCodec,
-		NegotiatedSerializer: legacyscheme.Codecs,
+		Scheme:                       legacyscheme.Scheme,
+		ParameterCodec:               legacyscheme.ParameterCodec,
+		NegotiatedSerializer:         legacyscheme.Codecs,
 	}
 
 	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
-	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); legacyscheme.Registry.IsEnabledVersion(policyGroupVersion) {
+	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); legacyscheme.Scheme.IsVersionRegistered(policyGroupVersion) {
 		var err error
 		podDisruptionClient, err = policyclient.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {
@@ -141,9 +144,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 	var serviceAccountStorage *serviceaccountstore.REST
 	if c.ServiceAccountIssuer != nil && utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.ServiceAccountAPIAudiences, podStorage.Pod.Store, secretStorage.Store)
+		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, secretStorage.Store)
 	} else {
-		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, nil, nil)
+		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, nil, nil)
 	}
 
 	serviceRESTStorage, serviceStatusStorage := servicestore.NewGenericREST(restOptionsGetter)
@@ -226,10 +229,10 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 		"componentStatuses": componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate),
 	}
-	if legacyscheme.Registry.IsEnabledVersion(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
+	if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 		restStorageMap["replicationControllers/scale"] = controllerStorage.Scale
 	}
-	if legacyscheme.Registry.IsEnabledVersion(schema.GroupVersion{Group: "policy", Version: "v1beta1"}) {
+	if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "policy", Version: "v1beta1"}) {
 		restStorageMap["pods/eviction"] = podStorage.Eviction
 	}
 	if serviceAccountStorage.Token != nil {
@@ -251,13 +254,13 @@ type componentStatusStorage struct {
 func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
 	serversToValidate := map[string]*componentstatus.Server{
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.InsecureKubeControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {Addr: "127.0.0.1", Port: ports.SchedulerPort, Path: "/healthz"},
+		"scheduler":          {Addr: "127.0.0.1", Port: ports.InsecureSchedulerPort, Path: "/healthz"},
 	}
 
 	for ix, machine := range s.storageFactory.Backends() {
 		etcdUrl, err := url.Parse(machine.Server)
 		if err != nil {
-			glog.Errorf("Failed to parse etcd url for validation: %v", err)
+			klog.Errorf("Failed to parse etcd url for validation: %v", err)
 			continue
 		}
 		var port int
@@ -266,7 +269,7 @@ func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.
 			var portString string
 			addr, portString, err = net.SplitHostPort(etcdUrl.Host)
 			if err != nil {
-				glog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
+				klog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
 				continue
 			}
 			port, _ = strconv.Atoi(portString)

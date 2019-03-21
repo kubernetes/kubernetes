@@ -24,14 +24,18 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,9 +45,9 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
+	clientsetv1 "k8s.io/client-go/kubernetes"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/master"
@@ -99,8 +103,16 @@ func TestKubernetesService(t *testing.T) {
 	_, _, closeFn := framework.RunAMaster(config)
 	defer closeFn()
 	coreClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
-	if _, err := coreClient.Core().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil {
-		t.Fatalf("Expected kubernetes service to exists, got: %v", err)
+	err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+		if _, err := coreClient.Core().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
+			return false, nil
+		} else if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Expected kubernetes service to exist, got: %v", err)
 	}
 }
 
@@ -225,6 +237,116 @@ func TestStatus(t *testing.T) {
 	}
 }
 
+func constructBody(val string, size int, field string, t *testing.T) *appsv1.Deployment {
+	var replicas int32 = 1
+	deploymentObject := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "test",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "foo",
+							Image: "foo",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	switch field {
+	case "labels":
+		labelsMap := map[string]string{}
+		for i := 0; i < size; i++ {
+			key := val + strconv.Itoa(i)
+			labelsMap[key] = val
+		}
+		deploymentObject.ObjectMeta.Labels = labelsMap
+	case "annotations":
+		annotationsMap := map[string]string{}
+		for i := 0; i < size; i++ {
+			key := val + strconv.Itoa(i)
+			annotationsMap[key] = val
+		}
+		deploymentObject.ObjectMeta.Annotations = annotationsMap
+	case "finalizers":
+		finalizerString := []string{}
+		for i := 0; i < size; i++ {
+			finalizerString = append(finalizerString, val)
+		}
+		deploymentObject.ObjectMeta.Finalizers = finalizerString
+	default:
+		t.Fatalf("Unexpected field: %s used for making large deployment object value", field)
+	}
+
+	return deploymentObject
+}
+
+func TestObjectSizeResponses(t *testing.T) {
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
+
+	client := clientsetv1.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+
+	const DeploymentMegabyteSize = 100000
+	const DeploymentTwoMegabyteSize = 1000000
+
+	expectedMsgFor1MB := `etcdserver: request is too large`
+	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = trying to send message larger than max`
+	expectedMsgForLargeAnnotation := `metadata.annotations: Too long: must have at most 262144 characters`
+
+	deployment1 := constructBody("a", DeploymentMegabyteSize, "labels", t)    // >1 MB file
+	deployment2 := constructBody("a", DeploymentTwoMegabyteSize, "labels", t) // >2 MB file
+
+	deployment3 := constructBody("a", DeploymentMegabyteSize, "annotations", t)
+
+	deployment4 := constructBody("sample/sample", DeploymentMegabyteSize, "finalizers", t)    // >1 MB file
+	deployment5 := constructBody("sample/sample", DeploymentTwoMegabyteSize, "finalizers", t) // >2 MB file
+
+	requests := []struct {
+		size             string
+		deploymentObject *appsv1.Deployment
+		expectedMessage  string
+	}{
+		{"1 MB", deployment1, expectedMsgFor1MB},
+		{"2 MB", deployment2, expectedMsgFor2MB},
+		{"1 MB", deployment3, expectedMsgForLargeAnnotation},
+		{"1 MB", deployment4, expectedMsgFor1MB},
+		{"2 MB", deployment5, expectedMsgFor2MB},
+	}
+
+	for _, r := range requests {
+		t.Run(r.size, func(t *testing.T) {
+			_, err := client.AppsV1().Deployments(metav1.NamespaceDefault).Create(r.deploymentObject)
+			if err != nil {
+				if !strings.Contains(err.Error(), r.expectedMessage) {
+					t.Errorf("got: %s;want: %s", err.Error(), r.expectedMessage)
+				}
+			}
+		})
+	}
+}
+
 func TestWatchSucceedsWithoutArgs(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(nil)
 	defer closeFn()
@@ -239,7 +361,7 @@ func TestWatchSucceedsWithoutArgs(t *testing.T) {
 	resp.Body.Close()
 }
 
-var hpaV1 string = `
+var hpaV1 = `
 {
   "apiVersion": "autoscaling/v1",
   "kind": "HorizontalPodAutoscaler",
@@ -260,7 +382,7 @@ var hpaV1 string = `
 }
 `
 
-var deploymentExtensions string = `
+var deploymentExtensions = `
 {
   "apiVersion": "extensions/v1beta1",
   "kind": "Deployment",
@@ -287,9 +409,9 @@ var deploymentExtensions string = `
 }
 `
 
-var deploymentApps string = `
+var deploymentApps = `
 {
-  "apiVersion": "apps/v1beta1",
+  "apiVersion": "apps/v1",
   "kind": "Deployment",
   "metadata": {
      "name": "test-deployment2",
@@ -297,6 +419,11 @@ var deploymentApps string = `
   },
   "spec": {
     "replicas": 1,
+    "selector": {
+      "matchLabels": {
+        "app": "nginx0"
+      }
+    },
     "template": {
       "metadata": {
         "labels": {
@@ -315,19 +442,31 @@ var deploymentApps string = `
 `
 
 func autoscalingPath(resource, namespace, name string) string {
-	return testapi.Autoscaling.ResourcePath(resource, namespace, name)
+	if namespace != "" {
+		namespace = path.Join("namespaces", namespace)
+	}
+	return path.Join("/apis/autoscaling/v1", namespace, resource, name)
 }
 
 func batchPath(resource, namespace, name string) string {
-	return testapi.Batch.ResourcePath(resource, namespace, name)
+	if namespace != "" {
+		namespace = path.Join("namespaces", namespace)
+	}
+	return path.Join("/apis/batch/v1", namespace, resource, name)
 }
 
 func extensionsPath(resource, namespace, name string) string {
-	return testapi.Extensions.ResourcePath(resource, namespace, name)
+	if namespace != "" {
+		namespace = path.Join("namespaces", namespace)
+	}
+	return path.Join("/apis/extensions/v1beta1", namespace, resource, name)
 }
 
 func appsPath(resource, namespace, name string) string {
-	return testapi.Apps.ResourcePath(resource, namespace, name)
+	if namespace != "" {
+		namespace = path.Join("namespaces", namespace)
+	}
+	return path.Join("/apis/apps/v1", namespace, resource, name)
 }
 
 func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
@@ -343,7 +482,7 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 		expectedVersion     string
 	}{
 		{"POST", autoscalingPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), hpaV1, integration.Code201, ""},
-		{"GET", autoscalingPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), "", integration.Code200, testapi.Autoscaling.GroupVersion().String()},
+		{"GET", autoscalingPath("horizontalpodautoscalers", metav1.NamespaceDefault, ""), "", integration.Code200, "autoscaling/v1"},
 	}
 
 	for _, r := range requests {
@@ -389,14 +528,15 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 	}{
 		// Post to extensions endpoint and get back from both: extensions and apps
 		{"POST", extensionsPath("deployments", metav1.NamespaceDefault, ""), deploymentExtensions, integration.Code201, ""},
-		{"GET", extensionsPath("deployments", metav1.NamespaceDefault, "test-deployment1"), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
-		{"GET", appsPath("deployments", metav1.NamespaceDefault, "test-deployment1"), "", integration.Code200, testapi.Apps.GroupVersion().String()},
-		{"DELETE", extensionsPath("deployments", metav1.NamespaceDefault, "test-deployment1"), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
+		{"GET", extensionsPath("deployments", metav1.NamespaceDefault, "test-deployment1"), "", integration.Code200, "extensions/v1beta1"},
+		{"GET", appsPath("deployments", metav1.NamespaceDefault, "test-deployment1"), "", integration.Code200, "apps/v1"},
+		{"DELETE", extensionsPath("deployments", metav1.NamespaceDefault, "test-deployment1"), "", integration.Code200, "extensions/v1beta1"},
 		// Post to apps endpoint and get back from both: apps and extensions
 		{"POST", appsPath("deployments", metav1.NamespaceDefault, ""), deploymentApps, integration.Code201, ""},
-		{"GET", appsPath("deployments", metav1.NamespaceDefault, "test-deployment2"), "", integration.Code200, testapi.Apps.GroupVersion().String()},
-		{"GET", extensionsPath("deployments", metav1.NamespaceDefault, "test-deployment2"), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
-		{"DELETE", appsPath("deployments", metav1.NamespaceDefault, "test-deployment2"), "", integration.Code200, testapi.Apps.GroupVersion().String()},
+		{"GET", appsPath("deployments", metav1.NamespaceDefault, "test-deployment2"), "", integration.Code200, "apps/v1"},
+		{"GET", extensionsPath("deployments", metav1.NamespaceDefault, "test-deployment2"), "", integration.Code200, "extensions/v1beta1"},
+		// set propagationPolicy=Orphan to force the object to be returned so we can check the apiVersion (otherwise, we just get a status object back)
+		{"DELETE", appsPath("deployments", metav1.NamespaceDefault, "test-deployment2") + "?propagationPolicy=Orphan", "", integration.Code200, "apps/v1"},
 	}
 
 	for _, r := range requests {
@@ -510,7 +650,7 @@ func TestMasterService(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
 	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
 		svcList, err := client.Core().Services(metav1.NamespaceDefault).List(metav1.ListOptions{})
@@ -552,7 +692,7 @@ func TestServiceAlloc(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(cfg)
 	defer closeFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
 	svc := func(i int) *api.Service {
 		return &api.Service{
@@ -666,7 +806,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 		go func(lister int) {
 			w, err := c.Nodes().Watch(metav1.ListOptions{})
 			if err != nil {
-				fmt.Printf("[watch:%d] error: %v", k, err)
+				fmt.Printf("[watch:%d] error: %v", lister, err)
 				return
 			}
 			i := 0
@@ -748,7 +888,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 							Reason: "bar",
 						},
 					}
-				case i%4 == 1:
+				case i%4 == 2:
 					lastCount = 0
 					n.Status.Conditions = nil
 				}

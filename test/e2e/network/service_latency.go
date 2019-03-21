@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -46,10 +47,9 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 	f := framework.NewDefaultFramework("svc-latency")
 
 	/*
-		    Testname: service-endpoint-latency
-		    Description: Ensure service endpoint's latency is not high
-		    (e.g. p50 < 20 seconds and p99 < 50 seconds). If any call to the
-			service endpoint fails, the test will also fail.
+		Release : v1.9
+		Testname: Service endpoint latency, thresholds
+		Description: Run 100 iterations of create service with the Pod running the pause image, measure the time it takes for creating the service and the endpoint with the service name is available. These durations are captured for 100 iterations, then the durations are sorted to compute 50th, 90th and 99th percentile. The single server latency MUST not exceed liberally set thresholds of 20s for 50th percentile and 50s for the 90th percentile.
 	*/
 	framework.ConformanceIt("should not be very high ", func() {
 		const (
@@ -71,6 +71,9 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 			totalTrials    = 200
 			parallelTrials = 15
 			minSampleSize  = 100
+
+			// Acceptable failure ratio for getting service latencies.
+			acceptableFailureRatio = .05
 		)
 
 		// Turn off rate limiting--it interferes with our measurements.
@@ -79,7 +82,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		defer func() { f.ClientSet.CoreV1().RESTClient().(*restclient.RESTClient).Throttle = oldThrottle }()
 
 		failing := sets.NewString()
-		d, err := runServiceLatencies(f, parallelTrials, totalTrials)
+		d, err := runServiceLatencies(f, parallelTrials, totalTrials, acceptableFailureRatio)
 		if err != nil {
 			failing.Insert(fmt.Sprintf("Not all RC/pod/service trials succeeded: %v", err))
 		}
@@ -123,11 +126,11 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 	})
 })
 
-func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
+func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptableFailureRatio float32) (output []time.Duration, err error) {
 	cfg := testutils.RCConfig{
 		Client:         f.ClientSet,
 		InternalClient: f.InternalClientset,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Name:           "svc-latency-rc",
 		Namespace:      f.Namespace.Name,
 		Replicas:       1,
@@ -180,7 +183,11 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 		}
 	}
 	if errCount != 0 {
-		return output, fmt.Errorf("got %v errors", errCount)
+		framework.Logf("Got %d errors out of %d tries", errCount, total)
+		errRatio := float32(errCount) / float32(total)
+		if errRatio > acceptableFailureRatio {
+			return output, fmt.Errorf("error ratio %g is higher than the acceptable ratio %g", errRatio, acceptableFailureRatio)
+		}
 	}
 	return output, nil
 }

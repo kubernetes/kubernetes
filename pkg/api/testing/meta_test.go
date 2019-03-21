@@ -30,7 +30,7 @@ import (
 var _ metav1.Object = &metav1.ObjectMeta{}
 
 func TestAccessorImplementations(t *testing.T) {
-	for _, gv := range legacyscheme.Registry.EnabledVersions() {
+	for _, gv := range legacyscheme.Scheme.PrioritizedVersionsAllGroups() {
 		internalGV := schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}
 		for _, gv := range []schema.GroupVersion{gv, internalGV} {
 			for kind, knownType := range legacyscheme.Scheme.KnownTypes(gv) {

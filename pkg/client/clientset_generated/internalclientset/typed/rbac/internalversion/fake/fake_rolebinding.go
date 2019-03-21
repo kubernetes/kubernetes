@@ -62,7 +62,7 @@ func (c *FakeRoleBindings) List(opts v1.ListOptions) (result *rbac.RoleBindingLi
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &rbac.RoleBindingList{}
+	list := &rbac.RoleBindingList{ListMeta: obj.(*rbac.RoleBindingList).ListMeta}
 	for _, item := range obj.(*rbac.RoleBindingList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -119,7 +119,7 @@ func (c *FakeRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptio
 // Patch applies the patch and returns the patched roleBinding.
 func (c *FakeRoleBindings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *rbac.RoleBinding, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolebindingsResource, c.ns, name, data, subresources...), &rbac.RoleBinding{})
+		Invokes(testing.NewPatchSubresourceAction(rolebindingsResource, c.ns, name, pt, data, subresources...), &rbac.RoleBinding{})
 
 	if obj == nil {
 		return nil, err

@@ -1,13 +1,13 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/url"
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // ContainerCommit applies changes into a container and creates a new tagged image.
@@ -39,7 +39,7 @@ func (cli *Client) ContainerCommit(ctx context.Context, container string, option
 	for _, change := range options.Changes {
 		query.Add("changes", change)
 	}
-	if options.Pause != true {
+	if !options.Pause {
 		query.Set("pause", "0")
 	}
 

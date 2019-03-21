@@ -19,7 +19,7 @@ package eviction
 import (
 	"fmt"
 	"reflect"
-	"sync"
+	"sort"
 	"testing"
 	"time"
 
@@ -27,14 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/quota"
 )
 
 func quantityMustParse(value string) *resource.Quantity {
@@ -426,7 +424,8 @@ func thresholdEqual(a evictionapi.Threshold, b evictionapi.Threshold) bool {
 }
 
 func TestOrderedByExceedsRequestMemory(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
+
 	below := newPod("below-requests", -1, []v1.Container{
 		newContainer("below-requests", newResourceList("", "200Mi", ""), newResourceList("", "", "")),
 	}, nil)
@@ -453,8 +452,8 @@ func TestOrderedByExceedsRequestMemory(t *testing.T) {
 }
 
 func TestOrderedByExceedsRequestDisk(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.LocalStorageCapacityIsolation))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	below := newPod("below-requests", -1, []v1.Container{
 		newContainer("below-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("200Mi")}, newResourceList("", "", "")),
 	}, nil)
@@ -470,7 +469,7 @@ func TestOrderedByExceedsRequestDisk(t *testing.T) {
 		return result, found
 	}
 	pods := []*v1.Pod{below, exceeds}
-	orderedBy(exceedDiskRequests(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
+	orderedBy(exceedDiskRequests(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)).Sort(pods)
 
 	expected := []*v1.Pod{exceeds, below}
 	for i := range expected {
@@ -481,7 +480,7 @@ func TestOrderedByExceedsRequestDisk(t *testing.T) {
 }
 
 func TestOrderedByPriority(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	low := newPod("low-priority", -134, []v1.Container{
 		newContainer("low-priority", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
@@ -504,7 +503,7 @@ func TestOrderedByPriority(t *testing.T) {
 }
 
 func TestOrderedByPriorityDisabled(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=false", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, false)()
 	low := newPod("low-priority", lowPriority, []v1.Container{
 		newContainer("low-priority", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
@@ -528,7 +527,7 @@ func TestOrderedByPriorityDisabled(t *testing.T) {
 }
 
 func TestOrderedbyDisk(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.LocalStorageCapacityIsolation))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
 		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -584,7 +583,7 @@ func TestOrderedbyDisk(t *testing.T) {
 		return result, found
 	}
 	pods := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
+	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)).Sort(pods)
 	expected := []*v1.Pod{pod1, pod3, pod2, pod4, pod5, pod6}
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -595,7 +594,7 @@ func TestOrderedbyDisk(t *testing.T) {
 
 // Tests that we correctly ignore disk requests when the local storage feature gate is disabled.
 func TestOrderedbyDiskDisableLocalStorage(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=false", features.LocalStorageCapacityIsolation))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, false)()
 	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
 		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -651,7 +650,7 @@ func TestOrderedbyDiskDisableLocalStorage(t *testing.T) {
 		return result, found
 	}
 	pods := []*v1.Pod{pod1, pod3, pod2, pod4, pod5, pod6}
-	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
+	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)).Sort(pods)
 	expected := []*v1.Pod{pod5, pod3, pod1, pod6, pod4, pod2}
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -661,8 +660,8 @@ func TestOrderedbyDiskDisableLocalStorage(t *testing.T) {
 }
 
 func TestOrderedbyInodes(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.LocalStorageCapacityIsolation))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	low := newPod("low", defaultPriority, []v1.Container{
 		newContainer("low", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -705,8 +704,8 @@ func TestOrderedbyInodes(t *testing.T) {
 
 // TestOrderedByPriorityDisk ensures we order pods by priority and then greediest resource consumer
 func TestOrderedByPriorityDisk(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.LocalStorageCapacityIsolation))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -780,7 +779,7 @@ func TestOrderedByPriorityDisk(t *testing.T) {
 	pods := []*v1.Pod{pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
 	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8}
 	fsStatsToMeasure := []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
-	orderedBy(exceedDiskRequests(statsFn, fsStatsToMeasure, resourceDisk), priority, disk(statsFn, fsStatsToMeasure, resourceDisk)).Sort(pods)
+	orderedBy(exceedDiskRequests(statsFn, fsStatsToMeasure, v1.ResourceEphemeralStorage), priority, disk(statsFn, fsStatsToMeasure, v1.ResourceEphemeralStorage)).Sort(pods)
 	for i := range expected {
 		if pods[i] != expected[i] {
 			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
@@ -790,7 +789,7 @@ func TestOrderedByPriorityDisk(t *testing.T) {
 
 // TestOrderedByPriorityInodes ensures we order pods by priority and then greediest resource consumer
 func TestOrderedByPriorityInodes(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	pod1 := newPod("low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -883,7 +882,7 @@ func TestOrderedByMemory(t *testing.T) {
 
 // TestOrderedByPriorityMemory ensures we order by priority and then memory consumption relative to request.
 func TestOrderedByPriorityMemory(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
@@ -932,6 +931,80 @@ func TestOrderedByPriorityMemory(t *testing.T) {
 	}
 }
 
+func TestSortByEvictionPriority(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		thresholds []evictionapi.Threshold
+		expected   []evictionapi.Threshold
+	}{
+		{
+			name:       "empty threshold list",
+			thresholds: []evictionapi.Threshold{},
+			expected:   []evictionapi.Threshold{},
+		},
+		{
+			name: "memory first",
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal: evictionapi.SignalNodeFsAvailable,
+				},
+				{
+					Signal: evictionapi.SignalPIDAvailable,
+				},
+				{
+					Signal: evictionapi.SignalMemoryAvailable,
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal: evictionapi.SignalMemoryAvailable,
+				},
+				{
+					Signal: evictionapi.SignalNodeFsAvailable,
+				},
+				{
+					Signal: evictionapi.SignalPIDAvailable,
+				},
+			},
+		},
+		{
+			name: "allocatable memory first",
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal: evictionapi.SignalNodeFsAvailable,
+				},
+				{
+					Signal: evictionapi.SignalPIDAvailable,
+				},
+				{
+					Signal: evictionapi.SignalAllocatableMemoryAvailable,
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal: evictionapi.SignalAllocatableMemoryAvailable,
+				},
+				{
+					Signal: evictionapi.SignalNodeFsAvailable,
+				},
+				{
+					Signal: evictionapi.SignalPIDAvailable,
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sort.Sort(byEvictionPriority(tc.thresholds))
+			for i := range tc.expected {
+				if tc.thresholds[i].Signal != tc.expected[i].Signal {
+					t.Errorf("At index %d, expected threshold with signal %s, but got %s", i, tc.expected[i].Signal, tc.thresholds[i].Signal)
+				}
+			}
+
+		})
+	}
+}
+
 type fakeSummaryProvider struct {
 	result *statsapi.Summary
 }
@@ -940,25 +1013,23 @@ func (f *fakeSummaryProvider) Get(updateStats bool) (*statsapi.Summary, error) {
 	return f.result, nil
 }
 
+func (f *fakeSummaryProvider) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
+	return f.result, nil
+}
+
 // newPodStats returns a pod stat where each container is using the specified working set
 // each pod must have a Name, UID, Namespace
-func newPodStats(pod *v1.Pod, containerWorkingSetBytes int64) statsapi.PodStats {
-	result := statsapi.PodStats{
+func newPodStats(pod *v1.Pod, podWorkingSetBytes uint64) statsapi.PodStats {
+	return statsapi.PodStats{
 		PodRef: statsapi.PodReference{
 			Name:      pod.Name,
 			Namespace: pod.Namespace,
 			UID:       string(pod.UID),
 		},
+		Memory: &statsapi.MemoryStats{
+			WorkingSetBytes: &podWorkingSetBytes,
+		},
 	}
-	val := uint64(containerWorkingSetBytes)
-	for range pod.Spec.Containers {
-		result.Containers = append(result.Containers, statsapi.ContainerStats{
-			Memory: &statsapi.MemoryStats{
-				WorkingSetBytes: &val,
-			},
-		})
-	}
-	return result
 }
 
 func TestMakeSignalObservations(t *testing.T) {
@@ -1023,9 +1094,9 @@ func TestMakeSignalObservations(t *testing.T) {
 		podMaker("pod1", "ns2", "uuid2", 1),
 		podMaker("pod3", "ns3", "uuid3", 1),
 	}
-	containerWorkingSetBytes := int64(1024 * 1024 * 1024)
+	podWorkingSetBytes := uint64(1024 * 1024 * 1024)
 	for _, pod := range pods {
-		fakeStats.Pods = append(fakeStats.Pods, newPodStats(pod, containerWorkingSetBytes))
+		fakeStats.Pods = append(fakeStats.Pods, newPodStats(pod, podWorkingSetBytes))
 	}
 	res := quantityMustParse("5Gi")
 	// Allocatable thresholds are always 100%.  Verify that Threshold == Capacity.
@@ -1098,11 +1169,8 @@ func TestMakeSignalObservations(t *testing.T) {
 		if !found {
 			t.Errorf("Pod stats were not found for pod %v", pod.UID)
 		}
-		for _, container := range podStats.Containers {
-			actual := int64(*container.Memory.WorkingSetBytes)
-			if containerWorkingSetBytes != actual {
-				t.Errorf("Container working set expected %v, actual: %v", containerWorkingSetBytes, actual)
-			}
+		if *podStats.Memory.WorkingSetBytes != podWorkingSetBytes {
+			t.Errorf("Pod working set expected %v, actual: %v", podWorkingSetBytes, *podStats.Memory.WorkingSetBytes)
 		}
 	}
 }
@@ -1622,47 +1690,6 @@ func TestHasNodeConditions(t *testing.T) {
 	}
 }
 
-func TestGetStarvedResources(t *testing.T) {
-	testCases := map[string]struct {
-		inputs []evictionapi.Threshold
-		result []v1.ResourceName
-	}{
-		"memory.available": {
-			inputs: []evictionapi.Threshold{
-				{Signal: evictionapi.SignalMemoryAvailable},
-			},
-			result: []v1.ResourceName{v1.ResourceMemory},
-		},
-		"imagefs.available": {
-			inputs: []evictionapi.Threshold{
-				{Signal: evictionapi.SignalImageFsAvailable},
-			},
-			result: []v1.ResourceName{resourceImageFs},
-		},
-		"nodefs.available": {
-			inputs: []evictionapi.Threshold{
-				{Signal: evictionapi.SignalNodeFsAvailable},
-			},
-			result: []v1.ResourceName{resourceNodeFs},
-		},
-	}
-	var internalResourceNames = func(in []v1.ResourceName) []api.ResourceName {
-		var out []api.ResourceName
-		for _, name := range in {
-			out = append(out, api.ResourceName(name))
-		}
-		return out
-	}
-	for testName, testCase := range testCases {
-		actual := getStarvedResources(testCase.inputs)
-		actualSet := quota.ToSet(internalResourceNames(actual))
-		expectedSet := quota.ToSet(internalResourceNames(testCase.result))
-		if !actualSet.Equal(expectedSet) {
-			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, expectedSet, actualSet)
-		}
-	}
-}
-
 func TestParsePercentage(t *testing.T) {
 	testCases := map[string]struct {
 		hasError bool
@@ -1819,20 +1846,15 @@ func newPodDiskStats(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resou
 }
 
 func newPodMemoryStats(pod *v1.Pod, workingSet resource.Quantity) statsapi.PodStats {
-	result := statsapi.PodStats{
+	workingSetBytes := uint64(workingSet.Value())
+	return statsapi.PodStats{
 		PodRef: statsapi.PodReference{
 			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
 		},
+		Memory: &statsapi.MemoryStats{
+			WorkingSetBytes: &workingSetBytes,
+		},
 	}
-	for range pod.Spec.Containers {
-		workingSetBytes := uint64(workingSet.Value())
-		result.Containers = append(result.Containers, statsapi.ContainerStats{
-			Memory: &statsapi.MemoryStats{
-				WorkingSetBytes: &workingSetBytes,
-			},
-		})
-	}
-	return result
 }
 
 func newResourceList(cpu, memory, disk string) v1.ResourceList {
@@ -1915,35 +1937,4 @@ func (s1 thresholdList) Equal(s2 thresholdList) bool {
 		}
 	}
 	return true
-}
-
-func TestThresholdStopCh(t *testing.T) {
-	var wg sync.WaitGroup
-	fakeClock := clock.NewFakeClock(time.Now())
-	stop := NewInitialStopCh(fakeClock)
-
-	// Should be able to reset the InitialStopCh right away
-	if !stop.Reset() {
-		t.Errorf("Expected to be able to close the initialStopCh, but was unsuccessful")
-	}
-
-	// Need to wait notifierRefreshInterval before closing
-	if stop.Reset() {
-		t.Errorf("Expected not to be able to close the initialStopCh, but was successful")
-	}
-
-	wg.Add(1)
-	ch := stop.Ch()
-	go func() {
-		defer wg.Done()
-		// wait for the channel to close
-		<-ch
-	}()
-
-	fakeClock.Step(2 * notifierRefreshInterval)
-	if !stop.Reset() {
-		t.Errorf("Expected to be able to close the initialStopCh, but was unsuccessful")
-	}
-	// ensure the Reset() closed the channel
-	wg.Wait()
 }

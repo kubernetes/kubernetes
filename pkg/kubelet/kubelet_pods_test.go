@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -35,328 +34,27 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+
 	// TODO: remove this import if
-	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
+	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
 	// to "v1"?
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/mount"
-	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
-
-func TestMakeAbsolutePath(t *testing.T) {
-	tests := []struct {
-		goos         string
-		path         string
-		expectedPath string
-		name         string
-	}{
-		{
-			goos:         "linux",
-			path:         "non-absolute/path",
-			expectedPath: "/non-absolute/path",
-			name:         "basic linux",
-		},
-		{
-			goos:         "windows",
-			path:         "some\\path",
-			expectedPath: "c:\\some\\path",
-			name:         "basic windows",
-		},
-		{
-			goos:         "windows",
-			path:         "/some/path",
-			expectedPath: "c:/some/path",
-			name:         "linux path on windows",
-		},
-		{
-			goos:         "windows",
-			path:         "\\some\\path",
-			expectedPath: "c:\\some\\path",
-			name:         "windows path no drive",
-		},
-		{
-			goos:         "windows",
-			path:         "\\:\\some\\path",
-			expectedPath: "\\:\\some\\path",
-			name:         "windows path with colon",
-		},
-	}
-	for _, test := range tests {
-		path := makeAbsolutePath(test.goos, test.path)
-		if path != test.expectedPath {
-			t.Errorf("[%s] Expected %s saw %s", test.name, test.expectedPath, path)
-		}
-	}
-}
-
-func TestMakeMounts(t *testing.T) {
-	bTrue := true
-	propagationHostToContainer := v1.MountPropagationHostToContainer
-	propagationBidirectional := v1.MountPropagationBidirectional
-
-	testCases := map[string]struct {
-		container      v1.Container
-		podVolumes     kubecontainer.VolumeMap
-		expectErr      bool
-		expectedErrMsg string
-		expectedMounts []kubecontainer.Mount
-	}{
-		"valid mounts in unprivileged container": {
-			podVolumes: kubecontainer.VolumeMap{
-				"disk":  kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
-				"disk4": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/host"}},
-				"disk5": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
-			},
-			container: v1.Container{
-				Name: "container1",
-				VolumeMounts: []v1.VolumeMount{
-					{
-						MountPath:        "/etc/hosts",
-						Name:             "disk",
-						ReadOnly:         false,
-						MountPropagation: &propagationHostToContainer,
-					},
-					{
-						MountPath: "/mnt/path3",
-						Name:      "disk",
-						ReadOnly:  true,
-					},
-					{
-						MountPath: "/mnt/path4",
-						Name:      "disk4",
-						ReadOnly:  false,
-					},
-					{
-						MountPath: "/mnt/path5",
-						Name:      "disk5",
-						ReadOnly:  false,
-					},
-				},
-			},
-			expectedMounts: []kubecontainer.Mount{
-				{
-					Name:           "disk",
-					ContainerPath:  "/etc/hosts",
-					HostPath:       "/mnt/disk",
-					ReadOnly:       false,
-					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
-				},
-				{
-					Name:           "disk",
-					ContainerPath:  "/mnt/path3",
-					HostPath:       "/mnt/disk",
-					ReadOnly:       true,
-					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
-				},
-				{
-					Name:           "disk4",
-					ContainerPath:  "/mnt/path4",
-					HostPath:       "/mnt/host",
-					ReadOnly:       false,
-					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
-				},
-				{
-					Name:           "disk5",
-					ContainerPath:  "/mnt/path5",
-					HostPath:       "/var/lib/kubelet/podID/volumes/empty/disk5",
-					ReadOnly:       false,
-					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
-				},
-			},
-			expectErr: false,
-		},
-		"valid mounts in privileged container": {
-			podVolumes: kubecontainer.VolumeMap{
-				"disk":  kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
-				"disk4": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/host"}},
-				"disk5": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
-			},
-			container: v1.Container{
-				Name: "container1",
-				VolumeMounts: []v1.VolumeMount{
-					{
-						MountPath:        "/etc/hosts",
-						Name:             "disk",
-						ReadOnly:         false,
-						MountPropagation: &propagationBidirectional,
-					},
-					{
-						MountPath:        "/mnt/path3",
-						Name:             "disk",
-						ReadOnly:         true,
-						MountPropagation: &propagationHostToContainer,
-					},
-					{
-						MountPath: "/mnt/path4",
-						Name:      "disk4",
-						ReadOnly:  false,
-					},
-				},
-				SecurityContext: &v1.SecurityContext{
-					Privileged: &bTrue,
-				},
-			},
-			expectedMounts: []kubecontainer.Mount{
-				{
-					Name:           "disk",
-					ContainerPath:  "/etc/hosts",
-					HostPath:       "/mnt/disk",
-					ReadOnly:       false,
-					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL,
-				},
-				{
-					Name:           "disk",
-					ContainerPath:  "/mnt/path3",
-					HostPath:       "/mnt/disk",
-					ReadOnly:       true,
-					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
-				},
-				{
-					Name:           "disk4",
-					ContainerPath:  "/mnt/path4",
-					HostPath:       "/mnt/host",
-					ReadOnly:       false,
-					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
-				},
-			},
-			expectErr: false,
-		},
-		"invalid absolute SubPath": {
-			podVolumes: kubecontainer.VolumeMap{
-				"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
-			},
-			container: v1.Container{
-				VolumeMounts: []v1.VolumeMount{
-					{
-						MountPath: "/mnt/path3",
-						SubPath:   "/must/not/be/absolute",
-						Name:      "disk",
-						ReadOnly:  true,
-					},
-				},
-			},
-			expectErr:      true,
-			expectedErrMsg: "error SubPath `/must/not/be/absolute` must not be an absolute path",
-		},
-		"invalid SubPath with backsteps": {
-			podVolumes: kubecontainer.VolumeMap{
-				"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
-			},
-			container: v1.Container{
-				VolumeMounts: []v1.VolumeMount{
-					{
-						MountPath: "/mnt/path3",
-						SubPath:   "no/backsteps/../allowed",
-						Name:      "disk",
-						ReadOnly:  true,
-					},
-				},
-			},
-			expectErr:      true,
-			expectedErrMsg: "unable to provision SubPath `no/backsteps/../allowed`: must not contain '..'",
-		},
-		"volume doesn't exist": {
-			podVolumes: kubecontainer.VolumeMap{},
-			container: v1.Container{
-				VolumeMounts: []v1.VolumeMount{
-					{
-						MountPath: "/mnt/path3",
-						Name:      "disk",
-						ReadOnly:  true,
-					},
-				},
-			},
-			expectErr:      true,
-			expectedErrMsg: "cannot find volume \"disk\" to mount into container \"\"",
-		},
-		"volume mounter is nil": {
-			podVolumes: kubecontainer.VolumeMap{
-				"disk": kubecontainer.VolumeInfo{},
-			},
-			container: v1.Container{
-				VolumeMounts: []v1.VolumeMount{
-					{
-						MountPath: "/mnt/path3",
-						Name:      "disk",
-						ReadOnly:  true,
-					},
-				},
-			},
-			expectErr:      true,
-			expectedErrMsg: "cannot find volume \"disk\" to mount into container \"\"",
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			fm := &mount.FakeMounter{}
-			pod := v1.Pod{
-				Spec: v1.PodSpec{
-					HostNetwork: true,
-				},
-			}
-			// test makeMounts with enabled mount propagation
-			err := utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
-			if err != nil {
-				t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
-				return
-			}
-
-			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm)
-
-			// validate only the error if we expect an error
-			if tc.expectErr {
-				if err == nil || err.Error() != tc.expectedErrMsg {
-					t.Fatalf("expected error message `%s` but got `%v`", tc.expectedErrMsg, err)
-				}
-				return
-			}
-
-			// otherwise validate the mounts
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			assert.Equal(t, tc.expectedMounts, mounts, "mounts of container %+v", tc.container)
-
-			// test makeMounts with disabled mount propagation
-			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=false")
-			if err != nil {
-				t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
-				return
-			}
-			mounts, _, err = makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm)
-			if !tc.expectErr {
-				expectedPrivateMounts := []kubecontainer.Mount{}
-				for _, mount := range tc.expectedMounts {
-					// all mounts are expected to be private when mount
-					// propagation is disabled
-					mount.Propagation = runtimeapi.MountPropagation_PROPAGATION_PRIVATE
-					expectedPrivateMounts = append(expectedPrivateMounts, mount)
-				}
-				assert.Equal(t, expectedPrivateMounts, mounts, "mounts of container %+v", tc.container)
-			}
-		})
-	}
-}
 
 func TestDisabledSubpath(t *testing.T) {
 	fm := &mount.FakeMounter{}
+	fsp := &subpath.FakeSubpath{}
 	pod := v1.Pod{
 		Spec: v1.PodSpec{
 			HostNetwork: true,
@@ -397,150 +95,15 @@ func TestDisabledSubpath(t *testing.T) {
 		},
 	}
 
-	utilfeature.DefaultFeatureGate.Set("VolumeSubpath=false")
-	defer utilfeature.DefaultFeatureGate.Set("VolumeSubpath=true")
-
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
 	for name, test := range cases {
-		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", "", podVolumes, fm)
+		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", "", podVolumes, fm, fsp, nil)
 		if err != nil && !test.expectError {
 			t.Errorf("test %v failed: %v", name, err)
 		}
 		if err == nil && test.expectError {
 			t.Errorf("test %v failed: expected error", name)
 		}
-	}
-}
-
-func TestMakeBlockVolumes(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	testCases := map[string]struct {
-		container       v1.Container
-		podVolumes      kubecontainer.VolumeMap
-		expectErr       bool
-		expectedErrMsg  string
-		expectedDevices []kubecontainer.DeviceInfo
-	}{
-		"valid volumeDevices in container": {
-			podVolumes: kubecontainer.VolumeMap{
-				"disk1": kubecontainer.VolumeInfo{BlockVolumeMapper: &stubBlockVolume{dirPath: "/dev/", volName: "sda"}},
-				"disk2": kubecontainer.VolumeInfo{BlockVolumeMapper: &stubBlockVolume{dirPath: "/dev/disk/by-path/", volName: "diskPath"}, ReadOnly: true},
-				"disk3": kubecontainer.VolumeInfo{BlockVolumeMapper: &stubBlockVolume{dirPath: "/dev/disk/by-id/", volName: "diskUuid"}},
-				"disk4": kubecontainer.VolumeInfo{BlockVolumeMapper: &stubBlockVolume{dirPath: "/var/lib/", volName: "rawdisk"}, ReadOnly: true},
-			},
-			container: v1.Container{
-				Name: "container1",
-				VolumeDevices: []v1.VolumeDevice{
-					{
-						DevicePath: "/dev/sda",
-						Name:       "disk1",
-					},
-					{
-						DevicePath: "/dev/xvda",
-						Name:       "disk2",
-					},
-					{
-						DevicePath: "/dev/xvdb",
-						Name:       "disk3",
-					},
-					{
-						DevicePath: "/mnt/rawdisk",
-						Name:       "disk4",
-					},
-				},
-			},
-			expectedDevices: []kubecontainer.DeviceInfo{
-				{
-					PathInContainer: "/dev/sda",
-					PathOnHost:      "/dev/sda",
-					Permissions:     "mrw",
-				},
-				{
-					PathInContainer: "/dev/xvda",
-					PathOnHost:      "/dev/disk/by-path/diskPath",
-					Permissions:     "r",
-				},
-				{
-					PathInContainer: "/dev/xvdb",
-					PathOnHost:      "/dev/disk/by-id/diskUuid",
-					Permissions:     "mrw",
-				},
-				{
-					PathInContainer: "/mnt/rawdisk",
-					PathOnHost:      "/var/lib/rawdisk",
-					Permissions:     "r",
-				},
-			},
-			expectErr: false,
-		},
-		"invalid absolute Path": {
-			podVolumes: kubecontainer.VolumeMap{
-				"disk": kubecontainer.VolumeInfo{BlockVolumeMapper: &stubBlockVolume{dirPath: "/dev/", volName: "sda"}},
-			},
-			container: v1.Container{
-				VolumeDevices: []v1.VolumeDevice{
-					{
-						DevicePath: "must/be/absolute",
-						Name:       "disk",
-					},
-				},
-			},
-			expectErr:      true,
-			expectedErrMsg: "error DevicePath `must/be/absolute` must be an absolute path",
-		},
-		"volume doesn't exist": {
-			podVolumes: kubecontainer.VolumeMap{},
-			container: v1.Container{
-				VolumeDevices: []v1.VolumeDevice{
-					{
-						DevicePath: "/dev/sdaa",
-						Name:       "disk",
-					},
-				},
-			},
-			expectErr:      true,
-			expectedErrMsg: "cannot find volume \"disk\" to pass into container \"\"",
-		},
-		"volume BlockVolumeMapper is nil": {
-			podVolumes: kubecontainer.VolumeMap{
-				"disk": kubecontainer.VolumeInfo{},
-			},
-			container: v1.Container{
-				VolumeDevices: []v1.VolumeDevice{
-					{
-						DevicePath: "/dev/sdzz",
-						Name:       "disk",
-					},
-				},
-			},
-			expectErr:      true,
-			expectedErrMsg: "cannot find volume \"disk\" to pass into container \"\"",
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			pod := v1.Pod{
-				Spec: v1.PodSpec{
-					HostNetwork: true,
-				},
-			}
-			blkutil := volumetest.NewBlockVolumePathHandler()
-			blkVolumes, err := kubelet.makeBlockVolumes(&pod, &tc.container, tc.podVolumes, blkutil)
-			// validate only the error if we expect an error
-			if tc.expectErr {
-				if err == nil || err.Error() != tc.expectedErrMsg {
-					t.Fatalf("expected error message `%s` but got `%v`", tc.expectedErrMsg, err)
-				}
-				return
-			}
-			// otherwise validate the devices
-			if err != nil {
-				t.Fatal(err)
-			}
-			assert.Equal(t, tc.expectedDevices, blkVolumes, "devices of container %+v", tc.container)
-		})
 	}
 }
 
@@ -563,7 +126,8 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 123.45.67.89	some.domain
 `,
-			`# hosts file for testing.
+			`# Kubernetes-managed hosts file (host network).
+# hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -585,7 +149,8 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 12.34.56.78	another.domain
 `,
-			`# another hosts file for testing.
+			`# Kubernetes-managed hosts file (host network).
+# another hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -609,7 +174,8 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 123.45.67.89	some.domain
 `,
-			`# hosts file for testing.
+			`# Kubernetes-managed hosts file (host network).
+# hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -619,9 +185,7 @@ fe00::2	ip6-allrouters
 123.45.67.89	some.domain
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
+123.45.67.89	foo	bar	baz
 `,
 		},
 		{
@@ -639,7 +203,8 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 12.34.56.78	another.domain
 `,
-			`# another hosts file for testing.
+			`# Kubernetes-managed hosts file (host network).
+# another hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -649,12 +214,8 @@ fe00::2	ip6-allrouters
 12.34.56.78	another.domain
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
-456.78.90.123	park
-456.78.90.123	doo
-456.78.90.123	boo
+123.45.67.89	foo	bar	baz
+456.78.90.123	park	doo	boo
 `,
 		},
 	}
@@ -735,9 +296,7 @@ fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
+123.45.67.89	foo	bar	baz
 `,
 		},
 		{
@@ -758,12 +317,8 @@ fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
 
 # Entries added by HostAliases.
-123.45.67.89	foo
-123.45.67.89	bar
-123.45.67.89	baz
-456.78.90.123	park
-456.78.90.123	doo
-456.78.90.123	boo
+123.45.67.89	foo	bar	baz
+456.78.90.123	park	doo	boo
 `,
 		},
 	}
@@ -874,21 +429,25 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		buildService("not-special", "kubernetes", "", "TCP", 8088),
 	}
 
+	trueValue := true
+	falseValue := false
 	testCases := []struct {
-		name            string                 // the name of the test case
-		ns              string                 // the namespace to generate environment for
-		container       *v1.Container          // the container to use
-		masterServiceNs string                 // the namespace to read master service info from
-		nilLister       bool                   // whether the lister should be nil
-		configMap       *v1.ConfigMap          // an optional ConfigMap to pull from
-		secret          *v1.Secret             // an optional Secret to pull from
-		expectedEnvs    []kubecontainer.EnvVar // a set of expected environment vars
-		expectedError   bool                   // does the test fail
-		expectedEvent   string                 // does the test emit an event
+		name               string                 // the name of the test case
+		ns                 string                 // the namespace to generate environment for
+		enableServiceLinks *bool                  // enabling service links
+		container          *v1.Container          // the container to use
+		masterServiceNs    string                 // the namespace to read master service info from
+		nilLister          bool                   // whether the lister should be nil
+		configMap          *v1.ConfigMap          // an optional ConfigMap to pull from
+		secret             *v1.Secret             // an optional Secret to pull from
+		expectedEnvs       []kubecontainer.EnvVar // a set of expected environment vars
+		expectedError      bool                   // does the test fail
+		expectedEvent      string                 // does the test emit an event
 	}{
 		{
-			name: "api server = Y, kubelet = Y",
-			ns:   "test1",
+			name:               "api server = Y, kubelet = Y",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				Env: []v1.EnvVar{
 					{Name: "FOO", Value: "BAR"},
@@ -922,8 +481,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "api server = Y, kubelet = N",
-			ns:   "test1",
+			name:               "api server = Y, kubelet = N",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				Env: []v1.EnvVar{
 					{Name: "FOO", Value: "BAR"},
@@ -950,8 +510,31 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "api server = N; kubelet = Y",
-			ns:   "test1",
+			name:               "api server = N; kubelet = Y",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{Name: "FOO", Value: "BAZ"},
+				},
+			},
+			masterServiceNs: metav1.NamespaceDefault,
+			nilLister:       false,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "FOO", Value: "BAZ"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.1"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP", Value: "tcp://1.2.3.1:8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8081_TCP_PORT", Value: "8081"},
+				{Name: "KUBERNETES_PORT_8081_TCP_ADDR", Value: "1.2.3.1"},
+			},
+		},
+		{
+			name:               "api server = N; kubelet = Y; service env vars",
+			ns:                 "test1",
+			enableServiceLinks: &trueValue,
 			container: &v1.Container{
 				Env: []v1.EnvVar{
 					{Name: "FOO", Value: "BAZ"},
@@ -978,8 +561,31 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "master service in pod ns",
-			ns:   "test2",
+			name:               "master service in pod ns",
+			ns:                 "test2",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{Name: "FOO", Value: "ZAP"},
+				},
+			},
+			masterServiceNs: "kubernetes",
+			nilLister:       false,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "FOO", Value: "ZAP"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.6"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8086"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.6:8086"},
+				{Name: "KUBERNETES_PORT_8086_TCP", Value: "tcp://1.2.3.6:8086"},
+				{Name: "KUBERNETES_PORT_8086_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8086_TCP_PORT", Value: "8086"},
+				{Name: "KUBERNETES_PORT_8086_TCP_ADDR", Value: "1.2.3.6"},
+			},
+		},
+		{
+			name:               "master service in pod ns, service env vars",
+			ns:                 "test2",
+			enableServiceLinks: &trueValue,
 			container: &v1.Container{
 				Env: []v1.EnvVar{
 					{Name: "FOO", Value: "ZAP"},
@@ -1006,11 +612,29 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name:            "pod in master service ns",
-			ns:              "kubernetes",
-			container:       &v1.Container{},
-			masterServiceNs: "kubernetes",
-			nilLister:       false,
+			name:               "pod in master service ns",
+			ns:                 "kubernetes",
+			enableServiceLinks: &falseValue,
+			container:          &v1.Container{},
+			masterServiceNs:    "kubernetes",
+			nilLister:          false,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.6"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8086"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.6:8086"},
+				{Name: "KUBERNETES_PORT_8086_TCP", Value: "tcp://1.2.3.6:8086"},
+				{Name: "KUBERNETES_PORT_8086_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8086_TCP_PORT", Value: "8086"},
+				{Name: "KUBERNETES_PORT_8086_TCP_ADDR", Value: "1.2.3.6"},
+			},
+		},
+		{
+			name:               "pod in master service ns, service env vars",
+			ns:                 "kubernetes",
+			enableServiceLinks: &trueValue,
+			container:          &v1.Container{},
+			masterServiceNs:    "kubernetes",
+			nilLister:          false,
 			expectedEnvs: []kubecontainer.EnvVar{
 				{Name: "NOT_SPECIAL_SERVICE_HOST", Value: "1.2.3.8"},
 				{Name: "NOT_SPECIAL_SERVICE_PORT", Value: "8088"},
@@ -1029,15 +653,16 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "downward api pod",
-			ns:   "downward-api",
+			name:               "downward api pod",
+			ns:                 "downward-api",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				Env: []v1.EnvVar{
 					{
 						Name: "POD_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: "v1",
 								FieldPath:  "metadata.name",
 							},
 						},
@@ -1046,7 +671,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAMESPACE",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: "v1",
 								FieldPath:  "metadata.namespace",
 							},
 						},
@@ -1055,7 +680,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NODE_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: "v1",
 								FieldPath:  "spec.nodeName",
 							},
 						},
@@ -1064,7 +689,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_SERVICE_ACCOUNT_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: "v1",
 								FieldPath:  "spec.serviceAccountName",
 							},
 						},
@@ -1073,7 +698,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_IP",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: "v1",
 								FieldPath:  "status.podIP",
 							},
 						},
@@ -1082,7 +707,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "HOST_IP",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: "v1",
 								FieldPath:  "status.hostIP",
 							},
 						},
@@ -1101,8 +726,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "env expansion",
-			ns:   "test1",
+			name:               "env expansion",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				Env: []v1.EnvVar{
 					{
@@ -1113,7 +739,103 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						Name: "POD_NAME",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								APIVersion: "v1", //legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+								FieldPath:  "metadata.name",
+							},
+						},
+					},
+					{
+						Name:  "OUT_OF_ORDER_TEST",
+						Value: "$(OUT_OF_ORDER_TARGET)",
+					},
+					{
+						Name:  "OUT_OF_ORDER_TARGET",
+						Value: "FOO",
+					},
+					{
+						Name: "EMPTY_VAR",
+					},
+					{
+						Name:  "EMPTY_TEST",
+						Value: "foo-$(EMPTY_VAR)",
+					},
+					{
+						Name:  "POD_NAME_TEST2",
+						Value: "test2-$(POD_NAME)",
+					},
+					{
+						Name:  "POD_NAME_TEST3",
+						Value: "$(POD_NAME_TEST2)-3",
+					},
+					{
+						Name:  "LITERAL_TEST",
+						Value: "literal-$(TEST_LITERAL)",
+					},
+					{
+						Name:  "TEST_UNDEFINED",
+						Value: "$(UNDEFINED_VAR)",
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       false,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "TEST_LITERAL",
+					Value: "test-test-test",
+				},
+				{
+					Name:  "POD_NAME",
+					Value: "dapi-test-pod-name",
+				},
+				{
+					Name:  "POD_NAME_TEST2",
+					Value: "test2-dapi-test-pod-name",
+				},
+				{
+					Name:  "POD_NAME_TEST3",
+					Value: "test2-dapi-test-pod-name-3",
+				},
+				{
+					Name:  "LITERAL_TEST",
+					Value: "literal-test-test-test",
+				},
+				{
+					Name:  "OUT_OF_ORDER_TEST",
+					Value: "$(OUT_OF_ORDER_TARGET)",
+				},
+				{
+					Name:  "OUT_OF_ORDER_TARGET",
+					Value: "FOO",
+				},
+				{
+					Name:  "TEST_UNDEFINED",
+					Value: "$(UNDEFINED_VAR)",
+				},
+				{
+					Name: "EMPTY_VAR",
+				},
+				{
+					Name:  "EMPTY_TEST",
+					Value: "foo-",
+				},
+			},
+		},
+		{
+			name:               "env expansion, service env vars",
+			ns:                 "test1",
+			enableServiceLinks: &trueValue,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{
+						Name:  "TEST_LITERAL",
+						Value: "test-test-test",
+					},
+					{
+						Name: "POD_NAME",
+						ValueFrom: &v1.EnvVarSource{
+							FieldRef: &v1.ObjectFieldSelector{
+								APIVersion: "v1",
 								FieldPath:  "metadata.name",
 							},
 						},
@@ -1232,8 +954,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "configmapkeyref_missing_optional",
-			ns:   "test",
+			name:               "configmapkeyref_missing_optional",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				Env: []v1.EnvVar{
 					{
@@ -1252,8 +975,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEnvs:    nil,
 		},
 		{
-			name: "configmapkeyref_missing_key_optional",
-			ns:   "test",
+			name:               "configmapkeyref_missing_key_optional",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				Env: []v1.EnvVar{
 					{
@@ -1282,8 +1006,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEnvs: nil,
 		},
 		{
-			name: "secretkeyref_missing_optional",
-			ns:   "test",
+			name:               "secretkeyref_missing_optional",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				Env: []v1.EnvVar{
 					{
@@ -1302,8 +1027,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEnvs:    nil,
 		},
 		{
-			name: "secretkeyref_missing_key_optional",
-			ns:   "test",
+			name:               "secretkeyref_missing_key_optional",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				Env: []v1.EnvVar{
 					{
@@ -1332,8 +1058,77 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEnvs: nil,
 		},
 		{
-			name: "configmap",
-			ns:   "test1",
+			name:               "configmap",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{
+						ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}},
+					},
+					{
+						Prefix:       "p_",
+						ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}},
+					},
+				},
+				Env: []v1.EnvVar{
+					{
+						Name:  "TEST_LITERAL",
+						Value: "test-test-test",
+					},
+					{
+						Name:  "EXPANSION_TEST",
+						Value: "$(REPLACE_ME)",
+					},
+					{
+						Name:  "DUPE_TEST",
+						Value: "ENV_VAR",
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       false,
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-configmap",
+				},
+				Data: map[string]string{
+					"REPLACE_ME": "FROM_CONFIG_MAP",
+					"DUPE_TEST":  "CONFIG_MAP",
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "TEST_LITERAL",
+					Value: "test-test-test",
+				},
+				{
+					Name:  "REPLACE_ME",
+					Value: "FROM_CONFIG_MAP",
+				},
+				{
+					Name:  "EXPANSION_TEST",
+					Value: "FROM_CONFIG_MAP",
+				},
+				{
+					Name:  "DUPE_TEST",
+					Value: "ENV_VAR",
+				},
+				{
+					Name:  "p_REPLACE_ME",
+					Value: "FROM_CONFIG_MAP",
+				},
+				{
+					Name:  "p_DUPE_TEST",
+					Value: "CONFIG_MAP",
+				},
+			},
+		},
+		{
+			name:               "configmap, service env vars",
+			ns:                 "test1",
+			enableServiceLinks: &trueValue,
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{
@@ -1427,8 +1222,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "configmap_missing",
-			ns:   "test1",
+			name:               "configmap_missing",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}}},
@@ -1438,8 +1234,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedError:   true,
 		},
 		{
-			name: "configmap_missing_optional",
-			ns:   "test",
+			name:               "configmap_missing_optional",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{ConfigMapRef: &v1.ConfigMapEnvSource{
@@ -1451,8 +1248,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEnvs:    nil,
 		},
 		{
-			name: "configmap_invalid_keys",
-			ns:   "test",
+			name:               "configmap_invalid_keys",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}}},
@@ -1479,8 +1277,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom configMap test/test-config-map were skipped since they are considered invalid environment variable names.",
 		},
 		{
-			name: "configmap_invalid_keys_valid",
-			ns:   "test",
+			name:               "configmap_invalid_keys_valid",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{
@@ -1507,8 +1306,77 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "secret",
-			ns:   "test1",
+			name:               "secret",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{
+						SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}},
+					},
+					{
+						Prefix:    "p_",
+						SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}},
+					},
+				},
+				Env: []v1.EnvVar{
+					{
+						Name:  "TEST_LITERAL",
+						Value: "test-test-test",
+					},
+					{
+						Name:  "EXPANSION_TEST",
+						Value: "$(REPLACE_ME)",
+					},
+					{
+						Name:  "DUPE_TEST",
+						Value: "ENV_VAR",
+					},
+				},
+			},
+			masterServiceNs: "nothing",
+			nilLister:       false,
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"REPLACE_ME": []byte("FROM_SECRET"),
+					"DUPE_TEST":  []byte("SECRET"),
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "TEST_LITERAL",
+					Value: "test-test-test",
+				},
+				{
+					Name:  "REPLACE_ME",
+					Value: "FROM_SECRET",
+				},
+				{
+					Name:  "EXPANSION_TEST",
+					Value: "FROM_SECRET",
+				},
+				{
+					Name:  "DUPE_TEST",
+					Value: "ENV_VAR",
+				},
+				{
+					Name:  "p_REPLACE_ME",
+					Value: "FROM_SECRET",
+				},
+				{
+					Name:  "p_DUPE_TEST",
+					Value: "SECRET",
+				},
+			},
+		},
+		{
+			name:               "secret, service env vars",
+			ns:                 "test1",
+			enableServiceLinks: &trueValue,
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{
@@ -1602,8 +1470,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
-			name: "secret_missing",
-			ns:   "test1",
+			name:               "secret_missing",
+			ns:                 "test1",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}}},
@@ -1613,8 +1482,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedError:   true,
 		},
 		{
-			name: "secret_missing_optional",
-			ns:   "test",
+			name:               "secret_missing_optional",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{SecretRef: &v1.SecretEnvSource{
@@ -1626,8 +1496,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEnvs:    nil,
 		},
 		{
-			name: "secret_invalid_keys",
-			ns:   "test",
+			name:               "secret_invalid_keys",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}}},
@@ -1654,8 +1525,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			expectedEvent: "Warning InvalidEnvironmentVariableNames Keys [1234, 1z] from the EnvFrom secret test/test-secret were skipped since they are considered invalid environment variable names.",
 		},
 		{
-			name: "secret_invalid_keys_valid",
-			ns:   "test",
+			name:               "secret_invalid_keys_valid",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
 			container: &v1.Container{
 				EnvFrom: []v1.EnvFromSource{
 					{
@@ -1680,6 +1552,30 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Value: "abc",
 				},
 			},
+		},
+		{
+			name:               "nil_enableServiceLinks",
+			ns:                 "test",
+			enableServiceLinks: nil,
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{
+						Prefix:    "p_",
+						SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}},
+					},
+				},
+			},
+			masterServiceNs: "",
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test1",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"1234.name": []byte("abc"),
+				},
+			},
+			expectedError: true,
 		},
 	}
 
@@ -1727,6 +1623,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			Spec: v1.PodSpec{
 				ServiceAccountName: "special",
 				NodeName:           "node-name",
+				EnableServiceLinks: tc.enableServiceLinks,
 			},
 		}
 		podIP := "1.2.3.4"
@@ -2135,7 +2032,7 @@ func (f *fakeReadWriteCloser) Close() error {
 	return nil
 }
 
-func TestExec(t *testing.T) {
+func TestGetExec(t *testing.T) {
 	const (
 		podName                = "podFoo"
 		podNamespace           = "nsFoo"
@@ -2146,9 +2043,6 @@ func TestExec(t *testing.T) {
 	var (
 		podFullName = kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, podName, podNamespace))
 		command     = []string{"ls"}
-		stdin       = &bytes.Buffer{}
-		stdout      = &fakeReadWriteCloser{}
-		stderr      = &fakeReadWriteCloser{}
 	)
 
 	testcases := []struct {
@@ -2189,65 +2083,27 @@ func TestExec(t *testing.T) {
 			}},
 		}
 
-		{ // No streaming case
-			description := "no streaming - " + tc.description
-			redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
-			assert.Error(t, err, description)
-			assert.Nil(t, redirect, description)
+		description := "streaming - " + tc.description
+		fakeRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
+		kubelet.containerRuntime = fakeRuntime
+		kubelet.streamingRuntime = fakeRuntime
 
-			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil, 0)
+		redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
+		if tc.expectError {
 			assert.Error(t, err, description)
-		}
-		{ // Direct streaming case
-			description := "direct streaming - " + tc.description
-			fakeRuntime := &containertest.FakeDirectStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
-			kubelet.containerRuntime = fakeRuntime
-
-			redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
+		} else {
 			assert.NoError(t, err, description)
-			assert.Nil(t, redirect, description)
-
-			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil, 0)
-			if tc.expectError {
-				assert.Error(t, err, description)
-			} else {
-				assert.NoError(t, err, description)
-				assert.Equal(t, fakeRuntime.Args.ContainerID.ID, containerID, description+": ID")
-				assert.Equal(t, fakeRuntime.Args.Cmd, command, description+": Command")
-				assert.Equal(t, fakeRuntime.Args.Stdin, stdin, description+": Stdin")
-				assert.Equal(t, fakeRuntime.Args.Stdout, stdout, description+": Stdout")
-				assert.Equal(t, fakeRuntime.Args.Stderr, stderr, description+": Stderr")
-				assert.Equal(t, fakeRuntime.Args.TTY, tty, description+": TTY")
-			}
-		}
-		{ // Indirect streaming case
-			description := "indirect streaming - " + tc.description
-			fakeRuntime := &containertest.FakeIndirectStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
-			kubelet.containerRuntime = fakeRuntime
-
-			redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
-			if tc.expectError {
-				assert.Error(t, err, description)
-			} else {
-				assert.NoError(t, err, description)
-				assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
-			}
-
-			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil, 0)
-			assert.Error(t, err, description)
+			assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
 		}
 	}
 }
 
-func TestPortForward(t *testing.T) {
+func TestGetPortForward(t *testing.T) {
 	const (
 		podName                = "podFoo"
 		podNamespace           = "nsFoo"
 		podUID       types.UID = "12345678"
 		port         int32     = 5000
-	)
-	var (
-		stream = &fakeReadWriteCloser{}
 	)
 
 	testcases := []struct {
@@ -2280,50 +2136,17 @@ func TestPortForward(t *testing.T) {
 			}},
 		}
 
-		podFullName := kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, tc.podName, podNamespace))
-		{ // No streaming case
-			description := "no streaming - " + tc.description
-			redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})
-			assert.Error(t, err, description)
-			assert.Nil(t, redirect, description)
+		description := "streaming - " + tc.description
+		fakeRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
+		kubelet.containerRuntime = fakeRuntime
+		kubelet.streamingRuntime = fakeRuntime
 
-			err = kubelet.PortForward(podFullName, podUID, port, stream)
+		redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})
+		if tc.expectError {
 			assert.Error(t, err, description)
-		}
-		{ // Direct streaming case
-			description := "direct streaming - " + tc.description
-			fakeRuntime := &containertest.FakeDirectStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
-			kubelet.containerRuntime = fakeRuntime
-
-			redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})
+		} else {
 			assert.NoError(t, err, description)
-			assert.Nil(t, redirect, description)
-
-			err = kubelet.PortForward(podFullName, podUID, port, stream)
-			if tc.expectError {
-				assert.Error(t, err, description)
-			} else {
-				assert.NoError(t, err, description)
-				require.Equal(t, fakeRuntime.Args.Pod.ID, podUID, description+": Pod UID")
-				require.Equal(t, fakeRuntime.Args.Port, port, description+": Port")
-				require.Equal(t, fakeRuntime.Args.Stream, stream, description+": stream")
-			}
-		}
-		{ // Indirect streaming case
-			description := "indirect streaming - " + tc.description
-			fakeRuntime := &containertest.FakeIndirectStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
-			kubelet.containerRuntime = fakeRuntime
-
-			redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})
-			if tc.expectError {
-				assert.Error(t, err, description)
-			} else {
-				assert.NoError(t, err, description)
-				assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
-			}
-
-			err = kubelet.PortForward(podFullName, podUID, port, stream)
-			assert.Error(t, err, description)
+			assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
 		}
 	}
 }

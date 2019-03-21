@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -61,32 +62,33 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 		var (
 			clientPod *v1.Pod
 			pvc       *v1.PersistentVolumeClaim
+			pv        *v1.PersistentVolume
 		)
 		BeforeEach(func() {
 			framework.Logf("Initializing pod and pvcs for test")
-			clientPod, pvc = createPodPVCFromSC(f, c, ns)
+			clientPod, pvc, pv = createPodPVCFromSC(f, c, ns)
 		})
 		for _, test := range disruptiveTestTable {
 			func(t disruptiveTest) {
 				It(t.testItStmt, func() {
 					By("Executing Spec")
-					t.runTest(c, f, clientPod, pvc)
+					t.runTest(c, f, clientPod)
 				})
 			}(test)
 		}
 		AfterEach(func() {
 			framework.Logf("Tearing down test spec")
-			tearDownTestCase(c, f, ns, clientPod, pvc, nil)
+			tearDownTestCase(c, f, ns, clientPod, pvc, pv, false)
 			pvc, clientPod = nil, nil
 		})
 	})
 })
 
-func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string) (*v1.Pod, *v1.PersistentVolumeClaim) {
+func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string) (*v1.Pod, *v1.PersistentVolumeClaim, *v1.PersistentVolume) {
 	var err error
-	test := storageClassTest{
-		name:      "default",
-		claimSize: "2Gi",
+	test := testsuites.StorageClassTest{
+		Name:      "default",
+		ClaimSize: "2Gi",
 	}
 	pvc := newClaim(test, ns, "default")
 	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
@@ -99,5 +101,5 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 	By("Creating a pod with dynamically provisioned volume")
 	pod, err := framework.CreateNginxPod(c, ns, nil, pvcClaims)
 	Expect(err).NotTo(HaveOccurred(), "While creating pods for kubelet restart test")
-	return pod, pvc
+	return pod, pvc, pvs[0]
 }

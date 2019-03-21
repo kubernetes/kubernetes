@@ -24,13 +24,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
-)
-
-const (
-	systemSpecPath = "test/e2e_node/system/specs"
+	"k8s.io/kubernetes/test/e2e_node/system"
+	"k8s.io/kubernetes/test/utils"
 )
 
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
@@ -49,12 +47,12 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := builder.GetK8sBuildOutputDir()
+	buildOutputDir, err := utils.GetK8sBuildOutputDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes build output directory: %v", err)
 	}
 
-	rootDir, err := builder.GetK8sRootDir()
+	rootDir, err := utils.GetK8sRootDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes root directory: %v", err)
 	}
@@ -74,7 +72,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 
 	if systemSpecName != "" {
 		// Copy system spec file
-		source := filepath.Join(rootDir, systemSpecPath, systemSpecName+".yaml")
+		source := filepath.Join(rootDir, system.SystemSpecPath, systemSpecName+".yaml")
 		if _, err := os.Stat(source); err != nil {
 			return fmt.Errorf("failed to locate system spec %q: %v", source, err)
 		}
@@ -107,7 +105,7 @@ func tarAddFile(tar, source, dest string) error {
 // prependCOSMounterFlag prepends the flag for setting the GCI mounter path to
 // args and returns the result.
 func prependCOSMounterFlag(args, host, workspace string) (string, error) {
-	glog.V(2).Infof("GCI/COS node and GCI/COS mounter both detected, modifying --experimental-mounter-path accordingly")
+	klog.V(2).Infof("GCI/COS node and GCI/COS mounter both detected, modifying --experimental-mounter-path accordingly")
 	mounterPath := filepath.Join(workspace, "mounter")
 	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
 	return args, nil
@@ -137,7 +135,7 @@ func updateOSSpecificKubeletFlags(args, host, workspace string) (string, error) 
 }
 
 // RunTest runs test on the node.
-func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName string, timeout time.Duration) (string, error) {
+func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
 	// TODO(random-liu): Do this in cloud init after we remove containervm test.
 	if err := setupCNI(host, workspace); err != nil {
@@ -163,11 +161,11 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePr
 	}
 
 	// Run the tests
-	glog.V(2).Infof("Starting tests on %q", host)
+	klog.V(2).Infof("Starting tests on %q", host)
 	cmd := getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
-		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s",
-			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, host, results, junitFilePrefix, imageDesc, testArgs),
+		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --extra-envs=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s",
+			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, extraEnvs, host, results, junitFilePrefix, imageDesc, testArgs),
 	)
 	return SSH(host, "sh", "-c", cmd)
 }

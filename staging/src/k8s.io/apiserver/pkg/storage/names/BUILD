@@ -15,8 +15,9 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["generate.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/names",
     importpath = "k8s.io/apiserver/pkg/storage/names",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library"],
 )
 
 filegroup(

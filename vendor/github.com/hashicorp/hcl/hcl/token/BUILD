@@ -6,6 +6,7 @@ go_library(
         "position.go",
         "token.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/hashicorp/hcl/hcl/token",
     importpath = "github.com/hashicorp/hcl/hcl/token",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/hashicorp/hcl/hcl/strconv:go_default_library"],

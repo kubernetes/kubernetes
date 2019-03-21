@@ -59,6 +59,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	*/
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		clientPod = nil
@@ -87,11 +88,10 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 				},
 				Prebind: nil,
 			}
+			emptyStorageClass := ""
 			pvcConfig = framework.PersistentVolumeClaimConfig{
-				Annotations: map[string]string{
-					v1.BetaStorageClassAnnotation: "",
-				},
-				Selector: selector,
+				Selector:         selector,
+				StorageClassName: &emptyStorageClass,
 			}
 		}
 		By("Creating the PV and PVC")
@@ -178,7 +178,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		3. Verify that written file is accessible after kubelet restart
 	*/
 	It("should test that a file written to the vspehre volume mount before kubelet restart can be read after restart [Disruptive]", func() {
-		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod, pvc)
+		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod)
 	})
 
 	/*
@@ -193,7 +193,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		5. Verify that volume mount not to be found.
 	*/
 	It("should test that a vspehre volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func() {
-		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod, pvc)
+		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod)
 	})
 
 	/*

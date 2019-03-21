@@ -24,12 +24,15 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // partially cloned from webserver.go
@@ -80,7 +83,7 @@ func testPreStop(c clientset.Interface, ns string) {
 			Containers: []v1.Container{
 				{
 					Name:    "tester",
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sleep", "600"},
 					Lifecycle: &v1.Lifecycle{
 						PreStop: &v1.Handler{
@@ -160,13 +163,83 @@ func testPreStop(c clientset.Interface, ns string) {
 
 var _ = SIGDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
+	var podClient *framework.PodClient
+	BeforeEach(func() {
+		podClient = f.PodClient()
+	})
 
 	/*
-		    Testname: pods-prestop-handler-invoked
-		    Description: Makes sure a pod's preStop handler is successfully
-			invoked immediately before a container is terminated.
+		Release : v1.9
+		Testname: Pods, prestop hook
+		Description: Create a server pod with a rest endpoint '/write' that changes state.Received field. Create a Pod with a pre-stop handle that posts to the /write endpoint on the server Pod. Verify that the Pod with pre-stop hook is running. Delete the Pod with the pre-stop hook. Before the Pod is deleted, pre-stop handler MUST be called when configured. Verify that the Pod is deleted and a call to prestop hook is verified by checking the status received on the server Pod.
 	*/
 	framework.ConformanceIt("should call prestop when killing a pod ", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
+
+	It("graceful pod terminated should wait until preStop hook completes the process", func() {
+		gracefulTerminationPeriodSeconds := int64(30)
+		By("creating the pod")
+		name := "pod-prestop-hook-" + string(uuid.NewUUID())
+		pod := getPodWithpreStopLifeCycle(name)
+
+		By("submitting the pod to kubernetes")
+		podClient.Create(pod)
+
+		By("waiting for pod running")
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+
+		var err error
+		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
+
+		By("deleting the pod gracefully")
+		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
+		Expect(err).NotTo(HaveOccurred(), "failed to delete pod")
+
+		//wait up to graceful termination period seconds
+		time.Sleep(30 * time.Second)
+
+		By("verifying the pod running state after graceful termination")
+		result := &v1.PodList{}
+		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
+			client, err := framework.NodeProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
+			Expect(err).NotTo(HaveOccurred(), "failed to get the pods of the node")
+			err = client.Into(result)
+			Expect(err).NotTo(HaveOccurred(), "failed to parse the pods of the node")
+
+			for _, kubeletPod := range result.Items {
+				if pod.Name != kubeletPod.Name {
+					continue
+				} else if kubeletPod.Status.Phase == v1.PodRunning {
+					framework.Logf("pod is running")
+					return true, err
+				}
+			}
+			return false, err
+		})
+	})
 })
+
+func getPodWithpreStopLifeCycle(name string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "nginx",
+					Image: imageutils.GetE2EImage(imageutils.Nginx),
+					Lifecycle: &v1.Lifecycle{
+						PreStop: &v1.Handler{
+							Exec: &v1.ExecAction{
+								Command: []string{"sh", "-c", "while true; do echo preStop; sleep 1; done"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}

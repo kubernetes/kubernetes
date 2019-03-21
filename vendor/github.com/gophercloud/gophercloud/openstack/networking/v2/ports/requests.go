@@ -19,9 +19,11 @@ type ListOptsBuilder interface {
 type ListOpts struct {
 	Status       string `q:"status"`
 	Name         string `q:"name"`
+	Description  string `q:"description"`
 	AdminStateUp *bool  `q:"admin_state_up"`
 	NetworkID    string `q:"network_id"`
 	TenantID     string `q:"tenant_id"`
+	ProjectID    string `q:"project_id"`
 	DeviceOwner  string `q:"device_owner"`
 	MACAddress   string `q:"mac_address"`
 	ID           string `q:"id"`
@@ -30,6 +32,10 @@ type ListOpts struct {
 	Marker       string `q:"marker"`
 	SortKey      string `q:"sort_key"`
 	SortDir      string `q:"sort_dir"`
+	Tags         string `q:"tags"`
+	TagsAny      string `q:"tags-any"`
+	NotTags      string `q:"not-tags"`
+	NotTagsAny   string `q:"not-tags-any"`
 }
 
 // ToPortListQuery formats a ListOpts into a query string.
@@ -75,12 +81,14 @@ type CreateOptsBuilder interface {
 type CreateOpts struct {
 	NetworkID           string        `json:"network_id" required:"true"`
 	Name                string        `json:"name,omitempty"`
+	Description         string        `json:"description,omitempty"`
 	AdminStateUp        *bool         `json:"admin_state_up,omitempty"`
 	MACAddress          string        `json:"mac_address,omitempty"`
 	FixedIPs            interface{}   `json:"fixed_ips,omitempty"`
 	DeviceID            string        `json:"device_id,omitempty"`
 	DeviceOwner         string        `json:"device_owner,omitempty"`
 	TenantID            string        `json:"tenant_id,omitempty"`
+	ProjectID           string        `json:"project_id,omitempty"`
 	SecurityGroups      *[]string     `json:"security_groups,omitempty"`
 	AllowedAddressPairs []AddressPair `json:"allowed_address_pairs,omitempty"`
 }
@@ -110,11 +118,12 @@ type UpdateOptsBuilder interface {
 
 // UpdateOpts represents the attributes used when updating an existing port.
 type UpdateOpts struct {
-	Name                string         `json:"name,omitempty"`
+	Name                *string        `json:"name,omitempty"`
+	Description         *string        `json:"description,omitempty"`
 	AdminStateUp        *bool          `json:"admin_state_up,omitempty"`
 	FixedIPs            interface{}    `json:"fixed_ips,omitempty"`
-	DeviceID            string         `json:"device_id,omitempty"`
-	DeviceOwner         string         `json:"device_owner,omitempty"`
+	DeviceID            *string        `json:"device_id,omitempty"`
+	DeviceOwner         *string        `json:"device_owner,omitempty"`
 	SecurityGroups      *[]string      `json:"security_groups,omitempty"`
 	AllowedAddressPairs *[]AddressPair `json:"allowed_address_pairs,omitempty"`
 }
@@ -149,7 +158,12 @@ func Delete(c *gophercloud.ServiceClient, id string) (r DeleteResult) {
 func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
 	count := 0
 	id := ""
-	pages, err := List(client, nil).AllPages()
+
+	listOpts := ListOpts{
+		Name: name,
+	}
+
+	pages, err := List(client, listOpts).AllPages()
 	if err != nil {
 		return "", err
 	}

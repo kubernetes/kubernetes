@@ -21,7 +21,7 @@ import (
 	"os"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"golang.org/x/oauth2/google"
 	gcm "google.golang.org/api/monitoring/v3"
 	"k8s.io/api/core/v1"
@@ -43,20 +43,20 @@ var acceleratorMetrics = []string{
 }
 
 var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
 
-	It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func() {
+	ginkgo.It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func() {
 		testStackdriverAcceleratorMonitoring(f)
 	})
 
 })
 
 func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
-	projectId := framework.TestContext.CloudConfig.ProjectID
+	projectID := framework.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
@@ -73,9 +73,6 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 	}
 
 	scheduling.SetupNVIDIAGPUNode(f, false)
-
-	// TODO: remove this after cAdvisor race is fixed.
-	time.Sleep(time.Minute)
 
 	f.PodClient().Create(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -100,7 +97,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 	})
 
 	metricsMap := map[string]bool{}
-	pollingFunction := checkForAcceleratorMetrics(projectId, gcmService, time.Now(), metricsMap)
+	pollingFunction := checkForAcceleratorMetrics(projectID, gcmService, time.Now(), metricsMap)
 	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
 	if err != nil {
 		framework.Logf("Missing metrics: %+v", metricsMap)
@@ -108,7 +105,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 	framework.ExpectNoError(err)
 }
 
-func checkForAcceleratorMetrics(projectId string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool) func() (bool, error) {
+func checkForAcceleratorMetrics(projectID string, gcmService *gcm.Service, start time.Time, metricsMap map[string]bool) func() (bool, error) {
 	return func() (bool, error) {
 		counter := 0
 		for _, metric := range acceleratorMetrics {
@@ -116,7 +113,7 @@ func checkForAcceleratorMetrics(projectId string, gcmService *gcm.Service, start
 		}
 		for _, metric := range acceleratorMetrics {
 			// TODO: check only for metrics from this cluster
-			ts, err := fetchTimeSeries(projectId, gcmService, metric, start, time.Now())
+			ts, err := fetchTimeSeries(projectID, gcmService, metric, start, time.Now())
 			framework.ExpectNoError(err)
 			if len(ts) > 0 {
 				counter = counter + 1

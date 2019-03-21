@@ -7,6 +7,7 @@ go_library(
         "main.go",
         "version.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/jteeuwen/go-bindata/go-bindata",
     importpath = "github.com/jteeuwen/go-bindata/go-bindata",
     visibility = ["//visibility:private"],
     deps = ["//vendor/github.com/jteeuwen/go-bindata:go_default_library"],
@@ -15,6 +16,7 @@ go_library(
 go_binary(
     name = "go-bindata",
     embed = [":go_default_library"],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 

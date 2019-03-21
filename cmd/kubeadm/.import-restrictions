@@ -1,0 +1,205 @@
+{
+	"Rules": [
+		{
+			"SelectorRegexp": "k8s[.]io/(api/|apimachinery/|apiextensions-apiserver/|apiserver/)",
+			"AllowedPrefixes": [
+				""
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/client-go/",
+			"AllowedPrefixes": [
+				""
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kubelet/",
+			"AllowedPrefixes": [
+				"k8s.io/kubelet/config/v1beta1"
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kube-openapi/",
+			"AllowedPrefixes": [
+				"k8s.io/kube-openapi/pkg/util/proto"
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kube-proxy/",
+			"AllowedPrefixes": [
+				"k8s.io/kube-proxy/config/v1alpha1"
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kubernetes/cmd",
+			"AllowedPrefixes": [
+				"k8s.io/kubernetes/cmd/kubeadm"
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/utils",
+			"AllowedPrefixes": [
+				"k8s.io/utils/exec",
+				"k8s.io/utils/integer",
+				"k8s.io/utils/path",
+				"k8s.io/utils/pointer",
+				"k8s.io/utils/net"
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kubernetes/pkg",
+			"AllowedPrefixes": [
+				"k8s.io/kubernetes/pkg/api/legacyscheme",
+				"k8s.io/kubernetes/pkg/apis/autoscaling",
+				"k8s.io/kubernetes/pkg/apis/core",
+				"k8s.io/kubernetes/pkg/api/service",
+				"k8s.io/kubernetes/pkg/apis/apps",
+				"k8s.io/kubernetes/pkg/apis/rbac",
+				"k8s.io/kubernetes/pkg/apis/scheduling",
+				"k8s.io/kubernetes/pkg/api/v1/pod",
+				"k8s.io/kubernetes/pkg/capabilities",
+				"k8s.io/kubernetes/pkg/controller",
+				"k8s.io/kubernetes/pkg/features",
+				"k8s.io/kubernetes/pkg/fieldpath",
+				"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes",
+				"k8s.io/kubernetes/pkg/kubelet/apis",
+				"k8s.io/kubernetes/pkg/kubelet/qos",
+				"k8s.io/kubernetes/pkg/kubelet/types",
+				"k8s.io/kubernetes/pkg/master/ports",
+				"k8s.io/kubernetes/pkg/proxy/apis/config",
+				"k8s.io/kubernetes/pkg/registry/core/service/allocator",
+				"k8s.io/kubernetes/pkg/registry/core/service/ipallocator",
+				"k8s.io/kubernetes/pkg/security/apparmor",
+				"k8s.io/kubernetes/pkg/serviceaccount",
+				"k8s.io/kubernetes/pkg/util/hash",
+				"k8s.io/kubernetes/pkg/util/initsystem",
+				"k8s.io/kubernetes/pkg/util/ipvs",
+				"k8s.io/kubernetes/pkg/util/metrics",
+				"k8s.io/kubernetes/pkg/util/node",
+				"k8s.io/kubernetes/pkg/util/normalizer",
+				"k8s.io/kubernetes/pkg/util/parsers",
+				"k8s.io/kubernetes/pkg/util/procfs",
+				"k8s.io/kubernetes/pkg/util/taints",
+				"k8s.io/kubernetes/pkg/util/ipvs",
+				"k8s.io/kubernetes/pkg/version"
+			],
+			"ForbiddenPrefixes": [
+				"k8s.io/kubernetes/pkg/cloudprovider/providers",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/fake",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/photon",
+				"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere",
+				"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+			]
+		},
+		{
+			"SelectorRegexp": "github[.]com",
+			"AllowedPrefixes": [
+				"github.com/beorn7/perks/quantile",
+				"github.com/blang/semver",
+				"github.com/coreos/etcd/auth/authpb",
+				"github.com/coreos/etcd/clientv3",
+				"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
+				"github.com/coreos/etcd/etcdserver/etcdserverpb",
+				"github.com/coreos/etcd/mvcc/mvccpb",
+				"github.com/coreos/etcd/pkg/tlsutil",
+				"github.com/coreos/etcd/pkg/transport",
+				"github.com/davecgh/go-spew/spew",
+				"github.com/docker/distribution/digestset",
+				"github.com/docker/distribution/reference",
+				"github.com/docker/docker/api",
+				"github.com/docker/docker/client",
+				"github.com/docker/docker/pkg/term",
+				"github.com/docker/go-connections/nat",
+				"github.com/docker/go-connections/sockets",
+				"github.com/docker/go-connections/tlsconfig",
+				"github.com/docker/go-units",
+				"github.com/docker/libnetwork/ipvs",
+				"github.com/gogo/protobuf/proto",
+				"github.com/gogo/protobuf/sortkeys",
+				"github.com/golang/groupcache/lru",
+				"github.com/golang/protobuf/proto",
+				"github.com/golang/protobuf/ptypes",
+				"github.com/googleapis/gnostic/compiler",
+				"github.com/googleapis/gnostic/extensions",
+				"github.com/googleapis/gnostic/OpenAPIv2",
+				"github.com/google/btree",
+				"github.com/google/gofuzz",
+				"github.com/gregjones/httpcache",
+				"github.com/hashicorp/golang-lru",
+				"github.com/imdario/mergo",
+				"github.com/json-iterator/go",
+				"github.com/MakeNowJust/heredoc",
+				"github.com/matttproud/golang_protobuf_extensions/pbutil",
+				"github.com/mholt/caddy/caddyfile",
+				"github.com/modern-go/concurrent",
+				"github.com/modern-go/reflect2",
+				"github.com/opencontainers/go-digest",
+				"github.com/opencontainers/image-spec/specs-go",
+				"github.com/peterbourgon/diskv",
+				"github.com/pkg/errors",
+				"github.com/pmezard/go-difflib/difflib",
+				"github.com/prometheus/client_golang/prometheus",
+				"github.com/prometheus/client_model/go",
+				"github.com/prometheus/common/expfmt",
+				"github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg",
+				"github.com/prometheus/common/model",
+				"github.com/prometheus/procfs",
+				"github.com/PuerkitoBio/purell",
+				"github.com/PuerkitoBio/urlesc",
+				"github.com/lithammer/dedent",
+				"github.com/russross/blackfriday",
+				"github.com/shurcooL/sanitized_anchor_name",
+				"github.com/spf13/cobra",
+				"github.com/spf13/pflag"
+			]
+		},
+		{
+			"SelectorRegexp": "golang[.]org",
+			"AllowedPrefixes": [
+				"golang.org/x/crypto/ed25519",
+				"golang.org/x/crypto/ssh/terminal",
+				"golang.org/x/net/context",
+				"golang.org/x/net/http2",
+				"golang.org/x/net/idna",
+				"golang.org/x/net/internal/timeseries",
+				"golang.org/x/net/lex/httplex",
+				"golang.org/x/net/proxy",
+				"golang.org/x/net/trace",
+				"golang.org/x/oauth2",
+				"golang.org/x/sys/unix",
+				"golang.org/x/text/cases",
+				"golang.org/x/text/internal",
+				"golang.org/x/text/language",
+				"golang.org/x/text/runes",
+				"golang.org/x/text/secure/bidirule",
+				"golang.org/x/text/secure/precis",
+				"golang.org/x/text/transform",
+				"golang.org/x/text/unicode/bidi",
+				"golang.org/x/text/unicode/norm",
+				"golang.org/x/text/width",
+				"golang.org/x/time/rate"
+			]
+		},
+		{
+			"SelectorRegexp": "google[.]golang[.]org",
+			"AllowedPrefixes": [
+				"google.golang.org/genproto/googleapis/rpc/status",
+				"google.golang.org/grpc"
+			]
+		},
+		{
+			"SelectorRegexp": "gopkg[.]in",
+			"AllowedPrefixes": [
+				"gopkg.in/inf.v0",
+				"gopkg.in/square/go-jose.v2",
+				"gopkg.in/yaml.v2"
+			]
+		}
+	]
+}

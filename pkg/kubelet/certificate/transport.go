@@ -17,26 +17,27 @@ limitations under the License.
 package certificate
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/certificate"
+	"k8s.io/client-go/util/connrotation"
 )
 
 // UpdateTransport instruments a restconfig with a transport that dynamically uses
 // certificates provided by the manager for TLS client auth.
 //
 // The config must not already provide an explicit transport.
+//
+// The returned function allows forcefully closing all active connections.
 //
 // The returned transport periodically checks the manager to determine if the
 // certificate has changed. If it has, the transport shuts down all existing client
@@ -51,16 +52,31 @@ import (
 //
 // stopCh should be used to indicate when the transport is unused and doesn't need
 // to continue checking the manager.
-func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) error {
+func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
 	return updateTransport(stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitAfter)
 }
 
 // updateTransport is an internal method that exposes how often this method checks that the
 // client cert has changed.
-func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) error {
-	if clientConfig.Transport != nil {
-		return fmt.Errorf("there is already a transport configured")
+func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
+	if clientConfig.Transport != nil || clientConfig.Dial != nil {
+		return nil, fmt.Errorf("there is already a transport or dialer configured")
 	}
+
+	d := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
+
+	if clientCertificateManager != nil {
+		if err := addCertRotation(stopCh, period, clientConfig, clientCertificateManager, exitAfter, d); err != nil {
+			return nil, err
+		}
+	} else {
+		clientConfig.Dial = d.DialContext
+	}
+
+	return d.CloseAll, nil
+}
+
+func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *connrotation.Dialer) error {
 	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
 	if err != nil {
 		return fmt.Errorf("unable to configure TLS for the rest client: %v", err)
@@ -68,6 +84,7 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	if tlsConfig == nil {
 		tlsConfig = &tls.Config{}
 	}
+
 	tlsConfig.Certificates = nil
 	tlsConfig.GetClientCertificate = func(requestInfo *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 		cert := clientCertificateManager.Current()
@@ -75,12 +92,6 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 			return &tls.Certificate{Certificate: nil}, nil
 		}
 		return cert, nil
-	}
-
-	// Custom dialer that will track all connections it creates.
-	t := &connTracker{
-		dialer: &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second},
-		conns:  make(map[*closableConn]struct{}),
 	}
 
 	lastCertAvailable := time.Now()
@@ -94,18 +105,18 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 				// the certificate has been deleted from disk or is otherwise corrupt
 				if now.After(lastCertAvailable.Add(exitAfter)) {
 					if clientCertificateManager.ServerHealthy() {
-						glog.Fatalf("It has been %s since a valid client cert was found and the server is responsive, exiting.", exitAfter)
+						klog.Fatalf("It has been %s since a valid client cert was found and the server is responsive, exiting.", exitAfter)
 					} else {
-						glog.Errorf("It has been %s since a valid client cert was found, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.", exitAfter)
+						klog.Errorf("It has been %s since a valid client cert was found, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.", exitAfter)
 					}
 				}
 			} else {
 				// the certificate is expired
 				if now.After(curr.Leaf.NotAfter) {
 					if clientCertificateManager.ServerHealthy() {
-						glog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
+						klog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
 					} else {
-						glog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
+						klog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
 					}
 				}
 				lastCertAvailable = now
@@ -118,12 +129,12 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		}
 		lastCert = curr
 
-		glog.Infof("certificate rotation detected, shutting down client connections to start using new credentials")
+		klog.Infof("certificate rotation detected, shutting down client connections to start using new credentials")
 		// The cert has been rotated. Close all existing connections to force the client
 		// to reperform its TLS handshake with new cert.
 		//
 		// See: https://github.com/kubernetes-incubator/bootkube/pull/663#issuecomment-318506493
-		t.closeAllConns()
+		d.CloseAll()
 	}, period, stopCh)
 
 	clientConfig.Transport = utilnet.SetTransportDefaults(&http.Transport{
@@ -131,7 +142,7 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: 25,
-		DialContext:         t.DialContext, // Use custom dialer.
+		DialContext:         d.DialContext,
 	})
 
 	// Zero out all existing TLS options since our new transport enforces them.
@@ -142,60 +153,6 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	clientConfig.CAData = nil
 	clientConfig.CAFile = ""
 	clientConfig.Insecure = false
+
 	return nil
-}
-
-// connTracker is a dialer that tracks all open connections it creates.
-type connTracker struct {
-	dialer *net.Dialer
-
-	mu    sync.Mutex
-	conns map[*closableConn]struct{}
-}
-
-// closeAllConns forcibly closes all tracked connections.
-func (c *connTracker) closeAllConns() {
-	c.mu.Lock()
-	conns := c.conns
-	c.conns = make(map[*closableConn]struct{})
-	c.mu.Unlock()
-
-	for conn := range conns {
-		conn.Close()
-	}
-}
-
-func (c *connTracker) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	conn, err := c.dialer.DialContext(ctx, network, address)
-	if err != nil {
-		return nil, err
-	}
-
-	closable := &closableConn{Conn: conn}
-
-	// Start tracking the connection
-	c.mu.Lock()
-	c.conns[closable] = struct{}{}
-	c.mu.Unlock()
-
-	// When the connection is closed, remove it from the map. This will
-	// be no-op if the connection isn't in the map, e.g. if closeAllConns()
-	// is called.
-	closable.onClose = func() {
-		c.mu.Lock()
-		delete(c.conns, closable)
-		c.mu.Unlock()
-	}
-
-	return closable, nil
-}
-
-type closableConn struct {
-	onClose func()
-	net.Conn
-}
-
-func (c *closableConn) Close() error {
-	go c.onClose()
-	return c.Conn.Close()
 }

@@ -62,7 +62,7 @@ func (c *FakeCronJobs) List(opts v1.ListOptions) (result *v2alpha1.CronJobList, 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v2alpha1.CronJobList{}
+	list := &v2alpha1.CronJobList{ListMeta: obj.(*v2alpha1.CronJobList).ListMeta}
 	for _, item := range obj.(*v2alpha1.CronJobList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -131,7 +131,7 @@ func (c *FakeCronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v
 // Patch applies the patch and returns the patched cronJob.
 func (c *FakeCronJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2alpha1.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, name, data, subresources...), &v2alpha1.CronJob{})
+		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, name, pt, data, subresources...), &v2alpha1.CronJob{})
 
 	if obj == nil {
 		return nil, err

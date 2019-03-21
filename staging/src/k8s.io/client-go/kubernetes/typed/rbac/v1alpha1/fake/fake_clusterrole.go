@@ -59,7 +59,7 @@ func (c *FakeClusterRoles) List(opts v1.ListOptions) (result *v1alpha1.ClusterRo
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.ClusterRoleList{}
+	list := &v1alpha1.ClusterRoleList{ListMeta: obj.(*v1alpha1.ClusterRoleList).ListMeta}
 	for _, item := range obj.(*v1alpha1.ClusterRoleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -112,7 +112,7 @@ func (c *FakeClusterRoles) DeleteCollection(options *v1.DeleteOptions, listOptio
 // Patch applies the patch and returns the patched clusterRole.
 func (c *FakeClusterRoles) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterRole, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, data, subresources...), &v1alpha1.ClusterRole{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, pt, data, subresources...), &v1alpha1.ClusterRole{})
 	if obj == nil {
 		return nil, err
 	}

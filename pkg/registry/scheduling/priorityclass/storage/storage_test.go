@@ -114,7 +114,7 @@ func TestDeleteSystemPriorityClass(t *testing.T) {
 	key := "test/system-node-critical"
 	ctx := genericapirequest.NewContext()
 	pc := scheduling.SystemPriorityClasses()[0]
-	if err := storage.Store.Storage.Create(ctx, key, pc, nil, 0); err != nil {
+	if err := storage.Store.Storage.Create(ctx, key, pc, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, _, err := storage.Delete(ctx, pc.Name, nil); err == nil {

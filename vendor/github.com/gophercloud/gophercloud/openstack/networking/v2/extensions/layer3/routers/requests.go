@@ -13,14 +13,20 @@ import (
 type ListOpts struct {
 	ID           string `q:"id"`
 	Name         string `q:"name"`
+	Description  string `q:"description"`
 	AdminStateUp *bool  `q:"admin_state_up"`
 	Distributed  *bool  `q:"distributed"`
 	Status       string `q:"status"`
 	TenantID     string `q:"tenant_id"`
+	ProjectID    string `q:"project_id"`
 	Limit        int    `q:"limit"`
 	Marker       string `q:"marker"`
 	SortKey      string `q:"sort_key"`
 	SortDir      string `q:"sort_dir"`
+	Tags         string `q:"tags"`
+	TagsAny      string `q:"tags-any"`
+	NotTags      string `q:"not-tags"`
+	NotTagsAny   string `q:"not-tags-any"`
 }
 
 // List returns a Pager which allows you to iterate over a collection of
@@ -50,9 +56,11 @@ type CreateOptsBuilder interface {
 // no required values.
 type CreateOpts struct {
 	Name                  string       `json:"name,omitempty"`
+	Description           string       `json:"description,omitempty"`
 	AdminStateUp          *bool        `json:"admin_state_up,omitempty"`
 	Distributed           *bool        `json:"distributed,omitempty"`
 	TenantID              string       `json:"tenant_id,omitempty"`
+	ProjectID             string       `json:"project_id,omitempty"`
 	GatewayInfo           *GatewayInfo `json:"external_gateway_info,omitempty"`
 	AvailabilityZoneHints []string     `json:"availability_zone_hints,omitempty"`
 }
@@ -95,6 +103,7 @@ type UpdateOptsBuilder interface {
 // UpdateOpts contains the values used when updating a router.
 type UpdateOpts struct {
 	Name         string       `json:"name,omitempty"`
+	Description  *string      `json:"description,omitempty"`
 	AdminStateUp *bool        `json:"admin_state_up,omitempty"`
 	Distributed  *bool        `json:"distributed,omitempty"`
 	GatewayInfo  *GatewayInfo `json:"external_gateway_info,omitempty"`

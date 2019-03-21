@@ -21,15 +21,15 @@ import (
 	"os"
 	"path"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -62,7 +62,7 @@ func (plugin *photonPersistentDiskPlugin) GetPluginName() string {
 func (plugin *photonPersistentDiskPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
-		glog.Errorf("Photon volume plugin: GetVolumeName failed to get volume source")
+		klog.Errorf("Photon volume plugin: GetVolumeName failed to get volume source")
 		return "", err
 	}
 
@@ -72,6 +72,10 @@ func (plugin *photonPersistentDiskPlugin) GetVolumeName(spec *volume.Spec) (stri
 func (plugin *photonPersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.PhotonPersistentDisk != nil) ||
 		(spec.Volume != nil && spec.Volume.PhotonPersistentDisk != nil)
+}
+
+func (plugin *photonPersistentDiskPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (plugin *photonPersistentDiskPlugin) RequiresRemount() bool {
@@ -97,7 +101,7 @@ func (plugin *photonPersistentDiskPlugin) NewUnmounter(volName string, podUID ty
 func (plugin *photonPersistentDiskPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Mounter, error) {
 	vvol, _, err := getVolumeSource(spec)
 	if err != nil {
-		glog.Errorf("Photon volume plugin: newMounterInternal failed to get volume source")
+		klog.Errorf("Photon volume plugin: newMounterInternal failed to get volume source")
 		return nil, err
 	}
 
@@ -114,7 +118,9 @@ func (plugin *photonPersistentDiskPlugin) newMounterInternal(spec *volume.Spec, 
 			plugin:  plugin,
 		},
 		fsType:      fsType,
-		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mountOption: util.MountOptionFromSpec(spec),
+	}, nil
 }
 
 func (plugin *photonPersistentDiskPlugin) newUnmounterInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -177,6 +183,7 @@ type photonPersistentDiskMounter struct {
 	*photonPersistentDisk
 	fsType      string
 	diskMounter *mount.SafeFormatAndMount
+	mountOption []string
 }
 
 func (b *photonPersistentDiskMounter) GetAttributes() volume.Attributes {
@@ -199,12 +206,12 @@ func (b *photonPersistentDiskMounter) SetUp(fsGroup *int64) error {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *photonPersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
-	glog.V(4).Infof("Photon Persistent Disk setup %s to %s", b.pdID, dir)
+	klog.V(4).Infof("Photon Persistent Disk setup %s to %s", b.pdID, dir)
 
 	// TODO: handle failed mounts here.
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate mount point: %s %v", dir, err)
+		klog.Errorf("cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notmnt {
@@ -212,7 +219,7 @@ func (b *photonPersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error 
 	}
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+		klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
 		return err
 	}
 
@@ -220,32 +227,33 @@ func (b *photonPersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error 
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
 	globalPDPath := makeGlobalPDPath(b.plugin.host, b.pdID)
-	glog.V(4).Infof("attempting to mount %s", dir)
+	klog.V(4).Infof("attempting to mount %s", dir)
 
-	err = b.mounter.Mount(globalPDPath, dir, "", options)
+	mountOptions := util.JoinMountOptions(options, b.mountOption)
+	err = b.mounter.Mount(globalPDPath, dir, "", mountOptions)
 	if err != nil {
 		notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notmnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
 			notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notmnt {
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
 				return err
 			}
 		}
 		os.Remove(dir)
-		glog.Errorf("Mount of disk %s failed: %v", dir, err)
+		klog.Errorf("Mount of disk %s failed: %v", dir, err)
 		return err
 	}
 
@@ -273,7 +281,7 @@ func (c *photonPersistentDiskUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *photonPersistentDiskUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
@@ -282,7 +290,7 @@ func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
 
 func (ppd *photonPersistentDisk) GetPath() string {
 	name := photonPersistentDiskPluginName
-	return ppd.plugin.host.GetPodVolumeDir(ppd.podUID, utilstrings.EscapeQualifiedNameForDisk(name), ppd.volName)
+	return ppd.plugin.host.GetPodVolumeDir(ppd.podUID, utilstrings.EscapeQualifiedName(name), ppd.volName)
 }
 
 // TODO: supporting more access mode for PhotonController persistent disk
@@ -340,9 +348,13 @@ func (plugin *photonPersistentDiskPlugin) newProvisionerInternal(options volume.
 	}, nil
 }
 
-func (p *photonPersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
+func (p *photonPersistentDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
+	}
+
+	if util.CheckPersistentVolumeClaimModeBlock(p.options.PVC) {
+		return nil, fmt.Errorf("%s does not support block volume provisioning", p.plugin.GetPluginName())
 	}
 
 	pdID, sizeGB, fstype, err := p.manager.CreateVolume(p)

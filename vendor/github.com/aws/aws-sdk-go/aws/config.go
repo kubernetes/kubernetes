@@ -18,7 +18,7 @@ const UseServiceDefaultRetries = -1
 type RequestRetryer interface{}
 
 // A Config provides service configuration for service clients. By default,
-// all clients will use the defaults.DefaultConfig tructure.
+// all clients will use the defaults.DefaultConfig structure.
 //
 //     // Create Session with MaxRetry configuration to be shared by multiple
 //     // service clients.
@@ -45,8 +45,8 @@ type Config struct {
 	// that overrides the default generated endpoint for a client. Set this
 	// to `""` to use the default generated endpoint.
 	//
-	// @note You must still provide a `Region` value when specifying an
-	//   endpoint for a client.
+	// Note: You must still provide a `Region` value when specifying an
+	// endpoint for a client.
 	Endpoint *string
 
 	// The resolver to use for looking up endpoints for AWS service clients
@@ -65,8 +65,8 @@ type Config struct {
 	// noted. A full list of regions is found in the "Regions and Endpoints"
 	// document.
 	//
-	// @see http://docs.aws.amazon.com/general/latest/gr/rande.html
-	//   AWS Regions and Endpoints
+	// See http://docs.aws.amazon.com/general/latest/gr/rande.html for AWS
+	// Regions and Endpoints.
 	Region *string
 
 	// Set this to `true` to disable SSL when sending requests. Defaults
@@ -120,9 +120,10 @@ type Config struct {
 	// will use virtual hosted bucket addressing when possible
 	// (`http://BUCKET.s3.amazonaws.com/KEY`).
 	//
-	// @note This configuration option is specific to the Amazon S3 service.
-	// @see http://docs.aws.amazon.com/AmazonS3/latest/dev/VirtualHosting.html
-	//   Amazon S3: Virtual Hosting of Buckets
+	// Note: This configuration option is specific to the Amazon S3 service.
+	//
+	// See http://docs.aws.amazon.com/AmazonS3/latest/dev/VirtualHosting.html
+	// for Amazon S3: Virtual Hosting of Buckets
 	S3ForcePathStyle *bool
 
 	// Set this to `true` to disable the SDK adding the `Expect: 100-Continue`
@@ -151,6 +152,15 @@ type Config struct {
 	// with accelerate.
 	S3UseAccelerate *bool
 
+	// S3DisableContentMD5Validation config option is temporarily disabled,
+	// For S3 GetObject API calls, #1837.
+	//
+	// Set this to `true` to disable the S3 service client from automatically
+	// adding the ContentMD5 to S3 Object Put and Upload API calls. This option
+	// will also disable the SDK from performing object ContentMD5 validation
+	// on GetObject API calls.
+	S3DisableContentMD5Validation *bool
+
 	// Set this to `true` to disable the EC2Metadata client from overriding the
 	// default http.Client's Timeout. This is helpful if you do not want the
 	// EC2Metadata client to create a new http.Client. This options is only
@@ -168,7 +178,7 @@ type Config struct {
 	//
 	EC2MetadataDisableTimeoutOverride *bool
 
-	// Instructs the endpiont to be generated for a service client to
+	// Instructs the endpoint to be generated for a service client to
 	// be the dual stack endpoint. The dual stack endpoint will support
 	// both IPv4 and IPv6 addressing.
 	//
@@ -214,6 +224,28 @@ type Config struct {
 	//    	Key: aws.String("//foo//bar//moo"),
 	//    })
 	DisableRestProtocolURICleaning *bool
+
+	// EnableEndpointDiscovery will allow for endpoint discovery on operations that
+	// have the definition in its model. By default, endpoint discovery is off.
+	//
+	// Example:
+	//    sess := session.Must(session.NewSession(&aws.Config{
+	//         EnableEndpointDiscovery: aws.Bool(true),
+	//    }))
+	//
+	//    svc := s3.New(sess)
+	//    out, err := svc.GetObject(&s3.GetObjectInput {
+	//    	Bucket: aws.String("bucketname"),
+	//    	Key: aws.String("/foo/bar/moo"),
+	//    })
+	EnableEndpointDiscovery *bool
+
+	// DisableEndpointHostPrefix will disable the SDK's behavior of prefixing
+	// request endpoint hosts with modeled information.
+	//
+	// Disabling this feature is useful when you want to use local endpoints
+	// for testing that do not support the modeled host prefix pattern.
+	DisableEndpointHostPrefix *bool
 }
 
 // NewConfig returns a new Config pointer that can be chained with builder
@@ -336,6 +368,15 @@ func (c *Config) WithS3Disable100Continue(disable bool) *Config {
 func (c *Config) WithS3UseAccelerate(enable bool) *Config {
 	c.S3UseAccelerate = &enable
 	return c
+
+}
+
+// WithS3DisableContentMD5Validation sets a config
+// S3DisableContentMD5Validation value returning a Config pointer for chaining.
+func (c *Config) WithS3DisableContentMD5Validation(enable bool) *Config {
+	c.S3DisableContentMD5Validation = &enable
+	return c
+
 }
 
 // WithUseDualStack sets a config UseDualStack value returning a Config
@@ -356,6 +397,19 @@ func (c *Config) WithEC2MetadataDisableTimeoutOverride(enable bool) *Config {
 // next retry. Defaults to time.Sleep.
 func (c *Config) WithSleepDelay(fn func(time.Duration)) *Config {
 	c.SleepDelay = fn
+	return c
+}
+
+// WithEndpointDiscovery will set whether or not to use endpoint discovery.
+func (c *Config) WithEndpointDiscovery(t bool) *Config {
+	c.EnableEndpointDiscovery = &t
+	return c
+}
+
+// WithDisableEndpointHostPrefix will set whether or not to use modeled host prefix
+// when making requests.
+func (c *Config) WithDisableEndpointHostPrefix(t bool) *Config {
+	c.DisableEndpointHostPrefix = &t
 	return c
 }
 
@@ -435,6 +489,10 @@ func mergeInConfig(dst *Config, other *Config) {
 		dst.S3UseAccelerate = other.S3UseAccelerate
 	}
 
+	if other.S3DisableContentMD5Validation != nil {
+		dst.S3DisableContentMD5Validation = other.S3DisableContentMD5Validation
+	}
+
 	if other.UseDualStack != nil {
 		dst.UseDualStack = other.UseDualStack
 	}
@@ -453,6 +511,14 @@ func mergeInConfig(dst *Config, other *Config) {
 
 	if other.EnforceShouldRetryCheck != nil {
 		dst.EnforceShouldRetryCheck = other.EnforceShouldRetryCheck
+	}
+
+	if other.EnableEndpointDiscovery != nil {
+		dst.EnableEndpointDiscovery = other.EnableEndpointDiscovery
+	}
+
+	if other.DisableEndpointHostPrefix != nil {
+		dst.DisableEndpointHostPrefix = other.DisableEndpointHostPrefix
 	}
 }
 

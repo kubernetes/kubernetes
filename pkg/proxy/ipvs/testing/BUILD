@@ -10,10 +10,15 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["fake.go"],
+    srcs = [
+        "fake.go",
+        "util.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs/testing",
-    tags = ["automanaged"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
+    deps = [
+        "//pkg/util/ipset:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+    ],
 )
 
 filegroup(
@@ -33,5 +38,5 @@ go_test(
     name = "go_default_test",
     srcs = ["fake_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
 )

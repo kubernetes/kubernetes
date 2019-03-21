@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	autoscaling "k8s.io/api/autoscaling/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -41,7 +40,7 @@ type restInterfaceProvider func(*restclient.Config) (restclient.Interface, error
 // It behaves somewhat similarly to the dynamic ClientPool,
 // but is more specifically scoped to Scale.
 type scaleClient struct {
-	mapper meta.RESTMapper
+	mapper PreferredResourceMapper
 
 	apiPathResolverFunc dynamic.APIPathResolverFunc
 	scaleKindResolver   ScaleKindResolver
@@ -51,7 +50,7 @@ type scaleClient struct {
 // NewForConfig creates a new ScalesGetter which resolves kinds
 // to resources using the given RESTMapper, and API paths using
 // the given dynamic.APIPathResolverFunc.
-func NewForConfig(cfg *restclient.Config, mapper meta.RESTMapper, resolver dynamic.APIPathResolverFunc, scaleKindResolver ScaleKindResolver) (ScalesGetter, error) {
+func NewForConfig(cfg *restclient.Config, mapper PreferredResourceMapper, resolver dynamic.APIPathResolverFunc, scaleKindResolver ScaleKindResolver) (ScalesGetter, error) {
 	// so that the RESTClientFor doesn't complain
 	cfg.GroupVersion = &schema.GroupVersion{}
 
@@ -72,7 +71,7 @@ func NewForConfig(cfg *restclient.Config, mapper meta.RESTMapper, resolver dynam
 
 // New creates a new ScalesGetter using the given client to make requests.
 // The GroupVersion on the client is ignored.
-func New(baseClient restclient.Interface, mapper meta.RESTMapper, resolver dynamic.APIPathResolverFunc, scaleKindResolver ScaleKindResolver) ScalesGetter {
+func New(baseClient restclient.Interface, mapper PreferredResourceMapper, resolver dynamic.APIPathResolverFunc, scaleKindResolver ScaleKindResolver) ScalesGetter {
 	return &scaleClient{
 		mapper: mapper,
 

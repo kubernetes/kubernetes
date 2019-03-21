@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +30,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/ingress"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 )
 
 const (
@@ -59,17 +62,17 @@ var (
 // IngressScaleFramework defines the framework for ingress scale testing.
 type IngressScaleFramework struct {
 	Clientset     clientset.Interface
-	Jig           *framework.IngressTestJig
-	GCEController *framework.GCEIngressController
+	Jig           *ingress.TestJig
+	GCEController *gce.GCEIngressController
 	CloudConfig   framework.CloudConfig
-	Logger        framework.TestLogger
+	Logger        ingress.TestLogger
 
 	Namespace        string
 	EnableTLS        bool
 	NumIngressesTest []int
 	OutputFile       string
 
-	ScaleTestDeploy *extensions.Deployment
+	ScaleTestDeploy *apps.Deployment
 	ScaleTestSvcs   []*v1.Service
 	ScaleTestIngs   []*extensions.Ingress
 
@@ -92,7 +95,7 @@ func NewIngressScaleFramework(cs clientset.Interface, ns string, cloudConfig fra
 		Namespace:   ns,
 		Clientset:   cs,
 		CloudConfig: cloudConfig,
-		Logger:      &framework.E2ELogger{},
+		Logger:      &ingress.E2ELogger{},
 		EnableTLS:   true,
 		NumIngressesTest: []int{
 			numIngressesSmall,
@@ -106,10 +109,10 @@ func NewIngressScaleFramework(cs clientset.Interface, ns string, cloudConfig fra
 // PrepareScaleTest prepares framework for ingress scale testing.
 func (f *IngressScaleFramework) PrepareScaleTest() error {
 	f.Logger.Infof("Initializing ingress test suite and gce controller...")
-	f.Jig = framework.NewIngressTestJig(f.Clientset)
+	f.Jig = ingress.NewIngressTestJig(f.Clientset)
 	f.Jig.Logger = f.Logger
 	f.Jig.PollInterval = scaleTestPollInterval
-	f.GCEController = &framework.GCEIngressController{
+	f.GCEController = &gce.GCEIngressController{
 		Client: f.Clientset,
 		Cloud:  f.CloudConfig,
 	}
@@ -145,7 +148,7 @@ func (f *IngressScaleFramework) CleanupScaleTest() []error {
 	}
 	if f.ScaleTestDeploy != nil {
 		f.Logger.Infof("Cleaning up deployment %s...", f.ScaleTestDeploy.Name)
-		if err := f.Clientset.ExtensionsV1beta1().Deployments(f.ScaleTestDeploy.Namespace).Delete(f.ScaleTestDeploy.Name, nil); err != nil {
+		if err := f.Clientset.AppsV1().Deployments(f.ScaleTestDeploy.Namespace).Delete(f.ScaleTestDeploy.Name, nil); err != nil {
 			errs = append(errs, fmt.Errorf("Error while delting deployment %s/%s: %v", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
 		}
 	}
@@ -164,7 +167,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 
 	testDeploy := generateScaleTestBackendDeploymentSpec(scaleTestNumBackends)
 	f.Logger.Infof("Creating deployment %s...", testDeploy.Name)
-	testDeploy, err := f.Jig.Client.ExtensionsV1beta1().Deployments(f.Namespace).Create(testDeploy)
+	testDeploy, err := f.Jig.Client.AppsV1().Deployments(f.Namespace).Create(testDeploy)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("Failed to create deployment %s: %v", testDeploy.Name, err))
 		return errs
@@ -179,25 +182,27 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 		}
 	}
 
-	// currentNum keeps track of how many ingresses have been created.
-	currentNum := new(int)
+	// numIngsCreated keeps track of how many ingresses have been created.
+	numIngsCreated := 0
 
-	prepareIngsFunc := func(goalNum int) {
+	prepareIngsFunc := func(numIngsNeeded int) {
 		var ingWg sync.WaitGroup
-		numToCreate := goalNum - *currentNum
-		ingWg.Add(numToCreate)
-		errQueue := make(chan error, numToCreate)
-		latencyQueue := make(chan time.Duration, numToCreate)
+		numIngsToCreate := numIngsNeeded - numIngsCreated
+		ingWg.Add(numIngsToCreate)
+		svcQueue := make(chan *v1.Service, numIngsToCreate)
+		ingQueue := make(chan *extensions.Ingress, numIngsToCreate)
+		errQueue := make(chan error, numIngsToCreate)
+		latencyQueue := make(chan time.Duration, numIngsToCreate)
 		start := time.Now()
-		for ; *currentNum < goalNum; *currentNum++ {
-			suffix := fmt.Sprintf("%d", *currentNum)
+		for ; numIngsCreated < numIngsNeeded; numIngsCreated++ {
+			suffix := fmt.Sprintf("%d", numIngsCreated)
 			go func() {
 				defer ingWg.Done()
 
 				start := time.Now()
 				svcCreated, ingCreated, err := f.createScaleTestServiceIngress(suffix, f.EnableTLS)
-				f.ScaleTestSvcs = append(f.ScaleTestSvcs, svcCreated)
-				f.ScaleTestIngs = append(f.ScaleTestIngs, ingCreated)
+				svcQueue <- svcCreated
+				ingQueue <- ingCreated
 				if err != nil {
 					errQueue <- err
 					return
@@ -214,11 +219,19 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 		}
 
 		// Wait until all ingress creations are complete.
-		f.Logger.Infof("Waiting for %d ingresses to come up...", numToCreate)
+		f.Logger.Infof("Waiting for %d ingresses to come up...", numIngsToCreate)
 		ingWg.Wait()
+		close(svcQueue)
+		close(ingQueue)
 		close(errQueue)
 		close(latencyQueue)
 		elapsed := time.Since(start)
+		for svc := range svcQueue {
+			f.ScaleTestSvcs = append(f.ScaleTestSvcs, svc)
+		}
+		for ing := range ingQueue {
+			f.ScaleTestIngs = append(f.ScaleTestIngs, ing)
+		}
 		var createLatencies []time.Duration
 		for latency := range latencyQueue {
 			createLatencies = append(createLatencies, latency)
@@ -231,15 +244,15 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 			}
 			return
 		}
-		f.Logger.Infof("Spent %s for %d ingresses to come up", elapsed, numToCreate)
+		f.Logger.Infof("Spent %s for %d ingresses to come up", elapsed, numIngsToCreate)
 		f.BatchDurations = append(f.BatchDurations, elapsed)
 	}
 
 	measureCreateUpdateFunc := func() {
 		f.Logger.Infof("Create one more ingress and wait for it to come up")
 		start := time.Now()
-		svcCreated, ingCreated, err := f.createScaleTestServiceIngress(fmt.Sprintf("%d", *currentNum), f.EnableTLS)
-		*currentNum = *currentNum + 1
+		svcCreated, ingCreated, err := f.createScaleTestServiceIngress(fmt.Sprintf("%d", numIngsCreated), f.EnableTLS)
+		numIngsCreated = numIngsCreated + 1
 		f.ScaleTestSvcs = append(f.ScaleTestSvcs, svcCreated)
 		f.ScaleTestIngs = append(f.ScaleTestIngs, ingCreated)
 		if err != nil {
@@ -424,12 +437,12 @@ func generateScaleTestServiceSpec(suffix string) *v1.Service {
 	}
 }
 
-func generateScaleTestBackendDeploymentSpec(numReplicas int32) *extensions.Deployment {
-	return &extensions.Deployment{
+func generateScaleTestBackendDeploymentSpec(numReplicas int32) *apps.Deployment {
+	return &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: scaleTestBackendName,
 		},
-		Spec: extensions.DeploymentSpec{
+		Spec: apps.DeploymentSpec{
 			Replicas: &numReplicas,
 			Selector: &metav1.LabelSelector{MatchLabels: scaleTestLabels},
 			Template: v1.PodTemplateSpec{
@@ -440,7 +453,7 @@ func generateScaleTestBackendDeploymentSpec(numReplicas int32) *extensions.Deplo
 					Containers: []v1.Container{
 						{
 							Name:  scaleTestBackendName,
-							Image: "gcr.io/google_containers/echoserver:1.6",
+							Image: "k8s.gcr.io/echoserver:1.10",
 							Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 							ReadinessProbe: &v1.Probe{
 								Handler: v1.Handler{

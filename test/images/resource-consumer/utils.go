@@ -28,6 +28,7 @@ const (
 	consumeMemBinary = "stress"
 )
 
+// ConsumeCPU consumes a given number of millicores for the specified duration.
 func ConsumeCPU(millicores int, durationSec int) {
 	log.Printf("ConsumeCPU millicores: %v, durationSec: %v", millicores, durationSec)
 	// creating new consume cpu process
@@ -37,6 +38,7 @@ func ConsumeCPU(millicores int, durationSec int) {
 	consumeCPU.Run()
 }
 
+// ConsumeMem consumes a given number of megabytes for the specified duration.
 func ConsumeMem(megabytes int, durationSec int) {
 	log.Printf("ConsumeMem megabytes: %v, durationSec: %v", megabytes, durationSec)
 	megabytesString := strconv.Itoa(megabytes) + "M"
@@ -46,6 +48,7 @@ func ConsumeMem(megabytes int, durationSec int) {
 	consumeMem.Run()
 }
 
+// GetCurrentStatus prints out a no-op.
 func GetCurrentStatus() {
 	log.Printf("GetCurrentStatus")
 	// not implemented
