@@ -901,7 +901,7 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 	}
 
 	if !isSecondaryControlPlane {
-		checks = addCommonChecks(execer, cfg, checks)
+		checks = addCommonChecks(execer, cfg.KubernetesVersion, &cfg.NodeRegistration, checks)
 
 		// Check IVPS required kernel module once we use IVPS kube-proxy mode
 		if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
@@ -959,7 +959,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
-	checks = addCommonChecks(execer, cfg, checks)
+	checks = addCommonChecks(execer, "", &cfg.NodeRegistration, checks)
 	if cfg.ControlPlane == nil {
 		checks = append(checks, FileAvailableCheck{Path: cfg.CACertPath})
 	}
@@ -1006,8 +1006,8 @@ func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.Clust
 
 // addCommonChecks is a helper function to deplicate checks that are common between both the
 // kubeadm init and join commands
-func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfiguration, checks []Checker) []Checker {
-	containerRuntime, err := utilruntime.NewContainerRuntime(execer, cfg.GetCRISocket())
+func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kubeadmapi.NodeRegistrationOptions, checks []Checker) []Checker {
+	containerRuntime, err := utilruntime.NewContainerRuntime(execer, nodeReg.CRISocket)
 	isDocker := false
 	if err != nil {
 		fmt.Printf("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
@@ -1044,8 +1044,8 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 	}
 	checks = append(checks,
 		SystemVerificationCheck{IsDocker: isDocker},
-		HostnameCheck{nodeName: cfg.GetNodeName()},
-		KubeletVersionCheck{KubernetesVersion: cfg.GetKubernetesVersion(), exec: execer},
+		HostnameCheck{nodeName: nodeReg.Name},
+		KubeletVersionCheck{KubernetesVersion: k8sVersion, exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		PortOpenCheck{port: ports.KubeletPort})
 	return checks
@@ -1062,7 +1062,7 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 
 // RunPullImagesCheck will pull images kubeadm needs if they are not found on the system
 func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
-	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.GetCRISocket())
+	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.NodeRegistration.CRISocket)
 	if err != nil {
 		return err
 	}
