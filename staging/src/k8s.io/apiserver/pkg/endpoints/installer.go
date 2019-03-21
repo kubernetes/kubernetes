@@ -63,20 +63,30 @@ type action struct {
 	Params        []*restful.Parameter // List of parameters associated with the action.
 	AllNamespaces bool                 // true iff the action is namespaced but works on aggregate result for all namespaces
 
-	handler           restful.RouteFunction
-	readObject        interface{}
-	producedObject    interface{}
+	handler     restful.RouteFunction
+	readSample  interface{} // optional. Sample object of request body
+	writeSample interface{} // required. Sample object of response body
+
+	// list of potential http status codes given action returns. The current
+	// state and assumption is all status code responses are of writeSample
+	// type
+	returnStatusCodes []int
 	consumedMIMETypes []string
 	producedMIMETypes []string
 }
 
-func newAction(verb, path string, params []*restful.Parameter, allNamespaces bool) action {
-	return action{
+func newAction(verb, path string, params []*restful.Parameter, allNamespaces bool, additionalReturnStatusCodes ...int) action {
+	a := action{
 		Verb:          verb,
 		Path:          path,
 		Params:        params,
 		AllNamespaces: allNamespaces,
 	}
+	a.returnStatusCodes = []int{http.StatusOK}
+	// TODO: in some cases, the API may return a v1.Status instead of the versioned object
+	// but currently go-restful can't handle multiple different objects being returned.
+	a.returnStatusCodes = append(a.returnStatusCodes, additionalReturnStatusCodes...)
+	return a
 }
 
 // An interface to see if one storage supports override its default verb for monitoring
@@ -476,7 +486,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 	// Add actions at the resource path: /api/apiVersion/resource
 	actions = appendIf(actions, newAction("LIST", resourcePath, resourceParams, false), isLister)
-	actions = appendIf(actions, newAction("POST", resourcePath, resourceParams, false), isCreater)
+	actions = appendIf(actions, newAction("POST", resourcePath, resourceParams, false, http.StatusCreated, http.StatusAccepted), isCreater)
 	actions = appendIf(actions, newAction("DELETECOLLECTION", resourcePath, resourceParams, false), isCollectionDeleter)
 
 	// DEPRECATED in 1.11
@@ -487,9 +497,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if getSubpath {
 		actions = appendIf(actions, newAction("GET", itemPath+"/{path:*}", proxyParams, false), isGetter)
 	}
-	actions = appendIf(actions, newAction("PUT", itemPath, nameParams, false), isUpdater)
+	actions = appendIf(actions, newAction("PUT", itemPath, nameParams, false, http.StatusCreated), isUpdater)
 	actions = appendIf(actions, newAction("PATCH", itemPath, nameParams, false), isPatcher)
-	actions = appendIf(actions, newAction("DELETE", itemPath, nameParams, false), isGracefulDeleter)
+	actions = appendIf(actions, newAction("DELETE", itemPath, nameParams, false, http.StatusAccepted), isGracefulDeleter)
 	// DEPRECATED in 1.11
 	actions = appendIf(actions, newAction("WATCH", "watch/"+itemPath, nameParams, false), isWatcher)
 	actions = appendIf(actions, newAction("CONNECT", itemPath, nameParams, false), isConnecter)
@@ -636,34 +646,34 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions[i].handler = handler
 	}
 
-	// assign readObject for each action
+	// assign readSample for each action
 	for i, action := range actions {
 		switch action.Verb {
 		case "PUT", "POST":
-			actions[i].readObject = defaultVersionedObject
+			actions[i].readSample = defaultVersionedObject
 		case "DELETE":
-			actions[i].readObject = versionedDeleterObject
+			actions[i].readSample = versionedDeleterObject
 		case "PATCH":
-			actions[i].readObject = metav1.Patch{}
+			actions[i].readSample = metav1.Patch{}
 		}
 	}
 
-	// assign producedObject for each action
+	// assign writeSample for each action
 	for i, action := range actions {
-		producedObject := storageMeta.ProducesObject(action.Verb)
-		if producedObject == nil {
-			producedObject = defaultVersionedObject
+		writeSample := storageMeta.ProducesObject(action.Verb)
+		if writeSample == nil {
+			writeSample = defaultVersionedObject
 		}
 		switch action.Verb {
 		case "LIST":
-			producedObject = versionedList
+			writeSample = versionedList
 		case "DELETE", "DELECTCOLLECTION":
-			producedObject = versionedStatus
+			writeSample = versionedStatus
 		case "WATCH", "WATCHLIST":
-			producedObject = versionedWatchEvent
+			writeSample = versionedWatchEvent
 		}
 
-		actions[i].producedObject = producedObject
+		actions[i].writeSample = writeSample
 	}
 
 	// assign consumedMIMETypes for each action
@@ -934,40 +944,27 @@ func registerActionsToWebService(action action, ws *restful.WebService, isNamesp
 	route = ws.Method(method).Path(action.Path).To(action.handler).
 		Doc(doc).
 		Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-		Operation(operation+namespaced+kind+strings.Title(subresource)+operationSuffix).
+		Operation(operation + namespaced + kind + strings.Title(subresource) + operationSuffix).
 		Produces(action.producedMIMETypes...).
-		Returns(http.StatusOK, "OK", action.producedObject).
-		Writes(action.producedObject)
-	if action.readObject != nil {
+		Writes(action.writeSample)
+
+	for _, statusCode := range action.returnStatusCodes {
+		route.Returns(statusCode, http.StatusText(statusCode), action.writeSample)
+	}
+	if action.readSample != nil {
 		if action.Verb == "DELETE" {
 			if isGracefulDeleter {
-				route.Reads(action.readObject)
+				route.Reads(action.readSample)
 				route.ParameterNamed("body").Required(false)
 			}
 		} else {
-			route.Reads(action.readObject)
+			route.Reads(action.readSample)
 		}
 	}
 	if action.consumedMIMETypes != nil {
 		route.Consumes(action.consumedMIMETypes...)
 	}
 	addParams(route, action.Params)
-
-	// additional return codes for specific verbs
-	switch action.Verb {
-	case "PUT":
-		// TODO: in some cases, the API may return a v1.Status instead of the versioned object
-		// but currently go-restful can't handle multiple different objects being returned.
-		route.Returns(http.StatusCreated, "Created", action.producedObject)
-	case "POST":
-		// TODO: in some cases, the API may return a v1.Status instead of the versioned object
-		// but currently go-restful can't handle multiple different objects being returned.
-		route.Returns(http.StatusCreated, "Created", action.producedObject).
-			Returns(http.StatusAccepted, "Accepted", action.producedObject)
-	case "DELETE":
-		route.Returns(http.StatusAccepted, "Accepted", action.producedObject)
-	}
-
 	routes = append(routes, route)
 	return routes, nil
 }
