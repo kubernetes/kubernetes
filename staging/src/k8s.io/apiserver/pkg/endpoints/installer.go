@@ -404,18 +404,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	tableProvider, _ := storage.(rest.TableConvertor)
 
-	var apiResource metav1.APIResource
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&
-		isStorageVersionProvider &&
-		storageVersionProvider.StorageVersion() != nil {
-		versioner := storageVersionProvider.StorageVersion()
-		gvk, err := getStorageVersionKind(versioner, storage, a.group.Typer)
-		if err != nil {
-			return nil, err
-		}
-		apiResource.StorageVersionHash = discovery.StorageVersionHash(gvk.Group, gvk.Version, gvk.Kind)
-	}
-
 	var namer handlers.ContextBasedNaming
 	var resourcePath, itemPath string
 	var resourceParams, nameParams, proxyParams []*restful.Parameter
@@ -435,9 +423,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			resourcePath = itemPath
 			resourceParams = nameParams
 		}
-		apiResource.Name = path
-		apiResource.Namespaced = false
-		apiResource.Kind = resourceKind
 		namer = handlers.ContextBasedNaming{
 			SelfLinker:         a.group.Linker,
 			ClusterScoped:      true,
@@ -463,9 +448,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			resourcePath = itemPath
 			resourceParams = nameParams
 		}
-		apiResource.Name = path
-		apiResource.Namespaced = true
-		apiResource.Kind = resourceKind
 		namer = handlers.ContextBasedNaming{
 			SelfLinker:         a.group.Linker,
 			ClusterScoped:      false,
@@ -534,17 +516,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	for _, action := range actions {
-		requestScope := "cluster"
-		if apiResource.Namespaced {
-			requestScope = "namespace"
-		}
-		if strings.HasSuffix(action.Path, "/{path:*}") {
-			requestScope = "resource"
-		}
-		if action.AllNamespaces {
-			requestScope = "cluster"
-		}
-
 		var handler restful.RouteFunction
 		verb := action.Verb
 		switch action.Verb {
@@ -564,15 +535,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "PUT":
 			handler = restfulUpdateResource(updater, reqScope, admit)
 		case "PATCH":
-			supportedTypes := []string{
-				string(types.JSONPatchType),
-				string(types.MergePatchType),
-				string(types.StrategicMergePatchType),
-			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
-			}
-			handler = restfulPatchResource(patcher, reqScope, admit, supportedTypes)
+			handler = restfulPatchResource(patcher, reqScope, admit, supportedPatchTypes())
 		case "POST":
 			if isNamedCreater {
 				handler = restfulCreateNamedResource(namedCreater, reqScope, admit)
@@ -587,6 +550,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			handler = restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout)
 		case "CONNECT":
 			handler = restfulConnectResource(connecter, reqScope, admit, path, isSubresource)
+		}
+		requestScope := "cluster"
+		if namespaceScoped {
+			requestScope = "namespace"
+		}
+		if strings.HasSuffix(action.Path, "/{path:*}") {
+			requestScope = "resource"
+		}
+		if action.AllNamespaces {
+			requestScope = "cluster"
 		}
 		// instrument handler
 		handler = metrics.InstrumentRouteFunc(verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
@@ -709,9 +682,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		var routes []*restful.RouteBuilder
 		var err error
 		if action.Verb == "CONNECT" {
-			routes, err = registerCONNECTToWebService(action, ws, apiResource.Namespaced, isSubresource, isLister, isWatcher, isGracefulDeleter, kind, subresource, storageMeta, connecter, kubeVerbs)
+			routes, err = registerCONNECTToWebService(action, ws, namespaceScoped, isSubresource, isLister, isWatcher, isGracefulDeleter, kind, subresource, storageMeta, connecter, kubeVerbs)
 		} else {
-			routes, err = registerActionsToWebService(action, ws, apiResource.Namespaced, isSubresource, isLister, isWatcher, isGracefulDeleter, kind, subresource)
+			routes, err = registerActionsToWebService(action, ws, namespaceScoped, isSubresource, isLister, isWatcher, isGracefulDeleter, kind, subresource)
 		}
 		if err != nil {
 			return nil, err
@@ -728,6 +701,20 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// Note: update GetAuthorizerAttributes() when adding a custom handler.
 	}
 
+	var apiResource metav1.APIResource
+	apiResource.Name = path
+	apiResource.Namespaced = namespaceScoped
+	apiResource.Kind = resourceKind
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&
+		isStorageVersionProvider &&
+		storageVersionProvider.StorageVersion() != nil {
+		versioner := storageVersionProvider.StorageVersion()
+		gvk, err := getStorageVersionKind(versioner, storage, a.group.Typer)
+		if err != nil {
+			return nil, err
+		}
+		apiResource.StorageVersionHash = discovery.StorageVersionHash(gvk.Group, gvk.Version, gvk.Kind)
+	}
 	apiResource.Verbs = make([]string, 0, len(kubeVerbs))
 	for kubeVerb := range kubeVerbs {
 		apiResource.Verbs = append(apiResource.Verbs, kubeVerb)
@@ -748,6 +735,18 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	return &apiResource, nil
+}
+
+func supportedPatchTypes() []string {
+	supportedTypes := []string{
+		string(types.JSONPatchType),
+		string(types.MergePatchType),
+		string(types.StrategicMergePatchType),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
+	}
+	return supportedTypes
 }
 
 func (a *APIInstaller) constructRequestScope(fqKindToRegister schema.GroupVersionKind, tableProvider rest.TableConvertor, resource, subresource string, namer handlers.ContextBasedNaming) (handlers.RequestScope, error) {
@@ -799,15 +798,7 @@ func (a *APIInstaller) constructRequestScope(fqKindToRegister schema.GroupVersio
 func (a *action) assignConsumedMIMETypes() *action {
 	switch a.Verb {
 	case "PATCH": // Partially update a resource
-		supportedTypes := []string{
-			string(types.JSONPatchType),
-			string(types.MergePatchType),
-			string(types.StrategicMergePatchType),
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-			supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
-		}
-		a.consumedMIMETypes = supportedTypes
+		a.consumedMIMETypes = supportedPatchTypes()
 	case "CONNECT":
 		a.consumedMIMETypes = []string{"*/*"}
 	}
