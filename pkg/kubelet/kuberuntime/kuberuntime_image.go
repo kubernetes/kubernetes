@@ -57,7 +57,7 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		authConfig := credentialprovider.LazyProvide(currentCreds)
+		authConfig := credentialprovider.LazyProvide(currentCreds, repoToPull)
 		auth := &runtimeapi.AuthConfig{
 			Username:      authConfig.Username,
 			Password:      authConfig.Password,
