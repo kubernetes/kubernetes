@@ -5,13 +5,11 @@ go_library(
     srcs = [
         "host_ports.go",
         "node_info.go",
-        "topology_info.go",
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/nodeinfo",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -26,7 +24,6 @@ go_test(
     srcs = [
         "host_ports_test.go",
         "node_info_test.go",
-        "topology_info_test.go",
         "util_test.go",
     ],
     embed = [":go_default_library"],
