@@ -29,9 +29,9 @@ import (
 )
 
 var (
-	scheme        = runtime.NewScheme()
-	codecs        = serializer.NewCodecFactory(scheme)
-	cfgserializer = NewConfigSerializer(scheme, &codecs)
+	scheme           = runtime.NewScheme()
+	codecs           = serializer.NewCodecFactory(scheme)
+	strictSerializer = NewStrictYAMLJSONSerializer(scheme, &codecs)
 
 	intsb = runtime.NewSchemeBuilder(addInternalTypes)
 	extsb = runtime.NewSchemeBuilder(registerConversions, addExternalTypes)
@@ -160,7 +160,7 @@ func TestEncode(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
-			actual, actualErr := cfgserializer.Encode(rt.format, rt.gv, rt.obj)
+			actual, actualErr := strictSerializer.Encode(rt.format, rt.gv, rt.obj)
 			if (actualErr != nil) != rt.expectedErr {
 				t2.Errorf("expected error %t but actual %t", rt.expectedErr, actualErr != nil)
 			}
@@ -192,7 +192,7 @@ func TestDecode(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
-			actual := cfgserializer.DecodeInto(rt.data, rt.obj)
+			actual := strictSerializer.DecodeInto(rt.data, rt.obj)
 			if (actual != nil) != rt.expectedErr {
 				t2.Errorf("expected error %t but actual %t, error:%v", rt.expectedErr, actual != nil, actual)
 			}
@@ -219,11 +219,11 @@ func TestRoundtrip(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
-			err := cfgserializer.DecodeInto(rt.data, rt.obj)
+			err := strictSerializer.DecodeInto(rt.data, rt.obj)
 			if err != nil {
 				t2.Errorf("unexpected decode error: %v", err)
 			}
-			actual, err := cfgserializer.Encode(rt.format, rt.gv, rt.obj)
+			actual, err := strictSerializer.Encode(rt.format, rt.gv, rt.obj)
 			if err != nil {
 				t2.Errorf("unexpected encode error: %v", err)
 			}

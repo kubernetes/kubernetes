@@ -36,8 +36,8 @@ const (
 	ContentTypeJSON EncodingFormat = "application/json"
 )
 
-// NewConfigSerializer creates a new implementation of the ConfigSerializer interface.
-func NewConfigSerializer(scheme *runtime.Scheme, codecs *serializer.CodecFactory) ConfigSerializer {
+// NewStrictYAMLJSONSerializer creates a new implementation of the StrictYAMLJSONSerializer interface.
+func NewStrictYAMLJSONSerializer(scheme *runtime.Scheme, codecs *serializer.CodecFactory) StrictYAMLJSONSerializer {
 	knownEncoders := map[EncodingFormat]runtime.Encoder{}
 	for _, serializerInfo := range codecs.SupportedMediaTypes() {
 		switch serializerInfo.MediaType {
@@ -52,19 +52,19 @@ func NewConfigSerializer(scheme *runtime.Scheme, codecs *serializer.CodecFactory
 	strictYAMLSerializer := json.NewStrictYAMLSerializer(json.DefaultMetaFactory, scheme, scheme)
 	universalDecoder := codecs.CodecForVersions(nil, strictYAMLSerializer, nil, runtime.InternalGroupVersioner)
 
-	return &configSerializer{scheme, codecs, knownEncoders, universalDecoder}
+	return &strictYAMLJSONSerializer{scheme, codecs, knownEncoders, universalDecoder}
 }
 
-// ConfigSerializer provides encoding/decoding for a configuration file.
-type ConfigSerializer interface {
+// StrictYAMLJSONSerializer provides encoding/decoding for a configuration file.
+type StrictYAMLJSONSerializer interface {
 	DecodeInto([]byte, runtime.Object) error
 	Encode(EncodingFormat, schema.GroupVersion, runtime.Object) ([]byte, error)
 }
 
-// configSerializer implements the ConfigSerializer interface.
-var _ ConfigSerializer = &configSerializer{}
+// strictYAMLJSONSerializer implements the StrictYAMLJSONSerializer interface.
+var _ StrictYAMLJSONSerializer = &strictYAMLJSONSerializer{}
 
-type configSerializer struct {
+type strictYAMLJSONSerializer struct {
 	scheme        *runtime.Scheme
 	codecs        *serializer.CodecFactory
 	knownEncoders map[EncodingFormat]runtime.Encoder
@@ -72,7 +72,7 @@ type configSerializer struct {
 }
 
 // DecodeInto decodes bytes into a pointer of the desired type.
-func (cs *configSerializer) DecodeInto(data []byte, into runtime.Object) error {
+func (cs *strictYAMLJSONSerializer) DecodeInto(data []byte, into runtime.Object) error {
 	out, gvk, err := cs.decoder.Decode(data, nil, into)
 	// return a structured error if the group was registered with the scheme but the version was unrecognized.
 	if gvk != nil && err != nil {
@@ -90,7 +90,7 @@ func (cs *configSerializer) DecodeInto(data []byte, into runtime.Object) error {
 }
 
 // Encode encodes the object into a byte slice for the specific format and version.
-func (cs *configSerializer) Encode(format EncodingFormat, gv schema.GroupVersion, obj runtime.Object) ([]byte, error) {
+func (cs *strictYAMLJSONSerializer) Encode(format EncodingFormat, gv schema.GroupVersion, obj runtime.Object) ([]byte, error) {
 	knownEncoder, ok := cs.knownEncoders[format]
 	if !ok {
 		return []byte{}, fmt.Errorf("encoding format not supported: %s", format)
