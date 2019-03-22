@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -1386,7 +1387,7 @@ func (c *PodAffinityChecker) nodeMatchesAllTopologyTerms(q affinityQuery, nodeIn
 			return false
 		}
 
-		pair := schedulernodeinfo.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
+		pair := internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
 		if _, ok := q[idx][pair]; !ok {
 			return false
 		}
@@ -1703,22 +1704,4 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta PredicateMetadata, no
 	// All volumes bound or matching PVs found for all unbound PVCs
 	klog.V(5).Infof("All PVCs found matches for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
 	return true, nil, nil
-}
-
-// BuildTopologyInfo buids a TopologyInfo based on a nodeInfoMap
-func BuildTopologyInfo(nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) schedulernodeinfo.TopologyInfo {
-	if nodeInfoMap == nil {
-		return nil
-	}
-	topologyInfo := make(schedulernodeinfo.TopologyInfo)
-	for nodeName, nodeInfo := range nodeInfoMap {
-		for k, v := range nodeInfo.Node().Labels {
-			pair := schedulernodeinfo.TopologyPair{Key: k, Value: v}
-			if topologyInfo[pair] == nil {
-				topologyInfo[pair] = sets.String{}
-			}
-			topologyInfo[pair][nodeName] = sets.Empty{}
-		}
-	}
-	return topologyInfo
 }

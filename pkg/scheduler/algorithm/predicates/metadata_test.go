@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -364,7 +365,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 				}
 				_, precompute := NewServiceAffinityPredicate(lister, schedulertesting.FakeServiceLister(test.services), FakeNodeListInfo(nodeList), nil)
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", precompute)
-				pmf := PredicateMetadataFactory{lister, BuildTopologyInfo(nodeInfoMap)}
+				pmf := PredicateMetadataFactory{lister, internalcache.BuildTopologyInfo(nodeInfoMap)}
 				meta := pmf.GetMetadata(test.pendingPod, nodeInfoMap)
 				return meta.(*predicateMetadata), nodeInfoMap
 			}
@@ -446,11 +447,11 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 		},
 		podAffinityQuery: affinityQuery{
 			{
-				schedulernodeinfo.TopologyPair{Key: "name", Value: "nodeA"}: sets.NewString("/p1"),
+				internalcache.TopologyPair{Key: "name", Value: "nodeA"}: sets.NewString("/p1"),
 			},
 			{
-				schedulernodeinfo.TopologyPair{Key: "name", Value: "nodeC"}: sets.NewString("/p2"),
-				schedulernodeinfo.TopologyPair{Key: "name", Value: "nodeC"}: sets.NewString("/p6"),
+				internalcache.TopologyPair{Key: "name", Value: "nodeC"}: sets.NewString("/p2"),
+				internalcache.TopologyPair{Key: "name", Value: "nodeC"}: sets.NewString("/p6"),
 			},
 		},
 		podAffinityFits: sets.String{},
@@ -610,7 +611,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 				},
 			},
 			wantPodAffinityQuery: affinityQuery{
-				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foo")},
+				{internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foo")},
 			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{
@@ -641,8 +642,8 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 				},
 			},
 			wantPodAffinityQuery: affinityQuery{
-				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar")},
-				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar")},
+				{internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar")},
+				{internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar")},
 			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{
@@ -670,9 +671,9 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 				},
 			},
 			wantPodAffinityQuery: affinityQuery{
-				make(map[schedulernodeinfo.TopologyPair]sets.String),
-				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foo", "/foobar")},
-				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar", "/bar")},
+				make(map[internalcache.TopologyPair]sets.String),
+				{internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foo", "/foobar")},
+				{internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar", "/bar")},
 			},
 			wantAntiAffinityPodsMaps: newTopologyPairsMaps(),
 		},
@@ -694,8 +695,8 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 				},
 			},
 			wantPodAffinityQuery: affinityQuery{
-				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foo")},
-				make(map[schedulernodeinfo.TopologyPair]sets.String),
+				{internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foo")},
+				make(map[internalcache.TopologyPair]sets.String),
 			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{
@@ -726,8 +727,8 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 				},
 			},
 			wantPodAffinityQuery: affinityQuery{
-				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar")},
-				make(map[schedulernodeinfo.TopologyPair]sets.String),
+				{internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/foobar")},
+				make(map[internalcache.TopologyPair]sets.String),
 			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{
@@ -758,8 +759,8 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 				},
 			},
 			wantPodAffinityQuery: affinityQuery{
-				make(map[schedulernodeinfo.TopologyPair]sets.String),
-				{schedulernodeinfo.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/bar")},
+				make(map[internalcache.TopologyPair]sets.String),
+				{internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: sets.NewString("/bar")},
 			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{

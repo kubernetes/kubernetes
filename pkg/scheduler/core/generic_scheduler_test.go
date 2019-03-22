@@ -797,7 +797,7 @@ func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 }
 
 func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) algorithmpredicates.PredicateMetadata {
-	topologyInfo := algorithmpredicates.BuildTopologyInfo(nodeInfo)
+	topologyInfo := internalcache.BuildTopologyInfo(nodeInfo)
 	return algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister{p}, topologyInfo)(p, nodeInfo)
 }
 

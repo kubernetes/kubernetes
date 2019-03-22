@@ -76,7 +76,7 @@ type schedulerCache struct {
 	// A map from image name to its imageState.
 	imageStates map[string]*imageState
 	// A map from node label to node names
-	toplogyInfo schedulernodeinfo.TopologyInfo
+	toplogyInfo TopologyInfo
 }
 
 type podState struct {
@@ -113,7 +113,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
 		imageStates: make(map[string]*imageState),
-		toplogyInfo: make(map[schedulernodeinfo.TopologyPair]sets.String),
+		toplogyInfo: make(map[TopologyPair]sets.String),
 	}
 }
 
@@ -672,6 +672,6 @@ func (cache *schedulerCache) NodeTree() *NodeTree {
 	return cache.nodeTree
 }
 
-func (cache *schedulerCache) TopologyInfo() schedulernodeinfo.TopologyInfo {
+func (cache *schedulerCache) TopologyInfo() TopologyInfo {
 	return cache.toplogyInfo
 }

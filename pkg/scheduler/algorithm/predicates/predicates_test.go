@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -87,7 +88,7 @@ func newResourceInitPod(pod *v1.Pod, usage ...schedulernodeinfo.Resource) *v1.Po
 }
 
 func GetPredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata {
-	pm := PredicateMetadataFactory{schedulertesting.FakePodLister{p}, BuildTopologyInfo(nodeInfo)}
+	pm := PredicateMetadataFactory{schedulertesting.FakePodLister{p}, internalcache.BuildTopologyInfo(nodeInfo)}
 	return pm.GetMetadata(p, nodeInfo)
 }
 

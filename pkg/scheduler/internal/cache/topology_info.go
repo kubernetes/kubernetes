@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nodeinfo
+package cache
 
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // TopologyPair is a key/value pair, and now used to describe labels of a node
@@ -28,7 +29,7 @@ type TopologyPair struct {
 	Value string
 }
 
-// TopologyInfo denotes a mapping from TopologyPair to a string set
+// TopologyInfo denotes a mapping from TopologyPair to a set of node names
 type TopologyInfo map[TopologyPair]sets.String
 
 // AddNode updates TopologyInfo when a node is added
@@ -69,28 +70,20 @@ func (t TopologyInfo) UpdateNode(oldNode, newNode *v1.Node) {
 		return
 	}
 
-	toRemovePairs, toAddPairs := make([]TopologyPair, 0), make([]TopologyPair, 0)
 	for oldKey, oldVal := range oldLabels {
 		if newVal, ok := newLabels[oldKey]; ok {
 			if oldVal != newVal {
-				toAddPairs = append(toAddPairs, TopologyPair{oldKey, newVal})
-				toRemovePairs = append(toRemovePairs, TopologyPair{oldKey, oldVal})
+				t.addTopologyPair(TopologyPair{oldKey, newVal}, newNode.Name)
+				t.removeTopologyPair(TopologyPair{oldKey, oldVal}, oldNode.Name)
 			}
 		} else {
-			toRemovePairs = append(toRemovePairs, TopologyPair{oldKey, oldVal})
+			t.removeTopologyPair(TopologyPair{oldKey, oldVal}, oldNode.Name)
 		}
 	}
 	for newKey, newVal := range newLabels {
 		if _, ok := oldLabels[newKey]; !ok {
-			toAddPairs = append(toAddPairs, TopologyPair{newKey, newVal})
+			t.addTopologyPair(TopologyPair{newKey, newVal}, newNode.Name)
 		}
-	}
-
-	for _, pair := range toAddPairs {
-		t.addTopologyPair(pair, newNode.Name)
-	}
-	for _, pair := range toRemovePairs {
-		t.removeTopologyPair(pair, oldNode.Name)
 	}
 }
 
@@ -108,4 +101,22 @@ func (t TopologyInfo) removeTopologyPair(pair TopologyPair, nodeName string) {
 			delete(t, pair)
 		}
 	}
+}
+
+// BuildTopologyInfo buids a TopologyInfo based on a nodeInfoMap
+func BuildTopologyInfo(nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) TopologyInfo {
+	if nodeInfoMap == nil {
+		return nil
+	}
+	topologyInfo := make(TopologyInfo)
+	for nodeName, nodeInfo := range nodeInfoMap {
+		for k, v := range nodeInfo.Node().Labels {
+			pair := TopologyPair{Key: k, Value: v}
+			if topologyInfo[pair] == nil {
+				topologyInfo[pair] = sets.String{}
+			}
+			topologyInfo[pair][nodeName] = sets.Empty{}
+		}
+	}
+	return topologyInfo
 }

@@ -113,7 +113,7 @@ type Cache interface {
 	NodeTree() *NodeTree
 
 	// TopologyInfo returns cached TopologyInfo
-	TopologyInfo() schedulernodeinfo.TopologyInfo
+	TopologyInfo() TopologyInfo
 }
 
 // Snapshot is a snapshot of cache state

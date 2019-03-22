@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -47,7 +48,7 @@ type PredicateMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*sche
 // PredicateMetadataFactory defines a factory of predicate metadata.
 type PredicateMetadataFactory struct {
 	podLister    algorithm.PodLister
-	topologyInfo schedulernodeinfo.TopologyInfo
+	topologyInfo internalcache.TopologyInfo
 }
 
 // AntiAffinityTerm's topology key value used in predicate metadata
@@ -77,7 +78,7 @@ type topologyPairsMaps struct {
 // affinityQuery represents how an incoming pod's affinity terms are matched:
 // - [region/region1 => matched on which pods, region/region2 => matched on which pods, ...]
 // - [zone/zone1 => matched on which pods, zone/zone2 => matched on which pods, ...]
-type affinityQuery []schedulernodeinfo.TopologyInfo
+type affinityQuery []internalcache.TopologyInfo
 
 // NOTE: When new fields are added/removed or logic is changed, please make sure that
 // RemovePod, AddPod, and ShallowCopy functions are updated to work with the new changes.
@@ -90,7 +91,7 @@ type predicateMetadata struct {
 	// Used to represent podAffinity rules
 	podAffinityQuery affinityQuery
 	// Used to get matching node names by giving a topologyPair
-	topologyInfo schedulernodeinfo.TopologyInfo
+	topologyInfo internalcache.TopologyInfo
 	// Node names which represent which nodes are fits for podAffinity
 	podAffinityFits sets.String
 	// Indicates whether "podAffinityFits" is up-to-dated;
@@ -146,7 +147,7 @@ func RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtende
 }
 
 // NewPredicateMetadataFactory creates a PredicateMetadataFactory.
-func NewPredicateMetadataFactory(podLister algorithm.PodLister, topologyInfo schedulernodeinfo.TopologyInfo) PredicateMetadataProducer {
+func NewPredicateMetadataFactory(podLister algorithm.PodLister, topologyInfo internalcache.TopologyInfo) PredicateMetadataProducer {
 	factory := &PredicateMetadataFactory{
 		podLister,
 		topologyInfo,
@@ -194,7 +195,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 func newAffinityQuery(length int) affinityQuery {
 	query := make(affinityQuery, length)
 	for i := 0; i < length; i++ {
-		query[i] = make(schedulernodeinfo.TopologyInfo)
+		query[i] = make(internalcache.TopologyInfo)
 	}
 	return query
 }
@@ -255,16 +256,15 @@ func (aq affinityQuery) append(toAppend affinityQuery) {
 	for i := range toAppend {
 		if len(aq[i]) == 0 {
 			aq[i] = toAppend[i]
-			continue
-		}
-		for topologyPair, podNames := range toAppend[i] {
-			existingPodNames, ok := aq[i][topologyPair]
-			if !ok {
-				aq[i][topologyPair] = podNames
-				continue
-			}
-			for podName := range podNames {
-				existingPodNames[podName] = sets.Empty{}
+		} else {
+			for topologyPair, podNames := range toAppend[i] {
+				if existingPodNames, ok := aq[i][topologyPair]; ok {
+					for podName := range podNames {
+						existingPodNames[podName] = sets.Empty{}
+					}
+				} else {
+					aq[i][topologyPair] = podNames
+				}
 			}
 		}
 	}
@@ -275,14 +275,12 @@ func (aq affinityQuery) removePod(delPod *v1.Pod) bool {
 	delPodFullName := podName(delPod)
 	for _, querySet := range aq {
 		for pair, nodeNames := range querySet {
-			_, ok := nodeNames[delPodFullName]
-			if !ok {
-				continue
-			}
-			updated = true
-			delete(nodeNames, delPodFullName)
-			if len(nodeNames) == 0 {
-				delete(querySet, pair)
+			if _, ok := nodeNames[delPodFullName]; ok {
+				updated = true
+				delete(nodeNames, delPodFullName)
+				if len(nodeNames) == 0 {
+					delete(querySet, pair)
+				}
 			}
 		}
 	}
@@ -338,7 +336,7 @@ func updateAffinityQuery(query affinityQuery, terms []v1.PodAffinityTerm, node *
 				continue
 			}
 			updated = true
-			pair := schedulernodeinfo.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
+			pair := internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
 			if query[i][pair] == nil {
 				query[i][pair] = make(sets.String)
 			}
