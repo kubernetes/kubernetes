@@ -649,7 +649,6 @@ test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common
 test/e2e/framework
-test/e2e/framework/providers/gce
 test/e2e/lifecycle
 test/e2e/lifecycle/bootstrap
 test/e2e/network
