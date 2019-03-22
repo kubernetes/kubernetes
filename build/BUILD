@@ -20,6 +20,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//build/pause/windows/wincat:all-srcs",
         "//build/release-tars:all-srcs",
         "//build/visible_to:all-srcs",
     ],
