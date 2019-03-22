@@ -129,6 +129,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/volume/persistentvolume/config:all-srcs",
         "//pkg/controller/volume/persistentvolume/metrics:all-srcs",
         "//pkg/controller/volume/persistentvolume/options:all-srcs",
     ],
