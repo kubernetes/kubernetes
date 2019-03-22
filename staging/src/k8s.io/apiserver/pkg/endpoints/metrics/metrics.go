@@ -34,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -346,7 +346,10 @@ func cleanUserAgent(ua string) string {
 		return "Browser"
 	}
 	// If an old "kubectl.exe" has passed us its full path, we discard the path portion.
-	ua = kubectlExeRegexp.ReplaceAllString(ua, "$1")
+	if kubectlExeRegexp.MatchString(ua) {
+		// avoid an allocation
+		ua = kubectlExeRegexp.ReplaceAllString(ua, "$1")
+	}
 	return ua
 }
 
