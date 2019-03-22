@@ -29,6 +29,7 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/pkg/errors"
+	"go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -109,7 +110,7 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	// synchronizes client's endpoints with the known endpoints from the etcd membership.
 	err = etcdClient.Sync()
 	if err != nil {
-		return nil, errors.Wrap(err, "error syncing endpoints with etc")
+		return nil, errors.Wrap(err, "error syncing endpoints with etcd")
 	}
 	klog.V(1).Infof("update etcd endpoints: %s", strings.Join(etcdClient.Endpoints, ","))
 
@@ -118,25 +119,38 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 
 // Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
 func (c *Client) Sync() error {
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		DialTimeout: 20 * time.Second,
-		TLS:         c.TLS,
-	})
-	if err != nil {
-		return err
-	}
-	defer cli.Close()
+	var cli *clientv3.Client
+	var err error
 
+	for _, endpoint := range c.Endpoints {
+		cli, err = clientv3.New(clientv3.Config{
+			Endpoints:   []string{endpoint},
+			DialTimeout: 20 * time.Second,
+			TLS:         c.TLS,
+		})
+		if err != nil {
+			return err
+		}
+
+		// check client/endpoint health before synching against it
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_, err = cli.Get(ctx, "health")
+		cancel()
+		if err == nil || err == rpctypes.ErrPermissionDenied {
+			break
+		}
+		cli.Close()
+	}
+
+	defer cli.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	err = cli.Sync(ctx)
 	cancel()
 	if err != nil {
 		return err
 	}
-	klog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
-
 	c.Endpoints = cli.Endpoints()
+	klog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
 	return nil
 }
 
