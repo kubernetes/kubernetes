@@ -148,6 +148,23 @@ type endpointsInfo struct {
 	refCount        uint16
 	providerAddress string
 	hns             HostNetworkService
+	policies        []*policiesinfo
+}
+
+// internal struct for policies information
+type policiesinfo struct {
+	Type     string
+	Settings json.RawMessage
+}
+
+// OutboundNatPolicySetting sets outbound Network Address Translation on an Endpoint.
+type outboundnatpolicysetting struct {
+	VirtualIP string
+}
+
+// Endpoint request for updating endpoint policies
+type policyendpointrequest struct {
+	Policies []policiesinfo
 }
 
 //Uses mac prefix and IPv4 address to return a mac address
@@ -218,7 +235,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *v1.ServicePort, ser
 		stickyMaxAgeSeconds:      stickyMaxAgeSeconds,
 		loadBalancerSourceRanges: make([]string, len(service.Spec.LoadBalancerSourceRanges)),
 		onlyNodeLocalEndpoints:   onlyNodeLocalEndpoints,
-		hns:                      hns,
+		hns: hns,
 	}
 
 	copy(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
@@ -932,6 +949,35 @@ func serviceToServiceMap(service *v1.Service, hns HostNetworkService) proxyServi
 	return serviceMap
 }
 
+func addDSRPolicyToEndpoint(hns HostNetworkService, endpoint *endpointsInfo) (*policiesinfo, error) {
+	policysetting := outboundnatpolicysetting{
+		VirtualIP: endpoint.ip,
+	}
+	rawJSON, err := json.Marshal(policysetting)
+	if err != nil {
+		return nil, err
+	}
+	newLoopbackPolicy := policiesinfo{
+		Type:     "OutBoundNAT",
+		Settings: rawJSON,
+	}
+	endpointRequest := policyendpointrequest{
+		Policies: []policiesinfo{newLoopbackPolicy},
+	}
+
+	settingsJson, err := json.Marshal(endpointRequest)
+	if err != nil {
+		klog.Errorf("Error Marshaling Endpoint Request err: %v ", err)
+		return nil, err
+	}
+	err = hns.updateEndpointPolicy(endpoint.hnsID, settingsJson)
+	if err != nil {
+		klog.Errorf("Error Updating EndpointPolicy err: %v ", err)
+		return nil, err
+	}
+	return &newLoopbackPolicy, nil
+}
+
 // This is where all of the hns save/restore calls happen.
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
@@ -1025,6 +1071,34 @@ func (proxier *Proxier) syncProxyRules() {
 				// A remote endpoint was already created and proxy was restarted
 				newHnsEndpoint, err = hns.getEndpointByIpAddress(ep.ip, hnsNetworkName)
 			}
+
+			// Need to add an OutboundNat policy to local endpoints for DSR loopback to properly work.
+			if newHnsEndpoint != nil {
+				if newHnsEndpoint.isLocal && proxier.isDSR {
+					var addDSRPolicy = false
+					for _, po := range newHnsEndpoint.policies {
+						if po.Type == "OutBoundNAT" {
+							var outputSettings outboundnatpolicysetting
+							if err := json.Unmarshal([]byte(po.Settings), &outputSettings); err != nil {
+								klog.Errorf("Error Unmarshaling Endpoint Policy err: %v ", err)
+								continue
+							}
+							if outputSettings.VirtualIP == newHnsEndpoint.ip {
+								addDSRPolicy = true
+							}
+						}
+					}
+					if !addDSRPolicy {
+						loopbackPolicy, err := addDSRPolicyToEndpoint(hns, newHnsEndpoint)
+						if err != nil {
+							klog.Errorf("Error Setting DSR Endpoint Policy err: %v ", err)
+						} else {
+							newHnsEndpoint.policies = append(newHnsEndpoint.policies, loopbackPolicy)
+						}
+					}
+				}
+			}
+			
 			if newHnsEndpoint == nil {
 				if ep.isLocal {
 					klog.Errorf("Local endpoint not found for %v: err: %v on network %s", ep.ip, err, hnsNetworkName)
