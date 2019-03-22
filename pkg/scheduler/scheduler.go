@@ -40,7 +40,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -59,7 +59,7 @@ type Scheduler struct {
 }
 
 // Cache returns the cache in scheduler for test to check the data in scheduler.
-func (sched *Scheduler) Cache() schedulerinternalcache.Cache {
+func (sched *Scheduler) Cache() internalcache.Cache {
 	return sched.config.SchedulerCache
 }
 

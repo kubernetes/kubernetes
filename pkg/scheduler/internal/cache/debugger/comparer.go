@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -33,7 +33,7 @@ import (
 type CacheComparer struct {
 	NodeLister corelisters.NodeLister
 	PodLister  corelisters.PodLister
-	Cache      schedulerinternalcache.Cache
+	Cache      internalcache.Cache
 	PodQueue   internalqueue.SchedulingQueue
 }
 
