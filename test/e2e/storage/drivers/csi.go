@@ -144,8 +144,6 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 		ClientNodeName: nodeName,
 	}
 
-	// TODO (?): the storage.csi.image.version and storage.csi.image.registry
-	// settings are ignored for this test. We could patch the image definitions.
 	o := utils.PatchCSIOptions{
 		OldDriverName:            h.driverInfo.Name,
 		NewDriverName:            config.GetUniqueDriverName(),
@@ -288,8 +286,6 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		containerArgs = append(containerArgs, "--node-expand-required=true")
 	}
 
-	// TODO (?): the storage.csi.image.version and storage.csi.image.registry
-	// settings are ignored for this test. We could patch the image definitions.
 	o := utils.PatchCSIOptions{
 		OldDriverName:                 "csi-mock",
 		NewDriverName:                 "csi-mock-" + f.UniqueName,
