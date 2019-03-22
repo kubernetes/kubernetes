@@ -40,15 +40,18 @@ const (
 
 // Other Constants
 const (
-	LogLevel                 = 4
-	DatastoreProperty        = "datastore"
-	ResourcePoolProperty     = "resourcePool"
-	DatastoreInfoProperty    = "info"
-	VirtualMachineType       = "VirtualMachine"
-	RoundTripperDefaultCount = 3
-	VSANDatastoreType        = "vsan"
-	DummyVMPrefixName        = "vsphere-k8s"
-	ActivePowerState         = "poweredOn"
+	LogLevel                   = 4
+	DatastoreProperty          = "datastore"
+	ResourcePoolProperty       = "resourcePool"
+	DatastoreInfoProperty      = "info"
+	VirtualMachineType         = "VirtualMachine"
+	RoundTripperDefaultCount   = 3
+	VSANDatastoreType          = "vsan"
+	DummyVMPrefixName          = "vsphere-k8s"
+	ActivePowerState           = "poweredOn"
+	DatacenterType             = "Datacenter"
+	ClusterComputeResourceType = "ClusterComputeResource"
+	HostSystemType             = "HostSystem"
 )
 
 // Test Constants

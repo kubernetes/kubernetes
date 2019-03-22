@@ -85,3 +85,19 @@ func (ds *Datastore) IsCompatibleWithStoragePolicy(ctx context.Context, storageP
 	}
 	return pbmClient.IsDatastoreCompatible(ctx, storagePolicyID, ds)
 }
+
+// GetDatastoreHostMounts gets the host names mounted on given datastore
+func (ds *Datastore) GetDatastoreHostMounts(ctx context.Context) ([]types.ManagedObjectReference, error) {
+	var dsMo mo.Datastore
+	pc := property.DefaultCollector(ds.Client())
+	err := pc.RetrieveOne(ctx, ds.Datastore.Reference(), []string{"host"}, &dsMo)
+	if err != nil {
+		klog.Errorf("Failed to retrieve datastore host mount property. err: %v", err)
+		return nil, err
+	}
+	hosts := make([]types.ManagedObjectReference, len(dsMo.Host))
+	for _, dsHostMount := range dsMo.Host {
+		hosts = append(hosts, dsHostMount.Key)
+	}
+	return hosts, nil
+}

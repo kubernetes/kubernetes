@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -60,6 +61,7 @@ type persistentVolumeLabel struct {
 	cloudConfig      []byte
 	gceCloudProvider *gce.Cloud
 	azureProvider    *azure.Cloud
+	vsphereProvider  *vsphere.VSphere
 }
 
 var _ admission.MutationInterface = &persistentVolumeLabel{}
@@ -129,6 +131,13 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 		labels, err := l.findAzureDiskLabels(volume)
 		if err != nil {
 			return admission.NewForbidden(a, fmt.Errorf("error querying AzureDisk volume %s: %v", volume.Spec.AzureDisk.DiskName, err))
+		}
+		volumeLabels = labels
+	}
+	if volume.Spec.VsphereVolume != nil {
+		labels, err := l.findVsphereVolumeLabels(volume)
+		if err != nil {
+			return admission.NewForbidden(a, fmt.Errorf("error querying vSphere Volume %s: %v", volume.Spec.VsphereVolume.VolumePath, err))
 		}
 		volumeLabels = labels
 	}
@@ -322,4 +331,44 @@ func (l *persistentVolumeLabel) findAzureDiskLabels(volume *api.PersistentVolume
 	}
 
 	return provider.GetAzureDiskLabels(volume.Spec.AzureDisk.DataDiskURI)
+}
+
+func (l *persistentVolumeLabel) findVsphereVolumeLabels(volume *api.PersistentVolume) (map[string]string, error) {
+	pvlabler, err := l.getVSphereProvider()
+	if err != nil {
+		return nil, err
+	}
+	if pvlabler == nil {
+		return nil, fmt.Errorf("unable to build vSphere cloud provider")
+	}
+
+	labels, err := pvlabler.GetVolumeLabels(volume.Spec.VsphereVolume.VolumePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return labels, nil
+}
+
+func (l *persistentVolumeLabel) getVSphereProvider() (*vsphere.VSphere, error) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	if l.vsphereProvider == nil {
+		var cloudConfigReader io.Reader
+		if len(l.cloudConfig) > 0 {
+			cloudConfigReader = bytes.NewReader(l.cloudConfig)
+		}
+		cloudProvider, err := cloudprovider.GetCloudProvider("vsphere", cloudConfigReader)
+		if err != nil || cloudProvider == nil {
+			return nil, err
+		}
+		vsphereProvider, ok := cloudProvider.(*vsphere.VSphere)
+		if !ok {
+			// GetCloudProvider failed
+			return nil, fmt.Errorf("Error retrieving vSphere Cloud Provider")
+		}
+		l.vsphereProvider = vsphereProvider
+	}
+	return l.vsphereProvider, nil
 }

@@ -18,6 +18,7 @@ go_library(
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
+        "//pkg/cloudprovider/providers/vsphere:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
