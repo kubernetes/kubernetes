@@ -342,7 +342,7 @@ func (c *Controller) enqueueFoo(obj interface{}) {
 		utilruntime.HandleError(err)
 		return
 	}
-	c.workqueue.AddRateLimited(key)
+	c.workqueue.Add(key)
 }
 
 // handleObject will take any resource implementing metav1.Object and attempt
