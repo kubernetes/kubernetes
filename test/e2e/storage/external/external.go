@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 
@@ -49,7 +50,7 @@ var csiTestSuites = []func() testsuites.TestSuite{
 }
 
 func init() {
-	flag.Var(testDriverParameter{}, "storage.testdriver", "name of a .yaml or .json file that defines a driver for storage testing, can be used more than once")
+	config.Flags.Var(testDriverParameter{}, "storage.testdriver", "name of a .yaml or .json file that defines a driver for storage testing, can be used more than once")
 }
 
 // testDriverParameter is used to hook loading of the driver

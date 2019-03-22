@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/generated"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -63,8 +64,9 @@ var systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only
 var systemSpecFile = flag.String("system-spec-file", "", "The name of the system spec file that will be used for node conformance test. If it's unspecified or empty, the default system spec (system.DefaultSysSpec) will be used.")
 
 func init() {
-	framework.RegisterCommonFlags()
-	framework.RegisterNodeFlags()
+	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
+	framework.RegisterCommonFlags(flag.CommandLine)
+	framework.RegisterNodeFlags(flag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	// Mark the run-services-mode flag as hidden to prevent user from using it.
 	pflag.CommandLine.MarkHidden("run-services-mode")
