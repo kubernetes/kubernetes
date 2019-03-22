@@ -16,45 +16,48 @@
 
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
-IMAGE_WITH_ARCH = $(IMAGE)-$(ARCH)
+IMAGE_WITH_OS_ARCH = $(IMAGE)-$(OS)-$(ARCH)
 
 TAG = 3.1
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64
+# Operating systems supported: linux, windows
+OS ?= linux
 
-ALL_ARCH = amd64 arm arm64 ppc64le s390x
+ALL_OS = linux windows
+ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x
+ALL_ARCH.windows = amd64
+ALL_OS_ARCH = $(foreach os, $(ALL_OS), $(foreach arch, ${ALL_ARCH.${os}}, $(os)-$(arch)))
 
 CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
-KUBE_CROSS_IMAGE ?= k8s.gcr.io/kube-cross
-KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
+KUBE_CROSS_IMAGE.linux ?= k8s.gcr.io/kube-cross
+KUBE_CROSS_VERSION.linux ?= $(shell cat ../build-image/cross/VERSION)
+KUBE_CROSS_IMAGE.windows ?= dockcross/windows-static-x64
+KUBE_CROSS_VERSION.windows ?= latest
+KUBE_CROSS_IMAGE := ${KUBE_CROSS_IMAGE.${OS}}
+KUBE_CROSS_VERSION := ${KUBE_CROSS_VERSION.${OS}}
 
 BIN = pause
-SRCS = pause.c
+SRCS.linux = linux/pause.c
+SRCS.windows = windows/pause.c
+SRCS := ${SRCS.${OS}}
 
 # The manifest command is still experimental as of Docker 18.09.3
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
-ifeq ($(ARCH),amd64)
-	TRIPLE ?= x86_64-linux-gnu
-endif
+TRIPLE.linux-amd64 := x86_64-linux-gnu
+TRIPLE.windows-amd64 := x86_64-w64-mingw32.static
+TRIPLE.linux-arm := arm-linux-gnueabihf
+TRIPLE.linux-arm64 := aarch64-linux-gnu
+TRIPLE.linux-ppc64le := powerpc64le-linux-gnu
+TRIPLE.linux-s390x := s390x-linux-gnu
+TRIPLE := ${TRIPLE.${OS}-${ARCH}}
 
-ifeq ($(ARCH),arm)
-	TRIPLE ?= arm-linux-gnueabihf
-endif
-
-ifeq ($(ARCH),arm64)
-	TRIPLE ?= aarch64-linux-gnu
-endif
-
-ifeq ($(ARCH),ppc64le)
-	TRIPLE ?= powerpc64le-linux-gnu
-endif
-
-ifeq ($(ARCH),s390x)
-	TRIPLE ?= s390x-linux-gnu
-endif
+BASE.linux := scratch
+BASE.windows := mcr.microsoft.com/windows/nanoserver:1809
+BASE := ${BASE.${OS}}
 
 # If you want to build AND push all containers, see the 'all-push' rule.
 all: all-container
@@ -64,24 +67,23 @@ all-push: push-manifest
 push-manifest: all-push-images all-annotate
 	docker manifest push $(IMAGE):$(TAG)
 
-sub-annotate-%:
-	$(MAKE) ARCH=$* annotate
+# split words on hyphen, access by 1-index
+word-hyphen = $(word $2,$(subst -, ,$1))
+sub-%:
+	$(MAKE) OS=$(call word-hyphen,$*,2) ARCH=$(call word-hyphen,$*,3) $(call word-hyphen,$*,1)
 
-sub-container-%:
-	$(MAKE) ARCH=$* container
+# targets prefixed with .windows will use the remote docker host
+.windows-%: DOCKER_HOST=${WINDOWS_DOCKER_HOST}
+.windows-%: DOCKER_CERT_PATH=${WINDOWS_DOCKER_CERT_PATH}
+.windows-%: DOCKER_TLS_VERIFY=${WINDOWS_DOCKER_TLS_VERIFY}
 
-sub-push-%:
-	$(MAKE) ARCH=$* push
+all-annotate: $(addprefix sub-annotate-,$(ALL_OS_ARCH))
+all-container: $(addprefix sub-container-,$(ALL_OS_ARCH))
+all-push-images: $(addprefix sub-push-,$(ALL_OS_ARCH))
 
-all-annotate: $(addprefix sub-annotate-,$(ALL_ARCH))
+build: bin/$(BIN)-$(OS)-$(ARCH)
 
-all-container: $(addprefix sub-container-,$(ALL_ARCH))
-
-all-push-images: $(addprefix sub-push-,$(ALL_ARCH))
-
-build: bin/$(BIN)-$(ARCH)
-
-bin/$(BIN)-$(ARCH): $(SRCS)
+bin/$(BIN)-$(OS)-$(ARCH): $(SRCS)
 	mkdir -p bin
 	docker run --rm -u $$(id -u):$$(id -g) -v $$(pwd):/build \
 		$(KUBE_CROSS_IMAGE):$(KUBE_CROSS_VERSION) \
@@ -90,19 +92,26 @@ bin/$(BIN)-$(ARCH): $(SRCS)
 			$(TRIPLE)-gcc $(CFLAGS) -o $@ $^ && \
 			$(TRIPLE)-strip $@"
 
-container: .container-$(ARCH)
-.container-$(ARCH): bin/$(BIN)-$(ARCH)
-	docker build --pull -t $(IMAGE_WITH_ARCH):$(TAG) --build-arg ARCH=$(ARCH) .
+container: .$(OS)-container-$(ARCH)
+.$(OS)-container-$(ARCH): bin/$(BIN)-$(OS)-$(ARCH)
+	DOCKER_HOST=$(DOCKER_HOST) \
+		DOCKER_CERT_PATH=$(DOCKER_CERT_PATH) \
+		DOCKER_TLS_VERIFY=$(DOCKER_TLS_VERIFY) \
+		docker build --pull -t $(IMAGE_WITH_OS_ARCH):$(TAG) \
+		--build-arg BASE=$(BASE) --build-arg OS=$(OS) --build-arg ARCH=$(ARCH) .
 	touch $@
 
-push: .push-$(ARCH)
-.push-$(ARCH): .container-$(ARCH)
-	docker push $(IMAGE_WITH_ARCH):$(TAG)
+push: .$(OS)-push-$(ARCH)
+.$(OS)-push-$(ARCH): .$(OS)-container-$(ARCH)
+	DOCKER_HOST=$(DOCKER_HOST) \
+		DOCKER_CERT_PATH=$(DOCKER_CERT_PATH) \
+		DOCKER_TLS_VERIFY=$(DOCKER_TLS_VERIFY) \
+		docker push $(IMAGE_WITH_OS_ARCH):$(TAG)
 	touch $@
 
 # Useful for testing, not automatically included in container image
-orphan: bin/orphan-$(ARCH)
-bin/orphan-$(ARCH): orphan.c
+orphan: bin/orphan-linux-$(ARCH)
+bin/orphan-linux-$(ARCH): linux/orphan.c
 	mkdir -p bin
 	docker run -u $$(id -u):$$(id -g) -v $$(pwd):/build \
 		$(KUBE_CROSS_IMAGE):$(KUBE_CROSS_VERSION) \
@@ -111,15 +120,15 @@ bin/orphan-$(ARCH): orphan.c
 			$(TRIPLE)-gcc $(CFLAGS) -o $@ $^ && \
 			$(TRIPLE)-strip $@"
 
-annotate: .annotate-$(ARCH)
-.annotate-$(ARCH): .container-$(ARCH) .push-$(ARCH) .manifest
-	docker manifest create --amend $(IMAGE):$(TAG) $(IMAGE_WITH_ARCH):$(TAG)
-	docker manifest annotate $(IMAGE):$(TAG) $(IMAGE_WITH_ARCH):$(TAG) --os linux --arch $(ARCH)
+annotate: .$(OS)-annotate-$(ARCH)
+.$(OS)-annotate-$(ARCH): .$(OS)-container-$(ARCH) .$(OS)-push-$(ARCH) .manifest
+	docker manifest create --amend $(IMAGE):$(TAG) $(IMAGE_WITH_OS_ARCH):$(TAG)
+	docker manifest annotate $(IMAGE):$(TAG) $(IMAGE_WITH_OS_ARCH):$(TAG) --os $(OS) --arch $(ARCH)
 	touch $@
 
 manifest: .manifest
 .manifest:
-	docker manifest create $(IMAGE):$(TAG) $(IMAGE_WITH_ARCH):$(TAG)
+	docker manifest create $(IMAGE):$(TAG) $(IMAGE_WITH_OS_ARCH):$(TAG)
 	touch $@
 
 clean:
