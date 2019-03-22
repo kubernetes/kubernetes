@@ -83,7 +83,7 @@ type quotaController struct {
 	stop chan struct{}
 }
 
-func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister quota.ListerForResourceFunc) quotaController {
+func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister quota.ListerForResourceFunc) (*quotaController, error) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	quotaConfiguration := install.NewQuotaConfigurationForControllers(lister)
 	alwaysStarted := make(chan struct{})
@@ -104,7 +104,15 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 	}
 	stop := make(chan struct{})
 	go informerFactory.Start(stop)
-	return quotaController{qc, stop}
+
+	// We need to wait for caches to sync or client action testing will get list+watch events
+	// at unexpected times. Hopefully there isn't a reason for a watch calls to fail in unit test
+	// scenarios so this will do an initial list+watch and won't produce further events.
+	if !controller.WaitForCacheSync("resource quota", stop, qc.informerSyncedFuncs...) {
+		return nil, fmt.Errorf("failed to wait for controller caches to sync")
+	}
+
+	return &quotaController{qc, stop}, nil
 }
 
 func newTestPods() []runtime.Object {
@@ -700,7 +708,10 @@ func TestSyncResourceQuota(t *testing.T) {
 		listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
 			testCase.gvr: newGenericLister(testCase.gvr.GroupResource(), testCase.items),
 		}
-		qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig))
+		qc, err := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig))
+		if err != nil {
+			t.Fatal(err)
+		}
 		defer close(qc.stop)
 
 		if err := qc.syncResourceQuota(&testCase.quota); err != nil {
@@ -751,7 +762,10 @@ func TestAddQuota(t *testing.T) {
 		gvr: newGenericLister(gvr.GroupResource(), newTestPods()),
 	}
 
-	qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig))
+	qc, err := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer close(qc.stop)
 
 	testCases := []struct {
