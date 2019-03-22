@@ -275,7 +275,7 @@ func (az *Cloud) newRouteTableCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
-		rt, err := az.RouteTablesClient.Get(ctx, az.ResourceGroup, key, "")
+		rt, err := az.RouteTablesClient.Get(ctx, az.RouteTableResourceGroup, key, "")
 		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
