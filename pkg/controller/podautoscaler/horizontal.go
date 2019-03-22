@@ -175,7 +175,7 @@ func (a *HorizontalController) updateHPA(old, cur interface{}) {
 func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %T: %v", obj, err))
 		return
 	}
 
@@ -188,7 +188,7 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 func (a *HorizontalController) deleteHPA(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %T: %v", obj, err))
 		return
 	}
 

@@ -370,7 +370,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
-			return fmt.Errorf("didn't get runtime.Object for replace: %#v", obj)
+			return fmt.Errorf("didn't get runtime.Object for replace: %T", obj)
 		}
 		key, err := w.keyFunc(object)
 		if err != nil {

@@ -156,7 +156,7 @@ func (cc *CertificateController) processNextWorkItem() bool {
 func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %T: %v", obj, err))
 		return
 	}
 	cc.queue.Add(key)

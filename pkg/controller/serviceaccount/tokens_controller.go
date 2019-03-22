@@ -656,7 +656,7 @@ func (e *TokensController) getSecret(ns string, name string, uid types.UID, fetc
 	if exists {
 		secret, ok := obj.(*v1.Secret)
 		if !ok {
-			return nil, fmt.Errorf("expected *v1.Secret, got %#v", secret)
+			return nil, fmt.Errorf("expected *v1.Secret, got %T", secret)
 		}
 		// Ensure UID matches if given
 		if len(uid) == 0 || uid == secret.UID {

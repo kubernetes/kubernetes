@@ -473,7 +473,7 @@ func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
 func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bool, error) {
 	objName, err := controller.KeyFunc(obj)
 	if err != nil {
-		return false, fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		return false, fmt.Errorf("Couldn't get key for object %T: %v", obj, err)
 	}
 	oldObj, found, err := store.Get(obj)
 	if err != nil {

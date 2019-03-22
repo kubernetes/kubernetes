@@ -120,7 +120,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	newPod, ok := obj.(*api.Pod)
 	// Check whether the object could be converted to single pod.
 	if !ok {
-		return false, pod, fmt.Errorf("invalid pod: %#v", obj)
+		return false, pod, fmt.Errorf("invalid pod: %T", obj)
 	}
 
 	// Apply default values and validate the pod.
@@ -147,7 +147,7 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 	newPods, ok := obj.(*api.PodList)
 	// Check whether the object could be converted to list of pods.
 	if !ok {
-		err = fmt.Errorf("invalid pods list: %#v", obj)
+		err = fmt.Errorf("invalid pods list: %T", obj)
 		return false, pods, err
 	}
 

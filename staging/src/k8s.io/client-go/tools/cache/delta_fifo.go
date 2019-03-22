@@ -231,7 +231,7 @@ func (f *DeltaFIFO) Delete(obj interface{}) error {
 func (f *DeltaFIFO) AddIfNotPresent(obj interface{}) error {
 	deltas, ok := obj.(Deltas)
 	if !ok {
-		return fmt.Errorf("object must be of type deltas, but got: %#v", obj)
+		return fmt.Errorf("object must be of type deltas, but got: %T", obj)
 	}
 	id, err := f.KeyOf(deltas.Newest().Object)
 	if err != nil {

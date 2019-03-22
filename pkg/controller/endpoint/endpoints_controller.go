@@ -333,12 +333,12 @@ func (e *EndpointController) deletePod(obj interface{}) {
 	// If we reached here it means the pod was deleted but its final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %T", obj))
 		return
 	}
 	pod, ok := tombstone.Obj.(*v1.Pod)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Pod: %T", obj))
 		return
 	}
 	klog.V(4).Infof("Enqueuing services of deleted pod %s/%s having final state unrecorded", pod.Namespace, pod.Name)
@@ -349,7 +349,7 @@ func (e *EndpointController) deletePod(obj interface{}) {
 func (e *EndpointController) enqueueService(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %T: %v", obj, err))
 		return
 	}
 
@@ -588,7 +588,7 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 		}
 		key, err := controller.KeyFunc(ep)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep))
+			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %T", ep))
 			continue
 		}
 		e.queue.Add(key)

@@ -592,7 +592,7 @@ type GetWithOptionsRESTStorage struct {
 
 func (r *GetWithOptionsRESTStorage) Get(ctx context.Context, name string, options runtime.Object) (runtime.Object, error) {
 	if _, ok := options.(*genericapitesting.SimpleGetOptions); !ok {
-		return nil, fmt.Errorf("Unexpected options object: %#v", options)
+		return nil, fmt.Errorf("Unexpected options object: %T", options)
 	}
 	r.optionsReceived = options
 	return r.SimpleRESTStorage.Get(ctx, name, &metav1.GetOptions{})
@@ -619,7 +619,7 @@ func (r *GetWithOptionsRootRESTStorage) NamespaceScoped() bool {
 
 func (r *GetWithOptionsRootRESTStorage) Get(ctx context.Context, name string, options runtime.Object) (runtime.Object, error) {
 	if _, ok := options.(*genericapitesting.SimpleGetOptions); !ok {
-		return nil, fmt.Errorf("Unexpected options object: %#v", options)
+		return nil, fmt.Errorf("Unexpected options object: %T", options)
 	}
 	r.optionsReceived = options
 	return r.SimpleTypedStorage.Get(ctx, name, &metav1.GetOptions{})

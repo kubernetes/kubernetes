@@ -229,7 +229,7 @@ func getPod(getter ResourceGetter, ctx context.Context, name string) (*api.Pod, 
 	}
 	pod := obj.(*api.Pod)
 	if pod == nil {
-		return nil, fmt.Errorf("Unexpected object type: %#v", pod)
+		return nil, fmt.Errorf("Unexpected object type: %T", pod)
 	}
 	return pod, nil
 }

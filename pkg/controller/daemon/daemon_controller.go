@@ -246,12 +246,12 @@ func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %T", obj))
 			return
 		}
 		ds, ok = tombstone.Obj.(*apps.DaemonSet)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a DaemonSet %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a DaemonSet %T", obj))
 			return
 		}
 	}
@@ -308,7 +308,7 @@ func (dsc *DaemonSetsController) processNextWorkItem() bool {
 func (dsc *DaemonSetsController) enqueue(ds *apps.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %T: %v", ds, err))
 		return
 	}
 
@@ -319,7 +319,7 @@ func (dsc *DaemonSetsController) enqueue(ds *apps.DaemonSet) {
 func (dsc *DaemonSetsController) enqueueRateLimited(ds *apps.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %T: %v", ds, err))
 		return
 	}
 
@@ -329,7 +329,7 @@ func (dsc *DaemonSetsController) enqueueRateLimited(ds *apps.DaemonSet) {
 func (dsc *DaemonSetsController) enqueueDaemonSetAfter(obj interface{}, after time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %T: %v", obj, err))
 		return
 	}
 
@@ -460,12 +460,12 @@ func (dsc *DaemonSetsController) deleteHistory(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %T", obj))
 			return
 		}
 		history, ok = tombstone.Obj.(*apps.ControllerRevision)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ControllerRevision %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ControllerRevision %T", obj))
 			return
 		}
 	}
@@ -649,12 +649,12 @@ func (dsc *DaemonSetsController) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %T", obj))
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %T", obj))
 			return
 		}
 	}
@@ -985,7 +985,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 	// We need to set expectations before creating/deleting pods to avoid race conditions.
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {
-		return fmt.Errorf("couldn't get key for object %#v: %v", ds, err)
+		return fmt.Errorf("couldn't get key for object %T: %v", ds, err)
 	}
 
 	createDiff := len(nodesNeedingDaemonPods)
@@ -1237,7 +1237,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	// then we do not want to call manage on foo until the daemon pods have been created.
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {
-		return fmt.Errorf("couldn't get key for object %#v: %v", ds, err)
+		return fmt.Errorf("couldn't get key for object %T: %v", ds, err)
 	}
 
 	// If the DaemonSet is being deleted (either by foreground deletion or

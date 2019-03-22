@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -211,11 +210,11 @@ func convertToCM(obj interface{}) (*v1.ConfigMap, error) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			return nil, fmt.Errorf("Couldn't get object from tombstone %#v", obj)
+			return nil, fmt.Errorf("Couldn't get object from tombstone %T", obj)
 		}
 		cm, ok = tombstone.Obj.(*v1.ConfigMap)
 		if !ok {
-			return nil, fmt.Errorf("Tombstone contained object that is not a ConfigMap %#v", obj)
+			return nil, fmt.Errorf("Tombstone contained object that is not a ConfigMap %T", tombstone.Obj)
 		}
 	}
 	return cm, nil

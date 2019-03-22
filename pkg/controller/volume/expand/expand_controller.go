@@ -169,12 +169,12 @@ func (expc *expandController) deletePVC(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(kcache.DeletedFinalStateUnknown)
 		if !ok {
-			runtime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			runtime.HandleError(fmt.Errorf("couldn't get object from tombstone %T", obj))
 			return
 		}
 		pvc, ok = tombstone.Obj.(*v1.PersistentVolumeClaim)
 		if !ok {
-			runtime.HandleError(fmt.Errorf("tombstone contained object that is not a pvc %#v", obj))
+			runtime.HandleError(fmt.Errorf("tombstone contained object that is not a pvc %T", obj))
 			return
 		}
 	}

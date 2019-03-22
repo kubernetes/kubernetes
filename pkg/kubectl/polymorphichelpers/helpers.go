@@ -75,7 +75,7 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 	}
 	pod, ok := event.Object.(*corev1.Pod)
 	if !ok {
-		return nil, 0, fmt.Errorf("%#v is not a pod event", event)
+		return nil, 0, fmt.Errorf("%T is not a pod event", event.Object)
 	}
 	return pod, 1, nil
 }

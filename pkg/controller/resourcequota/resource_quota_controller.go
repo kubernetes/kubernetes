@@ -184,7 +184,7 @@ func (rq *ResourceQuotaController) enqueueAll() {
 	for i := range rqs {
 		key, err := controller.KeyFunc(rqs[i])
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", rqs[i], err))
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %T: %v", rqs[i], err))
 			continue
 		}
 		rq.queue.Add(key)

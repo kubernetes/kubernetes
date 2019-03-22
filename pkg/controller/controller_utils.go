@@ -133,7 +133,7 @@ var ExpKeyFunc = func(obj interface{}) (string, error) {
 	if e, ok := obj.(*ControlleeExpectations); ok {
 		return e.key, nil
 	}
-	return "", fmt.Errorf("could not find key for obj %#v", obj)
+	return "", fmt.Errorf("could not find key for obj %T", obj)
 }
 
 // ControllerExpectationsInterface is an interface that allows users to set and wait on expectations.
@@ -298,7 +298,7 @@ var UIDSetKeyFunc = func(obj interface{}) (string, error) {
 	if u, ok := obj.(*UIDSet); ok {
 		return u.key, nil
 	}
-	return "", fmt.Errorf("could not find key for obj %#v", obj)
+	return "", fmt.Errorf("could not find key for obj %T", obj)
 }
 
 // UIDSet holds a key and a set of UIDs. Used by the

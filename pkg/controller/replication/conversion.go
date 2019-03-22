@@ -151,12 +151,12 @@ func (h conversionEventHandler) OnDelete(obj interface{}) {
 		// Convert the Obj inside DeletedFinalStateUnknown.
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: couldn't get object from tombstone %T", obj))
 			return
 		}
 		rc, ok = tombstone.Obj.(*v1.ReplicationController)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: tombstone contained object that is not a RC %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: tombstone contained object that is not a RC %T", obj))
 			return
 		}
 		rs, err := convertRCtoRS(rc, nil)

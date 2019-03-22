@@ -175,14 +175,14 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	cn, ok := w.(http.CloseNotifier)
 	if !ok {
-		err := fmt.Errorf("unable to start watch - can't get http.CloseNotifier: %#v", w)
+		err := fmt.Errorf("unable to start watch - can't get http.CloseNotifier: %T", w)
 		utilruntime.HandleError(err)
 		s.Scope.err(errors.NewInternalError(err), w, req)
 		return
 	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
+		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %T", w)
 		utilruntime.HandleError(err)
 		s.Scope.err(errors.NewInternalError(err), w, req)
 		return

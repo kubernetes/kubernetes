@@ -138,7 +138,7 @@ func (tc *Controller) enqueue(job *batch.Job) {
 	klog.V(4).Infof("Add job %s/%s to cleanup", job.Namespace, job.Name)
 	key, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %T: %v", job, err))
 		return
 	}
 
@@ -148,7 +148,7 @@ func (tc *Controller) enqueue(job *batch.Job) {
 func (tc *Controller) enqueueAfter(job *batch.Job, after time.Duration) {
 	key, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %T: %v", job, err))
 		return
 	}
 

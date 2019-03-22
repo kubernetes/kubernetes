@@ -65,7 +65,7 @@ func (r *LogREST) ProducesObject(verb string) interface{} {
 func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (runtime.Object, error) {
 	logOpts, ok := opts.(*api.PodLogOptions)
 	if !ok {
-		return nil, fmt.Errorf("invalid options object: %#v", opts)
+		return nil, fmt.Errorf("invalid options object: %T", opts)
 	}
 	if errs := validation.ValidatePodLogOptions(logOpts); len(errs) > 0 {
 		return nil, errors.NewInvalid(api.Kind("PodLogOptions"), name, errs)

@@ -212,7 +212,7 @@ func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID s
 	err = r.store.Storage.GuaranteedUpdate(ctx, dKey, &apps.Deployment{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 		d, ok := obj.(*apps.Deployment)
 		if !ok {
-			return nil, fmt.Errorf("unexpected object: %#v", obj)
+			return nil, fmt.Errorf("unexpected object: %T", obj)
 		}
 		if d.Annotations == nil {
 			d.Annotations = make(map[string]string)

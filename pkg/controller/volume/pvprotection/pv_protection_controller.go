@@ -198,7 +198,7 @@ func (c *Controller) isBeingUsed(pv *v1.PersistentVolume) bool {
 func (c *Controller) pvAddedUpdated(obj interface{}) {
 	pv, ok := obj.(*v1.PersistentVolume)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("PV informer returned non-PV object: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("PV informer returned non-PV object: %T", obj))
 		return
 	}
 	klog.V(4).Infof("Got event on PV %s", pv.Name)

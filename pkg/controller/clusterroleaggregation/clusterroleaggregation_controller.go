@@ -199,7 +199,7 @@ func (c *ClusterRoleAggregationController) enqueue() {
 		}
 		key, err := controller.KeyFunc(clusterRole)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", clusterRole, err))
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %T: %v", clusterRole, err))
 			return
 		}
 		c.queue.Add(key)

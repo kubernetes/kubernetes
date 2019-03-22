@@ -292,7 +292,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 	defer gc.attemptToDelete.Done(item)
 	n, ok := item.(*node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
+		utilruntime.HandleError(fmt.Errorf("expect *node, got %T", item))
 		return true
 	}
 	err := gc.attemptToDeleteItem(n)
@@ -591,7 +591,7 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 	defer gc.attemptToOrphan.Done(item)
 	owner, ok := item.(*node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
+		utilruntime.HandleError(fmt.Errorf("expect *node, got %T", item))
 		return true
 	}
 	// we don't need to lock each element, because they never get updated
