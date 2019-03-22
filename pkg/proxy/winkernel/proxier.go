@@ -148,6 +148,23 @@ type endpointsInfo struct {
 	refCount        uint16
 	providerAddress string
 	hns             HostNetworkService
+	policies        []*policiesinfo
+}
+
+// internal struct for policies information
+type policiesinfo struct {
+	Type     string
+	Settings json.RawMessage
+}
+
+// OutboundNatPolicySetting sets outbound Network Address Translation on an Endpoint.
+type outboundnatpolicysetting struct {
+	Destinations []string
+}
+
+// Endpoint request for updating endpoint policies
+type policyendpointrequest struct {
+	Policies []policiesinfo
 }
 
 //Uses mac prefix and IPv4 address to return a mac address
@@ -282,17 +299,17 @@ func newEndpointsChangeMap(hostname string) endpointsChangeMap {
 	}
 }
 
-func (ecm *endpointsChangeMap) update(namespacedName *types.NamespacedName, previous, current *v1.Endpoints, hns HostNetworkService) bool {
+func (ecm *endpointsChangeMap) update(namespacedName *types.NamespacedName, previous, current *v1.Endpoints, hns HostNetworkService, proxierendpointsMap proxyEndpointsMap) bool {
 	ecm.lock.Lock()
 	defer ecm.lock.Unlock()
 
 	change, exists := ecm.items[*namespacedName]
 	if !exists {
 		change = &endpointsChange{}
-		change.previous = endpointsToEndpointsMap(previous, ecm.hostname, hns)
+		change.previous = endpointsToEndpointsMap(previous, ecm.hostname, hns, proxierendpointsMap)
 		ecm.items[*namespacedName] = change
 	}
-	change.current = endpointsToEndpointsMap(current, ecm.hostname, hns)
+	change.current = endpointsToEndpointsMap(current, ecm.hostname, hns, proxierendpointsMap)
 	if reflect.DeepEqual(change.previous, change.current) {
 		delete(ecm.items, *namespacedName)
 	}
@@ -422,7 +439,8 @@ type Proxier struct {
 	mu           sync.Mutex // protects the following fields
 	serviceMap   proxyServiceMap
 	endpointsMap proxyEndpointsMap
-	portsMap     map[localPort]closeable
+
+	portsMap map[localPort]closeable
 	// endpointsSynced and servicesSynced are set to true when corresponding
 	// objects are synced after startup. This is used to avoid updating hns policies
 	// with some partial data after kube-proxy restart.
@@ -791,21 +809,21 @@ func (proxier *Proxier) updateServiceMap() (result updateServiceMapResult) {
 
 func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
-	if proxier.endpointsChanges.update(&namespacedName, nil, endpoints, proxier.hns) && proxier.isInitialized() {
+	if proxier.endpointsChanges.update(&namespacedName, nil, endpoints, proxier.hns, proxier.endpointsMap) && proxier.isInitialized() {
 		proxier.syncRunner.Run()
 	}
 }
 
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
-	if proxier.endpointsChanges.update(&namespacedName, oldEndpoints, endpoints, proxier.hns) && proxier.isInitialized() {
+	if proxier.endpointsChanges.update(&namespacedName, oldEndpoints, endpoints, proxier.hns, proxier.endpointsMap) && proxier.isInitialized() {
 		proxier.syncRunner.Run()
 	}
 }
 
 func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
-	if proxier.endpointsChanges.update(&namespacedName, endpoints, nil, proxier.hns) && proxier.isInitialized() {
+	if proxier.endpointsChanges.update(&namespacedName, endpoints, nil, proxier.hns, proxier.endpointsMap) && proxier.isInitialized() {
 		proxier.syncRunner.Run()
 	}
 }
@@ -869,7 +887,7 @@ func getLocalIPs(endpointsMap proxyEndpointsMap) map[types.NamespacedName]sets.S
 // This function is used for incremental updated of endpointsMap.
 //
 // NOTE: endpoints object should NOT be modified.
-func endpointsToEndpointsMap(endpoints *v1.Endpoints, hostname string, hns HostNetworkService) proxyEndpointsMap {
+func endpointsToEndpointsMap(endpoints *v1.Endpoints, hostname string, hns HostNetworkService, proxierendpointsMap proxyEndpointsMap) proxyEndpointsMap {
 	if endpoints == nil {
 		return nil
 	}
@@ -895,9 +913,23 @@ func endpointsToEndpointsMap(endpoints *v1.Endpoints, hostname string, hns HostN
 					klog.Warningf("Ignoring invalid endpoint port %s with empty host", port.Name)
 					continue
 				}
-				isLocal := addr.NodeName != nil && *addr.NodeName == hostname
-				epInfo := newEndpointInfo(addr.IP, uint16(port.Port), isLocal, hns)
-				endpointsMap[svcPortName] = append(endpointsMap[svcPortName], epInfo)
+
+				isAlreadyEndpoint := false
+				for _, endpointInfoList := range proxierendpointsMap {
+					for _, ep := range endpointInfoList {
+						if ep.ip == addr.IP {
+							klog.Infof("Already have reference to endpoint with ip: %v", addr.IP)
+							epInfo := ep
+							endpointsMap[svcPortName] = append(endpointsMap[svcPortName], epInfo)
+							isAlreadyEndpoint = true
+						}
+					}
+				}
+				if !isAlreadyEndpoint {
+					isLocal := addr.NodeName != nil && *addr.NodeName == hostname
+					epInfo := newEndpointInfo(addr.IP, uint16(port.Port), isLocal, hns)
+					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], epInfo)
+				}
 			}
 			if klog.V(3) {
 				newEPList := []*endpointsInfo{}
@@ -930,6 +962,35 @@ func serviceToServiceMap(service *v1.Service, hns HostNetworkService) proxyServi
 		serviceMap[svcPortName] = newServiceInfo(svcPortName, servicePort, service, hns)
 	}
 	return serviceMap
+}
+
+func addDSRPolicyToEndpoint(hns HostNetworkService, endpoint *endpointsInfo) (*policiesinfo, error) {
+	policysetting := outboundnatpolicysetting{
+		Destinations: []string{endpoint.ip},
+	}
+	rawJSON, err := json.Marshal(policysetting)
+	if err != nil {
+		return nil, err
+	}
+	newLoopbackPolicy := policiesinfo{
+		Type:     "OutBoundNAT",
+		Settings: rawJSON,
+	}
+	endpointRequest := policyendpointrequest{
+		Policies: []policiesinfo{newLoopbackPolicy},
+	}
+
+	settingsJson, err := json.Marshal(endpointRequest)
+	if err != nil {
+		klog.Errorf("Error Marshaling Endpoint Request err: %v ", err)
+		return nil, err
+	}
+	err = hns.updateEndpointPolicy(endpoint.hnsID, settingsJson)
+	if err != nil {
+		klog.Errorf("Error Updating EndpointPolicy err: %v ", err)
+		return nil, err
+	}
+	return &newLoopbackPolicy, nil
 }
 
 // This is where all of the hns save/restore calls happen.
@@ -1016,15 +1077,42 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			if len(ep.hnsID) > 0 {
-				newHnsEndpoint, err = hns.getEndpointByID(ep.hnsID)
+				newHnsEndpoint = ep
 			}
 
 			if newHnsEndpoint == nil {
-				// First check if an endpoint resource exists for this IP, on the current host
-				// A Local endpoint could exist here already
-				// A remote endpoint was already created and proxy was restarted
 				newHnsEndpoint, err = hns.getEndpointByIpAddress(ep.ip, hnsNetworkName)
 			}
+
+			// Need to add an OutboundNat policy to local endpoints for DSR loopback to properly work.
+			if newHnsEndpoint != nil {
+				if newHnsEndpoint.isLocal && proxier.isDSR {
+					var addDSRPolicy = false
+					for _, po := range newHnsEndpoint.policies {
+						if po.Type == "OutBoundNAT" {
+							var outputSettings outboundnatpolicysetting
+							if err := json.Unmarshal([]byte(po.Settings), &outputSettings); err != nil {
+								klog.Errorf("Error Unmarshaling Endpoint Policy err: %v settings: %v", err, po.Settings)
+								continue
+							}
+							for _, des := range outputSettings.Destinations {
+								if des == newHnsEndpoint.ip {
+									addDSRPolicy = true
+								}
+							}
+						}
+					}
+					if !addDSRPolicy {
+						loopbackPolicy, err := addDSRPolicyToEndpoint(hns, newHnsEndpoint)
+						if err != nil {
+							klog.Errorf("Error Setting DSR Endpoint Policy err: %v ", err)
+						} else {
+							newHnsEndpoint.policies = append(newHnsEndpoint.policies, loopbackPolicy)
+						}
+					}
+				}
+			}
+
 			if newHnsEndpoint == nil {
 				if ep.isLocal {
 					klog.Errorf("Local endpoint not found for %v: err: %v on network %s", ep.ip, err, hnsNetworkName)
@@ -1087,7 +1175,8 @@ func (proxier *Proxier) syncProxyRules() {
 			// Save the hnsId for reference
 			LogJson(newHnsEndpoint, "Hns Endpoint resource", 1)
 			hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
-			ep.hnsID = newHnsEndpoint.hnsID
+			*ep = *newHnsEndpoint
+
 			ep.refCount++
 			Log(ep, "Endpoint resource found", 3)
 		}
