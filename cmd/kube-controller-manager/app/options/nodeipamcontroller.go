@@ -19,12 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 )
 
 // NodeIPAMControllerOptions holds the NodeIpamController options.
 type NodeIPAMControllerOptions struct {
-	*kubectrlmgrconfig.NodeIPAMControllerConfiguration
+	*nodeipamconfig.NodeIPAMControllerConfiguration
 }
 
 // AddFlags adds flags related to NodeIpamController for controller manager to the specified FlagSet.
@@ -38,7 +38,7 @@ func (o *NodeIPAMControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up NodeIpamController config with options.
-func (o *NodeIPAMControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.NodeIPAMControllerConfiguration) error {
+func (o *NodeIPAMControllerOptions) ApplyTo(cfg *nodeipamconfig.NodeIPAMControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}
