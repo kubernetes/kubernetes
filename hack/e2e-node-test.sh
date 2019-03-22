@@ -28,7 +28,7 @@ if [[ -n "${FOCUS:-}" ]]; then
     ARGHELP="FOCUS='${FOCUS}' "
 fi
 if [[ -n "${SKIP:-}" ]]; then
-    ARGHELP="${ARGHELP}SKIP='${SKIP}'"
+    ARGHELP="${ARGHELP}SKIP='${SKIP}' "
 fi
 
 echo "NOTE: $0 has been replaced by 'make test-e2e-node'"
