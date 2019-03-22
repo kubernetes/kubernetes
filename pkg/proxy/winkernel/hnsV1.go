@@ -35,6 +35,7 @@ type HostNetworkService interface {
 	deleteEndpoint(hnsID string) error
 	getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bool, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error)
 	deleteLoadBalancer(hnsID string) error
+	updateEndpointPolicy(hnsID string, policy json.RawMessage) error
 }
 
 // V1 HNS API
@@ -222,4 +223,8 @@ func (hns hnsV1) deleteLoadBalancer(hnsID string) error {
 
 	_, err = hnsloadBalancer.Delete()
 	return err
+}
+
+func (hns hnsV1) updateEndpointPolicy(hnsID string, policy json.RawMessage) error {
+	return fmt.Errorf("DSR is not supported in V1. Using non DSR instead")
 }
