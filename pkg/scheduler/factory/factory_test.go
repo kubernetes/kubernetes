@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -254,7 +254,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	queue := &internalqueue.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
-	schedulerCache := schedulerinternalcache.New(30*time.Second, stopCh)
+	schedulerCache := internalcache.New(30*time.Second, stopCh)
 	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
 	errFunc := MakeDefaultErrorFunc(client, podBackoff, queue, schedulerCache, stopCh)
 

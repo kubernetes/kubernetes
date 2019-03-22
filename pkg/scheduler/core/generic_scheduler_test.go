@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
@@ -455,7 +455,7 @@ func TestGenericScheduler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache := schedulerinternalcache.New(time.Duration(0), wait.NeverStop)
+			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -497,7 +497,7 @@ func TestGenericScheduler(t *testing.T) {
 // makeScheduler makes a simple genericScheduler for testing.
 func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes []*v1.Node) *genericScheduler {
 	algorithmpredicates.SetPredicatesOrdering(order)
-	cache := schedulerinternalcache.New(time.Duration(0), wait.NeverStop)
+	cache := internalcache.New(time.Duration(0), wait.NeverStop)
 	for _, n := range nodes {
 		cache.AddNode(n)
 	}
@@ -1469,7 +1469,7 @@ func TestPreempt(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Logf("===== Running test %v", t.Name())
 			stop := make(chan struct{})
-			cache := schedulerinternalcache.New(time.Duration(0), stop)
+			cache := internalcache.New(time.Duration(0), stop)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}

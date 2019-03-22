@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -131,7 +131,7 @@ type ScheduleResult struct {
 }
 
 type genericScheduler struct {
-	cache                    schedulerinternalcache.Cache
+	cache                    internalcache.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
 	predicates               map[string]predicates.FitPredicate
 	priorityMetaProducer     priorities.PriorityMetadataProducer
@@ -141,7 +141,7 @@ type genericScheduler struct {
 	extenders                []algorithm.SchedulerExtender
 	lastNodeIndex            uint64
 	alwaysCheckAllPredicates bool
-	nodeInfoSnapshot         schedulerinternalcache.NodeInfoSnapshot
+	nodeInfoSnapshot         internalcache.NodeInfoSnapshot
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                algorithm.PDBLister
@@ -1205,7 +1205,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
-	cache schedulerinternalcache.Cache,
+	cache internalcache.Cache,
 	podQueue internalqueue.SchedulingQueue,
 	predicates map[string]predicates.FitPredicate,
 	predicateMetaProducer predicates.PredicateMetadataProducer,
@@ -1229,7 +1229,7 @@ func NewGenericScheduler(
 		priorityMetaProducer:     priorityMetaProducer,
 		pluginSet:                pluginSet,
 		extenders:                extenders,
-		nodeInfoSnapshot:         schedulerinternalcache.NewNodeInfoSnapshot(),
+		nodeInfoSnapshot:         internalcache.NewNodeInfoSnapshot(),
 		volumeBinder:             volumeBinder,
 		pvcLister:                pvcLister,
 		pdbLister:                pdbLister,
