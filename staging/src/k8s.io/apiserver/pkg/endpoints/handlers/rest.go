@@ -292,7 +292,12 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 }
 
 // setObjectSelfLink sets the self link of an object as needed.
+// TODO: remove the need for the namer LinkSetters by requiring objects implement either Object or List
+//   interfaces
 func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
+	// We only generate list links on objects that implement ListInterface - historically we duck typed this
+	// check via reflection, but as we move away from reflection we require that you not only carry Items but
+	// ListMeta into order to be identified as a list.
 	if !meta.IsListType(obj) {
 		requestInfo, ok := request.RequestInfoFrom(ctx)
 		if !ok {

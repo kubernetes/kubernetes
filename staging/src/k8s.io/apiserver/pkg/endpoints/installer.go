@@ -512,6 +512,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	//
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
+	for _, s := range a.group.Serializer.SupportedMediaTypes() {
+		if len(s.MediaTypeSubType) == 0 || len(s.MediaTypeType) == 0 {
+			return nil, fmt.Errorf("all serializers in the group Serializer must have MediaTypeType and MediaTypeSubType set: %s", s.MediaType)
+		}
+	}
 	mediaTypes, streamMediaTypes := negotiation.MediaTypesForSerializer(a.group.Serializer)
 	allMediaTypes := append(mediaTypes, streamMediaTypes...)
 	ws.Produces(allMediaTypes...)
