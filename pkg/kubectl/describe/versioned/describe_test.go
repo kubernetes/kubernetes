@@ -26,6 +26,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -1628,7 +1629,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 	if err != nil {
 		t.Errorf("unable to parse label selector: %v", err)
 	}
-	tests := []struct {
+	testsV2beta2 := []struct {
 		name string
 		hpa  autoscalingv2beta2.HorizontalPodAutoscaler
 	}{
@@ -2270,7 +2271,102 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for _, test := range testsV2beta2 {
+		t.Run(test.name, func(t *testing.T) {
+			test.hpa.ObjectMeta = metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: "foo",
+			}
+			fake := fake.NewSimpleClientset(&test.hpa)
+			desc := HorizontalPodAutoscalerDescriber{fake}
+			str, err := desc.Describe("foo", "bar", describe.DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("Unexpected error for test %s: %v", test.name, err)
+			}
+			if str == "" {
+				t.Errorf("Unexpected empty string for test %s.  Expected HPA Describer output", test.name)
+			}
+			t.Logf("Description for %q:\n%s", test.name, str)
+		})
+	}
+
+	testsV1 := []struct {
+		name string
+		hpa  autoscalingv1.HorizontalPodAutoscaler
+	}{
+		{
+			"minReplicas unset",
+			autoscalingv1.HorizontalPodAutoscaler{
+				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MaxReplicas: 10,
+				},
+				Status: autoscalingv1.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"minReplicas set",
+			autoscalingv1.HorizontalPodAutoscaler{
+				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+				},
+				Status: autoscalingv1.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"with target no current",
+			autoscalingv1.HorizontalPodAutoscaler{
+				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas:                    &minReplicasVal,
+					MaxReplicas:                    10,
+					TargetCPUUtilizationPercentage: &targetUtilizationVal,
+				},
+				Status: autoscalingv1.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"with target and current",
+			autoscalingv1.HorizontalPodAutoscaler{
+				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas:                    &minReplicasVal,
+					MaxReplicas:                    10,
+					TargetCPUUtilizationPercentage: &targetUtilizationVal,
+				},
+				Status: autoscalingv1.HorizontalPodAutoscalerStatus{
+					CurrentReplicas:                 4,
+					DesiredReplicas:                 5,
+					CurrentCPUUtilizationPercentage: &currentUtilizationVal,
+				},
+			},
+		},
+	}
+
+	for _, test := range testsV1 {
 		t.Run(test.name, func(t *testing.T) {
 			test.hpa.ObjectMeta = metav1.ObjectMeta{
 				Name:      "bar",
