@@ -33,15 +33,23 @@ type DockerConfigProvider interface {
 	Enabled() bool
 	// Provide returns docker configuration.
 	// Implementations can be blocking - e.g. metadata server unavailable.
-	Provide() DockerConfig
-	// LazyProvide() gets called after URL matches have been performed, so the
-	// location used as the key in DockerConfig would be redundant.
-	LazyProvide() *DockerConfigEntry
+	// The image is passed in as context in the event that the
+	// implementation depends on information in the image name to return
+	// credentials; implementations are safe to ignore the image.
+	Provide(image string) DockerConfig
+	// LazyProvide gets called after URL matches have been
+	// performed, so the location used as the key in DockerConfig would be
+	// redundant.
+	// The image is passed in as context in the event that the
+	// implementation depends on information in the image name to return
+	// credentials; implementations are safe to ignore the image.
+	LazyProvide(image string) *DockerConfigEntry
 }
 
-func LazyProvide(creds LazyAuthConfiguration) AuthConfig {
+//LazyProvide returns an Lazy AuthConfig
+func LazyProvide(creds LazyAuthConfiguration, image string) AuthConfig {
 	if creds.Provider != nil {
-		entry := *creds.Provider.LazyProvide()
+		entry := *creds.Provider.LazyProvide(image)
 		return DockerConfigEntryToLazyAuthConfiguration(entry).AuthConfig
 	}
 	return creds.AuthConfig
@@ -77,8 +85,8 @@ func (d *defaultDockerConfigProvider) Enabled() bool {
 	return true
 }
 
-// Provide implements dockerConfigProvider
-func (d *defaultDockerConfigProvider) Provide() DockerConfig {
+// LazyProvide implements dockerConfigProvider
+func (d *defaultDockerConfigProvider) Provide(image string) DockerConfig {
 	// Read the standard Docker credentials from .dockercfg
 	if cfg, err := ReadDockerConfigFile(); err == nil {
 		return cfg
@@ -89,7 +97,7 @@ func (d *defaultDockerConfigProvider) Provide() DockerConfig {
 }
 
 // LazyProvide implements dockerConfigProvider. Should never be called.
-func (d *defaultDockerConfigProvider) LazyProvide() *DockerConfigEntry {
+func (d *defaultDockerConfigProvider) LazyProvide(image string) *DockerConfigEntry {
 	return nil
 }
 
@@ -99,12 +107,12 @@ func (d *CachingDockerConfigProvider) Enabled() bool {
 }
 
 // LazyProvide implements dockerConfigProvider. Should never be called.
-func (d *CachingDockerConfigProvider) LazyProvide() *DockerConfigEntry {
+func (d *CachingDockerConfigProvider) LazyProvide(image string) *DockerConfigEntry {
 	return nil
 }
 
 // Provide implements dockerConfigProvider
-func (d *CachingDockerConfigProvider) Provide() DockerConfig {
+func (d *CachingDockerConfigProvider) Provide(image string) DockerConfig {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -114,7 +122,7 @@ func (d *CachingDockerConfigProvider) Provide() DockerConfig {
 	}
 
 	klog.V(2).Infof("Refreshing cache for provider: %v", reflect.TypeOf(d.Provider).String())
-	d.cacheDockerConfig = d.Provider.Provide()
+	d.cacheDockerConfig = d.Provider.Provide(image)
 	d.expiration = time.Now().Add(d.Lifetime)
 	return d.cacheDockerConfig
 }
