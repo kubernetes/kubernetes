@@ -150,7 +150,7 @@ func (c *Client) Sync() error {
 		return err
 	}
 	c.Endpoints = cli.Endpoints()
-	klog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
+	klog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(c.Endpoints, ","))
 	return nil
 }
 
