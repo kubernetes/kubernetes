@@ -39,7 +39,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -1321,7 +1320,7 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 
 // StartServeHostnameService creates a replication controller that serves its
 // hostname and a service on top of it.
-func StartServeHostnameService(c clientset.Interface, internalClient internalclientset.Interface, svc *v1.Service, ns string, replicas int) ([]string, string, error) {
+func StartServeHostnameService(c clientset.Interface, svc *v1.Service, ns string, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
 	name := svc.ObjectMeta.Name
 	By("creating service " + name + " in namespace " + ns)
@@ -1334,7 +1333,6 @@ func StartServeHostnameService(c clientset.Interface, internalClient internalcli
 	maxContainerFailures := 0
 	config := testutils.RCConfig{
 		Client:               c,
-		InternalClient:       internalClient,
 		Image:                ServeHostnameImage,
 		Name:                 name,
 		Namespace:            ns,

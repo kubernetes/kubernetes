@@ -122,13 +122,12 @@ var _ = SIGDescribe("Proxy", func() {
 			By("starting an echo server on multiple ports")
 			pods := []*v1.Pod{}
 			cfg := testutils.RCConfig{
-				Client:         f.ClientSet,
-				InternalClient: f.InternalClientset,
-				Image:          imageutils.GetE2EImage(imageutils.Porter),
-				Name:           service.Name,
-				Namespace:      f.Namespace.Name,
-				Replicas:       1,
-				PollInterval:   time.Second,
+				Client:       f.ClientSet,
+				Image:        imageutils.GetE2EImage(imageutils.Porter),
+				Name:         service.Name,
+				Namespace:    f.Namespace.Name,
+				Replicas:     1,
+				PollInterval: time.Second,
 				Env: map[string]string{
 					"SERVE_PORT_80":   `<a href="/rewriteme">test</a>`,
 					"SERVE_PORT_1080": `<a href="/rewriteme">test</a>`,

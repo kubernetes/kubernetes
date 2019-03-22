@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -70,12 +69,11 @@ var MaxMissingPodStartupMeasurements = 0
 var nodeCount = 0
 
 type DensityTestConfig struct {
-	Configs            []testutils.RunObjectConfig
-	ClientSets         []clientset.Interface
-	InternalClientsets []internalclientset.Interface
-	ScaleClients       []scaleclient.ScalesGetter
-	PollInterval       time.Duration
-	PodCount           int
+	Configs      []testutils.RunObjectConfig
+	ClientSets   []clientset.Interface
+	ScaleClients []scaleclient.ScalesGetter
+	PollInterval time.Duration
+	PodCount     int
 	// What kind of resource we want to create
 	kind             schema.GroupKind
 	SecretConfigs    []*testutils.SecretConfig
@@ -644,7 +642,7 @@ var _ = SIGDescribe("Density", func() {
 			}
 			timeout += 3 * time.Minute
 			// createClients is defined in load.go
-			clients, internalClients, scalesClients, err := createClients(numberOfCollections)
+			clients, scalesClients, err := createClients(numberOfCollections)
 			framework.ExpectNoError(err)
 			for i := 0; i < numberOfCollections; i++ {
 				nsName := namespaces[i].Name
@@ -675,7 +673,6 @@ var _ = SIGDescribe("Density", func() {
 				name := fmt.Sprintf("density%v-%v-%v", totalPods, i, uuid)
 				baseConfig := &testutils.RCConfig{
 					Client:                         clients[i],
-					InternalClient:                 internalClients[i],
 					ScalesGetter:                   scalesClients[i],
 					Image:                          imageutils.GetPauseImageName(),
 					Name:                           name,
@@ -722,18 +719,17 @@ var _ = SIGDescribe("Density", func() {
 			}
 
 			// Single client is running out of http2 connections in delete phase, hence we need more.
-			clients, internalClients, scalesClients, err = createClients(2)
+			clients, scalesClients, err = createClients(2)
 			framework.ExpectNoError(err)
 			dConfig := DensityTestConfig{
-				ClientSets:         clients,
-				InternalClientsets: internalClients,
-				ScaleClients:       scalesClients,
-				Configs:            configs,
-				PodCount:           totalPods,
-				PollInterval:       DensityPollInterval,
-				kind:               itArg.kind,
-				SecretConfigs:      secretConfigs,
-				ConfigMapConfigs:   configMapConfigs,
+				ClientSets:       clients,
+				ScaleClients:     scalesClients,
+				Configs:          configs,
+				PodCount:         totalPods,
+				PollInterval:     DensityPollInterval,
+				kind:             itArg.kind,
+				SecretConfigs:    secretConfigs,
+				ConfigMapConfigs: configMapConfigs,
 			}
 
 			for i := 0; i < itArg.daemonsPerNode; i++ {
