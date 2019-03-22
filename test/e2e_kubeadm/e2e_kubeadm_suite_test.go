@@ -30,11 +30,13 @@ import (
 
 	morereporters "github.com/onsi/ginkgo/reporters"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
 
 func init() {
-	framework.RegisterCommonFlags()
-	framework.RegisterClusterFlags()
+	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
+	framework.RegisterCommonFlags(flag.CommandLine)
+	framework.RegisterClusterFlags(flag.CommandLine)
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 }
