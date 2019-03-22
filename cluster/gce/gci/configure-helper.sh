@@ -597,6 +597,9 @@ function create-master-auth {
   if [[ -n "${GCE_GLBC_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${GCE_GLBC_TOKEN},"                "system:controller:glbc,uid:system:controller:glbc"
   fi
+  if [[ -n "${ADDON_MANAGER_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"   "system:addon-manager,uid:system:addon-manager,system:masters"
+  fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
@@ -954,6 +957,32 @@ EOF
   fi
 }
 
+function create-kubeconfig {
+  local component=$1
+  local token=$2
+  echo "Creating kubeconfig file for component ${component}"
+  mkdir -p /etc/srv/kubernetes/${component}
+  cat <<EOF >/etc/srv/kubernetes/${component}/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: ${component}
+  user:
+    token: ${token}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: ${component}
+  name: ${component}
+current-context: ${component}
+EOF
+}
+
 # Arg 1: the IP address of the API server
 function create-kubelet-kubeconfig() {
   local apiserver_address="${1}"
@@ -1024,102 +1053,6 @@ contexts:
     user: kube-proxy
   name: service-account-context
 current-context: service-account-context
-EOF
-}
-
-function create-kubecontrollermanager-kubeconfig {
-  echo "Creating kube-controller-manager kubeconfig file"
-  mkdir -p /etc/srv/kubernetes/kube-controller-manager
-  cat <<EOF >/etc/srv/kubernetes/kube-controller-manager/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: kube-controller-manager
-  user:
-    token: ${KUBE_CONTROLLER_MANAGER_TOKEN}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: kube-controller-manager
-  name: service-account-context
-current-context: service-account-context
-EOF
-}
-
-function create-l7-lb-controller-kubeconfig {
-  echo "Creating l7-lb-controller kubeconfig file"
-  mkdir -p /etc/srv/kubernetes/l7-lb-controller
-  cat <<EOF >/etc/srv/kubernetes/l7-lb-controller/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: l7-lb-controller
-  user:
-    token: ${GCE_GLBC_TOKEN}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: l7-lb-controller
-  name: l7-lb-controller
-current-context: l7-lb-controller
-EOF
-}
-
-function create-kubescheduler-kubeconfig {
-  echo "Creating kube-scheduler kubeconfig file"
-  mkdir -p /etc/srv/kubernetes/kube-scheduler
-  cat <<EOF >/etc/srv/kubernetes/kube-scheduler/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: kube-scheduler
-  user:
-    token: ${KUBE_SCHEDULER_TOKEN}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: kube-scheduler
-  name: kube-scheduler
-current-context: kube-scheduler
-EOF
-}
-
-function create-clusterautoscaler-kubeconfig {
-  echo "Creating cluster-autoscaler kubeconfig file"
-  mkdir -p /etc/srv/kubernetes/cluster-autoscaler
-  cat <<EOF >/etc/srv/kubernetes/cluster-autoscaler/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: cluster-autoscaler
-  user:
-    token: ${KUBE_CLUSTER_AUTOSCALER_TOKEN}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: cluster-autoscaler
-  name: cluster-autoscaler
-current-context: cluster-autoscaler
 EOF
 }
 
@@ -2060,7 +1993,7 @@ function apply-encryption-config() {
 #   DOCKER_REGISTRY
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
-  create-kubecontrollermanager-kubeconfig
+  create-kubeconfig "kube-controller-manager" ${KUBE_CONTROLLER_MANAGER_TOKEN}
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
@@ -2156,7 +2089,7 @@ function start-kube-controller-manager {
 #   DOCKER_REGISTRY
 function start-kube-scheduler {
   echo "Start kubernetes scheduler"
-  create-kubescheduler-kubeconfig
+  create-kubeconfig "kube-scheduler" ${KUBE_SCHEDULER_TOKEN}
   prepare-log-file /var/log/kube-scheduler.log
 
   # Calculate variables and set them in the manifest.
@@ -2194,7 +2127,7 @@ function start-cluster-autoscaler {
   if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Start kubernetes cluster autoscaler"
     setup-addon-manifests "addons" "rbac/cluster-autoscaler"
-    create-clusterautoscaler-kubeconfig
+    create-kubeconfig "cluster-autoscaler" ${KUBE_CLUSTER_AUTOSCALER_TOKEN}
     prepare-log-file /var/log/cluster-autoscaler.log
 
     # Remove salt comments and replace variables with values
@@ -2532,6 +2465,8 @@ function start-kube-addons {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/addons"
 
+  create-kubeconfig "addon-manager" ${ADDON_MANAGER_TOKEN}
+
   # prep addition kube-up specific rbac objects
   setup-addon-manifests "addons" "rbac/kubelet-api-auth"
   setup-addon-manifests "addons" "rbac/kubelet-cert-rotation"
@@ -2765,7 +2700,7 @@ function start-lb-controller {
     prepare-log-file /var/log/glbc.log
     setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
     setup-addon-manifests "addons" "rbac/cluster-loadbalancing/glbc"
-    create-l7-lb-controller-kubeconfig
+    create-kubeconfig "l7-lb-controller" ${GCE_GLBC_TOKEN}
 
     local -r src_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
     local -r dest_manifest="/etc/kubernetes/manifests/glbc.manifest"
@@ -2884,6 +2819,12 @@ spec:
 EOF
 }
 
+function wait-till-apiserver-ready() {
+  until kubectl get nodes; do
+    sleep 5
+  done
+}
+
 ########### Main Function ###########
 function main() {
   echo "Start to configure instance for kubernetes"
@@ -2938,6 +2879,7 @@ function main() {
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
     GCE_GLBC_TOKEN="$(secure_random 32)"
   fi
+  ADDON_MANAGER_TOKEN="$(secure_random 32)"
 
   setup-os-params
   config-ip-firewall
@@ -2982,6 +2924,7 @@ function main() {
     start-kube-apiserver
     start-kube-controller-manager
     start-kube-scheduler
+    wait-till-apiserver-ready
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller

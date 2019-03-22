@@ -30,9 +30,14 @@ spec:
     - mountPath: /var/log
       name: varlog
       readOnly: false
+    - mountPath: /etc/srv/kubernetes/addon-manager/
+      name: srvkube
+      readOnly: true
     env:
     - name: KUBECTL_EXTRA_PRUNE_WHITELIST
       value: {{kubectl_extra_prune_whitelist}}
+    - name: KUBECTL_OPTS
+      value: '--kubeconfig=/etc/srv/kubernetes/addon-manager/kubeconfig'
   volumes:
   - hostPath:
       path: /etc/kubernetes/
@@ -40,3 +45,6 @@ spec:
   - hostPath:
       path: /var/log
     name: varlog
+  - hostPath:
+      path: /etc/srv/kubernetes/addon-manager/
+    name: srvkube
