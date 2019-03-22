@@ -41,7 +41,6 @@
 ./hack/lib/swagger.sh
 ./hack/lib/test.sh
 ./hack/lib/version.sh
-./hack/list-feature-tests.sh
 ./hack/local-up-cluster.sh
 ./hack/make-rules/clean.sh
 ./hack/make-rules/helpers/cache_go_dirs.sh
@@ -71,12 +70,10 @@
 ./hack/verify-codegen.sh
 ./hack/verify-description.sh
 ./hack/verify-golint.sh
-./hack/verify-govet.sh
 ./hack/verify-import-boss.sh
 ./hack/verify-no-vendor-cycles.sh
 ./hack/verify-openapi-spec.sh
 ./hack/verify-readonly-packages.sh
-./hack/verify-staging-meta-files.sh
 ./hack/verify-test-featuregates.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
