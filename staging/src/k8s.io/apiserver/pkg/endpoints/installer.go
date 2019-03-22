@@ -572,13 +572,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		action.handler = handler
 	}
 
+	mediaTypes, streamMediaTypes := negotiation.MediaTypesForSerializer(a.group.Serializer)
+	allMediaTypes := append(mediaTypes, streamMediaTypes...)
+	ws.Produces(allMediaTypes...)
+
 	// complete actions
 	for _, action := range actions {
 		// assign producedMIMETypes
-		mediaTypes, streamMediaTypes := negotiation.MediaTypesForSerializer(a.group.Serializer)
-		allMediaTypes := append(mediaTypes, streamMediaTypes...)
-		producedMIMETypes := append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)
-		action = action.assignProducedMIMETypes(producedMIMETypes, allMediaTypes)
+		producedMIMETypes := storageMeta.ProducesMIMETypes(action.Verb)
+		action = action.assignProducedMIMETypes(producedMIMETypes, mediaTypes, allMediaTypes)
 
 		// assign consumedMIMETypes
 		action = action.assignConsumedMIMETypes()
@@ -805,7 +807,7 @@ func (a *action) assignConsumedMIMETypes() *action {
 	return a
 }
 
-func (a *action) assignProducedMIMETypes(producedMIMETypes, allMediaTypes []string) *action {
+func (a *action) assignProducedMIMETypes(producedMIMETypes, mediaTypes, allMediaTypes []string) *action {
 	switch a.Verb {
 	case "LIST":
 		producedMIMETypes = append(producedMIMETypes, allMediaTypes...)
@@ -813,6 +815,8 @@ func (a *action) assignProducedMIMETypes(producedMIMETypes, allMediaTypes []stri
 		producedMIMETypes = allMediaTypes
 	case "CONNECT":
 		producedMIMETypes = []string{"*/*"}
+	default:
+		producedMIMETypes = append(producedMIMETypes, mediaTypes...)
 	}
 	a.producedMIMETypes = producedMIMETypes
 	return a
@@ -822,7 +826,7 @@ func (a *action) assignWriteSample(writeSample, versionedList, versionedStatus, 
 	switch a.Verb {
 	case "LIST":
 		writeSample = versionedList
-	case "DELETE", "DELECTCOLLECTION":
+	case "DELETE", "DELETECOLLECTION":
 		writeSample = versionedStatus
 	case "WATCH", "WATCHLIST":
 		writeSample = versionedWatchEvent
@@ -953,6 +957,11 @@ func registerActionsToWebService(action *action, ws *restful.WebService, isNames
 		Operation(operation + namespaced + kind + strings.Title(subresource) + operationSuffix).
 		Produces(action.producedMIMETypes...).
 		Writes(action.writeSample)
+
+	// corner case
+	if action.Verb == "WATCHLIST" {
+		route = route.Operation("watch" + namespaced + kind + strings.Title(subresource) + "List" + operationSuffix)
+	}
 
 	for _, statusCode := range action.returnStatusCodes {
 		route.Returns(statusCode, http.StatusText(statusCode), action.writeSample)
