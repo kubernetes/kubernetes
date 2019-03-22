@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all push container clean orphan all-push push-manifest
-
-include ../../hack/make-rules/Makefile.manifest
+.PHONY: all push container clean orphan all-push push-manifest annotate manifest
 
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
@@ -34,6 +32,9 @@ KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 BIN = pause
 SRCS = pause.c
+
+# The manifest command is still experimental as of Docker 18.09.3
+export DOCKER_CLI_EXPERIMENTAL=enabled
 
 ifeq ($(ARCH),amd64)
 	TRIPLE ?= x86_64-linux-gnu
@@ -58,16 +59,21 @@ endif
 # If you want to build AND push all containers, see the 'all-push' rule.
 all: all-container
 
-all-push: all-push-images push-manifest
+all-push: push-manifest
 
-push-manifest: manifest-tool
-	manifest-tool push from-args --platforms $(call join_platforms,$(ALL_ARCH)) --template $(IMAGE)-ARCH:$(TAG) --target $(IMAGE):$(TAG)
+push-manifest: all-push-images all-annotate
+	docker manifest push $(IMAGE):$(TAG)
+
+sub-annotate-%:
+	$(MAKE) ARCH=$* annotate
 
 sub-container-%:
 	$(MAKE) ARCH=$* container
 
 sub-push-%:
 	$(MAKE) ARCH=$* push
+
+all-annotate: $(addprefix sub-annotate-,$(ALL_ARCH))
 
 all-container: $(addprefix sub-container-,$(ALL_ARCH))
 
@@ -105,5 +111,16 @@ bin/orphan-$(ARCH): orphan.c
 			$(TRIPLE)-gcc $(CFLAGS) -o $@ $^ && \
 			$(TRIPLE)-strip $@"
 
+annotate: .annotate-$(ARCH)
+.annotate-$(ARCH): .container-$(ARCH) .push-$(ARCH) .manifest
+	docker manifest create --amend $(IMAGE):$(TAG) $(IMAGE_WITH_ARCH):$(TAG)
+	docker manifest annotate $(IMAGE):$(TAG) $(IMAGE_WITH_ARCH):$(TAG) --os linux --arch $(ARCH)
+	touch $@
+
+manifest: .manifest
+.manifest:
+	docker manifest create $(IMAGE):$(TAG) $(IMAGE_WITH_ARCH):$(TAG)
+	touch $@
+
 clean:
-	rm -rf .container-* .push-* bin/
+	rm -rf .container-* .push-* .annotate-* .manifest bin/

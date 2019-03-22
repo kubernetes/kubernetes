@@ -1,3 +1,5 @@
+/.annotate-*
 /.container-*
 /.push-*
+/.manifest
 /bin
