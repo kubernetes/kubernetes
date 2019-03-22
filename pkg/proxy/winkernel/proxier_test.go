@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/proxy"
 
+	"encoding/json"
 	"net"
 	"strings"
 	"testing"
@@ -116,6 +117,10 @@ func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR 
 	}, nil
 }
 func (hns fakeHNS) deleteLoadBalancer(hnsID string) error {
+	return nil
+}
+
+func (hns fakeHNS) updateEndpointPolicy(endpointID string, policy json.RawMessage) error {
 	return nil
 }
 func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clusterCIDR string, hostname string, nodeIP net.IP, networkType string) *Proxier {
