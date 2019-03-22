@@ -220,7 +220,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return pods, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ v1.PodStatus, _ *PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
+func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -343,31 +343,6 @@ func (f *FakeRuntime) RemoveImage(image ImageSpec) error {
 	f.ImageList = append(f.ImageList[:index], f.ImageList[index+1:]...)
 
 	return f.Err
-}
-
-func (f *FakeRuntime) GetNetNS(containerID ContainerID) (string, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "GetNetNS")
-
-	for _, fp := range f.AllPodList {
-		for _, c := range fp.Pod.Containers {
-			if c.ID == containerID {
-				return fp.NetnsPath, nil
-			}
-		}
-	}
-
-	return "", f.Err
-}
-
-func (f *FakeRuntime) GetPodContainerID(pod *Pod) (ContainerID, error) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.CalledFunctions = append(f.CalledFunctions, "GetPodContainerID")
-	return ContainerID{}, f.Err
 }
 
 func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {

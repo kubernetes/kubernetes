@@ -28,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/printers"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"

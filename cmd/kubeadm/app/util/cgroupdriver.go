@@ -24,6 +24,13 @@ import (
 	utilsexec "k8s.io/utils/exec"
 )
 
+const (
+	// CgroupDriverSystemd holds the systemd driver type
+	CgroupDriverSystemd = "systemd"
+	// CgroupDriverCgroupfs holds the cgroupfs driver type
+	CgroupDriverCgroupfs = "cgroupfs"
+)
+
 // TODO: add support for detecting the cgroup driver for CRI other than
 // Docker. Currently only Docker driver detection is supported:
 // Discussion:
@@ -39,7 +46,7 @@ func GetCgroupDriverDocker(execer utilsexec.Interface) (string, error) {
 }
 
 func validateCgroupDriver(driver string) error {
-	if driver != "cgroupfs" && driver != "systemd" {
+	if driver != CgroupDriverCgroupfs && driver != CgroupDriverSystemd {
 		return errors.Errorf("unknown cgroup driver %q", driver)
 	}
 	return nil

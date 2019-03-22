@@ -23,7 +23,7 @@ go_library(
         "//staging/src/k8s.io/api/autoscaling/v2beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
-        "//staging/src/k8s.io/api/scheduling/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

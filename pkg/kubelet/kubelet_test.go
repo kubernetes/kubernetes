@@ -75,6 +75,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 func init() {
@@ -176,6 +177,7 @@ func newTestKubeletWithImageList(
 	kubelet.heartbeatClient = fakeKubeClient
 	kubelet.os = &containertest.FakeOS{}
 	kubelet.mounter = &mount.FakeMounter{}
+	kubelet.subpather = &subpath.FakeSubpath{}
 
 	kubelet.hostname = testKubeletHostname
 	kubelet.nodeName = types.NodeName(testKubeletHostname)
@@ -303,7 +305,7 @@ func newTestKubeletWithImageList(
 		Namespace: "",
 	}
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock)
+	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.podManager.GetMirrorPodByPod, kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock)
 
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)

@@ -27,8 +27,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
-	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -169,27 +169,47 @@ func (az *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, ser
 func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
-	klog.V(5).Infof("delete(%s): START clusterName=%q", serviceName, clusterName)
+	klog.V(5).Infof("Delete service (%s): START clusterName=%q", serviceName, clusterName)
+
+	ignoreErrors := func(err error) error {
+		if ignoreStatusNotFoundFromError(err) == nil {
+			klog.V(5).Infof("EnsureLoadBalancerDeleted: ignoring StatusNotFound error because the resource doesn't exist (%v)", err)
+			return nil
+		}
+
+		if ignoreStatusForbiddenFromError(err) == nil {
+			klog.V(5).Infof("EnsureLoadBalancerDeleted: ignoring StatusForbidden error (%v). This may be caused by wrong configuration via service annotations", err)
+			return nil
+		}
+
+		return err
+	}
 
 	serviceIPToCleanup, err := az.findServiceIPAddress(ctx, clusterName, service, isInternal)
-	if err != nil {
+	if ignoreErrors(err) != nil {
 		return err
 	}
 
 	klog.V(2).Infof("EnsureLoadBalancerDeleted: reconciling security group for service %q with IP %q, wantLb = false", serviceName, serviceIPToCleanup)
 	if _, err := az.reconcileSecurityGroup(clusterName, service, &serviceIPToCleanup, false /* wantLb */); err != nil {
-		return err
+		if ignoreErrors(err) != nil {
+			return err
+		}
 	}
 
 	if _, err := az.reconcileLoadBalancer(clusterName, service, nil, false /* wantLb */); err != nil {
-		return err
+		if ignoreErrors(err) != nil {
+			return err
+		}
 	}
 
 	if _, err := az.reconcilePublicIP(clusterName, service, nil, false /* wantLb */); err != nil {
-		return err
+		if ignoreErrors(err) != nil {
+			return err
+		}
 	}
 
-	klog.V(2).Infof("delete(%s): FINISH", serviceName)
+	klog.V(2).Infof("Delete service (%s): FINISH", serviceName)
 	return nil
 }
 
@@ -584,7 +604,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendPoolName)
 
 	lbIdleTimeout, err := getIdleTimeout(service)
-	if err != nil {
+	if wantLb && err != nil {
 		return nil, err
 	}
 
@@ -769,7 +789,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 		if az.serviceOwnsRule(service, *existingRule.Name) {
 			keepRule := false
 			klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - considering evicting", serviceName, wantLb, *existingRule.Name)
-			if findRule(expectedRules, existingRule) {
+			if findRule(expectedRules, existingRule, wantLb) {
 				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - keeping", serviceName, wantLb, *existingRule.Name)
 				keepRule = true
 			}
@@ -783,7 +803,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	// update rules: add needed
 	for _, expectedRule := range expectedRules {
 		foundRule := false
-		if findRule(updatedRules, expectedRule) {
+		if findRule(updatedRules, expectedRule, wantLb) {
 			klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb rule(%s) - already exists", serviceName, wantLb, *expectedRule.Name)
 			foundRule = true
 		}
@@ -879,74 +899,86 @@ func (az *Cloud) reconcileLoadBalancerRule(
 	var expectedProbes []network.Probe
 	var expectedRules []network.LoadBalancingRule
 	for _, port := range ports {
-		lbRuleName := az.getLoadBalancerRuleName(service, port, subnet(service))
-
-		klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) rule name (%s)", lbName, lbRuleName)
-
-		transportProto, _, probeProto, err := getProtocolsFromKubernetesProtocol(port.Protocol)
-		if err != nil {
-			return expectedProbes, expectedRules, err
-		}
-
-		if serviceapi.NeedsHealthCheck(service) {
-			podPresencePath, podPresencePort := serviceapi.GetServiceHealthCheckPathPort(service)
-
-			expectedProbes = append(expectedProbes, network.Probe{
-				Name: &lbRuleName,
-				ProbePropertiesFormat: &network.ProbePropertiesFormat{
-					RequestPath:       to.StringPtr(podPresencePath),
-					Protocol:          network.ProbeProtocolHTTP,
-					Port:              to.Int32Ptr(podPresencePort),
-					IntervalInSeconds: to.Int32Ptr(5),
-					NumberOfProbes:    to.Int32Ptr(2),
-				},
-			})
-		} else if port.Protocol != v1.ProtocolUDP && port.Protocol != v1.ProtocolSCTP {
-			// we only add the expected probe if we're doing TCP
-			expectedProbes = append(expectedProbes, network.Probe{
-				Name: &lbRuleName,
-				ProbePropertiesFormat: &network.ProbePropertiesFormat{
-					Protocol:          *probeProto,
-					Port:              to.Int32Ptr(port.NodePort),
-					IntervalInSeconds: to.Int32Ptr(5),
-					NumberOfProbes:    to.Int32Ptr(2),
-				},
-			})
-		}
-
-		loadDistribution := network.Default
-		if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
-			loadDistribution = network.SourceIP
-		}
-
-		expectedRule := network.LoadBalancingRule{
-			Name: &lbRuleName,
-			LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-				Protocol: *transportProto,
-				FrontendIPConfiguration: &network.SubResource{
-					ID: to.StringPtr(lbFrontendIPConfigID),
-				},
-				BackendAddressPool: &network.SubResource{
-					ID: to.StringPtr(lbBackendPoolID),
-				},
-				LoadDistribution: loadDistribution,
-				FrontendPort:     to.Int32Ptr(port.Port),
-				BackendPort:      to.Int32Ptr(port.Port),
-				EnableFloatingIP: to.BoolPtr(true),
-			},
-		}
-		if port.Protocol == v1.ProtocolTCP {
-			expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
-		}
-
-		// we didn't construct the probe objects for UDP or SCTP because they're not used/needed/allowed
-		if port.Protocol != v1.ProtocolUDP && port.Protocol != v1.ProtocolSCTP {
-			expectedRule.Probe = &network.SubResource{
-				ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
+		protocols := []v1.Protocol{port.Protocol}
+		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerMixedProtocols]; ok && v == "true" {
+			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) flag(%s) is set", lbName, ServiceAnnotationLoadBalancerMixedProtocols)
+			if port.Protocol == v1.ProtocolTCP {
+				protocols = append(protocols, v1.ProtocolUDP)
+			} else if port.Protocol == v1.ProtocolUDP {
+				protocols = append(protocols, v1.ProtocolTCP)
 			}
 		}
 
-		expectedRules = append(expectedRules, expectedRule)
+		for _, protocol := range protocols {
+			lbRuleName := az.getLoadBalancerRuleName(service, protocol, port.Port, subnet(service))
+			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) rule name (%s)", lbName, lbRuleName)
+
+			transportProto, _, probeProto, err := getProtocolsFromKubernetesProtocol(protocol)
+			if err != nil {
+				return expectedProbes, expectedRules, err
+			}
+
+			if servicehelpers.NeedsHealthCheck(service) {
+				podPresencePath, podPresencePort := servicehelpers.GetServiceHealthCheckPathPort(service)
+
+				expectedProbes = append(expectedProbes, network.Probe{
+					Name: &lbRuleName,
+					ProbePropertiesFormat: &network.ProbePropertiesFormat{
+						RequestPath:       to.StringPtr(podPresencePath),
+						Protocol:          network.ProbeProtocolHTTP,
+						Port:              to.Int32Ptr(podPresencePort),
+						IntervalInSeconds: to.Int32Ptr(5),
+						NumberOfProbes:    to.Int32Ptr(2),
+					},
+				})
+			} else if protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP {
+				// we only add the expected probe if we're doing TCP
+				expectedProbes = append(expectedProbes, network.Probe{
+					Name: &lbRuleName,
+					ProbePropertiesFormat: &network.ProbePropertiesFormat{
+						Protocol:          *probeProto,
+						Port:              to.Int32Ptr(port.NodePort),
+						IntervalInSeconds: to.Int32Ptr(5),
+						NumberOfProbes:    to.Int32Ptr(2),
+					},
+				})
+			}
+
+			loadDistribution := network.Default
+			if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
+				loadDistribution = network.SourceIP
+			}
+
+			expectedRule := network.LoadBalancingRule{
+				Name: &lbRuleName,
+				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+					Protocol: *transportProto,
+					FrontendIPConfiguration: &network.SubResource{
+						ID: to.StringPtr(lbFrontendIPConfigID),
+					},
+					BackendAddressPool: &network.SubResource{
+						ID: to.StringPtr(lbBackendPoolID),
+					},
+					LoadDistribution:    loadDistribution,
+					FrontendPort:        to.Int32Ptr(port.Port),
+					BackendPort:         to.Int32Ptr(port.Port),
+					EnableFloatingIP:    to.BoolPtr(true),
+					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
+				},
+			}
+			if protocol == v1.ProtocolTCP {
+				expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
+			}
+
+			// we didn't construct the probe objects for UDP or SCTP because they're not used/needed/allowed
+			if protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP {
+				expectedRule.Probe = &network.SubResource{
+					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
+				}
+			}
+
+			expectedRules = append(expectedRules, expectedRule)
+		}
 	}
 
 	return expectedProbes, expectedRules, nil
@@ -983,7 +1015,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		destinationIPAddress = "*"
 	}
 
-	sourceRanges, err := serviceapi.GetLoadBalancerSourceRanges(service)
+	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(service)
 	if err != nil {
 		return nil, err
 	}
@@ -992,7 +1024,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		return nil, err
 	}
 	var sourceAddressPrefixes []string
-	if (sourceRanges == nil || serviceapi.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
+	if (sourceRanges == nil || servicehelpers.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
 			sourceAddressPrefixes = []string{"Internet"}
 		}
@@ -1000,9 +1032,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		for _, ip := range sourceRanges {
 			sourceAddressPrefixes = append(sourceAddressPrefixes, ip.String())
 		}
-		for _, serviceTag := range serviceTags {
-			sourceAddressPrefixes = append(sourceAddressPrefixes, serviceTag)
-		}
+		sourceAddressPrefixes = append(sourceAddressPrefixes, serviceTags...)
 	}
 	expectedSecurityRules := []network.SecurityRule{}
 
@@ -1444,10 +1474,10 @@ func findProbe(probes []network.Probe, probe network.Probe) bool {
 	return false
 }
 
-func findRule(rules []network.LoadBalancingRule, rule network.LoadBalancingRule) bool {
+func findRule(rules []network.LoadBalancingRule, rule network.LoadBalancingRule, wantLB bool) bool {
 	for _, existingRule := range rules {
 		if strings.EqualFold(to.String(existingRule.Name), to.String(rule.Name)) &&
-			equalLoadBalancingRulePropertiesFormat(existingRule.LoadBalancingRulePropertiesFormat, rule.LoadBalancingRulePropertiesFormat) {
+			equalLoadBalancingRulePropertiesFormat(existingRule.LoadBalancingRulePropertiesFormat, rule.LoadBalancingRulePropertiesFormat, wantLB) {
 			return true
 		}
 	}
@@ -1456,19 +1486,23 @@ func findRule(rules []network.LoadBalancingRule, rule network.LoadBalancingRule)
 
 // equalLoadBalancingRulePropertiesFormat checks whether the provided LoadBalancingRulePropertiesFormat are equal.
 // Note: only fields used in reconcileLoadBalancer are considered.
-func equalLoadBalancingRulePropertiesFormat(s, t *network.LoadBalancingRulePropertiesFormat) bool {
+func equalLoadBalancingRulePropertiesFormat(s *network.LoadBalancingRulePropertiesFormat, t *network.LoadBalancingRulePropertiesFormat, wantLB bool) bool {
 	if s == nil || t == nil {
 		return false
 	}
 
-	return reflect.DeepEqual(s.Protocol, t.Protocol) &&
+	properties := reflect.DeepEqual(s.Protocol, t.Protocol) &&
 		reflect.DeepEqual(s.FrontendIPConfiguration, t.FrontendIPConfiguration) &&
 		reflect.DeepEqual(s.BackendAddressPool, t.BackendAddressPool) &&
 		reflect.DeepEqual(s.LoadDistribution, t.LoadDistribution) &&
 		reflect.DeepEqual(s.FrontendPort, t.FrontendPort) &&
 		reflect.DeepEqual(s.BackendPort, t.BackendPort) &&
-		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP) &&
-		reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)
+		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP)
+
+	if wantLB {
+		return properties && reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)
+	}
+	return properties
 }
 
 // This compares rule's Name, Protocol, SourcePortRange, DestinationPortRange, SourceAddressPrefix, Access, and Direction.
@@ -1527,7 +1561,7 @@ func requiresInternalLoadBalancer(service *v1.Service) bool {
 
 func subnet(service *v1.Service) *string {
 	if requiresInternalLoadBalancer(service) {
-		if l, found := service.Annotations[ServiceAnnotationLoadBalancerInternalSubnet]; found {
+		if l, found := service.Annotations[ServiceAnnotationLoadBalancerInternalSubnet]; found && strings.TrimSpace(l) != "" {
 			return &l
 		}
 	}

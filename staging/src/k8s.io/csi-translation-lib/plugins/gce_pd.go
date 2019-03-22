@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	cloudvolume "k8s.io/cloud-provider/volume"
 )
 
 const (
@@ -39,28 +40,37 @@ const (
 	volIDDiskNameValue = 5
 	volIDTotalElements = 6
 
-	// LabelZoneFailureDomain is the label on PVs indicating the zone they are provisioned in
-	LabelZoneFailureDomain = "failure-domain.beta.kubernetes.io/zone"
-	// LabelMultiZoneDelimiter separates zones for RePD volumes
-	LabelMultiZoneDelimiter = "__"
 	// UnspecifiedValue is used for an unknown zone string
 	UnspecifiedValue = "UNSPECIFIED"
 )
 
-// GCEPD handles translation of PV spec from In-tree GCE PD to CSI GCE PD and vice versa
-type GCEPD struct{}
+var _ InTreePlugin = &gcePersistentDiskCSITranslator{}
+
+// gcePersistentDiskCSITranslator handles translation of PV spec from In-tree
+// GCE PD to CSI GCE PD and vice versa
+type gcePersistentDiskCSITranslator struct{}
+
+// NewGCEPersistentDiskCSITranslator returns a new instance of gcePersistentDiskTranslator
+func NewGCEPersistentDiskCSITranslator() InTreePlugin {
+	return &gcePersistentDiskCSITranslator{}
+}
+
+// TranslateInTreeStorageClassParametersToCSI translates InTree GCE storage class parameters to CSI storage class
+func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
+	return scParameters, nil
+}
 
 // TranslateInTreePVToCSI takes a PV with GCEPersistentDisk set from in-tree
 // and converts the GCEPersistentDisk source to a CSIPersistentVolumeSource
-func (g *GCEPD) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	var volID string
 
 	if pv == nil || pv.Spec.GCEPersistentDisk == nil {
 		return nil, fmt.Errorf("pv is nil or GCE Persistent Disk source not defined on pv")
 	}
 
-	zonesLabel := pv.Labels[LabelZoneFailureDomain]
-	zones := strings.Split(zonesLabel, LabelMultiZoneDelimiter)
+	zonesLabel := pv.Labels[v1.LabelZoneFailureDomain]
+	zones := strings.Split(zonesLabel, cloudvolume.LabelMultiZoneDelimiter)
 	if len(zones) == 1 && len(zones[0]) != 0 {
 		// Zonal
 		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, zones[0], pv.Spec.GCEPersistentDisk.PDName)
@@ -77,13 +87,19 @@ func (g *GCEPD) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentV
 	}
 
 	gceSource := pv.Spec.PersistentVolumeSource.GCEPersistentDisk
+
+	partition := ""
+	if gceSource.Partition != 0 {
+		partition = strconv.Itoa(int(gceSource.Partition))
+	}
+
 	csiSource := &v1.CSIPersistentVolumeSource{
 		Driver:       GCEPDDriverName,
 		VolumeHandle: volID,
 		ReadOnly:     gceSource.ReadOnly,
 		FSType:       gceSource.FSType,
 		VolumeAttributes: map[string]string{
-			"partition": strconv.FormatInt(int64(gceSource.Partition), 10),
+			"partition": partition,
 		},
 	}
 
@@ -95,7 +111,7 @@ func (g *GCEPD) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentV
 
 // TranslateCSIPVToInTree takes a PV with CSIPersistentVolumeSource set and
 // translates the GCE PD CSI source to a GCEPersistentDisk source.
-func (g *GCEPD) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func (g *gcePersistentDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if pv == nil || pv.Spec.CSI == nil {
 		return nil, fmt.Errorf("pv is nil or CSI source not defined on pv")
 	}
@@ -111,7 +127,7 @@ func (g *GCEPD) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentV
 		FSType:   csiSource.FSType,
 		ReadOnly: csiSource.ReadOnly,
 	}
-	if partition, ok := csiSource.VolumeAttributes["partition"]; ok {
+	if partition, ok := csiSource.VolumeAttributes["partition"]; ok && partition != "" {
 		partInt, err := strconv.Atoi(partition)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to convert partition %v to integer: %v", partition, err)
@@ -130,13 +146,18 @@ func (g *GCEPD) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.PersistentV
 // CanSupport tests whether the plugin supports a given volume
 // specification from the API.  The spec pointer should be considered
 // const.
-func (g *GCEPD) CanSupport(pv *v1.PersistentVolume) bool {
+func (g *gcePersistentDiskCSITranslator) CanSupport(pv *v1.PersistentVolume) bool {
 	return pv != nil && pv.Spec.GCEPersistentDisk != nil
 }
 
 // GetInTreePluginName returns the name of the intree plugin driver
-func (g *GCEPD) GetInTreePluginName() string {
+func (g *gcePersistentDiskCSITranslator) GetInTreePluginName() string {
 	return GCEPDInTreePluginName
+}
+
+// GetCSIPluginName returns the name of the CSI plugin
+func (g *gcePersistentDiskCSITranslator) GetCSIPluginName() string {
+	return GCEPDDriverName
 }
 
 func pdNameFromVolumeID(id string) (string, error) {

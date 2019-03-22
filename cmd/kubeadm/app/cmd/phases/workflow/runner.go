@@ -53,7 +53,7 @@ type Runner struct {
 
 	// runDataInitializer defines a function that creates the runtime data shared
 	// among all the phases included in the workflow
-	runDataInitializer func(*cobra.Command) (RunData, error)
+	runDataInitializer func(*cobra.Command, []string) (RunData, error)
 
 	// runData is part of the internal state of the runner and it is used for implementing
 	// a singleton in the InitData methods (thus avoiding to initialize data
@@ -171,17 +171,17 @@ func (e *Runner) computePhaseRunFlags() (map[string]bool, error) {
 // SetDataInitializer allows to setup a function that initialize the runtime data shared
 // among all the phases included in the workflow.
 // The method will receive in input the cmd that triggers the Runner (only if the runner is BindToCommand)
-func (e *Runner) SetDataInitializer(builder func(cmd *cobra.Command) (RunData, error)) {
+func (e *Runner) SetDataInitializer(builder func(cmd *cobra.Command, args []string) (RunData, error)) {
 	e.runDataInitializer = builder
 }
 
 // InitData triggers the creation of runtime data shared among all the phases included in the workflow.
 // This action can be executed explicitly out, when it is necessary to get the RunData
 // before actually executing Run, or implicitly when invoking Run.
-func (e *Runner) InitData() (RunData, error) {
+func (e *Runner) InitData(args []string) (RunData, error) {
 	if e.runData == nil && e.runDataInitializer != nil {
 		var err error
-		if e.runData, err = e.runDataInitializer(e.runCmd); err != nil {
+		if e.runData, err = e.runDataInitializer(e.runCmd, args); err != nil {
 			return nil, err
 		}
 	}
@@ -190,7 +190,7 @@ func (e *Runner) InitData() (RunData, error) {
 }
 
 // Run the kubeadm composable kubeadm workflows.
-func (e *Runner) Run() error {
+func (e *Runner) Run(args []string) error {
 	e.prepareForExecution()
 
 	// determine which phase should be run according to RunnerOptions
@@ -201,7 +201,7 @@ func (e *Runner) Run() error {
 
 	// builds the runner data
 	var data RunData
-	if data, err = e.InitData(); err != nil {
+	if data, err = e.InitData(args); err != nil {
 		return err
 	}
 
@@ -295,6 +295,10 @@ func (e *Runner) SetAdditionalFlags(fn func(*pflag.FlagSet)) {
 // command help, adding phase related flags and by adding phases subcommands
 // Please note that this command needs to be done once all the phases are added to the Runner.
 func (e *Runner) BindToCommand(cmd *cobra.Command) {
+	// keep track of the command triggering the runner
+	e.runCmd = cmd
+
+	// return early if no phases were added
 	if len(e.Phases) == 0 {
 		return
 	}
@@ -305,7 +309,6 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 	phaseCommand := &cobra.Command{
 		Use:   "phase",
 		Short: fmt.Sprintf("use this command to invoke single phase of the %s workflow", cmd.Name()),
-		Args:  cobra.NoArgs, // this forces cobra to fail if a wrong phase name is passed
 	}
 
 	cmd.AddCommand(phaseCommand)
@@ -343,12 +346,11 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 				// overrides the command triggering the Runner using the phaseCmd
 				e.runCmd = cmd
 				e.Options.FilterPhases = []string{phaseSelector}
-				if err := e.Run(); err != nil {
+				if err := e.Run(args); err != nil {
 					fmt.Fprintln(os.Stderr, err)
 					os.Exit(1)
 				}
 			},
-			Args: cobra.NoArgs, // this forces cobra to fail if a wrong phase name is passed
 		}
 
 		// makes the new command inherits local flags from the parent command
@@ -365,6 +367,11 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			p.LocalFlags.VisitAll(func(f *pflag.Flag) {
 				phaseCmd.Flags().AddFlag(f)
 			})
+		}
+
+		// if this phase has children (not a leaf) it doesn't accept any args
+		if len(p.Phases) > 0 {
+			phaseCmd.Args = cobra.NoArgs
 		}
 
 		// adds the command to parent
@@ -387,9 +394,6 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 
 	// adds phase related flags to the main command
 	cmd.Flags().StringSliceVar(&e.Options.SkipPhases, "skip-phases", nil, "List of phases to be skipped")
-
-	// keep tracks of the command triggering the runner
-	e.runCmd = cmd
 }
 
 func inheritsFlags(sourceFlags, targetFlags *pflag.FlagSet, cmdFlags []string) {
@@ -438,8 +442,8 @@ func (e *Runner) prepareForExecution() {
 // addPhaseRunner adds the phaseRunner for a given phase to the phaseRunners list
 func addPhaseRunner(e *Runner, parentRunner *phaseRunner, phase Phase) {
 	// computes contextual information derived by the workflow managed by the Runner.
-	generatedName := strings.ToLower(phase.Name)
-	use := generatedName
+	use := cleanName(phase.Name)
+	generatedName := use
 	selfPath := []string{generatedName}
 
 	if parentRunner != nil {
@@ -466,4 +470,14 @@ func addPhaseRunner(e *Runner, parentRunner *phaseRunner, phase Phase) {
 	for _, childPhase := range phase.Phases {
 		addPhaseRunner(e, currentRunner, childPhase)
 	}
+}
+
+// cleanName makes phase name suitable for the runner help, by lowercasing the name
+// and removing args descriptors, if any
+func cleanName(name string) string {
+	ret := strings.ToLower(name)
+	if pos := strings.Index(ret, " "); pos != -1 {
+		ret = ret[:pos]
+	}
+	return ret
 }

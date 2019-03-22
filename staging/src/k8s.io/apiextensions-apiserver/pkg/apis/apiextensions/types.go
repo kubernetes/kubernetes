@@ -84,6 +84,15 @@ type CustomResourceConversion struct {
 
 	// `webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`.
 	WebhookClientConfig *WebhookClientConfig
+
+	// ConversionReviewVersions is an ordered list of preferred `ConversionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, conversion will fail for this object.
+	// If a persisted Webhook configuration specifies allowed versions and does not
+	// include any versions known to the API Server, calls to the webhook will fail.
+	// +optional
+	ConversionReviewVersions []string
 }
 
 // WebhookClientConfig contains the information to make a TLS

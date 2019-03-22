@@ -33,6 +33,7 @@ type VolumeOptions struct {
 	StoragePolicyName      string
 	StoragePolicyID        string
 	SCSIControllerType     string
+	Zone                   []string
 }
 
 var (

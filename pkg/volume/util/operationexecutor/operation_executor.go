@@ -145,7 +145,7 @@ type OperationExecutor interface {
 	// ExpandVolumeFSWithoutUnmounting will resize volume's file system to expected size without unmounting the volume.
 	ExpandVolumeFSWithoutUnmounting(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
-	ReconstructVolumeOperation(volumeMode v1.PersistentVolumeMode, plugin volume.VolumePlugin, mapperPlugin volume.BlockVolumePlugin, uid types.UID, podName volumetypes.UniquePodName, volumeSpecName string, mountPath string, pluginName string) (*volume.Spec, error)
+	ReconstructVolumeOperation(volumeMode v1.PersistentVolumeMode, plugin volume.VolumePlugin, mapperPlugin volume.BlockVolumePlugin, uid types.UID, podName volumetypes.UniquePodName, volumeSpecName string, volumePath string, pluginName string) (*volume.Spec, error)
 	// CheckVolumeExistenceOperation checks volume existence
 	CheckVolumeExistenceOperation(volumeSpec *volume.Spec, mountPath, volumeName string, mounter mount.Interface, uniqueVolumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, podUID types.UID, attachable volume.AttachableVolumePlugin) (bool, error)
 }
@@ -191,6 +191,12 @@ type ActualStateOfWorldAttacherUpdater interface {
 	// argument to this method -- since it is used only for attachable
 	// volumes.  See issue 29695.
 	MarkVolumeAsAttached(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
+
+	// Marks the specified volume as *possibly* attached to the specified node.
+	// If an attach operation fails, the attach/detach controller does not know for certain if the volume is attached or not.
+	// If the volume name is supplied, that volume name will be used.  If not, the
+	// volume name is computed using the result from querying the plugin.
+	MarkVolumeAsUncertain(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName) error
 
 	// Marks the specified volume as detached from the specified node
 	MarkVolumeAsDetached(volumeName v1.UniqueVolumeName, nodeName types.NodeName)
@@ -856,14 +862,14 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 	uid types.UID,
 	podName volumetypes.UniquePodName,
 	volumeSpecName string,
-	mountPath string,
+	volumePath string,
 	pluginName string) (*volume.Spec, error) {
 
 	// Filesystem Volume case
 	if volumeMode == v1.PersistentVolumeFilesystem {
 		// Create volumeSpec from mount path
 		klog.V(5).Infof("Starting operationExecutor.ReconstructVolumepodName")
-		volumeSpec, err := plugin.ConstructVolumeSpec(volumeSpecName, mountPath)
+		volumeSpec, err := plugin.ConstructVolumeSpec(volumeSpecName, volumePath)
 		if err != nil {
 			return nil, err
 		}
@@ -880,17 +886,17 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 			podName,
 			uid)
 	}
-	// mountPath contains volumeName on the path. In the case of block volume, {volumeName} is symbolic link
+	// volumePath contains volumeName on the path. In the case of block volume, {volumeName} is symbolic link
 	// corresponding to raw block device.
-	// ex. mountPath: pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
-	volumeSpec, err := mapperPlugin.ConstructBlockVolumeSpec(uid, volumeSpecName, mountPath)
+	// ex. volumePath: pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
+	volumeSpec, err := mapperPlugin.ConstructBlockVolumeSpec(uid, volumeSpecName, volumePath)
 	if err != nil {
 		return nil, err
 	}
 	return volumeSpec, nil
 }
 
-// CheckVolumeExistenceOperation return a func() to check mount path directory if volume still exists
+// CheckVolumeExistenceOperation checks mount path directory if volume still exists
 func (oe *operationExecutor) CheckVolumeExistenceOperation(
 	volumeSpec *volume.Spec,
 	mountPath, volumeName string,

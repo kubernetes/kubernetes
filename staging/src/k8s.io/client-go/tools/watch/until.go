@@ -95,6 +95,25 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 	return lastEvent, nil
 }
 
+// Until wraps the watcherClient's watch function with RetryWatcher making sure that watcher gets restarted in case of errors.
+// The initialResourceVersion will be given to watch method when first called. It shall not be "" or "0"
+// given the underlying WATCH call issues (#74022). If you want the initial list ("", "0") done for you use ListWatchUntil instead.
+// Remaining behaviour is identical to function UntilWithoutRetry. (See above.)
+// Until can deal with API timeouts and lost connections.
+// It guarantees you to see all events and in the order they happened.
+// Due to this guarantee there is no way it can deal with 'Resource version too old error'. It will fail in this case.
+// (See `UntilWithSync` if you'd prefer to recover from all the errors including RV too old by re-listing
+//  those items. In normal code you should care about being level driven so you'd not care about not seeing all the edges.)
+// The most frequent usage for Until would be a test where you want to verify exact order of events ("edges").
+func Until(ctx context.Context, initialResourceVersion string, watcherClient cache.Watcher, conditions ...ConditionFunc) (*watch.Event, error) {
+	w, err := NewRetryWatcher(initialResourceVersion, watcherClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return UntilWithoutRetry(ctx, w, conditions...)
+}
+
 // UntilWithSync creates an informer from lw, optionally checks precondition when the store is synced,
 // and watches the output until each provided condition succeeds, in a way that is identical
 // to function UntilWithoutRetry. (See above.)
@@ -108,7 +127,10 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 // The most frequent usage would be a command that needs to watch the "state of the world" and should't fail, like:
 // waiting for object reaching a state, "small" controllers, ...
 func UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object, precondition PreconditionFunc, conditions ...ConditionFunc) (*watch.Event, error) {
-	indexer, informer, watcher := NewIndexerInformerWatcher(lw, objType)
+	indexer, informer, watcher, done := NewIndexerInformerWatcher(lw, objType)
+	// We need to wait for the internal informers to fully stop so it's easier to reason about
+	// and it works with non-thread safe clients.
+	defer func() { <-done }()
 	// Proxy watcher can be stopped multiple times so it's fine to use defer here to cover alternative branches and
 	// let UntilWithoutRetry to stop it
 	defer watcher.Stop()
@@ -146,13 +168,14 @@ func ContextWithOptionalTimeout(parent context.Context, timeout time.Duration) (
 	return context.WithTimeout(parent, timeout)
 }
 
-// ListWatchUntil checks the provided conditions against the items returned by the list watcher, returning wait.ErrWaitTimeout
-// if timeout is exceeded without all conditions returning true, or an error if an error occurs.
-// TODO: check for watch expired error and retry watch from latest point?  Same issue exists for Until.
-// TODO: remove when no longer used
-//
-// Deprecated: Use UntilWithSync instead.
-func ListWatchUntil(timeout time.Duration, lw cache.ListerWatcher, conditions ...ConditionFunc) (*watch.Event, error) {
+// ListWatchUntil first lists objects, converts them into synthetic ADDED events
+// and checks conditions for those synthetic events. If the conditions have not been reached so far
+// it continues by calling Until which establishes a watch from resourceVersion of the list call
+// to evaluate those conditions based on new events.
+// ListWatchUntil provides the same guarantees as Until and replaces the old WATCH from RV "" (or "0")
+// which was mixing list and watch calls internally and having severe design issues. (see #74022)
+// There is no resourceVersion order guarantee for the initial list and those synthetic events.
+func ListWatchUntil(ctx context.Context, lw cache.ListerWatcher, conditions ...ConditionFunc) (*watch.Event, error) {
 	if len(conditions) == 0 {
 		return nil, nil
 	}
@@ -209,17 +232,5 @@ func ListWatchUntil(timeout time.Duration, lw cache.ListerWatcher, conditions ..
 	}
 	currResourceVersion := metaObj.GetResourceVersion()
 
-	watchInterface, err := lw.Watch(metav1.ListOptions{ResourceVersion: currResourceVersion})
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := ContextWithOptionalTimeout(context.Background(), timeout)
-	defer cancel()
-	evt, err := UntilWithoutRetry(ctx, watchInterface, remainingConditions...)
-	if err == ErrWatchClosed {
-		// present a consistent error interface to callers
-		err = wait.ErrWaitTimeout
-	}
-	return evt, err
+	return Until(ctx, currResourceVersion, lw, remainingConditions...)
 }

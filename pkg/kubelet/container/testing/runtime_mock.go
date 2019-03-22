@@ -67,8 +67,8 @@ func (r *Mock) GetPods(all bool) ([]*Pod, error) {
 	return args.Get(0).([]*Pod), args.Error(1)
 }
 
-func (r *Mock) SyncPod(pod *v1.Pod, apiStatus v1.PodStatus, status *PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult {
-	args := r.Called(pod, apiStatus, status, secrets, backOff)
+func (r *Mock) SyncPod(pod *v1.Pod, status *PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult {
+	args := r.Called(pod, status, secrets, backOff)
 	return args.Get(0).(PodSyncResult)
 }
 
@@ -130,16 +130,6 @@ func (r *Mock) RemoveImage(image ImageSpec) error {
 func (r *Mock) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error {
 	args := r.Called(pod, port, stream)
 	return args.Error(0)
-}
-
-func (r *Mock) GetNetNS(containerID ContainerID) (string, error) {
-	args := r.Called(containerID)
-	return "", args.Error(0)
-}
-
-func (r *Mock) GetPodContainerID(pod *Pod) (ContainerID, error) {
-	args := r.Called(pod)
-	return ContainerID{}, args.Error(0)
 }
 
 func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {

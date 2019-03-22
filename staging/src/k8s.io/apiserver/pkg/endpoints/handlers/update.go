@@ -38,7 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // UpdateResource returns a function that will handle a resource update
@@ -70,7 +70,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 			return
 		}
 
-		body, err := readBody(req)
+		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -121,7 +121,16 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		}
 
 		userInfo, _ := request.UserFrom(ctx)
-		var transformers []rest.TransformFunc
+		transformers := []rest.TransformFunc{}
+		if scope.FieldManager != nil {
+			transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
+				obj, err := scope.FieldManager.Update(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+				if err != nil {
+					return nil, fmt.Errorf("failed to update object (Update for %v) managed fields: %v", scope.Kind, err)
+				}
+				return obj, nil
+			})
+		}
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
 			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
 				isNotZeroObject, err := hasUID(oldObj)
@@ -129,11 +138,11 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 					return nil, fmt.Errorf("unexpected error when extracting UID from oldObj: %v", err.Error())
 				} else if !isNotZeroObject {
 					if mutatingAdmission.Handles(admission.Create) {
-						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, dryrun.IsDryRun(options.DryRun), userInfo))
+						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, dryrun.IsDryRun(options.DryRun), userInfo), &scope)
 					}
 				} else {
 					if mutatingAdmission.Handles(admission.Update) {
-						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, dryrun.IsDryRun(options.DryRun), userInfo))
+						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, dryrun.IsDryRun(options.DryRun), userInfo), &scope)
 					}
 				}
 				return newObj, nil
@@ -163,11 +172,11 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
 				withAuthorization(rest.AdmissionToValidateObjectFunc(
 					admit,
-					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, dryrun.IsDryRun(options.DryRun), userInfo)),
+					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, dryrun.IsDryRun(options.DryRun), userInfo), &scope),
 					scope.Authorizer, createAuthorizerAttributes),
 				rest.AdmissionToValidateObjectUpdateFunc(
 					admit,
-					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, dryrun.IsDryRun(options.DryRun), userInfo)),
+					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, dryrun.IsDryRun(options.DryRun), userInfo), &scope),
 				false,
 				options,
 			)

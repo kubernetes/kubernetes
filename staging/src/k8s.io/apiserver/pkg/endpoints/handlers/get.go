@@ -37,7 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // getterFunc performs a get request with the given context and object name. The request
@@ -257,7 +257,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 			requestInfo, _ := request.RequestInfoFrom(ctx)
 			metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
-				serveWatch(watcher, scope, req, w, timeout)
+				serveWatch(watcher, scope, outputMediaType, req, w, timeout)
 			})
 			return
 		}

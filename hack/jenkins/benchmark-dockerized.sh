@@ -21,7 +21,7 @@ set -o xtrace
 
 retry() {
   for i in {1..5}; do
-    "$@" && return 0 || sleep $i
+    "$@" && return 0 || sleep "${i}"
   done
   "$@"
 }
@@ -33,13 +33,15 @@ retry() {
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-retry go get github.com/cespare/prettybench
+go install k8s.io/kubernetes/vendor/github.com/cespare/prettybench
+go install k8s.io/kubernetes/vendor/github.com/jstemmer/go-junit-report
 
 # Disable the Go race detector.
 export KUBE_RACE=" "
 # Disable coverage report
 export KUBE_COVER="n"
 export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
+export FULL_LOG="true"
 
 mkdir -p "${ARTIFACTS}"
 cd /go/src/k8s.io/kubernetes

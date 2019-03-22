@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -52,7 +51,7 @@ import (
 
 // NewCmdToken returns cobra.Command for token management
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
-	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
+	var kubeConfigFile string
 	var dryRun bool
 	tokenCmd := &cobra.Command{
 		Use:   "token",
@@ -121,7 +120,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -129,8 +128,8 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 		},
 	}
-	createCmd.Flags().StringVar(&cfgPath,
-		"config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+
+	options.AddConfigFlag(createCmd.Flags(), &cfgPath)
 	createCmd.Flags().BoolVar(&printJoinCommand,
 		"print-join-command", false, "Instead of printing only the token, print the full 'kubeadm join' flag needed to join the cluster using the token.")
 	bto.AddTTLFlagWithName(createCmd.Flags(), "ttl")
@@ -148,7 +147,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			This command will list all bootstrap tokens for you.
 		`),
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -172,7 +171,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) < 1 {
 				kubeadmutil.CheckErr(errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern))
 			}
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -211,12 +210,12 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
 	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
-	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-	phaseutil.SetKubernetesVersion(cfg)
+	// of the version from the internet when executing LoadOrDefaultInitConfiguration
+	phaseutil.SetKubernetesVersion(&cfg.ClusterConfiguration)
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	klog.V(1).Infoln("[token] loading configurations")
-	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cfg)
 	if err != nil {
 		return err
 	}
@@ -226,13 +225,16 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 		return err
 	}
 
-	// if --print-join-command was specified, print the full `kubeadm join` command
+	// if --print-join-command was specified, print a machine-readable full `kubeadm join` command
 	// otherwise, just print the token
 	if printJoinCommand {
-		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), false)
+		skipTokenPrint := false
+		joinCommand, err := cmdutil.GetJoinWorkerCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), skipTokenPrint)
 		if err != nil {
 			return errors.Wrap(err, "failed to get join command")
 		}
+		joinCommand = strings.ReplaceAll(joinCommand, "\\\n", "")
+		joinCommand = strings.ReplaceAll(joinCommand, "\t", "")
 		fmt.Fprintln(out, joinCommand)
 	} else {
 		fmt.Fprintln(out, internalcfg.BootstrapTokens[0].Token.String())

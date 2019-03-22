@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -82,6 +82,10 @@ func (plugin *nfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.NFS != nil) ||
 		(spec.Volume != nil && spec.Volume.NFS != nil)
+}
+
+func (plugin *nfsPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (plugin *nfsPlugin) RequiresRemount() bool {
@@ -185,7 +189,7 @@ type nfs struct {
 
 func (nfsVolume *nfs) GetPath() string {
 	name := nfsPluginName
-	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
+	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, utilstrings.EscapeQualifiedName(name), nfsVolume.volName)
 }
 
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
@@ -294,7 +298,7 @@ func (c *nfsUnmounter) TearDownAt(dir string) error {
 	// Use extensiveMountPointCheck to consult /proc/mounts. We can't use faster
 	// IsLikelyNotMountPoint (lstat()), since there may be root_squash on the
 	// NFS server and kubelet may not be able to do lstat/stat() there.
-	return util.UnmountMountPoint(dir, c.mounter, true /* extensiveMountPointCheck */)
+	return mount.CleanupMountPoint(dir, c.mounter, true /* extensiveMountPointCheck */)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.NFSVolumeSource, bool, error) {

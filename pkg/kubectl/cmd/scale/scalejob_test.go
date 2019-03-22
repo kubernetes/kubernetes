@@ -69,7 +69,7 @@ func (c *errorJobClient) Jobs(namespace string) batchclient.JobInterface {
 }
 
 func TestJobScaleRetry(t *testing.T) {
-	fake := &errorJobClient{JobsGetter: fake.NewSimpleClientset().Batch(), conflict: true}
+	fake := &errorJobClient{JobsGetter: fake.NewSimpleClientset().BatchV1(), conflict: true}
 	scaler := &JobPsuedoScaler{JobsClient: fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
@@ -103,7 +103,7 @@ func job() *batch.Job {
 
 func TestJobScale(t *testing.T) {
 	fakeClientset := fake.NewSimpleClientset(job())
-	scaler := &JobPsuedoScaler{JobsClient: fakeClientset.Batch()}
+	scaler := &JobPsuedoScaler{JobsClient: fakeClientset.BatchV1()}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
@@ -122,7 +122,7 @@ func TestJobScale(t *testing.T) {
 }
 
 func TestJobScaleInvalid(t *testing.T) {
-	fake := &errorJobClient{JobsGetter: fake.NewSimpleClientset().Batch(), invalid: true}
+	fake := &errorJobClient{JobsGetter: fake.NewSimpleClientset().BatchV1(), invalid: true}
 	scaler := &JobPsuedoScaler{JobsClient: fake}
 	preconditions := ScalePrecondition{-1, ""}
 	count := uint(3)
@@ -150,7 +150,7 @@ func TestJobScaleFailsPreconditions(t *testing.T) {
 			Parallelism: &ten,
 		},
 	})
-	scaler := &JobPsuedoScaler{JobsClient: fake.Batch()}
+	scaler := &JobPsuedoScaler{JobsClient: fake.BatchV1()}
 	preconditions := ScalePrecondition{2, ""}
 	count := uint(3)
 	name := "foo"

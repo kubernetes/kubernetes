@@ -52,8 +52,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -239,10 +239,10 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Last Seen", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["lastTimestamp"]},
 		{Name: "Type", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["type"]},
 		{Name: "Reason", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["reason"]},
-		{Name: "Kind", Type: "string", Description: apiv1.Event{}.InvolvedObject.SwaggerDoc()["kind"]},
+		{Name: "Object", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["involvedObject"]},
+		{Name: "Subobject", Type: "string", Priority: 1, Description: apiv1.Event{}.InvolvedObject.SwaggerDoc()["fieldPath"]},
 		{Name: "Source", Type: "string", Priority: 1, Description: apiv1.Event{}.SwaggerDoc()["source"]},
 		{Name: "Message", Type: "string", Description: apiv1.Event{}.SwaggerDoc()["message"]},
-		{Name: "Subobject", Type: "string", Priority: 1, Description: apiv1.Event{}.InvolvedObject.SwaggerDoc()["fieldPath"]},
 		{Name: "First Seen", Type: "string", Priority: 1, Description: apiv1.Event{}.SwaggerDoc()["firstTimestamp"]},
 		{Name: "Count", Type: "string", Priority: 1, Description: apiv1.Event{}.SwaggerDoc()["count"]},
 		{Name: "Name", Type: "string", Priority: 1, Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -430,14 +430,14 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevision)
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevisionList)
 
-	resorceQuotaColumnDefinitions := []metav1beta1.TableColumnDefinition{
+	resourceQuotaColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Request", Type: "string", Description: "Request represents a minimum amount of cpu/memory that a container may consume."},
 		{Name: "Limit", Type: "string", Description: "Limits control the maximum amount of cpu/memory that a container may use independent of contention on the node."},
 	}
-	h.TableHandler(resorceQuotaColumnDefinitions, printResourceQuota)
-	h.TableHandler(resorceQuotaColumnDefinitions, printResourceQuotaList)
+	h.TableHandler(resourceQuotaColumnDefinitions, printResourceQuota)
+	h.TableHandler(resourceQuotaColumnDefinitions, printResourceQuotaList)
 
 	priorityClassColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -447,6 +447,25 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(priorityClassColumnDefinitions, printPriorityClass)
 	h.TableHandler(priorityClassColumnDefinitions, printPriorityClassList)
+
+	runtimeClassColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Handler", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["handler"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(runtimeClassColumnDefinitions, printRuntimeClass)
+	h.TableHandler(runtimeClassColumnDefinitions, printRuntimeClassList)
+
+	volumeAttachmentColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Attacher", Type: "string", Format: "name", Description: storagev1.VolumeAttachmentSpec{}.SwaggerDoc()["attacher"]},
+		{Name: "PV", Type: "string", Description: storagev1.VolumeAttachmentSource{}.SwaggerDoc()["persistentVolumeName"]},
+		{Name: "Node", Type: "string", Description: storagev1.VolumeAttachmentSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "Attached", Type: "boolean", Description: storagev1.VolumeAttachmentStatus{}.SwaggerDoc()["attached"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(volumeAttachmentColumnDefinitions, printVolumeAttachment)
+	h.TableHandler(volumeAttachmentColumnDefinitions, printVolumeAttachmentList)
 
 	AddDefaultHandlers(h)
 }
@@ -992,14 +1011,14 @@ func printServiceList(list *api.ServiceList, options printers.PrintOptions) ([]m
 }
 
 // backendStringer behaves just like a string interface and converts the given backend to a string.
-func backendStringer(backend *extensions.IngressBackend) string {
+func backendStringer(backend *networking.IngressBackend) string {
 	if backend == nil {
 		return ""
 	}
 	return fmt.Sprintf("%v:%v", backend.ServiceName, backend.ServicePort.String())
 }
 
-func formatHosts(rules []extensions.IngressRule) string {
+func formatHosts(rules []networking.IngressRule) string {
 	list := []string{}
 	max := 3
 	more := false
@@ -1021,14 +1040,14 @@ func formatHosts(rules []extensions.IngressRule) string {
 	return ret
 }
 
-func formatPorts(tls []extensions.IngressTLS) string {
+func formatPorts(tls []networking.IngressTLS) string {
 	if len(tls) != 0 {
 		return "80, 443"
 	}
 	return "80"
 }
 
-func printIngress(obj *extensions.Ingress, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printIngress(obj *networking.Ingress, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1040,7 +1059,7 @@ func printIngress(obj *extensions.Ingress, options printers.PrintOptions) ([]met
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printIngressList(list *extensions.IngressList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printIngressList(list *networking.IngressList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printIngress(&list.Items[i], options)
@@ -1385,15 +1404,21 @@ func printEvent(obj *api.Event, options printers.PrintOptions) ([]metav1beta1.Ta
 		firstTimestamp = translateTimestampSince(obj.FirstTimestamp)
 		lastTimestamp = translateTimestampSince(obj.LastTimestamp)
 	}
+	var target string
+	if len(obj.InvolvedObject.Name) > 0 {
+		target = fmt.Sprintf("%s/%s", strings.ToLower(obj.InvolvedObject.Kind), obj.InvolvedObject.Name)
+	} else {
+		target = strings.ToLower(obj.InvolvedObject.Kind)
+	}
 	if options.Wide {
 		row.Cells = append(row.Cells,
 			lastTimestamp,
 			obj.Type,
 			obj.Reason,
-			obj.InvolvedObject.Kind,
+			target,
+			obj.InvolvedObject.FieldPath,
 			formatEventSource(obj.Source),
 			strings.TrimSpace(obj.Message),
-			obj.InvolvedObject.FieldPath,
 			firstTimestamp,
 			int64(obj.Count),
 			obj.Name,
@@ -1403,7 +1428,7 @@ func printEvent(obj *api.Event, options printers.PrintOptions) ([]metav1beta1.Ta
 			lastTimestamp,
 			obj.Type,
 			obj.Reason,
-			obj.InvolvedObject.Kind,
+			target,
 			strings.TrimSpace(obj.Message),
 		)
 	}
@@ -1958,6 +1983,58 @@ func printPriorityClassList(list *scheduling.PriorityClassList, options printers
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPriorityClass(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printRuntimeClass(obj *nodeapi.RuntimeClass, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	name := obj.Name
+	handler := obj.Handler
+	row.Cells = append(row.Cells, name, handler, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printRuntimeClassList(list *nodeapi.RuntimeClassList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printRuntimeClass(&list.Items[i], options)
+
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printVolumeAttachment(obj *storage.VolumeAttachment, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	name := obj.Name
+	pvName := ""
+	if obj.Spec.Source.PersistentVolumeName != nil {
+		pvName = *obj.Spec.Source.PersistentVolumeName
+	}
+	row.Cells = append(row.Cells, name, obj.Spec.Attacher, pvName, obj.Spec.NodeName, obj.Status.Attached, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printVolumeAttachmentList(list *storage.VolumeAttachmentList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printVolumeAttachment(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

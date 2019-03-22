@@ -44,9 +44,9 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -194,7 +194,9 @@ type Proxier struct {
 	syncPeriod    time.Duration
 	minSyncPeriod time.Duration
 	// Values are CIDR's to exclude when cleaning up IPVS rules.
-	excludeCIDRs   []string
+	excludeCIDRs []string
+	// Set to true to set sysctls arp_ignore and arp_announce
+	strictARP      bool
 	iptables       utiliptables.Interface
 	ipvs           utilipvs.Interface
 	ipset          utilipset.Interface
@@ -285,6 +287,7 @@ func NewProxier(ipt utiliptables.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	excludeCIDRs []string,
+	strictARP bool,
 	masqueradeAll bool,
 	masqueradeBit int,
 	clusterCIDR string,
@@ -344,17 +347,19 @@ func NewProxier(ipt utiliptables.Interface,
 		}
 	}
 
-	// Set the arp_ignore sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlArpIgnore); val != 1 {
-		if err := sysctl.SetSysctl(sysctlArpIgnore, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpIgnore, err)
+	if strictARP {
+		// Set the arp_ignore sysctl we need for
+		if val, _ := sysctl.GetSysctl(sysctlArpIgnore); val != 1 {
+			if err := sysctl.SetSysctl(sysctlArpIgnore, 1); err != nil {
+				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpIgnore, err)
+			}
 		}
-	}
 
-	// Set the arp_announce sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlArpAnnounce); val != 2 {
-		if err := sysctl.SetSysctl(sysctlArpAnnounce, 2); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpAnnounce, err)
+		// Set the arp_announce sysctl we need for
+		if val, _ := sysctl.GetSysctl(sysctlArpAnnounce); val != 2 {
+			if err := sysctl.SetSysctl(sysctlArpAnnounce, 2); err != nil {
+				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpAnnounce, err)
+			}
 		}
 	}
 
@@ -373,7 +378,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 	if len(clusterCIDR) == 0 {
 		klog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
-	} else if utilnet.IsIPv6CIDR(clusterCIDR) != isIPv6 {
+	} else if utilnet.IsIPv6CIDRString(clusterCIDR) != isIPv6 {
 		return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", clusterCIDR, isIPv6)
 	}
 
@@ -719,7 +724,8 @@ func (proxier *Proxier) syncProxyRules() {
 
 	start := time.Now()
 	defer func() {
-		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInMicroseconds(start))
+		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
+		metrics.DeprecatedSyncProxyRulesLatency.Observe(metrics.SinceInMicroseconds(start))
 		klog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
@@ -740,6 +746,9 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.GetProtocol() == v1.ProtocolUDP {
 			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIPString())
 			staleServices.Insert(svcInfo.ClusterIPString())
+			for _, extIP := range svcInfo.ExternalIPStrings() {
+				staleServices.Insert(extIP)
+			}
 		}
 	}
 
@@ -1199,6 +1208,11 @@ func (proxier *Proxier) syncProxyRules() {
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
 	}
+	for _, lastChangeTriggerTime := range endpointUpdateResult.LastChangeTriggerTimes {
+		latency := metrics.SinceInSeconds(lastChangeTriggerTime)
+		metrics.NetworkProgrammingLatency.Observe(latency)
+		klog.V(4).Infof("Network programming took %f seconds", latency)
+	}
 
 	// Close old local ports and save new ones.
 	for k, v := range proxier.portsMap {
@@ -1492,6 +1506,18 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIPString(), endpointIP, v1.ProtocolUDP)
 			if err != nil {
 				klog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
+			}
+			for _, extIP := range svcInfo.ExternalIPStrings() {
+				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, v1.ProtocolUDP)
+				if err != nil {
+					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
+				}
+			}
+			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, v1.ProtocolUDP)
+				if err != nil {
+					klog.Errorf("Failed to delete %s endpoint connections for LoabBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
+				}
 			}
 		}
 	}

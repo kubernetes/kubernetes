@@ -172,7 +172,7 @@ func TestRunOrderAndConditions(t *testing.T) {
 		t.Run(u.name, func(t *testing.T) {
 			callstack = []string{}
 			w.Options = u.options
-			err := w.Run()
+			err := w.Run([]string{})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -241,7 +241,7 @@ func TestRunHandleErrors(t *testing.T) {
 	for _, u := range usecases {
 		t.Run(u.name, func(t *testing.T) {
 			w.Options = u.options
-			err := w.Run()
+			err := w.Run([]string{})
 			if (err != nil) != u.expectedError {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -262,7 +262,7 @@ func TestHelp(t *testing.T) {
 	var w = Runner{
 		Phases: []Phase{
 			phaseBuilder3("foo", false,
-				phaseBuilder3("bar", false),
+				phaseBuilder3("bar [arg]", false),
 				phaseBuilder3("baz", true),
 			),
 			phaseBuilder3("qux", false),
@@ -272,7 +272,7 @@ func TestHelp(t *testing.T) {
 	expected := "The \"myCommand\" command executes the following phases:\n" +
 		"```\n" +
 		"foo   long description for foo ...\n" +
-		"  /bar  long description for bar ...\n" +
+		"  /bar  long description for bar [arg] ...\n" +
 		"qux   long description for qux ...\n" +
 		"```"
 

@@ -28,6 +28,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -41,8 +42,10 @@ func NewCRIStatsProvider(
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	logMetricsService LogMetricsService,
+	osInterface kubecontainer.OSInterface,
 ) *StatsProvider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer, runtimeService, imageService, logMetricsService))
+	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
+		runtimeService, imageService, logMetricsService, osInterface))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both
@@ -87,6 +90,7 @@ type StatsProvider struct {
 // containers managed by pods.
 type containerStatsProvider interface {
 	ListPodStats() ([]statsapi.PodStats, error)
+	ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error)
 	ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error)
 	ImageFsStats() (*statsapi.FsStats, error)
 	ImageFsDevice() (string, error)
@@ -94,6 +98,11 @@ type containerStatsProvider interface {
 
 type rlimitStatsProvider interface {
 	RlimitStats() (*statsapi.RlimitStats, error)
+}
+
+// RlimitStats returns base information about process count
+func (p *StatsProvider) RlimitStats() (*statsapi.RlimitStats, error) {
+	return pidlimit.Stats()
 }
 
 // GetCgroupStats returns the stats of the cgroup with the cgroupName. Note that

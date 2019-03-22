@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -428,8 +427,8 @@ func (ctrl *PersistentVolumeController) resync() {
 
 // setClaimProvisioner saves
 // claim.Annotations[annStorageProvisioner] = class.Provisioner
-func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.PersistentVolumeClaim, class *storage.StorageClass) (*v1.PersistentVolumeClaim, error) {
-	if val, ok := claim.Annotations[annStorageProvisioner]; ok && val == class.Provisioner {
+func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.PersistentVolumeClaim, provisionerName string) (*v1.PersistentVolumeClaim, error) {
+	if val, ok := claim.Annotations[annStorageProvisioner]; ok && val == provisionerName {
 		// annotation is already set, nothing to do
 		return claim, nil
 	}
@@ -437,7 +436,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
-	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, class.Provisioner)
+	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, provisionerName)
 	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
 	if err != nil {
 		return newClaim, err
@@ -465,22 +464,6 @@ func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
 		claimName = fmt.Sprintf("%s/%s (uid: %s)", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name, volume.Spec.ClaimRef.UID)
 	}
 	return fmt.Sprintf("phase: %s, bound to: %q, boundByController: %v", volume.Status.Phase, claimName, boundByController)
-}
-
-// isVolumeBoundToClaim returns true, if given volume is pre-bound or bound
-// to specific claim. Both claim.Name and claim.Namespace must be equal.
-// If claim.UID is present in volume.Spec.ClaimRef, it must be equal too.
-func isVolumeBoundToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) bool {
-	if volume.Spec.ClaimRef == nil {
-		return false
-	}
-	if claim.Name != volume.Spec.ClaimRef.Name || claim.Namespace != volume.Spec.ClaimRef.Namespace {
-		return false
-	}
-	if volume.Spec.ClaimRef.UID != "" && claim.UID != volume.Spec.ClaimRef.UID {
-		return false
-	}
-	return true
 }
 
 // storeObjectUpdate updates given cache with a new object version from Informer

@@ -32,10 +32,14 @@ type Manager interface {
 	// i.e. should not block on network operations.
 
 	// RegisterPod registers all objects referenced from a given pod.
+	//
+	// NOTE: All implementations of RegisterPod should be idempotent.
 	RegisterPod(pod *v1.Pod)
 
 	// UnregisterPod unregisters objects referenced from a given pod that are not
 	// used by any other registered pod.
+	//
+	// NOTE: All implementations of UnregisterPod should be idempotent.
 	UnregisterPod(pod *v1.Pod)
 }
 

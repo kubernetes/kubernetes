@@ -44,4 +44,4 @@ find_files() {
 }
 
 GOFMT="gofmt -s -w"
-find_files | xargs $GOFMT
+find_files | xargs ${GOFMT}

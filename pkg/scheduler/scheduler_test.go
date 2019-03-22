@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
@@ -633,7 +634,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerinternalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, recorder record.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
 	algo := core.NewGenericScheduler(
 		scache,
-		nil,
+		internalqueue.NewSchedulingQueue(nil),
 		predicateMap,
 		predicates.EmptyPredicateMetadataProducer,
 		[]priorities.PriorityConfig{},
@@ -645,7 +646,8 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 		false,
 		false,
-		api.DefaultPercentageOfNodesToScore)
+		api.DefaultPercentageOfNodesToScore,
+	)
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
 
@@ -684,7 +686,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulerinternalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
 	algo := core.NewGenericScheduler(
 		scache,
-		nil,
+		internalqueue.NewSchedulingQueue(nil),
 		predicateMap,
 		predicates.EmptyPredicateMetadataProducer,
 		[]priorities.PriorityConfig{},
@@ -696,7 +698,8 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 		false,
 		false,
-		api.DefaultPercentageOfNodesToScore)
+		api.DefaultPercentageOfNodesToScore,
+	)
 	bindingChan := make(chan *v1.Binding, 2)
 
 	sched := NewFromConfig(&factory.Config{
@@ -733,10 +736,15 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 func setupTestSchedulerWithVolumeBinding(fakeVolumeBinder *volumebinder.VolumeBinder, stop <-chan struct{}, broadcaster record.EventBroadcaster) (*Scheduler, chan *v1.Binding, chan error) {
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	queuedPodStore.Add(podWithID("foo", ""))
+	pod := podWithID("foo", "")
+	pod.Namespace = "foo-ns"
+	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{Name: "testVol",
+		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}}})
+	queuedPodStore.Add(pod)
 	scache := schedulerinternalcache.New(10*time.Minute, stop)
 	scache.AddNode(&testNode)
-	client := clientsetfake.NewSimpleClientset(&testNode)
+	testPVC := v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "testPVC", Namespace: pod.Namespace, UID: types.UID("testPVC")}}
+	client := clientsetfake.NewSimpleClientset(&testNode, &testPVC)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 	predicateMap := map[string]predicates.FitPredicate{
@@ -787,7 +795,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				FindBoundSatsified:   true,
 			},
 			expectAssumeCalled: true,
-			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "machine1"}},
+			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "machine1"}},
 			eventReason:        "Scheduled",
 		},
 		{
@@ -826,7 +834,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 			},
 			expectAssumeCalled: true,
 			expectBindCalled:   true,
-			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "machine1"}},
+			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: "machine1"}},
 			eventReason:        "Scheduled",
 		},
 		{

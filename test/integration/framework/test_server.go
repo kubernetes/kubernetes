@@ -27,6 +27,7 @@ import (
 
 	"github.com/pborman/uuid"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -35,9 +36,11 @@ import (
 	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	"k8s.io/kubernetes/pkg/master"
 )
 
+// TestServerSetup holds configuration information for a kube-apiserver test server.
 type TestServerSetup struct {
 	ModifyServerRunOptions func(*options.ServerRunOptions)
 	ModifyServerConfig     func(*master.Config)
@@ -52,7 +55,7 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	}()
 
 	_, defaultServiceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	proxySigningKey, err := cert.NewPrivateKey()
+	proxySigningKey, err := pkiutil.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,10 +64,10 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		t.Fatal(err)
 	}
 	proxyCACertFile, _ := ioutil.TempFile(certDir, "proxy-ca.crt")
-	if err := ioutil.WriteFile(proxyCACertFile.Name(), cert.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+	if err := ioutil.WriteFile(proxyCACertFile.Name(), pkiutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
-	clientSigningKey, err := cert.NewPrivateKey()
+	clientSigningKey, err := pkiutil.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +76,7 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		t.Fatal(err)
 	}
 	clientCACertFile, _ := ioutil.TempFile(certDir, "client-ca.crt")
-	if err := ioutil.WriteFile(clientCACertFile.Name(), cert.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+	if err := ioutil.WriteFile(clientCACertFile.Name(), pkiutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -149,6 +152,13 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		healthStatus := 0
 		kubeClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
 		if healthStatus != http.StatusOK {
+			return false, nil
+		}
+
+		if _, err := kubeClient.CoreV1().Namespaces().Get("default", metav1.GetOptions{}); err != nil {
+			return false, nil
+		}
+		if _, err := kubeClient.CoreV1().Namespaces().Get("kube-system", metav1.GetOptions{}); err != nil {
 			return false, nil
 		}
 

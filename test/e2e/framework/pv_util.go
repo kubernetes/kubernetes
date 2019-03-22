@@ -507,7 +507,6 @@ func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) error {
 // Deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod
 // not existing.
 func DeletePodWithWaitByName(f *Framework, c clientset.Interface, podName, podNamespace string) error {
-	const maxWait = 5 * time.Minute
 	Logf("Deleting pod %q in namespace %q", podName, podNamespace)
 	err := c.CoreV1().Pods(podNamespace).Delete(podName, nil)
 	if err != nil {
@@ -516,8 +515,8 @@ func DeletePodWithWaitByName(f *Framework, c clientset.Interface, podName, podNa
 		}
 		return fmt.Errorf("pod Delete API error: %v", err)
 	}
-	Logf("Wait up to %v for pod %q to be fully deleted", maxWait, podName)
-	err = f.WaitForPodNotFound(podName, maxWait)
+	Logf("Wait up to %v for pod %q to be fully deleted", PodDeleteTimeout, podName)
+	err = f.WaitForPodNotFound(podName, PodDeleteTimeout)
 	if err != nil {
 		return fmt.Errorf("pod %q was not deleted: %v", podName, err)
 	}

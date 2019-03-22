@@ -75,8 +75,3 @@ var _ clientset.Interface = &Clientset{}
 func (c *Clientset) ApiextensionsV1beta1() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
 	return &fakeapiextensionsv1beta1.FakeApiextensionsV1beta1{Fake: &c.Fake}
 }
-
-// Apiextensions retrieves the ApiextensionsV1beta1Client
-func (c *Clientset) Apiextensions() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
-	return &fakeapiextensionsv1beta1.FakeApiextensionsV1beta1{Fake: &c.Fake}
-}

@@ -41,7 +41,7 @@ func (w npbISWorkload) PodSpec() corev1.PodSpec {
 	var containers []corev1.Container
 	ctn := corev1.Container{
 		Name:  fmt.Sprintf("%s-ctn", w.Name()),
-		Image: "gcr.io/kubernetes-e2e-test-images/node-perf/npb-is-amd64:1.0",
+		Image: "gcr.io/kubernetes-e2e-test-images/node-perf/npb-is:1.0",
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceName(corev1.ResourceCPU):    resource.MustParse("16000m"),

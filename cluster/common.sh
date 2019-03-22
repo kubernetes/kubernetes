@@ -299,6 +299,7 @@ function set_binary_version() {
 function find-tar() {
   local -r tarball=$1
   locations=(
+    "${KUBE_ROOT}/node/${tarball}"
     "${KUBE_ROOT}/server/${tarball}"
     "${KUBE_ROOT}/_output/release-tars/${tarball}"
     "${KUBE_ROOT}/bazel-bin/build/release-tars/${tarball}"
@@ -317,10 +318,14 @@ function find-tar() {
 # Assumed vars:
 #   KUBE_ROOT
 # Vars set:
+#   NODE_BINARY_TAR
 #   SERVER_BINARY_TAR
 #   KUBE_MANIFESTS_TAR
 function find-release-tars() {
   SERVER_BINARY_TAR=$(find-tar kubernetes-server-linux-amd64.tar.gz)
+  if [[ "${NUM_WINDOWS_NODES}" -gt "0" ]]; then
+    NODE_BINARY_TAR=$(find-tar kubernetes-node-windows-amd64.tar.gz)
+  fi
 
   # This tarball is used by GCI, Ubuntu Trusty, and Container Linux.
   KUBE_MANIFESTS_TAR=

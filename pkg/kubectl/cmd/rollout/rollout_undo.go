@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -126,7 +126,7 @@ func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 }
 
 func (o *UndoOptions) Validate() error {
-	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("required resource not specified")
 	}
 	return nil

@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 // TODO: We should invent a dynamic mechanism for this using the dynamic client instead of hard-coding these functions per-type
@@ -210,7 +209,7 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 
 		// The node may appear to have no labels at first,
 		// so we wait for it to get hostname label.
-		if _, found := n.ObjectMeta.Labels[kubeletapis.LabelHostname]; !found {
+		if _, found := n.ObjectMeta.Labels[v1.LabelHostname]; !found {
 			return false, nil
 		}
 
@@ -235,7 +234,7 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 		if _, err := client.CoreV1().Nodes().Patch(n.Name, types.StrategicMergePatchType, patchBytes); err != nil {
 			// TODO also check for timeouts
 			if apierrors.IsConflict(err) {
-				fmt.Println("[patchnode] Temporarily unable to update node metadata due to conflict (will retry)")
+				fmt.Println("Temporarily unable to update node metadata due to conflict (will retry)")
 				return false, nil
 			}
 			return false, errors.Wrapf(err, "error patching node %q through apiserver", n.Name)

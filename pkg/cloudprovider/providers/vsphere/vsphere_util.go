@@ -20,15 +20,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
+	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/soap"
+	"github.com/vmware/govmomi/vim25/types"
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
@@ -44,8 +46,6 @@ const (
 	Folder                = "Folder"
 	VirtualMachine        = "VirtualMachine"
 	DummyDiskName         = "kube-dummyDisk.vmdk"
-	UUIDPath              = "/sys/class/dmi/id/product_serial"
-	UUIDPrefix            = "VMware-"
 	ProviderPrefix        = "vsphere://"
 	vSphereConfFileEnvVar = "VSPHERE_CONF_FILE"
 )
@@ -72,7 +72,12 @@ func getVSphereConfig() (*VSphereConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer confFile.Close()
+	defer func() {
+		if err := confFile.Close(); err != nil {
+			klog.Errorf("failed to close config file: %v", err)
+		}
+	}()
+
 	cfg, err := readConfig(confFile)
 	if err != nil {
 		return nil, err
@@ -245,6 +250,98 @@ func getPbmCompatibleDatastore(ctx context.Context, dc *vclib.Datacenter, storag
 	return datastore, err
 }
 
+func getDatastoresForZone(ctx context.Context, dc *vclib.Datacenter, nodeManager *NodeManager, selectedZones []string) ([]*vclib.DatastoreInfo, error) {
+
+	var sharedDatastores []*vclib.DatastoreInfo
+
+	for _, zone := range selectedZones {
+		var sharedDatastoresPerZone []*vclib.DatastoreInfo
+		hosts, err := nodeManager.GetHostsInZone(ctx, zone)
+		if err != nil {
+			return nil, err
+		}
+		klog.V(4).Infof("Hosts in zone %s : %s", zone, hosts)
+
+		for _, host := range hosts {
+			var hostSystemMo mo.HostSystem
+			err = host.Properties(ctx, host.Reference(), []string{"datastore"}, &hostSystemMo)
+			if err != nil {
+				klog.Errorf("Failed to get datastore property for host %s. err : %+v", host, err)
+				return nil, err
+			}
+
+			klog.V(4).Infof("Datastores mounted on host %s : %s", host, hostSystemMo.Datastore)
+			var dsRefList []types.ManagedObjectReference
+			for _, dsRef := range hostSystemMo.Datastore {
+				dsRefList = append(dsRefList, dsRef)
+			}
+
+			var dsMoList []mo.Datastore
+			pc := property.DefaultCollector(host.Client())
+			properties := []string{DatastoreInfoProperty}
+			err = pc.Retrieve(ctx, dsRefList, properties, &dsMoList)
+			if err != nil {
+				klog.Errorf("Failed to get Datastore managed objects from datastore objects."+
+					" dsObjList: %+v, properties: %+v, err: %+v", dsRefList, properties, err)
+				return nil, err
+			}
+			klog.V(9).Infof("Datastore mo details: %+v", dsMoList)
+
+			var dsObjList []*vclib.DatastoreInfo
+			for _, dsMo := range dsMoList {
+				dsObjList = append(dsObjList,
+					&vclib.DatastoreInfo{
+						Datastore: &vclib.Datastore{Datastore: object.NewDatastore(host.Client(), dsMo.Reference()),
+							Datacenter: nil},
+						Info: dsMo.Info.GetDatastoreInfo()})
+			}
+
+			klog.V(9).Infof("DatastoreInfo details : %s", dsObjList)
+
+			if len(sharedDatastoresPerZone) == 0 {
+				sharedDatastoresPerZone = dsObjList
+			} else {
+				sharedDatastoresPerZone = intersect(sharedDatastoresPerZone, dsObjList)
+			}
+			klog.V(9).Infof("Shared datastore list after processing host %s : %s", host, sharedDatastoresPerZone)
+		}
+		klog.V(4).Infof("Shared datastore per zone %s is %s", zone, sharedDatastoresPerZone)
+		if len(sharedDatastores) == 0 {
+			sharedDatastores = sharedDatastoresPerZone
+		} else {
+			sharedDatastores = intersect(sharedDatastores, sharedDatastoresPerZone)
+		}
+	}
+	klog.V(1).Infof("Returning selected datastores : %s", sharedDatastores)
+	return sharedDatastores, nil
+}
+
+func getPbmCompatibleZonedDatastore(ctx context.Context, dc *vclib.Datacenter, storagePolicyName string, zonedDatastores []*vclib.DatastoreInfo) (string, error) {
+	pbmClient, err := vclib.NewPbmClient(ctx, dc.Client())
+	if err != nil {
+		return "", err
+	}
+	storagePolicyID, err := pbmClient.ProfileIDByName(ctx, storagePolicyName)
+	if err != nil {
+		klog.Errorf("Failed to get Profile ID by name: %s. err: %+v", storagePolicyName, err)
+		return "", err
+	}
+	compatibleDatastores, _, err := pbmClient.GetCompatibleDatastores(ctx, dc, storagePolicyID, zonedDatastores)
+	if err != nil {
+		klog.Errorf("Failed to get compatible datastores from datastores : %+v with storagePolicy: %s. err: %+v",
+			zonedDatastores, storagePolicyID, err)
+		return "", err
+	}
+	klog.V(9).Infof("compatibleDatastores : %+v", compatibleDatastores)
+	datastore, err := getMostFreeDatastoreName(ctx, dc.Client(), compatibleDatastores)
+	if err != nil {
+		klog.Errorf("Failed to get most free datastore from compatible datastores: %+v. err: %+v", compatibleDatastores, err)
+		return "", err
+	}
+	klog.V(4).Infof("Most free datastore : %+s", datastore)
+	return datastore, err
+}
+
 func (vs *VSphere) setVMOptions(ctx context.Context, dc *vclib.Datacenter, resourcePoolPath string) (*vclib.VMOptions, error) {
 	var vmOptions vclib.VMOptions
 	resourcePool, err := dc.GetResourcePool(ctx, resourcePoolPath)
@@ -325,10 +422,9 @@ func getcanonicalVolumePath(ctx context.Context, dc *vclib.Datacenter, volumePat
 			// Querying a non-existent dummy disk on the datastore folder.
 			// It would fail and return an folder ID in the error message.
 			_, err := dc.GetVirtualDiskPage83Data(ctx, dummyDiskVolPath)
+			canonicalVolumePath, err = getPathFromFileNotFound(err)
 			if err != nil {
-				re := regexp.MustCompile("File (.*?) was not found")
-				match := re.FindStringSubmatch(err.Error())
-				canonicalVolumePath = match[1]
+				return "", fmt.Errorf("failed to get path from dummy request: %v", err)
 			}
 		}
 		diskPath := vclib.GetPathFromVMDiskPath(canonicalVolumePath)
@@ -340,6 +436,19 @@ func getcanonicalVolumePath(ctx context.Context, dc *vclib.Datacenter, volumePat
 	}
 	canonicalVolumePath = strings.Replace(volumePath, dsFolder, folderID, 1)
 	return canonicalVolumePath, nil
+}
+
+// getPathFromFileNotFound returns the path from a fileNotFound error
+func getPathFromFileNotFound(err error) (string, error) {
+	if soap.IsSoapFault(err) {
+		fault := soap.ToSoapFault(err)
+		f, ok := fault.VimFault().(types.FileNotFound)
+		if !ok {
+			return "", fmt.Errorf("%v is not a FileNotFound error", err)
+		}
+		return f.File, nil
+	}
+	return "", fmt.Errorf("%v is not a soap fault", err)
 }
 
 func setdatastoreFolderIDMap(
@@ -532,29 +641,6 @@ func (vs *VSphere) GetNodeNameFromProviderID(providerID string) (string, error) 
 		return "", errors.New(msg)
 	}
 	return nodeName, nil
-}
-
-func GetVMUUID() (string, error) {
-	id, err := ioutil.ReadFile(UUIDPath)
-	if err != nil {
-		return "", fmt.Errorf("error retrieving vm uuid: %s", err)
-	}
-	uuidFromFile := string(id[:])
-	//strip leading and trailing white space and new line char
-	uuid := strings.TrimSpace(uuidFromFile)
-	// check the uuid starts with "VMware-"
-	if !strings.HasPrefix(uuid, UUIDPrefix) {
-		return "", fmt.Errorf("Failed to match Prefix, UUID read from the file is %v", uuidFromFile)
-	}
-	// Strip the prefix and white spaces and -
-	uuid = strings.Replace(uuid[len(UUIDPrefix):(len(uuid))], " ", "", -1)
-	uuid = strings.Replace(uuid, "-", "", -1)
-	if len(uuid) != 32 {
-		return "", fmt.Errorf("Length check failed, UUID read from the file is %v", uuidFromFile)
-	}
-	// need to add dashes, e.g. "564d395e-d807-e18a-cb25-b79f65eb2b9f"
-	uuid = fmt.Sprintf("%s-%s-%s-%s-%s", uuid[0:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:32])
-	return uuid, nil
 }
 
 func GetUUIDFromProviderID(providerID string) string {

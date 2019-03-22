@@ -157,10 +157,12 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 
 				// get podID from created Pod
 				createdLogPod, err := podClient.Get(logPodName, metav1.GetOptions{})
+				podNs := createdLogPod.Namespace
+				podName := createdLogPod.Name
 				podID := string(createdLogPod.UID)
 
 				// build log cri file path
-				expectedCRILogFile := logCRIDir + "/" + podID + "/" + logContainerName + "/0.log"
+				expectedCRILogFile := logCRIDir + "/" + podNs + "_" + podName + "_" + podID + "/" + logContainerName + "/0.log"
 
 				logCRICheckPodName := "log-cri-check-" + string(uuid.NewUUID())
 				err = createAndWaitPod(makeLogCheckPod(logCRICheckPodName, logString, expectedCRILogFile))

@@ -34,21 +34,27 @@ type Fuzzer struct {
 	nilChance        float64
 	minElements      int
 	maxElements      int
+	maxDepth         int
 }
 
 // New returns a new Fuzzer. Customize your Fuzzer further by calling Funcs,
 // RandSource, NilChance, or NumElements in any order.
 func New() *Fuzzer {
+	return NewWithSeed(time.Now().UnixNano())
+}
+
+func NewWithSeed(seed int64) *Fuzzer {
 	f := &Fuzzer{
 		defaultFuzzFuncs: fuzzFuncMap{
 			reflect.TypeOf(&time.Time{}): reflect.ValueOf(fuzzTime),
 		},
 
 		fuzzFuncs:   fuzzFuncMap{},
-		r:           rand.New(rand.NewSource(time.Now().UnixNano())),
+		r:           rand.New(rand.NewSource(seed)),
 		nilChance:   .2,
 		minElements: 1,
 		maxElements: 10,
+		maxDepth:    100,
 	}
 	return f
 }
@@ -136,6 +142,14 @@ func (f *Fuzzer) genShouldFill() bool {
 	return f.r.Float64() > f.nilChance
 }
 
+// MaxDepth sets the maximum number of recursive fuzz calls that will be made
+// before stopping.  This includes struct members, pointers, and map and slice
+// elements.
+func (f *Fuzzer) MaxDepth(d int) *Fuzzer {
+	f.maxDepth = d
+	return f
+}
+
 // Fuzz recursively fills all of obj's fields with something random.  First
 // this tries to find a custom fuzz function (see Funcs).  If there is no
 // custom function this tests whether the object implements fuzz.Interface and,
@@ -144,17 +158,19 @@ func (f *Fuzzer) genShouldFill() bool {
 // fails, this will generate random values for all primitive fields and then
 // recurse for all non-primitives.
 //
-// Not safe for cyclic or tree-like structs!
+// This is safe for cyclic or tree-like structs, up to a limit.  Use the
+// MaxDepth method to adjust how deep you need it to recurse.
 //
-// obj must be a pointer. Only exported (public) fields can be set (thanks, golang :/ )
-// Intended for tests, so will panic on bad input or unimplemented fields.
+// obj must be a pointer. Only exported (public) fields can be set (thanks,
+// golang :/ ) Intended for tests, so will panic on bad input or unimplemented
+// fields.
 func (f *Fuzzer) Fuzz(obj interface{}) {
 	v := reflect.ValueOf(obj)
 	if v.Kind() != reflect.Ptr {
 		panic("needed ptr!")
 	}
 	v = v.Elem()
-	f.doFuzz(v, 0)
+	f.fuzzWithContext(v, 0)
 }
 
 // FuzzNoCustom is just like Fuzz, except that any custom fuzz function for
@@ -170,7 +186,7 @@ func (f *Fuzzer) FuzzNoCustom(obj interface{}) {
 		panic("needed ptr!")
 	}
 	v = v.Elem()
-	f.doFuzz(v, flagNoCustomFuzz)
+	f.fuzzWithContext(v, flagNoCustomFuzz)
 }
 
 const (
@@ -178,69 +194,87 @@ const (
 	flagNoCustomFuzz uint64 = 1 << iota
 )
 
-func (f *Fuzzer) doFuzz(v reflect.Value, flags uint64) {
+func (f *Fuzzer) fuzzWithContext(v reflect.Value, flags uint64) {
+	fc := &fuzzerContext{fuzzer: f}
+	fc.doFuzz(v, flags)
+}
+
+// fuzzerContext carries context about a single fuzzing run, which lets Fuzzer
+// be thread-safe.
+type fuzzerContext struct {
+	fuzzer   *Fuzzer
+	curDepth int
+}
+
+func (fc *fuzzerContext) doFuzz(v reflect.Value, flags uint64) {
+	if fc.curDepth >= fc.fuzzer.maxDepth {
+		return
+	}
+	fc.curDepth++
+	defer func() { fc.curDepth-- }()
+
 	if !v.CanSet() {
 		return
 	}
 
 	if flags&flagNoCustomFuzz == 0 {
 		// Check for both pointer and non-pointer custom functions.
-		if v.CanAddr() && f.tryCustom(v.Addr()) {
+		if v.CanAddr() && fc.tryCustom(v.Addr()) {
 			return
 		}
-		if f.tryCustom(v) {
+		if fc.tryCustom(v) {
 			return
 		}
 	}
 
 	if fn, ok := fillFuncMap[v.Kind()]; ok {
-		fn(v, f.r)
+		fn(v, fc.fuzzer.r)
 		return
 	}
 	switch v.Kind() {
 	case reflect.Map:
-		if f.genShouldFill() {
+		if fc.fuzzer.genShouldFill() {
 			v.Set(reflect.MakeMap(v.Type()))
-			n := f.genElementCount()
+			n := fc.fuzzer.genElementCount()
 			for i := 0; i < n; i++ {
 				key := reflect.New(v.Type().Key()).Elem()
-				f.doFuzz(key, 0)
+				fc.doFuzz(key, 0)
 				val := reflect.New(v.Type().Elem()).Elem()
-				f.doFuzz(val, 0)
+				fc.doFuzz(val, 0)
 				v.SetMapIndex(key, val)
 			}
 			return
 		}
 		v.Set(reflect.Zero(v.Type()))
 	case reflect.Ptr:
-		if f.genShouldFill() {
+		if fc.fuzzer.genShouldFill() {
 			v.Set(reflect.New(v.Type().Elem()))
-			f.doFuzz(v.Elem(), 0)
+			fc.doFuzz(v.Elem(), 0)
 			return
 		}
 		v.Set(reflect.Zero(v.Type()))
 	case reflect.Slice:
-		if f.genShouldFill() {
-			n := f.genElementCount()
+		if fc.fuzzer.genShouldFill() {
+			n := fc.fuzzer.genElementCount()
 			v.Set(reflect.MakeSlice(v.Type(), n, n))
 			for i := 0; i < n; i++ {
-				f.doFuzz(v.Index(i), 0)
+				fc.doFuzz(v.Index(i), 0)
 			}
 			return
 		}
 		v.Set(reflect.Zero(v.Type()))
 	case reflect.Array:
-		if f.genShouldFill() {
+		if fc.fuzzer.genShouldFill() {
 			n := v.Len()
 			for i := 0; i < n; i++ {
-				f.doFuzz(v.Index(i), 0)
+				fc.doFuzz(v.Index(i), 0)
 			}
 			return
 		}
 		v.Set(reflect.Zero(v.Type()))
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
-			f.doFuzz(v.Field(i), 0)
+			fc.doFuzz(v.Field(i), 0)
 		}
 	case reflect.Chan:
 		fallthrough
@@ -255,20 +289,20 @@ func (f *Fuzzer) doFuzz(v reflect.Value, flags uint64) {
 
 // tryCustom searches for custom handlers, and returns true iff it finds a match
 // and successfully randomizes v.
-func (f *Fuzzer) tryCustom(v reflect.Value) bool {
+func (fc *fuzzerContext) tryCustom(v reflect.Value) bool {
 	// First: see if we have a fuzz function for it.
-	doCustom, ok := f.fuzzFuncs[v.Type()]
+	doCustom, ok := fc.fuzzer.fuzzFuncs[v.Type()]
 	if !ok {
 		// Second: see if it can fuzz itself.
 		if v.CanInterface() {
 			intf := v.Interface()
 			if fuzzable, ok := intf.(Interface); ok {
-				fuzzable.Fuzz(Continue{f: f, Rand: f.r})
+				fuzzable.Fuzz(Continue{fc: fc, Rand: fc.fuzzer.r})
 				return true
 			}
 		}
 		// Finally: see if there is a default fuzz function.
-		doCustom, ok = f.defaultFuzzFuncs[v.Type()]
+		doCustom, ok = fc.fuzzer.defaultFuzzFuncs[v.Type()]
 		if !ok {
 			return false
 		}
@@ -294,8 +328,8 @@ func (f *Fuzzer) tryCustom(v reflect.Value) bool {
 	}
 
 	doCustom.Call([]reflect.Value{v, reflect.ValueOf(Continue{
-		f:    f,
-		Rand: f.r,
+		fc:   fc,
+		Rand: fc.fuzzer.r,
 	})})
 	return true
 }
@@ -310,7 +344,7 @@ type Interface interface {
 // Continue can be passed to custom fuzzing functions to allow them to use
 // the correct source of randomness and to continue fuzzing their members.
 type Continue struct {
-	f *Fuzzer
+	fc *fuzzerContext
 
 	// For convenience, Continue implements rand.Rand via embedding.
 	// Use this for generating any randomness if you want your fuzzing
@@ -325,7 +359,7 @@ func (c Continue) Fuzz(obj interface{}) {
 		panic("needed ptr!")
 	}
 	v = v.Elem()
-	c.f.doFuzz(v, 0)
+	c.fc.doFuzz(v, 0)
 }
 
 // FuzzNoCustom continues fuzzing obj, except that any custom fuzz function for
@@ -338,7 +372,7 @@ func (c Continue) FuzzNoCustom(obj interface{}) {
 		panic("needed ptr!")
 	}
 	v = v.Elem()
-	c.f.doFuzz(v, flagNoCustomFuzz)
+	c.fc.doFuzz(v, flagNoCustomFuzz)
 }
 
 // RandString makes a random string up to 20 characters long. The returned string

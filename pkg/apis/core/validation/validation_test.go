@@ -1775,24 +1775,30 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 			csi:  &core.CSIPersistentVolumeSource{Driver: "io-kubernetes-storage-csi-flex", VolumeHandle: "test-123"},
 		},
 		{
-			name: "driver name: ok underscore only",
-			csi:  &core.CSIPersistentVolumeSource{Driver: "io_kubernetes_storage_csi_flex", VolumeHandle: "test-123"},
+			name:     "driver name: invalid underscore",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "io_kubernetes_storage_csi_flex", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
 		},
 		{
-			name: "driver name: ok dot underscores",
-			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage_csi.flex", VolumeHandle: "test-123"},
+			name:     "driver name: invalid dot underscores",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage_csi.flex", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
 		},
 		{
 			name: "driver name: ok beginnin with number",
-			csi:  &core.CSIPersistentVolumeSource{Driver: "2io.kubernetes.storage_csi.flex", VolumeHandle: "test-123"},
+			csi:  &core.CSIPersistentVolumeSource{Driver: "2io.kubernetes.storage-csi.flex", VolumeHandle: "test-123"},
 		},
 		{
 			name: "driver name: ok ending with number",
-			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage_csi.flex2", VolumeHandle: "test-123"},
+			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes.storage-csi.flex2", VolumeHandle: "test-123"},
 		},
 		{
-			name: "driver name: ok dot dash underscores",
-			csi:  &core.CSIPersistentVolumeSource{Driver: "io.kubernetes-storage.csi_flex", VolumeHandle: "test-123"},
+			name:     "driver name: invalid dot dash underscores",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "io.kubernetes-storage.csi_flex", VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "driver",
 		},
 		{
 			name:     "driver name: invalid length 0",
@@ -1801,10 +1807,8 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 			errfield: "driver",
 		},
 		{
-			name:     "driver name: invalid length 1",
-			csi:      &core.CSIPersistentVolumeSource{Driver: "a", VolumeHandle: "test-123"},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "driver",
+			name: "driver name: ok length 1",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "a", VolumeHandle: "test-123"},
 		},
 		{
 			name:     "driver name: invalid length > 63",
@@ -3379,6 +3383,7 @@ func TestValidateVolumes(t *testing.T) {
 						ReadOnly: false,
 						User:     "root",
 						Group:    "root",
+						Tenant:   "ThisIsSomeTenantUUID",
 					},
 				},
 			},
@@ -3390,6 +3395,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Quobyte: &core.QuobyteVolumeSource{
 						Volume: "/test",
+						Tenant: "ThisIsSomeTenantUUID",
 					},
 				},
 			},
@@ -3406,6 +3412,7 @@ func TestValidateVolumes(t *testing.T) {
 					Quobyte: &core.QuobyteVolumeSource{
 						Registry: "registry7861",
 						Volume:   "/test",
+						Tenant:   "ThisIsSomeTenantUUID",
 					},
 				},
 			},
@@ -3422,6 +3429,7 @@ func TestValidateVolumes(t *testing.T) {
 					Quobyte: &core.QuobyteVolumeSource{
 						Registry: "registry:7861,reg2",
 						Volume:   "/test",
+						Tenant:   "ThisIsSomeTenantUUID",
 					},
 				},
 			},
@@ -3437,12 +3445,47 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Quobyte: &core.QuobyteVolumeSource{
 						Registry: "registry:7861",
+						Tenant:   "ThisIsSomeTenantUUID",
 					},
 				},
 			},
 			errs: []verr{{
 				etype: field.ErrorTypeRequired,
 				field: "quobyte.volume",
+			}},
+		},
+		{
+			name: "empty tenant quobyte",
+			vol: core.Volume{
+				Name: "quobyte",
+				VolumeSource: core.VolumeSource{
+					Quobyte: &core.QuobyteVolumeSource{
+						Registry: "registry:7861,reg2",
+						Volume:   "/test",
+						Tenant:   "",
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "quobyte.tenant",
+			}},
+		},
+		{
+			name: "too long tenant quobyte",
+			vol: core.Volume{
+				Name: "quobyte",
+				VolumeSource: core.VolumeSource{
+					Quobyte: &core.QuobyteVolumeSource{
+						Registry: "registry:7861,reg2",
+						Volume:   "/test",
+						Tenant:   "this is too long to be a valid uuid so this test has to fail on the maximum length validation of the tenant.",
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "quobyte.tenant",
 			}},
 		},
 		// AzureDisk
@@ -3659,24 +3702,17 @@ func TestValidateVolumes(t *testing.T) {
 		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
 	}
 
-	// Validate HugePages medium type for EmptyDir when HugePages feature is enabled/disabled
+	// Validate HugePages medium type for EmptyDir
 	hugePagesCase := core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumHugePages}}
 
 	// Enable HugePages
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, true)()
 	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working"); len(errs) != 0 {
 		t.Errorf("Unexpected error when HugePages feature is enabled.")
 	}
 
-	// Disable feature HugePages
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, false)()
-	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "failing"); len(errs) == 0 {
-		t.Errorf("Expected error when HugePages feature is disabled got nothing.")
-	}
-
 }
 
-func TestAlphaHugePagesIsolation(t *testing.T) {
+func TestHugePagesIsolation(t *testing.T) {
 	successCases := []core.Pod{
 		{ // Basic fields.
 			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
@@ -3774,8 +3810,6 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 			},
 		},
 	}
-	// Enable feature HugePages
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, true)()
 	for i := range successCases {
 		pod := &successCases[i]
 		if errs := ValidatePod(pod); len(errs) != 0 {
@@ -3784,15 +3818,6 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 	}
 	for i := range failureCases {
 		pod := &failureCases[i]
-		if errs := ValidatePod(pod); len(errs) == 0 {
-			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
-		}
-	}
-	// Disable feature HugePages
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePages, false)()
-	// Disable feature HugePages and ensure all success cases fail
-	for i := range successCases {
-		pod := &successCases[i]
 		if errs := ValidatePod(pod); len(errs) == 0 {
 			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
 		}
@@ -4795,6 +4820,230 @@ func TestValidateDisabledSubpath(t *testing.T) {
 	}
 }
 
+func TestValidateSubpathMutuallyExclusive(t *testing.T) {
+	// Enable feature VolumeSubpathEnvExpansion and VolumeSubpath
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, true)()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, true)()
+
+	volumes := []core.Volume{
+		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
+		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
+		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+	}
+	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"))
+	if len(v1err) > 0 {
+		t.Errorf("Invalid test volume - expected success %v", v1err)
+		return
+	}
+
+	container := core.Container{
+		SecurityContext: nil,
+	}
+
+	goodVolumeDevices := []core.VolumeDevice{
+		{Name: "xyz", DevicePath: "/foofoo"},
+		{Name: "uvw", DevicePath: "/foofoo/share/test"},
+	}
+
+	cases := map[string]struct {
+		mounts      []core.VolumeMount
+		expectError bool
+	}{
+		"subpath and subpathexpr not specified": {
+			[]core.VolumeMount{
+				{
+					Name:      "abc-123",
+					MountPath: "/bab",
+				},
+			},
+			false,
+		},
+		"subpath expr specified": {
+			[]core.VolumeMount{
+				{
+					Name:        "abc-123",
+					MountPath:   "/bab",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			false,
+		},
+		"subpath specified": {
+			[]core.VolumeMount{
+				{
+					Name:      "abc-123",
+					MountPath: "/bab",
+					SubPath:   "baz",
+				},
+			},
+			false,
+		},
+		"subpath and subpathexpr specified": {
+			[]core.VolumeMount{
+				{
+					Name:        "abc-123",
+					MountPath:   "/bab",
+					SubPath:     "baz",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			true,
+		},
+	}
+
+	for name, test := range cases {
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+
+		if len(errs) != 0 && !test.expectError {
+			t.Errorf("test %v failed: %+v", name, errs)
+		}
+
+		if len(errs) == 0 && test.expectError {
+			t.Errorf("test %v failed, expected error", name)
+		}
+	}
+}
+
+func TestValidateDisabledSubpathExpr(t *testing.T) {
+	// Enable feature VolumeSubpathEnvExpansion
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, true)()
+
+	volumes := []core.Volume{
+		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
+		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
+		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
+	}
+	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"))
+	if len(v1err) > 0 {
+		t.Errorf("Invalid test volume - expected success %v", v1err)
+		return
+	}
+
+	container := core.Container{
+		SecurityContext: nil,
+	}
+
+	goodVolumeDevices := []core.VolumeDevice{
+		{Name: "xyz", DevicePath: "/foofoo"},
+		{Name: "uvw", DevicePath: "/foofoo/share/test"},
+	}
+
+	cases := map[string]struct {
+		mounts      []core.VolumeMount
+		expectError bool
+	}{
+		"subpath expr not specified": {
+			[]core.VolumeMount{
+				{
+					Name:      "abc-123",
+					MountPath: "/bab",
+				},
+			},
+			false,
+		},
+		"subpath expr specified": {
+			[]core.VolumeMount{
+				{
+					Name:        "abc-123",
+					MountPath:   "/bab",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			false,
+		},
+	}
+
+	for name, test := range cases {
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+
+		if len(errs) != 0 && !test.expectError {
+			t.Errorf("test %v failed: %+v", name, errs)
+		}
+
+		if len(errs) == 0 && test.expectError {
+			t.Errorf("test %v failed, expected error", name)
+		}
+	}
+
+	// Repeat with feature gate off
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, false)()
+	cases = map[string]struct {
+		mounts      []core.VolumeMount
+		expectError bool
+	}{
+		"subpath expr not specified": {
+			[]core.VolumeMount{
+				{
+					Name:      "abc-123",
+					MountPath: "/bab",
+				},
+			},
+			false,
+		},
+		"subpath expr specified": {
+			[]core.VolumeMount{
+				{
+					Name:        "abc-123",
+					MountPath:   "/bab",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			false, // validation should not fail, dropping the field is handled in PrepareForCreate/PrepareForUpdate
+		},
+	}
+
+	for name, test := range cases {
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+
+		if len(errs) != 0 && !test.expectError {
+			t.Errorf("test %v failed: %+v", name, errs)
+		}
+
+		if len(errs) == 0 && test.expectError {
+			t.Errorf("test %v failed, expected error", name)
+		}
+	}
+
+	// Repeat with subpath feature gate off
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
+	cases = map[string]struct {
+		mounts      []core.VolumeMount
+		expectError bool
+	}{
+		"subpath expr not specified": {
+			[]core.VolumeMount{
+				{
+					Name:      "abc-123",
+					MountPath: "/bab",
+				},
+			},
+			false,
+		},
+		"subpath expr specified": {
+			[]core.VolumeMount{
+				{
+					Name:        "abc-123",
+					MountPath:   "/bab",
+					SubPathExpr: "$(POD_NAME)",
+				},
+			},
+			false, // validation should not fail, dropping the field is handled in PrepareForCreate/PrepareForUpdate
+		},
+	}
+
+	for name, test := range cases {
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+
+		if len(errs) != 0 && !test.expectError {
+			t.Errorf("test %v failed: %+v", name, errs)
+		}
+
+		if len(errs) == 0 && test.expectError {
+			t.Errorf("test %v failed, expected error", name)
+		}
+	}
+}
+
 func TestValidateMountPropagation(t *testing.T) {
 	bTrue := true
 	bFalse := false
@@ -5559,8 +5808,6 @@ func TestValidateRestartPolicy(t *testing.T) {
 }
 
 func TestValidateDNSPolicy(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomPodDNS, true)()
-
 	successCases := []core.DNSPolicy{core.DNSClusterFirst, core.DNSDefault, core.DNSPolicy(core.DNSClusterFirst), core.DNSNone}
 	for _, policy := range successCases {
 		if errs := validateDNSPolicy(&policy, field.NewPath("field")); len(errs) != 0 {
@@ -5577,8 +5824,6 @@ func TestValidateDNSPolicy(t *testing.T) {
 }
 
 func TestValidatePodDNSConfig(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomPodDNS, true)()
-
 	generateTestSearchPathFunc := func(numChars int) string {
 		res := ""
 		for i := 0; i < numChars; i++ {
@@ -5633,10 +5878,17 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			expectedError: false,
 		},
 		{
+			desc: "valid: 1 search path with trailing period",
+			dnsConfig: &core.PodDNSConfig{
+				Searches: []string{"custom."},
+			},
+			expectedError: false,
+		},
+		{
 			desc: "valid: 3 nameservers and 6 search paths",
 			dnsConfig: &core.PodDNSConfig{
 				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
-				Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local"},
+				Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local."},
 			},
 			expectedError: false,
 		},
@@ -6688,6 +6940,33 @@ func TestValidatePod(t *testing.T) {
 				},
 				RestartPolicy: core.RestartPolicyAlways,
 				DNSPolicy:     core.DNSClusterFirst,
+			},
+		},
+		{ // valid serviceaccount token projected volume with serviceaccount name specified
+			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
+			Spec: core.PodSpec{
+				ServiceAccountName: "some-service-account",
+				Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy:      core.RestartPolicyAlways,
+				DNSPolicy:          core.DNSClusterFirst,
+				Volumes: []core.Volume{
+					{
+						Name: "projected-volume",
+						VolumeSource: core.VolumeSource{
+							Projected: &core.ProjectedVolumeSource{
+								Sources: []core.VolumeProjection{
+									{
+										ServiceAccountToken: &core.ServiceAccountTokenProjection{
+											Audience:          "foo-audience",
+											ExpirationSeconds: 6000,
+											Path:              "foo-path",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 	}

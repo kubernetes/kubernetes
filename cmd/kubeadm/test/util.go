@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -157,7 +157,7 @@ func AssertError(t *testing.T, err error, expected string) {
 
 // GetDefaultInternalConfig returns a defaulted kubeadmapi.InitConfiguration
 func GetDefaultInternalConfig(t *testing.T) *kubeadmapi.InitConfiguration {
-	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.InitConfiguration{})
+	internalcfg, err := configutil.DefaultedInitConfiguration(&kubeadmapiv1beta1.InitConfiguration{})
 	if err != nil {
 		t.Fatalf("unexpected error getting default config: %v", err)
 	}

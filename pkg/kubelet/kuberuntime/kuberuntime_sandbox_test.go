@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
@@ -44,7 +44,7 @@ func TestCreatePodSandbox(t *testing.T) {
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
 		// Check pod logs root directory is created.
-		assert.Equal(t, filepath.Join(podLogsRootDirectory, "12345678"), path)
+		assert.Equal(t, filepath.Join(podLogsRootDirectory, pod.Namespace+"_"+pod.Name+"_12345678"), path)
 		assert.Equal(t, os.FileMode(0755), perm)
 		return nil
 	}
@@ -61,8 +61,8 @@ func TestCreatePodSandbox(t *testing.T) {
 func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
 
-	rcm := runtimeclass.NewManager(rctest.NewPopulatedDynamicClient())
-	defer rctest.StartManagerSync(t, rcm)()
+	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
+	defer rctest.StartManagerSync(rcm)()
 
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
@@ -79,13 +79,13 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			fakeRuntime.Called = []string{}
 			pod := newTestPod()
 			pod.Spec.RuntimeClassName = test.rcn
 
 			id, _, err := m.createPodSandbox(pod, 1)
 			if test.expectError {
 				assert.Error(t, err)
-				assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
 			} else {
 				assert.NoError(t, err)
 				assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")

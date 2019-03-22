@@ -30,9 +30,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
@@ -100,7 +99,7 @@ func TestParseConfig(t *testing.T) {
 		MaximumLoadBalancerRuleCount:      1,
 		PrimaryAvailabilitySetName:        "primaryAvailabilitySetName",
 		PrimaryScaleSetName:               "primaryScaleSetName",
-		ResourceGroup:                     "resourceGroup",
+		ResourceGroup:                     "resourcegroup",
 		RouteTableName:                    "routeTableName",
 		SecurityGroupName:                 "securityGroupName",
 		SubnetName:                        "subnetName",
@@ -1093,7 +1092,7 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 			ObjectMeta: metav1.ObjectMeta{
 				Name: vmName,
 				Labels: map[string]string{
-					kubeletapis.LabelHostname: vmName,
+					v1.LabelHostname: vmName,
 				},
 			},
 		}
@@ -1135,6 +1134,13 @@ func getTestService(identifier string, proto v1.Protocol, requestedPorts ...int3
 func getInternalTestService(identifier string, requestedPorts ...int32) v1.Service {
 	svc := getTestService(identifier, v1.ProtocolTCP, requestedPorts...)
 	svc.Annotations[ServiceAnnotationLoadBalancerInternal] = "true"
+	return svc
+}
+
+func getResourceGroupTestService(identifier, resourceGroup, loadBalancerIP string, requestedPorts ...int32) v1.Service {
+	svc := getTestService(identifier, v1.ProtocolTCP, requestedPorts...)
+	svc.Spec.LoadBalancerIP = loadBalancerIP
+	svc.Annotations[ServiceAnnotationLoadBalancerResourceGroup] = resourceGroup
 	return svc
 }
 
@@ -1210,7 +1216,7 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 		}
 		for _, wantedRule := range svc.Spec.Ports {
 			expectedRuleCount++
-			wantedRuleName := az.getLoadBalancerRuleName(&svc, wantedRule, subnet(&svc))
+			wantedRuleName := az.getLoadBalancerRuleName(&svc, wantedRule.Protocol, wantedRule.Port, subnet(&svc))
 			foundRule := false
 			for _, actualRule := range *loadBalancer.LoadBalancingRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
@@ -1231,8 +1237,8 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 
 			expectedProbeCount++
 			foundProbe := false
-			if serviceapi.NeedsHealthCheck(&svc) {
-				path, port := serviceapi.GetServiceHealthCheckPathPort(&svc)
+			if servicehelpers.NeedsHealthCheck(&svc) {
+				path, port := servicehelpers.GetServiceHealthCheckPathPort(&svc)
 				for _, actualProbe := range *loadBalancer.Probes {
 					if strings.EqualFold(*actualProbe.Name, wantedRuleName) &&
 						*actualProbe.Port == port &&
@@ -1677,7 +1683,8 @@ func validateEmptyConfig(t *testing.T, config string) {
 func TestGetZone(t *testing.T) {
 	cloud := &Cloud{
 		Config: Config{
-			Location: "eastus",
+			Location:            "eastus",
+			UseInstanceMetadata: true,
 		},
 	}
 	testcases := []struct {

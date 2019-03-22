@@ -73,8 +73,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Testname: Security Context: runAsUser (id:65534)
 		  Description: Container created with runAsUser option, passing an id (id:65534) uses that
 		  given id when running the container.
+		  This test is marked LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		It("should run the container with uid 65534 [NodeConformance]", func() {
+		It("should run the container with uid 65534 [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(65534)
 		})
 
@@ -83,8 +84,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Testname: Security Context: runAsUser (id:0)
 		  Description: Container created with runAsUser option, passing an id (id:0) uses that
 		  given id when running the container.
+		  This test is marked LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		It("should run the container with uid 0 [NodeConformance]", func() {
+		It("should run the container with uid 0 [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(0)
 		})
 	})
@@ -131,8 +133,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Release : v1.12
 		  Testname: Security Context: readOnlyRootFilesystem=true.
 		  Description: when a container has configured readOnlyRootFilesystem to true, write operations are not allowed.
+		  This test is marked LinuxOnly since Windows does not support creating containers with read-only access.
 		*/
-		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [NodeConformance]", func() {
+		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(true)
 		})
 
@@ -178,7 +181,8 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			return podName
 		}
 
-		It("should run the container as unprivileged when false [NodeConformance]", func() {
+		It("should run the container as unprivileged when false [LinuxOnly] [NodeConformance]", func() {
+			// This test is marked LinuxOnly since it runs a Linux-specific command, and Windows does not support Windows escalation.
 			podName := createAndWaitUserPod(false)
 			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
@@ -227,8 +231,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Description: Configuring the allowPrivilegeEscalation unset, allows the privilege escalation operation.
 		  A container is configured with allowPrivilegeEscalation not specified (nil) and a given uid which is not 0.
 		  When the container is run, the container is run using uid=0.
+		  This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		It("should allow privilege escalation when not explicitly set and uid != 0 [NodeConformance]", func() {
+		It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
 			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, 1000); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
@@ -240,8 +245,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Description: Configuring the allowPrivilegeEscalation to false, does not allow the privilege escalation operation.
 		  A container is configured with allowPrivilegeEscalation=false and a given uid (1000) which is not 0.
 		  When the container is run, the container is run using uid=1000.
+		  This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		It("should not allow privilege escalation when false [NodeConformance]", func() {
+		It("should not allow privilege escalation when false [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
 			if err := createAndMatchOutput(podName, "Effective uid: 1000", &apeFalse, 1000); err != nil {
@@ -254,8 +260,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Description: Configuring the allowPrivilegeEscalation to true, allows the privilege escalation operation.
 		  A container is configured with allowPrivilegeEscalation=true and a given uid (1000) which is not 0.
 		  When the container is run, the container is run using uid=0 (making use of the privilege escalation).
+		  This test is marked LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		It("should allow privilege escalation when true [NodeConformance]", func() {
+		It("should allow privilege escalation when true [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
 			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, 1000); err != nil {

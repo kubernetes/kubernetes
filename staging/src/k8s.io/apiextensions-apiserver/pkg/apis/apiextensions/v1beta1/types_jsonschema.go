@@ -54,6 +54,7 @@ type JSONSchemaProps struct {
 	Definitions          JSONSchemaDefinitions      `json:"definitions,omitempty" protobuf:"bytes,34,opt,name=definitions"`
 	ExternalDocs         *ExternalDocumentation     `json:"externalDocs,omitempty" protobuf:"bytes,35,opt,name=externalDocs"`
 	Example              *JSON                      `json:"example,omitempty" protobuf:"bytes,36,opt,name=example"`
+	Nullable             bool                       `json:"nullable,omitempty" protobuf:"bytes,37,opt,name=nullable"`
 }
 
 // JSON represents any valid JSON value.
@@ -68,7 +69,7 @@ type JSON struct {
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
 func (_ JSON) OpenAPISchemaType() []string {
 	// TODO: return actual types when anyOf is supported
-	return []string{}
+	return nil
 }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing
@@ -91,7 +92,7 @@ type JSONSchemaPropsOrArray struct {
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
 func (_ JSONSchemaPropsOrArray) OpenAPISchemaType() []string {
 	// TODO: return actual types when anyOf is supported
-	return []string{}
+	return nil
 }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing
@@ -111,7 +112,7 @@ type JSONSchemaPropsOrBool struct {
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
 func (_ JSONSchemaPropsOrBool) OpenAPISchemaType() []string {
 	// TODO: return actual types when anyOf is supported
-	return []string{}
+	return nil
 }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing
@@ -133,7 +134,7 @@ type JSONSchemaPropsOrStringArray struct {
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
 func (_ JSONSchemaPropsOrStringArray) OpenAPISchemaType() []string {
 	// TODO: return actual types when anyOf is supported
-	return []string{}
+	return nil
 }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing

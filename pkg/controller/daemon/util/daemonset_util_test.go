@@ -26,15 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    label,
 			Namespace: metav1.NamespaceDefault,
@@ -210,7 +208,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -247,7 +245,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							Preference: v1.NodeSelectorTerm{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -265,7 +263,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							Preference: v1.NodeSelectorTerm{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},

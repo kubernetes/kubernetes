@@ -20,58 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +genclient
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// InitializerConfiguration describes the configuration of initializers.
-type InitializerConfiguration struct {
-	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
-	// +optional
-	metav1.ObjectMeta
-
-	// Initializers is a list of resources and their default initializers
-	// Order-sensitive.
-	// When merging multiple InitializerConfigurations, we sort the initializers
-	// from different InitializerConfigurations by the name of the
-	// InitializerConfigurations; the order of the initializers from the same
-	// InitializerConfiguration is preserved.
-	// +optional
-	Initializers []Initializer
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// InitializerConfigurationList is a list of InitializerConfiguration.
-type InitializerConfigurationList struct {
-	metav1.TypeMeta
-	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
-	// +optional
-	metav1.ListMeta
-
-	// List of InitializerConfiguration.
-	Items []InitializerConfiguration
-}
-
-// Initializer describes the name and the failure policy of an initializer, and
-// what resources it applies to.
-type Initializer struct {
-	// Name is the identifier of the initializer. It will be added to the
-	// object that needs to be initialized.
-	// Name should be fully qualified, e.g., alwayspullimages.kubernetes.io, where
-	// "alwayspullimages" is the name of the webhook, and kubernetes.io is the name
-	// of the organization.
-	// Required
-	Name string
-
-	// Rules describes what resources/subresources the initializer cares about.
-	// The initializer cares about an operation if it matches _any_ Rule.
-	// Rule.Resources must not include subresources.
-	Rules []Rule
-}
-
 // Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended
 // to make sure that all the tuple expansions are valid.
 type Rule struct {
@@ -101,7 +49,31 @@ type Rule struct {
 	// Depending on the enclosing object, subresources might not be allowed.
 	// Required.
 	Resources []string
+
+	// scope specifies the scope of this rule.
+	// Valid values are "Cluster", "Namespaced", and "*"
+	// "Cluster" means that only cluster-scoped resources will match this rule.
+	// Namespace API objects are cluster-scoped.
+	// "Namespaced" means that only namespaced resources will match this rule.
+	// "*" means that there are no scope restrictions.
+	// Subresources match the scope of their parent resource.
+	// Default is "*".
+	//
+	// +optional
+	Scope *ScopeType
 }
+
+type ScopeType string
+
+const (
+	// ClusterScope means that scope is limited to cluster-scoped objects.
+	// Namespace objects are cluster-scoped.
+	ClusterScope ScopeType = "Cluster"
+	// NamespacedScope means that scope is limited to namespaced objects.
+	NamespacedScope ScopeType = "Namespaced"
+	// AllScopes means that all scopes are included.
+	AllScopes ScopeType = "*"
+)
 
 type FailurePolicyType string
 
@@ -260,6 +232,22 @@ type Webhook struct {
 	// sideEffects == Unknown or Some. Defaults to Unknown.
 	// +optional
 	SideEffects *SideEffectClass
+
+	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+	// the webhook call will be ignored or the API call will fail based on the
+	// failure policy.
+	// The timeout value must be between 1 and 30 seconds.
+	// +optional
+	TimeoutSeconds *int32
+
+	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, validation will fail for this object.
+	// If the webhook configuration has already been persisted with a version apiserver
+	// does not understand, calls to the webhook will fail and be subject to the failure policy.
+	// +optional
+	AdmissionReviewVersions []string
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make

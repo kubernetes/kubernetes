@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"k8s.io/klog"
@@ -35,7 +36,7 @@ var etcdURL = ""
 
 const installEtcd = `
 Cannot find etcd, cannot run integration tests
-Please see https://github.com/kubernetes/community/blob/master/contributors/devel/testing.md#install-etcd-dependency for instructions.
+Please see https://git.k8s.io/community/contributors/devel/sig-testing/testing.md#install-etcd-dependency for instructions.
 
 You can use 'hack/install-etcd.sh' to install a copy in third_party/.
 
@@ -43,7 +44,8 @@ You can use 'hack/install-etcd.sh' to install a copy in third_party/.
 
 // getEtcdPath returns a path to an etcd executable.
 func getEtcdPath() (string, error) {
-	bazelPath := filepath.Join(os.Getenv("RUNFILES_DIR"), "com_coreos_etcd/etcd")
+	bazelPath := filepath.Join(os.Getenv("RUNFILES_DIR"), fmt.Sprintf("com_coreos_etcd_%s", runtime.GOARCH), "etcd")
+
 	p, err := exec.LookPath(bazelPath)
 	if err == nil {
 		return p, nil

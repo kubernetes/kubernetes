@@ -31,31 +31,32 @@ import (
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/certificates"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/storage"
+	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
+	"k8s.io/kubernetes/pkg/master/storageversionhashdata"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -79,17 +80,14 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	}
 
 	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
-	resourceEncoding.SetVersionEncoding(api.GroupName, schema.GroupVersion{Group: "", Version: "v1"}, schema.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, schema.GroupVersion{Group: "autoscaling", Version: "v1"}, schema.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(batch.GroupName, schema.GroupVersion{Group: "batch", Version: "v1"}, schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
-	// FIXME (soltysh): this GroupVersionResource override should be configurable
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: "batch", Resource: "cronjobs"}, schema.GroupVersion{Group: batch.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: "storage.k8s.io", Resource: "volumeattachments"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
-
-	resourceEncoding.SetVersionEncoding(apps.GroupName, schema.GroupVersion{Group: "apps", Version: "v1"}, schema.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(extensions.GroupName, schema.GroupVersion{Group: "extensions", Version: "v1beta1"}, schema.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(rbac.GroupName, schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1"}, schema.GroupVersion{Group: rbac.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(certificates.GroupName, schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1beta1"}, schema.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
+	// This configures the testing master the same way the real master is
+	// configured. The storage versions of these resources are different
+	// from the storage versions of other resources in their group.
+	resourceEncodingOverrides := []schema.GroupVersionResource{
+		batch.Resource("cronjobs").WithVersion("v1beta1"),
+		apisstorage.Resource("volumeattachments").WithVersion("v1beta1"),
+	}
+	resourceEncoding = resourceconfig.MergeResourceEncodingConfigs(resourceEncoding, resourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), legacyscheme.Codecs, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
 
 	etcdOptions := options.NewEtcdOptions(storageConfig)
@@ -101,12 +99,12 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	}
 
 	kubeVersion := kubeversion.Get()
+	config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	config.GenericConfig.Version = &kubeVersion
 	config.ExtraConfig.StorageFactory = storageFactory
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
-	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
 	config.ExtraConfig.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
 		DialContext:     func(ctx context.Context, network, addr string) (net.Conn, error) { return nil, nil },
@@ -257,7 +255,7 @@ func makeNodeList(nodes []string, nodeResources apiv1.NodeResources) *apiv1.Node
 func TestGetNodeAddresses(t *testing.T) {
 	assert := assert.New(t)
 
-	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2"}, apiv1.NodeResources{})).Core().Nodes()
+	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2"}, apiv1.NodeResources{})).CoreV1().Nodes()
 	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Fail case (no addresses associated with nodes)
@@ -281,7 +279,7 @@ func TestGetNodeAddresses(t *testing.T) {
 func TestGetNodeAddressesWithOnlySomeExternalIP(t *testing.T) {
 	assert := assert.New(t)
 
-	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2", "node3"}, apiv1.NodeResources{})).Core().Nodes()
+	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2", "node3"}, apiv1.NodeResources{})).CoreV1().Nodes()
 	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Pass case with 1 External type IP (index == 1) and nodes (indexes 0 & 2) have no External IP.
@@ -381,6 +379,112 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "v1")
 
+}
+
+// This test doesn't cover the apiregistration and apiextensions group, as they are installed by other apiservers.
+func TestStorageVersionHashes(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionHash, true)()
+	master, etcdserver, _, _ := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+
+	c := &restclient.Config{
+		Host:          server.URL,
+		APIPath:       "/api",
+		ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs},
+	}
+	discover := discovery.NewDiscoveryClientForConfigOrDie(c)
+	all, err := discover.ServerResources()
+	if err != nil {
+		t.Error(err)
+	}
+	var count int
+	for _, g := range all {
+		for _, r := range g.APIResources {
+			if strings.Contains(r.Name, "/") ||
+				storageversionhashdata.NoStorageVersionHash.Has(g.GroupVersion+"/"+r.Name) {
+				if r.StorageVersionHash != "" {
+					t.Errorf("expect resource %s/%s to have empty storageVersionHash, got hash %q", g.GroupVersion, r.Name, r.StorageVersionHash)
+				}
+				continue
+			}
+			if r.StorageVersionHash == "" {
+				t.Errorf("expect the storageVersionHash of %s/%s to exist", g.GroupVersion, r.Name)
+				continue
+			}
+			// Uncomment the following line if you want to update storageversionhash/data.go
+			// fmt.Printf("\"%s/%s\": \"%s\",\n", g.GroupVersion, r.Name, r.StorageVersionHash)
+			expected := storageversionhashdata.GVRToStorageVersionHash[g.GroupVersion+"/"+r.Name]
+			if r.StorageVersionHash != expected {
+				t.Errorf("expect the storageVersionHash of %s/%s to be %q, got %q", g.GroupVersion, r.Name, expected, r.StorageVersionHash)
+			}
+			count++
+		}
+	}
+	if count != len(storageversionhashdata.GVRToStorageVersionHash) {
+		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash")
+	}
+}
+
+func TestStorageVersionHashEqualities(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionHash, true)()
+	master, etcdserver, _, assert := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+
+	// Test 1: extensions/v1beta1/replicasets and apps/v1/replicasets have
+	// the same storage version hash.
+	resp, err := http.Get(server.URL + "/apis/extensions/v1beta1")
+	assert.Empty(err)
+	extList := metav1.APIResourceList{}
+	assert.NoError(decodeResponse(resp, &extList))
+	var extReplicasetHash, appsReplicasetHash string
+	for _, r := range extList.APIResources {
+		if r.Name == "replicasets" {
+			extReplicasetHash = r.StorageVersionHash
+		}
+	}
+	assert.NotEmpty(extReplicasetHash)
+
+	resp, err = http.Get(server.URL + "/apis/apps/v1")
+	assert.Empty(err)
+	appsList := metav1.APIResourceList{}
+	assert.NoError(decodeResponse(resp, &appsList))
+	for _, r := range appsList.APIResources {
+		if r.Name == "replicasets" {
+			appsReplicasetHash = r.StorageVersionHash
+		}
+	}
+	assert.Equal(extReplicasetHash, appsReplicasetHash)
+
+	// Test 2: batch/v1/jobs and batch/v1beta1/cronjobs have different
+	// storage version hashes.
+	resp, err = http.Get(server.URL + "/apis/batch/v1")
+	assert.Empty(err)
+	batchv1 := metav1.APIResourceList{}
+	assert.NoError(decodeResponse(resp, &batchv1))
+	var jobsHash string
+	for _, r := range batchv1.APIResources {
+		if r.Name == "jobs" {
+			jobsHash = r.StorageVersionHash
+		}
+	}
+	assert.NotEmpty(jobsHash)
+
+	resp, err = http.Get(server.URL + "/apis/batch/v1beta1")
+	assert.Empty(err)
+	batchv1beta1 := metav1.APIResourceList{}
+	assert.NoError(decodeResponse(resp, &batchv1beta1))
+	var cronjobsHash string
+	for _, r := range batchv1beta1.APIResources {
+		if r.Name == "cronjobs" {
+			cronjobsHash = r.StorageVersionHash
+		}
+	}
+	assert.NotEmpty(cronjobsHash)
+	assert.NotEqual(jobsHash, cronjobsHash)
 }
 
 func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {

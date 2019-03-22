@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
-	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
+	utilnet "k8s.io/utils/net"
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
@@ -162,7 +162,7 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 	// is because the forwarding rule is used as the indicator that the load
 	// balancer is fully created - it's what getLoadBalancer checks for.
 	// Check if user specified the allow source range
-	sourceRanges, err := apiservice.GetLoadBalancerSourceRanges(apiService)
+	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string,
 	if err != nil && !isHTTPErrorCode(err, http.StatusNotFound) {
 		return nil, fmt.Errorf("error checking HTTP health check for load balancer (%s): %v", lbRefStr, err)
 	}
-	if path, healthCheckNodePort := apiservice.GetServiceHealthCheckPathPort(apiService); path != "" {
+	if path, healthCheckNodePort := servicehelpers.GetServiceHealthCheckPathPort(apiService); path != "" {
 		klog.V(4).Infof("ensureExternalLoadBalancer(%s): Service needs local traffic health checks on: %d%s.", lbRefStr, healthCheckNodePort, path)
 		if hcLocalTrafficExisting == nil {
 			// This logic exists to detect a transition for non-OnlyLocal to OnlyLocal service
@@ -292,7 +292,7 @@ func (g *Cloud) ensureExternalLoadBalancerDeleted(clusterName, clusterID string,
 	lbRefStr := fmt.Sprintf("%v(%v)", loadBalancerName, serviceName)
 
 	var hcNames []string
-	if path, _ := apiservice.GetServiceHealthCheckPathPort(service); path != "" {
+	if path, _ := servicehelpers.GetServiceHealthCheckPathPort(service); path != "" {
 		hcToDelete, err := g.GetHTTPHealthCheck(loadBalancerName)
 		if err != nil && !isHTTPErrorCode(err, http.StatusNotFound) {
 			klog.Infof("ensureExternalLoadBalancerDeleted(%s): Failed to retrieve health check:%v.", lbRefStr, err)
@@ -819,7 +819,7 @@ func translateAffinityType(affinityType v1.ServiceAffinity) string {
 	}
 }
 
-func (g *Cloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []v1.ServicePort, sourceRanges netsets.IPNet) (exists bool, needsUpdate bool, err error) {
+func (g *Cloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []v1.ServicePort, sourceRanges utilnet.IPNetSet) (exists bool, needsUpdate bool, err error) {
 	fw, err := g.GetFirewall(MakeFirewallName(name))
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
@@ -843,7 +843,7 @@ func (g *Cloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string,
 	}
 	// The service controller already verified that the protocol matches on all ports, no need to check.
 
-	actualSourceRanges, err := netsets.ParseIPNets(fw.SourceRanges...)
+	actualSourceRanges, err := utilnet.ParseIPNets(fw.SourceRanges...)
 	if err != nil {
 		// This really shouldn't happen... GCE has returned something unexpected
 		klog.Warningf("Error parsing firewall SourceRanges: %v", fw.SourceRanges)
@@ -934,7 +934,7 @@ func createForwardingRule(s CloudForwardingRuleService, name, serviceName, regio
 	return nil
 }
 
-func (g *Cloud) createFirewall(svc *v1.Service, name, region, desc string, sourceRanges netsets.IPNet, ports []v1.ServicePort, hosts []*gceInstance) error {
+func (g *Cloud) createFirewall(svc *v1.Service, name, region, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) error {
 	firewall, err := g.firewallObject(name, region, desc, sourceRanges, ports, hosts)
 	if err != nil {
 		return err
@@ -952,7 +952,7 @@ func (g *Cloud) createFirewall(svc *v1.Service, name, region, desc string, sourc
 	return nil
 }
 
-func (g *Cloud) updateFirewall(svc *v1.Service, name, region, desc string, sourceRanges netsets.IPNet, ports []v1.ServicePort, hosts []*gceInstance) error {
+func (g *Cloud) updateFirewall(svc *v1.Service, name, region, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) error {
 	firewall, err := g.firewallObject(name, region, desc, sourceRanges, ports, hosts)
 	if err != nil {
 		return err
@@ -971,7 +971,7 @@ func (g *Cloud) updateFirewall(svc *v1.Service, name, region, desc string, sourc
 	return nil
 }
 
-func (g *Cloud) firewallObject(name, region, desc string, sourceRanges netsets.IPNet, ports []v1.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
+func (g *Cloud) firewallObject(name, region, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
 	allowedPorts := make([]string, len(ports))
 	for ix := range ports {
 		allowedPorts[ix] = strconv.Itoa(int(ports[ix].Port))

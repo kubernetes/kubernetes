@@ -21,7 +21,7 @@ all: container
 container:
 	docker build --pull -t ${REGISTRY}/${IMAGE}:${TAG} .
 
-push: 
+push:
 	docker push ${REGISTRY}/${IMAGE}:${TAG}
 
 upload:

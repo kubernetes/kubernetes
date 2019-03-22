@@ -29,7 +29,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -50,7 +49,7 @@ func TestMarkControlPlane(t *testing.T) {
 			"control-plane label and taint missing",
 			"",
 			nil,
-			[]v1.Taint{kubeadmconstants.MasterTaint},
+			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}},\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
 		},
 		{
@@ -63,22 +62,22 @@ func TestMarkControlPlane(t *testing.T) {
 		{
 			"control-plane label missing",
 			"",
-			[]v1.Taint{kubeadmconstants.MasterTaint},
-			[]v1.Taint{kubeadmconstants.MasterTaint},
+			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
+			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
 		},
 		{
 			"control-plane taint missing",
 			kubeadmconstants.LabelNodeRoleMaster,
 			nil,
-			[]v1.Taint{kubeadmconstants.MasterTaint},
+			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
 			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
 		},
 		{
 			"nothing missing",
 			kubeadmconstants.LabelNodeRoleMaster,
-			[]v1.Taint{kubeadmconstants.MasterTaint},
-			[]v1.Taint{kubeadmconstants.MasterTaint},
+			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
+			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
 			"{}",
 		},
 		{
@@ -102,7 +101,7 @@ func TestMarkControlPlane(t *testing.T) {
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			},
-			[]v1.Taint{kubeadmconstants.MasterTaint},
+			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
 			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"},{\"effect\":\"NoSchedule\",\"key\":\"node.cloudprovider.kubernetes.io/uninitialized\"}]}}",
 		},
 	}
@@ -116,7 +115,7 @@ func TestMarkControlPlane(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: hostname,
 				Labels: map[string]string{
-					kubeletapis.LabelHostname: hostname,
+					v1.LabelHostname: hostname,
 				},
 			},
 		}

@@ -35,11 +35,12 @@ source "${KUBE_ROOT}/test/cmd/certificate.sh"
 source "${KUBE_ROOT}/test/cmd/core.sh"
 source "${KUBE_ROOT}/test/cmd/crd.sh"
 source "${KUBE_ROOT}/test/cmd/create.sh"
+source "${KUBE_ROOT}/test/cmd/delete.sh"
 source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
-source "${KUBE_ROOT}/test/cmd/initializers.sh"
+source "${KUBE_ROOT}/test/cmd/kubeadm.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
 source "${KUBE_ROOT}/test/cmd/old-print.sh"
@@ -52,6 +53,7 @@ source "${KUBE_ROOT}/test/cmd/save-config.sh"
 source "${KUBE_ROOT}/test/cmd/storage.sh"
 source "${KUBE_ROOT}/test/cmd/template-output.sh"
 source "${KUBE_ROOT}/test/cmd/version.sh"
+source "${KUBE_ROOT}/test/cmd/wait.sh"
 
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
@@ -384,6 +386,26 @@ runTests() {
     kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
+  cleanup_tests(){
+    kube::test::clear_all
+    if [[ -n "${foundError}" ]]; then
+      echo "FAILED TESTS: ""${foundError}"
+      exit 1
+    fi
+  }
+
+   if [[ -n "${WHAT-}" ]]; then
+    for pkg in ${WHAT}
+    do 
+      # running of kubeadm is captured in hack/make-targets/test-cmd.sh
+      if [[ "${pkg}" != "kubeadm" ]]; then 
+        record_command run_${pkg}_tests
+      fi
+    done
+    cleanup_tests
+    return
+  fi
+
   #########################
   # Kubectl version #
   #########################
@@ -490,6 +512,16 @@ runTests() {
   ######################
   if kube::test::if_supports_resource "${secrets}" ; then
     record_command run_create_secret_tests
+  fi
+  if kube::test::if_supports_resource "${deployments}"; then
+    record_command run_kubectl_create_kustomization_directory_tests
+  fi
+
+  ######################
+  # Delete             #
+  ######################
+  if kube::test::if_supports_resource "${configmaps}" ; then
+    record_command run_kubectl_delete_allnamespaces_tests
   fi
 
   ##################
@@ -828,15 +860,17 @@ runTests() {
 
   record_command run_plugins_tests
 
+
   #################
   # Impersonation #
   #################
   record_command run_impersonation_tests
 
-  kube::test::clear_all
+  ####################
+  # kubectl wait     #
+  ####################
 
-  if [[ -n "${foundError}" ]]; then
-    echo "FAILED TESTS: ""${foundError}"
-    exit 1
-  fi
+  record_command run_wait_tests
+
+  cleanup_tests
 }

@@ -101,8 +101,13 @@ func (p *perfCounterNodeStatsClient) startMonitoring() error {
 		return err
 	}
 
+	networkAdapterCounter, err := newNetworkCounters()
+	if err != nil {
+		return err
+	}
+
 	go wait.Forever(func() {
-		p.collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter)
+		p.collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
 	}, perfCounterUpdatePeriod)
 
 	return nil
@@ -138,7 +143,7 @@ func (p *perfCounterNodeStatsClient) getNodeInfo() nodeInfo {
 	return p.nodeInfo
 }
 
-func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter *perfCounter) {
+func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter *perfCounter, networkAdapterCounter *networkCounter) {
 	cpuValue, err := cpuCounter.getData()
 	if err != nil {
 		klog.Errorf("Unable to get cpu perf counter data; err: %v", err)
@@ -157,12 +162,19 @@ func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSe
 		return
 	}
 
+	networkAdapterStats, err := networkAdapterCounter.getData()
+	if err != nil {
+		klog.Errorf("Unable to get network adapter perf counter data; err: %v", err)
+		return
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.nodeMetrics = nodeMetrics{
 		cpuUsageCoreNanoSeconds:   p.convertCPUValue(cpuValue),
 		memoryPrivWorkingSetBytes: memWorkingSetValue,
 		memoryCommittedBytes:      memCommittedBytesValue,
+		interfaceStats:            networkAdapterStats,
 		timeStamp:                 time.Now(),
 	}
 }

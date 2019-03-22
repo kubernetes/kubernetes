@@ -70,7 +70,8 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 		{"valid_cloud_allocator", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.CloudAllocatorType, false},
 		{"valid_ipam_from_cluster", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.IPAMFromClusterAllocatorType, false},
 		{"valid_ipam_from_cloud", "10.0.0.0/21", "10.1.0.0/21", 24, ipam.IPAMFromCloudAllocatorType, false},
-		{"invalid_cluster_CIDR", "invalid", "10.1.0.0/21", 24, ipam.CloudAllocatorType, true},
+		{"valid_skip_cluster_CIDR_validation_for_cloud_allocator", "invalid", "10.1.0.0/21", 24, ipam.CloudAllocatorType, false},
+		{"invalid_cluster_CIDR", "invalid", "10.1.0.0/21", 24, ipam.IPAMFromClusterAllocatorType, true},
 		{"valid_CIDR_smaller_than_mask_cloud_allocator", "10.0.0.0/26", "10.1.0.0/21", 24, ipam.CloudAllocatorType, false},
 		{"invalid_CIDR_smaller_than_mask_other_allocators", "10.0.0.0/26", "10.1.0.0/21", 24, ipam.IPAMFromCloudAllocatorType, true},
 	} {

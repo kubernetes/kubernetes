@@ -122,7 +122,7 @@ type TokenRequest struct {
 // TokenRequestSpec contains client provided parameters of a token request.
 type TokenRequestSpec struct {
 	// Audiences are the intendend audiences of the token. A recipient of a
-	// token must identitfy themself with an identifier in the list of
+	// token must identify themself with an identifier in the list of
 	// audiences of the token, and otherwise should reject the token. A
 	// token issued for multiple audiences may be used to authenticate
 	// against any of the audiences listed but implies a high degree of
@@ -135,7 +135,10 @@ type TokenRequestSpec struct {
 	ExpirationSeconds int64
 
 	// BoundObjectRef is a reference to an object that the token will be bound to.
-	// The token will only be valid for as long as the bound objet exists.
+	// The token will only be valid for as long as the bound object exists.
+	// NOTE: The API server's TokenReview endpoint will validate the
+	// BoundObjectRef, but other audiences may not. Keep ExpirationSeconds
+	// small if you want prompt revocation.
 	BoundObjectRef *BoundObjectReference
 }
 

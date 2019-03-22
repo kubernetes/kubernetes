@@ -18,6 +18,7 @@ package network
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -790,11 +791,47 @@ var _ = SIGDescribe("Services", func() {
 		jig.TestReachableUDP(nodeIP, udpNodePort, framework.KubeProxyLagTimeout)
 
 		By("hitting the TCP service's LoadBalancer")
-		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout) // this may actually recreate the LB
+		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		if loadBalancerSupportsUDP {
 			By("hitting the UDP service's LoadBalancer")
-			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout) // this may actually recreate the LB)
+			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+		}
+
+		By("Scaling the pods to 0")
+		jig.Scale(ns1, 0)
+		jig.Scale(ns2, 0)
+
+		By("looking for ICMP REJECT on the TCP service's NodePort")
+		jig.TestRejectedHTTP(nodeIP, tcpNodePort, framework.KubeProxyLagTimeout)
+
+		By("looking for ICMP REJECT on the UDP service's NodePort")
+		jig.TestRejectedUDP(nodeIP, udpNodePort, framework.KubeProxyLagTimeout)
+
+		By("looking for ICMP REJECT on the TCP service's LoadBalancer")
+		jig.TestRejectedHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
+
+		if loadBalancerSupportsUDP {
+			By("looking for ICMP REJECT on the UDP service's LoadBalancer")
+			jig.TestRejectedUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+		}
+
+		By("Scaling the pods to 1")
+		jig.Scale(ns1, 1)
+		jig.Scale(ns2, 1)
+
+		By("hitting the TCP service's NodePort")
+		jig.TestReachableHTTP(nodeIP, tcpNodePort, framework.KubeProxyLagTimeout)
+
+		By("hitting the UDP service's NodePort")
+		jig.TestReachableUDP(nodeIP, udpNodePort, framework.KubeProxyLagTimeout)
+
+		By("hitting the TCP service's LoadBalancer")
+		jig.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
+
+		if loadBalancerSupportsUDP {
+			By("hitting the UDP service's LoadBalancer")
+			jig.TestReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
 		}
 
 		// Change the services back to ClusterIP.
@@ -1748,6 +1785,62 @@ var _ = SIGDescribe("Services", func() {
 		By("verifying service-disabled is still not up")
 		framework.ExpectNoError(framework.VerifyServeHostnameServiceDown(cs, host, svcDisabledIP, servicePort))
 	})
+
+	It("should be rejected when no endpoints exist", func() {
+		namespace := f.Namespace.Name
+		serviceName := "no-pods"
+		jig := framework.NewServiceTestJig(cs, serviceName)
+		nodes := jig.GetNodes(framework.MaxNodesForEndpointsTests)
+		labels := map[string]string{
+			"nopods": "nopods",
+		}
+		port := 80
+		ports := []v1.ServicePort{{
+			Port:       int32(port),
+			TargetPort: intstr.FromInt(80),
+		}}
+
+		By("creating a service with no endpoints")
+		_, err := jig.CreateServiceWithServicePort(labels, namespace, ports)
+		if err != nil {
+			framework.Failf("Failed to create service: %v", err)
+		}
+
+		nodeName := nodes.Items[0].Name
+		podName := "execpod-noendpoints"
+
+		By(fmt.Sprintf("creating %v on node %v", podName, nodeName))
+		execPodName := framework.CreateExecPodOrFail(f.ClientSet, namespace, podName, func(pod *v1.Pod) {
+			pod.Spec.NodeName = nodeName
+		})
+		execPod, err := f.ClientSet.CoreV1().Pods(namespace).Get(execPodName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		serviceAddress := net.JoinHostPort(serviceName, strconv.Itoa(port))
+		framework.Logf("waiting up to %v wget %v", framework.KubeProxyEndpointLagTimeout, serviceAddress)
+		cmd := fmt.Sprintf(`wget -T 3 -qO- %v`, serviceAddress)
+
+		By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
+		expectedErr := "connection refused"
+		if pollErr := wait.PollImmediate(framework.Poll, framework.KubeProxyEndpointLagTimeout, func() (bool, error) {
+			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+
+			if err != nil {
+				if strings.Contains(strings.ToLower(err.Error()), expectedErr) {
+					framework.Logf("error contained '%s', as expected: %s", expectedErr, err.Error())
+					return true, nil
+				} else {
+					framework.Logf("error didn't contain '%s', keep trying: %s", expectedErr, err.Error())
+					return false, nil
+				}
+			} else {
+				return true, errors.New("expected wget call to fail")
+			}
+		}); pollErr != nil {
+			Expect(pollErr).NotTo(HaveOccurred())
+		}
+	})
+
 })
 
 // TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
@@ -2006,14 +2099,18 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		for nodeName, nodeIPs := range endpointNodeMap {
 			By(fmt.Sprintf("checking kube-proxy health check fails on node with endpoint (%s), public IP %s", nodeName, nodeIPs[0]))
 			var body bytes.Buffer
-			var result bool
-			var err error
-			if pollErr := wait.PollImmediate(framework.Poll, framework.ServiceTestTimeout, func() (bool, error) {
-				result, err = framework.TestReachableHTTPWithContent(nodeIPs[0], healthCheckNodePort, "/healthz", "", &body)
-				return !result, nil
-			}); pollErr != nil {
-				framework.Failf("Kube-proxy still exposing health check on node %v:%v, after ESIPP was turned off. Last err %v, last body %v",
-					nodeName, healthCheckNodePort, err, body.String())
+			pollfn := func() (bool, error) {
+				result := framework.PokeHTTP(nodeIPs[0], healthCheckNodePort, "/healthz", nil)
+				if result.Code == 0 {
+					return true, nil
+				}
+				body.Reset()
+				body.Write(result.Body)
+				return false, nil
+			}
+			if pollErr := wait.PollImmediate(framework.Poll, framework.ServiceTestTimeout, pollfn); pollErr != nil {
+				framework.Failf("Kube-proxy still exposing health check on node %v:%v, after ESIPP was turned off. body %s",
+					nodeName, healthCheckNodePort, body.String())
 			}
 		}
 
@@ -2143,17 +2240,17 @@ func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interf
 	Expect(err).NotTo(HaveOccurred(), "failed to fetch pod: %s in namespace: %s", execPodName, ns)
 
 	if !isTransitionTest {
-		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, true, false)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, true)).To(BeTrue())
 	}
 	if isTransitionTest {
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
-		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, false, true)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, false)).To(BeTrue())
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
-		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, true, true)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, execPod, svcIp, servicePort, true)).To(BeTrue())
 	}
 }
 
@@ -2183,16 +2280,16 @@ func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface
 	port := int(svc.Spec.Ports[0].Port)
 
 	if !isTransitionTest {
-		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, true, false)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, true)).To(BeTrue())
 	}
 	if isTransitionTest {
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
-		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, false, true)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, false)).To(BeTrue())
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
-		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, true, true)).To(BeTrue())
+		Expect(framework.CheckAffinity(jig, nil, ingressIP, port, true)).To(BeTrue())
 	}
 }

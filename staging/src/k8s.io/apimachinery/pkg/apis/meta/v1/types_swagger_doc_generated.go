@@ -49,16 +49,17 @@ func (APIGroupList) SwaggerDoc() map[string]string {
 }
 
 var map_APIResource = map[string]string{
-	"":             "APIResource specifies the name of a resource and whether it is namespaced.",
-	"name":         "name is the plural name of the resource.",
-	"singularName": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
-	"namespaced":   "namespaced indicates if a resource is namespaced or not.",
-	"group":        "group is the preferred group of the resource.  Empty implies the group of the containing resource list. For subresources, this may have a different value, for example: Scale\".",
-	"version":      "version is the preferred version of the resource.  Empty implies the version of the containing resource list For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)\".",
-	"kind":         "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
-	"verbs":        "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
-	"shortNames":   "shortNames is a list of suggested short names of the resource.",
-	"categories":   "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
+	"":                   "APIResource specifies the name of a resource and whether it is namespaced.",
+	"name":               "name is the plural name of the resource.",
+	"singularName":       "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
+	"namespaced":         "namespaced indicates if a resource is namespaced or not.",
+	"group":              "group is the preferred group of the resource.  Empty implies the group of the containing resource list. For subresources, this may have a different value, for example: Scale\".",
+	"version":            "version is the preferred version of the resource.  Empty implies the version of the containing resource list For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)\".",
+	"kind":               "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
+	"verbs":              "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
+	"shortNames":         "shortNames is a list of suggested short names of the resource.",
+	"categories":         "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
+	"storageVersionHash": "The hash value of the storage version, the version this resource is converted to when written to the data store. Value must be treated as opaque by clients. Only equality comparison on the value is valid. This is an alpha feature and may change or be removed in the future. The field is populated by the apiserver only if the StorageVersionHash feature gate is enabled. This field will remain optional even if it graduates.",
 }
 
 func (APIResource) SwaggerDoc() map[string]string {
@@ -86,9 +87,9 @@ func (APIVersions) SwaggerDoc() map[string]string {
 }
 
 var map_CreateOptions = map[string]string{
-	"":                     "CreateOptions may be provided when creating an API object.",
-	"dryRun":               "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-	"includeUninitialized": "If IncludeUninitialized is specified, the object may be returned without completing initialization.",
+	"":             "CreateOptions may be provided when creating an API object.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
 }
 
 func (CreateOptions) SwaggerDoc() map[string]string {
@@ -109,19 +110,26 @@ func (DeleteOptions) SwaggerDoc() map[string]string {
 }
 
 var map_ExportOptions = map[string]string{
-	"":       "ExportOptions is the query options to the standard REST get call.",
-	"export": "Should this value be exported.  Export strips fields that a user can not specify.",
-	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+	"":       "ExportOptions is the query options to the standard REST get call. Deprecated. Planned for removal in 1.18.",
+	"export": "Should this value be exported.  Export strips fields that a user can not specify. Deprecated. Planned for removal in 1.18.",
+	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'. Deprecated. Planned for removal in 1.18.",
 }
 
 func (ExportOptions) SwaggerDoc() map[string]string {
 	return map_ExportOptions
 }
 
+var map_Fields = map[string]string{
+	"": "Fields stores a set of fields in a data structure like a Trie. To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff",
+}
+
+func (Fields) SwaggerDoc() map[string]string {
+	return map_Fields
+}
+
 var map_GetOptions = map[string]string{
-	"":                     "GetOptions is the standard query options to the standard REST get call.",
-	"resourceVersion":      "When specified: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-	"includeUninitialized": "If true, partially initialized resources are included in the response.",
+	"":                "GetOptions is the standard query options to the standard REST get call.",
+	"resourceVersion": "When specified: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
 }
 
 func (GetOptions) SwaggerDoc() map[string]string {
@@ -200,19 +208,31 @@ func (ListMeta) SwaggerDoc() map[string]string {
 }
 
 var map_ListOptions = map[string]string{
-	"":                     "ListOptions is the query options to a standard REST list call.",
-	"labelSelector":        "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-	"fieldSelector":        "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-	"includeUninitialized": "If true, partially initialized resources are included in the response.",
-	"watch":                "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-	"resourceVersion":      "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-	"timeoutSeconds":       "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
-	"limit":                "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
-	"continue":             "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+	"":                "ListOptions is the query options to a standard REST list call.",
+	"labelSelector":   "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+	"fieldSelector":   "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+	"watch":           "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+	"resourceVersion": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+	"timeoutSeconds":  "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
+	"limit":           "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+	"continue":        "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
 }
 
 func (ListOptions) SwaggerDoc() map[string]string {
 	return map_ListOptions
+}
+
+var map_ManagedFieldsEntry = map[string]string{
+	"":           "ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource that the fieldset applies to.",
+	"manager":    "Manager is an identifier of the workflow managing these fields.",
+	"operation":  "Operation is the type of operation which lead to this ManagedFieldsEntry being created. The only valid values for this field are 'Apply' and 'Update'.",
+	"apiVersion": "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
+	"time":       "Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'",
+	"fields":     "Fields identifies a set of fields.",
+}
+
+func (ManagedFieldsEntry) SwaggerDoc() map[string]string {
+	return map_ManagedFieldsEntry
 }
 
 var map_ObjectMeta = map[string]string{
@@ -230,9 +250,10 @@ var map_ObjectMeta = map[string]string{
 	"labels":                     "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels",
 	"annotations":                "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations",
 	"ownerReferences":            "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
-	"initializers":               "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.",
+	"initializers":               "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.\n\nDEPRECATED - initializers are an alpha field and will be removed in v1.15.",
 	"finalizers":                 "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.",
 	"clusterName":                "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.",
+	"managedFields":              "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.\n\nThis field is alpha and can be changed or removed without notice.",
 }
 
 func (ObjectMeta) SwaggerDoc() map[string]string {
@@ -261,9 +282,21 @@ func (Patch) SwaggerDoc() map[string]string {
 	return map_Patch
 }
 
+var map_PatchOptions = map[string]string{
+	"":             "PatchOptions may be provided when patching an API object. PatchOptions is meant to be a superset of UpdateOptions.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"force":        "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
+}
+
+func (PatchOptions) SwaggerDoc() map[string]string {
+	return map_PatchOptions
+}
+
 var map_Preconditions = map[string]string{
-	"":    "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
-	"uid": "Specifies the target UID.",
+	"":                "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
+	"uid":             "Specifies the target UID.",
+	"resourceVersion": "Specifies the target ResourceVersion",
 }
 
 func (Preconditions) SwaggerDoc() map[string]string {
@@ -339,8 +372,9 @@ func (TypeMeta) SwaggerDoc() map[string]string {
 }
 
 var map_UpdateOptions = map[string]string{
-	"":       "UpdateOptions may be provided when updating an API object.",
-	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"":             "UpdateOptions may be provided when updating an API object. All fields in UpdateOptions should also be present in PatchOptions.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
 }
 
 func (UpdateOptions) SwaggerDoc() map[string]string {

@@ -35,10 +35,11 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
-	apiserverflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/globalflag"
+	"k8s.io/apiserver/pkg/util/term"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/cli/globalflag"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -89,15 +90,15 @@ through the API as necessary.`,
 	}
 
 	usageFmt := "Usage:\n  %s\n"
-	cols, _, _ := apiserverflag.TerminalSize(cmd.OutOrStdout())
+	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
 	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
 		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
-		apiserverflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
+		cliflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
 		return nil
 	})
 	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
-		apiserverflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
+		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
 	})
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
@@ -156,6 +157,9 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error 
 
 // Run executes the scheduler based on the given configuration. It only return on error or when stopCh is closed.
 func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
+	// To help debugging, immediately log version
+	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
+
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
 		cc.InformerFactory.Core().V1().Nodes(),
@@ -208,9 +212,10 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 	}
 	if cc.SecureServing != nil {
 		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, false, checks...), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
-		if err := cc.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		// TODO: handle stoppedCh returned by c.SecureServing.Serve
+		if _, err := cc.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			// fail early for secure handlers, removing the old error loop from above
-			return fmt.Errorf("failed to start healthz server: %v", err)
+			return fmt.Errorf("failed to start secure server: %v", err)
 		}
 	}
 
@@ -302,7 +307,7 @@ func newMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration) h
 	return pathRecorderMux
 }
 
-// newHealthzServer creates a healthz server from the config, and will also
+// newHealthzHandler creates a healthz server from the config, and will also
 // embed the metrics handler if the healthz and metrics address configurations
 // are the same.
 func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, separateMetrics bool, checks ...healthz.HealthzChecker) http.Handler {

@@ -54,5 +54,4 @@ func main() {
 	); err != nil {
 		log.Fatalf("OpenAPI code generation error: %v", err)
 	}
-	log.Println("Code for OpenAPI definitions generated")
 }

@@ -28,9 +28,7 @@ go_test(
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/master:go_default_library",
-        "//staging/src/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
-        "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/networking/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
@@ -68,6 +66,7 @@ go_test(
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ] + select({

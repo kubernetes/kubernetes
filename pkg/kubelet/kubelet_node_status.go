@@ -134,6 +134,7 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 	requiresUpdate := false
 	for k := range node.Status.Capacity {
 		if v1helper.IsExtendedResourceName(k) {
+			klog.Infof("Zero out resource %s capacity in existing node.", k)
 			node.Status.Capacity[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			node.Status.Allocatable[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			requiresUpdate = true
@@ -145,10 +146,12 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 // updateDefaultLabels will set the default labels on the node
 func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
 	defaultLabels := []string{
-		kubeletapis.LabelHostname,
-		kubeletapis.LabelZoneFailureDomain,
-		kubeletapis.LabelZoneRegion,
-		kubeletapis.LabelInstanceType,
+		v1.LabelHostname,
+		v1.LabelZoneFailureDomain,
+		v1.LabelZoneRegion,
+		v1.LabelInstanceType,
+		v1.LabelOSStable,
+		v1.LabelArchStable,
 		kubeletapis.LabelOS,
 		kubeletapis.LabelArch,
 	}
@@ -213,9 +216,11 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				kubeletapis.LabelHostname: kl.hostname,
-				kubeletapis.LabelOS:       goruntime.GOOS,
-				kubeletapis.LabelArch:     goruntime.GOARCH,
+				v1.LabelHostname:      kl.hostname,
+				v1.LabelOSStable:      goruntime.GOOS,
+				v1.LabelArchStable:    goruntime.GOARCH,
+				kubeletapis.LabelOS:   goruntime.GOOS,
+				kubeletapis.LabelArch: goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{
@@ -323,8 +328,8 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			return nil, err
 		}
 		if instanceType != "" {
-			klog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelInstanceType, instanceType)
-			node.ObjectMeta.Labels[kubeletapis.LabelInstanceType] = instanceType
+			klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceType, instanceType)
+			node.ObjectMeta.Labels[v1.LabelInstanceType] = instanceType
 		}
 		// If the cloud has zone information, label the node with the zone information
 		zones, ok := kl.cloud.Zones()
@@ -334,12 +339,12 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
-				klog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneFailureDomain, zone.FailureDomain)
-				node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain] = zone.FailureDomain
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomain, zone.FailureDomain)
+				node.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				klog.Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneRegion, zone.Region)
-				node.ObjectMeta.Labels[kubeletapis.LabelZoneRegion] = zone.Region
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
+				node.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
 			}
 		}
 	}
@@ -423,6 +428,23 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	now := kl.clock.Now()
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) && now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
 		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) {
+			// We must mark the volumes as ReportedInUse in volume manager's dsw even
+			// if no changes were made to the node status (no volumes were added or removed
+			// from the VolumesInUse list).
+			//
+			// The reason is that on a kubelet restart, the volume manager's dsw is
+			// repopulated and the volume ReportedInUse is initialized to false, while the
+			// VolumesInUse list from the Node object still contains the state from the
+			// previous kubelet instantiation.
+			//
+			// Once the volumes are added to the dsw, the ReportedInUse field needs to be
+			// synced from the VolumesInUse list in the Node.Status.
+			//
+			// The MarkVolumesAsReportedInUse() call cannot be performed in dsw directly
+			// because it does not have access to the Node object.
+			// This also cannot be populated on node status manager init because the volume
+			// may not have been added to dsw at that time.
+			kl.volumeManager.MarkVolumesAsReportedInUse(node.Status.VolumesInUse)
 			return nil
 		}
 	}
@@ -522,8 +544,9 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
 		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
-		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, validateHostFunc, kl.containerManager.Status, kl.recordNodeStatusEvent),
+		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors, validateHostFunc, kl.containerManager.Status, kl.recordNodeStatusEvent),
 		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
+		nodestatus.RemoveOutOfDiskCondition(),
 		// TODO(mtaufen): I decided not to move this setter for now, since all it does is send an event
 		// and record state back to the Kubelet runtime object. In the future, I'd like to isolate
 		// these side-effects by decoupling the decisions to send events and partial status recording

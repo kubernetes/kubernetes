@@ -85,10 +85,11 @@ KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a
 #   KUBE_VERSION
 function set_binary_version() {
   if [[ "${1}" =~ "/" ]]; then
-    export KUBE_VERSION=$(curl -fsSL --retry 5 "https://dl.k8s.io/${1}.txt")
+    KUBE_VERSION=$(curl -fsSL --retry 5 "https://dl.k8s.io/${1}.txt")
   else
-    export KUBE_VERSION=${1}
+    KUBE_VERSION=${1}
   fi
+  export KUBE_VERSION
 }
 
 # Use the script from inside the Kubernetes tarball to fetch the client and
@@ -129,7 +130,7 @@ fi
 if [[ -d "./kubernetes" ]]; then
   if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
     echo "'kubernetes' directory already exist. Should we skip download step and start to create cluster based on it? [Y]/n"
-    read confirm
+    read -r confirm
     if [[ ! "${confirm}" =~ ^[nN]$ ]]; then
       echo "Skipping download step."
       create_cluster
@@ -143,10 +144,8 @@ fi
 kernel=$(uname -s)
 case "${kernel}" in
   Darwin)
-    platform="darwin"
     ;;
   Linux)
-    platform="linux"
     ;;
   *)
     echo "Unknown, unsupported platform: ${kernel}." >&2
@@ -158,16 +157,12 @@ esac
 machine=$(uname -m)
 case "${machine}" in
   x86_64*|i?86_64*|amd64*)
-    arch="amd64"
     ;;
   aarch64*|arm64*)
-    arch="arm64"
     ;;
   arm*)
-    arch="arm"
     ;;
   i?86*)
-    arch="386"
     ;;
   *)
     echo "Unknown, unsupported architecture (${machine})." >&2
@@ -224,7 +219,7 @@ fi
 
 if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   echo "Is this ok? [Y]/n"
-  read confirm
+  read -r confirm
   if [[ "${confirm}" =~ ^[nN]$ ]]; then
     echo "Aborting."
     exit 0

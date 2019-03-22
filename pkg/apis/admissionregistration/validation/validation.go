@@ -24,30 +24,12 @@ import (
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
 )
-
-func ValidateInitializerConfiguration(ic *admissionregistration.InitializerConfiguration) field.ErrorList {
-	allErrors := genericvalidation.ValidateObjectMeta(&ic.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	for i, initializer := range ic.Initializers {
-		allErrors = append(allErrors, validateInitializer(&initializer, field.NewPath("initializers").Index(i))...)
-	}
-	return allErrors
-}
-
-func validateInitializer(initializer *admissionregistration.Initializer, fldPath *field.Path) field.ErrorList {
-	var allErrors field.ErrorList
-	// initlializer.Name must be fully qualified
-	allErrors = append(allErrors, validation.IsFullyQualifiedName(fldPath.Child("name"), initializer.Name)...)
-
-	for i, rule := range initializer.Rules {
-		notAllowSubresources := false
-		allErrors = append(allErrors, validateRule(&rule, fldPath.Child("rules").Index(i), notAllowSubresources)...)
-	}
-	return allErrors
-}
 
 func hasWildcard(slice []string) bool {
 	for _, s := range slice {
@@ -67,7 +49,7 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 	// */x
 	resourcesWithWildcardSubresoures := sets.String{}
 	// x/*
-	subResoucesWithWildcardResource := sets.String{}
+	subResourcesWithWildcardResource := sets.String{}
 	// */*
 	hasDoubleWildcard := false
 	// *
@@ -95,14 +77,14 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 		if _, ok := resourcesWithWildcardSubresoures[res]; ok {
 			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '%s/*' is present, must not specify %s", res, resSub)))
 		}
-		if _, ok := subResoucesWithWildcardResource[sub]; ok {
+		if _, ok := subResourcesWithWildcardResource[sub]; ok {
 			allErrors = append(allErrors, field.Invalid(fldPath.Index(i), resSub, fmt.Sprintf("if '*/%s' is present, must not specify %s", sub, resSub)))
 		}
 		if sub == "*" {
 			resourcesWithWildcardSubresoures[res] = struct{}{}
 		}
 		if res == "*" {
-			subResoucesWithWildcardResource[sub] = struct{}{}
+			subResourcesWithWildcardResource[sub] = struct{}{}
 		}
 	}
 	if len(resources) > 1 && hasDoubleWildcard {
@@ -133,6 +115,12 @@ func validateResourcesNoSubResources(resources []string, fldPath *field.Path) fi
 	return allErrors
 }
 
+var validScopes = sets.NewString(
+	string(admissionregistration.ClusterScope),
+	string(admissionregistration.NamespacedScope),
+	string(admissionregistration.AllScopes),
+)
+
 func validateRule(rule *admissionregistration.Rule, fldPath *field.Path, allowSubResource bool) field.ErrorList {
 	var allErrors field.ErrorList
 	if len(rule.APIGroups) == 0 {
@@ -158,25 +146,77 @@ func validateRule(rule *admissionregistration.Rule, fldPath *field.Path, allowSu
 	} else {
 		allErrors = append(allErrors, validateResourcesNoSubResources(rule.Resources, fldPath.Child("resources"))...)
 	}
+	if rule.Scope != nil && !validScopes.Has(string(*rule.Scope)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scope"), *rule.Scope, validScopes.List()))
+	}
 	return allErrors
 }
 
-func ValidateInitializerConfigurationUpdate(newIC, oldIC *admissionregistration.InitializerConfiguration) field.ErrorList {
-	return ValidateInitializerConfiguration(newIC)
+var AcceptedAdmissionReviewVersions = []string{v1beta1.SchemeGroupVersion.Version}
+
+func isAcceptedAdmissionReviewVersion(v string) bool {
+	for _, version := range AcceptedAdmissionReviewVersions {
+		if v == version {
+			return true
+		}
+	}
+	return false
+}
+
+func validateAdmissionReviewVersions(versions []string, requireRecognizedVersion bool, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	// Currently only v1beta1 accepted in AdmissionReviewVersions
+	if len(versions) < 1 {
+		allErrors = append(allErrors, field.Required(fldPath, ""))
+	} else {
+		seen := map[string]bool{}
+		hasAcceptedVersion := false
+		for i, v := range versions {
+			if seen[v] {
+				allErrors = append(allErrors, field.Invalid(fldPath.Index(i), v, "duplicate version"))
+				continue
+			}
+			seen[v] = true
+			for _, errString := range utilvalidation.IsDNS1035Label(v) {
+				allErrors = append(allErrors, field.Invalid(fldPath.Index(i), v, errString))
+			}
+			if isAcceptedAdmissionReviewVersion(v) {
+				hasAcceptedVersion = true
+			}
+		}
+		if requireRecognizedVersion && !hasAcceptedVersion {
+			allErrors = append(allErrors, field.Invalid(
+				fldPath, versions,
+				fmt.Sprintf("none of the versions accepted by this server. accepted version(s) are %v",
+					strings.Join(AcceptedAdmissionReviewVersions, ", "))))
+		}
+	}
+	return allErrors
 }
 
 func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
+	return validateValidatingWebhookConfiguration(e, true)
+}
+
+func validateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration, requireRecognizedVersion bool) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	for i, hook := range e.Webhooks {
 		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("webhooks").Index(i))...)
+		allErrors = append(allErrors, validateAdmissionReviewVersions(hook.AdmissionReviewVersions, requireRecognizedVersion, field.NewPath("webhooks").Index(i).Child("admissionReviewVersions"))...)
 	}
 	return allErrors
 }
 
 func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
+	return validateMutatingWebhookConfiguration(e, true)
+}
+
+func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration, requireRecognizedVersion bool) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	for i, hook := range e.Webhooks {
 		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("webhooks").Index(i))...)
+		allErrors = append(allErrors, validateAdmissionReviewVersions(hook.AdmissionReviewVersions, requireRecognizedVersion, field.NewPath("webhooks").Index(i).Child("admissionReviewVersions"))...)
 	}
 	return allErrors
 }
@@ -194,6 +234,9 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 	}
 	if hook.SideEffects != nil && !supportedSideEffectClasses.Has(string(*hook.SideEffects)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, supportedSideEffectClasses.List()))
+	}
+	if hook.TimeoutSeconds != nil && (*hook.TimeoutSeconds > 30 || *hook.TimeoutSeconds < 1) {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("timeoutSeconds"), *hook.TimeoutSeconds, "the timeout value must be between 1 and 30 seconds"))
 	}
 
 	if hook.NamespaceSelector != nil {
@@ -259,10 +302,28 @@ func validateRuleWithOperations(ruleWithOperations *admissionregistration.RuleWi
 	return allErrors
 }
 
+// hasAcceptedAdmissionReviewVersions returns true if all webhooks have at least one
+// admission review version this apiserver accepts.
+func hasAcceptedAdmissionReviewVersions(webhooks []admissionregistration.Webhook) bool {
+	for _, hook := range webhooks {
+		hasRecognizedVersion := false
+		for _, version := range hook.AdmissionReviewVersions {
+			if isAcceptedAdmissionReviewVersion(version) {
+				hasRecognizedVersion = true
+				break
+			}
+		}
+		if !hasRecognizedVersion && len(hook.AdmissionReviewVersions) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
-	return ValidateValidatingWebhookConfiguration(newC)
+	return validateValidatingWebhookConfiguration(newC, hasAcceptedAdmissionReviewVersions(oldC.Webhooks))
 }
 
 func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
-	return ValidateMutatingWebhookConfiguration(newC)
+	return validateMutatingWebhookConfiguration(newC, hasAcceptedAdmissionReviewVersions(oldC.Webhooks))
 }

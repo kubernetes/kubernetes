@@ -71,6 +71,10 @@ func (plugin *rbdPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, e
 	return mounter.GetMountRefs(deviceMountPath)
 }
 
+func (plugin *rbdPlugin) CanAttach(spec *volume.Spec) bool {
+	return true
+}
+
 // rbdAttacher implements volume.Attacher interface.
 type rbdAttacher struct {
 	plugin  *rbdPlugin
@@ -197,7 +201,7 @@ var _ volume.DeviceUnmounter = &rbdDetacher{}
 //  - Remove the deviceMountPath at last.
 // This method is idempotent, callers are responsible for retrying on failure.
 func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
-	if pathExists, pathErr := volutil.PathExists(deviceMountPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(deviceMountPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)

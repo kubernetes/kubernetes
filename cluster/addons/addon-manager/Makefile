@@ -18,7 +18,9 @@ TEMP_DIR:=$(shell mktemp -d)
 VERSION=v9.0
 KUBECTL_VERSION?=v1.13.2
 
-BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.0
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.1
+
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 
 .PHONY: build push
 
@@ -29,6 +31,12 @@ build:
 	curl -sSL --retry 5 https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
 	chmod +x $(TEMP_DIR)/kubectl
 	cd $(TEMP_DIR) && sed -i.back "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
+
+ifneq ($(ARCH),amd64)
+	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
+	$(SUDO) ../../../third_party/multiarch/qemu-user-static/register/register.sh --reset
+endif
+
 	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
 
 push: build

@@ -79,8 +79,13 @@ func FromURL(u *url.URL, forward Dialer) (Dialer, error) {
 	}
 
 	switch u.Scheme {
-	case "socks5":
-		return SOCKS5("tcp", u.Host, auth, forward)
+	case "socks5", "socks5h":
+		addr := u.Hostname()
+		port := u.Port()
+		if port == "" {
+			port = "1080"
+		}
+		return SOCKS5("tcp", net.JoinHostPort(addr, port), auth, forward)
 	}
 
 	// If the scheme doesn't match any of the built-in schemes, see if it

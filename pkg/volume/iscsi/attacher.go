@@ -26,10 +26,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/keymutex"
 )
 
 type iscsiAttacher struct {
@@ -174,6 +174,10 @@ func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
 	}
 	klog.V(4).Infof("iscsi: successfully detached disk: %s", deviceMountPath)
 	return nil
+}
+
+func (plugin *iscsiPlugin) CanAttach(spec *volume.Spec) bool {
+	return true
 }
 
 func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks keymutex.KeyMutex, pod *v1.Pod) (*iscsiDiskMounter, error) {

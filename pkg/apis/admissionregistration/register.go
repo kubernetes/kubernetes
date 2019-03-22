@@ -44,8 +44,6 @@ var (
 // Adds the list of known types to scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&InitializerConfiguration{},
-		&InitializerConfigurationList{},
 		&ValidatingWebhookConfiguration{},
 		&ValidatingWebhookConfigurationList{},
 		&MutatingWebhookConfiguration{},

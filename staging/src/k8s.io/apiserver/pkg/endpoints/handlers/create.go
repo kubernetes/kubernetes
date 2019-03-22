@@ -17,13 +17,16 @@ limitations under the License.
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -37,7 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	utiltrace "k8s.io/utils/trace"
 )
 
 func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
@@ -85,7 +88,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 
 		decoder := scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion)
 
-		body, err := readBody(req)
+		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -127,9 +130,23 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		userInfo, _ := request.UserFrom(ctx)
 		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, dryrun.IsDryRun(options.DryRun), userInfo)
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
-			err = mutatingAdmission.Admit(admissionAttributes)
+			err = mutatingAdmission.Admit(admissionAttributes, &scope)
 			if err != nil {
 				scope.err(err, w, req)
+				return
+			}
+		}
+
+		if scope.FieldManager != nil {
+			liveObj, err := scope.Creater.New(scope.Kind)
+			if err != nil {
+				scope.err(fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err), w, req)
+				return
+			}
+
+			obj, err = scope.FieldManager.Update(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+			if err != nil {
+				scope.err(fmt.Errorf("failed to update object (Create for %v) managed fields: %v", scope.Kind, err), w, req)
 				return
 			}
 		}
@@ -140,7 +157,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 				ctx,
 				name,
 				obj,
-				rest.AdmissionToValidateObjectFunc(admit, admissionAttributes),
+				rest.AdmissionToValidateObjectFunc(admit, admissionAttributes, &scope),
 				options,
 			)
 		})
@@ -150,13 +167,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		}
 		trace.Step("Object stored in database")
 
-		// If the object is partially initialized, always indicate it via StatusAccepted
 		code := http.StatusCreated
-		if accessor, err := meta.Accessor(result); err == nil {
-			if accessor.GetInitializers() != nil {
-				code = http.StatusAccepted
-			}
-		}
 		status, ok := result.(*metav1.Status)
 		if ok && err == nil && status.Code == 0 {
 			status.Code = int32(code)
@@ -183,4 +194,33 @@ type namedCreaterAdapter struct {
 
 func (c *namedCreaterAdapter) Create(ctx context.Context, name string, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	return c.Creater.Create(ctx, obj, createValidatingAdmission, options)
+}
+
+// manager is assumed to be already a valid value, we need to make
+// userAgent into a valid value too.
+func managerOrUserAgent(manager, userAgent string) string {
+	if manager != "" {
+		return manager
+	}
+	return prefixFromUserAgent(userAgent)
+}
+
+// prefixFromUserAgent takes the characters preceding the first /, quote
+// unprintable character and then trim what's beyond the
+// FieldManagerMaxLength limit.
+func prefixFromUserAgent(u string) string {
+	m := strings.Split(u, "/")[0]
+	buf := bytes.NewBuffer(nil)
+	for _, r := range m {
+		// Ignore non-printable characters
+		if !unicode.IsPrint(r) {
+			continue
+		}
+		// Only append if we have room for it
+		if buf.Len()+utf8.RuneLen(r) > validation.FieldManagerMaxLength {
+			break
+		}
+		buf.WriteRune(r)
+	}
+	return buf.String()
 }

@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,13 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
-	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	csi "k8s.io/csi-api/pkg/client/clientset/versioned"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -76,8 +74,6 @@ type Framework struct {
 
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
-	APIExtensionsClientSet           apiextensionsclient.Interface
-	CSIClientSet                     csi.Interface
 
 	InternalClientset *internalclientset.Clientset
 	AggregatorClient  *aggregatorclient.Clientset
@@ -117,7 +113,7 @@ type Framework struct {
 	TestSummaries []TestDataSummary
 
 	// Place to keep ClusterAutoscaler metrics from before test in order to compute delta.
-	clusterAutoscalerMetricsBeforeTest metrics.MetricsCollection
+	clusterAutoscalerMetricsBeforeTest metrics.Collection
 }
 
 type TestDataSummary interface {
@@ -173,7 +169,7 @@ func (f *Framework) BeforeEach() {
 				componentTexts)
 		}
 
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		config.QPS = f.Options.ClientQPS
 		config.Burst = f.Options.ClientBurst
 		if f.Options.GroupVersion != nil {
@@ -183,20 +179,17 @@ func (f *Framework) BeforeEach() {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
 		f.ClientSet, err = clientset.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
-		f.APIExtensionsClientSet, err = apiextensionsclient.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		f.InternalClientset, err = internalclientset.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		f.DynamicClient, err = dynamic.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
-		// csi.storage.k8s.io is based on CRD, which is served only as JSON
+		ExpectNoError(err)
+		// node.k8s.io is based on CRD, which is served only as JSON
 		jsonConfig := config
 		jsonConfig.ContentType = "application/json"
-		f.CSIClientSet, err = csi.NewForConfig(jsonConfig)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 
 		// create scales getter, set GroupVersion and NegotiatedSerializer to default values
 		// as they are required when creating a REST client.
@@ -207,9 +200,9 @@ func (f *Framework) BeforeEach() {
 			config.NegotiatedSerializer = legacyscheme.Codecs
 		}
 		restClient, err := rest.RESTClientFor(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
 		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
 		restMapper.Reset()
@@ -224,14 +217,14 @@ func (f *Framework) BeforeEach() {
 		namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
 			"e2e-framework": f.BaseName,
 		})
-		Expect(err).NotTo(HaveOccurred())
+		ExpectNoError(err)
 
 		f.Namespace = namespace
 
 		if TestContext.VerifyServiceAccount {
 			By("Waiting for a default service account to be provisioned in namespace")
 			err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
-			Expect(err).NotTo(HaveOccurred())
+			ExpectNoError(err)
 		} else {
 			Logf("Skipping waiting for service account")
 		}
@@ -711,7 +704,7 @@ type PodStateVerification struct {
 
 	// Optional: only pods passing this function will pass the filter
 	// Verify a pod.
-	// As an optimization, in addition to specfying filter (boolean),
+	// As an optimization, in addition to specifying filter (boolean),
 	// this function allows specifying an error as well.
 	// The error indicates that the polling of the pod spectrum should stop.
 	Verify func(v1.Pod) (bool, error)
@@ -851,7 +844,7 @@ func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration)
 	}
 }
 
-// ForEach runs a function against every verifiable pod.  Be warned that this doesn't wait for "n" pods to verifiy,
+// ForEach runs a function against every verifiable pod.  Be warned that this doesn't wait for "n" pods to verify,
 // so it may return very quickly if you have strict pod state requirements.
 //
 // For example, if you require at least 5 pods to be running before your test will pass,

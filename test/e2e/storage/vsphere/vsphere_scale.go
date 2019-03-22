@@ -34,7 +34,7 @@ import (
 	Perform vsphere volume life cycle management at scale based on user configurable value for number of volumes.
 	The following actions will be performed as part of this test.
 
-	1. Create Storage Classes of 4 Categories (Default, SC with Non Default Datastore, SC with SPBM Policy, SC with VSAN Storage Capalibilies.)
+	1. Create Storage Classes of 4 Categories (Default, SC with Non Default Datastore, SC with SPBM Policy, SC with VSAN Storage Capabilities.)
 	2. Read VCP_SCALE_VOLUME_COUNT, VCP_SCALE_INSTANCES, VCP_SCALE_VOLUMES_PER_POD, VSPHERE_SPBM_POLICY_NAME, VSPHERE_DATASTORE from System Environment.
 	3. Launch VCP_SCALE_INSTANCES goroutine for creating VCP_SCALE_VOLUME_COUNT volumes. Each goroutine is responsible for create/attach of VCP_SCALE_VOLUME_COUNT/VCP_SCALE_INSTANCES volumes.
 	4. Read VCP_SCALE_VOLUMES_PER_POD from System Environment. Each pod will be have VCP_SCALE_VOLUMES_PER_POD attached to it.
@@ -129,7 +129,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			case storageclass4:
 				scParams[Datastore] = datastoreName
 			}
-			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(scname, scParams))
+			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(scname, scParams, nil))
 			Expect(sc).NotTo(BeNil(), "Storage class is empty")
 			Expect(err).NotTo(HaveOccurred(), "Failed to create storage class")
 			defer client.StorageV1().StorageClasses().Delete(scname, nil)

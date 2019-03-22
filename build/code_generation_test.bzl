@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load(":code_generation.bzl", "bazel_go_library", "go_pkg")
-load("@bazel_skylib//:lib.bzl", "asserts", "unittest")
+load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 
 def _bazel_go_library_test_impl(ctx):
     env = unittest.begin(ctx)

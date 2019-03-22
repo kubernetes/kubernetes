@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
@@ -121,6 +122,10 @@ func (plugin *azureDataDiskPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AzureDisk != nil)
 }
 
+func (plugin *azureDataDiskPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *azureDataDiskPlugin) RequiresRemount() bool {
 	return false
 }
@@ -160,7 +165,9 @@ func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 	}
 
 	if vmSizeList == nil {
-		result, err := az.VirtualMachineSizesClient.List(context.TODO(), az.Location)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		result, err := az.VirtualMachineSizesClient.List(ctx, az.Location)
 		if err != nil || result.Value == nil {
 			klog.Errorf("failed to list vm sizes in GetVolumeLimits, plugin.host: %s, location: %s", plugin.host.GetHostName(), az.Location)
 			return volumeLimits, nil
@@ -229,6 +236,10 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 		plugin: plugin,
 		cloud:  azure,
 	}, nil
+}
+
+func (plugin *azureDataDiskPlugin) CanAttach(spec *volume.Spec) bool {
+	return true
 }
 
 func (plugin *azureDataDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -301,12 +312,15 @@ func (plugin *azureDataDiskPlugin) ExpandVolumeDevice(
 	return diskController.ResizeDisk(spec.PersistentVolume.Spec.AzureDisk.DataDiskURI, oldSize, newSize)
 }
 
-func (plugin *azureDataDiskPlugin) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
-	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), devicePath, deviceMountPath)
-	return err
+func (plugin *azureDataDiskPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
-var _ volume.FSResizableVolumePlugin = &azureDataDiskPlugin{}
+var _ volume.NodeExpandableVolumePlugin = &azureDataDiskPlugin{}
 
 func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())

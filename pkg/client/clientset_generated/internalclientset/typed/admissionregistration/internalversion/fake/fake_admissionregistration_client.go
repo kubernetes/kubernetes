@@ -28,10 +28,6 @@ type FakeAdmissionregistration struct {
 	*testing.Fake
 }
 
-func (c *FakeAdmissionregistration) InitializerConfigurations() internalversion.InitializerConfigurationInterface {
-	return &FakeInitializerConfigurations{c}
-}
-
 func (c *FakeAdmissionregistration) MutatingWebhookConfigurations() internalversion.MutatingWebhookConfigurationInterface {
 	return &FakeMutatingWebhookConfigurations{c}
 }

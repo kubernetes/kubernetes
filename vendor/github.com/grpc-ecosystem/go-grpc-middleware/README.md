@@ -11,8 +11,6 @@
 
 [gRPC Go](https://github.com/grpc/grpc-go) Middleware: interceptors, helpers, utilities.
 
-**Important** The repo recently moved to `github.com/grpc-ecosystem/go-grpc-middleware`, please update your import paths.
-
 ## Middleware
 
 [gRPC Go](https://github.com/grpc/grpc-go) recently acquired support for
@@ -24,7 +22,7 @@ These are generic building blocks that make it easy to build multiple microservi
 The purpose of this repository is to act as a go-to point for such reusable functionality. It contains
 some of them itself, but also will link to useful external repos.
 
-`grpc_middleware` itself provides support for chaining interceptors. See [Documentation](DOC.md), but here's an example:
+`grpc_middleware` itself provides support for chaining interceptors, here's an example:
 
 ```go
 import "github.com/grpc-ecosystem/go-grpc-middleware"

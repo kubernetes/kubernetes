@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -143,7 +143,7 @@ const (
 	// the TLS bootstrap to get itself an unique credential
 	KubeletBootstrapKubeConfigFileName = "bootstrap-kubelet.conf"
 
-	// KubeletKubeConfigFileName defines the file name for the kubeconfig that the master kubelet will use for talking
+	// KubeletKubeConfigFileName defines the file name for the kubeconfig that the control-plane kubelet will use for talking
 	// to the API server
 	KubeletKubeConfigFileName = "kubelet.conf"
 	// ControllerManagerKubeConfigFileName defines the file name for the controller manager's kubeconfig file
@@ -157,9 +157,9 @@ const (
 	ControllerManagerUser = "system:kube-controller-manager"
 	// SchedulerUser defines the well-known user the scheduler should be authenticated as
 	SchedulerUser = "system:kube-scheduler"
-	// MastersGroup defines the well-known group for the apiservers. This group is also superuser by default
+	// SystemPrivilegedGroup defines the well-known group for the apiservers. This group is also superuser by default
 	// (i.e. bound to the cluster-admin ClusterRole)
-	MastersGroup = "system:masters"
+	SystemPrivilegedGroup = "system:masters"
 	// NodesGroup defines the well-known group for all nodes.
 	NodesGroup = "system:nodes"
 	// NodesUserPrefix defines the user name prefix as requested by the Node authorizer.
@@ -171,9 +171,9 @@ const (
 
 	// APICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
 	APICallRetryInterval = 500 * time.Millisecond
-	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the master when doing discovery
+	// DiscoveryRetryInterval specifies how long kubeadm should wait before retrying to connect to the control-plane when doing discovery
 	DiscoveryRetryInterval = 5 * time.Second
-	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the master before timing out
+	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the control-plane before timing out
 	PatchNodeTimeout = 2 * time.Minute
 	// UpdateNodeTimeout specifies how long kubeadm should wait for updating node with the initial remote configuration of kubelet before timing out
 	UpdateNodeTimeout = 2 * time.Minute
@@ -191,7 +191,14 @@ const (
 	// Default behaviour is 24 hours
 	DefaultTokenDuration = 24 * time.Hour
 
-	// LabelNodeRoleMaster specifies that a node is a master
+	// DefaultCertTokenDuration specifies the default amount of time that the token used by upload certs will be valid
+	// Default behaviour is 2 hours
+	DefaultCertTokenDuration = 2 * time.Hour
+
+	// CertificateKeySize specifies the size of the key used to encrypt certificates on uploadcerts phase
+	CertificateKeySize = 32
+
+	// LabelNodeRoleMaster specifies that a node is a control-plane
 	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
@@ -332,7 +339,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.2.6"
+	CoreDNSVersion = "1.3.1"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -350,19 +357,22 @@ const (
 	// DefaultAPIServerBindAddress is the default bind address for the API Server
 	DefaultAPIServerBindAddress = "0.0.0.0"
 
-	// MasterNumCPU is the number of CPUs required on master
-	MasterNumCPU = 2
+	// ControlPlaneNumCPU is the number of CPUs required on control-plane
+	ControlPlaneNumCPU = 2
+
+	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
+	KubeadmCertsSecret = "kubeadm-certs"
 )
 
 var (
-	// MasterTaint is the taint to apply on the PodSpec for being able to run that Pod on the master
-	MasterTaint = v1.Taint{
+	// ControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
+	ControlPlaneTaint = v1.Taint{
 		Key:    LabelNodeRoleMaster,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// MasterToleration is the toleration to apply on the PodSpec for being able to run that Pod on the master
-	MasterToleration = v1.Toleration{
+	// ControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
+	ControlPlaneToleration = v1.Toleration{
 		Key:    LabelNodeRoleMaster,
 		Effect: v1.TaintEffectNoSchedule,
 	}
@@ -373,26 +383,28 @@ var (
 	// DefaultTokenGroups specifies the default groups that this token will authenticate as when used for authentication
 	DefaultTokenGroups = []string{NodeBootstrapTokenAuthGroup}
 
-	// MasterComponents defines the master component names
-	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
+	// ControlPlaneComponents defines the control-plane component names
+	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.12.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.13.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.12.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.13.0")
 
 	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
-	CurrentKubernetesVersion = version.MustParseSemantic("v1.13.0")
+	CurrentKubernetesVersion = version.MustParseSemantic("v1.14.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		10: "3.1.12",
-		11: "3.2.18",
 		12: "3.2.24",
 		13: "3.2.24",
 		14: "3.3.10",
 	}
+
+	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
+	// the bootstrap tokens to access the kubeadm-certs Secret during the join of a new control-plane
+	KubeadmCertsClusterRoleName = fmt.Sprintf("kubeadm:%s", KubeadmCertsSecret)
 )
 
 // EtcdSupportedVersion returns officially supported version of etcd for a specific Kubernetes release

@@ -86,7 +86,7 @@ QUICK_CHECKS=$(ls ${QUICK_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || tru
 
 function is-excluded {
   for e in ${EXCLUDED_CHECKS[@]}; do
-    if [[ $1 -ef "$e" ]]; then
+    if [[ $1 -ef "${e}" ]]; then
       return
     fi
   done
@@ -95,7 +95,7 @@ function is-excluded {
 
 function is-quick {
   for e in ${QUICK_CHECKS[@]}; do
-    if [[ $1 -ef "$e" ]]; then
+    if [[ $1 -ef "${e}" ]]; then
       return
     fi
   done
@@ -106,7 +106,7 @@ function is-explicitly-chosen {
   local name="${1#verify-}"
   name="${name%.*}"
   for e in ${WHAT}; do
-    if [[ $e == "$name" ]]; then
+    if [[ "${e}" == "${name}" ]]; then
       return
     fi
   done

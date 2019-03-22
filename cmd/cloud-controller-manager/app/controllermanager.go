@@ -30,16 +30,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
-	apiserverflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/globalflag"
+	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	cloudprovider "k8s.io/cloud-provider"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/klog"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
-	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
@@ -86,20 +86,22 @@ the cloud specific control loops shipped with Kubernetes.`,
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
-	cmoptions.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
+	// hoist this flag from the global flagset to preserve the commandline until
+	// the gce cloudprovider is removed.
+	globalflag.Register(namedFlagSets.FlagSet("generic"), "cloud-provider-gce-lb-src-cidrs")
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
 	usageFmt := "Usage:\n  %s\n"
-	cols, _, _ := apiserverflag.TerminalSize(cmd.OutOrStdout())
+	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
 	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
 		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
-		apiserverflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
+		cliflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
 		return nil
 	})
 	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
-		apiserverflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
+		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
 	})
 
 	return cmd
@@ -145,7 +147,8 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 	if c.SecureServing != nil {
 		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
-		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		// TODO: handle stoppedCh returned by c.SecureServing.Serve
+		if _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
@@ -182,6 +185,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 		"kube-system",
 		"cloud-controller-manager",
 		c.LeaderElectionClient.CoreV1(),
+		c.LeaderElectionClient.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: c.EventRecorder,
@@ -210,9 +214,11 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 
 // startControllers starts the cloud specific controller loops.
 func startControllers(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}, cloud cloudprovider.Interface, controllers map[string]initFunc) error {
-	if cloud != nil {
-		// Initialize the cloud provider with a reference to the clientBuilder
-		cloud.Initialize(c.ClientBuilder, stopCh)
+	// Initialize the cloud provider with a reference to the clientBuilder
+	cloud.Initialize(c.ClientBuilder, stopCh)
+	// Set the informer on the user cloud object
+	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
+		informerUserCloud.SetInformers(c.SharedInformers)
 	}
 
 	for controllerName, initFn := range controllers {
@@ -267,7 +273,6 @@ func newControllerInitializers() map[string]initFunc {
 	controllers := map[string]initFunc{}
 	controllers["cloud-node"] = startCloudNodeController
 	controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
-	controllers["persistentvolume-binder"] = startPersistentVolumeLabelController
 	controllers["service"] = startServiceController
 	controllers["route"] = startRouteController
 	return controllers

@@ -27,7 +27,7 @@ import (
 	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,9 +36,9 @@ import (
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
-	"k8s.io/client-go/util/integer"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/utils/integer"
 )
 
 const (
@@ -61,10 +61,11 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
+
 	// Reasons for deployment conditions
 	//
 	// Progressing:
-	//
+
 	// ReplicaSetUpdatedReason is added in a deployment when one of its replica sets is updated as part
 	// of the rollout process.
 	ReplicaSetUpdatedReason = "ReplicaSetUpdated"
@@ -89,7 +90,7 @@ const (
 	ResumedDeployReason = "DeploymentResumed"
 	//
 	// Available:
-	//
+
 	// MinimumReplicasAvailable is added in a deployment when it has its minimum replicas required available.
 	MinimumReplicasAvailable = "MinimumReplicasAvailable"
 	// MinimumReplicasUnavailable is added in a deployment when it doesn't have the minimum required replicas
@@ -401,7 +402,7 @@ func SetReplicasAnnotations(rs *apps.ReplicaSet, desiredReplicas, maxReplicas in
 	return updated
 }
 
-// AnnotationsNeedUpdate return true if ReplicasAnnotations need to be updated
+// ReplicasAnnotationsNeedUpdate return true if ReplicasAnnotations need to be updated
 func ReplicasAnnotationsNeedUpdate(rs *apps.ReplicaSet, desiredReplicas, maxReplicas int32) bool {
 	if rs.Annotations == nil {
 		return true
@@ -544,8 +545,12 @@ func RsListFromClient(c appsclient.AppsV1Interface) RsListFunc {
 	}
 }
 
-// TODO: switch this to full namespacers
+// TODO: switch RsListFunc and podListFunc to full namespacers
+
+// RsListFunc returns the ReplicaSet from the ReplicaSet namespace and the List metav1.ListOptions.
 type RsListFunc func(string, metav1.ListOptions) ([]*apps.ReplicaSet, error)
+
+// podListFunc returns the PodList from the Pod namespace and the List metav1.ListOptions.
 type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
 
 // ListReplicaSets returns a slice of RSes the given deployment targets.
@@ -883,9 +888,16 @@ func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired
 	return int32(surge), int32(unavailable), nil
 }
 
+// HasProgressDeadline checks if the Deployment d is expected to surface the reason
+// "ProgressDeadlineExceeded" when the Deployment progress takes longer than expected time.
 func HasProgressDeadline(d *apps.Deployment) bool {
 	return d.Spec.ProgressDeadlineSeconds != nil && *d.Spec.ProgressDeadlineSeconds != math.MaxInt32
 }
+
+// HasRevisionHistoryLimit checks if the Deployment d is expected to keep a specified number of
+// old replicaSets. These replicaSets are mainly kept with the purpose of rollback.
+// The RevisionHistoryLimit can start from 0 (no retained replicasSet). When set to math.MaxInt32,
+// the Deployment will keep all revisions.
 func HasRevisionHistoryLimit(d *apps.Deployment) bool {
 	return d.Spec.RevisionHistoryLimit != nil && *d.Spec.RevisionHistoryLimit != math.MaxInt32
 }

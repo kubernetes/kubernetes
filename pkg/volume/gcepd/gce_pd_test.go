@@ -29,12 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -85,7 +83,7 @@ type fakePDManager struct {
 func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
 	labels["fakepdmanager"] = "yes"
-	labels[kubeletapis.LabelZoneFailureDomain] = "zone1__zone2"
+	labels[v1.LabelZoneFailureDomain] = "zone1__zone2"
 	return "test-gce-volume-name", 100, labels, "", nil
 }
 
@@ -191,7 +189,7 @@ func TestPlugin(t *testing.T) {
 	}
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
 	size := cap.Value()
-	if size != 100*util.GIB {
+	if size != 100*volumehelpers.GiB {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)
 	}
 
@@ -199,8 +197,8 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() returned unexpected value for fakepdmanager: %v", persistentSpec.Labels["fakepdmanager"])
 	}
 
-	if persistentSpec.Labels[kubeletapis.LabelZoneFailureDomain] != "zone1__zone2" {
-		t.Errorf("Provision() returned unexpected value for %s: %v", kubeletapis.LabelZoneFailureDomain, persistentSpec.Labels[kubeletapis.LabelZoneFailureDomain])
+	if persistentSpec.Labels[v1.LabelZoneFailureDomain] != "zone1__zone2" {
+		t.Errorf("Provision() returned unexpected value for %s: %v", v1.LabelZoneFailureDomain, persistentSpec.Labels[v1.LabelZoneFailureDomain])
 	}
 
 	if persistentSpec.Spec.NodeAffinity == nil {
@@ -217,10 +215,10 @@ func TestPlugin(t *testing.T) {
 	if r == nil || r.Values[0] != "yes" || r.Operator != v1.NodeSelectorOpIn {
 		t.Errorf("NodeSelectorRequirement fakepdmanager-in-yes not found in volume NodeAffinity")
 	}
-	zones, _ := volumeutil.ZonesToSet("zone1,zone2")
-	r, _ = getNodeSelectorRequirementWithKey(kubeletapis.LabelZoneFailureDomain, term)
+	zones, _ := volumehelpers.ZonesToSet("zone1,zone2")
+	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
 	if r == nil {
-		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", kubeletapis.LabelZoneFailureDomain, zones)
+		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
 	}
 	sort.Strings(r.Values)
 	if !reflect.DeepEqual(r.Values, zones.List()) {

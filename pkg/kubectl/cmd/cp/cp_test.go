@@ -46,6 +46,7 @@ type FileType int
 const (
 	RegularFile FileType = 0
 	SymLink     FileType = 1
+	RegexFile   FileType = 2
 )
 
 func TestExtractFileSpec(t *testing.T) {
@@ -190,26 +191,33 @@ func TestStripPathShortcuts(t *testing.T) {
 	}
 }
 
-func TestTarUntar(t *testing.T) {
-	dir, err := ioutil.TempDir("", "input")
-	dir2, err2 := ioutil.TempDir("", "output")
-	if err != nil || err2 != nil {
-		t.Errorf("unexpected error: %v | %v", err, err2)
+func checkErr(t *testing.T, err error) {
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 		t.FailNow()
 	}
+}
+
+func TestTarUntar(t *testing.T) {
+	dir, err := ioutil.TempDir("", "input")
+	checkErr(t, err)
+	dir2, err := ioutil.TempDir("", "output")
+	checkErr(t, err)
+	dir3, err := ioutil.TempDir("", "dir")
+	checkErr(t, err)
+
 	dir = dir + "/"
 	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("Unexpected error cleaning up: %v", err)
-		}
-		if err := os.RemoveAll(dir2); err != nil {
-			t.Errorf("Unexpected error cleaning up: %v", err)
-		}
+		os.RemoveAll(dir)
+		os.RemoveAll(dir2)
+		os.RemoveAll(dir3)
 	}()
 
 	files := []struct {
 		name     string
+		nameList []string
 		data     string
+		omitted  bool
 		fileType FileType
 	}{
 		{
@@ -234,8 +242,31 @@ func TestTarUntar(t *testing.T) {
 		},
 		{
 			name:     "gakki",
-			data:     "/tmp/gakki",
+			data:     "tmp/gakki",
 			fileType: SymLink,
+		},
+		{
+			name:     "relative_to_dest",
+			data:     path.Join(dir2, "foo"),
+			fileType: SymLink,
+		},
+		{
+			name:     "tricky_relative",
+			data:     path.Join(dir3, "xyz"),
+			omitted:  true,
+			fileType: SymLink,
+		},
+		{
+			name:     "absolute_path",
+			data:     "/tmp/gakki",
+			omitted:  true,
+			fileType: SymLink,
+		},
+		{
+			name:     "blah*",
+			nameList: []string{"blah1", "blah2"},
+			data:     "regexp file name",
+			fileType: RegexFile,
 		},
 	}
 
@@ -245,27 +276,22 @@ func TestTarUntar(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if file.fileType == RegularFile {
-			f, err := os.Create(filepath)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			defer f.Close()
-			if _, err := io.Copy(f, bytes.NewBuffer([]byte(file.data))); err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if err := f.Close(); err != nil {
-				t.Fatal(err)
-			}
+			createTmpFile(t, filepath, file.data)
 		} else if file.fileType == SymLink {
 			err := os.Symlink(file.data, filepath)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+		} else if file.fileType == RegexFile {
+			for _, fileName := range file.nameList {
+				createTmpFile(t, path.Join(dir, fileName), file.data)
+			}
 		} else {
 			t.Fatalf("unexpected file type: %v", file)
 		}
-
 	}
+
+	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
 
 	writer := &bytes.Buffer{}
 	if err := makeTar(dir, dir, writer); err != nil {
@@ -273,7 +299,7 @@ func TestTarUntar(t *testing.T) {
 	}
 
 	reader := bytes.NewBuffer(writer.Bytes())
-	if err := untarAll(reader, dir2, ""); err != nil {
+	if err := opts.untarAll(reader, dir2, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -282,25 +308,15 @@ func TestTarUntar(t *testing.T) {
 		filePath := filepath.Join(absPath, file.name)
 
 		if file.fileType == RegularFile {
-			f, err := os.Open(filePath)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			defer f.Close()
-			buff := &bytes.Buffer{}
-			if _, err := io.Copy(buff, f); err != nil {
-				t.Fatal(err)
-			}
-			if err := f.Close(); err != nil {
-				t.Fatal(err)
-			}
-			if file.data != string(buff.Bytes()) {
-				t.Fatalf("expected: %s, saw: %s", file.data, string(buff.Bytes()))
-			}
+			cmpFileData(t, filePath, file.data)
 		} else if file.fileType == SymLink {
 			dest, err := os.Readlink(filePath)
-
+			if file.omitted {
+				if err != nil && strings.Contains(err.Error(), "no such file or directory") {
+					continue
+				}
+				t.Fatalf("expected to omit symlink for %s", filePath)
+			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -308,9 +324,45 @@ func TestTarUntar(t *testing.T) {
 			if file.data != dest {
 				t.Fatalf("expected: %s, saw: %s", file.data, dest)
 			}
+		} else if file.fileType == RegexFile {
+			for _, fileName := range file.nameList {
+				cmpFileData(t, path.Join(dir, fileName), file.data)
+			}
 		} else {
 			t.Fatalf("unexpected file type: %v", file)
 		}
+	}
+}
+
+func TestTarUntarWrongPrefix(t *testing.T) {
+	dir, err := ioutil.TempDir("", "input")
+	checkErr(t, err)
+	dir2, err := ioutil.TempDir("", "output")
+	checkErr(t, err)
+
+	dir = dir + "/"
+	defer func() {
+		os.RemoveAll(dir)
+		os.RemoveAll(dir2)
+	}()
+
+	filepath := path.Join(dir, "foo")
+	if err := os.MkdirAll(path.Dir(filepath), 0755); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	createTmpFile(t, filepath, "sample data")
+
+	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
+
+	writer := &bytes.Buffer{}
+	if err := makeTar(dir, dir, writer); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	reader := bytes.NewBuffer(writer.Bytes())
+	err = opts.untarAll(reader, dir2, "verylongprefix-showing-the-tar-was-tempered-with")
+	if err == nil || !strings.Contains(err.Error(), "tar contents corrupted") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -362,17 +414,7 @@ func TestCopyToLocalFileOrDir(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 				t.FailNow()
 			}
-			srcFile, err := os.Create(srcFilePath)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				t.FailNow()
-			}
-			defer srcFile.Close()
-
-			if _, err := io.Copy(srcFile, bytes.NewBuffer([]byte(file.data))); err != nil {
-				t.Errorf("unexpected error: %v", err)
-				t.FailNow()
-			}
+			createTmpFile(t, srcFilePath, file.data)
 			if file.destDirExists {
 				if err := os.MkdirAll(destPath, 0755); err != nil {
 					t.Errorf("unexpected error: %v", err)
@@ -396,11 +438,11 @@ func TestCopyToLocalFileOrDir(t *testing.T) {
 			}
 			defer srcTarFile.Close()
 
-			if err := untarAll(srcTarFile, destPath, getPrefix(srcFilePath)); err != nil {
+			opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
+			if err := opts.untarAll(srcTarFile, destPath, getPrefix(srcFilePath)); err != nil {
 				t.Errorf("unexpected error: %v", err)
 				t.FailNow()
 			}
-
 			actualDestFilePath := destPath
 			if file.destDirExists {
 				actualDestFilePath = filepath.Join(destPath, filepath.Base(srcFilePath))
@@ -409,17 +451,7 @@ func TestCopyToLocalFileOrDir(t *testing.T) {
 			if err != nil && os.IsNotExist(err) {
 				t.Errorf("expecting %s exists, but actually it's missing", actualDestFilePath)
 			}
-			destFile, err := os.Open(actualDestFilePath)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				t.FailNow()
-			}
-			defer destFile.Close()
-			buff := &bytes.Buffer{}
-			io.Copy(buff, destFile)
-			if file.data != string(buff.Bytes()) {
-				t.Errorf("expected: %s, actual: %s", file.data, string(buff.Bytes()))
-			}
+			cmpFileData(t, actualDestFilePath, file.data)
 		}()
 	}
 
@@ -470,16 +502,7 @@ func TestTarDestinationName(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 			t.FailNow()
 		}
-		f, err := os.Create(filepath)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			t.FailNow()
-		}
-		defer f.Close()
-		if _, err := io.Copy(f, bytes.NewBuffer([]byte(file.data))); err != nil {
-			t.Errorf("unexpected error: %v", err)
-			t.FailNow()
-		}
+		createTmpFile(t, filepath, file.data)
 	}
 
 	reader, writer := io.Pipe()
@@ -543,7 +566,8 @@ func TestBadTar(t *testing.T) {
 		t.FailNow()
 	}
 
-	if err := untarAll(&buf, dir, "/prefix"); err != nil {
+	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
+	if err := opts.untarAll(&buf, dir, "/prefix"); err != nil {
 		t.Errorf("unexpected error: %v ", err)
 		t.FailNow()
 	}
@@ -741,5 +765,38 @@ func TestValidate(t *testing.T) {
 				t.Errorf("expected error: %v, saw: %v, error: %v", test.expectedErr, err != nil, err)
 			}
 		})
+	}
+}
+
+func createTmpFile(t *testing.T, filepath, data string) {
+	f, err := os.Create(filepath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer f.Close()
+	if _, err := io.Copy(f, bytes.NewBuffer([]byte(data))); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func cmpFileData(t *testing.T, filePath, data string) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	defer f.Close()
+	buff := &bytes.Buffer{}
+	if _, err := io.Copy(buff, f); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if data != string(buff.Bytes()) {
+		t.Fatalf("expected: %s, saw: %s", data, string(buff.Bytes()))
 	}
 }

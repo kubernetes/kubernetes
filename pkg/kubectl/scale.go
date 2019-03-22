@@ -29,8 +29,6 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 )
 
-// TODO: Figure out if we should be waiting on initializers in the Scale() functions below.
-
 // Scaler provides an interface for resources that can be scaled.
 type Scaler interface {
 	// Scale scales the named resource after checking preconditions. It optionally

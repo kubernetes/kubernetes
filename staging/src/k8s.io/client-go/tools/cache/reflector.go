@@ -24,10 +24,8 @@ import (
 	"net"
 	"net/url"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -41,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/klog"
+	"k8s.io/utils/trace"
 )
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
@@ -95,17 +94,10 @@ func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyn
 	return NewNamedReflector(naming.GetNameFromCallsite(internalPackages...), lw, expectedType, store, resyncPeriod)
 }
 
-// reflectorDisambiguator is used to disambiguate started reflectors.
-// initialized to an unstable value to ensure meaning isn't attributed to the suffix.
-var reflectorDisambiguator = int64(time.Now().UnixNano() % 12345)
-
 // NewNamedReflector same as NewReflector, but with a specified name for logging
 func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
-	reflectorSuffix := atomic.AddInt64(&reflectorDisambiguator, 1)
 	r := &Reflector{
-		name: name,
-		// we need this to be unique per process (some names are still the same) but obvious who it belongs to
-		metrics:       newReflectorMetrics(makeValidPrometheusMetricLabel(fmt.Sprintf("reflector_"+name+"_%d", reflectorSuffix))),
+		name:          name,
 		listerWatcher: lw,
 		store:         store,
 		expectedType:  reflect.TypeOf(expectedType),
@@ -173,27 +165,55 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	// to be served from cache and potentially be delayed relative to
 	// etcd contents. Reflector framework will catch up via Watch() eventually.
 	options := metav1.ListOptions{ResourceVersion: "0"}
-	r.metrics.numberOfLists.Inc()
-	start := r.clock.Now()
-	list, err := r.listerWatcher.List(options)
-	if err != nil {
-		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
+
+	if err := func() error {
+		initTrace := trace.New("Reflector " + r.name + " ListAndWatch")
+		defer initTrace.LogIfLong(10 * time.Second)
+		var list runtime.Object
+		var err error
+		listCh := make(chan struct{}, 1)
+		panicCh := make(chan interface{}, 1)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					panicCh <- r
+				}
+			}()
+			list, err = r.listerWatcher.List(options)
+			close(listCh)
+		}()
+		select {
+		case <-stopCh:
+			return nil
+		case r := <-panicCh:
+			panic(r)
+		case <-listCh:
+		}
+		if err != nil {
+			return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
+		}
+		initTrace.Step("Objects listed")
+		listMetaInterface, err := meta.ListAccessor(list)
+		if err != nil {
+			return fmt.Errorf("%s: Unable to understand list result %#v: %v", r.name, list, err)
+		}
+		resourceVersion = listMetaInterface.GetResourceVersion()
+		initTrace.Step("Resource version extracted")
+		items, err := meta.ExtractList(list)
+		if err != nil {
+			return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
+		}
+		initTrace.Step("Objects extracted")
+		if err := r.syncWith(items, resourceVersion); err != nil {
+			return fmt.Errorf("%s: Unable to sync list result: %v", r.name, err)
+		}
+		initTrace.Step("SyncWith done")
+		r.setLastSyncResourceVersion(resourceVersion)
+		initTrace.Step("Resource version updated")
+		return nil
+	}(); err != nil {
+		return err
 	}
-	r.metrics.listDuration.Observe(time.Since(start).Seconds())
-	listMetaInterface, err := meta.ListAccessor(list)
-	if err != nil {
-		return fmt.Errorf("%s: Unable to understand list result %#v: %v", r.name, list, err)
-	}
-	resourceVersion = listMetaInterface.GetResourceVersion()
-	items, err := meta.ExtractList(list)
-	if err != nil {
-		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
-	}
-	r.metrics.numberOfItemsInList.Observe(float64(len(items)))
-	if err := r.syncWith(items, resourceVersion); err != nil {
-		return fmt.Errorf("%s: Unable to sync list result: %v", r.name, err)
-	}
-	r.setLastSyncResourceVersion(resourceVersion)
 
 	resyncerrc := make(chan error, 1)
 	cancelCh := make(chan struct{})
@@ -239,7 +259,6 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			TimeoutSeconds: &timeoutSeconds,
 		}
 
-		r.metrics.numberOfWatches.Inc()
 		w, err := r.listerWatcher.Watch(options)
 		if err != nil {
 			switch err {
@@ -291,11 +310,6 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, err
 	// Stopping the watcher should be idempotent and if we return from this function there's no way
 	// we're coming back in with the same watch interface.
 	defer w.Stop()
-	// update metrics
-	defer func() {
-		r.metrics.numberOfItemsInWatch.Observe(float64(eventCount))
-		r.metrics.watchDuration.Observe(time.Since(start).Seconds())
-	}()
 
 loop:
 	for {
@@ -351,7 +365,6 @@ loop:
 
 	watchDuration := r.clock.Now().Sub(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
-		r.metrics.numberOfShortWatches.Inc()
 		return fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", r.name)
 	}
 	klog.V(4).Infof("%s: Watch close - %v total %v items received", r.name, r.expectedType, eventCount)
@@ -370,9 +383,4 @@ func (r *Reflector) setLastSyncResourceVersion(v string) {
 	r.lastSyncResourceVersionMutex.Lock()
 	defer r.lastSyncResourceVersionMutex.Unlock()
 	r.lastSyncResourceVersion = v
-
-	rv, err := strconv.Atoi(v)
-	if err == nil {
-		r.metrics.lastResourceVersion.Set(float64(rv))
-	}
 }

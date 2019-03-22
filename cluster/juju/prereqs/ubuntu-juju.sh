@@ -22,7 +22,7 @@ set -o pipefail
 
 function check_for_ppa() {
     local repo="$1"
-    grep -qsw $repo /etc/apt/sources.list /etc/apt/sources.list.d/*
+    grep -qsw "${repo}" /etc/apt/sources.list /etc/apt/sources.list.d/*
 }
 
 function package_status() {
@@ -31,7 +31,7 @@ function package_status() {
     pkgstatus=$(dpkg-query -W --showformat='${Status}\n' "${pkgname}")
     if [[ "${pkgstatus}" != "install ok installed" ]]; then
         echo "Missing package ${pkgname}"
-        sudo apt-get --force-yes --yes install ${pkgname}
+        sudo apt-get --force-yes --yes install "${pkgname}"
     fi
 }
 

@@ -44,7 +44,7 @@ Here are the general rules that Kubelet plugin developers should follow:
 - The socket path needs to be unique within one directory, in normal case,
   each plugin type has its own sub directory, but the design does support socket file
   under any sub directory of PluginSockDir.
- 
+
 - A plugin should clean up its own socket upon exiting or when a new instance
   comes up. A plugin should NOT remove any sockets belonging to other plugins.
 
