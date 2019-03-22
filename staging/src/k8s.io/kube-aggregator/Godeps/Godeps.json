@@ -143,6 +143,10 @@
 			"Rev": "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 		},
 		{
+			"ImportPath": "github.com/google/uuid",
+			"Rev": "8c31c18f31ede9fc8eae72290a7e7a8064e9b3e3"
+		},
+		{
 			"ImportPath": "github.com/googleapis/gnostic/OpenAPIv2",
 			"Rev": "0c5108395e2debce0d731cf0287ddf7242066aba"
 		},
