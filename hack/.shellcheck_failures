@@ -43,12 +43,9 @@
 ./hack/lib/version.sh
 ./hack/list-feature-tests.sh
 ./hack/local-up-cluster.sh
-./hack/make-rules/build.sh
 ./hack/make-rules/clean.sh
-./hack/make-rules/cross.sh
 ./hack/make-rules/helpers/cache_go_dirs.sh
 ./hack/make-rules/make-help.sh
-./hack/make-rules/test-cmd.sh
 ./hack/make-rules/test-e2e-node.sh
 ./hack/make-rules/test-integration.sh
 ./hack/make-rules/test.sh
