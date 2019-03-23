@@ -20,9 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // PersistentVolumeBinderControllerConfiguration contains elements describing
 // PersistentVolumeBinderController.
 type PersistentVolumeBinderControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// pvClaimBinderSyncPeriod is the period for syncing persistent volumes
 	// and persistent volume claims.
 	PVClaimBinderSyncPeriod metav1.Duration

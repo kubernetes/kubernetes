@@ -16,8 +16,16 @@ limitations under the License.
 
 package config
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // TTLAfterFinishedControllerConfiguration contains elements describing TTLAfterFinishedController.
 type TTLAfterFinishedControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// concurrentTTLSyncs is the number of TTL-after-finished collector workers that are
 	// allowed to sync concurrently.
 	ConcurrentTTLSyncs int32

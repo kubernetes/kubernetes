@@ -210,8 +210,12 @@ type KubeCloudSharedConfiguration struct {
 	NodeSyncPeriod metav1.Duration
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // AttachDetachControllerConfiguration contains elements describing AttachDetachController.
 type AttachDetachControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// Reconciler runs a periodic loop to reconcile the desired state of the with
 	// the actual state of the world by triggering attach detach operations.
 	// This flag enables or disables reconcile.  Is false by default, and thus enabled.
@@ -229,8 +233,12 @@ type CloudProviderConfiguration struct {
 	CloudConfigFile string
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // CSRSigningControllerConfiguration contains elements describing CSRSigningController.
 type CSRSigningControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// clusterSigningCertFile is the filename containing a PEM-encoded
 	// X509 CA certificate used to issue cluster-scoped certificates
 	ClusterSigningCertFile string
@@ -242,16 +250,24 @@ type CSRSigningControllerConfiguration struct {
 	ClusterSigningDuration metav1.Duration
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // DaemonSetControllerConfiguration contains elements describing DaemonSetController.
 type DaemonSetControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// concurrentDaemonSetSyncs is the number of daemonset objects that are
 	// allowed to sync concurrently. Larger number = more responsive daemonset,
 	// but more CPU (and network) load.
 	ConcurrentDaemonSetSyncs int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // DeploymentControllerConfiguration contains elements describing DeploymentController.
 type DeploymentControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// concurrentDeploymentSyncs is the number of deployment objects that are
 	// allowed to sync concurrently. Larger number = more responsive deployments,
 	// but more CPU (and network) load.
@@ -273,16 +289,24 @@ type DeprecatedControllerConfiguration struct {
 	RegisterRetryCount int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // EndpointControllerConfiguration contains elements describing EndpointController.
 type EndpointControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// concurrentEndpointSyncs is the number of endpoint syncing operations
 	// that will be done concurrently. Larger number = faster endpoint updating,
 	// but more CPU (and network) load.
 	ConcurrentEndpointSyncs int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.
 type GarbageCollectorControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// enables the generic garbage collector. MUST be synced with the
 	// corresponding flag of the kube-apiserver. WARNING: the generic garbage
 	// collector is an alpha feature.
@@ -294,8 +318,12 @@ type GarbageCollectorControllerConfiguration struct {
 	GCIgnoredResources []GroupResource
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // HPAControllerConfiguration contains elements describing HPAController.
 type HPAControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// HorizontalPodAutoscalerSyncPeriod is the period for syncing the number of
 	// pods in horizontal pod autoscaler.
 	HorizontalPodAutoscalerSyncPeriod metav1.Duration
@@ -323,16 +351,24 @@ type HPAControllerConfiguration struct {
 	HorizontalPodAutoscalerInitialReadinessDelay metav1.Duration
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // JobControllerConfiguration contains elements describing JobController.
 type JobControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// concurrentJobSyncs is the number of job objects that are
 	// allowed to sync concurrently. Larger number = more responsive jobs,
 	// but more CPU (and network) load.
 	ConcurrentJobSyncs int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // NamespaceControllerConfiguration contains elements describing NamespaceController.
 type NamespaceControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// namespaceSyncPeriod is the period for syncing namespace life-cycle
 	// updates.
 	NamespaceSyncPeriod metav1.Duration
@@ -341,16 +377,24 @@ type NamespaceControllerConfiguration struct {
 	ConcurrentNamespaceSyncs int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // NodeIPAMControllerConfiguration contains elements describing NodeIpamController.
 type NodeIPAMControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// serviceCIDR is CIDR Range for Services in cluster.
 	ServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
 	NodeCIDRMaskSize int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.
 type NodeLifecycleControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// If set to true enables NoExecute Taints and will evict all not-tolerating
 	// Pod running on Nodes tainted with this kind of Taints.
 	EnableTaintManager *bool
@@ -375,9 +419,13 @@ type NodeLifecycleControllerConfiguration struct {
 	UnhealthyZoneThreshold float32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // PersistentVolumeBinderControllerConfiguration contains elements describing
 // PersistentVolumeBinderController.
 type PersistentVolumeBinderControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// pvClaimBinderSyncPeriod is the period for syncing persistent volumes
 	// and persistent volume claims.
 	PVClaimBinderSyncPeriod metav1.Duration
@@ -385,32 +433,48 @@ type PersistentVolumeBinderControllerConfiguration struct {
 	VolumeConfiguration VolumeConfiguration
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // PodGCControllerConfiguration contains elements describing PodGCController.
 type PodGCControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// terminatedPodGCThreshold is the number of terminated pods that can exist
 	// before the terminated pod garbage collector starts deleting terminated pods.
 	// If <= 0, the terminated pod garbage collector is disabled.
 	TerminatedPodGCThreshold int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ReplicaSetControllerConfiguration contains elements describing ReplicaSetController.
 type ReplicaSetControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// concurrentRSSyncs is the number of replica sets that are  allowed to sync
 	// concurrently. Larger number = more responsive replica  management, but more
 	// CPU (and network) load.
 	ConcurrentRSSyncs int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ReplicationControllerConfiguration contains elements describing ReplicationController.
 type ReplicationControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// concurrentRCSyncs is the number of replication controllers that are
 	// allowed to sync concurrently. Larger number = more responsive replica
 	// management, but more CPU (and network) load.
 	ConcurrentRCSyncs int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ResourceQuotaControllerConfiguration contains elements describing ResourceQuotaController.
 type ResourceQuotaControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// resourceQuotaSyncPeriod is the period for syncing quota usage status
 	// in the system.
 	ResourceQuotaSyncPeriod metav1.Duration
@@ -420,8 +484,12 @@ type ResourceQuotaControllerConfiguration struct {
 	ConcurrentResourceQuotaSyncs int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // SAControllerConfiguration contains elements describing ServiceAccountController.
 type SAControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// serviceAccountKeyFile is the filename containing a PEM-encoded private RSA key
 	// used to sign service account tokens.
 	ServiceAccountKeyFile string
@@ -433,16 +501,24 @@ type SAControllerConfiguration struct {
 	RootCAFile string
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ServiceControllerConfiguration contains elements describing ServiceController.
 type ServiceControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// concurrentServiceSyncs is the number of services that are
 	// allowed to sync concurrently. Larger number = more responsive service
 	// management, but more CPU (and network) load.
 	ConcurrentServiceSyncs int32
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // TTLAfterFinishedControllerConfiguration contains elements describing TTLAfterFinishedController.
 type TTLAfterFinishedControllerConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// concurrentTTLSyncs is the number of TTL-after-finished collector workers that are
 	// allowed to sync concurrently.
 	ConcurrentTTLSyncs int32

@@ -16,6 +16,10 @@ limitations under the License.
 
 package config
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 // GroupResource describes an group resource.
 type GroupResource struct {
 	// group is the group portion of the GroupResource.
@@ -24,8 +28,12 @@ type GroupResource struct {
 	Resource string
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.
 type GarbageCollectorControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// enables the generic garbage collector. MUST be synced with the
 	// corresponding flag of the kube-apiserver. WARNING: the generic garbage
 	// collector is an alpha feature.

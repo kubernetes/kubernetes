@@ -28,7 +28,7 @@ import (
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
-	poautosclerconfig "k8s.io/kubernetes/pkg/controller/podautoscaler/config"
+	podautosclerconfig "k8s.io/kubernetes/pkg/controller/podautoscaler/config"
 	podgcconfig "k8s.io/kubernetes/pkg/controller/podgc/config"
 	replicasetconfig "k8s.io/kubernetes/pkg/controller/replicaset/config"
 	replicationconfig "k8s.io/kubernetes/pkg/controller/replication/config"
@@ -74,7 +74,7 @@ type KubeControllerManagerConfiguration struct {
 	// GarbageCollectorController related features.
 	GarbageCollectorController garbagecollectorconfig.GarbageCollectorControllerConfiguration
 	// HPAControllerConfiguration holds configuration for HPAController related features.
-	HPAController poautosclerconfig.HPAControllerConfiguration
+	HPAController podautosclerconfig.HPAControllerConfiguration
 	// JobControllerConfiguration holds configuration for JobController related features.
 	JobController jobconfig.JobControllerConfiguration
 	// NamespaceControllerConfiguration holds configuration for NamespaceController

@@ -20,8 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // CSRSigningControllerConfiguration contains elements describing CSRSigningController.
 type CSRSigningControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// clusterSigningCertFile is the filename containing a PEM-encoded
 	// X509 CA certificate used to issue cluster-scoped certificates
 	ClusterSigningCertFile string

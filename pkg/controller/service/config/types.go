@@ -16,8 +16,16 @@ limitations under the License.
 
 package config
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ServiceControllerConfiguration contains elements describing ServiceController.
 type ServiceControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// concurrentServiceSyncs is the number of services that are
 	// allowed to sync concurrently. Larger number = more responsive service
 	// management, but more CPU (and network) load.

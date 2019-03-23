@@ -16,8 +16,16 @@ limitations under the License.
 
 package config
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // SAControllerConfiguration contains elements describing ServiceAccountController.
 type SAControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// serviceAccountKeyFile is the filename containing a PEM-encoded private RSA key
 	// used to sign service account tokens.
 	ServiceAccountKeyFile string

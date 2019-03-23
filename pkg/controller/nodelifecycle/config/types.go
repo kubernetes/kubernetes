@@ -20,8 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.
 type NodeLifecycleControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// If set to true enables NoExecute Taints and will evict all not-tolerating
 	// Pod running on Nodes tainted with this kind of Taints.
 	EnableTaintManager bool

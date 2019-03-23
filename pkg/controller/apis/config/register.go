@@ -19,6 +19,25 @@ package config
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
+	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
+	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
+	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
+	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
+	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
+	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
+	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
+	podautosclerconfig "k8s.io/kubernetes/pkg/controller/podautoscaler/config"
+	podgcconfig "k8s.io/kubernetes/pkg/controller/podgc/config"
+	replicasetconfig "k8s.io/kubernetes/pkg/controller/replicaset/config"
+	replicationconfig "k8s.io/kubernetes/pkg/controller/replication/config"
+	resourcequotaconfig "k8s.io/kubernetes/pkg/controller/resourcequota/config"
+	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
+	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
+	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
+	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
+	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 )
 
 // GroupName is the group name used in this package
@@ -38,6 +57,25 @@ var (
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&KubeControllerManagerConfiguration{},
+		&attachdetachconfig.AttachDetachControllerConfiguration{},
+		&csrsigningconfig.CSRSigningControllerConfiguration{},
+		&daemonconfig.DaemonSetControllerConfiguration{},
+		&deploymentconfig.DeploymentControllerConfiguration{},
+		&endpointconfig.EndpointControllerConfiguration{},
+		&garbagecollectorconfig.GarbageCollectorControllerConfiguration{},
+		&podautosclerconfig.HPAControllerConfiguration{},
+		&jobconfig.JobControllerConfiguration{},
+		&namespaceconfig.NamespaceControllerConfiguration{},
+		&nodeipamconfig.NodeIPAMControllerConfiguration{},
+		&nodelifecycleconfig.NodeLifecycleControllerConfiguration{},
+		&persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{},
+		&podgcconfig.PodGCControllerConfiguration{},
+		&replicasetconfig.ReplicaSetControllerConfiguration{},
+		&replicationconfig.ReplicationControllerConfiguration{},
+		&resourcequotaconfig.ResourceQuotaControllerConfiguration{},
+		&serviceaccountconfig.SAControllerConfiguration{},
+		&serviceconfig.ServiceControllerConfiguration{},
+		&ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{},
 	)
 	return nil
 }

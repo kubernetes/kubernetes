@@ -20,8 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // AttachDetachControllerConfiguration contains elements describing AttachDetachController.
 type AttachDetachControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// Reconciler runs a periodic loop to reconcile the desired state of the with
 	// the actual state of the world by triggering attach detach operations.
 	// This flag enables or disables reconcile.  Is false by default, and thus enabled.

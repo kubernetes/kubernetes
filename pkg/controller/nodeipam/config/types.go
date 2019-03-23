@@ -16,8 +16,16 @@ limitations under the License.
 
 package config
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // NodeIPAMControllerConfiguration contains elements describing NodeIPAMController.
 type NodeIPAMControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// serviceCIDR is CIDR Range for Services in cluster.
 	ServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.

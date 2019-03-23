@@ -20,8 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // DeploymentControllerConfiguration contains elements describing DeploymentController.
 type DeploymentControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// concurrentDeploymentSyncs is the number of deployment objects that are
 	// allowed to sync concurrently. Larger number = more responsive deployments,
 	// but more CPU (and network) load.

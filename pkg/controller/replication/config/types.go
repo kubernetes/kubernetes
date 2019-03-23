@@ -16,8 +16,16 @@ limitations under the License.
 
 package config
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ReplicationControllerConfiguration contains elements describing ReplicationController.
 type ReplicationControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// concurrentRCSyncs is the number of replication controllers that are
 	// allowed to sync concurrently. Larger number = more responsive replica
 	// management, but more CPU (and network) load.

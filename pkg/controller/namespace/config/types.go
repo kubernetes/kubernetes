@@ -20,8 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // NamespaceControllerConfiguration contains elements describing NamespaceController.
 type NamespaceControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// namespaceSyncPeriod is the period for syncing namespace life-cycle
 	// updates.
 	NamespaceSyncPeriod metav1.Duration

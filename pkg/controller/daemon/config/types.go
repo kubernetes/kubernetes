@@ -16,8 +16,16 @@ limitations under the License.
 
 package config
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // DaemonSetControllerConfiguration contains elements describing DaemonSetController.
 type DaemonSetControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// concurrentDaemonSetSyncs is the number of daemonset objects that are
 	// allowed to sync concurrently. Larger number = more responsive daemonset,
 	// but more CPU (and network) load.

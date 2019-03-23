@@ -20,8 +20,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ResourceQuotaControllerConfiguration contains elements describing ResourceQuotaController.
 type ResourceQuotaControllerConfiguration struct {
+	metav1.TypeMeta
+
 	// resourceQuotaSyncPeriod is the period for syncing quota usage status
 	// in the system.
 	ResourceQuotaSyncPeriod metav1.Duration
