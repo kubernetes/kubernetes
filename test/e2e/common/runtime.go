@@ -331,32 +331,61 @@ while true; do sleep 1; done
 				}
 			}
 
-			It("should not be able to pull image from invalid registry [NodeConformance]", func() {
+			/*
+				Release : v1.15
+				Testname: Container Runtime, image registry, pull from invalid registry
+				Description: Create a Pod with a container which is set to pull image from invalid registry. Container MUST be in waiting state due to error during image pull and the Pod status MUST be in Pending state.
+			*/
+			framework.ConformanceIt("should not be able to pull image from invalid registry [NodeConformance]", func() {
 				image := "invalid.com/invalid/alpine:3.1"
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
-			It("should not be able to pull non-existing image from gcr.io [NodeConformance]", func() {
+			/*
+				Release : v1.15
+				Testname: Container Runtime, image registry, pull non-existing image
+				Description: Create a Pod with a container which is set to pull non-existing image from the image registry. Container MUST be in waiting state due to error during image pull and the Pod status MUST be in Pending state.
+			*/
+			framework.ConformanceIt("should not be able to pull non-existing image from gcr.io [NodeConformance]", func() {
 				image := "k8s.gcr.io/invalid-image:invalid-tag"
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
+			/*
+				Release : v1.15
+				Testname: Container Runtime, image registry, pull linux image from gcr.io
+				Description: Create a Pod with a container which is set to pull Linux based image from scr.io image registry. Container MUST be in running state and the Pod MUST be in running state.
+				Note: May not be promoted to Conformance as this e2e is using debian base image and imposing linux specific constraint.
+			*/
 			It("should be able to pull image from gcr.io [LinuxOnly] [NodeConformance]", func() {
 				image := "gcr.io/google-containers/debian-base:0.4.1"
 				imagePullTest(image, false, v1.PodRunning, false, false)
 			})
 
+			/*
+				Release : v1.15
+				Testname: Container Runtime, image registry, pull windows image from gcr.io
+				Description: Create a Pod with a container which is set to pull Windows based image from scr.io image registry. Container MUST be in running state and the Pod MUST be in running state.
+				Note: May not be promoted to Conformance as this e2e would be skipped on non-windows platform.
+			*/
 			It("should be able to pull image from gcr.io [NodeConformance]", func() {
 				framework.SkipUnlessNodeOSDistroIs("windows")
 				image := "gcr.io/kubernetes-e2e-test-images/windows-nanoserver:v1"
 				imagePullTest(image, false, v1.PodRunning, false, true)
 			})
 
+			/*
+				Release : v1.15
+				Testname: Container Runtime, image registry, pull from docker hub
+				Description: Create a Pod with a container which is set to pull linux based image from docker hub image registry. Container MUST be in running state and the Pod MUST be in running state.
+				Note: May not be promoted to Conformance as this e2e is using alpine image and imposing linux specific constraint.
+			*/
 			It("should be able to pull image from docker hub [LinuxOnly] [NodeConformance]", func() {
 				image := "alpine:3.7"
 				imagePullTest(image, false, v1.PodRunning, false, false)
 			})
 
+			//Note: May not be promoted to Conformance as this e2e would be skipped on non-windows platform.
 			It("should be able to pull image from docker hub [NodeConformance]", func() {
 				framework.SkipUnlessNodeOSDistroIs("windows")
 				// TODO(claudiub): Switch to nanoserver image manifest list.
@@ -364,16 +393,28 @@ while true; do sleep 1; done
 				imagePullTest(image, false, v1.PodRunning, false, true)
 			})
 
-			It("should not be able to pull from private registry without secret [NodeConformance]", func() {
+			/*
+				Release : v1.15
+				Testname: Container Runtime, image registry, pull from private registry without secret
+				Description: Create a Pod with a container which is set to pull image from private registry without providing the necessary secret. Container MUST remain in waiting state due to error during image pull and the Pod status MUST be in Pending state.
+			*/
+			framework.ConformanceIt("should not be able to pull from private registry without secret [NodeConformance]", func() {
 				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
+			/*
+				Release : v1.15
+				Testname: Container Runtime, image registry, pull from private registry with secret
+				Description: Create a Pod with a container which is set to pull image from private registry with necessary secret. Container MUST be in running state and the Pod MUST be in running state.
+				Note: May not be promoted to Conformance as this e2e is using alpine image and imposing linux specific constraint.
+			*/
 			It("should be able to pull from private registry with secret [LinuxOnly] [NodeConformance]", func() {
 				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
 				imagePullTest(image, true, v1.PodRunning, false, false)
 			})
 
+			//Note: May not be promoted to Conformance as this e2e would be skipped on non-windows platform.
 			It("should be able to pull from private registry with secret [NodeConformance]", func() {
 				framework.SkipUnlessNodeOSDistroIs("windows")
 				image := "gcr.io/authenticated-image-pulling/windows-nanoserver:v1"
