@@ -51,7 +51,7 @@ func UnsafeObjectConvertor(scheme *Scheme) ObjectConvertor {
 func SetField(src interface{}, v reflect.Value, fieldName string) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
-		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+		return fmt.Errorf("couldn't find %v field in %T", fieldName, v.Interface())
 	}
 	srcValue := reflect.ValueOf(src)
 	if srcValue.Type().AssignableTo(field.Type()) {
@@ -70,7 +70,7 @@ func SetField(src interface{}, v reflect.Value, fieldName string) error {
 func Field(v reflect.Value, fieldName string, dest interface{}) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
-		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+		return fmt.Errorf("couldn't find %v field in %T", fieldName, v.Interface())
 	}
 	destValue, err := conversion.EnforcePtr(dest)
 	if err != nil {
@@ -93,7 +93,7 @@ func Field(v reflect.Value, fieldName string, dest interface{}) error {
 func FieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
-		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+		return fmt.Errorf("couldn't find %v field in %T", fieldName, v.Interface())
 	}
 	v, err := conversion.EnforcePtr(dest)
 	if err != nil {
