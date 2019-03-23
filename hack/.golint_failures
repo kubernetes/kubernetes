@@ -168,7 +168,6 @@ pkg/kubectl/cmd/testing
 pkg/kubectl/cmd/top
 pkg/kubectl/cmd/util
 pkg/kubectl/cmd/util/openapi
-pkg/kubectl/cmd/version
 pkg/kubectl/cmd/wait
 pkg/kubectl/describe/versioned
 pkg/kubectl/generate
