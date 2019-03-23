@@ -24,11 +24,14 @@ go_library(
         "tcpip.go",
         "transport.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/ssh",
     importpath = "golang.org/x/crypto/ssh",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/crypto/curve25519:go_default_library",
         "//vendor/golang.org/x/crypto/ed25519:go_default_library",
+        "//vendor/golang.org/x/crypto/internal/chacha20:go_default_library",
+        "//vendor/golang.org/x/crypto/poly1305:go_default_library",
     ],
 )
 

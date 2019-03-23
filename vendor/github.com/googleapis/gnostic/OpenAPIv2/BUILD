@@ -6,6 +6,7 @@ go_library(
         "OpenAPIv2.go",
         "OpenAPIv2.pb.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/googleapis/gnostic/OpenAPIv2",
     importpath = "github.com/googleapis/gnostic/OpenAPIv2",
     visibility = ["//visibility:public"],
     deps = [
@@ -14,12 +15,6 @@ go_library(
         "//vendor/github.com/googleapis/gnostic/compiler:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["OpenAPIv2.proto"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(

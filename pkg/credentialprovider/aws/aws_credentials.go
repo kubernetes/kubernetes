@@ -26,11 +26,16 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecr"
-	"github.com/golang/glog"
+	"k8s.io/klog"
+
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/version"
 )
 
-const registryURLTemplate = "*.dkr.ecr.%s.amazonaws.com"
+const awsChinaRegionPrefix = "cn-"
+const awsStandardDNSSuffix = "amazonaws.com"
+const awsChinaDNSSuffix = "amazonaws.com.cn"
+const registryURLTemplate = "*.dkr.ecr.%s.%s"
 
 // awsHandlerLogger is a handler that logs all AWS SDK requests
 // Copied from pkg/cloudprovider/providers/aws/log_handler.go
@@ -43,7 +48,7 @@ func awsHandlerLogger(req *request.Request) {
 		name = req.Operation.Name
 	}
 
-	glog.V(3).Infof("AWS request: %s:%s in %s", service, name, *region)
+	klog.V(3).Infof("AWS request: %s:%s in %s", service, name, *region)
 }
 
 // An interface for testing purposes.
@@ -80,6 +85,16 @@ type ecrProvider struct {
 
 var _ credentialprovider.DockerConfigProvider = &ecrProvider{}
 
+// registryURL has different suffix in AWS China region
+func registryURL(region string) string {
+	dnsSuffix := awsStandardDNSSuffix
+	// deal with aws none standard regions
+	if strings.HasPrefix(region, awsChinaRegionPrefix) {
+		dnsSuffix = awsChinaDNSSuffix
+	}
+	return fmt.Sprintf(registryURLTemplate, region, dnsSuffix)
+}
+
 // RegisterCredentialsProvider registers a credential provider for the specified region.
 // It creates a lazy provider for each AWS region, in order to support
 // cross-region ECR access. They have to be lazy because it's unlikely, but not
@@ -87,12 +102,12 @@ var _ credentialprovider.DockerConfigProvider = &ecrProvider{}
 // This should be called only if using the AWS cloud provider.
 // This way, we avoid timeouts waiting for a non-existent provider.
 func RegisterCredentialsProvider(region string) {
-	glog.V(4).Infof("registering credentials provider for AWS region %q", region)
+	klog.V(4).Infof("registering credentials provider for AWS region %q", region)
 
 	credentialprovider.RegisterCredentialProvider("aws-ecr-"+region,
 		&lazyEcrProvider{
 			region:    region,
-			regionURL: fmt.Sprintf(registryURLTemplate, region),
+			regionURL: registryURL(region),
 		})
 }
 
@@ -108,7 +123,7 @@ func (p *lazyEcrProvider) Enabled() bool {
 // provider only when we actually need it the first time.
 func (p *lazyEcrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
 	if p.actualProvider == nil {
-		glog.V(2).Infof("Creating ecrProvider for %s", p.region)
+		klog.V(2).Infof("Creating ecrProvider for %s", p.region)
 		p.actualProvider = &credentialprovider.CachingDockerConfigProvider{
 			Provider: newEcrProvider(p.region, nil),
 			// Refresh credentials a little earlier than expiration time
@@ -136,7 +151,7 @@ func (p *lazyEcrProvider) Provide() credentialprovider.DockerConfig {
 func newEcrProvider(region string, getter tokenGetter) *ecrProvider {
 	return &ecrProvider{
 		region:    region,
-		regionURL: fmt.Sprintf(registryURLTemplate, region),
+		regionURL: registryURL(region),
 		getter:    getter,
 	}
 }
@@ -147,7 +162,7 @@ func newEcrProvider(region string, getter tokenGetter) *ecrProvider {
 // use ECR somehow?
 func (p *ecrProvider) Enabled() bool {
 	if p.region == "" {
-		glog.Errorf("Called ecrProvider.Enabled() with no region set")
+		klog.Errorf("Called ecrProvider.Enabled() with no region set")
 		return false
 	}
 
@@ -155,6 +170,10 @@ func (p *ecrProvider) Enabled() bool {
 		Credentials: nil,
 		Region:      &p.region,
 	}))}
+	getter.svc.Handlers.Build.PushFrontNamed(request.NamedHandler{
+		Name: "k8s/user-agent",
+		Fn:   request.MakeAddToUserAgentHandler("kubernetes", version.Get().String()),
+	})
 	getter.svc.Handlers.Sign.PushFrontNamed(request.NamedHandler{
 		Name: "k8s/logger",
 		Fn:   awsHandlerLogger,
@@ -177,11 +196,11 @@ func (p *ecrProvider) Provide() credentialprovider.DockerConfig {
 	params := &ecr.GetAuthorizationTokenInput{}
 	output, err := p.getter.GetAuthorizationToken(params)
 	if err != nil {
-		glog.Errorf("while requesting ECR authorization token %v", err)
+		klog.Errorf("while requesting ECR authorization token %v", err)
 		return cfg
 	}
 	if output == nil {
-		glog.Errorf("Got back no ECR token")
+		klog.Errorf("Got back no ECR token")
 		return cfg
 	}
 
@@ -190,7 +209,7 @@ func (p *ecrProvider) Provide() credentialprovider.DockerConfig {
 			data.AuthorizationToken != nil {
 			decodedToken, err := base64.StdEncoding.DecodeString(aws.StringValue(data.AuthorizationToken))
 			if err != nil {
-				glog.Errorf("while decoding token for endpoint %v %v", data.ProxyEndpoint, err)
+				klog.Errorf("while decoding token for endpoint %v %v", data.ProxyEndpoint, err)
 				return cfg
 			}
 			parts := strings.SplitN(string(decodedToken), ":", 2)
@@ -203,7 +222,7 @@ func (p *ecrProvider) Provide() credentialprovider.DockerConfig {
 				Email: "not@val.id",
 			}
 
-			glog.V(3).Infof("Adding credentials for user %s in %s", user, p.region)
+			klog.V(3).Infof("Adding credentials for user %s in %s", user, p.region)
 			// Add our config entry for this region's registry URLs
 			cfg[p.regionURL] = entry
 

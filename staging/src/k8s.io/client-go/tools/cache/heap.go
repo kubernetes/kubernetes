@@ -204,7 +204,7 @@ func (h *Heap) AddIfNotPresent(obj interface{}) error {
 	return nil
 }
 
-// addIfNotPresentLocked assumes the lock is already held and adds the the provided
+// addIfNotPresentLocked assumes the lock is already held and adds the provided
 // item to the queue if it does not already exist.
 func (h *Heap) addIfNotPresentLocked(key string, obj interface{}) {
 	if _, exists := h.data.items[key]; exists {

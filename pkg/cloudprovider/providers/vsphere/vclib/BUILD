@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -23,20 +24,20 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//staging/src/k8s.io/client-go/pkg/version:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/github.com/vmware/govmomi:go_default_library",
         "//vendor/github.com/vmware/govmomi/find:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
         "//vendor/github.com/vmware/govmomi/pbm:go_default_library",
         "//vendor/github.com/vmware/govmomi/pbm/types:go_default_library",
         "//vendor/github.com/vmware/govmomi/property:go_default_library",
         "//vendor/github.com/vmware/govmomi/session:go_default_library",
+        "//vendor/github.com/vmware/govmomi/sts:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -52,6 +53,26 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/cloudprovider/providers/vsphere/vclib/diskmanagers:all-srcs",
+        "//pkg/cloudprovider/providers/vsphere/vclib/fixtures:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "connection_test.go",
+        "datacenter_test.go",
+        "datastore_test.go",
+        "folder_test.go",
+        "utils_test.go",
+        "virtualmachine_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//pkg/cloudprovider/providers/vsphere/vclib/fixtures:go_default_library",
+        "//vendor/github.com/vmware/govmomi:go_default_library",
+        "//vendor/github.com/vmware/govmomi/object:go_default_library",
+        "//vendor/github.com/vmware/govmomi/simulator:go_default_library",
+    ],
 )

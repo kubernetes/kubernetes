@@ -25,12 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -38,7 +39,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "services",
 	}
-	serviceStorage, statusStorage := NewREST(restOptions)
+	serviceStorage, statusStorage := NewGenericREST(restOptions)
 	return serviceStorage, statusStorage, server
 }
 
@@ -66,7 +67,7 @@ func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	validService := validService()
 	validService.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -97,7 +98,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
 		validService(),
@@ -124,7 +125,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate().ReturnDeletedObject()
 	test.TestDelete(validService())
 }
 
@@ -132,7 +133,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestGet(validService())
 }
 
@@ -140,7 +141,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestList(validService())
 }
 
@@ -148,7 +149,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestWatch(
 		validService(),
 		// matching labels
@@ -161,7 +162,7 @@ func TestWatch(t *testing.T) {
 		[]fields.Set{
 			{"metadata.name": "foo"},
 		},
-		// not matchin fields
+		// not matching fields
 		[]fields.Set{
 			{"metadata.name": "bar"},
 		},

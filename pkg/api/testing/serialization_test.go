@@ -19,41 +19,40 @@ package testing
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
+	gojson "encoding/json"
 	"io/ioutil"
 	"math/rand"
 	"reflect"
-	"strings"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	jsoniter "github.com/json-iterator/go"
-
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
-	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	k8s_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	k8s_apps_v1 "k8s.io/kubernetes/pkg/apis/apps/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
 // fuzzer registered with the apitesting package.
 func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runtime.Object, seed int64) runtime.Object {
-	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), api.Codecs).Fuzz(item)
+	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs).Fuzz(item)
 
 	j, err := meta.TypeAccessor(item)
 	if err != nil {
@@ -65,71 +64,71 @@ func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runti
 	return item
 }
 
-// dataAsString returns the given byte array as a string; handles detecting
-// protocol buffers.
-func dataAsString(data []byte) string {
-	dataString := string(data)
-	if !strings.HasPrefix(dataString, "{") {
-		dataString = "\n" + hex.Dump(data)
-		proto.NewBuffer(make([]byte, 0, 1024)).DebugPrint("decoded object", data)
-	}
-	return dataString
-}
-
-func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
-	intermediate1 := &extensions.ReplicaSet{}
-	if err := k8s_v1beta1.Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in, intermediate1, s); err != nil {
+func ConvertV1ReplicaSetToAPIReplicationController(in *appsv1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
+	intermediate1 := &apps.ReplicaSet{}
+	if err := k8s_apps_v1.Convert_v1_ReplicaSet_To_apps_ReplicaSet(in, intermediate1, s); err != nil {
 		return err
 	}
 
 	intermediate2 := &v1.ReplicationController{}
-	if err := k8s_api_v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
+	if err := k8s_api_v1.Convert_apps_ReplicaSet_To_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
 		return err
 	}
 
-	return k8s_api_v1.Convert_v1_ReplicationController_To_api_ReplicationController(intermediate2, out, s)
+	return k8s_api_v1.Convert_v1_ReplicationController_To_core_ReplicationController(intermediate2, out, s)
 }
 
 func TestSetControllerConversion(t *testing.T) {
-	if err := api.Scheme.AddConversionFuncs(Convert_v1beta1_ReplicaSet_to_api_ReplicationController); err != nil {
+	if err := legacyscheme.Scheme.AddConversionFuncs(ConvertV1ReplicaSetToAPIReplicationController); err != nil {
 		t.Fatal(err)
 	}
 
-	rs := &extensions.ReplicaSet{}
+	rs := &apps.ReplicaSet{}
 	rc := &api.ReplicationController{}
+	extGroup := schema.GroupVersion{Group: "apps", Version: "v1"}
+	extCodec := legacyscheme.Codecs.LegacyCodec(extGroup)
 
-	extGroup := testapi.Extensions
-	defaultGroup := testapi.Default
+	defaultGroup := schema.GroupVersion{Group: "", Version: "v1"}
+	defaultCodec := legacyscheme.Codecs.LegacyCodec(defaultGroup)
 
-	fuzzInternalObject(t, extGroup.InternalGroupVersion(), rs, rand.Int63())
+	fuzzInternalObject(t, schema.GroupVersion{Group: "apps", Version: runtime.APIVersionInternal}, rs, rand.Int63())
 
-	t.Logf("rs._internal.extensions -> rs.v1beta1.extensions")
-	data, err := runtime.Encode(extGroup.Codec(), rs)
+	// explicitly set the selector to something that is convertible to old-style selectors
+	// (since normally we'll fuzz the selectors with things that aren't convertible)
+	rs.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"foo": "bar",
+			"baz": "quux",
+		},
+	}
+
+	t.Logf("rs._internal.apps -> rs.v1.apps")
+	data, err := runtime.Encode(extCodec, rs)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
 
-	decoder := api.Codecs.DecoderToVersion(
-		api.Codecs.UniversalDeserializer(),
+	decoder := legacyscheme.Codecs.DecoderToVersion(
+		legacyscheme.Codecs.UniversalDeserializer(),
 		runtime.NewMultiGroupVersioner(
-			*defaultGroup.GroupVersion(),
-			schema.GroupKind{Group: defaultGroup.GroupVersion().Group},
-			schema.GroupKind{Group: extGroup.GroupVersion().Group},
+			defaultGroup,
+			schema.GroupKind{Group: defaultGroup.Group},
+			schema.GroupKind{Group: extGroup.Group},
 		),
 	)
 
-	t.Logf("rs.v1beta1.extensions -> rc._internal")
+	t.Logf("rs.v1.apps -> rc._internal")
 	if err := runtime.DecodeInto(decoder, data, rc); err != nil {
 		t.Fatalf("unexpected decoding error: %v", err)
 	}
 
 	t.Logf("rc._internal -> rc.v1")
-	data, err = runtime.Encode(defaultGroup.Codec(), rc)
+	data, err = runtime.Encode(defaultCodec, rc)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
 
-	t.Logf("rc.v1 -> rs._internal.extensions")
+	t.Logf("rc.v1 -> rs._internal.apps")
 	if err := runtime.DecodeInto(decoder, data, rs); err != nil {
 		t.Fatalf("unexpected decoding error: %v", err)
 	}
@@ -139,13 +138,13 @@ func TestSetControllerConversion(t *testing.T) {
 // debug issues that arise while adding a new API type.
 func TestSpecificKind(t *testing.T) {
 	// Uncomment the following line to enable logging of which conversions
-	// api.Scheme.Log(t)
-	internalGVK := schema.GroupVersionKind{Group: "extensions", Version: runtime.APIVersionInternal, Kind: "DaemonSet"}
+	// legacyscheme.Scheme.Log(t)
+	internalGVK := schema.GroupVersionKind{Group: "apps", Version: runtime.APIVersionInternal, Kind: "DaemonSet"}
 
 	seed := rand.Int63()
-	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), api.Codecs)
+	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)
 
-	roundtrip.RoundTripSpecificKind(t, internalGVK, api.Scheme, api.Codecs, fuzzer, nil)
+	roundtrip.RoundTripSpecificKind(t, internalGVK, legacyscheme.Scheme, legacyscheme.Codecs, fuzzer, nil)
 }
 
 var nonRoundTrippableTypes = sets.NewString(
@@ -158,11 +157,14 @@ var nonRoundTrippableTypes = sets.NewString(
 	"WatchEvent",
 	// ListOptions is now part of the meta group
 	"ListOptions",
-	// Delete options is only read in metav1
+	// DeleteOptions, CreateOptions and UpdateOptions are only read in metav1
 	"DeleteOptions",
+	"CreateOptions",
+	"UpdateOptions",
+	"PatchOptions",
 )
 
-var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions"}
+var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions", "PatchOptions"}
 
 // TestCommonKindsRegistered verifies that all group/versions registered with
 // the testapi package have the common kinds.
@@ -171,16 +173,16 @@ func TestCommonKindsRegistered(t *testing.T) {
 		for _, group := range testapi.Groups {
 			gv := group.GroupVersion()
 			gvk := gv.WithKind(kind)
-			obj, err := api.Scheme.New(gvk)
+			obj, err := legacyscheme.Scheme.New(gvk)
 			if err != nil {
 				t.Error(err)
 			}
 			defaults := gv.WithKind("")
 			var got *schema.GroupVersionKind
-			if obj, got, err = api.Codecs.LegacyCodec().Decode([]byte(`{"kind":"`+kind+`"}`), &defaults, obj); err != nil || gvk != *got {
+			if obj, got, err = legacyscheme.Codecs.LegacyCodec().Decode([]byte(`{"kind":"`+kind+`"}`), &defaults, obj); err != nil || gvk != *got {
 				t.Errorf("expected %v: %v %v", gvk, got, err)
 			}
-			data, err := runtime.Encode(api.Codecs.LegacyCodec(*gv), obj)
+			data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(*gv), obj)
 			if err != nil {
 				t.Errorf("expected %v: %v\n%s", gvk, err, string(data))
 				continue
@@ -204,20 +206,17 @@ func TestCommonKindsRegistered(t *testing.T) {
 // in all of the API groups registered for test in the testapi package.
 func TestRoundTripTypes(t *testing.T) {
 	seed := rand.Int63()
-	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), api.Codecs)
+	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)
+	nonRoundTrippableTypes := map[schema.GroupVersionKind]bool{}
 
-	nonRoundTrippableTypes := map[schema.GroupVersionKind]bool{
-		{Group: "componentconfig", Version: runtime.APIVersionInternal, Kind: "KubeProxyConfiguration"}:     true,
-		{Group: "componentconfig", Version: runtime.APIVersionInternal, Kind: "KubeSchedulerConfiguration"}: true,
-	}
-
-	roundtrip.RoundTripTypes(t, api.Scheme, api.Codecs, fuzzer, nonRoundTrippableTypes)
+	roundtrip.RoundTripTypes(t, legacyscheme.Scheme, legacyscheme.Codecs, fuzzer, nonRoundTrippableTypes)
 }
 
 // TestEncodePtr tests that a pointer to a golang type can be encoded and
 // decoded without information loss or mutation.
 func TestEncodePtr(t *testing.T) {
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{"name": "foo"},
@@ -228,8 +227,9 @@ func TestEncodePtr(t *testing.T) {
 
 			TerminationGracePeriodSeconds: &grace,
 
-			SecurityContext: &api.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SecurityContext:    &api.PodSecurityContext{},
+			SchedulerName:      api.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
 		},
 	}
 	obj := runtime.Object(pod)
@@ -243,6 +243,29 @@ func TestEncodePtr(t *testing.T) {
 	}
 	if !apiequality.Semantic.DeepEqual(obj2, pod) {
 		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, diff.ObjectDiff(obj2, pod))
+	}
+}
+
+func TestDecodeTimeStampWithoutQuotes(t *testing.T) {
+	testYAML := []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: 2018-08-30T14:10:58Z
+  name: test
+spec:
+  containers: null
+status: {}`)
+	if obj, err := runtime.Decode(testapi.Default.Codec(), testYAML); err != nil {
+		t.Fatalf("unable to decode yaml: %v", err)
+	} else {
+		if obj2, ok := obj.(*api.Pod); !ok {
+			t.Fatalf("Got wrong type")
+		} else {
+			if obj2.ObjectMeta.CreationTimestamp.UnixNano() != parseTimeOrDie("2018-08-30T14:10:58Z").UnixNano() {
+				t.Fatalf("Time stamps do not match")
+			}
+		}
 	}
 }
 
@@ -299,15 +322,18 @@ func TestUnversionedTypes(t *testing.T) {
 // TestObjectWatchFraming establishes that a watch event can be encoded and
 // decoded correctly through each of the supported RFC2046 media types.
 func TestObjectWatchFraming(t *testing.T) {
-	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), api.Codecs)
+	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs)
 	secret := &api.Secret{}
 	f.Fuzz(secret)
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
+	}
 	secret.Data["binary"] = []byte{0x00, 0x10, 0x30, 0x55, 0xff, 0x00}
 	secret.Data["utf8"] = []byte("a string with \u0345 characters")
 	secret.Data["long"] = bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x00}, 1000)
-	converted, _ := api.Scheme.ConvertToVersion(secret, v1.SchemeGroupVersion)
+	converted, _ := legacyscheme.Scheme.ConvertToVersion(secret, v1.SchemeGroupVersion)
 	v1secret := converted.(*v1.Secret)
-	for _, info := range api.Codecs.SupportedMediaTypes() {
+	for _, info := range legacyscheme.Codecs.SupportedMediaTypes() {
 		if info.StreamSerializer == nil {
 			continue
 		}
@@ -318,7 +344,7 @@ func TestObjectWatchFraming(t *testing.T) {
 			t.Errorf("no embedded serializer for %s", info.MediaType)
 			continue
 		}
-		innerDecode := api.Codecs.DecoderToVersion(embedded, api.SchemeGroupVersion)
+		innerDecode := legacyscheme.Codecs.DecoderToVersion(embedded, api.SchemeGroupVersion)
 
 		// write a single object through the framer and back out
 		obj := &bytes.Buffer{}
@@ -381,13 +407,13 @@ func TestObjectWatchFraming(t *testing.T) {
 const benchmarkSeed = 100
 
 func benchmarkItems(b *testing.B) []v1.Pod {
-	apiObjectFuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), api.Codecs)
+	apiObjectFuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs)
 	items := make([]v1.Pod, 10)
 	for i := range items {
 		var pod api.Pod
 		apiObjectFuzzer.Fuzz(&pod)
 		pod.Spec.InitContainers, pod.Status.InitContainerStatuses = nil, nil
-		out, err := api.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
+		out, err := legacyscheme.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
 		if err != nil {
 			panic(err)
 		}
@@ -417,7 +443,7 @@ func BenchmarkEncodeCodecFromInternal(b *testing.B) {
 	width := len(items)
 	encodable := make([]api.Pod, width)
 	for i := range items {
-		if err := api.Scheme.Convert(&items[i], &encodable[i], nil); err != nil {
+		if err := legacyscheme.Scheme.Convert(&items[i], &encodable[i], nil); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -436,7 +462,7 @@ func BenchmarkEncodeJSONMarshal(b *testing.B) {
 	width := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := json.Marshal(&items[i%width]); err != nil {
+		if _, err := gojson.Marshal(&items[i%width]); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -528,15 +554,16 @@ func BenchmarkDecodeIntoJSON(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
-		if err := json.Unmarshal(encoded[i%width], &obj); err != nil {
+		if err := gojson.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}
 	b.StopTimer()
 }
 
-// BenchmarkDecodeJSON provides a baseline for JSON decode performance
-func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
+// BenchmarkDecodeIntoJSONCodecGenConfigFast provides a baseline
+// for JSON decode performance with jsoniter.ConfigFast
+func BenchmarkDecodeIntoJSONCodecGenConfigFast(b *testing.B) {
 	kcodec := testapi.Default.Codec()
 	items := benchmarkItems(b)
 	width := len(items)
@@ -553,6 +580,34 @@ func BenchmarkDecodeIntoJSONCodecGen(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
 		if err := jsoniter.ConfigFastest.Unmarshal(encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary provides a
+// baseline for JSON decode performance with
+// jsoniter.ConfigCompatibleWithStandardLibrary, but with case sensitivity set
+// to true
+func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testing.B) {
+	kcodec := testapi.Default.Codec()
+	items := benchmarkItems(b)
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := runtime.Encode(kcodec, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.ResetTimer()
+	iter := json.CaseSensitiveJsonIterator()
+	for i := 0; i < b.N; i++ {
+		obj := v1.Pod{}
+		if err := iter.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}

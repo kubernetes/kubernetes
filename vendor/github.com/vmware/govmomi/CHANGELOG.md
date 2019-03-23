@@ -1,5 +1,80 @@
 # changelog
 
+### unreleased
+
+* SetRootCAs on the soap.Client returns an error for invalid certificates
+
+* Add ClusterComputeResource.MoveInto method
+
+### 0.18.0 (2018-05-24)
+
+* Add VirtualDiskManager wrapper to set UUID
+
+* Add vmxnet2, pcnet32 and sriov to VirtualDeviceList.EthernetCardTypes
+
+* Add new vSphere 6.7 APIs
+
+* Decrease LoginExtensionByCertificate tunnel usage
+
+* SAML token authentication support via SessionManager.LoginByToken
+
+* New SSO admin client for managing users
+
+* New STS client for issuing and renewing SAML tokens
+
+* New Lookup Service client for discovering endpoints such as STS and ssoadmin
+
+* Switch from gvt to go dep for managing dependencies
+
+### 0.17.1 (2018-03-19)
+
+* vcsim: add Destroy method for Folder and Datacenter types
+
+* In progress.Reader emit final report on EOF.
+
+* vcsim: add EventManager.QueryEvents
+
+### 0.17.0 (2018-02-28)
+
+* Add HostStorageSystem.AttachScsiLun method
+
+* Avoid possible panic in Datastore.Stat (#969)
+
+* Destroy event history collectors (#962)
+
+* Add VirtualDiskManager.CreateChildDisk method
+
+### 0.16.0 (2017-11-08)
+
+* Add support for SOAP request operation ID header
+
+* Moved ovf helpers from govc import.ovf command to ovf and nfc packages
+
+* Added guest/toolbox (client) package
+
+* Added toolbox package and toolbox command
+
+* Added simulator package and vcsim command
+
+### 0.15.0 (2017-06-19)
+
+* WaitOptions.MaxWaitSeconds is now optional
+
+* Support removal of ExtraConfig entries
+
+* GuestPosixFileAttributes OwnerId and GroupId fields are now pointers,
+  rather than omitempty ints to allow chown with root uid:gid
+
+* Updated examples/ using view package
+
+* Add DatastoreFile.TailFunc method
+
+* Export VirtualMachine.FindSnapshot method
+
+* Add AuthorizationManager {Enable,Disable}Methods
+
+* Add PBM client
+
 ### 0.14.0 (2017-04-08)
 
 * Add view.ContainerView type and methods

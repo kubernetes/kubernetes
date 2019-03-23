@@ -23,7 +23,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/glog"
+	"gopkg.in/square/go-jose.v2/jwt"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,20 +35,16 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 type testGenerator struct {
-	GeneratedServiceAccounts []v1.ServiceAccount
-	GeneratedSecrets         []v1.Secret
-	Token                    string
-	Err                      error
+	Token string
+	Err   error
 }
 
-func (t *testGenerator) GenerateToken(serviceAccount v1.ServiceAccount, secret v1.Secret) (string, error) {
-	t.GeneratedSecrets = append(t.GeneratedSecrets, secret)
-	t.GeneratedServiceAccounts = append(t.GeneratedServiceAccounts, serviceAccount)
+func (t *testGenerator) GenerateToken(sc *jwt.Claims, pc interface{}) (string, error) {
 	return t.Token, t.Err
 }
 
@@ -477,7 +474,7 @@ func TestTokenCreation(t *testing.T) {
 
 			AddedSecret:     serviceAccountTokenSecretWithNamespaceData([]byte("custom")),
 			ExpectedActions: []core.Action{
-			// no update is performed... the custom namespace is preserved
+				// no update is performed... the custom namespace is preserved
 			},
 		},
 
@@ -542,7 +539,7 @@ func TestTokenCreation(t *testing.T) {
 
 			UpdatedSecret:   serviceAccountTokenSecretWithNamespaceData([]byte("custom")),
 			ExpectedActions: []core.Action{
-			// no update is performed... the custom namespace is preserved
+				// no update is performed... the custom namespace is preserved
 			},
 		},
 
@@ -571,7 +568,7 @@ func TestTokenCreation(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		glog.Infof(k)
+		klog.Infof(k)
 
 		// Re-seed to reset name generation
 		utilrand.Seed(1)
@@ -586,7 +583,10 @@ func TestTokenCreation(t *testing.T) {
 		secretInformer := informers.Core().V1().Secrets().Informer()
 		secrets := secretInformer.GetStore()
 		serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
-		controller := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+		controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+		if err != nil {
+			t.Fatalf("error creating Tokens controller: %v", err)
+		}
 
 		if tc.ExistingServiceAccount != nil {
 			serviceAccounts.Add(tc.ExistingServiceAccount)

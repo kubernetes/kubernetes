@@ -24,7 +24,7 @@ import (
 	"sync"
 
 	"github.com/blang/semver"
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/devicemapper"
@@ -35,9 +35,9 @@ import (
 	dockerutil "github.com/google/cadvisor/utils/docker"
 	"github.com/google/cadvisor/zfs"
 
-	docker "github.com/docker/engine-api/client"
-	"github.com/golang/glog"
+	docker "github.com/docker/docker/client"
 	"golang.org/x/net/context"
+	"k8s.io/klog"
 )
 
 var ArgDockerEndpoint = flag.String("docker", "unix:///var/run/docker.sock", "docker endpoint")
@@ -110,7 +110,7 @@ type dockerFactory struct {
 
 	dockerAPIVersion []int
 
-	ignoreMetrics container.MetricSet
+	includedMetrics container.MetricSet
 
 	thinPoolName    string
 	thinPoolWatcher *devicemapper.ThinPoolWatcher
@@ -141,7 +141,7 @@ func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool
 		inHostNamespace,
 		metadataEnvs,
 		self.dockerVersion,
-		self.ignoreMetrics,
+		self.includedMetrics,
 		self.thinPoolName,
 		self.thinPoolWatcher,
 		self.zfsWatcher,
@@ -309,7 +309,7 @@ func ensureThinLsKernelVersion(kernelVersion string) error {
 }
 
 // Register root container before running this function!
-func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics container.MetricSet) error {
+func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics container.MetricSet) error {
 	client, err := Client()
 	if err != nil {
 		return fmt.Errorf("unable to communicate with docker daemon: %v", err)
@@ -325,7 +325,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 
 	dockerAPIVersion, _ := APIVersion()
 
-	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
+	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(includedMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
@@ -337,10 +337,11 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 	if storageDriver(dockerInfo.Driver) == devicemapperStorageDriver {
 		thinPoolWatcher, err = startThinPoolWatcher(dockerInfo)
 		if err != nil {
-			glog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
+			klog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
 		}
 
-		status := StatusFromDockerInfo(*dockerInfo)
+		// Safe to ignore error - driver status should always be populated.
+		status, _ := StatusFromDockerInfo(*dockerInfo)
 		thinPoolName = status.DriverStatus[dockerutil.DriverStatusPoolName]
 	}
 
@@ -348,11 +349,11 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 	if storageDriver(dockerInfo.Driver) == zfsStorageDriver {
 		zfsWatcher, err = startZfsWatcher(dockerInfo)
 		if err != nil {
-			glog.Errorf("zfs filesystem stats will not be reported: %v", err)
+			klog.Errorf("zfs filesystem stats will not be reported: %v", err)
 		}
 	}
 
-	glog.Infof("Registering Docker factory")
+	klog.V(1).Infof("Registering Docker factory")
 	f := &dockerFactory{
 		cgroupSubsystems:   cgroupSubsystems,
 		client:             client,
@@ -362,7 +363,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 		machineInfoFactory: factory,
 		storageDriver:      storageDriver(dockerInfo.Driver),
 		storageDir:         RootDir(),
-		ignoreMetrics:      ignoreMetrics,
+		includedMetrics:    includedMetrics,
 		thinPoolName:       thinPoolName,
 		thinPoolWatcher:    thinPoolWatcher,
 		zfsWatcher:         zfsWatcher,

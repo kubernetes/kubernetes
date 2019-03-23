@@ -8,16 +8,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "resource_container_linux.go",
         "resource_container_unsupported.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "resource_container_linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/resourcecontainer",
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
         ],

@@ -18,7 +18,7 @@ package selinux
 
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // SELinuxStrategy defines the interface for all SELinux constraint strategies.

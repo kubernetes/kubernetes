@@ -17,18 +17,20 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 )
 
@@ -40,19 +42,21 @@ type persistentvolumeStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating PersistentVolume
 // objects via the REST API.
-var Strategy = persistentvolumeStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = persistentvolumeStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 func (persistentvolumeStrategy) NamespaceScoped() bool {
 	return false
 }
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (persistentvolumeStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
+
+	pvutil.DropDisabledFields(&pv.Spec, nil)
 }
 
-func (persistentvolumeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
 	errorList := validation.ValidatePersistentVolume(persistentvolume)
 	return append(errorList, volumevalidation.ValidatePersistentVolume(persistentvolume)...)
@@ -67,13 +71,15 @@ func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
-func (persistentvolumeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (persistentvolumeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
+
+	pvutil.DropDisabledFields(&newPv.Spec, &oldPv.Spec)
 }
 
-func (persistentvolumeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPv := obj.(*api.PersistentVolume)
 	errorList := validation.ValidatePersistentVolume(newPv)
 	errorList = append(errorList, volumevalidation.ValidatePersistentVolume(newPv)...)
@@ -91,23 +97,23 @@ type persistentvolumeStatusStrategy struct {
 var StatusStrategy = persistentvolumeStatusStrategy{Strategy}
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
-func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Spec = oldPv.Spec
 }
 
-func (persistentvolumeStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (persistentvolumeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePersistentVolumeStatusUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	persistentvolumeObj, ok := obj.(*api.PersistentVolume)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("not a persistentvolume")
+		return nil, nil, fmt.Errorf("not a persistentvolume")
 	}
-	return labels.Set(persistentvolumeObj.Labels), PersistentVolumeToSelectableFields(persistentvolumeObj), persistentvolumeObj.Initializers != nil, nil
+	return labels.Set(persistentvolumeObj.Labels), PersistentVolumeToSelectableFields(persistentvolumeObj), nil
 }
 
 // MatchPersistentVolume returns a generic matcher for a given label and field selector.

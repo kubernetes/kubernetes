@@ -15,6 +15,9 @@ type FloatingIP struct {
 	// ID is the unique identifier for the floating IP instance.
 	ID string `json:"id"`
 
+	// Description for the floating IP instance.
+	Description string `json:"description"`
+
 	// FloatingNetworkID is the UUID of the external network where the floating
 	// IP is to be created.
 	FloatingNetworkID string `json:"floating_network_id"`
@@ -30,15 +33,21 @@ type FloatingIP struct {
 	// associated with the floating IP.
 	FixedIP string `json:"fixed_ip_address"`
 
-	// TenantID is the Owner of the floating IP. Only admin users can specify a
-	// tenant identifier other than its own.
+	// TenantID is the project owner of the floating IP. Only admin users can
+	// specify a project identifier other than its own.
 	TenantID string `json:"tenant_id"`
+
+	// ProjectID is the project owner of the floating IP.
+	ProjectID string `json:"project_id"`
 
 	// Status is the condition of the API resource.
 	Status string `json:"status"`
 
 	// RouterID is the ID of the router used for this floating IP.
 	RouterID string `json:"router_id"`
+
+	// Tags optionally set via extensions/attributestags
+	Tags []string `json:"tags"`
 }
 
 type commonResult struct {

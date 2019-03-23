@@ -17,16 +17,15 @@ limitations under the License.
 package user
 
 import (
+	policy "k8s.io/api/policy/v1beta1"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"strings"
 	"testing"
-
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestNewMustRunAs(t *testing.T) {
 	tests := map[string]struct {
-		opts *extensions.RunAsUserStrategyOptions
+		opts *policy.RunAsUserStrategyOptions
 		pass bool
 	}{
 		"nil opts": {
@@ -34,12 +33,12 @@ func TestNewMustRunAs(t *testing.T) {
 			pass: false,
 		},
 		"invalid opts": {
-			opts: &extensions.RunAsUserStrategyOptions{},
+			opts: &policy.RunAsUserStrategyOptions{},
 			pass: false,
 		},
 		"valid opts": {
-			opts: &extensions.RunAsUserStrategyOptions{
-				Ranges: []extensions.UserIDRange{
+			opts: &policy.RunAsUserStrategyOptions{
+				Ranges: []policy.IDRange{
 					{Min: 1, Max: 1},
 				},
 			},
@@ -58,8 +57,8 @@ func TestNewMustRunAs(t *testing.T) {
 }
 
 func TestGenerate(t *testing.T) {
-	opts := &extensions.RunAsUserStrategyOptions{
-		Ranges: []extensions.UserIDRange{
+	opts := &policy.RunAsUserStrategyOptions{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
 		},
 	}
@@ -77,8 +76,8 @@ func TestGenerate(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	opts := &extensions.RunAsUserStrategyOptions{
-		Ranges: []extensions.UserIDRange{
+	opts := &policy.RunAsUserStrategyOptions{
+		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
 			{Min: 10, Max: 20},
 		},

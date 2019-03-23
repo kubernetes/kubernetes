@@ -22,11 +22,11 @@ import (
 	"sync"
 	"time"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 var (
-	version = "0.1.0"
+	FakeVersion = "0.1.0"
 
 	FakeRuntimeName  = "fakeRuntime"
 	FakePodSandboxIP = "192.168.192.168"
@@ -35,6 +35,8 @@ var (
 type FakePodSandbox struct {
 	// PodSandboxStatus contains the runtime information for a sandbox.
 	runtimeapi.PodSandboxStatus
+	// RuntimeHandler is the runtime handler that was issued with the RunPodSandbox request.
+	RuntimeHandler string
 }
 
 type FakeContainer struct {
@@ -49,6 +51,7 @@ type FakeRuntimeService struct {
 	sync.Mutex
 
 	Called []string
+	Errors map[string][]error
 
 	FakeStatus         *runtimeapi.RuntimeStatus
 	Containers         map[string]*FakeContainer
@@ -101,9 +104,35 @@ func (r *FakeRuntimeService) AssertCalls(calls []string) error {
 	return nil
 }
 
+func (r *FakeRuntimeService) GetCalls() []string {
+	r.Lock()
+	defer r.Unlock()
+	return append([]string{}, r.Called...)
+}
+
+func (r *FakeRuntimeService) InjectError(f string, err error) {
+	r.Lock()
+	defer r.Unlock()
+	r.Errors[f] = append(r.Errors[f], err)
+}
+
+// caller of popError must grab a lock.
+func (r *FakeRuntimeService) popError(f string) error {
+	if r.Errors == nil {
+		return nil
+	}
+	errs := r.Errors[f]
+	if len(errs) == 0 {
+		return nil
+	}
+	err, errs := errs[0], errs[1:]
+	return err
+}
+
 func NewFakeRuntimeService() *FakeRuntimeService {
 	return &FakeRuntimeService{
 		Called:             make([]string, 0),
+		Errors:             make(map[string][]error),
 		Containers:         make(map[string]*FakeContainer),
 		Sandboxes:          make(map[string]*FakePodSandbox),
 		FakeContainerStats: make(map[string]*runtimeapi.ContainerStats),
@@ -117,10 +146,10 @@ func (r *FakeRuntimeService) Version(apiVersion string) (*runtimeapi.VersionResp
 	r.Called = append(r.Called, "Version")
 
 	return &runtimeapi.VersionResponse{
-		Version:           version,
+		Version:           FakeVersion,
 		RuntimeName:       FakeRuntimeName,
-		RuntimeVersion:    version,
-		RuntimeApiVersion: version,
+		RuntimeVersion:    FakeVersion,
+		RuntimeApiVersion: FakeVersion,
 	}, nil
 }
 
@@ -133,7 +162,7 @@ func (r *FakeRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
 	return r.FakeStatus, nil
 }
 
-func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -155,6 +184,7 @@ func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) 
 			Labels:      config.Labels,
 			Annotations: config.Annotations,
 		},
+		RuntimeHandler: runtimeHandler,
 	}
 
 	return podSandboxID, nil
@@ -458,4 +488,17 @@ func (r *FakeRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStat
 	}
 
 	return result, nil
+}
+
+func (r *FakeRuntimeService) ReopenContainerLog(containerID string) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ReopenContainerLog")
+
+	if err := r.popError("ReopenContainerLog"); err != nil {
+		return err
+	}
+
+	return nil
 }

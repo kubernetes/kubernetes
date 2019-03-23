@@ -12,22 +12,21 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/prober/results",
     deps = [
         "//pkg/kubelet/container:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["results_manager_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/prober/results",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/container:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
     ],
 )
 

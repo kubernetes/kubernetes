@@ -1,9 +1,24 @@
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"encoding/xml"
 	"net/http"
 	"net/url"
+	"sync"
 )
 
 // Directory represents a directory on a share.
@@ -92,10 +107,10 @@ func (d *Directory) CreateIfNotExists(options *FileRequestOptions) (bool, error)
 	params := prepareOptions(options)
 	resp, err := d.fsc.createResourceNoClose(d.buildPath(), resourceDirectory, params, nil)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusCreated || resp.statusCode == http.StatusConflict {
-			if resp.statusCode == http.StatusCreated {
-				d.updateEtagAndLastModified(resp.headers)
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
+			if resp.StatusCode == http.StatusCreated {
+				d.updateEtagAndLastModified(resp.Header)
 				return true, nil
 			}
 
@@ -120,9 +135,9 @@ func (d *Directory) Delete(options *FileRequestOptions) error {
 func (d *Directory) DeleteIfExists(options *FileRequestOptions) (bool, error) {
 	resp, err := d.fsc.deleteResourceNoClose(d.buildPath(), resourceDirectory, options)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusAccepted || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusAccepted, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusAccepted, nil
 		}
 	}
 	return false, err
@@ -169,6 +184,7 @@ func (d *Directory) GetFileReference(name string) *File {
 		Name:   name,
 		parent: d,
 		share:  d.share,
+		mutex:  &sync.Mutex{},
 	}
 }
 
@@ -184,9 +200,9 @@ func (d *Directory) ListDirsAndFiles(params ListDirsAndFilesParameters) (*DirsAn
 		return nil, err
 	}
 
-	defer resp.body.Close()
+	defer resp.Body.Close()
 	var out DirsAndFilesListResponse
-	err = xmlUnmarshal(resp.body, &out)
+	err = xmlUnmarshal(resp.Body, &out)
 	return &out, err
 }
 

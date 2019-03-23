@@ -78,7 +78,7 @@ func createNewRC(c clientset.Interface, ns string, name string) {
 }
 
 func findRegionForZone(zone string) string {
-	region, err := exec.Command("gcloud", "compute", "zones", "list", zone, "--quiet", "--format=csv[no-heading](region)").CombinedOutput()
+	region, err := exec.Command("gcloud", "compute", "zones", "list", zone, "--quiet", "--format=csv[no-heading](region)").Output()
 	framework.ExpectNoError(err)
 	if string(region) == "" {
 		framework.Failf("Region not found; zone: %s", zone)
@@ -88,7 +88,7 @@ func findRegionForZone(zone string) string {
 
 func findZonesForRegion(region string) []string {
 	output, err := exec.Command("gcloud", "compute", "zones", "list", "--filter=region="+region,
-		"--quiet", "--format=csv[no-heading](name)").CombinedOutput()
+		"--quiet", "--format=csv[no-heading](name)").Output()
 	framework.ExpectNoError(err)
 	zones := strings.Split(string(output), "\n")
 	return zones

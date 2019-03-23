@@ -1,24 +1,17 @@
-package(default_visibility = ["//visibility:public"])
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = [
-        "converter.go",
-        "doc.go",
-    ],
-    importpath = "k8s.io/apimachinery/pkg/conversion/unstructured",
+go_test(
+    name = "go_default_test",
+    srcs = ["unstructured_conversion_test.go"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/test:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 
@@ -31,9 +24,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//staging/src/k8s.io/apimachinery/pkg/conversion/unstructured/testing:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -17,97 +17,105 @@ limitations under the License.
 package azure
 
 import (
-	"encoding/json"
-	"io"
-	"io/ioutil"
-	"net/http"
+	"context"
+	"fmt"
+	"os"
 	"strconv"
-	"sync"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 )
 
-const instanceInfoURL = "http://169.254.169.254/metadata/v1/InstanceInfo"
-
-var faultMutex = &sync.Mutex{}
-var faultDomain *string
-
-type instanceInfo struct {
-	ID           string `json:"ID"`
-	UpdateDomain string `json:"UD"`
-	FaultDomain  string `json:"FD"`
+// makeZone returns the zone value in format of <region>-<zone-id>.
+func (az *Cloud) makeZone(zoneID int) string {
+	return fmt.Sprintf("%s-%d", strings.ToLower(az.Location), zoneID)
 }
 
-// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
-func (az *Cloud) GetZone() (cloudprovider.Zone, error) {
-	faultMutex.Lock()
-	if faultDomain == nil {
-		var err error
-		faultDomain, err = fetchFaultDomain()
+// isAvailabilityZone returns true if the zone is in format of <region>-<zone-id>.
+func (az *Cloud) isAvailabilityZone(zone string) bool {
+	return strings.HasPrefix(zone, fmt.Sprintf("%s-", az.Location))
+}
+
+// GetZoneID returns the ID of zone from node's zone label.
+func (az *Cloud) GetZoneID(zoneLabel string) string {
+	if !az.isAvailabilityZone(zoneLabel) {
+		return ""
+	}
+
+	return strings.TrimPrefix(zoneLabel, fmt.Sprintf("%s-", az.Location))
+}
+
+// GetZone returns the Zone containing the current availability zone and locality region that the program is running in.
+// If the node is not running with availability zones, then it will fall back to fault domain.
+func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
+	if az.UseInstanceMetadata {
+		metadata, err := az.metadata.GetMetadata()
 		if err != nil {
 			return cloudprovider.Zone{}, err
 		}
+
+		if metadata.Compute == nil {
+			return cloudprovider.Zone{}, fmt.Errorf("failure of getting compute information from instance metadata")
+		}
+
+		zone := ""
+		if metadata.Compute.Zone != "" {
+			zoneID, err := strconv.Atoi(metadata.Compute.Zone)
+			if err != nil {
+				return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone ID %q: %v", metadata.Compute.Zone, err)
+			}
+			zone = az.makeZone(zoneID)
+		} else {
+			klog.V(3).Infof("Availability zone is not enabled for the node, falling back to fault domain")
+			zone = metadata.Compute.FaultDomain
+		}
+
+		return cloudprovider.Zone{
+			FailureDomain: zone,
+			Region:        az.Location,
+		}, nil
 	}
-	zone := cloudprovider.Zone{
-		FailureDomain: *faultDomain,
-		Region:        az.Location,
+	// if UseInstanceMetadata is false, get Zone name by calling ARM
+	hostname, err := os.Hostname()
+	if err != nil {
+		return cloudprovider.Zone{}, fmt.Errorf("failure getting hostname from kernel")
 	}
-	faultMutex.Unlock()
-	return zone, nil
+	return az.vmSet.GetZoneByNodeName(strings.ToLower(hostname))
 }
 
 // GetZoneByProviderID implements Zones.GetZoneByProviderID
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (az *Cloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
-	nodeName, err := splitProviderID(providerID)
+func (az *Cloud) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
+	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
+	if az.IsNodeUnmanagedByProviderID(providerID) {
+		klog.V(2).Infof("GetZoneByProviderID: omitting unmanaged node %q", providerID)
+		return cloudprovider.Zone{}, nil
+	}
+
+	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
-	return az.GetZoneByNodeName(nodeName)
+
+	return az.GetZoneByNodeName(ctx, nodeName)
 }
 
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (az *Cloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
-
-	vm, err := az.VirtualMachinesClient.Get(az.ResourceGroup, string(nodeName), compute.InstanceView)
-
+func (az *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
+	// Returns "" for unmanaged nodes because azure cloud provider couldn't fetch information for them.
+	unmanaged, err := az.IsNodeUnmanaged(string(nodeName))
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
-
-	failureDomain := strconv.Itoa(int(*vm.VirtualMachineProperties.InstanceView.PlatformFaultDomain))
-
-	zone := cloudprovider.Zone{
-		FailureDomain: failureDomain,
-		Region:        *(vm.Location),
+	if unmanaged {
+		klog.V(2).Infof("GetZoneByNodeName: omitting unmanaged node %q", nodeName)
+		return cloudprovider.Zone{}, nil
 	}
-	return zone, nil
-}
 
-func fetchFaultDomain() (*string, error) {
-	resp, err := http.Get(instanceInfoURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	return readFaultDomain(resp.Body)
-}
-
-func readFaultDomain(reader io.Reader) (*string, error) {
-	var instanceInfo instanceInfo
-	body, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(body, &instanceInfo)
-	if err != nil {
-		return nil, err
-	}
-	return &instanceInfo.FaultDomain, nil
+	return az.vmSet.GetZoneByNodeName(string(nodeName))
 }

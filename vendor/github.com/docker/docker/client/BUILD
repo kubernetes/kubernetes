@@ -8,6 +8,8 @@ go_library(
         "checkpoint_delete.go",
         "checkpoint_list.go",
         "client.go",
+        "client_unix.go",
+        "client_windows.go",
         "config_create.go",
         "config_inspect.go",
         "config_list.go",
@@ -72,7 +74,6 @@ go_library(
         "node_list.go",
         "node_remove.go",
         "node_update.go",
-        "parse_logs.go",
         "ping.go",
         "plugin_create.go",
         "plugin_disable.go",
@@ -115,18 +116,8 @@ go_library(
         "volume_list.go",
         "volume_prune.go",
         "volume_remove.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "client_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "client_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "client_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/client",
     importpath = "github.com/docker/docker/client",
     visibility = ["//visibility:public"],
     deps = [
@@ -143,12 +134,10 @@ go_library(
         "//vendor/github.com/docker/docker/api/types/time:go_default_library",
         "//vendor/github.com/docker/docker/api/types/versions:go_default_library",
         "//vendor/github.com/docker/docker/api/types/volume:go_default_library",
-        "//vendor/github.com/docker/docker/pkg/tlsconfig:go_default_library",
         "//vendor/github.com/docker/go-connections/sockets:go_default_library",
         "//vendor/github.com/docker/go-connections/tlsconfig:go_default_library",
         "//vendor/github.com/opencontainers/go-digest:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/golang.org/x/net/context/ctxhttp:go_default_library",
     ],
 )

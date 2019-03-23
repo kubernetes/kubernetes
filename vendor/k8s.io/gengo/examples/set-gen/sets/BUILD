@@ -10,6 +10,7 @@ go_library(
         "int64.go",
         "string.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/gengo/examples/set-gen/sets",
     importpath = "k8s.io/gengo/examples/set-gen/sets",
     visibility = ["//visibility:public"],
 )

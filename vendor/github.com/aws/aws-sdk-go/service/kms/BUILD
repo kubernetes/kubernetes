@@ -4,8 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "api.go",
+        "doc.go",
+        "errors.go",
         "service.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/service/kms",
     importpath = "github.com/aws/aws-sdk-go/service/kms",
     visibility = ["//visibility:public"],
     deps = [

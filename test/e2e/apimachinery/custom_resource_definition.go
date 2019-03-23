@@ -19,8 +19,8 @@ package apimachinery
 import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -33,7 +33,12 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 	f := framework.NewDefaultFramework("custom-resource-definition")
 
 	Context("Simple CustomResourceDefinition", func() {
-		It("creating/deleting custom resource definition objects works [Conformance]", func() {
+		/*
+			Release : v1.9
+			Testname: Custom Resource Definition, create
+			Description: Create a API extension client, define a random custom resource definition, create the custom resource. API server MUST be able to create the custom resource.
+		*/
+		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 
 			framework.SkipUnlessServerVersionGTE(crdVersion, f.ClientSet.Discovery())
 
@@ -47,16 +52,16 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 				framework.Failf("failed to initialize apiExtensionClient: %v", err)
 			}
 
-			randomDefinition := testserver.NewRandomNameCustomResourceDefinition(v1beta1.ClusterScoped)
+			randomDefinition := fixtures.NewRandomNameCustomResourceDefinition(v1beta1.ClusterScoped)
 
 			//create CRD and waits for the resource to be recognized and available.
-			_, err = testserver.CreateNewCustomResourceDefinition(randomDefinition, apiExtensionClient, f.ClientPool)
+			randomDefinition, err = fixtures.CreateNewCustomResourceDefinition(randomDefinition, apiExtensionClient, f.DynamicClient)
 			if err != nil {
 				framework.Failf("failed to create CustomResourceDefinition: %v", err)
 			}
 
 			defer func() {
-				err = testserver.DeleteCustomResourceDefinition(randomDefinition, apiExtensionClient)
+				err = fixtures.DeleteCustomResourceDefinition(randomDefinition, apiExtensionClient)
 				if err != nil {
 					framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 				}

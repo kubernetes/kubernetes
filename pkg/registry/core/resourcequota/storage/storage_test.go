@@ -27,9 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -68,7 +69,7 @@ func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	resourcequota := validNewResourceQuota()
 	resourcequota.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -87,7 +88,7 @@ func TestCreateSetsFields(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := genericapirequest.NewDefaultContext()
 	resourcequota := validNewResourceQuota()
-	_, err := storage.Create(genericapirequest.NewDefaultContext(), resourcequota, false)
+	_, err := storage.Create(genericapirequest.NewDefaultContext(), resourcequota, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -109,7 +110,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage.Store).ReturnDeletedObject()
 	test.TestDelete(validNewResourceQuota())
 }
 
@@ -117,7 +118,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestGet(validNewResourceQuota())
 }
 
@@ -125,7 +126,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestList(validNewResourceQuota())
 }
 
@@ -133,7 +134,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestWatch(
 		validNewResourceQuota(),
 		// matching labels
@@ -146,7 +147,7 @@ func TestWatch(t *testing.T) {
 		[]fields.Set{
 			{"metadata.name": "foo"},
 		},
-		// not matchin fields
+		// not matching fields
 		[]fields.Set{
 			{"metadata.name": "bar"},
 		},
@@ -161,7 +162,7 @@ func TestUpdateStatus(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	resourcequotaStart := validNewResourceQuota()
-	err := storage.Storage.Create(ctx, key, resourcequotaStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, resourcequotaStart, nil, 0, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -191,7 +192,7 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	_, _, err = status.Update(ctx, resourcequotaIn.Name, rest.DefaultUpdatedObjectInfo(resourcequotaIn))
+	_, _, err = status.Update(ctx, resourcequotaIn.Name, rest.DefaultUpdatedObjectInfo(resourcequotaIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

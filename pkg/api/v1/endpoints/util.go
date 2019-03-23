@@ -38,12 +38,12 @@ func RepackSubsets(subsets []v1.EndpointSubset) []v1.EndpointSubset {
 	allAddrs := map[addressKey]*v1.EndpointAddress{}
 	portToAddrReadyMap := map[v1.EndpointPort]addressSet{}
 	for i := range subsets {
-		for _, port := range subsets[i].Ports {
-			for k := range subsets[i].Addresses {
-				mapAddressByPort(&subsets[i].Addresses[k], port, true, allAddrs, portToAddrReadyMap)
-			}
-			for k := range subsets[i].NotReadyAddresses {
-				mapAddressByPort(&subsets[i].NotReadyAddresses[k], port, false, allAddrs, portToAddrReadyMap)
+		if len(subsets[i].Ports) == 0 {
+			// Don't discard endpoints with no ports defined, use a sentinel.
+			mapAddressesByPort(&subsets[i], v1.EndpointPort{Port: -1}, allAddrs, portToAddrReadyMap)
+		} else {
+			for _, port := range subsets[i].Ports {
+				mapAddressesByPort(&subsets[i], port, allAddrs, portToAddrReadyMap)
 			}
 		}
 	}
@@ -58,7 +58,14 @@ func RepackSubsets(subsets []v1.EndpointSubset) []v1.EndpointSubset {
 	for port, addrs := range portToAddrReadyMap {
 		key := keyString(hashAddresses(addrs))
 		keyToAddrReadyMap[key] = addrs
-		addrReadyMapKeyToPorts[key] = append(addrReadyMapKeyToPorts[key], port)
+		if port.Port > 0 { // avoid sentinels
+			addrReadyMapKeyToPorts[key] = append(addrReadyMapKeyToPorts[key], port)
+		} else {
+			if _, found := addrReadyMapKeyToPorts[key]; !found {
+				// Force it to be present in the map
+				addrReadyMapKeyToPorts[key] = nil
+			}
+		}
 	}
 
 	// Next, build the N-to-M association the API wants.
@@ -85,7 +92,17 @@ type addressKey struct {
 	uid types.UID
 }
 
-// mapAddressByPort adds an address into a map by its ports, registering the address with a unique pointer, and preserving
+// mapAddressesByPort adds all ready and not-ready addresses into a map by a single port.
+func mapAddressesByPort(subset *v1.EndpointSubset, port v1.EndpointPort, allAddrs map[addressKey]*v1.EndpointAddress, portToAddrReadyMap map[v1.EndpointPort]addressSet) {
+	for k := range subset.Addresses {
+		mapAddressByPort(&subset.Addresses[k], port, true, allAddrs, portToAddrReadyMap)
+	}
+	for k := range subset.NotReadyAddresses {
+		mapAddressByPort(&subset.NotReadyAddresses[k], port, false, allAddrs, portToAddrReadyMap)
+	}
+}
+
+// mapAddressByPort adds one address into a map by port, registering the address with a unique pointer, and preserving
 // any existing ready state.
 func mapAddressByPort(addr *v1.EndpointAddress, port v1.EndpointPort, ready bool, allAddrs map[addressKey]*v1.EndpointAddress, portToAddrReadyMap map[v1.EndpointPort]addressSet) *v1.EndpointAddress {
 	// use addressKey to distinguish between two endpoints that are identical addresses
@@ -155,6 +172,7 @@ func (sl addrsReady) Less(i, j int) bool {
 	return lessAddrReady(sl[i], sl[j])
 }
 
+// LessEndpointAddress compares IP addresses lexicographically and returns true if first argument is lesser than second
 func LessEndpointAddress(a, b *v1.EndpointAddress) bool {
 	ipComparison := bytes.Compare([]byte(a.IP), []byte(b.IP))
 	if ipComparison != 0 {
@@ -169,21 +187,13 @@ func LessEndpointAddress(a, b *v1.EndpointAddress) bool {
 	return a.TargetRef.UID < b.TargetRef.UID
 }
 
-type addrPtrsByIpAndUID []*v1.EndpointAddress
-
-func (sl addrPtrsByIpAndUID) Len() int      { return len(sl) }
-func (sl addrPtrsByIpAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl addrPtrsByIpAndUID) Less(i, j int) bool {
-	return LessEndpointAddress(sl[i], sl[j])
-}
-
 // SortSubsets sorts an array of EndpointSubset objects in place.  For ease of
 // use it returns the input slice.
 func SortSubsets(subsets []v1.EndpointSubset) []v1.EndpointSubset {
 	for i := range subsets {
 		ss := &subsets[i]
-		sort.Sort(addrsByIpAndUID(ss.Addresses))
-		sort.Sort(addrsByIpAndUID(ss.NotReadyAddresses))
+		sort.Sort(addrsByIPAndUID(ss.Addresses))
+		sort.Sort(addrsByIPAndUID(ss.NotReadyAddresses))
 		sort.Sort(portsByHash(ss.Ports))
 	}
 	sort.Sort(subsetsByHash(subsets))
@@ -206,11 +216,11 @@ func (sl subsetsByHash) Less(i, j int) bool {
 	return bytes.Compare(h1, h2) < 0
 }
 
-type addrsByIpAndUID []v1.EndpointAddress
+type addrsByIPAndUID []v1.EndpointAddress
 
-func (sl addrsByIpAndUID) Len() int      { return len(sl) }
-func (sl addrsByIpAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl addrsByIpAndUID) Less(i, j int) bool {
+func (sl addrsByIPAndUID) Len() int      { return len(sl) }
+func (sl addrsByIPAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl addrsByIPAndUID) Less(i, j int) bool {
 	return LessEndpointAddress(&sl[i], &sl[j])
 }
 

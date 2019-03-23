@@ -18,13 +18,9 @@ package dockershim
 
 import (
 	"encoding/json"
-	"fmt"
-	"hash/fnv"
-	"path/filepath"
 
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 )
 
 const (
@@ -32,8 +28,14 @@ const (
 	sandboxCheckpointDir = "sandbox"
 	protocolTCP          = Protocol("tcp")
 	protocolUDP          = Protocol("udp")
+	protocolSCTP         = Protocol("sctp")
 	schemaVersion        = "v1"
 )
+
+type DockershimCheckpoint interface {
+	checkpointmanager.Checkpoint
+	GetData() (string, string, string, []*PortMapping, bool)
+}
 
 type Protocol string
 
@@ -45,6 +47,8 @@ type PortMapping struct {
 	ContainerPort *int32 `json:"container_port,omitempty"`
 	// Port number on the host.
 	HostPort *int32 `json:"host_port,omitempty"`
+	// Host ip to expose.
+	HostIP string `json:"host_ip,omitempty"`
 }
 
 // CheckpointData contains all types of data that can be stored in the checkpoint.
@@ -64,87 +68,31 @@ type PodSandboxCheckpoint struct {
 	// Data to checkpoint for pod sandbox.
 	Data *CheckpointData `json:"data,omitempty"`
 	// Checksum is calculated with fnv hash of the checkpoint object with checksum field set to be zero
-	CheckSum uint64 `json:"checksum"`
+	Checksum checksum.Checksum `json:"checksum"`
 }
 
-// CheckpointHandler provides the interface to manage PodSandbox checkpoint
-type CheckpointHandler interface {
-	// CreateCheckpoint persists sandbox checkpoint in CheckpointStore.
-	CreateCheckpoint(podSandboxID string, checkpoint *PodSandboxCheckpoint) error
-	// GetCheckpoint retrieves sandbox checkpoint from CheckpointStore.
-	GetCheckpoint(podSandboxID string) (*PodSandboxCheckpoint, error)
-	// RemoveCheckpoint removes sandbox checkpoint form CheckpointStore.
-	// WARNING: RemoveCheckpoint will not return error if checkpoint does not exist.
-	RemoveCheckpoint(podSandboxID string) error
-	// ListCheckpoint returns the list of existing checkpoints.
-	ListCheckpoints() ([]string, error)
-}
-
-// PersistentCheckpointHandler is an implementation of CheckpointHandler. It persists checkpoint in CheckpointStore
-type PersistentCheckpointHandler struct {
-	store CheckpointStore
-}
-
-func NewPersistentCheckpointHandler(dockershimRootDir string) (CheckpointHandler, error) {
-	fstore, err := NewFileStore(filepath.Join(dockershimRootDir, sandboxCheckpointDir))
-	if err != nil {
-		return nil, err
-	}
-	return &PersistentCheckpointHandler{store: fstore}, nil
-}
-
-func (handler *PersistentCheckpointHandler) CreateCheckpoint(podSandboxID string, checkpoint *PodSandboxCheckpoint) error {
-	checkpoint.CheckSum = calculateChecksum(*checkpoint)
-	blob, err := json.Marshal(checkpoint)
-	if err != nil {
-		return err
-	}
-	return handler.store.Write(podSandboxID, blob)
-}
-
-func (handler *PersistentCheckpointHandler) GetCheckpoint(podSandboxID string) (*PodSandboxCheckpoint, error) {
-	blob, err := handler.store.Read(podSandboxID)
-	if err != nil {
-		return nil, err
-	}
-	var checkpoint PodSandboxCheckpoint
-	//TODO: unmarhsal into a struct with just Version, check version, unmarshal into versioned type.
-	err = json.Unmarshal(blob, &checkpoint)
-	if err != nil {
-		glog.Errorf("Failed to unmarshal checkpoint %q. Checkpoint content: %q. ErrMsg: %v", podSandboxID, string(blob), err)
-		return &checkpoint, errors.CorruptCheckpointError
-	}
-	if checkpoint.CheckSum != calculateChecksum(checkpoint) {
-		glog.Errorf("Checksum of checkpoint %q is not valid", podSandboxID)
-		return &checkpoint, errors.CorruptCheckpointError
-	}
-	return &checkpoint, nil
-}
-
-func (handler *PersistentCheckpointHandler) RemoveCheckpoint(podSandboxID string) error {
-	return handler.store.Delete(podSandboxID)
-}
-
-func (handler *PersistentCheckpointHandler) ListCheckpoints() ([]string, error) {
-	keys, err := handler.store.List()
-	if err != nil {
-		return []string{}, fmt.Errorf("failed to list checkpoint store: %v", err)
-	}
-	return keys, nil
-}
-
-func NewPodSandboxCheckpoint(namespace, name string) *PodSandboxCheckpoint {
+func NewPodSandboxCheckpoint(namespace, name string, data *CheckpointData) DockershimCheckpoint {
 	return &PodSandboxCheckpoint{
 		Version:   schemaVersion,
 		Namespace: namespace,
 		Name:      name,
-		Data:      &CheckpointData{},
+		Data:      data,
 	}
 }
 
-func calculateChecksum(checkpoint PodSandboxCheckpoint) uint64 {
-	checkpoint.CheckSum = 0
-	hash := fnv.New32a()
-	hashutil.DeepHashObject(hash, checkpoint)
-	return uint64(hash.Sum32())
+func (cp *PodSandboxCheckpoint) MarshalCheckpoint() ([]byte, error) {
+	cp.Checksum = checksum.New(*cp.Data)
+	return json.Marshal(*cp)
+}
+
+func (cp *PodSandboxCheckpoint) UnmarshalCheckpoint(blob []byte) error {
+	return json.Unmarshal(blob, cp)
+}
+
+func (cp *PodSandboxCheckpoint) VerifyChecksum() error {
+	return cp.Checksum.Verify(*cp.Data)
+}
+
+func (cp *PodSandboxCheckpoint) GetData() (string, string, string, []*PortMapping, bool) {
+	return cp.Version, cp.Name, cp.Namespace, cp.Data.PortMappings, cp.Data.HostNetwork
 }

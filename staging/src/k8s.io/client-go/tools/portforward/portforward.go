@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,8 +40,9 @@ const PortForwardProtocolV1Name = "portforward.k8s.io"
 // PortForwarder knows how to listen for local connections and forward them to
 // a remote pod via an upgraded HTTP request.
 type PortForwarder struct {
-	ports    []ForwardedPort
-	stopChan <-chan struct{}
+	addresses []listenAddress
+	ports     []ForwardedPort
+	stopChan  <-chan struct{}
 
 	dialer        httpstream.Dialer
 	streamConn    httpstream.Connection
@@ -110,8 +112,59 @@ func parsePorts(ports []string) ([]ForwardedPort, error) {
 	return forwards, nil
 }
 
-// New creates a new PortForwarder.
+type listenAddress struct {
+	address     string
+	protocol    string
+	failureMode string
+}
+
+func parseAddresses(addressesToParse []string) ([]listenAddress, error) {
+	var addresses []listenAddress
+	parsed := make(map[string]listenAddress)
+	for _, address := range addressesToParse {
+		if address == "localhost" {
+			if _, exists := parsed["127.0.0.1"]; !exists {
+				ip := listenAddress{address: "127.0.0.1", protocol: "tcp4", failureMode: "all"}
+				parsed[ip.address] = ip
+			}
+			if _, exists := parsed["::1"]; !exists {
+				ip := listenAddress{address: "::1", protocol: "tcp6", failureMode: "all"}
+				parsed[ip.address] = ip
+			}
+		} else if net.ParseIP(address).To4() != nil {
+			parsed[address] = listenAddress{address: address, protocol: "tcp4", failureMode: "any"}
+		} else if net.ParseIP(address) != nil {
+			parsed[address] = listenAddress{address: address, protocol: "tcp6", failureMode: "any"}
+		} else {
+			return nil, fmt.Errorf("%s is not a valid IP", address)
+		}
+	}
+	addresses = make([]listenAddress, len(parsed))
+	id := 0
+	for _, v := range parsed {
+		addresses[id] = v
+		id++
+	}
+	// Sort addresses before returning to get a stable order
+	sort.Slice(addresses, func(i, j int) bool { return addresses[i].address < addresses[j].address })
+
+	return addresses, nil
+}
+
+// New creates a new PortForwarder with localhost listen addresses.
 func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
+	return NewOnAddresses(dialer, []string{"localhost"}, ports, stopChan, readyChan, out, errOut)
+}
+
+// NewOnAddresses creates a new PortForwarder with custom listen addresses.
+func NewOnAddresses(dialer httpstream.Dialer, addresses []string, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
+	if len(addresses) == 0 {
+		return nil, errors.New("You must specify at least 1 address")
+	}
+	parsedAddresses, err := parseAddresses(addresses)
+	if err != nil {
+		return nil, err
+	}
 	if len(ports) == 0 {
 		return nil, errors.New("You must specify at least 1 port")
 	}
@@ -120,12 +173,13 @@ func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, rea
 		return nil, err
 	}
 	return &PortForwarder{
-		dialer:   dialer,
-		ports:    parsedPorts,
-		stopChan: stopChan,
-		Ready:    readyChan,
-		out:      out,
-		errOut:   errOut,
+		dialer:    dialer,
+		addresses: parsedAddresses,
+		ports:     parsedPorts,
+		stopChan:  stopChan,
+		Ready:     readyChan,
+		out:       out,
+		errOut:    errOut,
 	}, nil
 }
 
@@ -151,8 +205,9 @@ func (pf *PortForwarder) forward() error {
 	var err error
 
 	listenSuccess := false
-	for _, port := range pf.ports {
-		err = pf.listenOnPort(&port)
+	for i := range pf.ports {
+		port := &pf.ports[i]
+		err = pf.listenOnPort(port)
 		switch {
 		case err == nil:
 			listenSuccess = true
@@ -181,13 +236,26 @@ func (pf *PortForwarder) forward() error {
 	return nil
 }
 
-// listenOnPort delegates tcp4 and tcp6 listener creation and waits for connections on both of these addresses.
-// If both listener creation fail, an error is raised.
+// listenOnPort delegates listener creation and waits for connections on requested bind addresses.
+// An error is raised based on address groups (default and localhost) and their failure modes
 func (pf *PortForwarder) listenOnPort(port *ForwardedPort) error {
-	errTcp4 := pf.listenOnPortAndAddress(port, "tcp4", "127.0.0.1")
-	errTcp6 := pf.listenOnPortAndAddress(port, "tcp6", "[::1]")
-	if errTcp4 != nil && errTcp6 != nil {
-		return fmt.Errorf("All listeners failed to create with the following errors: %s, %s", errTcp4, errTcp6)
+	var errors []error
+	failCounters := make(map[string]int, 2)
+	successCounters := make(map[string]int, 2)
+	for _, addr := range pf.addresses {
+		err := pf.listenOnPortAndAddress(port, addr.protocol, addr.address)
+		if err != nil {
+			errors = append(errors, err)
+			failCounters[addr.failureMode]++
+		} else {
+			successCounters[addr.failureMode]++
+		}
+	}
+	if successCounters["all"] == 0 && failCounters["all"] > 0 {
+		return fmt.Errorf("%s: %v", "Listeners failed to create with the following errors", errors)
+	}
+	if failCounters["any"] > 0 {
+		return fmt.Errorf("%s: %v", "Listeners failed to create with the following errors", errors)
 	}
 	return nil
 }
@@ -216,11 +284,12 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 	localPortUInt, err := strconv.ParseUint(localPort, 10, 16)
 
 	if err != nil {
+		fmt.Fprintf(pf.out, "Failed to forward from %s:%d -> %d\n", hostname, localPortUInt, port.Remote)
 		return nil, fmt.Errorf("Error parsing local port: %s from %s (%s)", err, listenerAddress, host)
 	}
 	port.Local = uint16(localPortUInt)
 	if pf.out != nil {
-		fmt.Fprintf(pf.out, "Forwarding from %s:%d -> %d\n", hostname, localPortUInt, port.Remote)
+		fmt.Fprintf(pf.out, "Forwarding from %s -> %d\n", net.JoinHostPort(hostname, strconv.Itoa(int(localPortUInt))), port.Remote)
 	}
 
 	return listener, nil
@@ -338,5 +407,22 @@ func (pf *PortForwarder) Close() {
 		if err := l.Close(); err != nil {
 			runtime.HandleError(fmt.Errorf("error closing listener: %v", err))
 		}
+	}
+}
+
+// GetPorts will return the ports that were forwarded; this can be used to
+// retrieve the locally-bound port in cases where the input was port 0. This
+// function will signal an error if the Ready channel is nil or if the
+// listeners are not ready yet; this function will succeed after the Ready
+// channel has been closed.
+func (pf *PortForwarder) GetPorts() ([]ForwardedPort, error) {
+	if pf.Ready == nil {
+		return nil, fmt.Errorf("no Ready channel provided")
+	}
+	select {
+	case <-pf.Ready:
+		return pf.ports, nil
+	default:
+		return nil, fmt.Errorf("listeners not ready")
 	}
 }

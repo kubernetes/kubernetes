@@ -18,14 +18,14 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 const defaultBoilerPlate = `
@@ -47,19 +47,20 @@ const defaultBoilerPlate = `
 var (
 	completionLong = dedent.Dedent(`
 		Output shell completion code for the specified shell (bash or zsh).
-		The shell code must be evalutated to provide interactive
+		The shell code must be evaluated to provide interactive
 		completion of kubeadm commands. This can be done by sourcing it from
 		the .bash_profile.
 
-		Note: this requires the bash-completion framework, which is not installed
-		by default on Mac. This can be installed by using homebrew:
+		Note: this requires the bash-completion framework.
 
+		To install it on Mac use homebrew:
 		    $ brew install bash-completion
-
 		Once installed, bash_completion must be evaluated. This can be done by adding the
 		following line to the .bash_profile
-
 		    $ source $(brew --prefix)/etc/bash_completion
+
+		If bash-completion is not installed on Linux, please install the 'bash-completion' package
+		via your distribution's package manager.
 
 		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2`)
 
@@ -72,7 +73,7 @@ var (
 		# Load the kubeadm completion code for bash into the current shell
 		source <(kubeadm completion bash)
 
-		# Write bash completion code to a file and source if from .bash_profile
+		# Write bash completion code to a file and source it from .bash_profile
 		kubeadm completion bash > ~/.kube/kubeadm_completion.bash.inc
 		printf "\n# Kubeadm shell completion\nsource '$HOME/.kube/kubeadm_completion.bash.inc'\n" >> $HOME/.bash_profile
 		source $HOME/.bash_profile
@@ -88,23 +89,27 @@ var (
 	}
 )
 
-// NewCmdCompletion return command for executing "kubeadm completion" command
-func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
+// GetSupportedShells returns a list of supported shells
+func GetSupportedShells() []string {
 	shells := []string{}
 	for s := range completionShells {
 		shells = append(shells, s)
 	}
+	return shells
+}
 
+// NewCmdCompletion returns the "kubeadm completion" command
+func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "completion SHELL",
-		Short:   i18n.T("Output shell completion code for the specified shell (bash or zsh)"),
+		Short:   "Output shell completion code for the specified shell (bash or zsh).",
 		Long:    completionLong,
 		Example: completionExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunCompletion(out, boilerPlate, cmd, args)
 			kubeadmutil.CheckErr(err)
 		},
-		ValidArgs: shells,
+		ValidArgs: GetSupportedShells(),
 	}
 
 	return cmd
@@ -113,14 +118,14 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 // RunCompletion checks given arguments and executes command
 func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("shell not specified")
+		return errors.New("shell not specified")
 	}
 	if len(args) > 1 {
-		return fmt.Errorf("too many arguments. expected only the shell type")
+		return errors.New("too many arguments. expected only the shell type")
 	}
 	run, found := completionShells[args[0]]
 	if !found {
-		return fmt.Errorf("unsupported shell type %q", args[0])
+		return errors.Errorf("unsupported shell type %q", args[0])
 	}
 
 	if len(boilerPlate) == 0 {
@@ -133,6 +138,7 @@ func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args [
 }
 
 func runCompletionBash(out io.Writer, kubeadm *cobra.Command) error {
+	klog.V(1).Infoln("[completion] writing completion code for Bash")
 	return kubeadm.GenBashCompletion(out)
 }
 
@@ -210,7 +216,7 @@ __kubeadm_get_comp_words_by_ref() {
 __kubeadm_filedir() {
 	local RET OLD_IFS w qw
 
-	__debug "_filedir $@ cur=$cur"
+	__kubectl_debug "_filedir $@ cur=$cur"
 	if [[ "$1" = \~* ]]; then
 		# somehow does not work. Maybe, zsh does not call this at all
 		eval echo "$1"
@@ -227,7 +233,7 @@ __kubeadm_filedir() {
 	fi
 	IFS="$OLD_IFS"
 
-	IFS="," __debug "RET=${RET[@]} len=${#RET[@]}"
+	IFS="," __kubectl_debug "RET=${RET[@]} len=${#RET[@]}"
 
 	for w in ${RET[@]}; do
 		if [[ ! "${w}" = "${cur}"* ]]; then
@@ -278,10 +284,12 @@ __kubeadm_convert_bash_to_zsh() {
 	-e "s/\\\$(type${RWORD}/\$(__kubeadm_type/g" \
 	<<'BASH_COMPLETION_EOF'
 `
+	klog.V(1).Infoln("[completion] writing completion code for Zsh")
 	out.Write([]byte(zshInitialization))
 
 	buf := new(bytes.Buffer)
 	kubeadm.GenBashCompletion(buf)
+	klog.V(1).Infoln("[completion] writing completion code for Bash")
 	out.Write(buf.Bytes())
 
 	zshTail := `

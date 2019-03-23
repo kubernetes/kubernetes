@@ -28,9 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -76,16 +77,11 @@ func validNewPersistentVolume(name string) *api.PersistentVolume {
 	return pv
 }
 
-func validChangedPersistentVolume() *api.PersistentVolume {
-	pv := validNewPersistentVolume("foo")
-	return pv
-}
-
 func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store).ClusterScope()
 	pv := validNewPersistentVolume("foo")
 	pv.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	test.TestCreate(
@@ -102,7 +98,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store).ClusterScope()
 	test.TestUpdate(
 		// valid
 		validNewPersistentVolume("foo"),
@@ -121,7 +117,7 @@ func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
+	test := genericregistrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
 	test.TestDelete(validNewPersistentVolume("foo"))
 }
 
@@ -129,7 +125,7 @@ func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store).ClusterScope()
 	test.TestGet(validNewPersistentVolume("foo"))
 }
 
@@ -137,7 +133,7 @@ func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store).ClusterScope()
 	test.TestList(validNewPersistentVolume("foo"))
 }
 
@@ -145,7 +141,7 @@ func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope()
+	test := genericregistrytest.New(t, storage.Store).ClusterScope()
 	test.TestWatch(
 		validNewPersistentVolume("foo"),
 		// matching labels
@@ -173,7 +169,7 @@ func TestUpdateStatus(t *testing.T) {
 	ctx := genericapirequest.NewContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	pvStart := validNewPersistentVolume("foo")
-	err := storage.Storage.Create(ctx, key, pvStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, pvStart, nil, 0, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -187,7 +183,7 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	_, _, err = statusStorage.Update(ctx, pvIn.Name, rest.DefaultUpdatedObjectInfo(pvIn))
+	_, _, err = statusStorage.Update(ctx, pvIn.Name, rest.DefaultUpdatedObjectInfo(pvIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

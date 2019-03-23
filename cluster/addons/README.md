@@ -1,4 +1,6 @@
-# Cluster add-ons
+# Legacy Cluster add-ons
+
+For more information on add-ons see [the documentation](https://kubernetes.io/docs/concepts/cluster-administration/addons/).
 
 ## Overview
 

@@ -17,18 +17,19 @@ limitations under the License.
 package cloudstack
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/xanzy/go-cloudstack/cloudstack"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 )
 
 // NodeAddresses returns the addresses of the specified instance.
-func (cs *CSCloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
+func (cs *CSCloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByName(
 		string(name),
 		cloudstack.WithProject(cs.projectID),
@@ -44,7 +45,7 @@ func (cs *CSCloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) 
 }
 
 // NodeAddressesByProviderID returns the addresses of the specified instance.
-func (cs *CSCloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+func (cs *CSCloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByID(
 		providerID,
 		cloudstack.WithProject(cs.projectID),
@@ -68,24 +69,23 @@ func (cs *CSCloud) nodeAddresses(instance *cloudstack.VirtualMachine) ([]v1.Node
 		{Type: v1.NodeInternalIP, Address: instance.Nic[0].Ipaddress},
 	}
 
+	if instance.Hostname != "" {
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeHostName, Address: instance.Hostname})
+	}
+
 	if instance.Publicip != "" {
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: instance.Publicip})
 	} else {
 		// Since there is no sane way to determine the external IP if the host isn't
 		// using static NAT, we will just fire a log message and omit the external IP.
-		glog.V(4).Infof("Could not determine the public IP of host %v (%v)", instance.Name, instance.Id)
+		klog.V(4).Infof("Could not determine the public IP of host %v (%v)", instance.Name, instance.Id)
 	}
 
 	return addresses, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (cs *CSCloud) ExternalID(name types.NodeName) (string, error) {
-	return cs.InstanceID(name)
-}
-
 // InstanceID returns the cloud provider ID of the specified instance.
-func (cs *CSCloud) InstanceID(name types.NodeName) (string, error) {
+func (cs *CSCloud) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByName(
 		string(name),
 		cloudstack.WithProject(cs.projectID),
@@ -101,7 +101,7 @@ func (cs *CSCloud) InstanceID(name types.NodeName) (string, error) {
 }
 
 // InstanceType returns the type of the specified instance.
-func (cs *CSCloud) InstanceType(name types.NodeName) (string, error) {
+func (cs *CSCloud) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByName(
 		string(name),
 		cloudstack.WithProject(cs.projectID),
@@ -117,7 +117,7 @@ func (cs *CSCloud) InstanceType(name types.NodeName) (string, error) {
 }
 
 // InstanceTypeByProviderID returns the type of the specified instance.
-func (cs *CSCloud) InstanceTypeByProviderID(providerID string) (string, error) {
+func (cs *CSCloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByID(
 		providerID,
 		cloudstack.WithProject(cs.projectID),
@@ -133,17 +133,17 @@ func (cs *CSCloud) InstanceTypeByProviderID(providerID string) (string, error) {
 }
 
 // AddSSHKeyToAllInstances is currently not implemented.
-func (cs *CSCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	return errors.New("AddSSHKeyToAllInstances not implemented")
+func (cs *CSCloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
+	return cloudprovider.NotImplemented
 }
 
 // CurrentNodeName returns the name of the node we are currently running on.
-func (cs *CSCloud) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (cs *CSCloud) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }
 
 // InstanceExistsByProviderID returns if the instance still exists.
-func (cs *CSCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+func (cs *CSCloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	_, count, err := cs.client.VirtualMachine.GetVirtualMachineByID(
 		providerID,
 		cloudstack.WithProject(cs.projectID),
@@ -156,4 +156,9 @@ func (cs *CSCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (cs *CSCloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
 }

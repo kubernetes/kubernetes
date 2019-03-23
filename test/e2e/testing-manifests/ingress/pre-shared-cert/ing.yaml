@@ -1,0 +1,20 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: pre-shared-cert
+  # Below annotation will be added upon test:
+  # annotations:
+  #  ingress.gcp.kubernetes.io/pre-shared-cert: "test-pre-shared-cert"
+spec:
+  # kubemci requires a default backend.
+  backend:
+    serviceName: echoheaders-https
+    servicePort: 80
+  rules:
+  - host: test.ingress.com
+    http:
+      paths:
+      - path: /test
+        backend:
+          serviceName: echoheaders-https
+          servicePort: 80

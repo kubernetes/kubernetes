@@ -17,7 +17,10 @@ limitations under the License.
 package storage
 
 import (
-	"golang.org/x/net/context"
+	"context"
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,7 +31,9 @@ import (
 // Versioner abstracts setting and retrieving metadata fields from database response
 // onto the object ot list. It is required to maintain storage invariants - updating an
 // object twice with the same data except for the ResourceVersion and SelfLink must be
-// a no-op.
+// a no-op. A resourceVersion of type uint64 is a 'raw' resourceVersion,
+// intended to be sent directly to or from the backend. A resourceVersion of
+// type string is a 'safe' resourceVersion, intended for consumption by users.
 type Versioner interface {
 	// UpdateObject sets storage metadata into an API object. Returns an error if the object
 	// cannot be updated correctly. May return nil if the requested object does not need metadata
@@ -45,6 +50,13 @@ type Versioner interface {
 	// ObjectResourceVersion returns the resource version (for persistence) of the specified object.
 	// Should return an error if the specified object does not have a persistable version.
 	ObjectResourceVersion(obj runtime.Object) (uint64, error)
+
+	// ParseResourceVersion takes a resource version argument and
+	// converts it to the storage backend. For watch we should pass to helper.Watch().
+	// Because resourceVersion is an opaque value, the default watch
+	// behavior for non-zero watch is to watch the next value (if you pass
+	// "1", you will see updates from "2" onwards).
+	ParseResourceVersion(resourceVersion string) (uint64, error)
 }
 
 // ResponseMeta contains information about the database metadata that is associated with
@@ -70,16 +82,10 @@ type MatchValue struct {
 // to that function.
 type TriggerPublisherFunc func(obj runtime.Object) []MatchValue
 
-// FilterFunc takes an API object and returns true if the object satisfies some requirements.
-// TODO: We will remove this type and use SelectionPredicate everywhere.
-type FilterFunc func(obj runtime.Object) bool
-
 // Everything accepts all objects.
 var Everything = SelectionPredicate{
 	Label: labels.Everything(),
 	Field: fields.Everything(),
-	// TODO: split this into a new top level constant?
-	IncludeUninitialized: true,
 }
 
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update
@@ -92,12 +98,44 @@ type Preconditions struct {
 	// Specifies the target UID.
 	// +optional
 	UID *types.UID `json:"uid,omitempty"`
+	// Specifies the target ResourceVersion
+	// +optional
+	ResourceVersion *string `json:"resourceVersion,omitempty"`
 }
 
 // NewUIDPreconditions returns a Preconditions with UID set.
 func NewUIDPreconditions(uid string) *Preconditions {
 	u := types.UID(uid)
 	return &Preconditions{UID: &u}
+}
+
+func (p *Preconditions) Check(key string, obj runtime.Object) error {
+	if p == nil {
+		return nil
+	}
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return NewInternalErrorf(
+			"can't enforce preconditions %v on un-introspectable object %v, got error: %v",
+			*p,
+			obj,
+			err)
+	}
+	if p.UID != nil && *p.UID != objMeta.GetUID() {
+		err := fmt.Sprintf(
+			"Precondition failed: UID in precondition: %v, UID in object meta: %v",
+			*p.UID,
+			objMeta.GetUID())
+		return NewInvalidObjError(key, err)
+	}
+	if p.ResourceVersion != nil && *p.ResourceVersion != objMeta.GetResourceVersion() {
+		err := fmt.Sprintf(
+			"Precondition failed: ResourceVersion in precondition: %v, ResourceVersion in object meta: %v",
+			*p.ResourceVersion,
+			objMeta.GetResourceVersion())
+		return NewInvalidObjError(key, err)
+	}
+	return nil
 }
 
 // Interface offers a common interface for object marshaling/unmarshaling operations and
@@ -186,4 +224,7 @@ type Interface interface {
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
 		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error
+
+	// Count returns number of different entries under the key (generally being path prefix).
+	Count(key string) (int64, error)
 }

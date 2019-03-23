@@ -31,11 +31,11 @@ import (
 func MatchesServerVersion(clientVersion apimachineryversion.Info, client DiscoveryInterface) error {
 	sVer, err := client.ServerVersion()
 	if err != nil {
-		return fmt.Errorf("couldn't read version from server: %v\n", err)
+		return fmt.Errorf("couldn't read version from server: %v", err)
 	}
 	// GitVersion includes GitCommit and GitTreeState, but best to be safe?
 	if clientVersion.GitVersion != sVer.GitVersion || clientVersion.GitCommit != sVer.GitCommit || clientVersion.GitTreeState != sVer.GitTreeState {
-		return fmt.Errorf("server version (%#v) differs from client version (%#v)!\n", sVer, clientVersion)
+		return fmt.Errorf("server version (%#v) differs from client version (%#v)", sVer, clientVersion)
 	}
 
 	return nil
@@ -101,12 +101,15 @@ func FilteredBy(pred ResourcePredicate, rls []*metav1.APIResourceList) []*metav1
 	return result
 }
 
+// ResourcePredicate has a method to check if a resource matches a given condition.
 type ResourcePredicate interface {
 	Match(groupVersion string, r *metav1.APIResource) bool
 }
 
+// ResourcePredicateFunc returns true if it matches a resource based on a custom condition.
 type ResourcePredicateFunc func(groupVersion string, r *metav1.APIResource) bool
 
+// Match is a wrapper around ResourcePredicateFunc.
 func (fn ResourcePredicateFunc) Match(groupVersion string, r *metav1.APIResource) bool {
 	return fn(groupVersion, r)
 }
@@ -116,6 +119,7 @@ type SupportsAllVerbs struct {
 	Verbs []string
 }
 
+// Match checks if a resource contains all the given verbs.
 func (p SupportsAllVerbs) Match(groupVersion string, r *metav1.APIResource) bool {
 	return sets.NewString([]string(r.Verbs)...).HasAll(p.Verbs...)
 }

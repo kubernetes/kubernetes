@@ -25,10 +25,11 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	. "k8s.io/kubernetes/pkg/apis/batch/v1"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultJob(t *testing.T) {
@@ -48,9 +49,9 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  newInt32(1),
-					Parallelism:  newInt32(1),
-					BackoffLimit: newInt32(6),
+					Completions:  utilpointer.Int32Ptr(1),
+					Parallelism:  utilpointer.Int32Ptr(1),
+					BackoffLimit: utilpointer.Int32Ptr(6),
 				},
 			},
 			expectLabels: true,
@@ -68,16 +69,16 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  newInt32(1),
-					Parallelism:  newInt32(1),
-					BackoffLimit: newInt32(6),
+					Completions:  utilpointer.Int32Ptr(1),
+					Parallelism:  utilpointer.Int32Ptr(1),
+					BackoffLimit: utilpointer.Int32Ptr(6),
 				},
 			},
 		},
 		"WQ: Parallelism explicitly 0 and completions unset -> BackoffLimit is defaulted": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: newInt32(0),
+					Parallelism: utilpointer.Int32Ptr(0),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -85,8 +86,8 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism:  newInt32(0),
-					BackoffLimit: newInt32(6),
+					Parallelism:  utilpointer.Int32Ptr(0),
+					BackoffLimit: utilpointer.Int32Ptr(6),
 				},
 			},
 			expectLabels: true,
@@ -94,7 +95,7 @@ func TestSetDefaultJob(t *testing.T) {
 		"WQ: Parallelism explicitly 2 and completions unset -> BackoffLimit is defaulted": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: newInt32(2),
+					Parallelism: utilpointer.Int32Ptr(2),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -102,8 +103,8 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism:  newInt32(2),
-					BackoffLimit: newInt32(6),
+					Parallelism:  utilpointer.Int32Ptr(2),
+					BackoffLimit: utilpointer.Int32Ptr(6),
 				},
 			},
 			expectLabels: true,
@@ -111,7 +112,7 @@ func TestSetDefaultJob(t *testing.T) {
 		"Completions explicitly 2 and others unset -> parallelism and BackoffLimit are defaulted": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions: newInt32(2),
+					Completions: utilpointer.Int32Ptr(2),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -119,9 +120,9 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  newInt32(2),
-					Parallelism:  newInt32(1),
-					BackoffLimit: newInt32(6),
+					Completions:  utilpointer.Int32Ptr(2),
+					Parallelism:  utilpointer.Int32Ptr(1),
+					BackoffLimit: utilpointer.Int32Ptr(6),
 				},
 			},
 			expectLabels: true,
@@ -129,7 +130,7 @@ func TestSetDefaultJob(t *testing.T) {
 		"BackoffLimit explicitly 5 and others unset -> parallelism and completions are defaulted": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					BackoffLimit: newInt32(5),
+					BackoffLimit: utilpointer.Int32Ptr(5),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -137,9 +138,9 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  newInt32(1),
-					Parallelism:  newInt32(1),
-					BackoffLimit: newInt32(5),
+					Completions:  utilpointer.Int32Ptr(1),
+					Parallelism:  utilpointer.Int32Ptr(1),
+					BackoffLimit: utilpointer.Int32Ptr(5),
 				},
 			},
 			expectLabels: true,
@@ -147,9 +148,9 @@ func TestSetDefaultJob(t *testing.T) {
 		"All set -> no change": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  newInt32(8),
-					Parallelism:  newInt32(9),
-					BackoffLimit: newInt32(10),
+					Completions:  utilpointer.Int32Ptr(8),
+					Parallelism:  utilpointer.Int32Ptr(9),
+					BackoffLimit: utilpointer.Int32Ptr(10),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -157,9 +158,9 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  newInt32(8),
-					Parallelism:  newInt32(9),
-					BackoffLimit: newInt32(10),
+					Completions:  utilpointer.Int32Ptr(8),
+					Parallelism:  utilpointer.Int32Ptr(9),
+					BackoffLimit: utilpointer.Int32Ptr(10),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -170,9 +171,9 @@ func TestSetDefaultJob(t *testing.T) {
 		"All set, flipped -> no change": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  newInt32(11),
-					Parallelism:  newInt32(10),
-					BackoffLimit: newInt32(9),
+					Completions:  utilpointer.Int32Ptr(11),
+					Parallelism:  utilpointer.Int32Ptr(10),
+					BackoffLimit: utilpointer.Int32Ptr(9),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -180,9 +181,9 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  newInt32(11),
-					Parallelism:  newInt32(10),
-					BackoffLimit: newInt32(9),
+					Completions:  utilpointer.Int32Ptr(11),
+					Parallelism:  utilpointer.Int32Ptr(10),
+					BackoffLimit: utilpointer.Int32Ptr(9),
 				},
 			},
 			expectLabels: true,
@@ -226,27 +227,21 @@ func validateDefaultInt32(t *testing.T, name string, field string, actual *int32
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := runtime.Encode(api.Codecs.LegacyCodec(SchemeGroupVersion), obj)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
 	}
-	obj2, err := runtime.Decode(api.Codecs.UniversalDecoder(), data)
+	obj2, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), obj)
 		return nil
 	}
 	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
-	err = api.Scheme.Convert(obj2, obj3, nil)
+	err = legacyscheme.Scheme.Convert(obj2, obj3, nil)
 	if err != nil {
 		t.Errorf("%v\nSource: %#v", err, obj2)
 		return nil
 	}
 	return obj3
-}
-
-func newInt32(val int32) *int32 {
-	p := new(int32)
-	*p = val
-	return p
 }

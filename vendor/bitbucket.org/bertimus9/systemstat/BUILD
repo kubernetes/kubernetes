@@ -4,12 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "systemstat.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "systemstat_linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "systemstat_ex.go",
+        "systemstat_linux.go",
+        "utils.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/bitbucket.org/bertimus9/systemstat",
     importpath = "bitbucket.org/bertimus9/systemstat",
     visibility = ["//visibility:public"],
 )

@@ -14,21 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package request_test
+package request
 
 import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/user"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // TestNamespaceContext validates that a namespace can be get/set on a context object
 func TestNamespaceContext(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	result, ok := genericapirequest.NamespaceFrom(ctx)
+	ctx := NewDefaultContext()
+	result, ok := NamespaceFrom(ctx)
 	if !ok {
 		t.Fatalf("Error getting namespace")
 	}
@@ -36,8 +34,8 @@ func TestNamespaceContext(t *testing.T) {
 		t.Fatalf("Expected: %s, Actual: %s", metav1.NamespaceDefault, result)
 	}
 
-	ctx = genericapirequest.NewContext()
-	result, ok = genericapirequest.NamespaceFrom(ctx)
+	ctx = NewContext()
+	result, ok = NamespaceFrom(ctx)
 	if ok {
 		t.Fatalf("Should not be ok because there is no namespace on the context")
 	}
@@ -45,12 +43,12 @@ func TestNamespaceContext(t *testing.T) {
 
 //TestUserContext validates that a userinfo can be get/set on a context object
 func TestUserContext(t *testing.T) {
-	ctx := genericapirequest.NewContext()
-	_, ok := genericapirequest.UserFrom(ctx)
+	ctx := NewContext()
+	_, ok := UserFrom(ctx)
 	if ok {
 		t.Fatalf("Should not be ok because there is no user.Info on the context")
 	}
-	ctx = genericapirequest.WithUser(
+	ctx = WithUser(
 		ctx,
 		&user.DefaultInfo{
 			Name:   "bob",
@@ -60,7 +58,7 @@ func TestUserContext(t *testing.T) {
 		},
 	)
 
-	result, ok := genericapirequest.UserFrom(ctx)
+	result, ok := UserFrom(ctx)
 	if !ok {
 		t.Fatalf("Error getting user info")
 	}
@@ -92,43 +90,4 @@ func TestUserContext(t *testing.T) {
 		t.Fatalf("Get user extra map value error, Expected: %s, Actual: %s", expectedExtraValue, actualExtra[expectedExtraKey])
 	}
 
-}
-
-//TestUIDContext validates that a UID can be get/set on a context object
-func TestUIDContext(t *testing.T) {
-	ctx := genericapirequest.NewContext()
-	_, ok := genericapirequest.UIDFrom(ctx)
-	if ok {
-		t.Fatalf("Should not be ok because there is no UID on the context")
-	}
-	ctx = genericapirequest.WithUID(
-		ctx,
-		types.UID("testUID"),
-	)
-	_, ok = genericapirequest.UIDFrom(ctx)
-	if !ok {
-		t.Fatalf("Error getting UID")
-	}
-}
-
-//TestUserAgentContext validates that a useragent can be get/set on a context object
-func TestUserAgentContext(t *testing.T) {
-	ctx := genericapirequest.NewContext()
-	_, ok := genericapirequest.UserAgentFrom(ctx)
-	if ok {
-		t.Fatalf("Should not be ok because there is no UserAgent on the context")
-	}
-
-	ctx = genericapirequest.WithUserAgent(
-		ctx,
-		"TestUserAgent",
-	)
-	result, ok := genericapirequest.UserAgentFrom(ctx)
-	if !ok {
-		t.Fatalf("Error getting UserAgent")
-	}
-	expectedResult := "TestUserAgent"
-	if result != expectedResult {
-		t.Fatalf("Get user agent error, Expected: %s, Actual: %s", expectedResult, result)
-	}
 }

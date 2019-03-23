@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
-	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // TODO: generalize for other controller objects that will follow the same pattern, such as ReplicaSet and DaemonSet, and
@@ -116,6 +116,9 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	}
 	if spec.BackoffLimit != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.BackoffLimit), fldPath.Child("backoffLimit"))...)
+	}
+	if spec.TTLSecondsAfterFinished != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.TTLSecondsAfterFinished), fldPath.Child("ttlSecondsAfterFinished"))...)
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"))...)

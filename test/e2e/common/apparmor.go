@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/gomega"
 )
@@ -39,6 +40,10 @@ const (
 
 // AppArmorDistros are distros with AppArmor support
 var AppArmorDistros = []string{"gci", "ubuntu"}
+
+func IsAppArmorSupported() bool {
+	return framework.NodeOSDistroIs(AppArmorDistros...)
+}
 
 func SkipIfAppArmorNotSupported() {
 	framework.SkipUnlessNodeOSDistroIs(AppArmorDistros...)
@@ -112,7 +117,7 @@ done`, testCmd)
 			Affinity: loaderAffinity,
 			Containers: []api.Container{{
 				Name:    "test",
-				Image:   busyboxImage,
+				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 				Command: []string{"sh", "-c", testCmd},
 			}},
 			RestartPolicy: api.RestartPolicyNever,
@@ -160,7 +165,7 @@ profile %s flags=(attach_disconnected) {
 			profileName: profile,
 		},
 	}
-	_, err := f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(cm)
+	_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(cm)
 	framework.ExpectNoError(err, "Failed to create apparmor-profiles ConfigMap")
 }
 
@@ -181,7 +186,7 @@ func createAppArmorProfileLoader(f *framework.Framework) {
 				Spec: api.PodSpec{
 					Containers: []api.Container{{
 						Name:  "apparmor-loader",
-						Image: "gcr.io/google_containers/apparmor-loader:0.1",
+						Image: imageutils.GetE2EImage(imageutils.AppArmorLoader),
 						Args:  []string{"-poll", "10s", "/profiles"},
 						SecurityContext: &api.SecurityContext{
 							Privileged: &True,
@@ -228,7 +233,7 @@ func createAppArmorProfileLoader(f *framework.Framework) {
 			},
 		},
 	}
-	_, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(loader)
+	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(loader)
 	framework.ExpectNoError(err, "Failed to create apparmor-loader ReplicationController")
 
 	// Wait for loader to be ready.

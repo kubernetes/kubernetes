@@ -1,12 +1,16 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - deads2k
 - lavalamp
 - mikedanese
+- sttts
 reviewers:
 - '249043822'
 - a-robinson
 - brendandburns
 - caesarxuchao
+- cheftako
 - cjcullen
 - dalanlan
 - david-mcmahon
@@ -59,7 +63,10 @@ reviewers:
 - smarterclayton
 - soltysh
 - spiffxp
+- stewart-yu
 - sttts
 - thockin
 - timothysc
 - wojtek-t
+labels:
+- sig/api-machinery

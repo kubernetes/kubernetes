@@ -26,10 +26,12 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	cpumanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -101,14 +103,33 @@ func getLocalNodeCPUDetails(f *framework.Framework) (cpuCapVal int64, cpuAllocVa
 	return cpuCap.Value(), (cpuCap.Value() - cpuRes.Value()), cpuRes.Value()
 }
 
-// TODO(balajismaniam): Make this func generic to all container runtimes.
-func waitForContainerRemoval(ctnPartName string) {
+func waitForContainerRemoval(containerName, podName, podNS string) {
+	rs, _, err := getCRIClient()
+	Expect(err).NotTo(HaveOccurred())
 	Eventually(func() bool {
-		err := exec.Command("/bin/sh", "-c", fmt.Sprintf("if [ -n \"$(docker ps -a | grep -i %s)\" ]; then exit 1; fi", ctnPartName)).Run()
+		containers, err := rs.ListContainers(&runtimeapi.ContainerFilter{
+			LabelSelector: map[string]string{
+				types.KubernetesPodNameLabel:       podName,
+				types.KubernetesPodNamespaceLabel:  podNS,
+				types.KubernetesContainerNameLabel: containerName,
+			},
+		})
 		if err != nil {
 			return false
 		}
-		return true
+		return len(containers) == 0
+	}, 2*time.Minute, 1*time.Second).Should(BeTrue())
+}
+
+func waitForStateFileCleanedUp() {
+	Eventually(func() bool {
+		restoredState, err := cpumanagerstate.NewCheckpointState("/var/lib/kubelet", "cpu_manager_state", "static")
+		framework.ExpectNoError(err, "failed to create testing cpumanager state instance")
+		assignments := restoredState.GetCPUAssignments()
+		if len(assignments) == 0 {
+			return true
+		}
+		return false
 	}, 2*time.Minute, 1*time.Second).Should(BeTrue())
 }
 
@@ -128,24 +149,66 @@ func getCPUSiblingList(cpuRes int64) string {
 	return string(out)
 }
 
+func deleteStateFile() {
+	err := exec.Command("/bin/sh", "-c", "rm -f /var/lib/kubelet/cpu_manager_state").Run()
+	framework.ExpectNoError(err, "error deleting state file")
+}
+
 func setOldKubeletConfig(f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration) {
+	// Delete the CPU Manager state file so that the old Kubelet configuration
+	// can take effect.i
+	deleteStateFile()
+
 	if oldCfg != nil {
 		framework.ExpectNoError(setKubeletConfiguration(f, oldCfg))
 	}
 }
 
-func enableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.KubeletConfiguration) {
-	// Run only if the container runtime is Docker.
-	// TODO(balajismaniam): Make this test generic to all container runtimes.
-	framework.RunIfContainerRuntimeIs("docker")
+func disableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.KubeletConfiguration) {
+	// Disable CPU Manager in Kubelet.
+	oldCfg, err := getCurrentKubeletConfig()
+	framework.ExpectNoError(err)
+	newCfg := oldCfg.DeepCopy()
+	if newCfg.FeatureGates == nil {
+		newCfg.FeatureGates = make(map[string]bool)
+	}
+	newCfg.FeatureGates["CPUManager"] = false
 
+	// Update the Kubelet configuration.
+	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
+
+	// Wait for the Kubelet to be ready.
+	Eventually(func() bool {
+		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		return len(nodeList.Items) == 1
+	}, time.Minute, time.Second).Should(BeTrue())
+
+	return oldCfg
+}
+
+func enableCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool) (oldCfg *kubeletconfig.KubeletConfiguration) {
 	// Enable CPU Manager in Kubelet with static policy.
 	oldCfg, err := getCurrentKubeletConfig()
 	framework.ExpectNoError(err)
 	newCfg := oldCfg.DeepCopy()
+	if newCfg.FeatureGates == nil {
+		newCfg.FeatureGates = make(map[string]bool)
+	} else {
+		newCfg.FeatureGates["CPUManager"] = true
+	}
 
-	// Enable CPU Manager using feature gate.
-	newCfg.FeatureGates[string(features.CPUManager)] = true
+	// After graduation of the CPU Manager feature to Beta, the CPU Manager
+	// "none" policy is ON by default. But when we set the CPU Manager policy to
+	// "static" in this test and the Kubelet is restarted so that "static"
+	// policy can take effect, there will always be a conflict with the state
+	// checkpointed in the disk (i.e., the policy checkpointed in the disk will
+	// be "none" whereas we are trying to restart Kubelet with "static"
+	// policy). Therefore, we delete the state file so that we can proceed
+	// with the tests.
+	// Only delete the state file at the begin of the tests.
+	if cleanStateFile {
+		deleteStateFile()
+	}
 
 	// Set the CPU Manager policy to static.
 	newCfg.CPUManagerPolicy = string(cpumanager.PolicyStatic)
@@ -156,6 +219,10 @@ func enableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.Ku
 	// The Kubelet panics if either kube-reserved or system-reserved is not set
 	// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
 	// kubelet doesn't panic.
+	if newCfg.KubeReserved == nil {
+		newCfg.KubeReserved = map[string]string{}
+	}
+
 	if _, ok := newCfg.KubeReserved["cpu"]; !ok {
 		newCfg.KubeReserved["cpu"] = "200m"
 	}
@@ -172,7 +239,7 @@ func enableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.Ku
 }
 
 func runCPUManagerTests(f *framework.Framework) {
-	var cpuCap, cpuAlloc, cpuRes int64
+	var cpuCap, cpuAlloc int64
 	var oldCfg *kubeletconfig.KubeletConfiguration
 	var cpuListString, expAllowedCPUsListRegex string
 	var cpuList []int
@@ -183,14 +250,15 @@ func runCPUManagerTests(f *framework.Framework) {
 	var pod, pod1, pod2 *v1.Pod
 
 	It("should assign CPUs as expected based on the Pod spec", func() {
-		oldCfg = enableCPUManagerInKubelet(f)
+		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
 
-		cpuCap, cpuAlloc, cpuRes = getLocalNodeCPUDetails(f)
-
-		// Skip CPU Manager tests if the number of allocatable CPUs < 1.
-		if cpuAlloc < 1 {
-			framework.Skipf("Skipping CPU Manager tests since the number of allocatable CPUs < 1")
+		// Skip CPU Manager tests altogether if the CPU capacity < 2.
+		if cpuCap < 2 {
+			framework.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
 		}
+
+		// Enable CPU Manager in the kubelet.
+		oldCfg = enableCPUManagerInKubelet(f, true)
 
 		By("running a non-Gu pod")
 		ctnAttrs = []ctnAttribute{
@@ -211,7 +279,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod.Name})
-		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod.Spec.Containers[0].Name, pod.Name))
+		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 
 		By("running a Gu pod")
 		ctnAttrs = []ctnAttribute{
@@ -237,7 +305,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod.Name})
-		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod.Spec.Containers[0].Name, pod.Name))
+		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 
 		By("running multiple Gu and non-Gu pods")
 		ctnAttrs = []ctnAttribute{
@@ -283,12 +351,12 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod1.Name, pod2.Name})
-		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod1.Spec.Containers[0].Name, pod1.Name))
-		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod2.Spec.Containers[0].Name, pod2.Name))
+		waitForContainerRemoval(pod1.Spec.Containers[0].Name, pod1.Name, pod1.Namespace)
+		waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
 
-		// Skip rest of the tests if the number of allocatable CPUs < 2.
-		if cpuAlloc < 2 {
-			framework.Skipf("Skipping rest of the CPU Manager tests since the number of allocatable CPUs < 2")
+		// Skip rest of the tests if CPU capacity < 3.
+		if cpuCap < 3 {
+			framework.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
 		}
 
 		By("running a Gu pod requesting multiple CPUs")
@@ -319,7 +387,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod.Name})
-		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod.Spec.Containers[0].Name, pod.Name))
+		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 
 		By("running a Gu pod with multiple containers requesting integer CPUs")
 		ctnAttrs = []ctnAttribute{
@@ -357,8 +425,8 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod.Name})
-		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod.Spec.Containers[0].Name, pod.Name))
-		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod.Spec.Containers[1].Name, pod.Name))
+		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+		waitForContainerRemoval(pod.Spec.Containers[1].Name, pod.Name, pod.Namespace)
 
 		By("running multiple Gu pods")
 		ctnAttrs = []ctnAttribute{
@@ -402,15 +470,58 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		By("by deleting the pods and waiting for container removal")
 		deletePods(f, []string{pod1.Name, pod2.Name})
-		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod1.Spec.Containers[0].Name, pod1.Name))
-		waitForContainerRemoval(fmt.Sprintf("%s_%s", pod2.Spec.Containers[0].Name, pod2.Name))
+		waitForContainerRemoval(pod1.Spec.Containers[0].Name, pod1.Name, pod1.Namespace)
+		waitForContainerRemoval(pod2.Spec.Containers[0].Name, pod2.Name, pod2.Namespace)
+
+		By("test for automatically remove inactive pods from cpumanager state file.")
+		// First running a Gu Pod,
+		// second disable cpu manager in kubelet,
+		// then delete the Gu Pod,
+		// then enable cpu manager in kubelet,
+		// at last wait for the reconcile process cleaned up the state file, if the assignments map is empty,
+		// it proves that the automatic cleanup in the reconcile process is in effect.
+		By("running a Gu pod for test remove")
+		ctnAttrs = []ctnAttribute{
+			{
+				ctnName:    "gu-container-testremove",
+				cpuRequest: "1000m",
+				cpuLimit:   "1000m",
+			},
+		}
+		pod = makeCPUManagerPod("gu-pod-testremove", ctnAttrs)
+		pod = f.PodClient().CreateSync(pod)
+
+		By("checking if the expected cpuset was assigned")
+		cpu1 = 1
+		if isHTEnabled() {
+			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+			cpu1 = cpuList[1]
+		}
+		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
+		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+			pod.Spec.Containers[0].Name, pod.Name)
+
+		By("disable cpu manager in kubelet")
+		disableCPUManagerInKubelet(f)
+
+		By("by deleting the pod and waiting for container removal")
+		deletePods(f, []string{pod.Name})
+		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+
+		By("enable cpu manager in kubelet without delete state file")
+		enableCPUManagerInKubelet(f, false)
+
+		By("wait for the deleted pod to be cleaned up from the state file")
+		waitForStateFileCleanedUp()
+		By("the deleted pod has already been deleted from the state file")
 
 		setOldKubeletConfig(f, oldCfg)
 	})
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = framework.KubeDescribe("CPU Manager [Serial]", func() {
+var _ = SIGDescribe("CPU Manager [Serial] [Feature:CPUManager][NodeAlphaFeature:CPUManager]", func() {
 	f := framework.NewDefaultFramework("cpu-manager-test")
 
 	Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {

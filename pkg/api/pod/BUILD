@@ -11,10 +11,11 @@ go_library(
     srcs = ["util.go"],
     importpath = "k8s.io/kubernetes/pkg/api/pod",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//pkg/security/apparmor:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 
@@ -34,11 +35,17 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/pod",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/features:go_default_library",
+        "//pkg/security/apparmor:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
     ],
 )

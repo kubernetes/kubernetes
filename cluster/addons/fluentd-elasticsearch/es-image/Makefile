@@ -12,20 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	binary build push
+.PHONY:	build
 
-PREFIX = gcr.io/google-containers
+PREFIX = gcr.io/fluentd-elasticsearch
 IMAGE = elasticsearch
-TAG = v5.6.2
+TAG = v6.6.1
 
 build:
-	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
-
-push:
-	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)
-
-binary:
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags "-w" elasticsearch_logging_discovery.go
-
-clean:
-	rm elasticsearch_logging_discovery
+	gcloud builds submit --tag ${PREFIX}/${IMAGE}:${TAG}

@@ -31,12 +31,15 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
+	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 )
 
 const defaultEtcdPathPrefix = "/registry/kube-aggregator.kubernetes.io/"
 
+// AggregatorOptions contains everything necessary to create and run an API Aggregator.
 type AggregatorOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
+	APIEnablement      *genericoptions.APIEnablementOptions
 
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -48,9 +51,9 @@ type AggregatorOptions struct {
 }
 
 // NewCommandStartAggregator provides a CLI handler for 'start master' command
-func NewCommandStartAggregator(out, err io.Writer, stopCh <-chan struct{}) *cobra.Command {
-	o := NewDefaultOptions(out, err)
-
+// with a default AggregatorOptions.
+func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct{}) *cobra.Command {
+	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
 		Long:  "Launch a API aggregator and proxy server",
@@ -75,6 +78,7 @@ func NewCommandStartAggregator(out, err io.Writer, stopCh <-chan struct{}) *cobr
 // AddFlags is necessary because hyperkube doesn't work using cobra, so we have to have different registration and execution paths
 func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 	o.RecommendedOptions.AddFlags(fs)
+	o.APIEnablement.AddFlags(fs)
 	fs.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
 	fs.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
 }
@@ -82,7 +86,12 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(
+			defaultEtcdPathPrefix,
+			aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
+			genericoptions.NewProcessInfo("kube-aggregator", "kube-system"),
+		),
+		APIEnablement: genericoptions.NewAPIEnablementOptions(),
 
 		StdOut: out,
 		StdErr: err,
@@ -91,25 +100,32 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	return o
 }
 
+// Validate validates all the required options.
 func (o AggregatorOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
+	errors = append(errors, o.APIEnablement.Validate(aggregatorscheme.Scheme)...)
 	return utilerrors.NewAggregate(errors)
 }
 
+// Complete fills in missing Options.
 func (o *AggregatorOptions) Complete() error {
 	return nil
 }
 
+// RunAggregator runs the API Aggregator.
 func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	serverConfig := genericapiserver.NewRecommendedConfig(aggregatorscheme.Codecs)
 
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
+		return err
+	}
+	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), aggregatorscheme.Scheme); err != nil {
 		return err
 	}
 	serverConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
@@ -136,7 +152,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	server, err := config.Complete().NewWithDelegate(genericapiserver.EmptyDelegate)
+	server, err := config.Complete().NewWithDelegate(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return err
 	}

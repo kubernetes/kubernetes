@@ -1,9 +1,0 @@
-kind: Service
-apiVersion: v1
-metadata:
-  name: nfs-web
-spec:
-  ports:
-    - port: 80
-  selector:
-    role: web-frontend

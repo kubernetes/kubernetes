@@ -22,20 +22,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	. "github.com/onsi/ginkgo"
 )
 
 var _ = framework.KubeDescribe("Docker Containers", func() {
 	f := framework.NewDefaultFramework("containers")
 
-	It("should use the image defaults if command and args are blank [Conformance]", func() {
+	/*
+		Release : v1.9
+		Testname: Docker containers, without command and arguments
+		Description: Default command and arguments from the docker image entrypoint MUST be used when Pod does not specify the container command
+	*/
+	framework.ConformanceIt("should use the image defaults if command and args are blank [NodeConformance]", func() {
 		f.TestContainerOutput("use defaults", entrypointTestPod(), 0, []string{
 			"[/ep default arguments]",
 		})
 	})
 
-	It("should be able to override the image's default arguments (docker cmd) [Conformance]", func() {
+	/*
+		Release : v1.9
+		Testname: Docker containers, with arguments
+		Description: Default command and  from the docker image entrypoint MUST be used when Pod does not specify the container command but the arguments from Pod spec MUST override when specified.
+	*/
+	framework.ConformanceIt("should be able to override the image's default arguments (docker cmd) [NodeConformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
@@ -46,7 +54,12 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 
 	// Note: when you override the entrypoint, the image's arguments (docker cmd)
 	// are ignored.
-	It("should be able to override the image's default commmand (docker entrypoint) [Conformance]", func() {
+	/*
+		Release : v1.9
+		Testname: Docker containers, with command
+		Description: Default command from the docker image entrypoint MUST NOT be used when Pod specifies the container command.  Command from Pod spec MUST override the command in the image.
+	*/
+	framework.ConformanceIt("should be able to override the image's default command (docker entrypoint) [NodeConformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 
@@ -55,7 +68,12 @@ var _ = framework.KubeDescribe("Docker Containers", func() {
 		})
 	})
 
-	It("should be able to override the image's default command and arguments [Conformance]", func() {
+	/*
+		Release : v1.9
+		Testname: Docker containers, with command and arguments
+		Description: Default command and arguments from the docker image entrypoint MUST NOT be used when Pod specifies the container command and arguments.  Command and arguments from Pod spec MUST override the command and arguments in the image.
+	*/
+	framework.ConformanceIt("should be able to override the image's default command and arguments [NodeConformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}

@@ -25,17 +25,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/proxy"
-
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/proxy"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/util/conntrack"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
 )
@@ -55,12 +55,12 @@ type ServiceInfo struct {
 
 	isAliveAtomic       int32 // Only access this with atomic ops
 	portal              portal
-	protocol            api.Protocol
+	protocol            v1.Protocol
 	proxyPort           int
 	socket              ProxySocket
 	nodePort            int
-	loadBalancerStatus  api.LoadBalancerStatus
-	sessionAffinityType api.ServiceAffinity
+	loadBalancerStatus  v1.LoadBalancerStatus
+	sessionAffinityType v1.ServiceAffinity
 	stickyMaxAgeSeconds int
 	// Deprecated, but required for back-compat (including e2e)
 	externalIPs []string
@@ -81,7 +81,7 @@ func (info *ServiceInfo) IsAlive() bool {
 func logTimeout(err error) bool {
 	if e, ok := err.(net.Error); ok {
 		if e.Timeout() {
-			glog.V(3).Infof("connection to endpoint closed due to inactivity")
+			klog.V(3).Infof("connection to endpoint closed due to inactivity")
 			return true
 		}
 	}
@@ -89,7 +89,7 @@ func logTimeout(err error) bool {
 }
 
 // ProxySocketFunc is a function which constructs a ProxySocket from a protocol, ip, and port
-type ProxySocketFunc func(protocol api.Protocol, ip net.IP, port int) (ProxySocket, error)
+type ProxySocketFunc func(protocol v1.Protocol, ip net.IP, port int) (ProxySocket, error)
 
 // Proxier is a simple proxy for TCP connections between a localhost:lport
 // and services that provide the actual implementations.
@@ -119,11 +119,11 @@ var _ proxy.ProxyProvider = &Proxier{}
 type portMapKey struct {
 	ip       string
 	port     int
-	protocol api.Protocol
+	protocol v1.Protocol
 }
 
 func (k *portMapKey) String() string {
-	return fmt.Sprintf("%s:%d/%s", k.ip, k.port, k.protocol)
+	return fmt.Sprintf("%s/%s", net.JoinHostPort(k.ip, strconv.Itoa(k.port)), k.protocol)
 }
 
 // A value for the portMap
@@ -153,15 +153,15 @@ func IsProxyLocked(err error) bool {
 // if iptables fails to update or acquire the initial lock. Once a proxier is
 // created, it will keep iptables up to date in the background and will not
 // terminate if a particular iptables call fails.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
-	return NewCustomProxier(loadBalancer, listenIP, iptables, exec, pr, syncPeriod, minSyncPeriod, udpIdleTimeout, newProxySocket)
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, nodePortAddresses []string) (*Proxier, error) {
+	return NewCustomProxier(loadBalancer, listenIP, iptables, exec, pr, syncPeriod, minSyncPeriod, udpIdleTimeout, nodePortAddresses, newProxySocket)
 }
 
-// NewCustomProxier functions similarly to NewProxier, returing a new Proxier
+// NewCustomProxier functions similarly to NewProxier, returning a new Proxier
 // for the given LoadBalancer and address.  The new proxier is constructed using
 // the ProxySocket constructor provided, however, instead of constructing the
 // default ProxySockets.
-func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
+func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, nodePortAddresses []string, makeProxySocket ProxySocketFunc) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
 	}
@@ -170,7 +170,7 @@ func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptab
 	// try to find a suitable host IP address from network interfaces.
 	var err error
 	hostIP := listenIP
-	if hostIP.Equal(net.IPv4zero) {
+	if hostIP.Equal(net.IPv4zero) || hostIP.Equal(net.IPv6zero) {
 		hostIP, err = utilnet.ChooseHostInterface()
 		if err != nil {
 			return nil, fmt.Errorf("failed to select a host interface: %v", err)
@@ -184,7 +184,7 @@ func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptab
 
 	proxyPorts := newPortAllocator(pr)
 
-	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
+	klog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
 	return createProxier(loadBalancer, listenIP, iptables, exec, hostIP, proxyPorts, syncPeriod, minSyncPeriod, udpIdleTimeout, makeProxySocket)
 }
 
@@ -229,13 +229,13 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 	args := []string{"-m", "comment", "--comment", "handle ClusterIPs; NOTE: this must be before the NodePort rules"}
 	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(iptablesHostPortalChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing userspace rule: %v", err)
+			klog.Errorf("Error removing userspace rule: %v", err)
 			encounteredError = true
 		}
 	}
 	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(iptablesContainerPortalChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing userspace rule: %v", err)
+			klog.Errorf("Error removing userspace rule: %v", err)
 			encounteredError = true
 		}
 	}
@@ -243,20 +243,20 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 	args = append(args, "-m", "comment", "--comment", "handle service NodePorts; NOTE: this must be the last rule in the chain")
 	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(iptablesHostNodePortChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing userspace rule: %v", err)
+			klog.Errorf("Error removing userspace rule: %v", err)
 			encounteredError = true
 		}
 	}
 	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(iptablesContainerNodePortChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing userspace rule: %v", err)
+			klog.Errorf("Error removing userspace rule: %v", err)
 			encounteredError = true
 		}
 	}
 	args = []string{"-m", "comment", "--comment", "Ensure that non-local NodePort traffic can flow"}
 	if err := ipt.DeleteRule(iptables.TableFilter, iptables.ChainInput, append(args, "-j", string(iptablesNonLocalNodePortChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing userspace rule: %v", err)
+			klog.Errorf("Error removing userspace rule: %v", err)
 			encounteredError = true
 		}
 	}
@@ -271,13 +271,13 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 			// flush chain, then if successful delete, delete will fail if flush fails.
 			if err := ipt.FlushChain(table, c); err != nil {
 				if !iptables.IsNotFoundError(err) {
-					glog.Errorf("Error flushing userspace chain: %v", err)
+					klog.Errorf("Error flushing userspace chain: %v", err)
 					encounteredError = true
 				}
 			} else {
 				if err = ipt.DeleteChain(table, c); err != nil {
 					if !iptables.IsNotFoundError(err) {
-						glog.Errorf("Error deleting userspace chain: %v", err)
+						klog.Errorf("Error deleting userspace chain: %v", err)
 						encounteredError = true
 					}
 				}
@@ -290,7 +290,7 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 // Sync is called to immediately synchronize the proxier state to iptables
 func (proxier *Proxier) Sync() {
 	if err := iptablesInit(proxier.iptables); err != nil {
-		glog.Errorf("Failed to ensure iptables: %v", err)
+		klog.Errorf("Failed to ensure iptables: %v", err)
 	}
 	proxier.ensurePortals()
 	proxier.cleanupStaleStickySessions()
@@ -302,7 +302,7 @@ func (proxier *Proxier) SyncLoop() {
 	defer t.Stop()
 	for {
 		<-t.C
-		glog.V(6).Infof("Periodic sync")
+		klog.V(6).Infof("Periodic sync")
 		proxier.Sync()
 	}
 }
@@ -315,7 +315,7 @@ func (proxier *Proxier) ensurePortals() {
 	for name, info := range proxier.serviceMap {
 		err := proxier.openPortal(name, info)
 		if err != nil {
-			glog.Errorf("Failed to ensure portal for %q: %v", name, err)
+			klog.Errorf("Failed to ensure portal for %q: %v", name, err)
 		}
 	}
 }
@@ -362,7 +362,7 @@ func (proxier *Proxier) setServiceInfo(service proxy.ServicePortName, info *Serv
 // addServiceOnPort starts listening for a new service, returning the ServiceInfo.
 // Pass proxyPort=0 to allocate a random port. The timeout only applies to UDP
 // connections, for now.
-func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol api.Protocol, proxyPort int, timeout time.Duration) (*ServiceInfo, error) {
+func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol v1.Protocol, proxyPort int, timeout time.Duration) (*ServiceInfo, error) {
 	sock, err := proxier.makeProxySocket(protocol, proxier.listenIP, proxyPort)
 	if err != nil {
 		return nil, err
@@ -384,11 +384,11 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 		proxyPort:           portNum,
 		protocol:            protocol,
 		socket:              sock,
-		sessionAffinityType: api.ServiceAffinityNone, // default
+		sessionAffinityType: v1.ServiceAffinityNone, // default
 	}
 	proxier.setServiceInfo(service, si)
 
-	glog.V(2).Infof("Proxying for service %q on %s port %d", service, protocol, portNum)
+	klog.V(2).Infof("Proxying for service %q on %s port %d", service, protocol, portNum)
 	go func(service proxy.ServicePortName, proxier *Proxier) {
 		defer runtime.HandleCrash()
 		atomic.AddInt32(&proxier.numProxyLoops, 1)
@@ -399,13 +399,13 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 	return si, nil
 }
 
-func (proxier *Proxier) mergeService(service *api.Service) sets.String {
+func (proxier *Proxier) mergeService(service *v1.Service) sets.String {
 	if service == nil {
 		return nil
 	}
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	if !helper.IsServiceIPSet(service) {
-		glog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
 		return nil
 	}
 	existingPorts := sets.NewString()
@@ -420,43 +420,43 @@ func (proxier *Proxier) mergeService(service *api.Service) sets.String {
 			continue
 		}
 		if exists {
-			glog.V(4).Infof("Something changed for service %q: stopping it", serviceName)
+			klog.V(4).Infof("Something changed for service %q: stopping it", serviceName)
 			if err := proxier.closePortal(serviceName, info); err != nil {
-				glog.Errorf("Failed to close portal for %q: %v", serviceName, err)
+				klog.Errorf("Failed to close portal for %q: %v", serviceName, err)
 			}
 			if err := proxier.stopProxy(serviceName, info); err != nil {
-				glog.Errorf("Failed to stop service %q: %v", serviceName, err)
+				klog.Errorf("Failed to stop service %q: %v", serviceName, err)
 			}
 		}
 		proxyPort, err := proxier.proxyPorts.AllocateNext()
 		if err != nil {
-			glog.Errorf("failed to allocate proxy port for service %q: %v", serviceName, err)
+			klog.Errorf("failed to allocate proxy port for service %q: %v", serviceName, err)
 			continue
 		}
 
 		serviceIP := net.ParseIP(service.Spec.ClusterIP)
-		glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, serviceIP, servicePort.Port, servicePort.Protocol)
+		klog.V(1).Infof("Adding new service %q at %s/%s", serviceName, net.JoinHostPort(serviceIP.String(), strconv.Itoa(int(servicePort.Port))), servicePort.Protocol)
 		info, err = proxier.addServiceOnPort(serviceName, servicePort.Protocol, proxyPort, proxier.udpIdleTimeout)
 		if err != nil {
-			glog.Errorf("Failed to start proxy for %q: %v", serviceName, err)
+			klog.Errorf("Failed to start proxy for %q: %v", serviceName, err)
 			continue
 		}
 		info.portal.ip = serviceIP
 		info.portal.port = int(servicePort.Port)
 		info.externalIPs = service.Spec.ExternalIPs
 		// Deep-copy in case the service instance changes
-		info.loadBalancerStatus = *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
+		info.loadBalancerStatus = *service.Status.LoadBalancer.DeepCopy()
 		info.nodePort = int(servicePort.NodePort)
 		info.sessionAffinityType = service.Spec.SessionAffinity
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
-		if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
+		if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
 			info.stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 		}
 
-		glog.V(4).Infof("info: %#v", info)
+		klog.V(4).Infof("info: %#v", info)
 
 		if err := proxier.openPortal(serviceName, info); err != nil {
-			glog.Errorf("Failed to open portal for %q: %v", serviceName, err)
+			klog.Errorf("Failed to open portal for %q: %v", serviceName, err)
 		}
 		proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeSeconds)
 	}
@@ -464,13 +464,13 @@ func (proxier *Proxier) mergeService(service *api.Service) sets.String {
 	return existingPorts
 }
 
-func (proxier *Proxier) unmergeService(service *api.Service, existingPorts sets.String) {
+func (proxier *Proxier) unmergeService(service *v1.Service, existingPorts sets.String) {
 	if service == nil {
 		return
 	}
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	if !helper.IsServiceIPSet(service) {
-		glog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
 		return
 	}
 
@@ -484,49 +484,49 @@ func (proxier *Proxier) unmergeService(service *api.Service, existingPorts sets.
 		}
 		serviceName := proxy.ServicePortName{NamespacedName: svcName, Port: servicePort.Name}
 
-		glog.V(1).Infof("Stopping service %q", serviceName)
+		klog.V(1).Infof("Stopping service %q", serviceName)
 		info, exists := proxier.serviceMap[serviceName]
 		if !exists {
-			glog.Errorf("Service %q is being removed but doesn't exist", serviceName)
+			klog.Errorf("Service %q is being removed but doesn't exist", serviceName)
 			continue
 		}
 
-		if proxier.serviceMap[serviceName].protocol == api.ProtocolUDP {
+		if proxier.serviceMap[serviceName].protocol == v1.ProtocolUDP {
 			staleUDPServices.Insert(proxier.serviceMap[serviceName].portal.ip.String())
 		}
 
 		if err := proxier.closePortal(serviceName, info); err != nil {
-			glog.Errorf("Failed to close portal for %q: %v", serviceName, err)
+			klog.Errorf("Failed to close portal for %q: %v", serviceName, err)
 		}
 		if err := proxier.stopProxyInternal(serviceName, info); err != nil {
-			glog.Errorf("Failed to stop service %q: %v", serviceName, err)
+			klog.Errorf("Failed to stop service %q: %v", serviceName, err)
 		}
 		proxier.loadBalancer.DeleteService(serviceName)
 	}
-	for _, svcIP := range staleUDPServices.List() {
-		if err := utilproxy.ClearUDPConntrackForIP(proxier.exec, svcIP); err != nil {
-			glog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
+	for _, svcIP := range staleUDPServices.UnsortedList() {
+		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
+			klog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
 		}
 	}
 }
 
-func (proxier *Proxier) OnServiceAdd(service *api.Service) {
+func (proxier *Proxier) OnServiceAdd(service *v1.Service) {
 	_ = proxier.mergeService(service)
 }
 
-func (proxier *Proxier) OnServiceUpdate(oldService, service *api.Service) {
+func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 	existingPorts := proxier.mergeService(service)
 	proxier.unmergeService(oldService, existingPorts)
 }
 
-func (proxier *Proxier) OnServiceDelete(service *api.Service) {
+func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.unmergeService(service, sets.NewString())
 }
 
 func (proxier *Proxier) OnServiceSynced() {
 }
 
-func sameConfig(info *ServiceInfo, service *api.Service, port *api.ServicePort) bool {
+func sameConfig(info *ServiceInfo, service *v1.Service, port *v1.ServicePort) bool {
 	if info.protocol != port.Protocol || info.portal.port != int(port.Port) || info.nodePort != int(port.NodePort) {
 		return false
 	}
@@ -585,7 +585,7 @@ func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *ServiceI
 	return nil
 }
 
-func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
+func (proxier *Proxier) openOnePortal(portal portal, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
 	if local, err := utilproxy.IsLocalIP(portal.ip.String()); err != nil {
 		return fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err)
 	} else if local {
@@ -597,33 +597,34 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, prox
 
 	// Handle traffic from containers.
 	args := proxier.iptablesContainerPortalArgs(portal.ip, portal.isExternal, false, portal.port, protocol, proxyIP, proxyPort, name)
+	portalAddress := net.JoinHostPort(portal.ip.String(), strconv.Itoa(portal.port))
 	existed, err := proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesContainerPortalChain, args...)
 	if err != nil {
-		glog.Errorf("Failed to install iptables %s rule for service %q, args:%v", iptablesContainerPortalChain, name, args)
+		klog.Errorf("Failed to install iptables %s rule for service %q, args:%v", iptablesContainerPortalChain, name, args)
 		return err
 	}
 	if !existed {
-		glog.V(3).Infof("Opened iptables from-containers portal for service %q on %s %s:%d", name, protocol, portal.ip, portal.port)
+		klog.V(3).Infof("Opened iptables from-containers portal for service %q on %s %s", name, protocol, portalAddress)
 	}
 	if portal.isExternal {
 		args := proxier.iptablesContainerPortalArgs(portal.ip, false, true, portal.port, protocol, proxyIP, proxyPort, name)
 		existed, err := proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesContainerPortalChain, args...)
 		if err != nil {
-			glog.Errorf("Failed to install iptables %s rule that opens service %q for local traffic, args:%v", iptablesContainerPortalChain, name, args)
+			klog.Errorf("Failed to install iptables %s rule that opens service %q for local traffic, args:%v", iptablesContainerPortalChain, name, args)
 			return err
 		}
 		if !existed {
-			glog.V(3).Infof("Opened iptables from-containers portal for service %q on %s %s:%d for local traffic", name, protocol, portal.ip, portal.port)
+			klog.V(3).Infof("Opened iptables from-containers portal for service %q on %s %s for local traffic", name, protocol, portalAddress)
 		}
 
 		args = proxier.iptablesHostPortalArgs(portal.ip, true, portal.port, protocol, proxyIP, proxyPort, name)
 		existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesHostPortalChain, args...)
 		if err != nil {
-			glog.Errorf("Failed to install iptables %s rule for service %q for dst-local traffic", iptablesHostPortalChain, name)
+			klog.Errorf("Failed to install iptables %s rule for service %q for dst-local traffic", iptablesHostPortalChain, name)
 			return err
 		}
 		if !existed {
-			glog.V(3).Infof("Opened iptables from-host portal for service %q on %s %s:%d for dst-local traffic", name, protocol, portal.ip, portal.port)
+			klog.V(3).Infof("Opened iptables from-host portal for service %q on %s %s for dst-local traffic", name, protocol, portalAddress)
 		}
 		return nil
 	}
@@ -632,18 +633,18 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, prox
 	args = proxier.iptablesHostPortalArgs(portal.ip, false, portal.port, protocol, proxyIP, proxyPort, name)
 	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesHostPortalChain, args...)
 	if err != nil {
-		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesHostPortalChain, name)
+		klog.Errorf("Failed to install iptables %s rule for service %q", iptablesHostPortalChain, name)
 		return err
 	}
 	if !existed {
-		glog.V(3).Infof("Opened iptables from-host portal for service %q on %s %s:%d", name, protocol, portal.ip, portal.port)
+		klog.V(3).Infof("Opened iptables from-host portal for service %q on %s %s", name, protocol, portalAddress)
 	}
 	return nil
 }
 
 // Marks a port as being owned by a particular service, or returns error if already claimed.
 // Idempotent: reclaiming with the same owner is not an error
-func (proxier *Proxier) claimNodePort(ip net.IP, port int, protocol api.Protocol, owner proxy.ServicePortName) error {
+func (proxier *Proxier) claimNodePort(ip net.IP, port int, protocol v1.Protocol, owner proxy.ServicePortName) error {
 	proxier.portMapMutex.Lock()
 	defer proxier.portMapMutex.Unlock()
 
@@ -664,7 +665,7 @@ func (proxier *Proxier) claimNodePort(ip net.IP, port int, protocol api.Protocol
 			return fmt.Errorf("can't open node port for %s: %v", key.String(), err)
 		}
 		proxier.portMap[key] = &portMapValue{owner: owner, socket: socket}
-		glog.V(2).Infof("Claimed local port %s", key.String())
+		klog.V(2).Infof("Claimed local port %s", key.String())
 		return nil
 	}
 	if existing.owner == owner {
@@ -676,7 +677,7 @@ func (proxier *Proxier) claimNodePort(ip net.IP, port int, protocol api.Protocol
 
 // Release a claim on a port.  Returns an error if the owner does not match the claim.
 // Tolerates release on an unclaimed port, to simplify .
-func (proxier *Proxier) releaseNodePort(ip net.IP, port int, protocol api.Protocol, owner proxy.ServicePortName) error {
+func (proxier *Proxier) releaseNodePort(ip net.IP, port int, protocol v1.Protocol, owner proxy.ServicePortName) error {
 	proxier.portMapMutex.Lock()
 	defer proxier.portMapMutex.Unlock()
 
@@ -684,7 +685,7 @@ func (proxier *Proxier) releaseNodePort(ip net.IP, port int, protocol api.Protoc
 	existing, found := proxier.portMap[key]
 	if !found {
 		// We tolerate this, it happens if we are cleaning up a failed allocation
-		glog.Infof("Ignoring release on unowned port: %v", key)
+		klog.Infof("Ignoring release on unowned port: %v", key)
 		return nil
 	}
 	if existing.owner != owner {
@@ -695,7 +696,7 @@ func (proxier *Proxier) releaseNodePort(ip net.IP, port int, protocol api.Protoc
 	return nil
 }
 
-func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
+func (proxier *Proxier) openNodePort(nodePort int, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
 	// TODO: Do we want to allow containers to access public services?  Probably yes.
 	// TODO: We could refactor this to be the same code as portal, but with IP == nil
 
@@ -705,35 +706,35 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyI
 	}
 
 	// Handle traffic from containers.
-	args := proxier.iptablesContainerNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
+	args := proxier.iptablesContainerPortalArgs(nil, false, false, nodePort, protocol, proxyIP, proxyPort, name)
 	existed, err := proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesContainerNodePortChain, args...)
 	if err != nil {
-		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesContainerNodePortChain, name)
+		klog.Errorf("Failed to install iptables %s rule for service %q", iptablesContainerNodePortChain, name)
 		return err
 	}
 	if !existed {
-		glog.Infof("Opened iptables from-containers public port for service %q on %s port %d", name, protocol, nodePort)
+		klog.Infof("Opened iptables from-containers public port for service %q on %s port %d", name, protocol, nodePort)
 	}
 
 	// Handle traffic from the host.
 	args = proxier.iptablesHostNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
 	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesHostNodePortChain, args...)
 	if err != nil {
-		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesHostNodePortChain, name)
+		klog.Errorf("Failed to install iptables %s rule for service %q", iptablesHostNodePortChain, name)
 		return err
 	}
 	if !existed {
-		glog.Infof("Opened iptables from-host public port for service %q on %s port %d", name, protocol, nodePort)
+		klog.Infof("Opened iptables from-host public port for service %q on %s port %d", name, protocol, nodePort)
 	}
 
 	args = proxier.iptablesNonLocalNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
 	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableFilter, iptablesNonLocalNodePortChain, args...)
 	if err != nil {
-		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesNonLocalNodePortChain, name)
+		klog.Errorf("Failed to install iptables %s rule for service %q", iptablesNonLocalNodePortChain, name)
 		return err
 	}
 	if !existed {
-		glog.Infof("Opened iptables from-non-local public port for service %q on %s port %d", name, protocol, nodePort)
+		klog.Infof("Opened iptables from-non-local public port for service %q on %s port %d", name, protocol, nodePort)
 	}
 
 	return nil
@@ -754,14 +755,14 @@ func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *Service
 		el = append(el, proxier.closeNodePort(info.nodePort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
 	}
 	if len(el) == 0 {
-		glog.V(3).Infof("Closed iptables portals for service %q", service)
+		klog.V(3).Infof("Closed iptables portals for service %q", service)
 	} else {
-		glog.Errorf("Some errors closing iptables portals for service %q", service)
+		klog.Errorf("Some errors closing iptables portals for service %q", service)
 	}
 	return utilerrors.NewAggregate(el)
 }
 
-func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
+func (proxier *Proxier) closeOnePortal(portal portal, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
 
 	if local, err := utilproxy.IsLocalIP(portal.ip.String()); err != nil {
@@ -775,20 +776,20 @@ func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, pro
 	// Handle traffic from containers.
 	args := proxier.iptablesContainerPortalArgs(portal.ip, portal.isExternal, false, portal.port, protocol, proxyIP, proxyPort, name)
 	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesContainerPortalChain, args...); err != nil {
-		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesContainerPortalChain, name)
+		klog.Errorf("Failed to delete iptables %s rule for service %q", iptablesContainerPortalChain, name)
 		el = append(el, err)
 	}
 
 	if portal.isExternal {
 		args := proxier.iptablesContainerPortalArgs(portal.ip, false, true, portal.port, protocol, proxyIP, proxyPort, name)
 		if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesContainerPortalChain, args...); err != nil {
-			glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesContainerPortalChain, name)
+			klog.Errorf("Failed to delete iptables %s rule for service %q", iptablesContainerPortalChain, name)
 			el = append(el, err)
 		}
 
 		args = proxier.iptablesHostPortalArgs(portal.ip, true, portal.port, protocol, proxyIP, proxyPort, name)
 		if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesHostPortalChain, args...); err != nil {
-			glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostPortalChain, name)
+			klog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostPortalChain, name)
 			el = append(el, err)
 		}
 		return el
@@ -797,34 +798,34 @@ func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, pro
 	// Handle traffic from the host (portalIP is not external).
 	args = proxier.iptablesHostPortalArgs(portal.ip, false, portal.port, protocol, proxyIP, proxyPort, name)
 	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesHostPortalChain, args...); err != nil {
-		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostPortalChain, name)
+		klog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostPortalChain, name)
 		el = append(el, err)
 	}
 
 	return el
 }
 
-func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
+func (proxier *Proxier) closeNodePort(nodePort int, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
 
 	// Handle traffic from containers.
-	args := proxier.iptablesContainerNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
+	args := proxier.iptablesContainerPortalArgs(nil, false, false, nodePort, protocol, proxyIP, proxyPort, name)
 	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesContainerNodePortChain, args...); err != nil {
-		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesContainerNodePortChain, name)
+		klog.Errorf("Failed to delete iptables %s rule for service %q", iptablesContainerNodePortChain, name)
 		el = append(el, err)
 	}
 
 	// Handle traffic from the host.
 	args = proxier.iptablesHostNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
 	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesHostNodePortChain, args...); err != nil {
-		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostNodePortChain, name)
+		klog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostNodePortChain, name)
 		el = append(el, err)
 	}
 
 	// Handle traffic not local to the host
 	args = proxier.iptablesNonLocalNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
 	if err := proxier.iptables.DeleteRule(iptables.TableFilter, iptablesNonLocalNodePortChain, args...); err != nil {
-		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesNonLocalNodePortChain, name)
+		klog.Errorf("Failed to delete iptables %s rule for service %q", iptablesNonLocalNodePortChain, name)
 		el = append(el, err)
 	}
 
@@ -933,7 +934,7 @@ func iptablesFlush(ipt iptables.Interface) error {
 		el = append(el, err)
 	}
 	if len(el) != 0 {
-		glog.Errorf("Some errors flushing old iptables portals: %v", el)
+		klog.Errorf("Some errors flushing old iptables portals: %v", el)
 	}
 	return utilerrors.NewAggregate(el)
 }
@@ -946,7 +947,7 @@ var zeroIPv6 = net.ParseIP("::")
 var localhostIPv6 = net.ParseIP("::1")
 
 // Build a slice of iptables args that are common to from-container and from-host portal rules.
-func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol api.Protocol, service proxy.ServicePortName) []string {
+func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol v1.Protocol, service proxy.ServicePortName) []string {
 	// This list needs to include all fields as they are eventually spit out
 	// by iptables-save.  This is because some systems do not support the
 	// 'iptables -C' arg, and so fall back on parsing iptables-save output.
@@ -964,7 +965,7 @@ func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, add
 	}
 
 	if destIP != nil {
-		args = append(args, "-d", fmt.Sprintf("%s/32", destIP.String()))
+		args = append(args, "-d", utilproxy.ToCIDR(destIP))
 	}
 
 	if addPhysicalInterfaceMatch {
@@ -979,7 +980,7 @@ func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, add
 }
 
 // Build a slice of iptables args for a from-container portal rule.
-func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
+func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol v1.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := iptablesCommonPortalArgs(destIP, addPhysicalInterfaceMatch, addDstLocalMatch, destPort, protocol, service)
 
 	// This is tricky.
@@ -1026,7 +1027,7 @@ func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, addPhysicalIn
 }
 
 // Build a slice of iptables args for a from-host portal rule.
-func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, addDstLocalMatch bool, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
+func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, addDstLocalMatch bool, destPort int, protocol v1.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := iptablesCommonPortalArgs(destIP, false, addDstLocalMatch, destPort, protocol, service)
 
 	// This is tricky.
@@ -1058,27 +1059,10 @@ func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, addDstLocalMatch b
 	return args
 }
 
-// Build a slice of iptables args for a from-container public-port rule.
-// See iptablesContainerPortalArgs
-// TODO: Should we just reuse iptablesContainerPortalArgs?
-func (proxier *Proxier) iptablesContainerNodePortArgs(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
-	args := iptablesCommonPortalArgs(nil, false, false, nodePort, protocol, service)
-
-	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) {
-		// TODO: Can we REDIRECT with IPv6?
-		args = append(args, "-j", "REDIRECT", "--to-ports", fmt.Sprintf("%d", proxyPort))
-	} else {
-		// TODO: Can we DNAT with IPv6?
-		args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
-	}
-
-	return args
-}
-
 // Build a slice of iptables args for a from-host public-port rule.
 // See iptablesHostPortalArgs
 // TODO: Should we just reuse iptablesHostPortalArgs?
-func (proxier *Proxier) iptablesHostNodePortArgs(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
+func (proxier *Proxier) iptablesHostNodePortArgs(nodePort int, protocol v1.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := iptablesCommonPortalArgs(nil, false, false, nodePort, protocol, service)
 
 	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) {
@@ -1090,9 +1074,9 @@ func (proxier *Proxier) iptablesHostNodePortArgs(nodePort int, protocol api.Prot
 }
 
 // Build a slice of iptables args for an from-non-local public-port rule.
-func (proxier *Proxier) iptablesNonLocalNodePortArgs(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
+func (proxier *Proxier) iptablesNonLocalNodePortArgs(nodePort int, protocol v1.Protocol, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := iptablesCommonPortalArgs(nil, false, false, proxyPort, protocol, service)
-	args = append(args, "-m", "comment", "--comment", service.String(), "-m", "state", "--state", "NEW", "-j", "ACCEPT")
+	args = append(args, "-m", "state", "--state", "NEW", "-j", "ACCEPT")
 	return args
 }
 

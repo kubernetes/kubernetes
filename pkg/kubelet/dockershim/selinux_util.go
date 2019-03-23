@@ -19,7 +19,7 @@ package dockershim
 import (
 	"fmt"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 // selinuxLabelUser returns the fragment of a Docker security opt that
@@ -52,12 +52,6 @@ func selinuxLabelType(separator rune) string {
 // value pair necessary to set the opt.
 func selinuxLabelLevel(separator rune) string {
 	return fmt.Sprintf("label%clevel", separator)
-}
-
-// dockerLaelDisable returns the Docker security opt that disables SELinux for
-// the container.
-func selinuxLabelDisable(separator rune) string {
-	return fmt.Sprintf("label%cdisable", separator)
 }
 
 // addSELinuxOptions adds SELinux options to config using the given

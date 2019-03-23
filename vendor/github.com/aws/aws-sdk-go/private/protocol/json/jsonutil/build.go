@@ -4,12 +4,15 @@ package jsonutil
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/private/protocol"
 )
 
@@ -25,6 +28,7 @@ func BuildJSON(v interface{}) ([]byte, error) {
 }
 
 func buildAny(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) error {
+	origVal := value
 	value = reflect.Indirect(value)
 	if !value.IsValid() {
 		return nil
@@ -46,7 +50,10 @@ func buildAny(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) err
 				t = "list"
 			}
 		case reflect.Map:
-			t = "map"
+			// cannot be a JSONValue map
+			if _, ok := value.Interface().(aws.JSONValue); !ok {
+				t = "map"
+			}
 		}
 	}
 
@@ -61,7 +68,7 @@ func buildAny(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) err
 	case "map":
 		return buildMap(value, buf, tag)
 	default:
-		return buildScalar(value, buf, tag)
+		return buildScalar(origVal, buf, tag)
 	}
 }
 
@@ -87,6 +94,10 @@ func buildStruct(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 	first := true
 	for i := 0; i < t.NumField(); i++ {
 		member := value.Field(i)
+
+		// This allocates the most memory.
+		// Additionally, we cannot skip nil fields due to
+		// idempotency auto filling.
 		field := t.Field(i)
 
 		if field.PkgPath != "" {
@@ -182,24 +193,42 @@ func buildMap(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) err
 	return nil
 }
 
-func buildScalar(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) error {
-	switch value.Kind() {
+func buildScalar(v reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) error {
+	// prevents allocation on the heap.
+	scratch := [64]byte{}
+	switch value := reflect.Indirect(v); value.Kind() {
 	case reflect.String:
 		writeString(value.String(), buf)
 	case reflect.Bool:
-		buf.WriteString(strconv.FormatBool(value.Bool()))
+		if value.Bool() {
+			buf.WriteString("true")
+		} else {
+			buf.WriteString("false")
+		}
 	case reflect.Int64:
-		buf.WriteString(strconv.FormatInt(value.Int(), 10))
+		buf.Write(strconv.AppendInt(scratch[:0], value.Int(), 10))
 	case reflect.Float64:
-		buf.WriteString(strconv.FormatFloat(value.Float(), 'f', -1, 64))
+		f := value.Float()
+		if math.IsInf(f, 0) || math.IsNaN(f) {
+			return &json.UnsupportedValueError{Value: v, Str: strconv.FormatFloat(f, 'f', -1, 64)}
+		}
+		buf.Write(strconv.AppendFloat(scratch[:0], f, 'f', -1, 64))
 	default:
-		switch value.Type() {
-		case timeType:
-			converted := value.Interface().(time.Time)
-			buf.WriteString(strconv.FormatInt(converted.UTC().Unix(), 10))
-		case byteSliceType:
+		switch converted := value.Interface().(type) {
+		case time.Time:
+			format := tag.Get("timestampFormat")
+			if len(format) == 0 {
+				format = protocol.UnixTimeFormatName
+			}
+
+			ts := protocol.FormatTime(format, converted)
+			if format != protocol.UnixTimeFormatName {
+				ts = `"` + ts + `"`
+			}
+
+			buf.WriteString(ts)
+		case []byte:
 			if !value.IsNil() {
-				converted := value.Interface().([]byte)
 				buf.WriteByte('"')
 				if len(converted) < 1024 {
 					// for small buffers, using Encode directly is much faster.
@@ -215,6 +244,12 @@ func buildScalar(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 				}
 				buf.WriteByte('"')
 			}
+		case aws.JSONValue:
+			str, err := protocol.EncodeJSONValue(converted, protocol.QuotedEscape)
+			if err != nil {
+				return fmt.Errorf("unable to encode JSONValue, %v", err)
+			}
+			buf.WriteString(str)
 		default:
 			return fmt.Errorf("unsupported JSON value %v (%s)", value.Interface(), value.Type())
 		}
@@ -222,27 +257,31 @@ func buildScalar(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 	return nil
 }
 
+var hex = "0123456789abcdef"
+
 func writeString(s string, buf *bytes.Buffer) {
 	buf.WriteByte('"')
-	for _, r := range s {
-		if r == '"' {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '"' {
 			buf.WriteString(`\"`)
-		} else if r == '\\' {
+		} else if s[i] == '\\' {
 			buf.WriteString(`\\`)
-		} else if r == '\b' {
+		} else if s[i] == '\b' {
 			buf.WriteString(`\b`)
-		} else if r == '\f' {
+		} else if s[i] == '\f' {
 			buf.WriteString(`\f`)
-		} else if r == '\r' {
+		} else if s[i] == '\r' {
 			buf.WriteString(`\r`)
-		} else if r == '\t' {
+		} else if s[i] == '\t' {
 			buf.WriteString(`\t`)
-		} else if r == '\n' {
+		} else if s[i] == '\n' {
 			buf.WriteString(`\n`)
-		} else if r < 32 {
-			fmt.Fprintf(buf, "\\u%0.4x", r)
+		} else if s[i] < 32 {
+			buf.WriteString("\\u00")
+			buf.WriteByte(hex[s[i]>>4])
+			buf.WriteByte(hex[s[i]&0xF])
 		} else {
-			buf.WriteRune(r)
+			buf.WriteByte(s[i])
 		}
 	}
 	buf.WriteByte('"')

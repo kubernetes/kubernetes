@@ -32,6 +32,7 @@ type DefaultMetrics struct{}
 
 // Install adds the DefaultMetrics handler
 func (m DefaultMetrics) Install(c *mux.PathRecorderMux) {
+	register()
 	c.Handle("/metrics", prometheus.Handler())
 }
 
@@ -41,6 +42,7 @@ type MetricsWithReset struct{}
 
 // Install adds the MetricsWithReset handler
 func (m MetricsWithReset) Install(c *mux.PathRecorderMux) {
+	register()
 	defaultMetricsHandler := prometheus.Handler().ServeHTTP
 	c.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "DELETE" {
@@ -51,4 +53,10 @@ func (m MetricsWithReset) Install(c *mux.PathRecorderMux) {
 		}
 		defaultMetricsHandler(w, req)
 	})
+}
+
+// register apiserver and etcd metrics
+func register() {
+	apimetrics.Register()
+	etcdmetrics.Register()
 }

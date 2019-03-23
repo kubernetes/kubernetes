@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -18,20 +18,19 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-if [[ -z "${KUBE_ROOT:-}" ]]; then
-	KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-fi
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+export KUBE_ROOT
+source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 
-source "${KUBE_ROOT}/cluster/lib/logging.sh"
-
-if [[ ! -d "${KUBE_ROOT}/examples" ]]; then
-	echo "${KUBE_ROOT}/examples not detected.  This script should be run from a location where the source dirs are available."
+if [[ ! -d "${KUBE_ROOT}/pkg" ]]; then
+	echo "${KUBE_ROOT}/pkg not detected.  This script should be run from a location where the source dirs are available."
 	exit 1
 fi
 
 # kube::golang::build_kube_toolchain installs the vendored go-bindata in
 # $GOPATH/bin, so make sure that's explicitly part of our $PATH.
-export PATH="${GOPATH}/bin:${PATH}"
+export PATH="${KUBE_OUTPUT_BINPATH}:${PATH}"
 
 if ! which go-bindata &>/dev/null ; then
 	echo "Cannot find go-bindata."
@@ -39,13 +38,14 @@ if ! which go-bindata &>/dev/null ; then
 fi
 
 # run the generation from the root directory for stable output
-pushd "${KUBE_ROOT}"
+pushd "${KUBE_ROOT}" >/dev/null
 
 # These are files for e2e tests.
 BINDATA_OUTPUT="test/e2e/generated/bindata.go"
+# IMPORTANT: if you make any changes to these arguments, you must also update
+# test/e2e/generated/BUILD and/or build/bindata.bzl.
 go-bindata -nometadata -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
-	-ignore .jpg -ignore .png -ignore .md \
-	"examples/..." \
+	-ignore .jpg -ignore .png -ignore .md -ignore 'BUILD(\.bazel)?' \
 	"test/e2e/testing-manifests/..." \
 	"test/images/..." \
 	"test/fixtures/..."
@@ -65,9 +65,11 @@ fi
 rm -f "${BINDATA_OUTPUT}.tmp"
 
 # These are files for runtime code
-BINDATA_OUTPUT="pkg/generated/bindata.go"
+BINDATA_OUTPUT="pkg/kubectl/generated/bindata.go"
+# IMPORTANT: if you make any changes to these arguments, you must also update
+# pkg/generated/BUILD and/or build/bindata.bzl.
 go-bindata -nometadata -nocompress -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
-	-ignore .jpg -ignore .png -ignore .md \
+	-ignore .jpg -ignore .png -ignore .md -ignore 'BUILD(\.bazel)?' \
 	"translations/..."
 
 gofmt -s -w "${BINDATA_OUTPUT}.tmp"
@@ -84,4 +86,4 @@ fi
 
 rm -f "${BINDATA_OUTPUT}.tmp"
 
-popd
+popd >/dev/null

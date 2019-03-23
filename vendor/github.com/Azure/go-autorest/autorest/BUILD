@@ -9,13 +9,21 @@ go_library(
         "error.go",
         "preparer.go",
         "responder.go",
+        "retriablerequest.go",
+        "retriablerequest_1.7.go",
+        "retriablerequest_1.8.go",
         "sender.go",
         "utility.go",
         "version.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-autorest/autorest",
     importpath = "github.com/Azure/go-autorest/autorest",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library"],
+    deps = [
+        "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/logger:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/version:go_default_library",
+    ],
 )
 
 filegroup(

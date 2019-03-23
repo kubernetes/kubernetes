@@ -6,6 +6,7 @@ go_library(
         "afero.go",
         "basepath.go",
         "cacheOnReadFs.go",
+        "const_bsds.go",
         "const_win_unix.go",
         "copyOnWriteFs.go",
         "httpFs.go",
@@ -19,12 +20,8 @@ go_library(
         "sftp.go",
         "unionFile.go",
         "util.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "const_bsds.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/spf13/afero",
     importpath = "github.com/spf13/afero",
     visibility = ["//visibility:public"],
     deps = [

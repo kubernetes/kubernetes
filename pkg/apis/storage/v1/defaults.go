@@ -31,4 +31,9 @@ func SetDefaults_StorageClass(obj *storagev1.StorageClass) {
 		obj.ReclaimPolicy = new(v1.PersistentVolumeReclaimPolicy)
 		*obj.ReclaimPolicy = v1.PersistentVolumeReclaimDelete
 	}
+
+	if obj.VolumeBindingMode == nil {
+		obj.VolumeBindingMode = new(storagev1.VolumeBindingMode)
+		*obj.VolumeBindingMode = storagev1.VolumeBindingImmediate
+	}
 }

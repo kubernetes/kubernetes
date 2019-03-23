@@ -1,16 +1,24 @@
 # etcd-version-monitor
 
-This is a tool for exporting metrics related to etcd version, like etcd
-server's binary version, cluster version, and counts of different kinds of
-gRPC calls (which is a characteristic of v3), etc. These metrics are in
+This is a tool for exporting etcd metrics and supplementing them with etcd
+server binary version and cluster version. These metrics are in
 prometheus format and can be scraped by a prometheus server.
 The metrics are exposed at the http://localhost:9101/metrics endpoint.
+
+For etcd 3.1+, the
+[go-grpc-prometheus](https://github.com/grpc-ecosystem/go-grpc-prometheus)
+metrics format, which backward incompatibly replaces the 3.0 legacy grpc metric
+format, is exposed in both the 3.1 format and in the 3.0. This preserves
+backward compatibility.
+
+For etcd 3.1+, the `--metrics=extensive` must be set on etcd for grpc request
+latency metrics (`etcd_grpc_unary_requests_duration_seconds`) to be exposed.
 
 **RUNNING THE TOOL**
 
 To run this tool as a docker container:
 - make build
-- docker run --net=host -i -t gcr.io/google_containers/etcd-version-monitor:test /etcd-version-monitor --logtostderr
+- docker run --net=host -i -t k8s.gcr.io/etcd-version-monitor:test /etcd-version-monitor --logtostderr
 
 To run this as a pod on the kubernetes cluster:
 - Place the 'etcd-version-monitor.yaml' in the manifests directory of

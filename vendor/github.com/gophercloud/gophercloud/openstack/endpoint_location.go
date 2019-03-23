@@ -84,7 +84,7 @@ func V3EndpointURL(catalog *tokens3.ServiceCatalog, opts gophercloud.EndpointOpt
 					return "", err
 				}
 				if (opts.Availability == gophercloud.Availability(endpoint.Interface)) &&
-					(opts.Region == "" || endpoint.Region == opts.Region) {
+					(opts.Region == "" || endpoint.Region == opts.Region || endpoint.RegionID == opts.Region) {
 					endpoints = append(endpoints, endpoint)
 				}
 			}

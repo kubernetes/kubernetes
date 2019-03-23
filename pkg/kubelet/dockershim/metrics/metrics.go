@@ -25,13 +25,22 @@ import (
 
 const (
 	// DockerOperationsKey is the key for docker operation metrics.
-	DockerOperationsKey = "docker_operations"
+	DockerOperationsKey = "docker_operations_total"
 	// DockerOperationsLatencyKey is the key for the operation latency metrics.
-	DockerOperationsLatencyKey = "docker_operations_latency_microseconds"
+	DockerOperationsLatencyKey = "docker_operations_duration_seconds"
 	// DockerOperationsErrorsKey is the key for the operation error metrics.
-	DockerOperationsErrorsKey = "docker_operations_errors"
-	// DockerOperationsTimeoutKey is the key for the operation timoeut metrics.
-	DockerOperationsTimeoutKey = "docker_operations_timeout"
+	DockerOperationsErrorsKey = "docker_operations_errors_total"
+	// DockerOperationsTimeoutKey is the key for the operation timeout metrics.
+	DockerOperationsTimeoutKey = "docker_operations_timeout_total"
+
+	// DeprecatedDockerOperationsKey is the deprecated key for docker operation metrics.
+	DeprecatedDockerOperationsKey = "docker_operations"
+	// DeprecatedDockerOperationsLatencyKey is the deprecated key for the operation latency metrics.
+	DeprecatedDockerOperationsLatencyKey = "docker_operations_latency_microseconds"
+	// DeprecatedDockerOperationsErrorsKey is the deprecated key for the operation error metrics.
+	DeprecatedDockerOperationsErrorsKey = "docker_operations_errors"
+	// DeprecatedDockerOperationsTimeoutKey is the deprecated key for the operation timeout metrics.
+	DeprecatedDockerOperationsTimeoutKey = "docker_operations_timeout"
 
 	// Keep the "kubelet" subsystem for backward compatibility.
 	kubeletSubsystem = "kubelet"
@@ -40,11 +49,12 @@ const (
 var (
 	// DockerOperationsLatency collects operation latency numbers by operation
 	// type.
-	DockerOperationsLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	DockerOperationsLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Subsystem: kubeletSubsystem,
 			Name:      DockerOperationsLatencyKey,
-			Help:      "Latency in microseconds of Docker operations. Broken down by operation type.",
+			Help:      "Latency in seconds of Docker operations. Broken down by operation type.",
+			Buckets:   prometheus.DefBuckets,
 		},
 		[]string{"operation_type"},
 	)
@@ -76,6 +86,45 @@ var (
 		},
 		[]string{"operation_type"},
 	)
+
+	// DeprecatedDockerOperationsLatency collects operation latency numbers by operation
+	// type.
+	DeprecatedDockerOperationsLatency = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      DeprecatedDockerOperationsLatencyKey,
+			Help:      "(Deprecated) Latency in microseconds of Docker operations. Broken down by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+	// DeprecatedDockerOperations collects operation counts by operation type.
+	DeprecatedDockerOperations = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      DeprecatedDockerOperationsKey,
+			Help:      "(Deprecated) Cumulative number of Docker operations by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+	// DeprecatedDockerOperationsErrors collects operation errors by operation
+	// type.
+	DeprecatedDockerOperationsErrors = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      DeprecatedDockerOperationsErrorsKey,
+			Help:      "(Deprecated) Cumulative number of Docker operation errors by operation type.",
+		},
+		[]string{"operation_type"},
+	)
+	// DeprecatedDockerOperationsTimeout collects operation timeouts by operation type.
+	DeprecatedDockerOperationsTimeout = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: kubeletSubsystem,
+			Name:      DeprecatedDockerOperationsTimeoutKey,
+			Help:      "(Deprecated) Cumulative number of Docker operation timeout by operation type.",
+		},
+		[]string{"operation_type"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -87,10 +136,19 @@ func Register() {
 		prometheus.MustRegister(DockerOperations)
 		prometheus.MustRegister(DockerOperationsErrors)
 		prometheus.MustRegister(DockerOperationsTimeout)
+		prometheus.MustRegister(DeprecatedDockerOperationsLatency)
+		prometheus.MustRegister(DeprecatedDockerOperations)
+		prometheus.MustRegister(DeprecatedDockerOperationsErrors)
+		prometheus.MustRegister(DeprecatedDockerOperationsTimeout)
 	})
 }
 
 // SinceInMicroseconds gets the time since the specified start in microseconds.
 func SinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
+}
+
+// SinceInSeconds gets the time since the specified start in seconds.
+func SinceInSeconds(start time.Time) float64 {
+	return time.Since(start).Seconds()
 }

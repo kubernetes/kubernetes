@@ -9,9 +9,14 @@ go_library(
         "sender.go",
         "token.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-autorest/autorest/adal",
     importpath = "github.com/Azure/go-autorest/autorest/adal",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/dgrijalva/jwt-go:go_default_library"],
+    deps = [
+        "//vendor/github.com/Azure/go-autorest/autorest/date:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/version:go_default_library",
+        "//vendor/github.com/dgrijalva/jwt-go:go_default_library",
+    ],
 )
 
 filegroup(

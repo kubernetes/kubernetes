@@ -15,6 +15,7 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/runc/libcontainer/utils"
 
@@ -45,14 +46,16 @@ type parentProcess interface {
 }
 
 type setnsProcess struct {
-	cmd           *exec.Cmd
-	parentPipe    *os.File
-	childPipe     *os.File
-	cgroupPaths   map[string]string
-	config        *initConfig
-	fds           []string
-	process       *Process
-	bootstrapData io.Reader
+	cmd             *exec.Cmd
+	parentPipe      *os.File
+	childPipe       *os.File
+	cgroupPaths     map[string]string
+	rootlessCgroups bool
+	intelRdtPath    string
+	config          *initConfig
+	fds             []string
+	process         *Process
+	bootstrapData   io.Reader
 }
 
 func (p *setnsProcess) startTime() (uint64, error) {
@@ -83,10 +86,18 @@ func (p *setnsProcess) start() (err error) {
 	if err = p.execSetns(); err != nil {
 		return newSystemErrorWithCause(err, "executing setns process")
 	}
-	// We can't join cgroups if we're in a rootless container.
-	if !p.config.Rootless && len(p.cgroupPaths) > 0 {
-		if err := cgroups.EnterPid(p.cgroupPaths, p.pid()); err != nil {
+	if len(p.cgroupPaths) > 0 {
+		if err := cgroups.EnterPid(p.cgroupPaths, p.pid()); err != nil && !p.rootlessCgroups {
 			return newSystemErrorWithCausef(err, "adding pid %d to cgroups", p.pid())
+		}
+	}
+	if p.intelRdtPath != "" {
+		// if Intel RDT "resource control" filesystem path exists
+		_, err := os.Stat(p.intelRdtPath)
+		if err == nil {
+			if err := intelrdt.WriteIntelRdtTasks(p.intelRdtPath, p.pid()); err != nil {
+				return newSystemErrorWithCausef(err, "adding pid %d to Intel RDT resource control filesystem", p.pid())
+			}
 		}
 	}
 	// set rlimits, this has to be done here because we lose permissions
@@ -193,16 +204,17 @@ func (p *setnsProcess) setExternalDescriptors(newFds []string) {
 }
 
 type initProcess struct {
-	cmd           *exec.Cmd
-	parentPipe    *os.File
-	childPipe     *os.File
-	config        *initConfig
-	manager       cgroups.Manager
-	container     *linuxContainer
-	fds           []string
-	process       *Process
-	bootstrapData io.Reader
-	sharePidns    bool
+	cmd             *exec.Cmd
+	parentPipe      *os.File
+	childPipe       *os.File
+	config          *initConfig
+	manager         cgroups.Manager
+	intelRdtManager intelrdt.Manager
+	container       *linuxContainer
+	fds             []string
+	process         *Process
+	bootstrapData   io.Reader
+	sharePidns      bool
 }
 
 func (p *initProcess) pid() int {
@@ -261,12 +273,35 @@ func (p *initProcess) start() error {
 		p.process.ops = nil
 		return newSystemErrorWithCause(err, "starting init process command")
 	}
+	// Do this before syncing with child so that no children can escape the
+	// cgroup. We don't need to worry about not doing this and not being root
+	// because we'd be using the rootless cgroup manager in that case.
+	if err := p.manager.Apply(p.pid()); err != nil {
+		return newSystemErrorWithCause(err, "applying cgroup configuration for process")
+	}
+	if p.intelRdtManager != nil {
+		if err := p.intelRdtManager.Apply(p.pid()); err != nil {
+			return newSystemErrorWithCause(err, "applying Intel RDT configuration for process")
+		}
+	}
+	defer func() {
+		if err != nil {
+			// TODO: should not be the responsibility to call here
+			p.manager.Destroy()
+			if p.intelRdtManager != nil {
+				p.intelRdtManager.Destroy()
+			}
+		}
+	}()
+
 	if _, err := io.Copy(p.parentPipe, p.bootstrapData); err != nil {
 		return newSystemErrorWithCause(err, "copying bootstrap data to pipe")
 	}
+
 	if err := p.execSetns(); err != nil {
 		return newSystemErrorWithCause(err, "running exec setns process for init")
 	}
+
 	// Save the standard descriptor names before the container process
 	// can potentially move them (e.g., via dup2()).  If we don't do this now,
 	// we won't know at checkpoint time which file descriptor to look up.
@@ -275,18 +310,6 @@ func (p *initProcess) start() error {
 		return newSystemErrorWithCausef(err, "getting pipe fds for pid %d", p.pid())
 	}
 	p.setExternalDescriptors(fds)
-	// Do this before syncing with child so that no children can escape the
-	// cgroup. We don't need to worry about not doing this and not being root
-	// because we'd be using the rootless cgroup manager in that case.
-	if err := p.manager.Apply(p.pid()); err != nil {
-		return newSystemErrorWithCause(err, "applying cgroup configuration for process")
-	}
-	defer func() {
-		if err != nil {
-			// TODO: should not be the responsibility to call here
-			p.manager.Destroy()
-		}
-	}()
 	if err := p.createNetworkInterfaces(); err != nil {
 		return newSystemErrorWithCause(err, "creating network interfaces")
 	}
@@ -312,13 +335,20 @@ func (p *initProcess) start() error {
 				if err := p.manager.Set(p.config.Config); err != nil {
 					return newSystemErrorWithCause(err, "setting cgroup config for ready process")
 				}
+				if p.intelRdtManager != nil {
+					if err := p.intelRdtManager.Set(p.config.Config); err != nil {
+						return newSystemErrorWithCause(err, "setting Intel RDT config for ready process")
+					}
+				}
 
 				if p.config.Config.Hooks != nil {
+					bundle, annotations := utils.Annotations(p.container.config.Labels)
 					s := configs.HookState{
-						Version: p.container.config.Version,
-						ID:      p.container.id,
-						Pid:     p.pid(),
-						Bundle:  utils.SearchLabels(p.config.Config.Labels, "bundle"),
+						Version:     p.container.config.Version,
+						ID:          p.container.id,
+						Pid:         p.pid(),
+						Bundle:      bundle,
+						Annotations: annotations,
 					}
 					for i, hook := range p.config.Config.Hooks.Prestart {
 						if err := hook.Run(s); err != nil {
@@ -337,12 +367,19 @@ func (p *initProcess) start() error {
 			if err := p.manager.Set(p.config.Config); err != nil {
 				return newSystemErrorWithCause(err, "setting cgroup config for procHooks process")
 			}
+			if p.intelRdtManager != nil {
+				if err := p.intelRdtManager.Set(p.config.Config); err != nil {
+					return newSystemErrorWithCause(err, "setting Intel RDT config for procHooks process")
+				}
+			}
 			if p.config.Config.Hooks != nil {
+				bundle, annotations := utils.Annotations(p.container.config.Labels)
 				s := configs.HookState{
-					Version: p.container.config.Version,
-					ID:      p.container.id,
-					Pid:     p.pid(),
-					Bundle:  utils.SearchLabels(p.config.Config.Labels, "bundle"),
+					Version:     p.container.config.Version,
+					ID:          p.container.id,
+					Pid:         p.pid(),
+					Bundle:      bundle,
+					Annotations: annotations,
 				}
 				for i, hook := range p.config.Config.Hooks.Prestart {
 					if err := hook.Run(s); err != nil {
@@ -501,7 +538,7 @@ func (p *Process) InitializeIO(rootuid, rootgid int) (i *IO, err error) {
 	}
 	fds = append(fds, r.Fd(), w.Fd())
 	p.Stderr, i.Stderr = w, r
-	// change ownership of the pipes incase we are in a user namespace
+	// change ownership of the pipes in case we are in a user namespace
 	for _, fd := range fds {
 		if err := unix.Fchown(int(fd), rootuid, rootgid); err != nil {
 			return nil, err

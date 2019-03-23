@@ -26,4 +26,4 @@ export MINIMUM_MASTER_NODES=${MINIMUM_MASTER_NODES:-2}
 chown -R elasticsearch:elasticsearch /data
 
 ./bin/elasticsearch_logging_discovery >> ./config/elasticsearch.yml
-exec su elasticsearch -c ./bin/es-docker
+exec su elasticsearch -c /usr/local/bin/docker-entrypoint.sh

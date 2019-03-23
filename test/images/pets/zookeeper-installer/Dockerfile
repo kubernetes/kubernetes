@@ -18,16 +18,16 @@ FROM BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-RUN clean-install wget netcat
+RUN clean-install wget bash netcat
 
 ADD on-start.sh /
 
 COPY peer-finder /
 
 # See README.md
-RUN wget -q -O /zookeeper-3.5.0-alpha.tar.gz http://apache.mirrors.pair.com/zookeeper/zookeeper-3.5.0-alpha/zookeeper-3.5.0-alpha.tar.gz && \
+RUN wget -q -O /zookeeper-3.5.0-alpha.tar.gz http://archive.apache.org/dist/zookeeper/zookeeper-3.5.0-alpha/zookeeper-3.5.0-alpha.tar.gz && \
     tar -xzf /zookeeper-3.5.0-alpha.tar.gz -C /tmp/ && mv /tmp/zookeeper-3.5.0-alpha /zookeeper && rm /zookeeper-3.5.0-alpha.tar.gz
 
 ADD install.sh /
 RUN chmod -c 755 /install.sh /on-start.sh /peer-finder
-Entrypoint ["/install.sh"]
+ENTRYPOINT ["/install.sh"]

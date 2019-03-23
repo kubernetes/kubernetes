@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metadata-agent
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: metadata-agent
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: metadata-agent
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: metadata-agent
+  template:
+    metadata:
+      labels:
+        app: metadata-agent
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: metadata-agent
+      priorityClassName: system-node-critical
+      containers:
+      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
+        imagePullPolicy: IfNotPresent
+        name: metadata-agent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 5
+          failureThreshold: 1
+          successThreshold: 1
+        args:
+        - -o KubernetesUseWatch=true
+        - -o KubernetesClusterLevelMetadata=false
+        - -o MetadataReporterPurgeDeleted=true
+        ports:
+        - containerPort: 8000
+          hostPort: 8799
+          protocol: TCP
+        resources:
+          requests:
+            cpu: {{ metadata_agent_cpu_request }}
+            memory: {{ metadata_agent_memory_request }}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - operator: "Exists"
+        effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: metadata-agent-cluster-level
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: metadata-agent-cluster-level
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metadata-agent-cluster-level
+  template:
+    metadata:
+      labels:
+        app: metadata-agent-cluster-level
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+    spec:
+      serviceAccountName: metadata-agent
+      priorityClassName: system-cluster-critical
+      containers:
+      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
+        imagePullPolicy: IfNotPresent
+        name: metadata-agent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 5
+          failureThreshold: 1
+          successThreshold: 1
+        args:
+        - -o KubernetesUseWatch=true
+        - -o KubernetesClusterLevelMetadata=true
+        - -o MetadataReporterPurgeDeleted=true
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        resources:
+          requests:
+            cpu: {{ metadata_agent_cluster_level_cpu_request }}
+            memory: {{ metadata_agent_cluster_level_memory_request }}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate

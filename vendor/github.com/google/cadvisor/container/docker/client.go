@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"sync"
 
-	dclient "github.com/docker/engine-api/client"
+	dclient "github.com/docker/docker/client"
 	"github.com/docker/go-connections/tlsconfig"
 )
 

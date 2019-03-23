@@ -23,29 +23,37 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
-	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"golang.org/x/net/context"
+	"k8s.io/klog"
 
 	apiv1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/remote"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // TODO(random-liu): Get this automatically from kubelet flag.
@@ -53,7 +61,16 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
-var busyboxImage = imageutils.GetBusyBoxImage()
+var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
+
+const (
+	// Kubelet internal cgroup name for node allocatable cgroup.
+	defaultNodeAllocatableCgroup = "kubepods"
+	// defaultPodResourcesPath is the path to the local endpoint serving the podresources GRPC service.
+	defaultPodResourcesPath    = "/var/lib/kubelet/pod-resources"
+	defaultPodResourcesTimeout = 10 * time.Second
+	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
+)
 
 func getNodeSummary() (*stats.Summary, error) {
 	req, err := http.NewRequest("GET", *kubeletAddress+"/stats/summary", nil)
@@ -83,6 +100,22 @@ func getNodeSummary() (*stats.Summary, error) {
 	return &summary, nil
 }
 
+func getNodeDevices() (*podresourcesapi.ListPodResourcesResponse, error) {
+	endpoint := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+	client, conn, err := podresources.GetClient(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+	if err != nil {
+		return nil, fmt.Errorf("Error getting grpc client: %v", err)
+	}
+	defer conn.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	resp, err := client.List(ctx, &podresourcesapi.ListPodResourcesRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("%v.Get(_) = _, %v", client, err)
+	}
+	return resp, nil
+}
+
 // Returns the current KubeletConfiguration
 func getCurrentKubeletConfig() (*kubeletconfig.KubeletConfiguration, error) {
 	resp := pollConfigz(5*time.Minute, 5*time.Second)
@@ -108,6 +141,10 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 		framework.ExpectNoError(err)
 		newCfg := oldCfg.DeepCopy()
 		updateFunction(newCfg)
+		if apiequality.Semantic.DeepEqual(*newCfg, *oldCfg) {
+			return
+		}
+
 		framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 	})
 	AfterEach(func() {
@@ -126,7 +163,7 @@ func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
 	}
 	v, ok := cfgz.FeatureGates[string(features.DynamicKubeletConfig)]
 	if !ok {
-		return false, nil
+		return true, nil
 	}
 	return v, nil
 }
@@ -158,10 +195,10 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 
 	// create the reference and set Node.Spec.ConfigSource
 	src := &apiv1.NodeConfigSource{
-		ConfigMapRef: &apiv1.ObjectReference{
-			Namespace: "kube-system",
-			Name:      cm.Name,
-			UID:       cm.UID,
+		ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+			Namespace:        "kube-system",
+			Name:             cm.Name,
+			KubeletConfigKey: "kubelet",
 		},
 	}
 
@@ -179,10 +216,10 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 		if err != nil {
 			return fmt.Errorf("failed trying to get current Kubelet config, will retry, error: %v", err)
 		}
-		if !reflect.DeepEqual(*kubeCfg, *newKubeCfg) {
+		if !apiequality.Semantic.DeepEqual(*kubeCfg, *newKubeCfg) {
 			return fmt.Errorf("still waiting for new configuration to take effect, will continue to watch /configz")
 		}
-		glog.Infof("new configuration has taken effect")
+		klog.Infof("new configuration has taken effect")
 		return nil
 	}, restartGap, pollInterval).Should(BeNil())
 
@@ -213,20 +250,9 @@ func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource)
 	return nil
 }
 
-// getConfigOK returns the first NodeCondition in `cs` with Type == apiv1.NodeConfigOK,
-// or if no such condition exists, returns nil.
-func getConfigOKCondition(cs []apiv1.NodeCondition) *apiv1.NodeCondition {
-	for i := range cs {
-		if cs[i].Type == apiv1.NodeConfigOK {
-			return &cs[i]
-		}
-	}
-	return nil
-}
-
 // Causes the test to fail, or returns a status 200 response from the /configz endpoint
 func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Response {
-	endpoint := fmt.Sprintf("http://127.0.0.1:8080/api/v1/proxy/nodes/%s/configz", framework.TestContext.NodeName)
+	endpoint := fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", framework.TestContext.NodeName)
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	framework.ExpectNoError(err)
@@ -236,11 +262,11 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Respon
 	Eventually(func() bool {
 		resp, err = client.Do(req)
 		if err != nil {
-			glog.Errorf("Failed to get /configz, retrying. Error: %v", err)
+			klog.Errorf("Failed to get /configz, retrying. Error: %v", err)
 			return false
 		}
 		if resp.StatusCode != 200 {
-			glog.Errorf("/configz response status not 200, retrying. Response was: %+v", resp)
+			klog.Errorf("/configz response status not 200, retrying. Response was: %+v", resp)
 			return false
 		}
 		return true
@@ -251,9 +277,9 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Respon
 // Decodes the http response from /configz and returns a kubeletconfig.KubeletConfiguration (internal type).
 func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, error) {
 	// This hack because /configz reports the following structure:
-	// {"kubeletconfig": {the JSON representation of kubeletconfigv1alpha1.KubeletConfiguration}}
+	// {"kubeletconfig": {the JSON representation of kubeletconfigv1beta1.KubeletConfiguration}}
 	type configzWrapper struct {
-		ComponentConfig kubeletconfigv1alpha1.KubeletConfiguration `json:"kubeletconfig"`
+		ComponentConfig kubeletconfigv1beta1.KubeletConfiguration `json:"kubeletconfig"`
 	}
 
 	configz := configzWrapper{}
@@ -280,7 +306,7 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 // creates a configmap containing kubeCfg in kube-system namespace
 func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletConfiguration) (*apiv1.ConfigMap, error) {
 	cmap := newKubeletConfigMap("testcfg", internalKC)
-	cmap, err := f.ClientSet.Core().ConfigMaps("kube-system").Create(cmap)
+	cmap, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(cmap)
 	if err != nil {
 		return nil, err
 	}
@@ -289,21 +315,11 @@ func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletCo
 
 // constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Always uses GenerateName to generate a suffix.
 func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfiguration) *apiv1.ConfigMap {
-	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
-	framework.ExpectNoError(err)
-
-	versioned := &kubeletconfigv1alpha1.KubeletConfiguration{}
-	err = scheme.Convert(internalKC, versioned, nil)
-	framework.ExpectNoError(err)
-
-	encoder, err := newKubeletConfigJSONEncoder()
-	framework.ExpectNoError(err)
-
-	data, err := runtime.Encode(encoder, versioned)
+	data, err := kubeletconfigcodec.EncodeKubeletConfig(internalKC, kubeletconfigv1beta1.SchemeGroupVersion)
 	framework.ExpectNoError(err)
 
 	cmap := &apiv1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: name},
+		ObjectMeta: metav1.ObjectMeta{GenerateName: name + "-"},
 		Data: map[string]string{
 			"kubelet": string(data),
 		},
@@ -329,32 +345,38 @@ func getLocalNode(f *framework.Framework) *apiv1.Node {
 	return &nodeList.Items[0]
 }
 
-// logs prometheus metrics from the local kubelet.
-func logKubeletMetrics(metricKeys ...string) {
+// logKubeletLatencyMetrics logs KubeletLatencyMetrics computed from the Prometheus
+// metrics exposed on the current node and identified by the metricNames.
+// The Kubelet subsystem prefix is automatically prepended to these metric names.
+func logKubeletLatencyMetrics(metricNames ...string) {
 	metricSet := sets.NewString()
-	for _, key := range metricKeys {
+	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")
+	metric, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
-		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletMetrics(metric, metricSet))
+		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletLatencyMetrics(metric, metricSet))
 	}
 }
 
-func newKubeletConfigJSONEncoder() (runtime.Encoder, error) {
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
+// returns config related metrics from the local kubelet, filtered to the filterMetricNames passed in
+func getKubeletMetrics(filterMetricNames sets.String) (frameworkmetrics.KubeletMetrics, error) {
+	// grab Kubelet metrics
+	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
 	if err != nil {
 		return nil, err
 	}
 
-	mediaType := "application/json"
-	info, ok := runtime.SerializerInfoForMediaType(kubeletCodecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return nil, fmt.Errorf("unsupported media type %q", mediaType)
+	filtered := metrics.NewKubeletMetrics()
+	for name := range ms {
+		if !filterMetricNames.Has(name) {
+			continue
+		}
+		filtered[name] = ms[name]
 	}
-	return kubeletCodecs.EncoderForVersion(info.Serializer, kubeletconfigv1alpha1.SchemeGroupVersion), nil
+	return filtered, nil
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an
@@ -365,4 +387,56 @@ func runCommand(cmd ...string) (string, error) {
 		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
 	}
 	return string(output), nil
+}
+
+// getCRIClient connects CRI and returns CRI runtime service clients and image service client.
+func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
+	// connection timeout for CRI service connection
+	const connectionTimeout = 2 * time.Minute
+	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout)
+	if err != nil {
+		return nil, nil, err
+	}
+	imageManagerEndpoint := runtimeEndpoint
+	if framework.TestContext.ImageServiceEndpoint != "" {
+		//ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
+		//explicitly specified
+		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
+	}
+	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout)
+	if err != nil {
+		return nil, nil, err
+	}
+	return r, i, nil
+}
+
+// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
+func restartKubelet() {
+	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
+	framework.ExpectNoError(err)
+	regex := regexp.MustCompile("(kubelet-\\w+)")
+	matches := regex.FindStringSubmatch(string(stdout))
+	Expect(len(matches)).NotTo(BeZero())
+	kube := matches[0]
+	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
+	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
+	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+}
+
+func toCgroupFsName(cgroupName cm.CgroupName) string {
+	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+		return cgroupName.ToSystemd()
+	} else {
+		return cgroupName.ToCgroupfs()
+	}
+}
+
+// reduceAllocatableMemoryUsage uses memory.force_empty (https://lwn.net/Articles/432224/)
+// to make the kernel reclaim memory in the allocatable cgroup
+// the time to reduce pressure may be unbounded, but usually finishes within a second
+func reduceAllocatableMemoryUsage() {
+	cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
+	_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
+	framework.ExpectNoError(err)
 }

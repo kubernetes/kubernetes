@@ -23,8 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kubernetes/pkg/api"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	// install all api groups for testing
 	_ "k8s.io/kubernetes/pkg/api/testapi"
@@ -106,7 +106,7 @@ func TestExportSecret(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+		"v1",
 		"Secret",
 		SelectableFields(&api.Secret{}),
 		nil,

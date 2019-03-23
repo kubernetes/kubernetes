@@ -19,11 +19,14 @@ import (
 
 	"github.com/coreos/etcd/auth"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
+	"github.com/coreos/etcd/lease"
+	"github.com/coreos/etcd/mvcc"
 )
 
 type authApplierV3 struct {
 	applierV3
-	as auth.AuthStore
+	as     auth.AuthStore
+	lessor lease.Lessor
 
 	// mu serializes Apply so that user isn't corrupted and so that
 	// serialized requests don't leak data from TOCTOU errors
@@ -32,8 +35,8 @@ type authApplierV3 struct {
 	authInfo auth.AuthInfo
 }
 
-func newAuthApplierV3(as auth.AuthStore, base applierV3) *authApplierV3 {
-	return &authApplierV3{applierV3: base, as: as}
+func newAuthApplierV3(as auth.AuthStore, base applierV3, lessor lease.Lessor) *authApplierV3 {
+	return &authApplierV3{applierV3: base, as: as, lessor: lessor}
 }
 
 func (aa *authApplierV3) Apply(r *pb.InternalRaftRequest) *applyResult {
@@ -58,27 +61,36 @@ func (aa *authApplierV3) Apply(r *pb.InternalRaftRequest) *applyResult {
 	return ret
 }
 
-func (aa *authApplierV3) Put(txnID int64, r *pb.PutRequest) (*pb.PutResponse, error) {
+func (aa *authApplierV3) Put(txn mvcc.TxnWrite, r *pb.PutRequest) (*pb.PutResponse, error) {
 	if err := aa.as.IsPutPermitted(&aa.authInfo, r.Key); err != nil {
 		return nil, err
 	}
+
+	if err := aa.checkLeasePuts(lease.LeaseID(r.Lease)); err != nil {
+		// The specified lease is already attached with a key that cannot
+		// be written by this user. It means the user cannot revoke the
+		// lease so attaching the lease to the newly written key should
+		// be forbidden.
+		return nil, err
+	}
+
 	if r.PrevKv {
 		err := aa.as.IsRangePermitted(&aa.authInfo, r.Key, nil)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return aa.applierV3.Put(txnID, r)
+	return aa.applierV3.Put(txn, r)
 }
 
-func (aa *authApplierV3) Range(txnID int64, r *pb.RangeRequest) (*pb.RangeResponse, error) {
+func (aa *authApplierV3) Range(txn mvcc.TxnRead, r *pb.RangeRequest) (*pb.RangeResponse, error) {
 	if err := aa.as.IsRangePermitted(&aa.authInfo, r.Key, r.RangeEnd); err != nil {
 		return nil, err
 	}
-	return aa.applierV3.Range(txnID, r)
+	return aa.applierV3.Range(txn, r)
 }
 
-func (aa *authApplierV3) DeleteRange(txnID int64, r *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error) {
+func (aa *authApplierV3) DeleteRange(txn mvcc.TxnWrite, r *pb.DeleteRangeRequest) (*pb.DeleteRangeResponse, error) {
 	if err := aa.as.IsDeleteRangePermitted(&aa.authInfo, r.Key, r.RangeEnd); err != nil {
 		return nil, err
 	}
@@ -89,7 +101,7 @@ func (aa *authApplierV3) DeleteRange(txnID int64, r *pb.DeleteRangeRequest) (*pb
 		}
 	}
 
-	return aa.applierV3.DeleteRange(txnID, r)
+	return aa.applierV3.DeleteRange(txn, r)
 }
 
 func checkTxnReqsPermission(as auth.AuthStore, ai *auth.AuthInfo, reqs []*pb.RequestOp) error {
@@ -137,7 +149,7 @@ func checkTxnReqsPermission(as auth.AuthStore, ai *auth.AuthInfo, reqs []*pb.Req
 
 func checkTxnAuth(as auth.AuthStore, ai *auth.AuthInfo, rt *pb.TxnRequest) error {
 	for _, c := range rt.Compare {
-		if err := as.IsRangePermitted(ai, c.Key, nil); err != nil {
+		if err := as.IsRangePermitted(ai, c.Key, c.RangeEnd); err != nil {
 			return err
 		}
 	}
@@ -157,6 +169,48 @@ func (aa *authApplierV3) Txn(rt *pb.TxnRequest) (*pb.TxnResponse, error) {
 	return aa.applierV3.Txn(rt)
 }
 
+func (aa *authApplierV3) LeaseRevoke(lc *pb.LeaseRevokeRequest) (*pb.LeaseRevokeResponse, error) {
+	if err := aa.checkLeasePuts(lease.LeaseID(lc.ID)); err != nil {
+		return nil, err
+	}
+	return aa.applierV3.LeaseRevoke(lc)
+}
+
+func (aa *authApplierV3) checkLeasePuts(leaseID lease.LeaseID) error {
+	lease := aa.lessor.Lookup(leaseID)
+	if lease != nil {
+		for _, key := range lease.Keys() {
+			if err := aa.as.IsPutPermitted(&aa.authInfo, []byte(key)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (aa *authApplierV3) UserGet(r *pb.AuthUserGetRequest) (*pb.AuthUserGetResponse, error) {
+	err := aa.as.IsAdminPermitted(&aa.authInfo)
+	if err != nil && r.Name != aa.authInfo.Username {
+		aa.authInfo.Username = ""
+		aa.authInfo.Revision = 0
+		return &pb.AuthUserGetResponse{}, err
+	}
+
+	return aa.applierV3.UserGet(r)
+}
+
+func (aa *authApplierV3) RoleGet(r *pb.AuthRoleGetRequest) (*pb.AuthRoleGetResponse, error) {
+	err := aa.as.IsAdminPermitted(&aa.authInfo)
+	if err != nil && !aa.as.HasRole(aa.authInfo.Username, r.Role) {
+		aa.authInfo.Username = ""
+		aa.authInfo.Revision = 0
+		return &pb.AuthRoleGetResponse{}, err
+	}
+
+	return aa.applierV3.RoleGet(r)
+}
+
 func needAdminPermission(r *pb.InternalRaftRequest) bool {
 	switch {
 	case r.AuthEnable != nil:
@@ -171,15 +225,11 @@ func needAdminPermission(r *pb.InternalRaftRequest) bool {
 		return true
 	case r.AuthUserGrantRole != nil:
 		return true
-	case r.AuthUserGet != nil:
-		return true
 	case r.AuthUserRevokeRole != nil:
 		return true
 	case r.AuthRoleAdd != nil:
 		return true
 	case r.AuthRoleGrantPermission != nil:
-		return true
-	case r.AuthRoleGet != nil:
 		return true
 	case r.AuthRoleRevokePermission != nil:
 		return true

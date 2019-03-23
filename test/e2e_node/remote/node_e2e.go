@@ -24,14 +24,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
-)
-
-const (
-	localCOSMounterPath = "cluster/gce/gci/mounter/mounter"
-	systemSpecPath      = "test/e2e_node/system/specs"
+	"k8s.io/kubernetes/test/e2e_node/system"
+	"k8s.io/kubernetes/test/utils"
 )
 
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
@@ -46,22 +43,22 @@ func InitNodeE2ERemote() TestSuite {
 func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	// Build the executables
 	if err := builder.BuildGo(); err != nil {
-		return fmt.Errorf("failed to build the depedencies: %v", err)
+		return fmt.Errorf("failed to build the dependencies: %v", err)
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := builder.GetK8sBuildOutputDir()
+	buildOutputDir, err := utils.GetK8sBuildOutputDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes build output directory: %v", err)
 	}
 
-	rootDir, err := builder.GetK8sRootDir()
+	rootDir, err := utils.GetK8sRootDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes root directory: %v", err)
 	}
 
 	// Copy binaries
-	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo"}
+	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "mounter"}
 	for _, bin := range requiredBins {
 		source := filepath.Join(buildOutputDir, bin)
 		if _, err := os.Stat(source); err != nil {
@@ -75,7 +72,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 
 	if systemSpecName != "" {
 		// Copy system spec file
-		source := filepath.Join(rootDir, systemSpecPath, systemSpecName+".yaml")
+		source := filepath.Join(rootDir, system.SystemSpecPath, systemSpecName+".yaml")
 		if _, err := os.Stat(source); err != nil {
 			return fmt.Errorf("failed to locate system spec %q: %v", source, err)
 		}
@@ -85,11 +82,6 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 		}
 	}
 
-	// Include the GCI/COS mounter artifacts in the deployed tarball
-	err = tarAddCOSMounter(tardir)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -110,51 +102,11 @@ func tarAddFile(tar, source, dest string) error {
 	return nil
 }
 
-// Includes the GCI/COS mounter artifacts in the deployed tarball
-func tarAddCOSMounter(tar string) error {
-	k8sDir, err := builder.GetK8sRootDir()
-	if err != nil {
-		return fmt.Errorf("Could not find K8s root dir! Err: %v", err)
-	}
-
-	source := filepath.Join(k8sDir, localCOSMounterPath)
-
-	// Require the GCI/COS mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
-	if _, err := os.Stat(source); err != nil {
-		return fmt.Errorf("Could not find GCI/COS mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
-	}
-
-	tarAddFile(tar, source, localCOSMounterPath)
-	return nil
-}
-
 // prependCOSMounterFlag prepends the flag for setting the GCI mounter path to
 // args and returns the result.
 func prependCOSMounterFlag(args, host, workspace string) (string, error) {
-	// If we are testing on a GCI/COS node, we chmod 544 the mounter and specify a different mounter path in the test args.
-	// We do this here because the local var `workspace` tells us which /tmp/node-e2e-%d is relevant to the current test run.
-
-	// Determine if the GCI/COS mounter script exists locally.
-	k8sDir, err := builder.GetK8sRootDir()
-	if err != nil {
-		return args, fmt.Errorf("could not find K8s root dir! Err: %v", err)
-	}
-	source := filepath.Join(k8sDir, localCOSMounterPath)
-
-	// Require the GCI/COS mounter script, we want to make sure the remote test runner stays up to date if the mounter file moves
-	if _, err = os.Stat(source); err != nil {
-		return args, fmt.Errorf("could not find GCI/COS mounter script at %q! If this script has been (re)moved, please update the e2e node remote test runner accordingly! Err: %v", source, err)
-	}
-
-	glog.V(2).Infof("GCI/COS node and GCI/COS mounter both detected, modifying --experimental-mounter-path accordingly")
-	// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
-	// here will tell us to update the remote test runner.
-	mounterPath := filepath.Join(workspace, localCOSMounterPath)
-	output, err := SSH(host, "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
-	if err != nil {
-		return args, fmt.Errorf("unabled to chmod 544 GCI/COS mounter script. Err: %v, Output:\n%s", err, output)
-	}
-	// Insert args at beginning of test args, so any values from command line take precedence
+	klog.V(2).Infof("GCI/COS node and GCI/COS mounter both detected, modifying --experimental-mounter-path accordingly")
+	mounterPath := filepath.Join(workspace, "mounter")
 	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
 	return args, nil
 }
@@ -183,7 +135,7 @@ func updateOSSpecificKubeletFlags(args, host, workspace string) (string, error) 
 }
 
 // RunTest runs test on the node.
-func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName string, timeout time.Duration) (string, error) {
+func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
 	// TODO(random-liu): Do this in cloud init after we remove containervm test.
 	if err := setupCNI(host, workspace); err != nil {
@@ -209,11 +161,11 @@ func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePr
 	}
 
 	// Run the tests
-	glog.V(2).Infof("Starting tests on %q", host)
+	klog.V(2).Infof("Starting tests on %q", host)
 	cmd := getSSHCommand(" && ",
 		fmt.Sprintf("cd %s", workspace),
-		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s",
-			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, host, results, junitFilePrefix, imageDesc, testArgs),
+		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --system-spec-name=%s --system-spec-file=%s --extra-envs=%s --logtostderr --v 4 --node-name=%s --report-dir=%s --report-prefix=%s --image-description=\"%s\" %s",
+			timeout.Seconds(), ginkgoArgs, systemSpecName, systemSpecFile, extraEnvs, host, results, junitFilePrefix, imageDesc, testArgs),
 	)
 	return SSH(host, "sh", "-c", cmd)
 }

@@ -24,7 +24,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var class1Parameters = map[string]string{
@@ -34,6 +34,7 @@ var class2Parameters = map[string]string{
 	"param2": "value2",
 }
 var deleteReclaimPolicy = v1.PersistentVolumeReclaimDelete
+var modeImmediate = storage.VolumeBindingImmediate
 var storageClasses = []*storage.StorageClass{
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -44,9 +45,10 @@ var storageClasses = []*storage.StorageClass{
 			Name: "gold",
 		},
 
-		Provisioner:   mockPluginName,
-		Parameters:    class1Parameters,
-		ReclaimPolicy: &deleteReclaimPolicy,
+		Provisioner:       mockPluginName,
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeImmediate,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -55,9 +57,10 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "silver",
 		},
-		Provisioner:   mockPluginName,
-		Parameters:    class2Parameters,
-		ReclaimPolicy: &deleteReclaimPolicy,
+		Provisioner:       mockPluginName,
+		Parameters:        class2Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeImmediate,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -66,9 +69,10 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "external",
 		},
-		Provisioner:   "vendor.com/my-volume",
-		Parameters:    class1Parameters,
-		ReclaimPolicy: &deleteReclaimPolicy,
+		Provisioner:       "vendor.com/my-volume",
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeImmediate,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -77,9 +81,10 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "unknown-internal",
 		},
-		Provisioner:   "kubernetes.io/unknown",
-		Parameters:    class1Parameters,
-		ReclaimPolicy: &deleteReclaimPolicy,
+		Provisioner:       "kubernetes.io/unknown",
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeImmediate,
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
@@ -88,10 +93,11 @@ var storageClasses = []*storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "unsupported-mountoptions",
 		},
-		Provisioner:   mockPluginName,
-		Parameters:    class1Parameters,
-		ReclaimPolicy: &deleteReclaimPolicy,
-		MountOptions:  []string{"foo"},
+		Provisioner:       mockPluginName,
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		MountOptions:      []string{"foo"},
+		VolumeBindingMode: &modeImmediate,
 	},
 }
 
@@ -166,13 +172,13 @@ func TestProvisionSync(t *testing.T) {
 		{
 			// No provisioning if there is a matching volume available
 			"11-6 - provisioning when there is a volume available",
-			newVolumeArray("volume11-6", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classGold),
+			newVolumeArray("volume11-6", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classGold),
 			newVolumeArray("volume11-6", "1Gi", "uid11-6", "claim11-6", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classGold, annBoundByController),
 			newClaimArray("claim11-6", "uid11-6", "1Gi", "", v1.ClaimPending, &classGold),
 			newClaimArray("claim11-6", "uid11-6", "1Gi", "volume11-6", v1.ClaimBound, &classGold, annBoundByController, annBindCompleted),
 			noevents, noerrors,
 			// No provisioning plugin confingure - makes the test fail when
-			// the controller errorneously tries to provision something
+			// the controller erroneously tries to provision something
 			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
@@ -415,8 +421,19 @@ func TestProvisionSync(t *testing.T) {
 			[]string{"Warning ProvisioningFailed Mount options"},
 			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
+		{
+			// No provisioning due to CSI migration + normal event with external provisioner
+			"11-21 - external provisioner for CSI migration",
+			novolumes,
+			novolumes,
+			newClaimArray("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold),
+			claimWithAnnotation(annStorageProvisioner, "vendor.com/MockCSIPlugin",
+				newClaimArray("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold)),
+			[]string{"Normal ExternalProvisioning"},
+			noerrors, wrapTestWithCSIMigrationProvisionCalls(testSyncClaim),
+		},
 	}
-	runSyncTests(t, tests, storageClasses)
+	runSyncTests(t, tests, storageClasses, []*v1.Pod{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all

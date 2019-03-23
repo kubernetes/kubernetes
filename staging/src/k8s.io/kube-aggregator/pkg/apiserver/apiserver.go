@@ -20,44 +20,32 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
+	openapiaggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
-	apiservicestorage "k8s.io/kube-aggregator/pkg/registry/apiservice/etcd"
-)
-
-var (
-	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-	registry             = registered.NewOrDie("")
-	Scheme               = runtime.NewScheme()
-	Codecs               = serializer.NewCodecFactory(Scheme)
+	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
 )
 
 func init() {
-	install.Install(groupFactoryRegistry, registry, Scheme)
-
 	// we need to add the options (like ListOptions) to empty v1
-	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Group: "", Version: "v1"})
+	metav1.AddToGroupVersion(aggregatorscheme.Scheme, schema.GroupVersion{Group: "", Version: "v1"})
 
 	unversioned := schema.GroupVersion{Group: "", Version: "v1"}
-	Scheme.AddUnversionedTypes(unversioned,
+	aggregatorscheme.Scheme.AddUnversionedTypes(unversioned,
 		&metav1.Status{},
 		&metav1.APIVersions{},
 		&metav1.APIGroupList{},
@@ -69,6 +57,7 @@ func init() {
 // legacyAPIServiceName is the fixed name of the only non-groupified API version
 const legacyAPIServiceName = "v1."
 
+// ExtraConfig represents APIServices-specific configuration
 type ExtraConfig struct {
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -83,6 +72,7 @@ type ExtraConfig struct {
 	ServiceResolver ServiceResolver
 }
 
+// Config represents the configuration needed to create an APIAggregator.
 type Config struct {
 	GenericConfig *genericapiserver.RecommendedConfig
 	ExtraConfig   ExtraConfig
@@ -93,6 +83,7 @@ type completedConfig struct {
 	ExtraConfig   *ExtraConfig
 }
 
+// CompletedConfig same as Config, just to swap private object.
 type CompletedConfig struct {
 	// Embed a private pointer that cannot be instantiated outside of this package.
 	*completedConfig
@@ -103,8 +94,6 @@ type APIAggregator struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
 	delegateHandler http.Handler
-
-	contextMapper genericapirequest.RequestContextMapper
 
 	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -146,11 +135,11 @@ func (cfg *Config) Complete() CompletedConfig {
 	return CompletedConfig{&c}
 }
 
-// New returns a new instance of APIAggregator from the given config.
+// NewWithDelegate returns a new instance of APIAggregator from the given config.
 func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
 	// Prevent generic API server to install OpenAPI handler. Aggregator server
 	// has its own customized OpenAPI handler.
-	openApiConfig := c.GenericConfig.OpenAPIConfig
+	openAPIConfig := c.GenericConfig.OpenAPIConfig
 	c.GenericConfig.OpenAPIConfig = nil
 
 	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
@@ -168,75 +157,69 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	)
 
 	s := &APIAggregator{
-		GenericAPIServer: genericServer,
-		delegateHandler:  delegationTarget.UnprotectedHandler(),
-		contextMapper:    c.GenericConfig.RequestContextMapper,
-		proxyClientCert:  c.ExtraConfig.ProxyClientCert,
-		proxyClientKey:   c.ExtraConfig.ProxyClientKey,
-		proxyTransport:   c.ExtraConfig.ProxyTransport,
-		proxyHandlers:    map[string]*proxyHandler{},
-		handledGroups:    sets.String{},
-		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
+		GenericAPIServer:         genericServer,
+		delegateHandler:          delegationTarget.UnprotectedHandler(),
+		proxyClientCert:          c.ExtraConfig.ProxyClientCert,
+		proxyClientKey:           c.ExtraConfig.ProxyClientKey,
+		proxyTransport:           c.ExtraConfig.ProxyTransport,
+		proxyHandlers:            map[string]*proxyHandler{},
+		handledGroups:            sets.String{},
+		lister:                   informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
 		APIRegistrationInformers: informerFactory,
 		serviceResolver:          c.ExtraConfig.ServiceResolver,
 	}
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
-	apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
-	v1beta1storage := map[string]rest.Storage{}
-	apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
-	v1beta1storage["apiservices"] = apiServiceREST
-	v1beta1storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
-	apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = v1beta1storage
-
+	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
 	}
 
 	apisHandler := &apisHandler{
-		codecs: Codecs,
+		codecs: aggregatorscheme.Codecs,
 		lister: s.lister,
-		mapper: s.contextMapper,
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
-	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), c.GenericConfig.SharedInformerFactory.Core().V1().Services(), s)
+	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), s)
 	availableController := statuscontrollers.NewAvailableConditionController(
 		informerFactory.Apiregistration().InternalVersion().APIServices(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
 		apiregistrationClient.Apiregistration(),
+		c.ExtraConfig.ProxyTransport,
+		s.serviceResolver,
 	)
 
-	s.GenericAPIServer.AddPostStartHook("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
 		informerFactory.Start(context.StopCh)
 		c.GenericConfig.SharedInformerFactory.Start(context.StopCh)
 		return nil
 	})
-	s.GenericAPIServer.AddPostStartHook("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
 		go apiserviceRegistrationController.Run(context.StopCh)
 		return nil
 	})
-	s.GenericAPIServer.AddPostStartHook("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
-		go availableController.Run(context.StopCh)
+	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
+		// if we end up blocking for long periods of time, we may need to increase threadiness.
+		go availableController.Run(5, context.StopCh)
 		return nil
 	})
 
-	if openApiConfig != nil {
-		specDownloader := openapicontroller.NewDownloader(s.contextMapper)
-		openAPIAggregator, err := openapicontroller.BuildAndRegisterAggregator(
+	if openAPIConfig != nil {
+		specDownloader := openapiaggregator.NewDownloader()
+		openAPIAggregator, err := openapiaggregator.BuildAndRegisterAggregator(
 			&specDownloader,
 			delegationTarget,
 			s.GenericAPIServer.Handler.GoRestfulContainer.RegisteredWebServices(),
-			openApiConfig,
+			openAPIConfig,
 			s.GenericAPIServer.Handler.NonGoRestfulMux)
 		if err != nil {
 			return nil, err
 		}
 		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
 
-		s.GenericAPIServer.AddPostStartHook("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIAggregationController.Run(context.StopCh)
 			return nil
 		})
@@ -246,7 +229,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 }
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
-// It's a slow moving API, so its ok to run the controller on a single thread
+// It's a slow moving API, so it's ok to run the controller on a single thread
 func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) error {
 	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
 	// since they are wired against listers because they require multiple resources to respond
@@ -266,7 +249,6 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 
 	// register the proxy handler
 	proxyHandler := &proxyHandler{
-		contextMapper:   s.contextMapper,
 		localDelegate:   s.delegateHandler,
 		proxyClientCert: s.proxyClientCert,
 		proxyClientKey:  s.proxyClientKey,
@@ -294,11 +276,10 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 	// it's time to register the group aggregation endpoint
 	groupPath := "/apis/" + apiService.Spec.Group
 	groupDiscoveryHandler := &apiGroupHandler{
-		codecs:        Codecs,
-		groupName:     apiService.Spec.Group,
-		lister:        s.lister,
-		delegate:      s.delegateHandler,
-		contextMapper: s.contextMapper,
+		codecs:    aggregatorscheme.Codecs,
+		groupName: apiService.Spec.Group,
+		lister:    s.lister,
+		delegate:  s.delegateHandler,
 	}
 	// aggregation is protected
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)
@@ -308,7 +289,7 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 }
 
 // RemoveAPIService removes the APIService from being handled.  It is not thread-safe, so only call it on one thread at a time please.
-// It's a slow moving API, so its ok to run the controller on a single thread.
+// It's a slow moving API, so it's ok to run the controller on a single thread.
 func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	version := apiregistration.APIServiceNameToGroupVersion(apiServiceName)
 
@@ -326,4 +307,16 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 
 	// TODO unregister group level discovery when there are no more versions for the group
 	// We don't need this right away because the handler properly delegates when no versions are present
+}
+
+// DefaultAPIResourceConfigSource returns default configuration for an APIResource.
+func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
+	ret := serverstorage.NewResourceConfig()
+	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
+	ret.EnableVersions(
+		v1.SchemeGroupVersion,
+		v1beta1.SchemeGroupVersion,
+	)
+
+	return ret
 }

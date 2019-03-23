@@ -26,18 +26,19 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 var (
-	doTCP  = flag.Bool("tcp", false, "Serve raw over TCP.")
-	doUDP  = flag.Bool("udp", false, "Serve raw over UDP.")
-	doHTTP = flag.Bool("http", true, "Serve HTTP.")
-	port   = flag.Int("port", 9376, "Port number.")
+	doTCP   = flag.Bool("tcp", false, "Serve raw over TCP.")
+	doUDP   = flag.Bool("udp", false, "Serve raw over UDP.")
+	doHTTP  = flag.Bool("http", true, "Serve HTTP.")
+	doClose = flag.Bool("close", false, "Close connection per each HTTP request")
+	port    = flag.Int("port", 9376, "Port number.")
 )
 
 func main() {
 	flag.Parse()
-
 	if *doHTTP && (*doTCP || *doUDP) {
 		log.Fatalf("Can't server TCP/UDP mode and HTTP mode at the same time")
 	}
@@ -88,6 +89,12 @@ func main() {
 	if *doHTTP {
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			log.Printf("HTTP request from %s", r.RemoteAddr)
+
+			if *doClose {
+				// Add this header to force to close the connection after serving the request.
+				w.Header().Add("Connection", "close")
+			}
+
 			fmt.Fprintf(w, "%s", hostname)
 		})
 		go func() {
@@ -95,11 +102,11 @@ func main() {
 			log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
 		}()
 	}
-
-	// Write to stdout after receiving SIGTERM and SIGINT to help with debugging kubernetes issue #21605
+	log.Printf("Serving on port %d.\n", *port)
 	signals := make(chan os.Signal)
-	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
+	signal.Notify(signals, syscall.SIGTERM)
 	sig := <-signals
-	// Keep behavior consistent with how the signal is handled by default (default is to panic)
-	log.Panicf("Terminating after receiving signal: %s.\n", sig)
+	log.Printf("Shutting down after receiving signal: %s.\n", sig)
+	log.Printf("Awaiting pod deletion.\n")
+	time.Sleep(60 * time.Second)
 }

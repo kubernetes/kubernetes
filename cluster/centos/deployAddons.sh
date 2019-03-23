@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -18,20 +18,20 @@
 
 set -e
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "config-default.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+source "${KUBE_ROOT}/cluster/centos/config-default.sh"
 KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
 export KUBECTL_PATH="${KUBE_ROOT}/cluster/centos/binaries/kubectl"
 export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/centos/config-default.sh}
 
 function deploy_dns {
   echo "Deploying DNS on Kubernetes"
-  cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns.yaml.sed" kube-dns.yaml
+  cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.sed" kube-dns.yaml
   sed -i -e "s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g" kube-dns.yaml
   sed -i -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" kube-dns.yaml
 
-  KUBEDNS=`eval "${KUBECTL} get services --namespace=kube-system | grep kube-dns | cat"`
-      
+  KUBEDNS=$("${KUBECTL} get services --namespace=kube-system | grep kube-dns | cat")
+
   if [ ! "$KUBEDNS" ]; then
     # use kubectl to create kube-dns addon
     ${KUBECTL} --namespace=kube-system create -f kube-dns.yaml
@@ -45,19 +45,13 @@ function deploy_dns {
 }
 
 function deploy_dashboard {
-    if ${KUBECTL} get rc -l k8s-app=kubernetes-dashboard --namespace=kube-system | grep kubernetes-dashboard-v &> /dev/null; then
-        echo "Kubernetes Dashboard replicationController already exists"
-    else
-        echo "Creating Kubernetes Dashboard replicationController"
-        ${KUBECTL} create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml
-    fi
+  echo "Deploying Kubernetes Dashboard"
 
-    if ${KUBECTL} get service/kubernetes-dashboard --namespace=kube-system &> /dev/null; then
-        echo "Kubernetes Dashboard service already exists"
-    else
-        echo "Creating Kubernetes Dashboard service"
-        ${KUBECTL} create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml
-    fi
+  ${KUBECTL} apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-secret.yaml"
+  ${KUBECTL} apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-configmap.yaml"
+  ${KUBECTL} apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-rbac.yaml"
+  ${KUBECTL} apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml"
+  ${KUBECTL} apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml"
 
   echo
 }
@@ -70,4 +64,3 @@ fi
 if [ "${ENABLE_CLUSTER_UI}" == true ]; then
   deploy_dashboard
 fi
-

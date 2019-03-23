@@ -17,17 +17,16 @@ limitations under the License.
 package cmd
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // NewCmdAlpha creates a command that acts as an alternate root command for features in alpha
-func NewCmdAlpha(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewCmdAlpha(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "alpha",
 		Short: i18n.T("Commands for features in alpha"),

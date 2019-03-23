@@ -278,7 +278,7 @@ func (m *mux) handleChannelOpen(packet []byte) error {
 
 	if msg.MaxPacketSize < minPacketLength || msg.MaxPacketSize > 1<<31 {
 		failMsg := channelOpenFailureMsg{
-			PeersId:  msg.PeersId,
+			PeersID:  msg.PeersID,
 			Reason:   ConnectionFailed,
 			Message:  "invalid request",
 			Language: "en_US.UTF-8",
@@ -287,7 +287,7 @@ func (m *mux) handleChannelOpen(packet []byte) error {
 	}
 
 	c := m.newChannel(msg.ChanType, channelInbound, msg.TypeSpecificData)
-	c.remoteId = msg.PeersId
+	c.remoteId = msg.PeersID
 	c.maxRemotePayload = msg.MaxPacketSize
 	c.remoteWin.add(msg.PeersWindow)
 	m.incomingChannels <- c
@@ -313,7 +313,7 @@ func (m *mux) openChannel(chanType string, extra []byte) (*channel, error) {
 		PeersWindow:      ch.myWindow,
 		MaxPacketSize:    ch.maxIncomingPayload,
 		TypeSpecificData: extra,
-		PeersId:          ch.localId,
+		PeersID:          ch.localId,
 	}
 	if err := m.sendMessage(open); err != nil {
 		return nil, err

@@ -19,11 +19,11 @@ package antiaffinity
 import (
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ensures the hard PodAntiAffinity is denied if it defines TopologyKey other than kubernetes.io/hostname.
@@ -101,7 +101,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: kubeletapis.LabelHostname,
+							TopologyKey: v1.LabelHostname,
 						},
 					},
 				},
@@ -123,7 +123,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: kubeletapis.LabelHostname,
+							TopologyKey: v1.LabelHostname,
 						},
 					},
 				},
@@ -167,7 +167,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: kubeletapis.LabelHostname,
+							TopologyKey: v1.LabelHostname,
 						}, {
 							LabelSelector: &metav1.LabelSelector{
 								MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -189,7 +189,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: kubeletapis.LabelHostname,
+							TopologyKey: v1.LabelHostname,
 						},
 					},
 				},
@@ -199,7 +199,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 	}
 	for _, test := range tests {
 		pod.Spec.Affinity = test.affinity
-		err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
+		err := handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", false, nil), nil)
 
 		if test.errorExpected && err == nil {
 			t.Errorf("Expected error for Anti Affinity %+v but did not get an error", test.affinity)
@@ -265,9 +265,9 @@ func TestOtherResources(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		handler := &plugin{}
+		handler := &Plugin{}
 
-		err := handler.Admit(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, nil))
+		err := handler.Validate(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, false, nil), nil)
 
 		if tc.expectError {
 			if err == nil {

@@ -24,22 +24,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
 )
 
-type CinderDiskUtil struct{}
+// DiskUtil has utility/helper methods
+type DiskUtil struct{}
 
-// Attaches a disk specified by a volume.CinderPersistenDisk to the current kubelet.
+// AttachDisk attaches a disk specified by a volume.CinderPersistenDisk to the current kubelet.
 // Mounts the disk to its global path.
-func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) error {
+func (util *DiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) error {
 	options := []string{}
 	if b.readOnly {
 		options = append(options, "ro")
@@ -93,13 +95,13 @@ func (util *CinderDiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath stri
 			os.Remove(globalPDPath)
 			return err
 		}
-		glog.V(2).Infof("Safe mount successful: %q\n", devicePath)
+		klog.V(2).Infof("Safe mount successful: %q\n", devicePath)
 	}
 	return nil
 }
 
-// Unmounts the device and detaches the disk from the kubelet's host machine.
-func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
+// DetachDisk unmounts the device and detaches the disk from the kubelet's host machine.
+func (util *DiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
 	globalPDPath := makeGlobalPDName(cd.plugin.host, cd.pdName)
 	if err := cd.mounter.Unmount(globalPDPath); err != nil {
 		return err
@@ -107,7 +109,7 @@ func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
 	if err := os.Remove(globalPDPath); err != nil {
 		return err
 	}
-	glog.V(2).Infof("Successfully unmounted main device: %s\n", globalPDPath)
+	klog.V(2).Infof("Successfully unmounted main device: %s\n", globalPDPath)
 
 	cloud, err := cd.plugin.getCloudProvider()
 	if err != nil {
@@ -120,11 +122,12 @@ func (util *CinderDiskUtil) DetachDisk(cd *cinderVolumeUnmounter) error {
 	if err = cloud.DetachDisk(instanceid, cd.pdName); err != nil {
 		return err
 	}
-	glog.V(2).Infof("Successfully detached cinder volume %s", cd.pdName)
+	klog.V(2).Infof("Successfully detached cinder volume %s", cd.pdName)
 	return nil
 }
 
-func (util *CinderDiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
+// DeleteVolume uses the cloud entrypoint to delete specified volume
+func (util *DiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
 	cloud, err := cd.plugin.getCloudProvider()
 	if err != nil {
 		return err
@@ -133,10 +136,10 @@ func (util *CinderDiskUtil) DeleteVolume(cd *cinderVolumeDeleter) error {
 	if err = cloud.DeleteVolume(cd.pdName); err != nil {
 		// OpenStack cloud provider returns volume.tryAgainError when necessary,
 		// no handling needed here.
-		glog.V(2).Infof("Error deleting cinder volume %s: %v", cd.pdName, err)
+		klog.V(2).Infof("Error deleting cinder volume %s: %v", cd.pdName, err)
 		return err
 	}
-	glog.V(2).Infof("Successfully deleted cinder volume %s", cd.pdName)
+	klog.V(2).Infof("Successfully deleted cinder volume %s", cd.pdName)
 	return nil
 }
 
@@ -144,31 +147,35 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 	// TODO: caching, currently it is overkill because it calls this function
 	// only when it creates dynamic PV
 	zones := make(sets.String)
-	nodes, err := kubeClient.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
-		glog.V(2).Infof("Error listing nodes")
+		klog.V(2).Infof("Error listing nodes")
 		return zones, err
 	}
 	for _, node := range nodes.Items {
-		if zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]; ok {
+		if zone, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
 			zones.Insert(zone)
 		}
 	}
-	glog.V(4).Infof("zones found: %v", zones)
+	klog.V(4).Infof("zones found: %v", zones)
 	return zones, nil
 }
 
-func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
+// CreateVolume uses the cloud provider entrypoint for creating a volume
+func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
 	cloud, err := c.plugin.getCloudProvider()
 	if err != nil {
 		return "", 0, nil, "", err
 	}
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGB := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
-	name := volume.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // Cinder volume name can have up to 255 characters
+	volSizeGiB, err := volumehelpers.RoundUpToGiBInt(capacity)
+	if err != nil {
+		return "", 0, nil, "", err
+	}
+
+	name := volutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // Cinder volume name can have up to 255 characters
 	vtype := ""
 	availability := ""
 	// Apply ProvisionerParameters (case-insensitive). We leave validation of
@@ -194,29 +201,38 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 		// No zone specified, choose one randomly in the same region
 		zones, err := getZonesFromNodes(c.plugin.host.GetKubeClient())
 		if err != nil {
-			glog.V(2).Infof("error getting zone information: %v", err)
+			klog.V(2).Infof("error getting zone information: %v", err)
 			return "", 0, nil, "", err
 		}
 		// if we did not get any zones, lets leave it blank and gophercloud will
 		// use zone "nova" as default
 		if len(zones) > 0 {
-			availability = volume.ChooseZoneForVolume(zones, c.options.PVC.Name)
+			availability, err = volumehelpers.SelectZoneForVolume(false, false, "", nil, zones, node, allowedTopologies, c.options.PVC.Name)
+			if err != nil {
+				klog.V(2).Infof("error selecting zone for volume: %v", err)
+				return "", 0, nil, "", err
+			}
 		}
 	}
 
-	volumeID, volumeAZ, IgnoreVolumeAZ, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
-	if errr != nil {
-		glog.V(2).Infof("Error creating cinder volume: %v", errr)
-		return "", 0, nil, "", errr
+	volumeID, volumeAZ, volumeRegion, IgnoreVolumeAZ, err := cloud.CreateVolume(name, volSizeGiB, vtype, availability, c.options.CloudTags)
+	if err != nil {
+		klog.V(2).Infof("Error creating cinder volume: %v", err)
+		return "", 0, nil, "", err
 	}
-	glog.V(2).Infof("Successfully created cinder volume %s", volumeID)
+	klog.V(2).Infof("Successfully created cinder volume %s", volumeID)
 
 	// these are needed that pod is spawning to same AZ
 	volumeLabels = make(map[string]string)
 	if IgnoreVolumeAZ == false {
-		volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
+		if volumeAZ != "" {
+			volumeLabels[v1.LabelZoneFailureDomain] = volumeAZ
+		}
+		if volumeRegion != "" {
+			volumeLabels[v1.LabelZoneRegion] = volumeRegion
+		}
 	}
-	return volumeID, volSizeGB, volumeLabels, fstype, nil
+	return volumeID, volSizeGiB, volumeLabels, fstype, nil
 }
 
 func probeAttachedVolume() error {
@@ -224,22 +240,33 @@ func probeAttachedVolume() error {
 	scsiHostRescan()
 
 	executor := exec.New()
+
+	// udevadm settle waits for udevd to process the device creation
+	// events for all hardware devices, thus ensuring that any device
+	// nodes have been created successfully before proceeding.
+	argsSettle := []string{"settle"}
+	cmdSettle := executor.Command("udevadm", argsSettle...)
+	_, errSettle := cmdSettle.CombinedOutput()
+	if errSettle != nil {
+		klog.Errorf("error running udevadm settle %v\n", errSettle)
+	}
+
 	args := []string{"trigger"}
 	cmd := executor.Command("udevadm", args...)
 	_, err := cmd.CombinedOutput()
 	if err != nil {
-		glog.Errorf("error running udevadm trigger %v\n", err)
+		klog.Errorf("error running udevadm trigger %v\n", err)
 		return err
 	}
-	glog.V(4).Infof("Successfully probed all attachments")
+	klog.V(4).Infof("Successfully probed all attachments")
 	return nil
 }
 
 func scsiHostRescan() {
-	scsi_path := "/sys/class/scsi_host/"
-	if dirs, err := ioutil.ReadDir(scsi_path); err == nil {
+	scsiPath := "/sys/class/scsi_host/"
+	if dirs, err := ioutil.ReadDir(scsiPath); err == nil {
 		for _, f := range dirs {
-			name := scsi_path + f.Name() + "/scan"
+			name := scsiPath + f.Name() + "/scan"
 			data := []byte("- - -")
 			ioutil.WriteFile(name, data, 0666)
 		}

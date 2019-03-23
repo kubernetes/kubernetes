@@ -3,36 +3,35 @@ package storageos
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/storageos/go-api/netutil"
+	"github.com/storageos/go-api/serror"
 )
 
 const (
-	userAgent         = "go-storageosclient"
-	unixProtocol      = "unix"
-	namedPipeProtocol = "npipe"
+	// DefaultUserAgent is the default User-Agent header to include in HTTP requests.
+	DefaultUserAgent = "go-storageosclient"
+	// DefaultVersionStr is the string value of the default API version.
 	DefaultVersionStr = "1"
-	DefaultVersion    = 1
-	defaultNamespace  = "default"
+	// DefaultVersion is the default API version.
+	DefaultVersion = 1
 )
 
 var (
-	// ErrInvalidEndpoint is returned when the endpoint is not a valid HTTP URL.
-	ErrInvalidEndpoint = errors.New("invalid endpoint")
-
 	// ErrConnectionRefused is returned when the client cannot connect to the given endpoint.
 	ErrConnectionRefused = errors.New("cannot connect to StorageOS API endpoint")
 
@@ -42,8 +41,17 @@ var (
 	// ErrInvalidVersion is returned when a versioned client was requested but no version specified.
 	ErrInvalidVersion = errors.New("invalid version")
 
-	// DefaultHost is the default API host
-	DefaultHost = "tcp://localhost:5705"
+	// ErrProxyNotSupported is returned when a client is unable to set a proxy for http requests.
+	ErrProxyNotSupported = errors.New("client does not support http proxy")
+
+	// DefaultPort is the default API port.
+	DefaultPort = "5705"
+
+	// DataplaneHealthPort is the the port used by the dataplane health-check service.
+	DataplaneHealthPort = "5704"
+
+	// DefaultHost is the default API host.
+	DefaultHost = "http://localhost:" + DefaultPort
 )
 
 // APIVersion is an internal representation of a version of the Remote API.
@@ -70,18 +78,21 @@ func (version APIVersion) String() string {
 // Client is the basic type of this package. It provides methods for
 // interaction with the API.
 type Client struct {
+	httpClient *http.Client
+
+	addresses []string
+	username  string
+	secret    string
+	userAgent string
+
+	configLock  *sync.RWMutex // Lock for config changes
+	addressLock *sync.Mutex   // Lock used to copy/update the address slice
+
+	requestedAPIVersion APIVersion
+	serverAPIVersion    APIVersion
+	expectedAPIVersion  APIVersion
+
 	SkipServerVersionCheck bool
-	HTTPClient             *http.Client
-	TLSConfig              *tls.Config
-	Dialer                 Dialer
-	endpoint               string
-	endpointURL            *url.URL
-	username               string
-	secret                 string
-	requestedAPIVersion    APIVersion
-	serverAPIVersion       APIVersion
-	expectedAPIVersion     APIVersion
-	nativeHTTPClient       *http.Client
 }
 
 // ClientVersion returns the API version of the client
@@ -99,40 +110,38 @@ type Dialer interface {
 // NewClient returns a Client instance ready for communication with the given
 // server endpoint. It will use the latest remote API version available in the
 // server.
-func NewClient(endpoint string) (*Client, error) {
-	client, err := NewVersionedClient(endpoint, "")
+func NewClient(nodes string) (*Client, error) {
+	client, err := NewVersionedClient(nodes, "")
 	if err != nil {
 		return nil, err
 	}
 	client.SkipServerVersionCheck = true
-	return client, nil
-}
-
-// NewTLSClient returns a Client instance ready for TLS communications with the given
-// server endpoint, key and certificates . It will use the latest remote API version
-// available in the server.
-func NewTLSClient(endpoint string, cert, key, ca string) (*Client, error) {
-	client, err := NewVersionedTLSClient(endpoint, cert, key, ca, "")
-	if err != nil {
-		return nil, err
-	}
-	client.SkipServerVersionCheck = true
+	client.userAgent = DefaultUserAgent
 	return client, nil
 }
 
 // NewVersionedClient returns a Client instance ready for communication with
 // the given server endpoint, using a specific remote API version.
-func NewVersionedClient(endpoint string, apiVersionString string) (*Client, error) {
-	u, err := parseEndpoint(endpoint, false)
+func NewVersionedClient(nodestring string, apiVersionString string) (*Client, error) {
+	nodes := strings.Split(nodestring, ",")
+	addresses, err := netutil.AddressesFromNodes(nodes)
 	if err != nil {
 		return nil, err
 	}
 
-	c := &Client{
-		HTTPClient:  defaultClient(),
-		Dialer:      &net.Dialer{},
-		endpoint:    endpoint,
-		endpointURL: u,
+	if len(addresses) > 1 {
+		// Shuffle returned addresses in attempt to spread the load
+		rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+		rnd.Shuffle(len(addresses), func(i, j int) {
+			addresses[i], addresses[j] = addresses[j], addresses[i]
+		})
+	}
+
+	client := &Client{
+		httpClient:  defaultClient(),
+		addresses:   addresses,
+		configLock:  &sync.RWMutex{},
+		addressLock: &sync.Mutex{},
 	}
 
 	if apiVersionString != "" {
@@ -140,94 +149,24 @@ func NewVersionedClient(endpoint string, apiVersionString string) (*Client, erro
 		if err != nil {
 			return nil, err
 		}
-		c.requestedAPIVersion = APIVersion(version)
+		client.requestedAPIVersion = APIVersion(version)
 	}
 
-	c.initializeNativeClient()
-	return c, nil
+	return client, nil
 }
 
-// NewVersionedTLSClient returns a Client instance ready for TLS communications with the givens
-// server endpoint, key and certificates, using a specific remote API version.
-func NewVersionedTLSClient(endpoint string, cert, key, ca, apiVersionString string) (*Client, error) {
-	var certPEMBlock []byte
-	var keyPEMBlock []byte
-	var caPEMCert []byte
-	if _, err := os.Stat(cert); !os.IsNotExist(err) {
-		certPEMBlock, err = ioutil.ReadFile(cert)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if _, err := os.Stat(key); !os.IsNotExist(err) {
-		keyPEMBlock, err = ioutil.ReadFile(key)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if _, err := os.Stat(ca); !os.IsNotExist(err) {
-		caPEMCert, err = ioutil.ReadFile(ca)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return NewVersionedTLSClientFromBytes(endpoint, certPEMBlock, keyPEMBlock, caPEMCert, apiVersionString)
-}
-
-// NewVersionedTLSClientFromBytes returns a Client instance ready for TLS communications with the givens
-// server endpoint, key and certificates (passed inline to the function as opposed to being
-// read from a local file), using a specific remote API version.
-func NewVersionedTLSClientFromBytes(endpoint string, certPEMBlock, keyPEMBlock, caPEMCert []byte, apiVersionString string) (*Client, error) {
-	u, err := parseEndpoint(endpoint, true)
-	if err != nil {
-		return nil, err
-	}
-
-	tlsConfig := &tls.Config{}
-	if certPEMBlock != nil && keyPEMBlock != nil {
-		tlsCert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
-		if err != nil {
-			return nil, err
-		}
-		tlsConfig.Certificates = []tls.Certificate{tlsCert}
-	}
-	if caPEMCert == nil {
-		tlsConfig.InsecureSkipVerify = true
-	} else {
-		caPool := x509.NewCertPool()
-		if !caPool.AppendCertsFromPEM(caPEMCert) {
-			return nil, errors.New("Could not add RootCA pem")
-		}
-		tlsConfig.RootCAs = caPool
-	}
-	tr := defaultTransport()
-	tr.TLSClientConfig = tlsConfig
-	if err != nil {
-		return nil, err
-	}
-	c := &Client{
-		HTTPClient:  &http.Client{Transport: tr},
-		TLSConfig:   tlsConfig,
-		Dialer:      &net.Dialer{},
-		endpoint:    endpoint,
-		endpointURL: u,
-	}
-
-	if apiVersionString != "" {
-		version, err := strconv.Atoi(apiVersionString)
-		if err != nil {
-			return nil, err
-		}
-		c.requestedAPIVersion = APIVersion(version)
-	}
-
-	c.initializeNativeClient()
-	return c, nil
+// SetUserAgent sets the client useragent.
+func (c *Client) SetUserAgent(useragent string) {
+	c.configLock.Lock()
+	defer c.configLock.Unlock()
+	c.userAgent = useragent
 }
 
 // SetAuth sets the API username and secret to be used for all API requests.
 // It should not be called concurrently with any other Client methods.
 func (c *Client) SetAuth(username string, secret string) {
+	c.configLock.Lock()
+	defer c.configLock.Unlock()
 	if username != "" {
 		c.username = username
 	}
@@ -236,15 +175,31 @@ func (c *Client) SetAuth(username string, secret string) {
 	}
 }
 
+// SetProxy will set the proxy URL for both the HTTPClient.
+// If the transport method does not support usage
+// of proxies, an error will be returned.
+func (c *Client) SetProxy(proxy *url.URL) error {
+	c.configLock.Lock()
+	defer c.configLock.Unlock()
+
+	if client := c.httpClient; client != nil {
+		transport, supported := client.Transport.(*http.Transport)
+		if !supported {
+			return ErrProxyNotSupported
+		}
+		transport.Proxy = http.ProxyURL(proxy)
+	}
+	return nil
+}
+
 // SetTimeout takes a timeout and applies it to both the HTTPClient and
 // nativeHTTPClient. It should not be called concurrently with any other Client
 // methods.
 func (c *Client) SetTimeout(t time.Duration) {
-	if c.HTTPClient != nil {
-		c.HTTPClient.Timeout = t
-	}
-	if c.nativeHTTPClient != nil {
-		c.nativeHTTPClient.Timeout = t
+	c.configLock.Lock()
+	defer c.configLock.Unlock()
+	if c.httpClient != nil {
+		c.httpClient.Timeout = t
 	}
 }
 
@@ -257,19 +212,14 @@ func (c *Client) checkAPIVersion() error {
 	if err != nil {
 		return err
 	}
+	c.configLock.Lock()
+	defer c.configLock.Unlock()
 	if c.requestedAPIVersion == 0 {
 		c.expectedAPIVersion = c.serverAPIVersion
 	} else {
 		c.expectedAPIVersion = c.requestedAPIVersion
 	}
 	return nil
-}
-
-// Endpoint returns the current endpoint. It's useful for getting the endpoint
-// when using functions that get this data from the environment (like
-// NewClientFromEnv.
-func (c *Client) Endpoint() string {
-	return c.endpoint
 }
 
 // Ping pings the API server
@@ -284,8 +234,7 @@ func (c *Client) Ping() error {
 	if resp.StatusCode != http.StatusOK {
 		return newError(resp)
 	}
-	resp.Body.Close()
-	return nil
+	return resp.Body.Close()
 }
 
 func (c *Client) getServerAPIVersionString() (version string, err error) {
@@ -297,16 +246,19 @@ func (c *Client) getServerAPIVersionString() (version string, err error) {
 }
 
 type doOptions struct {
-	data          interface{}
+	context context.Context
+	data    interface{}
+
+	values  url.Values
+	headers map[string]string
+
 	fieldSelector string
 	labelSelector string
 	namespace     string
-	forceJSON     bool
-	force         bool
-	values        url.Values
-	headers       map[string]string
-	unversioned   bool
-	context       context.Context
+
+	forceJSON   bool
+	force       bool
+	unversioned bool
 }
 
 func (c *Client) do(method, urlpath string, doOptions doOptions) (*http.Response, error) {
@@ -340,88 +292,118 @@ func (c *Client) do(method, urlpath string, doOptions doOptions) (*http.Response
 		query.Add("force", "1")
 	}
 
-	httpClient := c.HTTPClient
-	protocol := c.endpointURL.Scheme
-	var u string
-	switch protocol {
-	case unixProtocol, namedPipeProtocol:
-		httpClient = c.nativeHTTPClient
-		u = c.getFakeNativeURL(urlpath, doOptions.unversioned)
-	default:
-		u = c.getAPIPath(urlpath, query, doOptions.unversioned)
-	}
+	// Obtain a reader lock to prevent the http client from being
+	// modified underneath us during a do().
+	c.configLock.RLock()
+	defer c.configLock.RUnlock() // This defer matches both the initial and the above lock
 
-	req, err := http.NewRequest(method, u, params)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	if doOptions.data != nil {
-		req.Header.Set("Content-Type", "application/json")
-	} else if method == "POST" {
-		req.Header.Set("Content-Type", "plain/text")
-	}
-	if c.username != "" && c.secret != "" {
-		req.SetBasicAuth(c.username, c.secret)
-	}
+	httpClient := c.httpClient
+	endpoint := c.getAPIPath(urlpath, query, doOptions.unversioned)
 
-	for k, v := range doOptions.headers {
-		req.Header.Set(k, v)
-	}
-
+	// The doOptions Context is shared for every attempted request in the do.
 	ctx := doOptions.context
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	resp, err := httpClient.Do(req.WithContext(ctx))
-	if err != nil {
-		if strings.Contains(err.Error(), "connection refused") {
-			return nil, ErrConnectionRefused
+	var failedAddresses = map[string]struct{}{}
+
+	c.addressLock.Lock()
+	var addresses = make([]string, len(c.addresses))
+	copy(addresses, c.addresses)
+	c.addressLock.Unlock()
+
+	for _, address := range addresses {
+		target := address + endpoint
+
+		req, err := http.NewRequest(method, target, params)
+		if err != nil {
+			// Probably should not try and continue if we're unable
+			// to create the request.
+			return nil, err
 		}
-		return nil, chooseError(ctx, err)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		return nil, newError(resp)
-	}
-	return resp, nil
-}
+		req.Header.Set("User-Agent", c.userAgent)
+		if doOptions.data != nil {
+			req.Header.Set("Content-Type", "application/json")
+		} else if method == "POST" {
+			req.Header.Set("Content-Type", "plain/text")
+		}
+		if c.username != "" && c.secret != "" {
+			req.SetBasicAuth(c.username, c.secret)
+		}
 
-// if error in context, return that instead of generic http error
-func chooseError(ctx context.Context, err error) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		return err
-	}
-}
+		for k, v := range doOptions.headers {
+			req.Header.Set(k, v)
+		}
 
-func (c *Client) getURL(path string, unversioned bool) string {
+		resp, err := httpClient.Do(req.WithContext(ctx))
+		if err != nil {
+			// If it is a custom error, return it. It probably knows more than us
+			if serror.IsStorageOSError(err) {
+				switch serror.ErrorKind(err) {
+				case serror.APIUncontactable:
+					// If API isn't contactable we should try the next address
+					failedAddresses[address] = struct{}{}
+					continue
+				case serror.InvalidHostConfig:
+					// If invalid host or unknown error, we should report back
+					fallthrough
+				case serror.UnknownError:
+					return nil, err
+				}
+			}
 
-	urlStr := strings.TrimRight(c.endpointURL.String(), "/")
-	path = strings.TrimLeft(path, "/")
-	if c.endpointURL.Scheme == unixProtocol || c.endpointURL.Scheme == namedPipeProtocol {
-		urlStr = ""
-	}
-	if unversioned {
-		return fmt.Sprintf("%s/%s", urlStr, path)
-	}
-	return fmt.Sprintf("%s/%s/%s", urlStr, c.requestedAPIVersion, path)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			default:
+				if _, ok := err.(net.Error); ok {
+					// Be optimistic and try the next endpoint
+					failedAddresses[address] = struct{}{}
+					continue
+				}
+				return nil, err
+			}
+		}
 
+		// If we get to the point of response, we should move any failed
+		// addresses to the back.
+		failed := len(failedAddresses)
+		if failed > 0 {
+			// Copy addresses we think are okay into the head of the list
+			newOrder := make([]string, 0, len(addresses)-failed)
+
+			for _, addr := range addresses {
+				if _, exists := failedAddresses[addr]; !exists {
+					newOrder = append(newOrder, addr)
+				}
+			}
+			for addr := range failedAddresses {
+				newOrder = append(newOrder, addr)
+			}
+
+			c.addressLock.Lock()
+			// Bring in the new order
+			c.addresses = newOrder
+			c.addressLock.Unlock()
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+			return nil, newError(resp) // These status codes are likely to be fatal
+		}
+		return resp, nil
+	}
+
+	return nil, netutil.ErrAllFailed(addresses)
 }
 
 func (c *Client) getAPIPath(path string, query url.Values, unversioned bool) string {
-	var apiPath string
-	urlStr := strings.TrimRight(c.endpointURL.String(), "/")
-	path = strings.TrimLeft(path, "/")
-	if c.endpointURL.Scheme == unixProtocol || c.endpointURL.Scheme == namedPipeProtocol {
-		urlStr = ""
-	}
-	if unversioned {
-		apiPath = fmt.Sprintf("%s/%s", urlStr, path)
+	var apiPath = strings.TrimLeft(path, "/")
+
+	if !unversioned {
+		apiPath = fmt.Sprintf("/%s/%s", c.requestedAPIVersion, apiPath)
 	} else {
-		apiPath = fmt.Sprintf("%s/%s/%s", urlStr, c.requestedAPIVersion, path)
+		apiPath = fmt.Sprintf("/%s", apiPath)
 	}
 
 	if len(query) > 0 {
@@ -429,30 +411,6 @@ func (c *Client) getAPIPath(path string, query url.Values, unversioned bool) str
 	}
 
 	return apiPath
-}
-
-// getFakeNativeURL returns the URL needed to make an HTTP request over a UNIX
-// domain socket to the given path.
-func (c *Client) getFakeNativeURL(path string, unversioned bool) string {
-	u := *c.endpointURL // Copy.
-
-	// Override URL so that net/http will not complain.
-	u.Scheme = "http"
-	u.Host = "unix.sock" // Doesn't matter what this is - it's not used.
-	u.Path = ""
-	urlStr := strings.TrimRight(u.String(), "/")
-	path = strings.TrimLeft(path, "/")
-	if unversioned {
-		return fmt.Sprintf("%s/%s", urlStr, path)
-	}
-	return fmt.Sprintf("%s/%s/%s", urlStr, c.requestedAPIVersion, path)
-}
-
-type jsonMessage struct {
-	Status   string `json:"status,omitempty"`
-	Progress string `json:"progress,omitempty"`
-	Error    string `json:"error,omitempty"`
-	Stream   string `json:"stream,omitempty"`
 }
 
 func queryString(opts interface{}) string {
@@ -530,80 +488,55 @@ type Error struct {
 }
 
 func newError(resp *http.Response) *Error {
+	type jsonError struct {
+		Message string `json:"message"`
+	}
+
 	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return &Error{Status: resp.StatusCode, Message: fmt.Sprintf("cannot read body, err: %v", err)}
 	}
-	return &Error{Status: resp.StatusCode, Message: string(data)}
+
+	// attempt to unmarshal the error if in json format
+	jerr := &jsonError{}
+	err = json.Unmarshal(data, jerr)
+	if err != nil {
+		return &Error{Status: resp.StatusCode, Message: string(data)} // Failed, just return string
+	}
+
+	return &Error{Status: resp.StatusCode, Message: jerr.Message}
 }
 
 func (e *Error) Error() string {
-	return fmt.Sprintf("API error (%d): %s", e.Status, e.Message)
-}
+	var niceStatus string
 
-func parseEndpoint(endpoint string, tls bool) (*url.URL, error) {
-	if endpoint != "" && !strings.Contains(endpoint, "://") {
-		endpoint = "tcp://" + endpoint
+	switch e.Status {
+	case 400, 500:
+		niceStatus = "Server failed to process your request. Was the data correct?"
+	case 401:
+		niceStatus = "Unauthenticated access of secure endpoint, please retry after authentication"
+	case 403:
+		niceStatus = "Forbidden request. Your user cannot perform this action"
+	case 404:
+		niceStatus = "Requested object not found. Does this item exist?"
 	}
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, ErrInvalidEndpoint
-	}
-	if tls && u.Scheme != "unix" {
-		u.Scheme = "https"
-	}
-	switch u.Scheme {
-	case unixProtocol, namedPipeProtocol:
-		return u, nil
-	case "http", "https", "tcp":
-		_, port, err := net.SplitHostPort(u.Host)
-		if err != nil {
-			if e, ok := err.(*net.AddrError); ok {
-				if e.Err == "missing port in address" {
-					return u, nil
-				}
-			}
-			return nil, ErrInvalidEndpoint
-		}
-		number, err := strconv.ParseInt(port, 10, 64)
-		if err == nil && number > 0 && number < 65536 {
-			if u.Scheme == "tcp" {
-				if tls {
-					u.Scheme = "https"
-				} else {
-					u.Scheme = "http"
-				}
-			}
-			return u, nil
-		}
-		return nil, ErrInvalidEndpoint
-	default:
-		return nil, ErrInvalidEndpoint
-	}
-}
 
-// defaultTransport returns a new http.Transport with the same default values
-// as http.DefaultTransport, but with idle connections and keepalives disabled.
-func defaultTransport() *http.Transport {
-	transport := defaultPooledTransport()
-	transport.DisableKeepAlives = true
-	transport.MaxIdleConnsPerHost = -1
-	return transport
+	if niceStatus != "" {
+		return fmt.Sprintf("API error (%s): %s", niceStatus, e.Message)
+	}
+	return fmt.Sprintf("API error (%s): %s", http.StatusText(e.Status), e.Message)
 }
 
 // defaultPooledTransport returns a new http.Transport with similar default
 // values to http.DefaultTransport. Do not use this for transient transports as
 // it can leak file descriptors over time. Only use this for transports that
 // will be re-used for the same host(s).
-func defaultPooledTransport() *http.Transport {
+func defaultPooledTransport(dialer Dialer) *http.Transport {
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		Dial: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: 10 * time.Second,
+		Proxy:               http.ProxyFromEnvironment,
+		Dial:                dialer.Dial,
+		TLSHandshakeTimeout: 5 * time.Second,
 		DisableKeepAlives:   false,
 		MaxIdleConnsPerHost: 1,
 	}
@@ -613,8 +546,14 @@ func defaultPooledTransport() *http.Transport {
 // defaultClient returns a new http.Client with similar default values to
 // http.Client, but with a non-shared Transport, idle connections disabled, and
 // keepalives disabled.
+// If a custom dialer is not provided, one with sane defaults will be created.
 func defaultClient() *http.Client {
+	dialer := &net.Dialer{
+		Timeout:   5 * time.Second,
+		KeepAlive: 5 * time.Second,
+	}
+
 	return &http.Client{
-		Transport: defaultTransport(),
+		Transport: defaultPooledTransport(dialer),
 	}
 }

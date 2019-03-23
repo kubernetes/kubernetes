@@ -23,7 +23,7 @@ import (
 	"reflect"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -35,18 +35,30 @@ type unsetOptions struct {
 	propertyName string
 }
 
-var unset_long = templates.LongDesc(`
+var (
+	unsetLong = templates.LongDesc(`
 	Unsets an individual value in a kubeconfig file
 
 	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.`)
 
+	unsetExample = templates.Examples(`
+		# Unset the current-context.
+		kubectl config unset current-context
+
+		# Unset namespace in foo context.
+		kubectl config unset contexts.foo.namespace`)
+)
+
+// NewCmdConfigUnset returns a Command instance for 'config unset' sub command
 func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &unsetOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:   "unset PROPERTY_NAME",
-		Short: i18n.T("Unsets an individual value in a kubeconfig file"),
-		Long:  unset_long,
+		Use:                   "unset PROPERTY_NAME",
+		DisableFlagsInUseLine: true,
+		Short:                 i18n.T("Unsets an individual value in a kubeconfig file"),
+		Long:                  unsetLong,
+		Example:               unsetExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd, args))
 			cmdutil.CheckErr(options.run(out))

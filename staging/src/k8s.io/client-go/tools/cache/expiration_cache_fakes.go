@@ -38,7 +38,7 @@ type FakeExpirationPolicy struct {
 	RetrieveKeyFunc KeyFunc
 }
 
-func (p *FakeExpirationPolicy) IsExpired(obj *timestampedEntry) bool {
+func (p *FakeExpirationPolicy) IsExpired(obj *TimestampedEntry) bool {
 	key, _ := p.RetrieveKeyFunc(obj)
 	return !p.NeverExpire.Has(key)
 }

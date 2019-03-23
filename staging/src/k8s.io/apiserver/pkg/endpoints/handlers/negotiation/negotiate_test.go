@@ -17,8 +17,10 @@ limitations under the License.
 package negotiation
 
 import (
+	"mime"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +41,23 @@ type fakeNegotiater struct {
 func (n *fakeNegotiater) SupportedMediaTypes() []runtime.SerializerInfo {
 	var out []runtime.SerializerInfo
 	for _, s := range n.types {
-		info := runtime.SerializerInfo{Serializer: n.serializer, MediaType: s, EncodesAsText: true}
+		mediaType, _, err := mime.ParseMediaType(s)
+		if err != nil {
+			panic(err)
+		}
+		parts := strings.SplitN(mediaType, "/", 2)
+		if len(parts) == 1 {
+			// this is an error on the server side
+			parts = append(parts, "")
+		}
+
+		info := runtime.SerializerInfo{
+			Serializer:       n.serializer,
+			MediaType:        s,
+			MediaTypeType:    parts[0],
+			MediaTypeSubType: parts[1],
+			EncodesAsText:    true,
+		}
 		for _, t := range n.streamTypes {
 			if t == s {
 				info.StreamSerializer = &runtime.StreamSerializerInfo{
@@ -181,7 +199,26 @@ func TestNegotiate(t *testing.T) {
 			serializer:  fakeCodec,
 			params:      map[string]string{"pretty": "1"},
 		},
-
+		{
+			req: &http.Request{
+				Header: http.Header{
+					"Accept": []string{"application/json;as=BOGUS;v=v1beta1;g=meta.k8s.io, application/json"},
+				},
+			},
+			contentType: "application/json",
+			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			serializer:  fakeCodec,
+		},
+		{
+			req: &http.Request{
+				Header: http.Header{
+					"Accept": []string{"application/BOGUS, application/json"},
+				},
+			},
+			contentType: "application/json",
+			ns:          &fakeNegotiater{serializer: fakeCodec, types: []string{"application/json"}},
+			serializer:  fakeCodec,
+		},
 		// "application" is not a valid media type, so the server will reject the response during
 		// negotiation (the server, in error, has specified an invalid media type)
 		{
@@ -212,7 +249,7 @@ func TestNegotiate(t *testing.T) {
 			req = &http.Request{Header: http.Header{}}
 			req.Header.Set("Accept", test.accept)
 		}
-		s, err := NegotiateOutputSerializer(req, test.ns)
+		_, s, err := NegotiateOutputMediaType(req, test.ns, DefaultEndpointRestrictions)
 		switch {
 		case err == nil && test.errFn != nil:
 			t.Errorf("%d: failed: expected error", i)

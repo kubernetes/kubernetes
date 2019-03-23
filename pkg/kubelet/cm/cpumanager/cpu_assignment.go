@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -86,7 +86,7 @@ func (a *cpuAccumulator) freeCores() []int {
 
 // Returns CPU IDs as a slice sorted by:
 // - socket affinity with result
-// - number of CPUs available on the same sockett
+// - number of CPUs available on the same socket
 // - number of CPUs available on the same core
 // - socket ID.
 // - core ID.
@@ -160,7 +160,7 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	//    least a socket's-worth of CPUs.
 	for _, s := range acc.freeSockets() {
 		if acc.needs(acc.topo.CPUsPerSocket()) {
-			glog.V(4).Infof("[cpumanager] takeByTopology: claiming socket [%d]", s)
+			klog.V(4).Infof("[cpumanager] takeByTopology: claiming socket [%d]", s)
 			acc.take(acc.details.CPUsInSocket(s))
 			if acc.isSatisfied() {
 				return acc.result, nil
@@ -172,7 +172,7 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	//    a core's-worth of CPUs.
 	for _, c := range acc.freeCores() {
 		if acc.needs(acc.topo.CPUsPerCore()) {
-			glog.V(4).Infof("[cpumanager] takeByTopology: claiming core [%d]", c)
+			klog.V(4).Infof("[cpumanager] takeByTopology: claiming core [%d]", c)
 			acc.take(acc.details.CPUsInCore(c))
 			if acc.isSatisfied() {
 				return acc.result, nil
@@ -184,7 +184,7 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	//    on the same sockets as the whole cores we have already taken in this
 	//    allocation.
 	for _, c := range acc.freeCPUs() {
-		glog.V(4).Infof("[cpumanager] takeByTopology: claiming CPU [%d]", c)
+		klog.V(4).Infof("[cpumanager] takeByTopology: claiming CPU [%d]", c)
 		if acc.needs(1) {
 			acc.take(cpuset.NewCPUSet(c))
 		}

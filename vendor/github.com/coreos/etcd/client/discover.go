@@ -14,8 +14,27 @@
 
 package client
 
+import (
+	"github.com/coreos/etcd/pkg/srv"
+)
+
 // Discoverer is an interface that wraps the Discover method.
 type Discoverer interface {
 	// Discover looks up the etcd servers for the domain.
 	Discover(domain string) ([]string, error)
+}
+
+type srvDiscover struct{}
+
+// NewSRVDiscover constructs a new Discoverer that uses the stdlib to lookup SRV records.
+func NewSRVDiscover() Discoverer {
+	return &srvDiscover{}
+}
+
+func (d *srvDiscover) Discover(domain string) ([]string, error) {
+	srvs, err := srv.GetClient("etcd-client", domain)
+	if err != nil {
+		return nil, err
+	}
+	return srvs.Endpoints, nil
 }

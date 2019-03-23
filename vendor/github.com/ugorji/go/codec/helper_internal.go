@@ -219,24 +219,3 @@ func growCap(oldCap, unit, num int) (newCap int) {
 	}
 	return
 }
-
-func expandSliceValue(s reflect.Value, num int) reflect.Value {
-	if num <= 0 {
-		return s
-	}
-	l0 := s.Len()
-	l1 := l0 + num // new slice length
-	if l1 < l0 {
-		panic("ExpandSlice: slice overflow")
-	}
-	c0 := s.Cap()
-	if l1 <= c0 {
-		return s.Slice(0, l1)
-	}
-	st := s.Type()
-	c1 := growCap(c0, int(st.Elem().Size()), num)
-	s2 := reflect.MakeSlice(st, l1, c1)
-	// println("expandslicevalue: cap-old: ", c0, ", cap-new: ", c1, ", len-new: ", l1)
-	reflect.Copy(s2, s)
-	return s2
-}

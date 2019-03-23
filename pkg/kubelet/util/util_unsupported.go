@@ -1,4 +1,4 @@
-// +build !freebsd,!linux,!windows
+// +build !freebsd,!linux,!windows,!darwin
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -30,4 +30,23 @@ func CreateListener(endpoint string) (net.Listener, error) {
 
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
 	return "", nil, fmt.Errorf("GetAddressAndDialer is unsupported in this build")
+}
+
+// LockAndCheckSubPath empty implementation
+func LockAndCheckSubPath(volumePath, subPath string) ([]uintptr, error) {
+	return []uintptr{}, nil
+}
+
+// UnlockPath empty implementation
+func UnlockPath(fileHandles []uintptr) {
+}
+
+// LocalEndpoint empty implementation
+func LocalEndpoint(path, file string) string {
+	return ""
+}
+
+// GetBootTime empty implementation
+func GetBootTime() (time.Time, error) {
+	return time.Time{}, fmt.Errorf("GetBootTime is unsupported in this build")
 }

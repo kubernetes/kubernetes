@@ -17,13 +17,16 @@ limitations under the License.
 package podtemplate
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // podTemplateStrategy implements behavior for PodTemplates
@@ -34,7 +37,7 @@ type podTemplateStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating PodTemplate
 // objects via the REST API.
-var Strategy = podTemplateStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = podTemplateStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for pod templates.
 func (podTemplateStrategy) NamespaceScoped() bool {
@@ -42,16 +45,18 @@ func (podTemplateStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podTemplateStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	template := obj.(*api.PodTemplate)
 
-	pod.DropDisabledAlphaFields(&template.Template.Spec)
+	pod.DropDisabledTemplateFields(&template.Template, nil)
 }
 
 // Validate validates a new pod template.
-func (podTemplateStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
-	pod := obj.(*api.PodTemplate)
-	return validation.ValidatePodTemplate(pod)
+func (podTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	template := obj.(*api.PodTemplate)
+	allErrs := validation.ValidatePodTemplate(template)
+	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&template.Template, nil, field.NewPath("template"))...)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -64,24 +69,27 @@ func (podTemplateStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podTemplateStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newTemplate := obj.(*api.PodTemplate)
 	oldTemplate := old.(*api.PodTemplate)
 
-	pod.DropDisabledAlphaFields(&newTemplate.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldTemplate.Template.Spec)
+	pod.DropDisabledTemplateFields(&newTemplate.Template, &oldTemplate.Template)
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (podTemplateStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePodTemplateUpdate(obj.(*api.PodTemplate), old.(*api.PodTemplate))
+func (podTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	template := obj.(*api.PodTemplate)
+	oldTemplate := old.(*api.PodTemplate)
+	allErrs := validation.ValidatePodTemplateUpdate(template, oldTemplate)
+	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&template.Template, &oldTemplate.Template, field.NewPath("template"))...)
+	return allErrs
 }
 
 func (podTemplateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (podTemplateStrategy) Export(ctx genericapirequest.Context, obj runtime.Object, exact bool) error {
+func (podTemplateStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
 	// Do nothing
 	return nil
 }

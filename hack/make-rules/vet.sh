@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -34,9 +34,6 @@ fi
 # This is required before we run govet for the results to be correct.
 # See https://github.com/golang/go/issues/16086 for details.
 go install ./cmd/...
-
-# Use eval to preserve embedded quoted strings.
-eval "goflags=(${GOFLAGS:-})"
 
 # Filter out arguments that start with "-" and move them to goflags.
 targets=()

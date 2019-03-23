@@ -6,11 +6,6 @@
 
 package unix
 
-import (
-	"sync/atomic"
-	"syscall"
-)
-
 //sys	EpollWait(epfd int, events []EpollEvent, msec int) (n int, err error)
 //sys	Dup2(oldfd int, newfd int) (err error)
 //sys	Fchown(fd int, uid int, gid int) (err error)
@@ -63,21 +58,6 @@ import (
 //sys	sendmsg(s int, msg *Msghdr, flags int) (n int, err error)
 //sys	mmap(addr uintptr, length uintptr, prot int, flags int, fd int, offset int64) (xaddr uintptr, err error)
 
-func sysconf(name int) (n int64, err syscall.Errno)
-
-// pageSize caches the value of Getpagesize, since it can't change
-// once the system is booted.
-var pageSize int64 // accessed atomically
-
-func Getpagesize() int {
-	n := atomic.LoadInt64(&pageSize)
-	if n == 0 {
-		n, _ = sysconf(_SC_PAGESIZE)
-		atomic.StoreInt64(&pageSize, n)
-	}
-	return int(n)
-}
-
 func Ioperm(from int, num int, on int) (err error) {
 	return ENOSYS
 }
@@ -102,19 +82,12 @@ func Time(t *Time_t) (tt Time_t, err error) {
 
 //sys	Utime(path string, buf *Utimbuf) (err error)
 
-func TimespecToNsec(ts Timespec) int64 { return int64(ts.Sec)*1e9 + int64(ts.Nsec) }
-
-func NsecToTimespec(nsec int64) (ts Timespec) {
-	ts.Sec = nsec / 1e9
-	ts.Nsec = nsec % 1e9
-	return
+func setTimespec(sec, nsec int64) Timespec {
+	return Timespec{Sec: sec, Nsec: nsec}
 }
 
-func NsecToTimeval(nsec int64) (tv Timeval) {
-	nsec += 999 // round up to microsecond
-	tv.Sec = nsec / 1e9
-	tv.Usec = int32(nsec % 1e9 / 1e3)
-	return
+func setTimeval(sec, usec int64) Timeval {
+	return Timeval{Sec: sec, Usec: int32(usec)}
 }
 
 func (r *PtraceRegs) PC() uint64 { return r.Tpc }

@@ -15,6 +15,7 @@
 package mvcc
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/coreos/etcd/mvcc/mvccpb"
@@ -183,7 +184,7 @@ func (wg *watcherGroup) add(wa *watcher) {
 // contains is whether the given key has a watcher in the group.
 func (wg *watcherGroup) contains(key string) bool {
 	_, ok := wg.keyWatchers[key]
-	return ok || wg.ranges.Contains(adt.NewStringAffinePoint(key))
+	return ok || wg.ranges.Intersects(adt.NewStringAffinePoint(key))
 }
 
 // size gives the number of unique watchers in the group.
@@ -238,7 +239,15 @@ func (wg *watcherGroup) chooseAll(curRev, compactRev int64) int64 {
 	minRev := int64(math.MaxInt64)
 	for w := range wg.watchers {
 		if w.minRev > curRev {
-			panic("watcher current revision should not exceed current revision")
+			// after network partition, possibly choosing future revision watcher from restore operation
+			// with watch key "proxy-namespace__lostleader" and revision "math.MaxInt64 - 2"
+			// do not panic when such watcher had been moved from "synced" watcher during restore operation
+			if !w.restore {
+				panic(fmt.Errorf("watcher minimum revision %d should not exceed current revision %d", w.minRev, curRev))
+			}
+
+			// mark 'restore' done, since it's chosen
+			w.restore = false
 		}
 		if w.minRev < compactRev {
 			select {

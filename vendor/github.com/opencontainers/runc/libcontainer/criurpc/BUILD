@@ -3,15 +3,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["criurpc.pb.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/criurpc",
     importpath = "github.com/opencontainers/runc/libcontainer/criurpc",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["criurpc.proto"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(

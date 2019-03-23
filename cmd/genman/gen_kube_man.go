@@ -26,15 +26,16 @@ import (
 	mangen "github.com/cpuguy83/go-md2man/md2man"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/apiserver/pkg/server"
 	ccmapp "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
 	"k8s.io/kubernetes/cmd/genutils"
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
+	schapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
+	kubeadmapp "k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
-	kubectlcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	schapp "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 )
 
 func main() {
@@ -62,7 +63,7 @@ func main() {
 	switch module {
 	case "kube-apiserver":
 		// generate manpage for kube-apiserver
-		apiserver := apiservapp.NewAPIServerCommand()
+		apiserver := apiservapp.NewAPIServerCommand(server.SetupSignalHandler())
 		genMarkdown(apiserver, "", outDir)
 		for _, c := range apiserver.Commands() {
 			genMarkdown(c, "kube-apiserver", outDir)
@@ -97,7 +98,7 @@ func main() {
 		}
 	case "kubelet":
 		// generate manpage for kubelet
-		kubelet := kubeletapp.NewKubeletCommand()
+		kubelet := kubeletapp.NewKubeletCommand(server.SetupSignalHandler())
 		genMarkdown(kubelet, "", outDir)
 		for _, c := range kubelet.Commands() {
 			genMarkdown(c, "kubelet", outDir)
@@ -105,10 +106,17 @@ func main() {
 	case "kubectl":
 		// generate manpage for kubectl
 		// TODO os.Stdin should really be something like ioutil.Discard, but a Reader
-		kubectl := kubectlcmd.NewKubectlCommand(kubectlcmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
+		kubectl := kubectlcmd.NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
 		genMarkdown(kubectl, "", outDir)
 		for _, c := range kubectl.Commands() {
 			genMarkdown(c, "kubectl", outDir)
+		}
+	case "kubeadm":
+		// generate manpage for kubelet
+		kubeadm := kubeadmapp.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
+		genMarkdown(kubeadm, "", outDir)
+		for _, c := range kubeadm.Commands() {
+			genMarkdown(c, "kubeadm", outDir)
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "Module %s is not supported", module)

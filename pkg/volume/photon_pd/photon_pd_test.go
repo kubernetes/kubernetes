@@ -68,21 +68,12 @@ func TestGetAccessModes(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) {
+	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteOnce) {
 		t.Errorf("Expected to support AccessModeTypes:  %s", v1.ReadWriteOnce)
 	}
-	if contains(plug.GetAccessModes(), v1.ReadOnlyMany) {
+	if volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadOnlyMany) {
 		t.Errorf("Expected not to support AccessModeTypes:  %s", v1.ReadOnlyMany)
 	}
-}
-
-func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
 }
 
 type fakePDManager struct {
@@ -147,13 +138,6 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
-	}
 
 	fakeManager = &fakePDManager{}
 	unmounter, err := plug.(*photonPersistentDiskPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
@@ -170,19 +154,19 @@ func TestPlugin(t *testing.T) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 
 	// Test Provisioner
 	options := volume.VolumeOptions{
-		PVC: volumetest.CreateTestPVC("10Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PVC:                           volumetest.CreateTestPVC("10Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*photonPersistentDiskPlugin).newProvisionerInternal(options, &fakePDManager{})
 	if err != nil {
 		t.Fatalf("Error creating new provisioner:%v", err)
 	}
-	persistentSpec, err := provisioner.Provision()
+	persistentSpec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
 	}

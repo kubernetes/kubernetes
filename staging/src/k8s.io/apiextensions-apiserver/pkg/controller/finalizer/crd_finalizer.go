@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -65,7 +65,7 @@ type ListerCollectionDeleter interface {
 type CRClientGetter interface {
 	// GetCustomResourceListerCollectionDeleter gets the ListerCollectionDeleter for the given CRD
 	// UID.
-	GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) ListerCollectionDeleter
+	GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) (ListerCollectionDeleter, error)
 }
 
 // NewCRDFinalizer creates a new CRDFinalizer.
@@ -79,7 +79,7 @@ func NewCRDFinalizer(
 		crdLister:      crdInformer.Lister(),
 		crdSynced:      crdInformer.Informer().HasSynced,
 		crClientGetter: crClientGetter,
-		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDefinition-CRDFinalizer"),
+		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_finalizer"),
 	}
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -116,6 +116,10 @@ func (c *CRDFinalizer) sync(key string) error {
 		Message: "CustomResource deletion is in progress",
 	})
 	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+		// deleted or changed in the meantime, we'll get called again
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -143,6 +147,10 @@ func (c *CRDFinalizer) sync(key string) error {
 
 	apiextensions.CRDRemoveFinalizer(crd, apiextensions.CustomResourceCleanupFinalizer)
 	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+		// deleted or changed in the meantime, we'll get called again
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -155,9 +163,9 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 	// Now we can start deleting items. While it would be ideal to use a REST API client, doing so
 	// could incorrectly delete a ThirdPartyResource with the same URL as the CustomResource, so we go
 	// directly to the storage instead. Since we control the storage, we know that delete collection works.
-	crClient := c.crClientGetter.GetCustomResourceListerCollectionDeleter(crd)
-	if crClient == nil {
-		err := fmt.Errorf("unable to find a custom resource client for %s.%s", crd.Status.AcceptedNames.Plural, crd.Spec.Group)
+	crClient, err := c.crClientGetter.GetCustomResourceListerCollectionDeleter(crd)
+	if err != nil {
+		err = fmt.Errorf("unable to find a custom resource client for %s.%s: %v", crd.Status.AcceptedNames.Plural, crd.Spec.Group, err)
 		return apiextensions.CustomResourceDefinitionCondition{
 			Type:    apiextensions.Terminating,
 			Status:  apiextensions.ConditionTrue,
@@ -216,7 +224,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 		if len(listObj.(*unstructured.UnstructuredList).Items) == 0 {
 			return true, nil
 		}
-		glog.V(2).Infof("%s.%s waiting for %d items to be removed", crd.Status.AcceptedNames.Plural, crd.Spec.Group, len(listObj.(*unstructured.UnstructuredList).Items))
+		klog.V(2).Infof("%s.%s waiting for %d items to be removed", crd.Status.AcceptedNames.Plural, crd.Spec.Group, len(listObj.(*unstructured.UnstructuredList).Items))
 		return false, nil
 	})
 	if err != nil {
@@ -239,8 +247,8 @@ func (c *CRDFinalizer) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting CRDFinalizer")
-	defer glog.Infof("Shutting down CRDFinalizer")
+	klog.Infof("Starting CRDFinalizer")
+	defer klog.Infof("Shutting down CRDFinalizer")
 
 	if !cache.WaitForCacheSync(stopCh, c.crdSynced) {
 		return

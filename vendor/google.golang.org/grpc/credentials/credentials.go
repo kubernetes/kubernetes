@@ -1,33 +1,18 @@
 /*
  *
- * Copyright 2014, Google Inc.
- * All rights reserved.
+ * Copyright 2014 gRPC authors.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *     * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -49,10 +34,8 @@ import (
 	"golang.org/x/net/context"
 )
 
-var (
-	// alpnProtoStr are the specified application level protocols for gRPC.
-	alpnProtoStr = []string{"h2"}
-)
+// alpnProtoStr are the specified application level protocols for gRPC.
+var alpnProtoStr = []string{"h2"}
 
 // PerRPCCredentials defines the common interface for the credentials which need to
 // attach security information to every RPC (e.g., oauth2).
@@ -60,8 +43,9 @@ type PerRPCCredentials interface {
 	// GetRequestMetadata gets the current request metadata, refreshing
 	// tokens if required. This should be called by the transport layer on
 	// each request, and the data should be populated in headers or other
-	// context. uri is the URI of the entry point for the request. When
-	// supported by the underlying implementation, ctx can be used for
+	// context. If a status code is returned, it will be used as the status
+	// for the RPC. uri is the URI of the entry point for the request.
+	// When supported by the underlying implementation, ctx can be used for
 	// timeout and cancellation.
 	// TODO(zhaoq): Define the set of the qualified keys instead of leaving
 	// it as an arbitrary string.
@@ -89,11 +73,9 @@ type AuthInfo interface {
 	AuthType() string
 }
 
-var (
-	// ErrConnDispatched indicates that rawConn has been dispatched out of gRPC
-	// and the caller should not close rawConn.
-	ErrConnDispatched = errors.New("credentials: rawConn is dispatched out of gRPC")
-)
+// ErrConnDispatched indicates that rawConn has been dispatched out of gRPC
+// and the caller should not close rawConn.
+var ErrConnDispatched = errors.New("credentials: rawConn is dispatched out of gRPC")
 
 // TransportCredentials defines the common interface for all the live gRPC wire
 // protocols and supported transport security protocols (e.g., TLS, SSL).
@@ -106,10 +88,14 @@ type TransportCredentials interface {
 	// (io.EOF, context.DeadlineExceeded or err.Temporary() == true).
 	// If the returned error is a wrapper error, implementations should make sure that
 	// the error implements Temporary() to have the correct retry behaviors.
+	//
+	// If the returned net.Conn is closed, it MUST close the net.Conn provided.
 	ClientHandshake(context.Context, string, net.Conn) (net.Conn, AuthInfo, error)
 	// ServerHandshake does the authentication handshake for servers. It returns
 	// the authenticated connection and the corresponding auth information about
 	// the connection.
+	//
+	// If the returned net.Conn is closed, it MUST close the net.Conn provided.
 	ServerHandshake(net.Conn) (net.Conn, AuthInfo, error)
 	// Info provides the ProtocolInfo of this TransportCredentials.
 	Info() ProtocolInfo
@@ -146,15 +132,15 @@ func (c tlsCreds) Info() ProtocolInfo {
 	}
 }
 
-func (c *tlsCreds) ClientHandshake(ctx context.Context, addr string, rawConn net.Conn) (_ net.Conn, _ AuthInfo, err error) {
+func (c *tlsCreds) ClientHandshake(ctx context.Context, authority string, rawConn net.Conn) (_ net.Conn, _ AuthInfo, err error) {
 	// use local cfg to avoid clobbering ServerName if using multiple endpoints
 	cfg := cloneTLSConfig(c.config)
 	if cfg.ServerName == "" {
-		colonPos := strings.LastIndex(addr, ":")
+		colonPos := strings.LastIndex(authority, ":")
 		if colonPos == -1 {
-			colonPos = len(addr)
+			colonPos = len(authority)
 		}
-		cfg.ServerName = addr[:colonPos]
+		cfg.ServerName = authority[:colonPos]
 	}
 	conn := tls.Client(rawConn, cfg)
 	errChannel := make(chan error, 1)
@@ -196,14 +182,14 @@ func NewTLS(c *tls.Config) TransportCredentials {
 	return tc
 }
 
-// NewClientTLSFromCert constructs a TLS from the input certificate for client.
+// NewClientTLSFromCert constructs TLS credentials from the input certificate for client.
 // serverNameOverride is for testing only. If set to a non empty string,
 // it will override the virtual host name of authority (e.g. :authority header field) in requests.
 func NewClientTLSFromCert(cp *x509.CertPool, serverNameOverride string) TransportCredentials {
 	return NewTLS(&tls.Config{ServerName: serverNameOverride, RootCAs: cp})
 }
 
-// NewClientTLSFromFile constructs a TLS from the input certificate file for client.
+// NewClientTLSFromFile constructs TLS credentials from the input certificate file for client.
 // serverNameOverride is for testing only. If set to a non empty string,
 // it will override the virtual host name of authority (e.g. :authority header field) in requests.
 func NewClientTLSFromFile(certFile, serverNameOverride string) (TransportCredentials, error) {
@@ -218,12 +204,12 @@ func NewClientTLSFromFile(certFile, serverNameOverride string) (TransportCredent
 	return NewTLS(&tls.Config{ServerName: serverNameOverride, RootCAs: cp}), nil
 }
 
-// NewServerTLSFromCert constructs a TLS from the input certificate for server.
+// NewServerTLSFromCert constructs TLS credentials from the input certificate for server.
 func NewServerTLSFromCert(cert *tls.Certificate) TransportCredentials {
 	return NewTLS(&tls.Config{Certificates: []tls.Certificate{*cert}})
 }
 
-// NewServerTLSFromFile constructs a TLS from the input certificate file and key
+// NewServerTLSFromFile constructs TLS credentials from the input certificate file and key
 // file for server.
 func NewServerTLSFromFile(certFile, keyFile string) (TransportCredentials, error) {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)

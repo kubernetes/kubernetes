@@ -66,14 +66,8 @@ func (h *Handler) WaitForReady() bool {
 	if h.readyFunc == nil {
 		return true
 	}
-	return h.waitForReadyInternal(time.After(timeToWaitForReady))
-}
 
-func (h *Handler) waitForReadyInternal(timeout <-chan time.Time) bool {
-	// there is no configured ready func, so return immediately
-	if h.readyFunc == nil {
-		return true
-	}
+	timeout := time.After(timeToWaitForReady)
 	for !h.readyFunc() {
 		select {
 		case <-time.After(100 * time.Millisecond):

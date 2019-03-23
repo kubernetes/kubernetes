@@ -19,19 +19,22 @@ package set
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
 
-	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -41,7 +44,7 @@ var (
 	serviceaccountLong = templates.LongDesc(i18n.T(`
 	Update ServiceAccount of pod template resources.
 
-	Possible resources (case insensitive) can be: 
+	Possible resources (case insensitive) can be:
 	` + serviceaccountResources))
 
 	serviceaccountExample = templates.Examples(i18n.T(`
@@ -53,91 +56,113 @@ var (
 	`))
 )
 
-// serviceAccountConfig encapsulates the data required to perform the operation.
-type serviceAccountConfig struct {
+// SetServiceAccountOptions encapsulates the data required to perform the operation.
+type SetServiceAccountOptions struct {
+	PrintFlags  *genericclioptions.PrintFlags
+	RecordFlags *genericclioptions.RecordFlags
+
 	fileNameOptions        resource.FilenameOptions
-	mapper                 meta.RESTMapper
-	encoder                runtime.Encoder
-	out                    io.Writer
-	err                    io.Writer
 	dryRun                 bool
 	shortOutput            bool
 	all                    bool
-	record                 bool
 	output                 string
-	changeCause            string
 	local                  bool
-	saPrint                func(obj runtime.Object) error
-	updatePodSpecForObject func(runtime.Object, func(*api.PodSpec) error) (bool, error)
+	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	infos                  []*resource.Info
 	serviceAccountName     string
+
+	PrintObj printers.ResourcePrinterFunc
+	Recorder genericclioptions.Recorder
+
+	genericclioptions.IOStreams
+}
+
+// NewSetServiceAccountOptions returns an initialized SetServiceAccountOptions instance
+func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServiceAccountOptions {
+	return &SetServiceAccountOptions{
+		PrintFlags:  genericclioptions.NewPrintFlags("serviceaccount updated").WithTypeSetter(scheme.Scheme),
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		Recorder: genericclioptions.NoopRecorder{},
+
+		IOStreams: streams,
+	}
 }
 
 // NewCmdServiceAccount returns the "set serviceaccount" command.
-func NewCmdServiceAccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
-	saConfig := &serviceAccountConfig{
-		out: out,
-		err: err,
-	}
+func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewSetServiceAccountOptions(streams)
 
 	cmd := &cobra.Command{
-		Use:     "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
-		Aliases: []string{"sa"},
-		Short:   i18n.T("Update ServiceAccount of a resource"),
-		Long:    serviceaccountLong,
-		Example: serviceaccountExample,
+		Use:                   "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
+		DisableFlagsInUseLine: true,
+		Aliases:               []string{"sa"},
+		Short:                 i18n.T("Update ServiceAccount of a resource"),
+		Long:                  serviceaccountLong,
+		Example:               serviceaccountExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(saConfig.Complete(f, cmd, args))
-			cmdutil.CheckErr(saConfig.Run())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmdutil.AddPrinterFlags(cmd)
+
+	o.PrintFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd)
 
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, &saConfig.fileNameOptions, usage)
-	cmd.Flags().BoolVar(&saConfig.all, "all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().BoolVar(&saConfig.local, "local", false, "If true, set image will NOT contact api-server but run locally.")
-	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.fileNameOptions, usage)
+	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, set serviceaccount will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
 
 // Complete configures serviceAccountConfig from command line args.
-func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	saConfig.mapper, _ = f.Object()
-	saConfig.encoder = f.JSONEncoder()
-	saConfig.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-	saConfig.record = cmdutil.GetRecordFlag(cmd)
-	saConfig.changeCause = f.Command(cmd, false)
-	saConfig.dryRun = cmdutil.GetDryRunFlag(cmd)
-	saConfig.output = cmdutil.GetFlagString(cmd, "output")
-	saConfig.updatePodSpecForObject = f.UpdatePodSpecForObject
-	saConfig.saPrint = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, saConfig.local, saConfig.mapper, obj, saConfig.out)
+func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
+
+	o.RecordFlags.Complete(cmd)
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
 	}
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+
+	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
+	o.dryRun = cmdutil.GetDryRunFlag(cmd)
+	o.output = cmdutil.GetFlagString(cmd, "output")
+	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
+
+	if o.dryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = printer.PrintObj
+
+	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
 	if len(args) == 0 {
 		return errors.New("serviceaccount is required")
 	}
-	saConfig.serviceAccountName = args[len(args)-1]
+	o.serviceAccountName = args[len(args)-1]
 	resources := args[:len(args)-1]
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	builder := f.NewBuilder().ContinueOnError().
+	builder := f.NewBuilder().
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+		LocalParam(o.local).
+		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &saConfig.fileNameOptions).
-		IncludeUninitialized(includeUninitialized).
+		FilenameParam(enforceNamespace, &o.fileNameOptions).
 		Flatten()
-	if !saConfig.local {
-		builder.ResourceTypeOrNameArgs(saConfig.all, resources...).
+	if !o.local {
+		builder.ResourceTypeOrNameArgs(o.all, resources...).
 			Latest()
-	} else {
-		builder = builder.Local(f.ClientForMapping)
 	}
-	saConfig.infos, err = builder.Do().Infos()
+	o.infos, err = builder.Do().Infos()
 	if err != nil {
 		return err
 	}
@@ -145,43 +170,47 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 }
 
 // Run creates and applies the patch either locally or calling apiserver.
-func (saConfig *serviceAccountConfig) Run() error {
+func (o *SetServiceAccountOptions) Run() error {
 	patchErrs := []error{}
-	patchFn := func(info *resource.Info) ([]byte, error) {
-		saConfig.updatePodSpecForObject(info.Object, func(podSpec *api.PodSpec) error {
-			podSpec.ServiceAccountName = saConfig.serviceAccountName
+	patchFn := func(obj runtime.Object) ([]byte, error) {
+		_, err := o.updatePodSpecForObject(obj, func(podSpec *v1.PodSpec) error {
+			podSpec.ServiceAccountName = o.serviceAccountName
 			return nil
 		})
-		return runtime.Encode(saConfig.encoder, info.Object)
+		if err != nil {
+			return nil, err
+		}
+		// record this change (for rollout history)
+		if err := o.Recorder.Record(obj); err != nil {
+			klog.V(4).Infof("error recording current command: %v", err)
+		}
+
+		return runtime.Encode(scheme.DefaultJSONEncoder(), obj)
 	}
-	patches := CalculatePatches(saConfig.infos, saConfig.encoder, patchFn)
+
+	patches := CalculatePatches(o.infos, scheme.DefaultJSONEncoder(), patchFn)
 	for _, patch := range patches {
 		info := patch.Info
+		name := info.ObjectName()
 		if patch.Err != nil {
-			patchErrs = append(patchErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			patchErrs = append(patchErrs, fmt.Errorf("error: %s %v\n", name, patch.Err))
 			continue
 		}
-		if saConfig.local || saConfig.dryRun {
-			saConfig.saPrint(patch.Info.Object)
+		if o.local || o.dryRun {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
+				patchErrs = append(patchErrs, err)
+			}
 			continue
 		}
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			patchErrs = append(patchErrs, fmt.Errorf("failed to patch ServiceAccountName %v", err))
 			continue
 		}
-		info.Refresh(patched, true)
-		if saConfig.record || cmdutil.ContainsChangeCause(info) {
-			if patch, patchType, err := cmdutil.ChangeResourcePatch(info, saConfig.changeCause); err == nil {
-				if patched, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch); err != nil {
-					fmt.Fprintf(saConfig.err, "WARNING: changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
-				}
-			}
+
+		if err := o.PrintObj(actual, o.Out); err != nil {
+			patchErrs = append(patchErrs, err)
 		}
-		if len(saConfig.output) > 0 {
-			saConfig.saPrint(patched)
-		}
-		cmdutil.PrintSuccess(saConfig.mapper, saConfig.shortOutput, saConfig.out, info.Mapping.Resource, info.Name, saConfig.dryRun, "serviceaccount updated")
 	}
 	return utilerrors.NewAggregate(patchErrs)
 }

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -48,10 +48,9 @@ EOF
 # Store FLANNEL_NET to etcd.
 attempt=0
 while true; do
-  /opt/kubernetes/bin/etcdctl --ca-file ${CA_FILE} --cert-file ${CERT_FILE} --key-file ${KEY_FILE} \
-    --no-sync -C ${ETCD_SERVERS} \
-    get /coreos.com/network/config >/dev/null 2>&1
-  if [[ "$?" == 0 ]]; then
+  if /opt/kubernetes/bin/etcdctl --ca-file ${CA_FILE} --cert-file ${CERT_FILE} --key-file ${KEY_FILE} \
+    --no-sync -C "${ETCD_SERVERS}" \
+    get /coreos.com/network/config >/dev/null 2>&1; then
     break
   else
     if (( attempt > 600 )); then
@@ -60,7 +59,7 @@ while true; do
     fi
 
     /opt/kubernetes/bin/etcdctl --ca-file ${CA_FILE} --cert-file ${CERT_FILE} --key-file ${KEY_FILE} \
-      --no-sync -C ${ETCD_SERVERS} \
+      --no-sync -C "${ETCD_SERVERS}" \
       mk /coreos.com/network/config "{\"Network\":\"${FLANNEL_NET}\"}" >/dev/null 2>&1
     attempt=$((attempt+1))
     sleep 3

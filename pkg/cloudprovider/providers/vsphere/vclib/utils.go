@@ -22,10 +22,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
+	"k8s.io/klog"
 )
 
 // IsNotFound return true if err is NotFoundError or DefaultNotFoundError
@@ -44,7 +46,7 @@ func IsNotFound(err error) bool {
 }
 
 func getFinder(dc *Datacenter) *find.Finder {
-	finder := find.NewFinder(dc.Client(), true)
+	finder := find.NewFinder(dc.Client(), false)
 	finder.SetDatacenter(dc.Datacenter)
 	return finder
 }
@@ -121,10 +123,10 @@ func getSCSIControllers(vmDevices object.VirtualDeviceList) []*types.VirtualCont
 	return scsiControllers
 }
 
-// RemoveClusterFromVDiskPath removes the cluster or folder path from the vDiskPath
+// RemoveStorageClusterORFolderNameFromVDiskPath removes the cluster or folder path from the vDiskPath
 // for vDiskPath [DatastoreCluster/sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk, return value is [sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk
 // for vDiskPath [sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk, return value remains same [sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk
-func RemoveClusterFromVDiskPath(vDiskPath string) string {
+func RemoveStorageClusterORFolderNameFromVDiskPath(vDiskPath string) string {
 	datastore := regexp.MustCompile("\\[(.*?)\\]").FindStringSubmatch(vDiskPath)[1]
 	if filepath.Base(datastore) != datastore {
 		vDiskPath = strings.Replace(vDiskPath, datastore, filepath.Base(datastore), 1)
@@ -138,22 +140,10 @@ func GetPathFromVMDiskPath(vmDiskPath string) string {
 	datastorePathObj := new(object.DatastorePath)
 	isSuccess := datastorePathObj.FromString(vmDiskPath)
 	if !isSuccess {
-		glog.Errorf("Failed to parse vmDiskPath: %s", vmDiskPath)
+		klog.Errorf("Failed to parse vmDiskPath: %s", vmDiskPath)
 		return ""
 	}
 	return datastorePathObj.Path
-}
-
-// GetDatastoreFromVMDiskPath retrieves the path from VM Disk Path.
-// Example: For vmDiskPath - [vsanDatastore] kubevols/volume.vmdk, the path is vsanDatastore
-func GetDatastoreFromVMDiskPath(vmDiskPath string) string {
-	datastorePathObj := new(object.DatastorePath)
-	isSuccess := datastorePathObj.FromString(vmDiskPath)
-	if !isSuccess {
-		glog.Errorf("Failed to parse vmDiskPath: %s", vmDiskPath)
-		return ""
-	}
-	return datastorePathObj.Datastore
 }
 
 //GetDatastorePathObjFromVMDiskPath gets the datastorePathObj from VM disk path.
@@ -161,7 +151,7 @@ func GetDatastorePathObjFromVMDiskPath(vmDiskPath string) (*object.DatastorePath
 	datastorePathObj := new(object.DatastorePath)
 	isSuccess := datastorePathObj.FromString(vmDiskPath)
 	if !isSuccess {
-		glog.Errorf("Failed to parse volPath: %s", vmDiskPath)
+		klog.Errorf("Failed to parse volPath: %s", vmDiskPath)
 		return nil, fmt.Errorf("Failed to parse volPath: %s", vmDiskPath)
 	}
 	return datastorePathObj, nil
@@ -171,4 +161,50 @@ func GetDatastorePathObjFromVMDiskPath(vmDiskPath string) (*object.DatastorePath
 func IsValidUUID(uuid string) bool {
 	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 	return r.MatchString(uuid)
+}
+
+// IsManagedObjectNotFoundError returns true if error is of type ManagedObjectNotFound
+func IsManagedObjectNotFoundError(err error) bool {
+	isManagedObjectNotFoundError := false
+	if soap.IsSoapFault(err) {
+		_, isManagedObjectNotFoundError = soap.ToSoapFault(err).VimFault().(types.ManagedObjectNotFound)
+	}
+	return isManagedObjectNotFoundError
+}
+
+// IsInvalidCredentialsError returns true if error is of type InvalidLogin
+func IsInvalidCredentialsError(err error) bool {
+	isInvalidCredentialsError := false
+	if soap.IsSoapFault(err) {
+		_, isInvalidCredentialsError = soap.ToSoapFault(err).VimFault().(types.InvalidLogin)
+	}
+	return isInvalidCredentialsError
+}
+
+// VerifyVolumePathsForVM verifies if the volume paths (volPaths) are attached to VM.
+func VerifyVolumePathsForVM(vmMo mo.VirtualMachine, volPaths []string, nodeName string, nodeVolumeMap map[string]map[string]bool) {
+	// Verify if the volume paths are present on the VM backing virtual disk devices
+	vmDevices := object.VirtualDeviceList(vmMo.Config.Hardware.Device)
+	VerifyVolumePathsForVMDevices(vmDevices, volPaths, nodeName, nodeVolumeMap)
+
+}
+
+// VerifyVolumePathsForVMDevices verifies if the volume paths (volPaths) are attached to VM.
+func VerifyVolumePathsForVMDevices(vmDevices object.VirtualDeviceList, volPaths []string, nodeName string, nodeVolumeMap map[string]map[string]bool) {
+	volPathsMap := make(map[string]bool)
+	for _, volPath := range volPaths {
+		volPathsMap[volPath] = true
+	}
+	// Verify if the volume paths are present on the VM backing virtual disk devices
+	for _, device := range vmDevices {
+		if vmDevices.TypeName(device) == "VirtualDisk" {
+			virtualDevice := device.GetVirtualDevice()
+			if backing, ok := virtualDevice.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
+				if volPathsMap[backing.FileName] {
+					setNodeVolumeMap(nodeVolumeMap, backing.FileName, nodeName, true)
+				}
+			}
+		}
+	}
+
 }

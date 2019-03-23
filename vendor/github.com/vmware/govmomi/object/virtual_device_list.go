@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015 VMware, Inc. All Rights Reserved.
+Copyright (c) 2015-2017 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 
 // Type values for use in BootOrder
 const (
+	DeviceTypeNone     = "-"
 	DeviceTypeCdrom    = "cdrom"
 	DeviceTypeDisk     = "disk"
 	DeviceTypeEthernet = "ethernet"
@@ -60,7 +61,10 @@ func EthernetCardTypes() VirtualDeviceList {
 	return VirtualDeviceList([]types.BaseVirtualDevice{
 		&types.VirtualE1000{},
 		&types.VirtualE1000e{},
+		&types.VirtualVmxnet2{},
 		&types.VirtualVmxnet3{},
+		&types.VirtualPCNet32{},
+		&types.VirtualSriovEthernetCard{},
 	}).Select(func(device types.BaseVirtualDevice) bool {
 		c := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
 		c.GetVirtualDevice().Key = -1
@@ -754,6 +758,9 @@ func (l VirtualDeviceList) PrimaryMacAddress() string {
 
 // convert a BaseVirtualDevice to a BaseVirtualMachineBootOptionsBootableDevice
 var bootableDevices = map[string]func(device types.BaseVirtualDevice) types.BaseVirtualMachineBootOptionsBootableDevice{
+	DeviceTypeNone: func(types.BaseVirtualDevice) types.BaseVirtualMachineBootOptionsBootableDevice {
+		return &types.VirtualMachineBootOptionsBootableDevice{}
+	},
 	DeviceTypeCdrom: func(types.BaseVirtualDevice) types.BaseVirtualMachineBootOptionsBootableDevice {
 		return &types.VirtualMachineBootOptionsBootableCdromDevice{}
 	},
@@ -773,17 +780,23 @@ var bootableDevices = map[string]func(device types.BaseVirtualDevice) types.Base
 }
 
 // BootOrder returns a list of devices which can be used to set boot order via VirtualMachine.SetBootOptions.
-// The order can any of "ethernet", "cdrom", "floppy" or "disk" or by specific device name.
+// The order can be any of "ethernet", "cdrom", "floppy" or "disk" or by specific device name.
+// A value of "-" will clear the existing boot order on the VC/ESX side.
 func (l VirtualDeviceList) BootOrder(order []string) []types.BaseVirtualMachineBootOptionsBootableDevice {
 	var devices []types.BaseVirtualMachineBootOptionsBootableDevice
 
 	for _, name := range order {
 		if kind, ok := bootableDevices[name]; ok {
+			if name == DeviceTypeNone {
+				// Not covered in the API docs, nor obvious, but this clears the boot order on the VC/ESX side.
+				devices = append(devices, new(types.VirtualMachineBootOptionsBootableDevice))
+				continue
+			}
+
 			for _, device := range l {
 				if l.Type(device) == name {
 					devices = append(devices, kind(device))
 				}
-
 			}
 			continue
 		}
@@ -824,7 +837,7 @@ func (l VirtualDeviceList) TypeName(device types.BaseVirtualDevice) string {
 	return dtype.Elem().Name()
 }
 
-var deviceNameRegexp = regexp.MustCompile(`(?:Virtual)?(?:Machine)?(\w+?)(?:Card|Device|Controller)?$`)
+var deviceNameRegexp = regexp.MustCompile(`(?:Virtual)?(?:Machine)?(\w+?)(?:Card|EthernetCard|Device|Controller)?$`)
 
 func (l VirtualDeviceList) deviceName(device types.BaseVirtualDevice) string {
 	name := "device"

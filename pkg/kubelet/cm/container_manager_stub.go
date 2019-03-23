@@ -17,21 +17,27 @@ limitations under the License.
 package cm
 
 import (
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/klog"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 type containerManagerStub struct{}
 
 var _ ContainerManager = &containerManagerStub{}
 
-func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
-	glog.V(2).Infof("Starting stub container manager")
+func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
+	klog.V(2).Infof("Starting stub container manager")
 	return nil
 }
 
@@ -64,19 +70,44 @@ func (cm *containerManagerStub) GetNodeAllocatableReservation() v1.ResourceList 
 }
 
 func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
+	c := v1.ResourceList{
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(
+			int64(0),
+			resource.BinarySI),
+	}
+	return c
+}
+
+func (cm *containerManagerStub) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
 	return nil
+}
+
+func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
+	return nil, nil, []string{}
 }
 
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerStub{}
 }
 
-func (cm *containerManagerStub) GetResources(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) (*kubecontainer.RunContainerOptions, error) {
+func (cm *containerManagerStub) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	return &kubecontainer.RunContainerOptions{}, nil
+}
+
+func (cm *containerManagerStub) UpdatePluginResources(*schedulernodeinfo.NodeInfo, *lifecycle.PodAdmitAttributes) error {
+	return nil
 }
 
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
 	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager()}
+}
+
+func (cm *containerManagerStub) GetPodCgroupRoot() string {
+	return ""
+}
+
+func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
+	return nil
 }
 
 func NewStubContainerManager() ContainerManager {

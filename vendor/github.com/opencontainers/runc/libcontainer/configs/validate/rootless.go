@@ -2,30 +2,18 @@ package validate
 
 import (
 	"fmt"
-	"os"
-	"reflect"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-var (
-	geteuid = os.Geteuid
-	getegid = os.Getegid
-)
-
-func (v *ConfigValidator) rootless(config *configs.Config) error {
-	if err := rootlessMappings(config); err != nil {
+// rootlessEUID makes sure that the config can be applied when runc
+// is being executed as a non-root user (euid != 0) in the current user namespace.
+func (v *ConfigValidator) rootlessEUID(config *configs.Config) error {
+	if err := rootlessEUIDMappings(config); err != nil {
 		return err
 	}
-	if err := rootlessMount(config); err != nil {
-		return err
-	}
-	// Currently, cgroups cannot effectively be used in rootless containers.
-	// The new cgroup namespace doesn't really help us either because it doesn't
-	// have nice interactions with the user namespace (we're working with upstream
-	// to fix this).
-	if err := rootlessCgroup(config); err != nil {
+	if err := rootlessEUIDMount(config); err != nil {
 		return err
 	}
 
@@ -36,66 +24,33 @@ func (v *ConfigValidator) rootless(config *configs.Config) error {
 	return nil
 }
 
-func rootlessMappings(config *configs.Config) error {
-	rootuid, err := config.HostRootUID()
-	if err != nil {
-		return fmt.Errorf("failed to get root uid from uidMappings: %v", err)
-	}
-	if euid := geteuid(); euid != 0 {
-		if !config.Namespaces.Contains(configs.NEWUSER) {
-			return fmt.Errorf("rootless containers require user namespaces")
-		}
-		if rootuid != euid {
-			return fmt.Errorf("rootless containers cannot map container root to a different host user")
+func hasIDMapping(id int, mappings []configs.IDMap) bool {
+	for _, m := range mappings {
+		if id >= m.ContainerID && id < m.ContainerID+m.Size {
+			return true
 		}
 	}
-
-	rootgid, err := config.HostRootGID()
-	if err != nil {
-		return fmt.Errorf("failed to get root gid from gidMappings: %v", err)
-	}
-
-	// Similar to the above test, we need to make sure that we aren't trying to
-	// map to a group ID that we don't have the right to be.
-	if rootgid != getegid() {
-		return fmt.Errorf("rootless containers cannot map container root to a different host group")
-	}
-
-	// We can only map one user and group inside a container (our own).
-	if len(config.UidMappings) != 1 || config.UidMappings[0].Size != 1 {
-		return fmt.Errorf("rootless containers cannot map more than one user")
-	}
-	if len(config.GidMappings) != 1 || config.GidMappings[0].Size != 1 {
-		return fmt.Errorf("rootless containers cannot map more than one group")
-	}
-
-	return nil
+	return false
 }
 
-// cgroup verifies that the user isn't trying to set any cgroup limits or paths.
-func rootlessCgroup(config *configs.Config) error {
-	// Nothing set at all.
-	if config.Cgroups == nil || config.Cgroups.Resources == nil {
-		return nil
+func rootlessEUIDMappings(config *configs.Config) error {
+	if !config.Namespaces.Contains(configs.NEWUSER) {
+		return fmt.Errorf("rootless container requires user namespaces")
 	}
 
-	// Used for comparing to the zero value.
-	left := reflect.ValueOf(*config.Cgroups.Resources)
-	right := reflect.Zero(left.Type())
-
-	// This is all we need to do, since specconv won't add cgroup options in
-	// rootless mode.
-	if !reflect.DeepEqual(left.Interface(), right.Interface()) {
-		return fmt.Errorf("cannot specify resource limits in rootless container")
+	if len(config.UidMappings) == 0 {
+		return fmt.Errorf("rootless containers requires at least one UID mapping")
 	}
-
+	if len(config.GidMappings) == 0 {
+		return fmt.Errorf("rootless containers requires at least one GID mapping")
+	}
 	return nil
 }
 
 // mount verifies that the user isn't trying to set up any mounts they don't have
 // the rights to do. In addition, it makes sure that no mount has a `uid=` or
 // `gid=` option that doesn't resolve to root.
-func rootlessMount(config *configs.Config) error {
+func rootlessEUIDMount(config *configs.Config) error {
 	// XXX: We could whitelist allowed devices at this point, but I'm not
 	//      convinced that's a good idea. The kernel is the best arbiter of
 	//      access control.
@@ -104,11 +59,28 @@ func rootlessMount(config *configs.Config) error {
 		// Check that the options list doesn't contain any uid= or gid= entries
 		// that don't resolve to root.
 		for _, opt := range strings.Split(mount.Data, ",") {
-			if strings.HasPrefix(opt, "uid=") && opt != "uid=0" {
-				return fmt.Errorf("cannot specify uid= mount options in rootless containers where argument isn't 0")
+			if strings.HasPrefix(opt, "uid=") {
+				var uid int
+				n, err := fmt.Sscanf(opt, "uid=%d", &uid)
+				if n != 1 || err != nil {
+					// Ignore unknown mount options.
+					continue
+				}
+				if !hasIDMapping(uid, config.UidMappings) {
+					return fmt.Errorf("cannot specify uid= mount options for unmapped uid in rootless containers")
+				}
 			}
-			if strings.HasPrefix(opt, "gid=") && opt != "gid=0" {
-				return fmt.Errorf("cannot specify gid= mount options in rootless containers where argument isn't 0")
+
+			if strings.HasPrefix(opt, "gid=") {
+				var gid int
+				n, err := fmt.Sscanf(opt, "gid=%d", &gid)
+				if n != 1 || err != nil {
+					// Ignore unknown mount options.
+					continue
+				}
+				if !hasIDMapping(gid, config.GidMappings) {
+					return fmt.Errorf("cannot specify gid= mount options for unmapped gid in rootless containers")
+				}
 			}
 		}
 	}

@@ -1,10 +1,13 @@
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: cockroachdb
 spec:
   serviceName: "cockroachdb"
   replicas: 3
+  selector:
+    matchLabels:
+      app: cockroachdb
   template:
     metadata:
       labels:
@@ -92,8 +95,6 @@ spec:
   volumeClaimTemplates:
   - metadata:
       name: datadir
-      annotations:
-        volume.alpha.kubernetes.io/storage-class: anything
     spec:
       accessModes:
         - "ReadWriteOnce"

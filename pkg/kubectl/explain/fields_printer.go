@@ -16,9 +16,7 @@ limitations under the License.
 
 package explain
 
-import (
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-)
+import "k8s.io/kube-openapi/pkg/util/proto"
 
 // indentDesc is the level of indentation for descriptions.
 const indentDesc = 2
@@ -29,17 +27,17 @@ type regularFieldsPrinter struct {
 	Error  error
 }
 
-var _ openapi.SchemaVisitor = &regularFieldsPrinter{}
+var _ proto.SchemaVisitor = &regularFieldsPrinter{}
 var _ fieldsPrinter = &regularFieldsPrinter{}
 
 // VisitArray prints a Array type. It is just a passthrough.
-func (f *regularFieldsPrinter) VisitArray(a *openapi.Array) {
+func (f *regularFieldsPrinter) VisitArray(a *proto.Array) {
 	a.SubType.Accept(f)
 }
 
 // VisitKind prints a Kind type. It prints each key in the kind, with
 // the type, the required flag, and the description.
-func (f *regularFieldsPrinter) VisitKind(k *openapi.Kind) {
+func (f *regularFieldsPrinter) VisitKind(k *proto.Kind) {
 	for _, key := range k.Keys() {
 		v := k.Fields[key]
 		required := ""
@@ -63,22 +61,22 @@ func (f *regularFieldsPrinter) VisitKind(k *openapi.Kind) {
 }
 
 // VisitMap prints a Map type. It is just a passthrough.
-func (f *regularFieldsPrinter) VisitMap(m *openapi.Map) {
+func (f *regularFieldsPrinter) VisitMap(m *proto.Map) {
 	m.SubType.Accept(f)
 }
 
 // VisitPrimitive prints a Primitive type. It stops the recursion.
-func (f *regularFieldsPrinter) VisitPrimitive(p *openapi.Primitive) {
+func (f *regularFieldsPrinter) VisitPrimitive(p *proto.Primitive) {
 	// Nothing to do. Shouldn't really happen.
 }
 
 // VisitReference prints a Reference type. It is just a passthrough.
-func (f *regularFieldsPrinter) VisitReference(r openapi.Reference) {
+func (f *regularFieldsPrinter) VisitReference(r proto.Reference) {
 	r.SubSchema().Accept(f)
 }
 
 // PrintFields will write the types from schema.
-func (f *regularFieldsPrinter) PrintFields(schema openapi.Schema) error {
+func (f *regularFieldsPrinter) PrintFields(schema proto.Schema) error {
 	schema.Accept(f)
 	return f.Error
 }

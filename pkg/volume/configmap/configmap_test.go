@@ -31,7 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -52,6 +52,38 @@ func TestMakePayload(t *testing.T) {
 			configMap: &v1.ConfigMap{
 				Data: map[string]string{
 					"foo": "foo",
+					"bar": "bar",
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644},
+				"bar": {Data: []byte("bar"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
+			name: "no overrides binary data",
+			configMap: &v1.ConfigMap{
+				BinaryData: map[string][]byte{
+					"foo": []byte("foo"),
+					"bar": []byte("bar"),
+				},
+			},
+			mode: 0644,
+			payload: map[string]util.FileProjection{
+				"foo": {Data: []byte("foo"), Mode: 0644},
+				"bar": {Data: []byte("bar"), Mode: 0644},
+			},
+			success: true,
+		},
+		{
+			name: "no overrides mixed data",
+			configMap: &v1.ConfigMap{
+				BinaryData: map[string][]byte{
+					"foo": []byte("foo"),
+				},
+				Data: map[string]string{
 					"bar": "bar",
 				},
 			},
@@ -265,7 +297,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, emptydir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -466,13 +498,35 @@ func TestPluginOptional(t *testing.T) {
 		}
 	}
 
+	datadirSymlink := path.Join(volumePath, "..data")
+	datadir, err := os.Readlink(datadirSymlink)
+	if err != nil && os.IsNotExist(err) {
+		t.Fatalf("couldn't find volume path's data dir, %s", datadirSymlink)
+	} else if err != nil {
+		t.Fatalf("couldn't read symlink, %s", datadirSymlink)
+	}
+	datadirPath := path.Join(volumePath, datadir)
+
 	infos, err := ioutil.ReadDir(volumePath)
 	if err != nil {
 		t.Fatalf("couldn't find volume path, %s", volumePath)
 	}
 	if len(infos) != 0 {
-		t.Errorf("empty directory, %s, not found", volumePath)
+		for _, fi := range infos {
+			if fi.Name() != "..data" && fi.Name() != datadir {
+				t.Errorf("empty data directory, %s, is not empty. Contains: %s", datadirSymlink, fi.Name())
+			}
+		}
 	}
+
+	infos, err = ioutil.ReadDir(datadirPath)
+	if err != nil {
+		t.Fatalf("couldn't find volume data path, %s", datadirPath)
+	}
+	if len(infos) != 0 {
+		t.Errorf("empty data directory, %s, is not empty. Contains: %s", datadirSymlink, infos[0].Name())
+	}
+
 	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
 }
 
@@ -559,6 +613,66 @@ func volumeSpec(volumeName, configMapName string, defaultMode int32) *v1.Volume 
 	}
 }
 
+func TestInvalidConfigMapSetup(t *testing.T) {
+	var (
+		testPodUID     = types.UID("test_pod_uid")
+		testVolumeName = "test_volume_name"
+		testNamespace  = "test_configmap_namespace"
+		testName       = "test_configmap_name"
+
+		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
+		configMap     = configMap(testNamespace, testName)
+		client        = fake.NewSimpleClientset(&configMap)
+		pluginMgr     = volume.VolumePluginMgr{}
+		tempDir, host = newTestHost(t, client)
+	)
+	volumeSpec.VolumeSource.ConfigMap.Items = []v1.KeyToPath{
+		{Key: "missing", Path: "missing"},
+	}
+
+	defer os.RemoveAll(tempDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+
+	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
+	}
+
+	vName, err := plugin.GetVolumeName(volume.NewSpecFromVolume(volumeSpec))
+	if err != nil {
+		t.Errorf("Failed to GetVolumeName: %v", err)
+	}
+	if vName != "test_volume_name/test_configmap_name" {
+		t.Errorf("Got unexpect VolumeName %v", vName)
+	}
+
+	volumePath := mounter.GetPath()
+	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~configmap/test_volume_name")) {
+		t.Errorf("Got unexpected path: %s", volumePath)
+	}
+
+	fsGroup := int64(1001)
+	err = mounter.SetUp(&fsGroup)
+	if err == nil {
+		t.Errorf("Expected setup to fail")
+	}
+	_, err = os.Stat(volumePath)
+	if err == nil {
+		t.Errorf("Expected %s to not exist", volumePath)
+	}
+
+	doTestCleanAndTeardown(plugin, testPodUID, testVolumeName, volumePath, t)
+}
+
 func configMap(namespace, name string) v1.ConfigMap {
 	return v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -606,6 +720,6 @@ func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVo
 	if _, err := os.Stat(volumePath); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", volumePath)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 }

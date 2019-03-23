@@ -22,24 +22,20 @@ import (
 	"strings"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon"
-	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -57,6 +53,10 @@ const (
 	daemonsetColorLabel  = daemonsetLabelPrefix + "color"
 )
 
+// The annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
+// node selectors labels to namespaces
+var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
+
 // This test must be run in serial because it assumes the Daemon Set pods will
 // always get scheduled.  If we run other tests in parallel, this may not
 // happen.  In the future, running in parallel may work if we have an eviction
@@ -67,26 +67,23 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 	AfterEach(func() {
 		// Clean up
-		daemonsets, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).List(metav1.ListOptions{})
+		daemonsets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred(), "unable to dump DaemonSets")
 		if daemonsets != nil && len(daemonsets.Items) > 0 {
 			for _, ds := range daemonsets.Items {
-				By(fmt.Sprintf("Deleting DaemonSet %q with reaper", ds.Name))
-				dsReaper, err := kubectl.ReaperFor(extensionsinternal.Kind("DaemonSet"), f.InternalClientset)
-				Expect(err).NotTo(HaveOccurred())
-				err = dsReaper.Stop(f.Namespace.Name, ds.Name, 0, nil)
-				Expect(err).NotTo(HaveOccurred())
+				By(fmt.Sprintf("Deleting DaemonSet %q", ds.Name))
+				framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, extensionsinternal.Kind("DaemonSet"), f.Namespace.Name, ds.Name))
 				err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, &ds))
 				Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to be reaped")
 			}
 		}
-		if daemonsets, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
-			framework.Logf("daemonset: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), daemonsets))
+		if daemonsets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
+			framework.Logf("daemonset: %s", runtime.EncodeOrDie(legacyscheme.Codecs.LegacyCodec(legacyscheme.Scheme.PrioritizedVersionsAllGroups()...), daemonsets))
 		} else {
 			framework.Logf("unable to dump daemonsets: %v", err)
 		}
-		if pods, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
-			framework.Logf("pods: %s", runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), pods))
+		if pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
+			framework.Logf("pods: %s", runtime.EncodeOrDie(legacyscheme.Codecs.LegacyCodec(legacyscheme.Scheme.PrioritizedVersionsAllGroups()...), pods))
 		} else {
 			framework.Logf("unable to dump pods: %v", err)
 		}
@@ -96,7 +93,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 	f = framework.NewDefaultFramework("daemonsets")
 
-	image := framework.ServeHostnameImage
+	image := NginxImage
 	dsName := "daemon-set"
 
 	var ns string
@@ -106,15 +103,26 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		ns = f.Namespace.Name
 
 		c = f.ClientSet
-		err := clearDaemonSetNodeLabels(c)
+
+		updatedNS, err := updateNamespaceAnnotations(c, ns)
+		Expect(err).NotTo(HaveOccurred())
+
+		ns = updatedNS.Name
+
+		err = clearDaemonSetNodeLabels(c)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should run and stop simple daemon", func() {
+	/*
+	  Testname: DaemonSet-Creation
+	  Description: A conformant Kubernetes distribution MUST support the creation of DaemonSets. When a DaemonSet
+	  Pod is deleted, the DaemonSet controller MUST create a replacement Pod.
+	*/
+	framework.ConformanceIt("should run and stop simple daemon", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
-		ds, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
+		ds, err := c.AppsV1().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods launch on every node of the cluster.")
@@ -126,19 +134,24 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		By("Stop a daemon pod, check that the daemon pod is revived.")
 		podList := listDaemonPods(c, ns, label)
 		pod := podList.Items[0]
-		err = c.Core().Pods(ns).Delete(pod.Name, nil)
+		err = c.CoreV1().Pods(ns).Delete(pod.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
 	})
 
-	It("should run and stop complex daemon", func() {
+	/*
+	  Testname: DaemonSet-NodeSelection
+	  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod node selection via label
+	  selectors.
+	*/
+	framework.ConformanceIt("should run and stop complex daemon", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		framework.Logf("Creating daemon %q with a node selector", dsName)
 		ds := newDaemonSet(dsName, image, complexLabel)
 		ds.Spec.Template.Spec.NodeSelector = nodeSelector
-		ds, err := c.Extensions().DaemonSets(ns).Create(ds)
+		ds, err := c.AppsV1().DaemonSets(ns).Create(ds)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Initially, daemon pods should not be running on any nodes.")
@@ -167,7 +180,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		By("Update DaemonSet node selector to green, and change its update strategy to RollingUpdate")
 		patch := fmt.Sprintf(`{"spec":{"template":{"spec":{"nodeSelector":{"%s":"%s"}}},"updateStrategy":{"type":"RollingUpdate"}}}`,
 			daemonsetColorLabel, greenNode.Labels[daemonsetColorLabel])
-		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
+		ds, err = c.AppsV1().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred(), "error patching daemon set")
 		daemonSetLabels, _ = separateDaemonSetNodeLabels(greenNode.Labels)
 		Expect(len(daemonSetLabels)).To(Equal(1))
@@ -177,6 +190,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	// We defer adding this test to conformance pending the disposition of moving DaemonSet scheduling logic to the
+	// default scheduler.
 	It("should run and stop complex daemon with node affinity", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
@@ -199,7 +214,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 				},
 			},
 		}
-		ds, err := c.Extensions().DaemonSets(ns).Create(ds)
+		ds, err := c.AppsV1().DaemonSets(ns).Create(ds)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Initially, daemon pods should not be running on any nodes.")
@@ -225,11 +240,15 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 			NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
 	})
 
-	It("should retry creating failed daemon pods", func() {
+	/*
+	  Testname: DaemonSet-FailedPodCreation
+	  Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
+	*/
+	framework.ConformanceIt("should retry creating failed daemon pods", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		By(fmt.Sprintf("Creating a simple DaemonSet %q", dsName))
-		ds, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
+		ds, err := c.AppsV1().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods launch on every node of the cluster.")
@@ -243,105 +262,103 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		pod := podList.Items[0]
 		pod.ResourceVersion = ""
 		pod.Status.Phase = v1.PodFailed
-		_, err = c.Core().Pods(ns).UpdateStatus(&pod)
+		_, err = c.CoreV1().Pods(ns).UpdateStatus(&pod)
 		Expect(err).NotTo(HaveOccurred(), "error failing a daemon pod")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
+
+		By("Wait for the failed daemon pod to be completely deleted.")
+		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, waitFailedDaemonPodDeleted(c, &pod))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for the failed daemon pod to be completely deleted")
 	})
 
-	It("Should not update pod when spec was updated and update strategy is OnDelete", func() {
+	// This test should not be added to conformance. We will consider deprecating OnDelete when the
+	// extensions/v1beta1 and apps/v1beta1 are removed.
+	It("should not update pod when spec was updated and update strategy is OnDelete", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating simple daemon set %s", dsName)
-		ds, err := c.Extensions().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
+		ds := newDaemonSet(dsName, image, label)
+		ds.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{Type: apps.OnDeleteDaemonSetStrategyType}
+		ds, err := c.AppsV1().DaemonSets(ns).Create(ds)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ds.Spec.TemplateGeneration).To(Equal(int64(1)))
 
 		By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 
-		By("Make sure all daemon pods have correct template generation 1")
-		templateGeneration := "1"
-		err = checkDaemonPodsTemplateGeneration(c, ns, label, "1")
-		Expect(err).NotTo(HaveOccurred())
-
 		// Check history and labels
-		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
+		ds, err = c.AppsV1().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 1)
 		first := curHistory(listDaemonHistories(c, ns, label), ds)
-		firstHash := first.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+		firstHash := first.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 		Expect(first.Revision).To(Equal(int64(1)))
-		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash, templateGeneration)
+		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash)
 
 		By("Update daemon pods image.")
 		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, RedisImage)
-		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
+		ds, err = c.AppsV1().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ds.Spec.TemplateGeneration).To(Equal(int64(2)))
 
 		By("Check that daemon pods images aren't updated.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImageAndAvailability(c, ds, image, 0))
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Make sure all daemon pods have correct template generation 1")
-		err = checkDaemonPodsTemplateGeneration(c, ns, label, templateGeneration)
-		Expect(err).NotTo(HaveOccurred())
-
 		By("Check that daemon pods are still running on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 
 		// Check history and labels
-		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
+		ds, err = c.AppsV1().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 2)
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
 		Expect(cur.Revision).To(Equal(int64(2)))
-		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).NotTo(Equal(firstHash))
-		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash, templateGeneration)
+		Expect(cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]).NotTo(Equal(firstHash))
+		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash)
 	})
 
-	It("Should update pod when spec was updated and update strategy is RollingUpdate", func() {
+	/*
+	  Testname: DaemonSet-RollingUpdate
+	  Description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
+	*/
+	framework.ConformanceIt("should update pod when spec was updated and update strategy is RollingUpdate", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
-		templateGeneration := int64(999)
-		framework.Logf("Creating simple daemon set %s with templateGeneration %d", dsName, templateGeneration)
+		framework.Logf("Creating simple daemon set %s", dsName)
 		ds := newDaemonSet(dsName, image, label)
-		ds.Spec.TemplateGeneration = templateGeneration
-		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
-		ds, err := c.Extensions().DaemonSets(ns).Create(ds)
+		ds.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{Type: apps.RollingUpdateDaemonSetStrategyType}
+		ds, err := c.AppsV1().DaemonSets(ns).Create(ds)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration))
 
 		By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 
-		By(fmt.Sprintf("Make sure all daemon pods have correct template generation %d", templateGeneration))
-		err = checkDaemonPodsTemplateGeneration(c, ns, label, fmt.Sprint(templateGeneration))
-		Expect(err).NotTo(HaveOccurred())
-
 		// Check history and labels
-		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
+		ds, err = c.AppsV1().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 1)
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
-		hash := cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+		hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Revision).To(Equal(int64(1)))
-		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash, fmt.Sprint(templateGeneration))
+		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash)
 
 		By("Update daemon pods image.")
 		patch := getDaemonSetImagePatch(ds.Spec.Template.Spec.Containers[0].Name, RedisImage)
-		ds, err = c.Extensions().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
+		ds, err = c.AppsV1().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
 		Expect(err).NotTo(HaveOccurred())
-		templateGeneration++
-		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration))
+
+		// Time to complete the rolling upgrade is proportional to the number of nodes in the cluster.
+		// Get the number of nodes, and set the timeout appropriately.
+		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		nodeCount := len(nodes.Items)
+		retryTimeout := dsRetryTimeout + time.Duration(nodeCount*30)*time.Second
 
 		By("Check that daemon pods images are updated.")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodsImageAndAvailability(c, ds, RedisImage, 1))
-		Expect(err).NotTo(HaveOccurred())
-
-		By(fmt.Sprintf("Make sure all daemon pods have correct template generation %d", templateGeneration))
-		err = checkDaemonPodsTemplateGeneration(c, ns, label, fmt.Sprint(templateGeneration))
+		err = wait.PollImmediate(dsRetryPeriod, retryTimeout, checkDaemonPodsImageAndAvailability(c, ds, RedisImage, 1))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods are still running on every node of the cluster.")
@@ -349,100 +366,28 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
 
 		// Check history and labels
-		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
+		ds, err = c.AppsV1().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 2)
 		cur = curHistory(listDaemonHistories(c, ns, label), ds)
-		hash = cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
+		hash = cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Revision).To(Equal(int64(2)))
-		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash, fmt.Sprint(templateGeneration))
+		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash)
 	})
 
-	It("Should adopt existing pods when creating a RollingUpdate DaemonSet regardless of templateGeneration", func() {
-		label := map[string]string{daemonsetNameLabel: dsName}
-
-		// 1. Create a RollingUpdate DaemonSet
-		templateGeneration := int64(999)
-		framework.Logf("Creating simple RollingUpdate DaemonSet %s with templateGeneration %d", dsName, templateGeneration)
-		ds := newDaemonSet(dsName, image, label)
-		ds.Spec.TemplateGeneration = templateGeneration
-		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
-		ds, err := c.Extensions().DaemonSets(ns).Create(ds)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(ds.Spec.TemplateGeneration).To(Equal(templateGeneration))
-
-		framework.Logf("Check that daemon pods launch on every node of the cluster.")
-		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to start")
-
-		framework.Logf("Make sure all daemon pods have correct template generation %d", templateGeneration)
-		err = checkDaemonPodsTemplateGeneration(c, ns, label, fmt.Sprint(templateGeneration))
-		Expect(err).NotTo(HaveOccurred())
-
-		// 2. Orphan DaemonSet pods
-		framework.Logf("Deleting DaemonSet %s and orphaning its pods and history", dsName)
-		deleteDaemonSetAndOrphan(c, ds)
-
-		// 3. Adopt DaemonSet pods (no restart)
-		newDSName := "adopt"
-		framework.Logf("Creating a new RollingUpdate DaemonSet %s to adopt pods", newDSName)
-		newDS := newDaemonSet(newDSName, image, label)
-		newDS.Spec.TemplateGeneration = templateGeneration
-		newDS.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
-		newDS, err = c.Extensions().DaemonSets(ns).Create(newDS)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(newDS.Spec.TemplateGeneration).To(Equal(templateGeneration))
-		Expect(apiequality.Semantic.DeepEqual(newDS.Spec.Template, ds.Spec.Template)).To(BeTrue(), "DaemonSet template should match to adopt pods")
-
-		framework.Logf("Wait for pods and history to be adopted by DaemonSet %s", newDS.Name)
-		waitDaemonSetAdoption(c, newDS, ds.Name, templateGeneration)
-
-		// 4. Orphan DaemonSet pods again
-		framework.Logf("Deleting DaemonSet %s and orphaning its pods and history", newDSName)
-		deleteDaemonSetAndOrphan(c, newDS)
-
-		// 5. Adopt DaemonSet pods (no restart) as long as template matches, even when templateGeneration doesn't match
-		newAdoptDSName := "adopt-template-matches"
-		framework.Logf("Creating a new RollingUpdate DaemonSet %s to adopt pods", newAdoptDSName)
-		newAdoptDS := newDaemonSet(newAdoptDSName, image, label)
-		newAdoptDS.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
-		newAdoptDS, err = c.Extensions().DaemonSets(ns).Create(newAdoptDS)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(newAdoptDS.Spec.TemplateGeneration).To(Equal(int64(1)))
-		Expect(newAdoptDS.Spec.TemplateGeneration).NotTo(Equal(templateGeneration))
-		Expect(apiequality.Semantic.DeepEqual(newAdoptDS.Spec.Template, newDS.Spec.Template)).To(BeTrue(), "DaemonSet template should match to adopt pods")
-
-		framework.Logf(fmt.Sprintf("Wait for pods and history to be adopted by DaemonSet %s", newAdoptDS.Name))
-		waitDaemonSetAdoption(c, newAdoptDS, ds.Name, templateGeneration)
-
-		// 6. Orphan DaemonSet pods again
-		framework.Logf("Deleting DaemonSet %s and orphaning its pods and history", newAdoptDSName)
-		deleteDaemonSetAndOrphan(c, newAdoptDS)
-
-		// 7. Adopt DaemonSet pods (no restart) as long as templateGeneration matches, even when template doesn't match
-		newAdoptDSName = "adopt-template-generation-matches"
-		framework.Logf("Creating a new RollingUpdate DaemonSet %s to adopt pods", newAdoptDSName)
-		newAdoptDS = newDaemonSet(newAdoptDSName, image, label)
-		newAdoptDS.Spec.Template.Spec.Containers[0].Name = "not-match"
-		newAdoptDS.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
-		newAdoptDS.Spec.TemplateGeneration = templateGeneration
-		newAdoptDS, err = c.Extensions().DaemonSets(ns).Create(newAdoptDS)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(newAdoptDS.Spec.TemplateGeneration).To(Equal(templateGeneration))
-		Expect(apiequality.Semantic.DeepEqual(newAdoptDS.Spec.Template, newDS.Spec.Template)).NotTo(BeTrue(), "DaemonSet template should not match")
-
-		framework.Logf("Wait for pods and history to be adopted by DaemonSet %s", newAdoptDS.Name)
-		waitDaemonSetAdoption(c, newAdoptDS, ds.Name, templateGeneration)
-	})
-
-	It("Should rollback without unnecessary restarts", func() {
-		// Skip clusters with only one node, where we cannot have half-done DaemonSet rollout for this test
-		framework.SkipUnlessNodeCountIsAtLeast(2)
-
+	/*
+	  Testname: DaemonSet-Rollback
+	  Description: A conformant Kubernetes distribution MUST support automated, minimally disruptive
+	  rollback of updates to a DaemonSet.
+	*/
+	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
+		schedulableNodes := framework.GetReadySchedulableNodesOrDie(c)
+		Expect(len(schedulableNodes.Items)).To(BeNumerically(">", 1), "Conformance test suite needs a cluster with at least 2 nodes.")
 		framework.Logf("Create a RollingUpdate DaemonSet")
 		label := map[string]string{daemonsetNameLabel: dsName}
 		ds := newDaemonSet(dsName, image, label)
-		ds.Spec.UpdateStrategy = extensions.DaemonSetUpdateStrategy{Type: extensions.RollingUpdateDaemonSetStrategyType}
-		ds, err := c.Extensions().DaemonSets(ns).Create(ds)
+		ds.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{Type: apps.RollingUpdateDaemonSetStrategyType}
+		ds, err := c.AppsV1().DaemonSets(ns).Create(ds)
 		Expect(err).NotTo(HaveOccurred())
 
 		framework.Logf("Check that daemon pods launch on every node of the cluster")
@@ -452,7 +397,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.Logf("Update the DaemonSet to trigger a rollout")
 		// We use a nonexistent image here, so that we make sure it won't finish
 		newImage := "foo:non-existent"
-		newDS, err := framework.UpdateDaemonSetWithRetries(c, ns, ds.Name, func(update *extensions.DaemonSet) {
+		newDS, err := framework.UpdateDaemonSetWithRetries(c, ns, ds.Name, func(update *apps.DaemonSet) {
 			update.Spec.Template.Spec.Containers[0].Image = newImage
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -475,11 +420,16 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 				framework.Failf("unexpected pod found, image = %s", image)
 			}
 		}
-		Expect(len(existingPods)).NotTo(Equal(0))
+		schedulableNodes = framework.GetReadySchedulableNodesOrDie(c)
+		if len(schedulableNodes.Items) < 2 {
+			Expect(len(existingPods)).To(Equal(0))
+		} else {
+			Expect(len(existingPods)).NotTo(Equal(0))
+		}
 		Expect(len(newPods)).NotTo(Equal(0))
 
 		framework.Logf("Roll back the DaemonSet before rollout is complete")
-		rollbackDS, err := framework.UpdateDaemonSetWithRetries(c, ns, ds.Name, func(update *extensions.DaemonSet) {
+		rollbackDS, err := framework.UpdateDaemonSetWithRetries(c, ns, ds.Name, func(update *apps.DaemonSet) {
 			update.Spec.Template.Spec.Containers[0].Image = image
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -505,29 +455,15 @@ func getDaemonSetImagePatch(containerName, containerImage string) string {
 	return fmt.Sprintf(`{"spec":{"template":{"spec":{"containers":[{"name":"%s","image":"%s"}]}}}}`, containerName, containerImage)
 }
 
-// deleteDaemonSetAndOrphan deletes the given DaemonSet and orphans all its dependents.
-// It also checks that all dependents are orphaned, and the DaemonSet is deleted.
-func deleteDaemonSetAndOrphan(c clientset.Interface, ds *extensions.DaemonSet) {
-	trueVar := true
-	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &trueVar}
-	deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(ds.UID))
-	err := c.Extensions().DaemonSets(ds.Namespace).Delete(ds.Name, deleteOptions)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetPodsOrphaned(c, ds.Namespace, ds.Spec.Template.Labels))
-	Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet pods to be orphaned")
-	err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetHistoryOrphaned(c, ds.Namespace, ds.Spec.Template.Labels))
-	Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet history to be orphaned")
-	err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetDeleted(c, ds.Namespace, ds.Name))
-	Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet to be deleted")
-}
-
-func newDaemonSet(dsName, image string, label map[string]string) *extensions.DaemonSet {
-	return &extensions.DaemonSet{
+func newDaemonSet(dsName, image string, label map[string]string) *apps.DaemonSet {
+	return &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: dsName,
 		},
-		Spec: extensions.DaemonSetSpec{
+		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: label,
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: label,
@@ -549,7 +485,7 @@ func newDaemonSet(dsName, image string, label map[string]string) *extensions.Dae
 func listDaemonPods(c clientset.Interface, ns string, label map[string]string) *v1.PodList {
 	selector := labels.Set(label).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := c.Core().Pods(ns).List(options)
+	podList, err := c.CoreV1().Pods(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(podList.Items)).To(BeNumerically(">", 0))
 	return podList
@@ -579,8 +515,28 @@ func clearDaemonSetNodeLabels(c clientset.Interface) error {
 	return nil
 }
 
+// updateNamespaceAnnotations sets node selectors related annotations on tests namespaces to empty
+func updateNamespaceAnnotations(c clientset.Interface, nsName string) (*v1.Namespace, error) {
+	nsClient := c.CoreV1().Namespaces()
+
+	ns, err := nsClient.Get(nsName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if ns.Annotations == nil {
+		ns.Annotations = make(map[string]string)
+	}
+
+	for _, n := range NamespaceNodeSelectors {
+		ns.Annotations[n] = ""
+	}
+
+	return nsClient.Update(ns)
+}
+
 func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[string]string) (*v1.Node, error) {
-	nodeClient := c.Core().Nodes()
+	nodeClient := c.CoreV1().Nodes()
 	var newNode *v1.Node
 	var newLabels map[string]string
 	err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, func() (bool, error) {
@@ -604,7 +560,7 @@ func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[s
 			newLabels, _ = separateDaemonSetNodeLabels(newNode.Labels)
 			return true, err
 		}
-		if se, ok := err.(*apierrs.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
+		if se, ok := err.(*apierrors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 			framework.Logf("failed to update node due to resource version conflict")
 			return false, nil
 		}
@@ -619,9 +575,9 @@ func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[s
 	return newNode, nil
 }
 
-func checkDaemonPodOnNodes(f *framework.Framework, ds *extensions.DaemonSet, nodeNames []string) func() (bool, error) {
+func checkDaemonPodOnNodes(f *framework.Framework, ds *apps.DaemonSet, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
-		podList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+		podList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("could not get the pod list: %v", err)
 			return false, nil
@@ -658,20 +614,25 @@ func checkDaemonPodOnNodes(f *framework.Framework, ds *extensions.DaemonSet, nod
 	}
 }
 
-func checkRunningOnAllNodes(f *framework.Framework, ds *extensions.DaemonSet) func() (bool, error) {
+func checkRunningOnAllNodes(f *framework.Framework, ds *apps.DaemonSet) func() (bool, error) {
 	return func() (bool, error) {
-		nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		nodeNames := make([]string, 0)
-		for _, node := range nodeList.Items {
-			if !canScheduleOnNode(node, ds) {
-				framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
-				continue
-			}
-			nodeNames = append(nodeNames, node.Name)
-		}
+		nodeNames := schedulableNodes(f.ClientSet, ds)
 		return checkDaemonPodOnNodes(f, ds, nodeNames)()
 	}
+}
+
+func schedulableNodes(c clientset.Interface, ds *apps.DaemonSet) []string {
+	nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	framework.ExpectNoError(err)
+	nodeNames := make([]string, 0)
+	for _, node := range nodeList.Items {
+		if !canScheduleOnNode(node, ds) {
+			framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
+			continue
+		}
+		nodeNames = append(nodeNames, node.Name)
+	}
+	return nodeNames
 }
 
 func checkAtLeastOneNewPod(c clientset.Interface, ns string, label map[string]string, newImage string) func() (bool, error) {
@@ -687,9 +648,9 @@ func checkAtLeastOneNewPod(c clientset.Interface, ns string, label map[string]st
 }
 
 // canScheduleOnNode checks if a given DaemonSet can schedule pods on the given node
-func canScheduleOnNode(node v1.Node, ds *extensions.DaemonSet) bool {
+func canScheduleOnNode(node v1.Node, ds *apps.DaemonSet) bool {
 	newPod := daemon.NewPod(ds, node.Name)
-	nodeInfo := schedulercache.NewNodeInfo()
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
 	nodeInfo.SetNode(&node)
 	fit, _, err := daemon.Predicates(newPod, nodeInfo)
 	if err != nil {
@@ -699,12 +660,12 @@ func canScheduleOnNode(node v1.Node, ds *extensions.DaemonSet) bool {
 	return fit
 }
 
-func checkRunningOnNoNodes(f *framework.Framework, ds *extensions.DaemonSet) func() (bool, error) {
+func checkRunningOnNoNodes(f *framework.Framework, ds *apps.DaemonSet) func() (bool, error) {
 	return checkDaemonPodOnNodes(f, ds, make([]string, 0))
 }
 
 func checkDaemonStatus(f *framework.Framework, dsName string) error {
-	ds, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Get(dsName, metav1.GetOptions{})
+	ds, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get(dsName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("Could not get daemon set from v1.")
 	}
@@ -715,24 +676,25 @@ func checkDaemonStatus(f *framework.Framework, dsName string) error {
 	return nil
 }
 
-func checkDaemonPodsImageAndAvailability(c clientset.Interface, ds *extensions.DaemonSet, image string, maxUnavailable int) func() (bool, error) {
+func checkDaemonPodsImageAndAvailability(c clientset.Interface, ds *apps.DaemonSet, image string, maxUnavailable int) func() (bool, error) {
 	return func() (bool, error) {
-		podList, err := c.Core().Pods(ds.Namespace).List(metav1.ListOptions{})
+		podList, err := c.CoreV1().Pods(ds.Namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
 		pods := podList.Items
 
 		unavailablePods := 0
-		allImagesUpdated := true
+		nodesToUpdatedPodCount := make(map[string]int)
 		for _, pod := range pods {
 			if !metav1.IsControlledBy(&pod, ds) {
 				continue
 			}
 			podImage := pod.Spec.Containers[0].Image
 			if podImage != image {
-				allImagesUpdated = false
 				framework.Logf("Wrong image for pod: %s. Expected: %s, got: %s.", pod.Name, image, podImage)
+			} else {
+				nodesToUpdatedPodCount[pod.Spec.NodeName] += 1
 			}
 			if !podutil.IsPodAvailable(&pod, ds.Spec.MinReadySeconds, metav1.Now()) {
 				framework.Logf("Pod %s is not available", pod.Name)
@@ -742,44 +704,10 @@ func checkDaemonPodsImageAndAvailability(c clientset.Interface, ds *extensions.D
 		if unavailablePods > maxUnavailable {
 			return false, fmt.Errorf("number of unavailable pods: %d is greater than maxUnavailable: %d", unavailablePods, maxUnavailable)
 		}
-		if !allImagesUpdated {
-			return false, nil
-		}
-		return true, nil
-	}
-}
-
-func checkDaemonPodsTemplateGeneration(c clientset.Interface, ns string, label map[string]string, templateGeneration string) error {
-	pods := listDaemonPods(c, ns, label)
-	for _, pod := range pods.Items {
-		// We don't care about inactive pods
-		if !controller.IsPodActive(&pod) {
-			continue
-		}
-		podTemplateGeneration := pod.Labels[extensions.DaemonSetTemplateGenerationKey]
-		if podTemplateGeneration != templateGeneration {
-			return fmt.Errorf("expected pod %s/%s template generation %s, but got %s", pod.Namespace, pod.Name, templateGeneration, podTemplateGeneration)
-		}
-	}
-	return nil
-}
-
-func checkDaemonSetDeleted(c clientset.Interface, ns, name string) func() (bool, error) {
-	return func() (bool, error) {
-		_, err := c.Extensions().DaemonSets(ns).Get(name, metav1.GetOptions{})
-		if !apierrs.IsNotFound(err) {
-			return false, err
-		}
-		return true, nil
-	}
-}
-
-func checkDaemonSetPodsOrphaned(c clientset.Interface, ns string, label map[string]string) func() (bool, error) {
-	return func() (bool, error) {
-		pods := listDaemonPods(c, ns, label)
-		for _, pod := range pods.Items {
-			// This pod is orphaned only when controller ref is cleared
-			if controllerRef := metav1.GetControllerOf(&pod); controllerRef != nil {
+		// Make sure every daemon pod on the node has been updated
+		nodeNames := schedulableNodes(c, ds)
+		for _, node := range nodeNames {
+			if nodesToUpdatedPodCount[node] == 0 {
 				return false, nil
 			}
 		}
@@ -787,102 +715,50 @@ func checkDaemonSetPodsOrphaned(c clientset.Interface, ns string, label map[stri
 	}
 }
 
-func checkDaemonSetHistoryOrphaned(c clientset.Interface, ns string, label map[string]string) func() (bool, error) {
-	return func() (bool, error) {
-		histories := listDaemonHistories(c, ns, label)
-		for _, history := range histories.Items {
-			// This history is orphaned only when controller ref is cleared
-			if controllerRef := metav1.GetControllerOf(&history); controllerRef != nil {
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-}
-
-func checkDaemonSetPodsAdopted(c clientset.Interface, ns string, dsUID types.UID, label map[string]string) func() (bool, error) {
-	return func() (bool, error) {
-		pods := listDaemonPods(c, ns, label)
-		for _, pod := range pods.Items {
-			// This pod is adopted only when its controller ref is update
-			if controllerRef := metav1.GetControllerOf(&pod); controllerRef == nil || controllerRef.UID != dsUID {
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-}
-
-func checkDaemonSetHistoryAdopted(c clientset.Interface, ns string, dsUID types.UID, label map[string]string) func() (bool, error) {
-	return func() (bool, error) {
-		histories := listDaemonHistories(c, ns, label)
-		for _, history := range histories.Items {
-			// This history is adopted only when its controller ref is update
-			if controllerRef := metav1.GetControllerOf(&history); controllerRef == nil || controllerRef.UID != dsUID {
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-}
-
-func waitDaemonSetAdoption(c clientset.Interface, ds *extensions.DaemonSet, podPrefix string, podTemplateGeneration int64) {
-	ns := ds.Namespace
-	label := ds.Spec.Template.Labels
-
-	err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetPodsAdopted(c, ns, ds.UID, label))
-	Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet pods to be adopted")
-	err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonSetHistoryAdopted(c, ns, ds.UID, label))
-	Expect(err).NotTo(HaveOccurred(), "error waiting for DaemonSet history to be adopted")
-
-	framework.Logf("Make sure no daemon pod updated its template generation %d", podTemplateGeneration)
-	err = checkDaemonPodsTemplateGeneration(c, ns, label, fmt.Sprint(podTemplateGeneration))
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Make sure no pods are recreated by looking at their names")
-	err = checkDaemonSetPodsName(c, ns, podPrefix, label)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-func checkDaemonSetPodsName(c clientset.Interface, ns, prefix string, label map[string]string) error {
-	pods := listDaemonPods(c, ns, label)
-	for _, pod := range pods.Items {
-		if !strings.HasPrefix(pod.Name, prefix) {
-			return fmt.Errorf("expected pod %s name to be prefixed %q", pod.Name, prefix)
-		}
-	}
-	return nil
-}
-
-func checkDaemonSetPodsLabels(podList *v1.PodList, hash, templateGeneration string) {
+func checkDaemonSetPodsLabels(podList *v1.PodList, hash string) {
 	for _, pod := range podList.Items {
-		podHash := pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
-		podTemplate := pod.Labels[extensions.DaemonSetTemplateGenerationKey]
+		podHash := pod.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 		Expect(len(podHash)).To(BeNumerically(">", 0))
 		if len(hash) > 0 {
 			Expect(podHash).To(Equal(hash))
 		}
-		Expect(len(podTemplate)).To(BeNumerically(">", 0))
-		Expect(podTemplate).To(Equal(templateGeneration))
 	}
+}
+
+func waitForHistoryCreated(c clientset.Interface, ns string, label map[string]string, numHistory int) {
+	listHistoryFn := func() (bool, error) {
+		selector := labels.Set(label).AsSelector()
+		options := metav1.ListOptions{LabelSelector: selector.String()}
+		historyList, err := c.AppsV1().ControllerRevisions(ns).List(options)
+		if err != nil {
+			return false, err
+		}
+		if len(historyList.Items) == numHistory {
+			return true, nil
+		}
+		framework.Logf("%d/%d controllerrevisions created.", len(historyList.Items), numHistory)
+		return false, nil
+	}
+	err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, listHistoryFn)
+	Expect(err).NotTo(HaveOccurred(), "error waiting for controllerrevisions to be created")
 }
 
 func listDaemonHistories(c clientset.Interface, ns string, label map[string]string) *apps.ControllerRevisionList {
 	selector := labels.Set(label).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	historyList, err := c.AppsV1beta1().ControllerRevisions(ns).List(options)
+	historyList, err := c.AppsV1().ControllerRevisions(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(historyList.Items)).To(BeNumerically(">", 0))
 	return historyList
 }
 
-func curHistory(historyList *apps.ControllerRevisionList, ds *extensions.DaemonSet) *apps.ControllerRevision {
+func curHistory(historyList *apps.ControllerRevisionList, ds *apps.DaemonSet) *apps.ControllerRevision {
 	var curHistory *apps.ControllerRevision
 	foundCurHistories := 0
 	for i := range historyList.Items {
 		history := &historyList.Items[i]
 		// Every history should have the hash label
-		Expect(len(history.Labels[extensions.DefaultDaemonSetUniqueLabelKey])).To(BeNumerically(">", 0))
+		Expect(len(history.Labels[apps.DefaultDaemonSetUniqueLabelKey])).To(BeNumerically(">", 0))
 		match, err := daemon.Match(ds, history)
 		Expect(err).NotTo(HaveOccurred())
 		if match {
@@ -893,4 +769,16 @@ func curHistory(historyList *apps.ControllerRevisionList, ds *extensions.DaemonS
 	Expect(foundCurHistories).To(Equal(1))
 	Expect(curHistory).NotTo(BeNil())
 	return curHistory
+}
+
+func waitFailedDaemonPodDeleted(c clientset.Interface, pod *v1.Pod) func() (bool, error) {
+	return func() (bool, error) {
+		if _, err := c.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, fmt.Errorf("failed to get failed daemon pod %q: %v", pod.Name, err)
+		}
+		return false, nil
+	}
 }

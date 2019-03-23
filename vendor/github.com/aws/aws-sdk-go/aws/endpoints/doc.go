@@ -21,12 +21,12 @@
 //     partitions := resolver.(endpoints.EnumPartitions).Partitions()
 //
 //     for _, p := range partitions {
-//         fmt.Println("Regions for", p.Name)
+//         fmt.Println("Regions for", p.ID())
 //         for id, _ := range p.Regions() {
 //             fmt.Println("*", id)
 //         }
 //
-//         fmt.Println("Services for", p.Name)
+//         fmt.Println("Services for", p.ID())
 //         for id, _ := range p.Services() {
 //             fmt.Println("*", id)
 //         }

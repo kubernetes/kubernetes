@@ -29,19 +29,22 @@ func createMergeStrategy(options Options, strategic *delegatingStrategy) mergeSt
 	}
 }
 
-// mergeStrategy creates a patch to merge a local file value into a remote field value
+// mergeStrategy merges the values in an Element into a single Result
 type mergeStrategy struct {
 	strategic *delegatingStrategy
 	options   Options
 }
 
-// MergeList creates a patch to merge a local list field value into a remote list field value
+// MergeList merges the lists in a ListElement into a single Result
 func (v mergeStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
 	// No merge logic if adding or deleting a field
 	if result, done := v.doAddOrDelete(e); done {
 		return result, nil
 	}
-
+	// Detect conflict in ListElement
+	if err := v.doConflictDetect(e); err != nil {
+		return apply.Result{}, err
+	}
 	// Merge each item in the list and append it to the list
 	merged := []interface{}{}
 	for _, value := range e.Values {
@@ -51,7 +54,6 @@ func (v mergeStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
 			return apply.Result{}, err
 		}
 
-		fmt.Printf("\nResult %+v\n%+v\n", m.MergedResult, value)
 		switch m.Operation {
 		case apply.SET:
 			// Keep the list item value
@@ -71,26 +73,38 @@ func (v mergeStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
 	return apply.Result{Operation: apply.SET, MergedResult: merged}, nil
 }
 
-// MergeMap creates a patch to merge a local map field into a remote map field
+// MergeMap merges the maps in a MapElement into a single Result
 func (v mergeStrategy) MergeMap(e apply.MapElement) (apply.Result, error) {
-	return v.doMergeMap(e)
-}
-
-// MergeType creates a patch to merge a local map field into a remote map field
-func (v mergeStrategy) MergeType(e apply.TypeElement) (apply.Result, error) {
-	return v.doMergeMap(e)
-}
-
-// do merges a recorded, local and remote map into a new object
-func (v mergeStrategy) doMergeMap(e apply.MapValuesElement) (apply.Result, error) {
 	// No merge logic if adding or deleting a field
 	if result, done := v.doAddOrDelete(e); done {
 		return result, nil
 	}
+	// Detect conflict in MapElement
+	if err := v.doConflictDetect(e); err != nil {
+		return apply.Result{}, err
+	}
+	return v.doMergeMap(e.GetValues())
+}
+
+// MergeMap merges the type instances in a TypeElement into a single Result
+func (v mergeStrategy) MergeType(e apply.TypeElement) (apply.Result, error) {
+	// No merge logic if adding or deleting a field
+	if result, done := v.doAddOrDelete(e); done {
+		return result, nil
+	}
+	// Detect conflict in TypeElement
+	if err := v.doConflictDetect(e); err != nil {
+		return apply.Result{}, err
+	}
+	return v.doMergeMap(e.GetValues())
+}
+
+// do merges a recorded, local and remote map into a new object
+func (v mergeStrategy) doMergeMap(e map[string]apply.Element) (apply.Result, error) {
 
 	// Merge each item in the list
 	merged := map[string]interface{}{}
-	for key, value := range e.GetValues() {
+	for key, value := range e {
 		// Recursively merge the map element before adding the value to the map
 		result, err := value.Merge(v.strategic)
 		if err != nil {
@@ -135,9 +149,14 @@ func (v mergeStrategy) MergePrimitive(diff apply.PrimitiveElement) (apply.Result
 	return apply.Result{}, fmt.Errorf("Cannot merge primitive element %v", diff.Name)
 }
 
-// MergeEmpty
+// MergeEmpty returns an empty result
 func (v mergeStrategy) MergeEmpty(diff apply.EmptyElement) (apply.Result, error) {
 	return apply.Result{Operation: apply.SET}, nil
+}
+
+// doConflictDetect returns error if element has conflict
+func (v mergeStrategy) doConflictDetect(e apply.Element) error {
+	return v.strategic.doConflictDetect(e)
 }
 
 var _ apply.Strategy = &mergeStrategy{}

@@ -67,7 +67,7 @@ func (a KubeletLatencyMetrics) Less(i, j int) bool { return a[i].Latency > a[j].
 // or else, the function will try to get kubelet metrics directly from the node.
 func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (metrics.KubeletMetrics, error) {
 	if c == nil {
-		return metrics.GrabKubeletMetricsWithoutProxy(nodeName)
+		return metrics.GrabKubeletMetricsWithoutProxy(nodeName, "/metrics")
 	}
 	grabber, err := metrics.NewMetricsGrabber(c, nil, true, false, false, false, false)
 	if err != nil {
@@ -97,25 +97,28 @@ func getKubeletMetrics(c clientset.Interface, nodeName string) (metrics.KubeletM
 	return kubeletMetrics, nil
 }
 
-// GetKubeletLatencyMetrics gets all latency related kubelet metrics. Note that the KubeletMetrcis
-// passed in should not contain subsystem prefix.
-func GetKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
-	latencyMethods := sets.NewString(
-		kubeletmetrics.PodWorkerLatencyKey,
-		kubeletmetrics.PodWorkerStartLatencyKey,
-		kubeletmetrics.PodStartLatencyKey,
+// GetDefaultKubeletLatencyMetrics calls GetKubeletLatencyMetrics with a set of default metricNames
+// identifying common latency metrics.
+// Note that the KubeletMetrics passed in should not contain subsystem prefix.
+func GetDefaultKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
+	latencyMetricNames := sets.NewString(
+		kubeletmetrics.PodWorkerDurationKey,
+		kubeletmetrics.PodWorkerStartDurationKey,
+		kubeletmetrics.PodStartDurationKey,
 		kubeletmetrics.CgroupManagerOperationsKey,
 		dockermetrics.DockerOperationsLatencyKey,
-		kubeletmetrics.PodWorkerStartLatencyKey,
-		kubeletmetrics.PLEGRelistLatencyKey,
+		kubeletmetrics.PodWorkerStartDurationKey,
+		kubeletmetrics.PLEGRelistDurationKey,
 	)
-	return GetKubeletMetrics(ms, latencyMethods)
+	return GetKubeletLatencyMetrics(ms, latencyMetricNames)
 }
 
-func GetKubeletMetrics(ms metrics.KubeletMetrics, methods sets.String) KubeletLatencyMetrics {
+// GetKubeletLatencyMetrics filters ms to include only those contained in the metricNames set,
+// then constructs a KubeletLatencyMetrics list based on the samples associated with those metrics.
+func GetKubeletLatencyMetrics(ms metrics.KubeletMetrics, filterMetricNames sets.String) KubeletLatencyMetrics {
 	var latencyMetrics KubeletLatencyMetrics
-	for method, samples := range ms {
-		if !methods.Has(method) {
+	for name, samples := range ms {
+		if !filterMetricNames.Has(name) {
 			continue
 		}
 		for _, sample := range samples {
@@ -131,7 +134,7 @@ func GetKubeletMetrics(ms metrics.KubeletMetrics, methods sets.String) KubeletLa
 
 			latencyMetrics = append(latencyMetrics, KubeletLatencyMetric{
 				Operation: operation,
-				Method:    method,
+				Method:    name,
 				Quantile:  quantile,
 				Latency:   time.Duration(int64(latency)) * time.Microsecond,
 			})
@@ -161,7 +164,7 @@ func NewRuntimeOperationMonitor(c clientset.Interface) *RuntimeOperationMonitor 
 		client:          c,
 		nodesRuntimeOps: make(map[string]NodeRuntimeOperationErrorRate),
 	}
-	nodes, err := m.client.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := m.client.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		Failf("RuntimeOperationMonitor: unable to get list of nodes: %v", err)
 	}
@@ -265,7 +268,7 @@ func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration
 	if err != nil {
 		return KubeletLatencyMetrics{}, err
 	}
-	latencyMetrics := GetKubeletLatencyMetrics(ms)
+	latencyMetrics := GetDefaultKubeletLatencyMetrics(ms)
 	sort.Sort(latencyMetrics)
 	var badMetrics KubeletLatencyMetrics
 	logFunc("\nLatency metrics for node %v", nodeName)
@@ -278,35 +281,19 @@ func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration
 	return badMetrics, nil
 }
 
-// getStatsSummary contacts kubelet for the container information.
-func getStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
-	subResourceProxyAvailable, err := ServerVersionGTE(SubResourceServiceAndNodeProxyVersion, c.Discovery())
-	if err != nil {
-		return nil, err
-	}
-
+// GetStatsSummary contacts kubelet for the container information.
+func GetStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
 	defer cancel()
 
-	var data []byte
-	if subResourceProxyAvailable {
-		data, err = c.Core().RESTClient().Get().
-			Context(ctx).
-			Resource("nodes").
-			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
-			Suffix("stats/summary").
-			Do().Raw()
+	data, err := c.CoreV1().RESTClient().Get().
+		Context(ctx).
+		Resource("nodes").
+		SubResource("proxy").
+		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+		Suffix("stats/summary").
+		Do().Raw()
 
-	} else {
-		data, err = c.Core().RESTClient().Get().
-			Context(ctx).
-			Prefix("proxy").
-			Resource("nodes").
-			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
-			Suffix("stats/summary").
-			Do().Raw()
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +348,7 @@ func getOneTimeResourceUsageOnNode(
 		return nil, fmt.Errorf("numStats needs to be > 1 and < %d", maxNumStatsToRequest)
 	}
 	// Get information of all containers on the node.
-	summary, err := getStatsSummary(c, nodeName)
+	summary, err := GetStatsSummary(c, nodeName)
 	if err != nil {
 		return nil, err
 	}
@@ -406,30 +393,14 @@ func getOneTimeResourceUsageOnNode(
 }
 
 func getNodeStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
-	subResourceProxyAvailable, err := ServerVersionGTE(SubResourceServiceAndNodeProxyVersion, c.Discovery())
-	if err != nil {
-		return nil, err
-	}
+	data, err := c.CoreV1().RESTClient().Get().
+		Resource("nodes").
+		SubResource("proxy").
+		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+		Suffix("stats/summary").
+		SetHeader("Content-Type", "application/json").
+		Do().Raw()
 
-	var data []byte
-	if subResourceProxyAvailable {
-		data, err = c.Core().RESTClient().Get().
-			Resource("nodes").
-			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
-			Suffix("stats/summary").
-			SetHeader("Content-Type", "application/json").
-			Do().Raw()
-
-	} else {
-		data, err = c.Core().RESTClient().Get().
-			Prefix("proxy").
-			Resource("nodes").
-			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
-			Suffix("stats/summary").
-			SetHeader("Content-Type", "application/json").
-			Do().Raw()
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -521,7 +492,7 @@ type usageDataPerContainer struct {
 }
 
 func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error) {
-	client, err := NodeProxyRequest(c, nodeName, "debug/pprof/heap")
+	client, err := NodeProxyRequest(c, nodeName, "debug/pprof/heap", ports.KubeletPort)
 	if err != nil {
 		return "", err
 	}
@@ -700,7 +671,7 @@ func NewResourceMonitor(c clientset.Interface, containerNames []string, pollingI
 
 func (r *ResourceMonitor) Start() {
 	// It should be OK to monitor unschedulable Nodes
-	nodes, err := r.client.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := r.client.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		Failf("ResourceMonitor: unable to get list of nodes: %v", err)
 	}

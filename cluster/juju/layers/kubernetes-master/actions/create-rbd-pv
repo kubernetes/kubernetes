@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/local/sbin/charm-env python3
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -38,6 +38,14 @@ def main():
     this script thinks the environment is 'sane' enough to provision volumes.
     '''
 
+    # k8s >= 1.10 uses CSI and doesn't directly create persistent volumes
+    if get_version('kube-apiserver') >= (1, 10):
+       print('This action is deprecated in favor of CSI creation of persistent volumes')
+       print('in Kubernetes >= 1.10. Just create the PVC and a PV will be created')
+       print('for you.')
+       action_fail('Deprecated, just create PVC.')
+       return
+
     # validate relationship pre-reqs before additional steps can be taken
     if not validate_relation():
         print('Failed ceph relationship check')
@@ -60,7 +68,7 @@ def main():
     if not validate_space(context['RBD_SIZE']):
         return
 
-    # Ensure our paramters match
+    # Ensure our parameters match
     param_validation = validate_parameters(context['RBD_NAME'],
                                            context['RBD_FS'],
                                            context['PV_MODE'])
@@ -87,6 +95,23 @@ def main():
         cmd = ['kubectl', 'create', '-f', temp_template]
         debug_command(cmd)
         check_call(cmd)
+
+
+def get_version(bin_name):
+    """Get the version of an installed Kubernetes binary.
+
+    :param str bin_name: Name of binary
+    :return: 3-tuple version (maj, min, patch)
+
+    Example::
+
+        >>> `get_version('kubelet')
+        (1, 6, 0)
+
+    """
+    cmd = '{} --version'.format(bin_name).split()
+    version_string = check_output(cmd).decode('utf-8')
+    return tuple(int(q) for q in re.findall("[0-9]+", version_string)[:3])
 
 
 def action_get_or_default(key):

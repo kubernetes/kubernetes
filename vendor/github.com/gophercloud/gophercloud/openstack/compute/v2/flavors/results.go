@@ -12,6 +12,8 @@ type commonResult struct {
 	gophercloud.Result
 }
 
+// CreateResult is the response of a Get operations. Call its Extract method to
+// interpret it as a Flavor.
 type CreateResult struct {
 	commonResult
 }
@@ -57,13 +59,16 @@ type Flavor struct {
 	RxTxFactor float64 `json:"rxtx_factor"`
 
 	// Swap is the amount of swap space, measured in MB.
-	Swap int `json:"swap"`
+	Swap int `json:"-"`
 
 	// VCPUs indicates how many (virtual) CPUs are available for this flavor.
 	VCPUs int `json:"vcpus"`
 
 	// IsPublic indicates whether the flavor is public.
-	IsPublic bool `json:"is_public"`
+	IsPublic bool `json:"os-flavor-access:is_public"`
+
+	// Ephemeral is the amount of ephemeral disk space, measured in GB.
+	Ephemeral int `json:"OS-FLV-EXT-DATA:ephemeral"`
 }
 
 func (r *Flavor) UnmarshalJSON(b []byte) error {
@@ -130,4 +135,118 @@ func ExtractFlavors(r pagination.Page) ([]Flavor, error) {
 	}
 	err := (r.(FlavorPage)).ExtractInto(&s)
 	return s.Flavors, err
+}
+
+// AccessPage contains a single page of all FlavorAccess entries for a flavor.
+type AccessPage struct {
+	pagination.SinglePageBase
+}
+
+// IsEmpty indicates whether an AccessPage is empty.
+func (page AccessPage) IsEmpty() (bool, error) {
+	v, err := ExtractAccesses(page)
+	return len(v) == 0, err
+}
+
+// ExtractAccesses interprets a page of results as a slice of FlavorAccess.
+func ExtractAccesses(r pagination.Page) ([]FlavorAccess, error) {
+	var s struct {
+		FlavorAccesses []FlavorAccess `json:"flavor_access"`
+	}
+	err := (r.(AccessPage)).ExtractInto(&s)
+	return s.FlavorAccesses, err
+}
+
+type accessResult struct {
+	gophercloud.Result
+}
+
+// AddAccessResult is the response of an AddAccess operation. Call its
+// Extract method to interpret it as a slice of FlavorAccess.
+type AddAccessResult struct {
+	accessResult
+}
+
+// RemoveAccessResult is the response of a RemoveAccess operation. Call its
+// Extract method to interpret it as a slice of FlavorAccess.
+type RemoveAccessResult struct {
+	accessResult
+}
+
+// Extract provides access to the result of an access create or delete.
+// The result will be all accesses that the flavor has.
+func (r accessResult) Extract() ([]FlavorAccess, error) {
+	var s struct {
+		FlavorAccesses []FlavorAccess `json:"flavor_access"`
+	}
+	err := r.ExtractInto(&s)
+	return s.FlavorAccesses, err
+}
+
+// FlavorAccess represents an ACL of tenant access to a specific Flavor.
+type FlavorAccess struct {
+	// FlavorID is the unique ID of the flavor.
+	FlavorID string `json:"flavor_id"`
+
+	// TenantID is the unique ID of the tenant.
+	TenantID string `json:"tenant_id"`
+}
+
+// Extract interprets any extraSpecsResult as ExtraSpecs, if possible.
+func (r extraSpecsResult) Extract() (map[string]string, error) {
+	var s struct {
+		ExtraSpecs map[string]string `json:"extra_specs"`
+	}
+	err := r.ExtractInto(&s)
+	return s.ExtraSpecs, err
+}
+
+// extraSpecsResult contains the result of a call for (potentially) multiple
+// key-value pairs. Call its Extract method to interpret it as a
+// map[string]interface.
+type extraSpecsResult struct {
+	gophercloud.Result
+}
+
+// ListExtraSpecsResult contains the result of a Get operation. Call its Extract
+// method to interpret it as a map[string]interface.
+type ListExtraSpecsResult struct {
+	extraSpecsResult
+}
+
+// CreateExtraSpecResult contains the result of a Create operation. Call its
+// Extract method to interpret it as a map[string]interface.
+type CreateExtraSpecsResult struct {
+	extraSpecsResult
+}
+
+// extraSpecResult contains the result of a call for individual a single
+// key-value pair.
+type extraSpecResult struct {
+	gophercloud.Result
+}
+
+// GetExtraSpecResult contains the result of a Get operation. Call its Extract
+// method to interpret it as a map[string]interface.
+type GetExtraSpecResult struct {
+	extraSpecResult
+}
+
+// UpdateExtraSpecResult contains the result of an Update operation. Call its
+// Extract method to interpret it as a map[string]interface.
+type UpdateExtraSpecResult struct {
+	extraSpecResult
+}
+
+// DeleteExtraSpecResult contains the result of a Delete operation. Call its
+// ExtractErr method to determine if the call succeeded or failed.
+type DeleteExtraSpecResult struct {
+	gophercloud.ErrResult
+}
+
+// Extract interprets any extraSpecResult as an ExtraSpec, if possible.
+func (r extraSpecResult) Extract() (map[string]string, error) {
+	var s map[string]string
+	err := r.ExtractInto(&s)
+	return s, err
 }

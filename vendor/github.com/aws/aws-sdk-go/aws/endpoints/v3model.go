@@ -79,7 +79,9 @@ func (p partition) EndpointFor(service, region string, opts ...func(*Options)) (
 	opt.Set(opts...)
 
 	s, hasService := p.Services[service]
-	if !hasService {
+	if !(hasService || opt.ResolveUnknownService) {
+		// Only return error if the resolver will not fallback to creating
+		// endpoint based on service endpoint ID passed in.
 		return resolved, NewUnknownServiceError(p.ID, service, serviceList(p.Services))
 	}
 
@@ -224,16 +226,20 @@ func (e endpoint) resolve(service, region, dnsSuffix string, defs []endpoint, op
 	if len(signingRegion) == 0 {
 		signingRegion = region
 	}
+
 	signingName := e.CredentialScope.Service
+	var signingNameDerived bool
 	if len(signingName) == 0 {
 		signingName = service
+		signingNameDerived = true
 	}
 
 	return ResolvedEndpoint{
-		URL:           u,
-		SigningRegion: signingRegion,
-		SigningName:   signingName,
-		SigningMethod: getByPriority(e.SignatureVersions, signerPriority, defaultSigner),
+		URL:                u,
+		SigningRegion:      signingRegion,
+		SigningName:        signingName,
+		SigningNameDerived: signingNameDerived,
+		SigningMethod:      getByPriority(e.SignatureVersions, signerPriority, defaultSigner),
 	}
 }
 

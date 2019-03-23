@@ -16,6 +16,7 @@ go_library(
         "stat.go",
         "xfrm.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/procfs",
     importpath = "github.com/prometheus/procfs",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/prometheus/procfs/xfs:go_default_library"],

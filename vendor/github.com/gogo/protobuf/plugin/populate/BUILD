@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["populate.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/plugin/populate",
     importpath = "github.com/gogo/protobuf/plugin/populate",
     visibility = ["//visibility:public"],
     deps = [

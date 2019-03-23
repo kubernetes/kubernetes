@@ -19,6 +19,8 @@ package container
 import (
 	"fmt"
 	"time"
+
+	"k8s.io/klog"
 )
 
 // Specified a policy for garbage collecting containers.
@@ -58,7 +60,7 @@ type realContainerGC struct {
 	// Policy for garbage collection.
 	policy ContainerGCPolicy
 
-	// sourcesReadyProvider provides the readyness of kubelet configuration sources.
+	// sourcesReadyProvider provides the readiness of kubelet configuration sources.
 	sourcesReadyProvider SourcesReadyProvider
 }
 
@@ -80,5 +82,6 @@ func (cgc *realContainerGC) GarbageCollect() error {
 }
 
 func (cgc *realContainerGC) DeleteAllUnusedContainers() error {
+	klog.Infof("attempting to delete unused containers")
 	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
 }

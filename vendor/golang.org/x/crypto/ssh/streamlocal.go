@@ -32,6 +32,7 @@ type streamLocalChannelForwardMsg struct {
 
 // ListenUnix is similar to ListenTCP but uses a Unix domain socket.
 func (c *Client) ListenUnix(socketPath string) (net.Listener, error) {
+	c.handleForwardsOnce.Do(c.handleForwards)
 	m := streamLocalChannelForwardMsg{
 		socketPath,
 	}

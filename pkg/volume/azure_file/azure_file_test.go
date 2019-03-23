@@ -17,12 +17,15 @@ limitations under the License.
 package azure_file
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -71,18 +74,9 @@ func TestGetAccessModes(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) || !contains(plug.GetAccessModes(), v1.ReadOnlyMany) || !contains(plug.GetAccessModes(), v1.ReadWriteMany) {
+	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteOnce) || !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadOnlyMany) || !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteMany) {
 		t.Errorf("Expected three AccessModeTypes:  %s, %s, and %s", v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadWriteMany)
 	}
-}
-
-func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
 }
 
 func getAzureTestCloud(t *testing.T) *azure.Cloud {
@@ -155,7 +149,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 	if mounter == nil {
 		t.Errorf("Got a nil Mounter")
 	}
-	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~azure-file/vol1")
+	volPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~azure-file/vol1")
 	path := mounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
@@ -163,13 +157,6 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
-	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("SetUp() failed, volume path not created: %s", path)
-		} else {
-			t.Errorf("SetUp() failed: %v", err)
-		}
 	}
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
@@ -193,7 +180,7 @@ func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 }
 
@@ -366,4 +353,62 @@ func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
 		}
 	}
 
+}
+
+func TestAppendDefaultMountOptions(t *testing.T) {
+	tests := []struct {
+		options  []string
+		fsGroup  *int64
+		expected []string
+	}{
+		{
+			options: []string{"dir_mode=0777"},
+			fsGroup: nil,
+			expected: []string{"dir_mode=0777",
+				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", vers, defaultVers)},
+		},
+		{
+			options: []string{"file_mode=0777"},
+			fsGroup: to.Int64Ptr(0),
+			expected: []string{"file_mode=0777",
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				fmt.Sprintf("%s=%s", vers, defaultVers),
+				fmt.Sprintf("%s=0", gid)},
+		},
+		{
+			options: []string{"vers=2.1"},
+			fsGroup: to.Int64Ptr(1000),
+			expected: []string{"vers=2.1",
+				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				fmt.Sprintf("%s=1000", gid)},
+		},
+		{
+			options: []string{""},
+			expected: []string{"", fmt.Sprintf("%s=%s",
+				fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				fmt.Sprintf("%s=%s", vers, defaultVers)},
+		},
+		{
+			options:  []string{"file_mode=0777", "dir_mode=0777"},
+			expected: []string{"file_mode=0777", "dir_mode=0777", fmt.Sprintf("%s=%s", vers, defaultVers)},
+		},
+		{
+			options: []string{"gid=2000"},
+			fsGroup: to.Int64Ptr(1000),
+			expected: []string{"gid=2000",
+				fmt.Sprintf("%s=%s", fileMode, defaultFileMode),
+				fmt.Sprintf("%s=%s", dirMode, defaultDirMode),
+				"vers=3.0"},
+		},
+	}
+
+	for _, test := range tests {
+		result := appendDefaultMountOptions(test.options, test.fsGroup)
+		if !reflect.DeepEqual(result, test.expected) {
+			t.Errorf("input: %q, appendDefaultMountOptions result: %q, expected: %q", test.options, result, test.expected)
+		}
+	}
 }

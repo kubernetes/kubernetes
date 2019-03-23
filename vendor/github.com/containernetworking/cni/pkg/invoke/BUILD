@@ -7,19 +7,11 @@ go_library(
         "delegate.go",
         "exec.go",
         "find.go",
+        "os_unix.go",
+        "os_windows.go",
         "raw_exec.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "os_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/containernetworking/cni/pkg/invoke",
     importpath = "github.com/containernetworking/cni/pkg/invoke",
     visibility = ["//visibility:public"],
     deps = [

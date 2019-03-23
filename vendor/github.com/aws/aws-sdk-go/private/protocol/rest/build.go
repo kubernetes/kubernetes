@@ -17,10 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/private/protocol"
 )
-
-// RFC822 returns an RFC822 formatted timestamp for AWS protocols
-const RFC822 = "Mon, 2 Jan 2006 15:04:05 GMT"
 
 // Whether the byte value can be sent without escaping in AWS URLs
 var noEscape [256]bool
@@ -82,8 +80,12 @@ func buildLocationElements(r *request.Request, v reflect.Value, buildGETQuery bo
 			if name == "" {
 				name = field.Name
 			}
-			if m.Kind() == reflect.Ptr {
+			if kind := m.Kind(); kind == reflect.Ptr {
 				m = m.Elem()
+			} else if kind == reflect.Interface {
+				if !m.Elem().IsValid() {
+					continue
+				}
 			}
 			if !m.IsValid() {
 				continue
@@ -95,16 +97,16 @@ func buildLocationElements(r *request.Request, v reflect.Value, buildGETQuery bo
 			var err error
 			switch field.Tag.Get("location") {
 			case "headers": // header maps
-				err = buildHeaderMap(&r.HTTPRequest.Header, m, field.Tag.Get("locationName"))
+				err = buildHeaderMap(&r.HTTPRequest.Header, m, field.Tag)
 			case "header":
-				err = buildHeader(&r.HTTPRequest.Header, m, name)
+				err = buildHeader(&r.HTTPRequest.Header, m, name, field.Tag)
 			case "uri":
-				err = buildURI(r.HTTPRequest.URL, m, name)
+				err = buildURI(r.HTTPRequest.URL, m, name, field.Tag)
 			case "querystring":
-				err = buildQueryString(query, m, name)
+				err = buildQueryString(query, m, name, field.Tag)
 			default:
 				if buildGETQuery {
-					err = buildQueryString(query, m, name)
+					err = buildQueryString(query, m, name, field.Tag)
 				}
 			}
 			r.Error = err
@@ -145,8 +147,8 @@ func buildBody(r *request.Request, v reflect.Value) {
 	}
 }
 
-func buildHeader(header *http.Header, v reflect.Value, name string) error {
-	str, err := convertType(v)
+func buildHeader(header *http.Header, v reflect.Value, name string, tag reflect.StructTag) error {
+	str, err := convertType(v, tag)
 	if err == errValueNotSet {
 		return nil
 	} else if err != nil {
@@ -158,9 +160,10 @@ func buildHeader(header *http.Header, v reflect.Value, name string) error {
 	return nil
 }
 
-func buildHeaderMap(header *http.Header, v reflect.Value, prefix string) error {
+func buildHeaderMap(header *http.Header, v reflect.Value, tag reflect.StructTag) error {
+	prefix := tag.Get("locationName")
 	for _, key := range v.MapKeys() {
-		str, err := convertType(v.MapIndex(key))
+		str, err := convertType(v.MapIndex(key), tag)
 		if err == errValueNotSet {
 			continue
 		} else if err != nil {
@@ -173,8 +176,8 @@ func buildHeaderMap(header *http.Header, v reflect.Value, prefix string) error {
 	return nil
 }
 
-func buildURI(u *url.URL, v reflect.Value, name string) error {
-	value, err := convertType(v)
+func buildURI(u *url.URL, v reflect.Value, name string, tag reflect.StructTag) error {
+	value, err := convertType(v, tag)
 	if err == errValueNotSet {
 		return nil
 	} else if err != nil {
@@ -190,7 +193,7 @@ func buildURI(u *url.URL, v reflect.Value, name string) error {
 	return nil
 }
 
-func buildQueryString(query url.Values, v reflect.Value, name string) error {
+func buildQueryString(query url.Values, v reflect.Value, name string, tag reflect.StructTag) error {
 	switch value := v.Interface().(type) {
 	case []*string:
 		for _, item := range value {
@@ -207,7 +210,7 @@ func buildQueryString(query url.Values, v reflect.Value, name string) error {
 			}
 		}
 	default:
-		str, err := convertType(v)
+		str, err := convertType(v, tag)
 		if err == errValueNotSet {
 			return nil
 		} else if err != nil {
@@ -246,13 +249,12 @@ func EscapePath(path string, encodeSep bool) string {
 	return buf.String()
 }
 
-func convertType(v reflect.Value) (string, error) {
+func convertType(v reflect.Value, tag reflect.StructTag) (str string, err error) {
 	v = reflect.Indirect(v)
 	if !v.IsValid() {
 		return "", errValueNotSet
 	}
 
-	var str string
 	switch value := v.Interface().(type) {
 	case string:
 		str = value
@@ -265,9 +267,28 @@ func convertType(v reflect.Value) (string, error) {
 	case float64:
 		str = strconv.FormatFloat(value, 'f', -1, 64)
 	case time.Time:
-		str = value.UTC().Format(RFC822)
+		format := tag.Get("timestampFormat")
+		if len(format) == 0 {
+			format = protocol.RFC822TimeFormatName
+			if tag.Get("location") == "querystring" {
+				format = protocol.ISO8601TimeFormatName
+			}
+		}
+		str = protocol.FormatTime(format, value)
+	case aws.JSONValue:
+		if len(value) == 0 {
+			return "", errValueNotSet
+		}
+		escaping := protocol.NoEscape
+		if tag.Get("location") == "header" {
+			escaping = protocol.Base64Escape
+		}
+		str, err = protocol.EncodeJSONValue(value, escaping)
+		if err != nil {
+			return "", fmt.Errorf("unable to encode JSONValue, %v", err)
+		}
 	default:
-		err := fmt.Errorf("Unsupported value for param %v (%s)", v.Interface(), v.Type())
+		err := fmt.Errorf("unsupported value for param %v (%s)", v.Interface(), v.Type())
 		return "", err
 	}
 	return str, nil

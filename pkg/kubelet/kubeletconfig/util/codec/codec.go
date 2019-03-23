@@ -20,32 +20,60 @@ import (
 	"fmt"
 
 	// ensure the core apis are installed
-	_ "k8s.io/kubernetes/pkg/api/install"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 )
 
-// TODO(mtaufen): allow an encoder to be injected into checkpoint objects at creation time? (then we could ultimately instantiate only one encoder)
+// EncodeKubeletConfig encodes an internal KubeletConfiguration to an external YAML representation
+func EncodeKubeletConfig(internal *kubeletconfig.KubeletConfiguration, targetVersion schema.GroupVersion) ([]byte, error) {
+	encoder, err := NewKubeletconfigYAMLEncoder(targetVersion)
+	if err != nil {
+		return nil, err
+	}
+	// encoder will convert to external version
+	data, err := runtime.Encode(encoder, internal)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
 
-// NewJSONEncoder generates a new runtime.Encoder that encodes objects to JSON
-func NewJSONEncoder(groupName string) (runtime.Encoder, error) {
-	// encode to json
-	mediaType := "application/json"
-	info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
+// NewKubeletconfigYAMLEncoder returns an encoder that can write objects in the kubeletconfig API group to YAML
+func NewKubeletconfigYAMLEncoder(targetVersion schema.GroupVersion) (runtime.Encoder, error) {
+	_, codecs, err := scheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+	mediaType := "application/yaml"
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return nil, fmt.Errorf("unsupported media type %q", mediaType)
+	}
+	return codecs.EncoderForVersion(info.Serializer, targetVersion), nil
+}
+
+// NewYAMLEncoder generates a new runtime.Encoder that encodes objects to YAML
+func NewYAMLEncoder(groupName string) (runtime.Encoder, error) {
+	// encode to YAML
+	mediaType := "application/yaml"
+	info, ok := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
 
-	versions := api.Registry.EnabledVersionsForGroup(groupName)
+	versions := legacyscheme.Scheme.PrioritizedVersionsForGroup(groupName)
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("no enabled versions for group %q", groupName)
 	}
 
-	// the "best" version supposedly comes first in the list returned from api.Registry.EnabledVersionsForGroup
-	return api.Codecs.EncoderForVersion(info.Serializer, versions[0]), nil
+	// the "best" version supposedly comes first in the list returned from legacyscheme.Registry.EnabledVersionsForGroup
+	return legacyscheme.Codecs.EncoderForVersion(info.Serializer, versions[0]), nil
 }
 
 // DecodeKubeletConfiguration decodes a serialized KubeletConfiguration to the internal type

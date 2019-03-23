@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: hostname
+  name: hostname
+spec:
+  minReadySeconds: 60
+  selector:
+    matchLabels:
+      run: hostname
+  template:
+    metadata:
+      labels:
+        run: hostname
+    spec:
+      containers:
+      - image: gcr.io/kubernetes-e2e-test-images/serve-hostname:1.1
+        imagePullPolicy: IfNotPresent
+        name: hostname
+      terminationGracePeriodSeconds: 120

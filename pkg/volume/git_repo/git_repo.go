@@ -20,14 +20,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -77,6 +78,10 @@ func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.GitRepo != nil
 }
 
+func (plugin *gitRepoPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *gitRepoPlugin) RequiresRemount() bool {
 	return false
 }
@@ -90,6 +95,10 @@ func (plugin *gitRepoPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+	if err := validateVolume(spec.Volume.GitRepo); err != nil {
+		return nil, err
+	}
+
 	return &gitRepoVolumeMounter{
 		gitRepoVolume: &gitRepoVolume{
 			volName: spec.Name(),
@@ -138,7 +147,7 @@ var _ volume.Volume = &gitRepoVolume{}
 
 func (gr *gitRepoVolume) GetPath() string {
 	name := gitRepoPluginName
-	return gr.plugin.host.GetPodVolumeDir(gr.podUID, utilstrings.EscapeQualifiedNameForDisk(name), gr.volName)
+	return gr.plugin.host.GetPodVolumeDir(gr.podUID, utilstrings.EscapeQualifiedName(name), gr.volName)
 }
 
 // gitRepoVolumeMounter builds git repo volumes.
@@ -190,7 +199,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	args := []string{"clone", b.source}
+	args := []string{"clone", "--", b.source}
 
 	if len(b.target) != 0 {
 		args = append(args, b.target)
@@ -214,7 +223,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	var subdir string
 
 	switch {
-	case b.target == ".":
+	case len(b.target) != 0 && filepath.Clean(b.target) == ".":
 		// if target dir is '.', use the current dir
 		subdir = path.Join(dir)
 	case len(files) == 1:
@@ -239,13 +248,26 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func (b *gitRepoVolumeMounter) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(gitRepoPluginName)), b.volName)
+	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedName(gitRepoPluginName)), b.volName)
 }
 
 func (b *gitRepoVolumeMounter) execCommand(command string, args []string, dir string) ([]byte, error) {
 	cmd := b.exec.Command(command, args...)
 	cmd.SetDir(dir)
 	return cmd.CombinedOutput()
+}
+
+func validateVolume(src *v1.GitRepoVolumeSource) error {
+	if err := validateNonFlagArgument(src.Repository, "repository"); err != nil {
+		return err
+	}
+	if err := validateNonFlagArgument(src.Revision, "revision"); err != nil {
+		return err
+	}
+	if err := validateNonFlagArgument(src.Directory, "directory"); err != nil {
+		return err
+	}
+	return nil
 }
 
 // gitRepoVolumeUnmounter cleans git repo volumes.
@@ -262,7 +284,7 @@ func (c *gitRepoVolumeUnmounter) TearDown() error {
 
 // TearDownAt simply deletes everything in the directory.
 func (c *gitRepoVolumeUnmounter) TearDownAt(dir string) error {
-	return volume.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
+	return volumeutil.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.GitRepoVolumeSource, bool) {
@@ -275,4 +297,11 @@ func getVolumeSource(spec *volume.Spec) (*v1.GitRepoVolumeSource, bool) {
 	}
 
 	return volumeSource, readOnly
+}
+
+func validateNonFlagArgument(arg, argName string) error {
+	if len(arg) > 0 && arg[0] == '-' {
+		return fmt.Errorf("%q is an invalid value for %s", arg, argName)
+	}
+	return nil
 }

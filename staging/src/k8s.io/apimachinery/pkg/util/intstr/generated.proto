@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ option go_package = "intstr";
 // inner type.  This allows you to have, for example, a JSON field that can
 // accept a name or number.
 // TODO: Rename to Int32OrString
-// 
+//
 // +protobuf=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:openapi-gen=true

@@ -1,5 +1,19 @@
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"encoding/xml"
 	"errors"
@@ -90,7 +104,7 @@ type BlobProperties struct {
 	CacheControl          string      `xml:"Cache-Control" header:"x-ms-blob-cache-control"`
 	ContentLanguage       string      `xml:"Cache-Language" header:"x-ms-blob-content-language"`
 	ContentDisposition    string      `xml:"Content-Disposition" header:"x-ms-blob-content-disposition"`
-	BlobType              BlobType    `xml:"x-ms-blob-blob-type"`
+	BlobType              BlobType    `xml:"BlobType"`
 	SequenceNumber        int64       `xml:"x-ms-blob-sequence-number"`
 	CopyID                string      `xml:"CopyId"`
 	CopyStatus            string      `xml:"CopyStatus"`
@@ -126,17 +140,16 @@ func (b *Blob) Exists() (bool, error) {
 	headers := b.Container.bsc.client.getStandardHeaders()
 	resp, err := b.Container.bsc.client.exec(http.MethodHead, uri, headers, nil, b.Container.bsc.auth)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusOK || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusOK, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusOK, nil
 		}
 	}
 	return false, err
 }
 
 // GetURL gets the canonical URL to the blob with the specified name in the
-// specified container. If name is not specified, the canonical URL for the entire
-// container is obtained.
+// specified container.
 // This method does not create a publicly accessible URL if the blob or container
 // is private and this method does not check if the blob exists.
 func (b *Blob) GetURL() string {
@@ -174,11 +187,17 @@ type BlobRange struct {
 }
 
 func (br BlobRange) String() string {
+	if br.End == 0 {
+		return fmt.Sprintf("bytes=%d-", br.Start)
+	}
 	return fmt.Sprintf("bytes=%d-%d", br.Start, br.End)
 }
 
 // Get returns a stream to read the blob. Caller must call both Read and Close()
 // to correctly close the underlying connection.
+//
+// See the GetRange method for use with a Range header.
+//
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Get-Blob
 func (b *Blob) Get(options *GetBlobOptions) (io.ReadCloser, error) {
 	rangeOptions := GetBlobRangeOptions{
@@ -189,13 +208,13 @@ func (b *Blob) Get(options *GetBlobOptions) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return nil, err
 	}
-	if err := b.writePropoerties(resp.headers); err != nil {
-		return resp.body, err
+	if err := b.writeProperties(resp.Header, true); err != nil {
+		return resp.Body, err
 	}
-	return resp.body, nil
+	return resp.Body, nil
 }
 
 // GetRange reads the specified range of a blob to a stream. The bytesRange
@@ -209,23 +228,27 @@ func (b *Blob) GetRange(options *GetBlobRangeOptions) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusPartialContent}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusPartialContent}); err != nil {
 		return nil, err
 	}
-	if err := b.writePropoerties(resp.headers); err != nil {
-		return resp.body, err
+	// Content-Length header should not be updated, as the service returns the range length
+	// (which is not alwys the full blob length)
+	if err := b.writeProperties(resp.Header, false); err != nil {
+		return resp.Body, err
 	}
-	return resp.body, nil
+	return resp.Body, nil
 }
 
-func (b *Blob) getRange(options *GetBlobRangeOptions) (*storageResponse, error) {
+func (b *Blob) getRange(options *GetBlobRangeOptions) (*http.Response, error) {
 	params := url.Values{}
 	headers := b.Container.bsc.client.getStandardHeaders()
 
 	if options != nil {
 		if options.Range != nil {
 			headers["Range"] = options.Range.String()
-			headers["x-ms-range-get-content-md5"] = fmt.Sprintf("%v", options.GetRangeContentMD5)
+			if options.GetRangeContentMD5 {
+				headers["x-ms-range-get-content-md5"] = "true"
+			}
 		}
 		if options.GetBlobOptions != nil {
 			headers = mergeHeaders(headers, headersFromStruct(*options.GetBlobOptions))
@@ -270,13 +293,13 @@ func (b *Blob) CreateSnapshot(options *SnapshotOptions) (snapshotTimestamp *time
 	if err != nil || resp == nil {
 		return nil, err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusCreated}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusCreated}); err != nil {
 		return nil, err
 	}
 
-	snapshotResponse := resp.headers.Get(http.CanonicalHeaderKey("x-ms-snapshot"))
+	snapshotResponse := resp.Header.Get(http.CanonicalHeaderKey("x-ms-snapshot"))
 	if snapshotResponse != "" {
 		snapshotTimestamp, err := time.Parse(time.RFC3339, snapshotResponse)
 		if err != nil {
@@ -317,23 +340,25 @@ func (b *Blob) GetProperties(options *GetBlobPropertiesOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err = checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err = checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
 	}
-	return b.writePropoerties(resp.headers)
+	return b.writeProperties(resp.Header, true)
 }
 
-func (b *Blob) writePropoerties(h http.Header) error {
+func (b *Blob) writeProperties(h http.Header, includeContentLen bool) error {
 	var err error
 
-	var contentLength int64
-	contentLengthStr := h.Get("Content-Length")
-	if contentLengthStr != "" {
-		contentLength, err = strconv.ParseInt(contentLengthStr, 0, 64)
-		if err != nil {
-			return err
+	contentLength := b.Properties.ContentLength
+	if includeContentLen {
+		contentLengthStr := h.Get("Content-Length")
+		if contentLengthStr != "" {
+			contentLength, err = strconv.ParseInt(contentLengthStr, 0, 64)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -425,8 +450,8 @@ func (b *Blob) SetProperties(options *SetBlobPropertiesOptions) error {
 	uri := b.Container.bsc.client.getEndpoint(blobServiceName, b.buildPath(), params)
 
 	if b.Properties.BlobType == BlobTypePage {
-		headers = addToHeaders(headers, "x-ms-blob-content-length", fmt.Sprintf("byte %v", b.Properties.ContentLength))
-		if options != nil || options.SequenceNumberAction != nil {
+		headers = addToHeaders(headers, "x-ms-blob-content-length", fmt.Sprintf("%v", b.Properties.ContentLength))
+		if options != nil && options.SequenceNumberAction != nil {
 			headers = addToHeaders(headers, "x-ms-sequence-number-action", string(*options.SequenceNumberAction))
 			if *options.SequenceNumberAction != SequenceNumberActionIncrement {
 				headers = addToHeaders(headers, "x-ms-blob-sequence-number", fmt.Sprintf("%v", b.Properties.SequenceNumber))
@@ -438,8 +463,8 @@ func (b *Blob) SetProperties(options *SetBlobPropertiesOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusOK})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusOK})
 }
 
 // SetBlobMetadataOptions includes the options for a set blob metadata operation
@@ -476,8 +501,8 @@ func (b *Blob) SetMetadata(options *SetBlobMetadataOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusOK})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusOK})
 }
 
 // GetBlobMetadataOptions includes the options for a get blob metadata operation
@@ -513,38 +538,18 @@ func (b *Blob) GetMetadata(options *GetBlobMetadataOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
 	}
 
-	b.writeMetadata(resp.headers)
+	b.writeMetadata(resp.Header)
 	return nil
 }
 
 func (b *Blob) writeMetadata(h http.Header) {
-	metadata := make(map[string]string)
-	for k, v := range h {
-		// Can't trust CanonicalHeaderKey() to munge case
-		// reliably. "_" is allowed in identifiers:
-		// https://msdn.microsoft.com/en-us/library/azure/dd179414.aspx
-		// https://msdn.microsoft.com/library/aa664670(VS.71).aspx
-		// http://tools.ietf.org/html/rfc7230#section-3.2
-		// ...but "_" is considered invalid by
-		// CanonicalMIMEHeaderKey in
-		// https://golang.org/src/net/textproto/reader.go?s=14615:14659#L542
-		// so k can be "X-Ms-Meta-Lol" or "x-ms-meta-lol_rofl".
-		k = strings.ToLower(k)
-		if len(v) == 0 || !strings.HasPrefix(k, strings.ToLower(userDefinedMetadataHeaderPrefix)) {
-			continue
-		}
-		// metadata["lol"] = content of the last X-Ms-Meta-Lol header
-		k = k[len(userDefinedMetadataHeaderPrefix):]
-		metadata[k] = v[len(v)-1]
-	}
-
-	b.Metadata = BlobMetadata(metadata)
+	b.Metadata = BlobMetadata(writeMetadata(h))
 }
 
 // DeleteBlobOptions includes the options for a delete blob operation
@@ -569,8 +574,8 @@ func (b *Blob) Delete(options *DeleteBlobOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusAccepted})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusAccepted})
 }
 
 // DeleteIfExists deletes the given blob from the specified container If the
@@ -580,15 +585,15 @@ func (b *Blob) Delete(options *DeleteBlobOptions) error {
 func (b *Blob) DeleteIfExists(options *DeleteBlobOptions) (bool, error) {
 	resp, err := b.delete(options)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusAccepted || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusAccepted, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusAccepted, nil
 		}
 	}
 	return false, err
 }
 
-func (b *Blob) delete(options *DeleteBlobOptions) (*storageResponse, error) {
+func (b *Blob) delete(options *DeleteBlobOptions) (*http.Response, error) {
 	params := url.Values{}
 	headers := b.Container.bsc.client.getStandardHeaders()
 
@@ -614,4 +619,14 @@ func pathForResource(container, name string) string {
 		return fmt.Sprintf("/%s/%s", container, name)
 	}
 	return fmt.Sprintf("/%s", container)
+}
+
+func (b *Blob) respondCreation(resp *http.Response, bt BlobType) error {
+	defer drainRespBody(resp)
+	err := checkRespCode(resp, []int{http.StatusCreated})
+	if err != nil {
+		return err
+	}
+	b.Properties.BlobType = bt
+	return nil
 }

@@ -5,7 +5,9 @@ go_library(
     srcs = [
         "handlers.go",
         "param_validator.go",
+        "user_agent.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/aws/corehandlers",
     importpath = "github.com/aws/aws-sdk-go/aws/corehandlers",
     visibility = ["//visibility:public"],
     deps = [

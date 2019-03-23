@@ -18,13 +18,14 @@ package generators
 
 import (
 	"io"
+	"path"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // factoryGenerator produces a file of listers for a given GroupVersion and
@@ -34,6 +35,7 @@ type factoryGenerator struct {
 	outputPackage             string
 	imports                   namer.ImportTracker
 	groupVersions             map[string]clientgentypes.GroupVersions
+	gvGoNames                 map[string]string
 	clientSetPackage          string
 	internalInterfacesPackage string
 	filtered                  bool
@@ -63,27 +65,31 @@ func (g *factoryGenerator) Imports(c *generator.Context) (imports []string) {
 func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "{{", "}}")
 
-	glog.V(5).Infof("processing type %v", t)
+	klog.V(5).Infof("processing type %v", t)
 
 	gvInterfaces := make(map[string]*types.Type)
 	gvNewFuncs := make(map[string]*types.Type)
-	for groupName := range g.groupVersions {
-		gvInterfaces[groupName] = c.Universe.Type(types.Name{Package: packageForGroup(vendorless(g.outputPackage), g.groupVersions[groupName].Group), Name: "Interface"})
-		gvNewFuncs[groupName] = c.Universe.Function(types.Name{Package: packageForGroup(vendorless(g.outputPackage), g.groupVersions[groupName].Group), Name: "New"})
+	for groupPkgName := range g.groupVersions {
+		gvInterfaces[groupPkgName] = c.Universe.Type(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "Interface"})
+		gvNewFuncs[groupPkgName] = c.Universe.Function(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "New"})
 	}
 	m := map[string]interface{}{
-		"cacheSharedIndexInformer":   c.Universe.Type(cacheSharedIndexInformer),
-		"groupVersions":              g.groupVersions,
-		"gvInterfaces":               gvInterfaces,
-		"gvNewFuncs":                 gvNewFuncs,
-		"interfacesNewInformerFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "NewInformerFunc"}),
-		"informerFactoryInterface":   c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
-		"clientSetInterface":         c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
-		"reflectType":                c.Universe.Type(reflectType),
-		"runtimeObject":              c.Universe.Type(runtimeObject),
-		"schemaGroupVersionResource": c.Universe.Type(schemaGroupVersionResource),
-		"syncMutex":                  c.Universe.Type(syncMutex),
-		"timeDuration":               c.Universe.Type(timeDuration),
+		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
+		"groupVersions":                  g.groupVersions,
+		"gvInterfaces":                   gvInterfaces,
+		"gvNewFuncs":                     gvNewFuncs,
+		"gvGoNames":                      g.gvGoNames,
+		"interfacesNewInformerFunc":      c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "NewInformerFunc"}),
+		"interfacesTweakListOptionsFunc": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
+		"informerFactoryInterface":       c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
+		"clientSetInterface":             c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
+		"reflectType":                    c.Universe.Type(reflectType),
+		"runtimeObject":                  c.Universe.Type(runtimeObject),
+		"schemaGroupVersionResource":     c.Universe.Type(schemaGroupVersionResource),
+		"syncMutex":                      c.Universe.Type(syncMutex),
+		"timeDuration":                   c.Universe.Type(timeDuration),
+		"namespaceAll":                   c.Universe.Type(metav1NamespaceAll),
+		"object":                         c.Universe.Type(metav1Object),
 	}
 
 	sw.Do(sharedInformerFactoryStruct, m)
@@ -93,10 +99,16 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 }
 
 var sharedInformerFactoryStruct = `
+// SharedInformerOption defines the functional option type for SharedInformerFactory.
+type SharedInformerOption func(*sharedInformerFactory) *sharedInformerFactory
+
 type sharedInformerFactory struct {
 	client {{.clientSetInterface|raw}}
+	namespace string
+	tweakListOptions {{.interfacesTweakListOptionsFunc|raw}}
 	lock {{.syncMutex|raw}}
 	defaultResync {{.timeDuration|raw}}
+	customResync map[{{.reflectType|raw}}]{{.timeDuration|raw}}
 
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
 	// startedInformers is used for tracking which informers have been started.
@@ -104,14 +116,62 @@ type sharedInformerFactory struct {
 	startedInformers map[{{.reflectType|raw}}]bool
 }
 
-// NewSharedInformerFactory constructs a new instance of sharedInformerFactory
+// WithCustomResyncConfig sets a custom resync period for the specified informer types.
+func WithCustomResyncConfig(resyncConfig map[{{.object|raw}}]{{.timeDuration|raw}}) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		for k, v := range resyncConfig {
+			factory.customResync[reflect.TypeOf(k)] = v
+		}
+		return factory
+	}
+}
+
+// WithTweakListOptions sets a custom filter on all listers of the configured SharedInformerFactory.
+func WithTweakListOptions(tweakListOptions internalinterfaces.TweakListOptionsFunc) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.tweakListOptions = tweakListOptions
+		return factory
+	}
+}
+
+// WithNamespace limits the SharedInformerFactory to the specified namespace.
+func WithNamespace(namespace string) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.namespace = namespace
+		return factory
+	}
+}
+
+// NewSharedInformerFactory constructs a new instance of sharedInformerFactory for all namespaces.
 func NewSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}) SharedInformerFactory {
-  return &sharedInformerFactory{
-		client: client,
-    defaultResync:    defaultResync,
-    informers:        make(map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}),
-    startedInformers: make(map[{{.reflectType|raw}}]bool),
-  }
+	return NewSharedInformerFactoryWithOptions(client, defaultResync)
+}
+
+// NewFilteredSharedInformerFactory constructs a new instance of sharedInformerFactory.
+// Listers obtained via this SharedInformerFactory will be subject to the same filters
+// as specified here.
+// Deprecated: Please use NewSharedInformerFactoryWithOptions instead
+func NewFilteredSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}, namespace string, tweakListOptions {{.interfacesTweakListOptionsFunc|raw}}) SharedInformerFactory {
+	return NewSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace), WithTweakListOptions(tweakListOptions))
+}
+
+// NewSharedInformerFactoryWithOptions constructs a new instance of a SharedInformerFactory with additional options.
+func NewSharedInformerFactoryWithOptions(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}, options ...SharedInformerOption) SharedInformerFactory {
+	factory := &sharedInformerFactory{
+		client:           client,
+		namespace:        v1.NamespaceAll,
+		defaultResync:    defaultResync,
+		informers:        make(map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}),
+		startedInformers: make(map[{{.reflectType|raw}}]bool),
+		customResync:     make(map[{{.reflectType|raw}}]{{.timeDuration|raw}}),
+	}
+
+	// Apply all options
+	for _, opt := range options {
+		factory = opt(factory)
+	}
+
+	return factory
 }
 
 // Start initializes all requested informers.
@@ -160,7 +220,13 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
   if exists {
     return informer
   }
-  informer = newFunc(f.client, f.defaultResync)
+
+  resyncPeriod, exists := f.customResync[informerType]
+  if !exists {
+    resyncPeriod = f.defaultResync
+  }
+
+  informer = newFunc(f.client, resyncPeriod)
   f.informers[informerType] = informer
 
   return informer
@@ -177,14 +243,16 @@ type SharedInformerFactory interface {
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	{{$gvInterfaces := .gvInterfaces}}
-	{{range $groupName, $group := .groupVersions}}{{$groupName}}() {{index $gvInterfaces $groupName|raw}}
+	{{$gvGoNames := .gvGoNames}}
+	{{range $groupName, $group := .groupVersions}}{{index $gvGoNames $groupName}}() {{index $gvInterfaces $groupName|raw}}
 	{{end}}
 }
 
 {{$gvNewFuncs := .gvNewFuncs}}
-{{range $groupName, $group := .groupVersions}}
-func (f *sharedInformerFactory) {{$groupName}}() {{index $gvInterfaces $groupName|raw}} {
-  return {{index $gvNewFuncs $groupName|raw}}(f)
+{{$gvGoNames := .gvGoNames}}
+{{range $groupPkgName, $group := .groupVersions}}
+func (f *sharedInformerFactory) {{index $gvGoNames $groupPkgName}}() {{index $gvInterfaces $groupPkgName|raw}} {
+  return {{index $gvNewFuncs $groupPkgName|raw}}(f, f.namespace, f.tweakListOptions)
 }
 {{end}}
 `

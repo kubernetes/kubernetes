@@ -1,0 +1,2 @@
+amd64=python:3.6-slim-stretch
+arm64=arm64v8/python:3.6-slim-stretch

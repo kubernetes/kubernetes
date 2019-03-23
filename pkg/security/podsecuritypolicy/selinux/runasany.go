@@ -17,9 +17,9 @@ limitations under the License.
 package selinux
 
 import (
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // runAsAny implements the SELinuxStrategy interface.
@@ -28,7 +28,7 @@ type runAsAny struct{}
 var _ SELinuxStrategy = &runAsAny{}
 
 // NewRunAsAny provides a strategy that will return the configured se linux context or nil.
-func NewRunAsAny(options *extensions.SELinuxStrategyOptions) (SELinuxStrategy, error) {
+func NewRunAsAny(options *policy.SELinuxStrategyOptions) (SELinuxStrategy, error) {
 	return &runAsAny{}, nil
 }
 

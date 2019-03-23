@@ -22,7 +22,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	podpresetstore "k8s.io/kubernetes/pkg/registry/settings/podpreset/storage"
 )
@@ -30,26 +30,23 @@ import (
 type RESTStorageProvider struct{}
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(settings.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(settings.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(settingsapiv1alpha1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(settingsapiv1alpha1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[settingsapiv1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = settingsapiv1alpha1.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true
 }
 
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	version := settingsapiv1alpha1.SchemeGroupVersion
-
 	storage := map[string]rest.Storage{}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("podpresets")) {
-		podPresetStorage := podpresetstore.NewREST(restOptionsGetter)
-		storage["podpresets"] = podPresetStorage
-	}
+	// podpresets
+	podPresetStorage := podpresetstore.NewREST(restOptionsGetter)
+	storage["podpresets"] = podPresetStorage
+
 	return storage
 }
 

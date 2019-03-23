@@ -19,11 +19,15 @@ package flexvolume
 import (
 	"testing"
 
+	"k8s.io/kubernetes/test/utils/harness"
 	exec "k8s.io/utils/exec/testing"
 )
 
-func TestInit(t *testing.T) {
-	plugin, _ := testPlugin()
+func TestInit(tt *testing.T) {
+	t := harness.For(tt)
+	defer t.Close()
+
+	plugin, _ := testPlugin(t)
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, successOutput(), "init"),
 	)
@@ -37,12 +41,15 @@ func fakeVolumeNameOutput(name string) exec.FakeCombinedOutputAction {
 	})
 }
 
-func TestGetVolumeName(t *testing.T) {
+func TestGetVolumeName(tt *testing.T) {
+	t := harness.For(tt)
+	defer t.Close()
+
 	spec := fakeVolumeSpec()
-	plugin, _ := testPlugin()
+	plugin, _ := testPlugin(t)
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, fakeVolumeNameOutput(spec.Name()), getVolumeNameCmd,
-			specJson(plugin, spec, nil)),
+			specJSON(plugin, spec, nil)),
 	)
 
 	name, err := plugin.GetVolumeName(spec)

@@ -22,8 +22,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 // JobUpgradeTest is a test harness for batch Jobs.
@@ -32,30 +32,31 @@ type JobUpgradeTest struct {
 	namespace string
 }
 
+// Name returns the tracking name of the test.
 func (JobUpgradeTest) Name() string { return "[sig-apps] job-upgrade" }
 
 // Setup starts a Job with a parallelism of 2 and 2 completions running.
 func (t *JobUpgradeTest) Setup(f *framework.Framework) {
 	t.namespace = f.Namespace.Name
 
-	By("Creating a job")
+	ginkgo.By("Creating a job")
 	t.job = framework.NewTestJob("notTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2, nil, 6)
 	job, err := framework.CreateJob(f.ClientSet, t.namespace, t.job)
 	t.job = job
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	By("Ensuring active pods == parallelism")
+	ginkgo.By("Ensuring active pods == parallelism")
 	err = framework.WaitForAllJobPodsRunning(f.ClientSet, t.namespace, job.Name, 2)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 }
 
 // Test verifies that the Jobs Pods are running after the an upgrade
 func (t *JobUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
-	By("Ensuring active pods == parallelism")
+	ginkgo.By("Ensuring active pods == parallelism")
 	running, err := framework.CheckForAllJobPodsRunning(f.ClientSet, t.namespace, t.job.Name, 2)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(running).To(BeTrue())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(running).To(gomega.BeTrue())
 }
 
 // Teardown cleans up any remaining resources.

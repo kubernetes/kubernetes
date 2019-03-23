@@ -3,24 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "popcnt_amd64.go",
+        "popcnt_amd64.s",
         "popcnt_generic.go",
         "sparse.go",
         "util.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "popcnt_amd64.go",
-            "popcnt_amd64.s",
-        ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "popcnt_amd64.go",
-            "popcnt_amd64.s",
-        ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "popcnt_amd64.go",
-            "popcnt_amd64.s",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/tools/container/intsets",
     importpath = "golang.org/x/tools/container/intsets",
     visibility = ["//visibility:public"],
 )

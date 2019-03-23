@@ -17,26 +17,25 @@ limitations under the License.
 package upgrades
 
 import (
+	"github.com/onsi/ginkgo"
+
+	apps "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller"
-
-	"k8s.io/api/core/v1"
-
-	extensions "k8s.io/api/extensions/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/upgrades"
-
-	. "github.com/onsi/ginkgo"
 )
 
 // DaemonSetUpgradeTest tests that a DaemonSet is running before and after
 // a cluster upgrade.
 type DaemonSetUpgradeTest struct {
-	daemonSet *extensions.DaemonSet
+	daemonSet *apps.DaemonSet
 }
 
+// Name returns the tracking name of the test.
 func (DaemonSetUpgradeTest) Name() string { return "[sig-apps] daemonset-upgrade" }
 
 // Setup creates a DaemonSet and verifies that it's running
@@ -47,17 +46,23 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 
 	ns := f.Namespace
 
-	t.daemonSet = &extensions.DaemonSet{
+	t.daemonSet = &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns.Name,
 			Name:      daemonSetName,
 		},
-		Spec: extensions.DaemonSetSpec{
+		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labelSet,
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labelSet,
 				},
 				Spec: v1.PodSpec{
+					Tolerations: []v1.Toleration{
+						{Operator: v1.TolerationOpExists},
+					},
 					Containers: []v1.Container{
 						{
 							Name:  daemonSetName,
@@ -70,29 +75,29 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 		},
 	}
 
-	By("Creating a DaemonSet")
+	ginkgo.By("Creating a DaemonSet")
 	var err error
-	if t.daemonSet, err = f.ClientSet.Extensions().DaemonSets(ns.Name).Create(t.daemonSet); err != nil {
+	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(t.daemonSet); err != nil {
 		framework.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
 	}
 
-	By("Waiting for DaemonSet pods to become ready")
+	ginkgo.By("Waiting for DaemonSet pods to become ready")
 	err = wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
 		return checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
 	})
 	framework.ExpectNoError(err)
 
-	By("Validating the DaemonSet after creation")
+	ginkgo.By("Validating the DaemonSet after creation")
 	t.validateRunningDaemonSet(f)
 }
 
 // Test waits until the upgrade has completed and then verifies that the DaemonSet
 // is still running
 func (t *DaemonSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
-	By("Waiting for upgradet to complete before re-validating DaemonSet")
+	ginkgo.By("Waiting for upgradet to complete before re-validating DaemonSet")
 	<-done
 
-	By("validating the DaemonSet is still running after upgrade")
+	ginkgo.By("validating the DaemonSet is still running after upgrade")
 	t.validateRunningDaemonSet(f)
 }
 
@@ -102,7 +107,7 @@ func (t *DaemonSetUpgradeTest) Teardown(f *framework.Framework) {
 }
 
 func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) {
-	By("confirming the DaemonSet pods are running on all expected nodes")
+	ginkgo.By("confirming the DaemonSet pods are running on all expected nodes")
 	res, err := checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
 	framework.ExpectNoError(err)
 	if !res {
@@ -110,7 +115,7 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 	}
 
 	// DaemonSet resource itself should be good
-	By("confirming the DaemonSet resource is in a good state")
+	ginkgo.By("confirming the DaemonSet resource is in a good state")
 	res, err = checkDaemonStatus(f, t.daemonSet.Namespace, t.daemonSet.Name)
 	framework.ExpectNoError(err)
 	if !res {
@@ -119,18 +124,18 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 }
 
 func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector map[string]string) (bool, error) {
-	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return false, err
 	}
 
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
-		if len(node.Spec.Taints) == 0 {
-			nodeNames = append(nodeNames, node.Name)
-		} else {
-			framework.Logf("Node %v not expected to have DaemonSet pod, has taints %v", node.Name, node.Spec.Taints)
+		if len(node.Spec.Taints) != 0 {
+			framework.Logf("Ignore taints %v on Node %v for DaemonSet Pod.", node.Spec.Taints, node.Name)
 		}
+		// DaemonSet Pods are expected to run on all the nodes in e2e.
+		nodeNames = append(nodeNames, node.Name)
 	}
 
 	return checkDaemonPodOnNodes(f, namespace, selector, nodeNames)
@@ -139,7 +144,7 @@ func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector m
 func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet map[string]string, nodeNames []string) (bool, error) {
 	selector := labels.Set(labelSet).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := f.ClientSet.Core().Pods(namespace).List(options)
+	podList, err := f.ClientSet.CoreV1().Pods(namespace).List(options)
 	if err != nil {
 		return false, err
 	}
@@ -168,7 +173,7 @@ func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet ma
 }
 
 func checkDaemonStatus(f *framework.Framework, namespace string, dsName string) (bool, error) {
-	ds, err := f.ClientSet.ExtensionsV1beta1().DaemonSets(namespace).Get(dsName, metav1.GetOptions{})
+	ds, err := f.ClientSet.AppsV1().DaemonSets(namespace).Get(dsName, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}

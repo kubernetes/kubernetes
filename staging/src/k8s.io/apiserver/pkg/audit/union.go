@@ -17,6 +17,9 @@ limitations under the License.
 package audit
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/util/errors"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
@@ -34,10 +37,12 @@ type union struct {
 	backends []Backend
 }
 
-func (u union) ProcessEvents(events ...*auditinternal.Event) {
+func (u union) ProcessEvents(events ...*auditinternal.Event) bool {
+	success := true
 	for _, backend := range u.backends {
-		backend.ProcessEvents(events...)
+		success = backend.ProcessEvents(events...) && success
 	}
+	return success
 }
 
 func (u union) Run(stopCh <-chan struct{}) error {
@@ -54,4 +59,12 @@ func (u union) Shutdown() {
 	for _, backend := range u.backends {
 		backend.Shutdown()
 	}
+}
+
+func (u union) String() string {
+	var backendStrings []string
+	for _, backend := range u.backends {
+		backendStrings = append(backendStrings, fmt.Sprintf("%s", backend))
+	}
+	return fmt.Sprintf("union[%s]", strings.Join(backendStrings, ","))
 }

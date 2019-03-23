@@ -1,4 +1,14 @@
-apiVersion: extensions/v1beta1
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metadata-proxy
+  namespace: kube-system
+  labels:
+    k8s-app: metadata-proxy
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: metadata-proxy-v0.1
@@ -9,6 +19,10 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     version: v0.1
 spec:
+  selector:
+    matchLabels:
+      k8s-app: metadata-proxy
+      version: v0.1
   updateStrategy:
     type: RollingUpdate
   template:
@@ -23,30 +37,58 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: metadata-proxy
       hostNetwork: true
       dnsPolicy: Default
+      tolerations:
+      - operator: "Exists"
+        effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
       containers:
       - name: metadata-proxy
-        image: gcr.io/google-containers/metadata-proxy:0.1.3
-        imagePullPolicy: Always
+        image: k8s.gcr.io/metadata-proxy:v0.1.11
         securityContext:
           privileged: true
-        command:
-          - '/start-proxy.sh'
+        # Request and limit resources to get guaranteed QoS.
         resources:
           requests:
-            memory: "32Mi"
-            cpu: "50m"
+            memory: "25Mi"
+            cpu: "30m"
           limits:
-            memory: "32Mi"
-            cpu: "50m"
-        volumeMounts:
-          - name: config-volume
-            mountPath: /etc/nginx/
+            memory: "25Mi"
+            cpu: "30m"
+      # BEGIN_PROMETHEUS_TO_SD
+      - name: prometheus-to-sd-exporter
+        image: k8s.gcr.io/prometheus-to-sd:v0.3.1
+        # Request and limit resources to get guaranteed QoS.
+        resources:
+          requests:
+            memory: "20Mi"
+            cpu: "2m"
+          limits:
+            memory: "20Mi"
+            cpu: "2m"
+        command:
+          - /monitor
+          - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
+          - --api-override={{ prometheus_to_sd_endpoint }}
+          - --source=metadata_proxy:http://127.0.0.1:989?whitelisted=request_count
+          - --pod-id=$(POD_NAME)
+          - --namespace-id=$(POD_NAMESPACE)
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+      # END_PROMETHEUS_TO_SD
       nodeSelector:
+        # TODO(liggitt): switch to cloud.google.com/metadata-proxy-ready=true in v1.16
         beta.kubernetes.io/metadata-proxy-ready: "true"
+        beta.kubernetes.io/os: linux
       terminationGracePeriodSeconds: 30
-      volumes:
-      - name: config-volume
-        configMap:
-          name: metadata-proxy-config

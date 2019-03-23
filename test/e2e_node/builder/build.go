@@ -22,10 +22,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/test/utils"
 )
 
 var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet binaries.")
@@ -34,11 +34,12 @@ var buildTargets = []string{
 	"cmd/kubelet",
 	"test/e2e_node/e2e_node.test",
 	"vendor/github.com/onsi/ginkgo/ginkgo",
+	"cluster/gce/gci/mounter",
 }
 
 func BuildGo() error {
-	glog.Infof("Building k8s binaries...")
-	k8sRoot, err := GetK8sRootDir()
+	klog.Infof("Building k8s binaries...")
+	k8sRoot, err := utils.GetK8sRootDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes root directory %v.", err)
 	}
@@ -74,7 +75,7 @@ func getK8sBin(bin string) (string, error) {
 		return filepath.Join(path, bin), nil
 	}
 
-	buildOutputDir, err := GetK8sBuildOutputDir()
+	buildOutputDir, err := utils.GetK8sBuildOutputDir()
 	if err != nil {
 		return "", err
 	}
@@ -83,40 +84,13 @@ func getK8sBin(bin string) (string, error) {
 	}
 
 	// Give up with error
-	return "", fmt.Errorf("Unable to locate %s.  Can be defined using --k8s-path.", bin)
-}
-
-// TODO: Dedup / merge this with comparable utilities in e2e/util.go
-func GetK8sRootDir() (string, error) {
-	// Get the directory of the current executable
-	_, testExec, _, _ := runtime.Caller(0)
-	path := filepath.Dir(testExec)
-
-	// Look for the kubernetes source root directory
-	if strings.Contains(path, "k8s.io/kubernetes") {
-		splitPath := strings.Split(path, "k8s.io/kubernetes")
-		return filepath.Join(splitPath[0], "k8s.io/kubernetes/"), nil
-	}
-
-	return "", fmt.Errorf("Could not find kubernetes source root directory.")
-}
-
-func GetK8sBuildOutputDir() (string, error) {
-	k8sRoot, err := GetK8sRootDir()
-	if err != nil {
-		return "", err
-	}
-	buildOutputDir := filepath.Join(k8sRoot, "_output/local/go/bin")
-	if _, err := os.Stat(buildOutputDir); err != nil {
-		return "", err
-	}
-	return buildOutputDir, nil
+	return "", fmt.Errorf("unable to locate %s, Can be defined using --k8s-path", bin)
 }
 
 func GetKubeletServerBin() string {
 	bin, err := getK8sBin("kubelet")
 	if err != nil {
-		glog.Fatalf("Could not locate kubelet binary %v.", err)
+		klog.Fatalf("Could not locate kubelet binary %v.", err)
 	}
 	return bin
 }

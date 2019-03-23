@@ -17,12 +17,12 @@ limitations under the License.
 package dns
 
 const (
-	// v170AndAboveKubeDNSDeployment is the kube-dns Deployment manifest for the kube-dns manifest for v1.7+
-	v170AndAboveKubeDNSDeployment = `
-apiVersion: apps/v1beta2
+	// KubeDNSDeployment is the kube-dns Deployment manifest for the kube-dns manifest for v1.7+
+	KubeDNSDeployment = `
+apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kube-dns
+  name: {{ .DeploymentName }}
   namespace: kube-system
   labels:
     k8s-app: kube-dns
@@ -43,6 +43,7 @@ spec:
       labels:
         k8s-app: kube-dns
     spec:
+      priorityClassName: system-cluster-critical
       volumes:
       - name: kube-dns-config
         configMap:
@@ -50,7 +51,7 @@ spec:
           optional: true
       containers:
       - name: kubedns
-        image: {{ .ImageRepository }}/k8s-dns-kube-dns-{{ .Arch }}:{{ .Version }}
+        image: {{ .KubeDNSImage }}
         imagePullPolicy: IfNotPresent
         resources:
           # TODO: Set memory limits when we've profiled the container for large
@@ -76,7 +77,7 @@ spec:
             path: /readiness
             port: 8081
             scheme: HTTP
-          # we poll on pod startup for the Kubernetes master service and
+          # we poll on pod startup for the Kubernetes control-plane service and
           # only setup the /readiness HTTP server once that's available.
           initialDelaySeconds: 3
           timeoutSeconds: 5
@@ -102,7 +103,7 @@ spec:
         - name: kube-dns-config
           mountPath: /kube-dns-config
       - name: dnsmasq
-        image: {{ .ImageRepository }}/k8s-dns-dnsmasq-nanny-{{ .Arch }}:{{ .Version }}
+        image: {{ .DNSMasqImage }}
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -122,10 +123,11 @@ spec:
         - -k
         - --cache-size=1000
         - --no-negcache
+        - --dns-loop-detect
         - --log-facility=-
-        - --server=/{{ .DNSDomain }}/127.0.0.1#10053
-        - --server=/in-addr.arpa/127.0.0.1#10053
-        - --server=/ip6.arpa/127.0.0.1#10053
+        - --server=/{{ .DNSDomain }}/{{ .DNSBindAddr }}#10053
+        - --server=/in-addr.arpa/{{ .DNSBindAddr }}#10053
+        - --server=/ip6.arpa/{{ .DNSBindAddr }}#10053
         ports:
         - containerPort: 53
           name: dns
@@ -142,7 +144,7 @@ spec:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
       - name: sidecar
-        image: {{ .ImageRepository }}/k8s-dns-sidecar-{{ .Arch }}:{{ .Version }}
+        image: {{ .SidecarImage }}
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -156,8 +158,8 @@ spec:
         args:
         - --v=2
         - --logtostderr
-        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.{{ .DNSDomain }},5,A
-        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.{{ .DNSDomain }},5,A
+        - --probe=kubedns,{{ .DNSProbeAddr }}:10053,kubernetes.default.svc.{{ .DNSDomain }},5,SRV
+        - --probe=dnsmasq,{{ .DNSProbeAddr }}:53,kubernetes.default.svc.{{ .DNSDomain }},5,SRV
         ports:
         - containerPort: 10054
           name: metrics
@@ -171,18 +173,8 @@ spec:
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
-      - key: {{ .MasterTaintKey }}
+      - key: {{ .ControlPlaneTaintKey }}
         effect: NoSchedule
-      # TODO: Remove this affinity field as soon as we are using manifest lists
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: beta.kubernetes.io/arch
-                operator: In
-                values:
-                - {{ .Arch }}
 `
 
 	// KubeDNSService is the kube-dns Service manifest
@@ -196,6 +188,9 @@ metadata:
     kubernetes.io/name: "KubeDNS"
   name: kube-dns
   namespace: kube-system
+  annotations:
+    prometheus.io/port: "9153"
+    prometheus.io/scrape: "true"
   # Without this resourceVersion value, an update of the Service between versions will yield:
   #   Service "kube-dns" is invalid: metadata.resourceVersion: Invalid value: "": must be specified for an update
   resourceVersion: "0"
@@ -210,7 +205,173 @@ spec:
     port: 53
     protocol: TCP
     targetPort: 53
+  - name: metrics
+    port: 9153
+    protocol: TCP
+    targetPort: 9153
   selector:
     k8s-app: kube-dns
+`
+
+	// CoreDNSDeployment is the CoreDNS Deployment manifest
+	CoreDNSDeployment = `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .DeploymentName }}
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+    spec:
+      priorityClassName: system-cluster-critical
+      serviceAccountName: coredns
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: {{ .ControlPlaneTaintKey }}
+        effect: NoSchedule
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      containers:
+      - name: coredns
+        image: {{ .Image }}
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: 170Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        args: [ "-conf", "/etc/coredns/Corefile" ]
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/coredns
+          readOnly: true
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        - containerPort: 9153
+          name: metrics
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+            drop:
+            - all
+          readOnlyRootFilesystem: true
+      dnsPolicy: Default
+      volumes:
+        - name: config-volume
+          configMap:
+            name: coredns
+            items:
+            - key: Corefile
+              path: Corefile
+`
+
+	// CoreDNSConfigMap is the CoreDNS ConfigMap manifest
+	CoreDNSConfigMap = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health
+        kubernetes {{ .DNSDomain }} in-addr.arpa ip6.arpa {
+           pods insecure
+           upstream
+           fallthrough in-addr.arpa ip6.arpa
+        }{{ .Federation }}
+        prometheus :9153
+        forward . {{ .UpstreamNameserver }}
+        cache 30
+        loop
+        reload
+        loadbalance
+    }{{ .StubDomain }}
+`
+	// CoreDNSClusterRole is the CoreDNS ClusterRole manifest
+	CoreDNSClusterRole = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:coredns
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - services
+  - pods
+  - namespaces
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+`
+	// CoreDNSClusterRoleBinding is the CoreDNS Clusterrolebinding manifest
+	CoreDNSClusterRoleBinding = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:coredns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:coredns
+subjects:
+- kind: ServiceAccount
+  name: coredns
+  namespace: kube-system
+`
+	// CoreDNSServiceAccount is the CoreDNS ServiceAccount manifest
+	CoreDNSServiceAccount = `
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: coredns
+  namespace: kube-system
 `
 )

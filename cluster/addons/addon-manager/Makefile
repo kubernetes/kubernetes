@@ -12,27 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE=gcr.io/google-containers/kube-addon-manager
+IMAGE=staging-k8s.gcr.io/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v6.4-beta.2
-KUBECTL_VERSION?=v1.6.4
+VERSION=v9.0
+KUBECTL_VERSION?=v1.13.2
 
-ifeq ($(ARCH),amd64)
-	BASEIMAGE?=bashell/alpine-bash
-endif
-ifeq ($(ARCH),arm)
-	BASEIMAGE?=arm32v7/debian
-endif
-ifeq ($(ARCH),arm64)
-	BASEIMAGE?=arm64v8/debian
-endif
-ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/debian
-endif
-ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/debian
-endif
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.1
+
+SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
 
 .PHONY: build push
 
@@ -40,18 +28,24 @@ all: build
 
 build:
 	cp ./* $(TEMP_DIR)
-	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
+	curl -sSL --retry 5 https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
 	chmod +x $(TEMP_DIR)/kubectl
 	cd $(TEMP_DIR) && sed -i.back "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
+
+ifneq ($(ARCH),amd64)
+	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
+	$(SUDO) ../../../third_party/multiarch/qemu-user-static/register/register.sh --reset
+endif
+
 	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(IMAGE)-$(ARCH):$(VERSION)
+	docker push $(IMAGE)-$(ARCH):$(VERSION)
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
 	docker rmi $(IMAGE):$(VERSION) 2>/dev/null || true
 	docker tag $(IMAGE)-$(ARCH):$(VERSION) $(IMAGE):$(VERSION)
-	gcloud docker -- push $(IMAGE):$(VERSION)
+	docker push $(IMAGE):$(VERSION)
 endif
 
 clean:

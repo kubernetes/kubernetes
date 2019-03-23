@@ -17,13 +17,15 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // strategy implements behavior for ConfigMap objects
@@ -34,7 +36,7 @@ type strategy struct {
 
 // Strategy is the default logic that applies when creating and updating ConfigMap
 // objects via the REST API.
-var Strategy = strategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -46,11 +48,11 @@ func (strategy) NamespaceScoped() bool {
 	return true
 }
 
-func (strategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	_ = obj.(*api.ConfigMap)
 }
 
-func (strategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cfg := obj.(*api.ConfigMap)
 
 	return validation.ValidateConfigMap(cfg)
@@ -64,7 +66,7 @@ func (strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (strategy) PrepareForUpdate(ctx genericapirequest.Context, newObj, oldObj runtime.Object) {
+func (strategy) PrepareForUpdate(ctx context.Context, newObj, oldObj runtime.Object) {
 	_ = oldObj.(*api.ConfigMap)
 	_ = newObj.(*api.ConfigMap)
 }
@@ -73,7 +75,7 @@ func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (strategy) ValidateUpdate(ctx genericapirequest.Context, newObj, oldObj runtime.Object) field.ErrorList {
+func (strategy) ValidateUpdate(ctx context.Context, newObj, oldObj runtime.Object) field.ErrorList {
 	oldCfg, newCfg := oldObj.(*api.ConfigMap), newObj.(*api.ConfigMap)
 
 	return validation.ValidateConfigMapUpdate(newCfg, oldCfg)

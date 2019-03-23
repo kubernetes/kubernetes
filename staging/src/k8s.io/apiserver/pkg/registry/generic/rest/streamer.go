@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -28,13 +30,14 @@ import (
 )
 
 // LocationStreamer is a resource that streams the contents of a particular
-// location URL
+// location URL.
 type LocationStreamer struct {
 	Location        *url.URL
 	Transport       http.RoundTripper
 	ContentType     string
 	Flush           bool
 	ResponseChecker HttpResponseChecker
+	RedirectChecker func(req *http.Request, via []*http.Request) error
 }
 
 // a LocationStreamer must implement a rest.ResourceStreamer
@@ -49,7 +52,7 @@ func (obj *LocationStreamer) DeepCopyObject() runtime.Object {
 
 // InputStream returns a stream with the contents of the URL location. If no location is provided,
 // a null stream is returned.
-func (s *LocationStreamer) InputStream(apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, contentType string, err error) {
+func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, contentType string, err error) {
 	if s.Location == nil {
 		// If no location was provided, return a null stream
 		return nil, false, "", nil
@@ -58,8 +61,16 @@ func (s *LocationStreamer) InputStream(apiVersion, acceptHeader string) (stream 
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
-	client := &http.Client{Transport: transport}
-	resp, err := client.Get(s.Location.String())
+	client := &http.Client{
+		Transport:     transport,
+		CheckRedirect: s.RedirectChecker,
+	}
+	req, err := http.NewRequest("GET", s.Location.String(), nil)
+	// Pass the parent context down to the request to ensure that the resources
+	// will be release properly.
+	req = req.WithContext(ctx)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, false, "", err
 	}
@@ -80,4 +91,9 @@ func (s *LocationStreamer) InputStream(apiVersion, acceptHeader string) (stream 
 	flush = s.Flush
 	stream = resp.Body
 	return
+}
+
+// PreventRedirects is a redirect checker that prevents the client from following a redirect.
+func PreventRedirects(_ *http.Request, _ []*http.Request) error {
+	return errors.New("redirects forbidden")
 }

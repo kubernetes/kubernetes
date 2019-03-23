@@ -19,35 +19,34 @@ limitations under the License.
 package framework
 
 import (
-	"strings"
+	"net/http/httptest"
+	"testing"
 
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	// When these values are updated, also update cmd/kubelet/app/options/options.go
-	// A copy of these values exist in e2e/framework/util.go.
-	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
-	currentPodInfraContainerImageVersion = "3.0"
+	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
+	// A copy of these values exist in test/utils/image/manifest.go
+	currentPodInfraContainerImageName    = "k8s.gcr.io/pause"
+	currentPodInfraContainerImageVersion = "3.1"
 )
 
-// GetServerArchitecture fetches the architecture of the cluster's apiserver.
-func GetServerArchitecture(c clientset.Interface) string {
-	arch := ""
-	sVer, err := c.Discovery().ServerVersion()
-	if err != nil || sVer.Platform == "" {
-		// If we failed to get the server version for some reason, default to amd64.
-		arch = "amd64"
-	} else {
-		// Split the platform string into OS and Arch separately.
-		// The platform string may for example be "linux/amd64", "linux/arm" or "windows/amd64".
-		osArchArray := strings.Split(sVer.Platform, "/")
-		arch = osArchArray[1]
+// CreateTestingNamespace creates a namespace for testing.
+func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *testing.T) *v1.Namespace {
+	// TODO: Create a namespace with a given basename.
+	// Currently we neither create the namespace nor delete all of its contents at the end.
+	// But as long as tests are not using the same namespaces, this should work fine.
+	return &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			// TODO: Once we start creating namespaces, switch to GenerateName.
+			Name: baseName,
+		},
 	}
-	return arch
 }
 
-// GetPauseImageName fetches the pause image name for the same architecture as the apiserver.
-func GetPauseImageName(c clientset.Interface) string {
-	return currentPodInfraContainerImageName + "-" + GetServerArchitecture(c) + ":" + currentPodInfraContainerImageVersion
+// DeleteTestingNamespace is currently a no-op function.
+func DeleteTestingNamespace(ns *v1.Namespace, apiserver *httptest.Server, t *testing.T) {
+	// TODO: Remove all resources from a given namespace once we implement CreateTestingNamespace.
 }

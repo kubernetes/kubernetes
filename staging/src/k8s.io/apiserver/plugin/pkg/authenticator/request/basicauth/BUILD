@@ -9,22 +9,19 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["basicauth_test.go"],
-    importpath = "k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["basicauth.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth",
     importpath = "k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth",
-    deps = [
-        "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-    ],
+    deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library"],
 )
 
 filegroup(

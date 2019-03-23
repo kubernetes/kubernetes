@@ -23,10 +23,11 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	. "k8s.io/kubernetes/pkg/apis/batch/v1beta1"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultCronJob(t *testing.T) {
@@ -40,8 +41,8 @@ func TestSetDefaultCronJob(t *testing.T) {
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.AllowConcurrent,
 					Suspend:                    newBool(false),
-					SuccessfulJobsHistoryLimit: newInt32(3),
-					FailedJobsHistoryLimit:     newInt32(1),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(3),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(1),
 				},
 			},
 		},
@@ -50,16 +51,16 @@ func TestSetDefaultCronJob(t *testing.T) {
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
 					Suspend:                    newBool(true),
-					SuccessfulJobsHistoryLimit: newInt32(5),
-					FailedJobsHistoryLimit:     newInt32(5),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(5),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(5),
 				},
 			},
 			expected: &batchv1beta1.CronJob{
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
 					Suspend:                    newBool(true),
-					SuccessfulJobsHistoryLimit: newInt32(5),
-					FailedJobsHistoryLimit:     newInt32(5),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(5),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(5),
 				},
 			},
 		},
@@ -90,18 +91,18 @@ func TestSetDefaultCronJob(t *testing.T) {
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := runtime.Encode(api.Codecs.LegacyCodec(SchemeGroupVersion), obj)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
 	}
-	obj2, err := runtime.Decode(api.Codecs.UniversalDecoder(), data)
+	obj2, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), obj)
 		return nil
 	}
 	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
-	err = api.Scheme.Convert(obj2, obj3, nil)
+	err = legacyscheme.Scheme.Convert(obj2, obj3, nil)
 	if err != nil {
 		t.Errorf("%v\nSource: %#v", err, obj2)
 		return nil
@@ -111,12 +112,6 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 
 func newBool(val bool) *bool {
 	p := new(bool)
-	*p = val
-	return p
-}
-
-func newInt32(val int32) *int32 {
-	p := new(int32)
 	*p = val
 	return p
 }

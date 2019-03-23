@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -26,11 +26,30 @@
 # 3. Kubectl prints the output to stderr (the output should be captured and then
 #    logged)
 
-# The business logic for whether a given object should be created
-# was already enforced by salt, and /etc/kubernetes/addons is the
-# managed result is of that. Start everything below that directory.
 KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 KUBECTL_OPTS=${KUBECTL_OPTS:-}
+# KUBECTL_PRUNE_WHITELIST is a list of resources whitelisted by
+# default.
+# This is currently the same with the default in:
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/apply.go
+KUBECTL_PRUNE_WHITELIST=(
+  core/v1/ConfigMap
+  core/v1/Endpoints
+  core/v1/Namespace
+  core/v1/PersistentVolumeClaim
+  core/v1/PersistentVolume
+  core/v1/Pod
+  core/v1/ReplicationController
+  core/v1/Secret
+  core/v1/Service
+  batch/v1/Job
+  batch/v1beta1/CronJob
+  apps/v1/DaemonSet
+  apps/v1/Deployment
+  apps/v1/ReplicaSet
+  apps/v1/StatefulSet
+  extensions/v1beta1/Ingress
+)
 
 ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-60}
 ADDON_PATH=${ADDON_PATH:-/etc/kubernetes/addons}
@@ -46,6 +65,11 @@ ADDON_MANAGER_LABEL="addonmanager.kubernetes.io/mode"
 # CLUSTER_SERVICE_LABEL=true and without ADDON_MANAGER_LABEL=EnsureExists
 # will be reconciled for now.
 CLUSTER_SERVICE_LABEL="kubernetes.io/cluster-service"
+
+# Whether only one addon manager should be running in a multi-master setup.
+# Disabling this flag will force all addon managers to assume they are the
+# leaders.
+ADDON_MANAGER_LEADER_ELECTION=${ADDON_MANAGER_LEADER_ELECTION:-true}
 
 # Remember that you can't log from functions that print some output (because
 # logs are also printed on stdout).
@@ -79,6 +103,25 @@ function log() {
         ;;
   esac
 }
+
+# Generate kubectl prune-whitelist flags from provided resource list.
+function generate_prune_whitelist_flags() {
+  local -r resources=($@)
+  for resource in "${resources[@]}"; do
+    printf "%s" "--prune-whitelist ${resource} "
+  done
+}
+
+# KUBECTL_EXTRA_PRUNE_WHITELIST is a list of extra whitelisted resources
+# besides the default ones.
+extra_prune_whitelist=
+if [ -n "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" ]; then
+  extra_prune_whitelist=( ${KUBECTL_EXTRA_PRUNE_WHITELIST:-} )
+fi
+prune_whitelist=( ${KUBECTL_PRUNE_WHITELIST[@]}  ${extra_prune_whitelist[@]} )
+prune_whitelist_flags=$(generate_prune_whitelist_flags ${prune_whitelist[@]})
+
+log INFO "== Generated kubectl prune whitelist flags: $prune_whitelist_flags =="
 
 # $1 filename of addon to start.
 # $2 count of tries to start the addon.
@@ -122,14 +165,14 @@ function reconcile_addons() {
   # Filter out `configured` message to not noisily log.
   # `created`, `pruned` and errors will be logged.
   log INFO "== Reconciling with deprecated label =="
-  ${KUBECTL} ${KUBECTL_OPTS} apply --namespace=${SYSTEM_NAMESPACE} -f ${ADDON_PATH} \
+  ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}=true,${ADDON_MANAGER_LABEL}!=EnsureExists \
-    --prune=true --recursive | grep -v configured
+    --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
 
   log INFO "== Reconciling with addon-manager label =="
-  ${KUBECTL} ${KUBECTL_OPTS} apply --namespace=${SYSTEM_NAMESPACE} -f ${ADDON_PATH} \
+  ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}!=true,${ADDON_MANAGER_LABEL}=Reconcile \
-    --prune=true --recursive | grep -v configured
+    --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
 
   log INFO "== Kubernetes addon reconcile completed at $(date -Is) =="
 }
@@ -137,15 +180,34 @@ function reconcile_addons() {
 function ensure_addons() {
   # Create objects already exist should fail.
   # Filter out `AlreadyExists` message to not noisily log.
-  ${KUBECTL} ${KUBECTL_OPTS} create --namespace=${SYSTEM_NAMESPACE} -f ${ADDON_PATH} \
+  ${KUBECTL} ${KUBECTL_OPTS} create -f ${ADDON_PATH} \
     -l ${ADDON_MANAGER_LABEL}=EnsureExists --recursive 2>&1 | grep -v AlreadyExists
 
   log INFO "== Kubernetes addon ensure completed at $(date -Is) =="
 }
 
+function is_leader() {
+  # In multi-master setup, only one addon manager should be running. We use
+  # existing leader election in kube-controller-manager instead of implementing
+  # a separate mechanism here.
+  if ! $ADDON_MANAGER_LEADER_ELECTION; then
+    log INFO "Leader election disabled."
+    return 0;
+  fi
+  KUBE_CONTROLLER_MANAGER_LEADER=`${KUBECTL} -n kube-system get ep kube-controller-manager \
+    -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
+    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/' | awk -F'_' '{print $1}'`
+  # If there was any problem with getting the leader election results, var will
+  # be empty. Since it's better to have multiple addon managers than no addon
+  # managers at all, we're going to assume that we're the leader in such case.
+  log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
+  [[ "$KUBE_CONTROLLER_MANAGER_LEADER" == "" ||
+     "$HOSTNAME" == "$KUBE_CONTROLLER_MANAGER_LEADER" ]]
+}
+
 # The business logic for whether a given object should be created
 # was already enforced by salt, and /etc/kubernetes/addons is the
-# managed result is of that. Start everything below that directory.
+# managed result of that. Start everything below that directory.
 log INFO "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC} =="
 
 # Create the namespace that will be used to host the cluster-level add-ons.
@@ -178,8 +240,12 @@ done
 log INFO "== Entering periodical apply loop at $(date -Is) =="
 while true; do
   start_sec=$(date +"%s")
-  ensure_addons
-  reconcile_addons
+  if is_leader; then
+    ensure_addons
+    reconcile_addons
+  else
+    log INFO "Not elected leader, going back to sleep."
+  fi
   end_sec=$(date +"%s")
   len_sec=$((${end_sec}-${start_sec}))
   # subtract the time passed from the sleep time

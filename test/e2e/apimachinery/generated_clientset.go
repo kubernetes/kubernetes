@@ -49,7 +49,7 @@ func stagingClientPod(name, value string) v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+					Image: imageutils.GetE2EImage(imageutils.Nginx),
 					Ports: []v1.ContainerPort{{ContainerPort: 80}},
 				},
 			},
@@ -70,7 +70,7 @@ func testingPod(name, value string) v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+					Image: imageutils.GetE2EImage(imageutils.Nginx),
 					Ports: []v1.ContainerPort{{ContainerPort: 80}},
 					LivenessProbe: &v1.Probe{
 						Handler: v1.Handler{
@@ -151,7 +151,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
-		podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
+		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		By("constructing the pod")
 		name := "pod" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -243,7 +243,7 @@ func newTestingCronJob(name string, value string) *batchv1beta1.CronJob {
 							Containers: []v1.Container{
 								{
 									Name:  "c",
-									Image: imageutils.GetBusyBoxImage(),
+									Image: imageutils.GetE2EImage(imageutils.BusyBox),
 									VolumeMounts: []v1.VolumeMount{
 										{
 											MountPath: "/data",
@@ -264,7 +264,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 
 	BeforeEach(func() {
-		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResource, f.Namespace.Name)
+		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
 	})
 
 	It("should create v1beta1 cronJobs, delete cronJobs, watch cronJobs", func() {

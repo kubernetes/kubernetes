@@ -15,7 +15,8 @@ write_files:
       ExecStartPre=/bin/mkdir -p /home/kubernetes/bin
       ExecStartPre=/bin/mount --bind /home/kubernetes/bin /home/kubernetes/bin
       ExecStartPre=/bin/mount -o remount,exec /home/kubernetes/bin
-      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error	-H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+      # Use --retry-connrefused opt only if it's supported by curl.
+      ExecStartPre=/bin/bash -c 'OPT=""; if curl --help | grep -q -- "--retry-connrefused"; then OPT="--retry-connrefused"; fi; /usr/bin/curl --fail --retry 5 --retry-delay 3 $OPT --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh'
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure.sh
       ExecStart=/home/kubernetes/bin/configure.sh
 
@@ -39,12 +40,12 @@ write_files:
       [Install]
       WantedBy=kubernetes.target
 
-  - path: /etc/systemd/system/kube-docker-monitor.service
+  - path: /etc/systemd/system/kube-container-runtime-monitor.service
     permissions: 0644
     owner: root
     content: |
       [Unit]
-      Description=Kubernetes health monitoring for docker
+      Description=Kubernetes health monitoring for container runtime
       After=kube-master-configuration.service
 
       [Service]
@@ -53,7 +54,7 @@ write_files:
       RemainAfterExit=yes
       RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
-      ExecStart=/home/kubernetes/bin/health-monitor.sh docker
+      ExecStart=/home/kubernetes/bin/health-monitor.sh container-runtime
 
       [Install]
       WantedBy=kubernetes.target
@@ -119,7 +120,7 @@ runcmd:
  - systemctl daemon-reload
  - systemctl enable kube-master-installation.service
  - systemctl enable kube-master-configuration.service
- - systemctl enable kube-docker-monitor.service
+ - systemctl enable kube-container-runtime-monitor.service
  - systemctl enable kubelet-monitor.service
  - systemctl enable kube-logrotate.timer
  - systemctl enable kube-logrotate.service

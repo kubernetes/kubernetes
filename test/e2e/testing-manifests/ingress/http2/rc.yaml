@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echoheaders
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echoheaders
+  template:
+    metadata:
+      labels:
+        app: echoheaders
+    spec:
+      containers:
+      - name: echoheaders
+        image: gcr.io/kubernetes-e2e-test-images/echoserver:2.2
+        ports:
+        - containerPort: 8443

@@ -22,8 +22,8 @@ func Minor(dev uint64) uint32 {
 // Mkdev returns a NetBSD device number generated from the given major and minor
 // components.
 func Mkdev(major, minor uint32) uint64 {
-	dev := uint64((major << 8) & 0x000fff00)
-	dev |= uint64((minor << 12) & 0xfff00000)
-	dev |= uint64((minor << 0) & 0x000000ff)
+	dev := (uint64(major) << 8) & 0x000fff00
+	dev |= (uint64(minor) << 12) & 0xfff00000
+	dev |= (uint64(minor) << 0) & 0x000000ff
 	return dev
 }

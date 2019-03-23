@@ -23,7 +23,7 @@ import (
 
 	// TODO: Ideally we should create the necessary package structure in e.g.,
 	// pkg/conversion/test/... instead of importing pkg/api here.
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

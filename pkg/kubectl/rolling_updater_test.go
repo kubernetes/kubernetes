@@ -26,26 +26,28 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	manualfake "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 
-func oldRc(replicas int, original int) *api.ReplicationController {
-	return &api.ReplicationController{
+func oldRc(replicas int, original int) *corev1.ReplicationController {
+	t := replicas
+	replicasCopy := int32(t)
+	return &corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceDefault,
 			Name:      "foo-v1",
@@ -54,25 +56,25 @@ func oldRc(replicas int, original int) *api.ReplicationController {
 				originalReplicasAnnotation: fmt.Sprintf("%d", original),
 			},
 		},
-		Spec: api.ReplicationControllerSpec{
-			Replicas: int32(replicas),
+		Spec: corev1.ReplicationControllerSpec{
+			Replicas: &replicasCopy,
 			Selector: map[string]string{"version": "v1"},
-			Template: &api.PodTemplateSpec{
+			Template: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo-v1",
 					Labels: map[string]string{"version": "v1"},
 				},
 			},
 		},
-		Status: api.ReplicationControllerStatus{
+		Status: corev1.ReplicationControllerStatus{
 			Replicas: int32(replicas),
 		},
 	}
 }
 
-func newRc(replicas int, desired int) *api.ReplicationController {
+func newRc(replicas int, desired int) *corev1.ReplicationController {
 	rc := oldRc(replicas, replicas)
-	rc.Spec.Template = &api.PodTemplateSpec{
+	rc.Spec.Template = &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "foo-v2",
 			Labels: map[string]string{"version": "v2"},
@@ -84,7 +86,7 @@ func newRc(replicas int, desired int) *api.ReplicationController {
 		Name:      "foo-v2",
 		Annotations: map[string]string{
 			desiredReplicasAnnotation: fmt.Sprintf("%d", desired),
-			sourceIdAnnotation:        "foo-v1:7764ae47-9092-11e4-8393-42010af018ff",
+			sourceIDAnnotation:        "foo-v1:7764ae47-9092-11e4-8393-42010af018ff",
 		},
 	}
 	return rc
@@ -118,9 +120,9 @@ func TestUpdate(t *testing.T) {
 	tests := []struct {
 		name string
 		// oldRc is the "from" deployment
-		oldRc *api.ReplicationController
+		oldRc *corev1.ReplicationController
 		// newRc is the "to" deployment
-		newRc *api.ReplicationController
+		newRc *corev1.ReplicationController
 		// whether newRc existed (false means it was created)
 		newRcExists bool
 		maxUnavail  intstr.IntOrString
@@ -747,106 +749,108 @@ Scaling foo-v2 up to 2
 		},
 	}
 
-	for i, test := range tests {
+	for i, tt := range tests {
 		// Extract expectations into some makeshift FIFOs so they can be returned
 		// in the correct order from the right places. This lets scale downs be
 		// expressed a single event even though the data is used from multiple
 		// interface calls.
-		oldReady := []int{}
-		newReady := []int{}
-		upTo := []int{}
-		downTo := []int{}
-		for _, event := range test.expected {
-			switch e := event.(type) {
-			case down:
-				oldReady = append(oldReady, e.oldReady)
-				newReady = append(newReady, e.newReady)
-				if !e.noop {
-					downTo = append(downTo, e.to)
+		t.Run(tt.name, func(t *testing.T) {
+			oldReady := []int{}
+			newReady := []int{}
+			upTo := []int{}
+			downTo := []int{}
+			for _, event := range tt.expected {
+				switch e := event.(type) {
+				case down:
+					oldReady = append(oldReady, e.oldReady)
+					newReady = append(newReady, e.newReady)
+					if !e.noop {
+						downTo = append(downTo, e.to)
+					}
+				case up:
+					upTo = append(upTo, e.to)
 				}
-			case up:
-				upTo = append(upTo, e.to)
 			}
-		}
 
-		// Make a way to get the next item from our FIFOs. Returns -1 if the array
-		// is empty.
-		next := func(s *[]int) int {
-			slice := *s
-			v := -1
-			if len(slice) > 0 {
-				v = slice[0]
-				if len(slice) > 1 {
-					*s = slice[1:]
-				} else {
-					*s = []int{}
+			// Make a way to get the next item from our FIFOs. Returns -1 if the array
+			// is empty.
+			next := func(s *[]int) int {
+				slice := *s
+				v := -1
+				if len(slice) > 0 {
+					v = slice[0]
+					if len(slice) > 1 {
+						*s = slice[1:]
+					} else {
+						*s = []int{}
+					}
 				}
+				return v
 			}
-			return v
-		}
-		t.Logf("running test %d (%s) (up: %v, down: %v, oldReady: %v, newReady: %v)", i, test.name, upTo, downTo, oldReady, newReady)
-		updater := &RollingUpdater{
-			ns: "default",
-			scaleAndWait: func(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
-				// Return a scale up or scale down expectation depending on the rc,
-				// and throw errors if there is no expectation expressed for this
-				// call.
-				expected := -1
-				switch {
-				case rc == test.newRc:
-					t.Logf("scaling up %s to %d", rc.Name, rc.Spec.Replicas)
-					expected = next(&upTo)
-				case rc == test.oldRc:
-					t.Logf("scaling down %s to %d", rc.Name, rc.Spec.Replicas)
-					expected = next(&downTo)
-				}
-				if expected == -1 {
-					t.Fatalf("unexpected scale of %s to %d", rc.Name, rc.Spec.Replicas)
-				} else if e, a := expected, int(rc.Spec.Replicas); e != a {
-					t.Fatalf("expected scale of %s to %d, got %d", rc.Name, e, a)
-				}
-				// Simulate the scale.
-				rc.Status.Replicas = rc.Spec.Replicas
-				return rc, nil
-			},
-			getOrCreateTargetController: func(controller *api.ReplicationController, sourceId string) (*api.ReplicationController, bool, error) {
-				// Simulate a create vs. update of an existing controller.
-				return test.newRc, test.newRcExists, nil
-			},
-			cleanup: func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error {
-				return nil
-			},
-		}
-		// Set up a mock readiness check which handles the test assertions.
-		updater.getReadyPods = func(oldRc, newRc *api.ReplicationController, minReadySecondsDeadline int32) (int32, int32, error) {
-			// Return simulated readiness, and throw an error if this call has no
-			// expectations defined.
-			oldReady := next(&oldReady)
-			newReady := next(&newReady)
-			if oldReady == -1 || newReady == -1 {
-				t.Fatalf("unexpected getReadyPods call for:\noldRc: %#v\nnewRc: %#v", oldRc, newRc)
+			t.Logf("running test %d (%s) (up: %v, down: %v, oldReady: %v, newReady: %v)", i, tt.name, upTo, downTo, oldReady, newReady)
+			updater := &RollingUpdater{
+				ns: "default",
+				scaleAndWait: func(rc *corev1.ReplicationController, retry *RetryParams, wait *RetryParams) (*corev1.ReplicationController, error) {
+					// Return a scale up or scale down expectation depending on the rc,
+					// and throw errors if there is no expectation expressed for this
+					// call.
+					expected := -1
+					switch {
+					case rc == tt.newRc:
+						t.Logf("scaling up %s to %d", rc.Name, rc.Spec.Replicas)
+						expected = next(&upTo)
+					case rc == tt.oldRc:
+						t.Logf("scaling down %s to %d", rc.Name, rc.Spec.Replicas)
+						expected = next(&downTo)
+					}
+					if expected == -1 {
+						t.Fatalf("unexpected scale of %s to %d", rc.Name, rc.Spec.Replicas)
+					} else if e, a := expected, int(*rc.Spec.Replicas); e != a {
+						t.Fatalf("expected scale of %s to %d, got %d", rc.Name, e, a)
+					}
+					// Simulate the scale.
+					rc.Status.Replicas = *rc.Spec.Replicas
+					return rc, nil
+				},
+				getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {
+					// Simulate a create vs. update of an existing controller.
+					return tt.newRc, tt.newRcExists, nil
+				},
+				cleanup: func(oldRc, newRc *corev1.ReplicationController, config *RollingUpdaterConfig) error {
+					return nil
+				},
 			}
-			return int32(oldReady), int32(newReady), nil
-		}
-		var buffer bytes.Buffer
-		config := &RollingUpdaterConfig{
-			Out:            &buffer,
-			OldRc:          test.oldRc,
-			NewRc:          test.newRc,
-			UpdatePeriod:   0,
-			Interval:       time.Millisecond,
-			Timeout:        time.Millisecond,
-			CleanupPolicy:  DeleteRollingUpdateCleanupPolicy,
-			MaxUnavailable: test.maxUnavail,
-			MaxSurge:       test.maxSurge,
-		}
-		err := updater.Update(config)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if buffer.String() != test.output {
-			t.Errorf("Bad output. expected:\n%s\ngot:\n%s", test.output, buffer.String())
-		}
+			// Set up a mock readiness check which handles the test assertions.
+			updater.getReadyPods = func(oldRc, newRc *corev1.ReplicationController, minReadySecondsDeadline int32) (int32, int32, error) {
+				// Return simulated readiness, and throw an error if this call has no
+				// expectations defined.
+				oldReady := next(&oldReady)
+				newReady := next(&newReady)
+				if oldReady == -1 || newReady == -1 {
+					t.Fatalf("unexpected getReadyPods call for:\noldRc: %#v\nnewRc: %#v", oldRc, newRc)
+				}
+				return int32(oldReady), int32(newReady), nil
+			}
+			var buffer bytes.Buffer
+			config := &RollingUpdaterConfig{
+				Out:            &buffer,
+				OldRc:          tt.oldRc,
+				NewRc:          tt.newRc,
+				UpdatePeriod:   0,
+				Interval:       time.Millisecond,
+				Timeout:        time.Millisecond,
+				CleanupPolicy:  DeleteRollingUpdateCleanupPolicy,
+				MaxUnavailable: tt.maxUnavail,
+				MaxSurge:       tt.maxSurge,
+			}
+			err := updater.Update(config)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if buffer.String() != tt.output {
+				t.Errorf("Bad output. expected:\n%s\ngot:\n%s", tt.output, buffer.String())
+			}
+		})
 	}
 }
 
@@ -857,18 +861,18 @@ func TestUpdate_progressTimeout(t *testing.T) {
 	newRc := newRc(0, 2)
 	updater := &RollingUpdater{
 		ns: "default",
-		scaleAndWait: func(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
+		scaleAndWait: func(rc *corev1.ReplicationController, retry *RetryParams, wait *RetryParams) (*corev1.ReplicationController, error) {
 			// Do nothing.
 			return rc, nil
 		},
-		getOrCreateTargetController: func(controller *api.ReplicationController, sourceId string) (*api.ReplicationController, bool, error) {
+		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {
 			return newRc, false, nil
 		},
-		cleanup: func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error {
+		cleanup: func(oldRc, newRc *corev1.ReplicationController, config *RollingUpdaterConfig) error {
 			return nil
 		},
 	}
-	updater.getReadyPods = func(oldRc, newRc *api.ReplicationController, minReadySeconds int32) (int32, int32, error) {
+	updater.getReadyPods = func(oldRc, newRc *corev1.ReplicationController, minReadySeconds int32) (int32, int32, error) {
 		// Coerce a timeout by pods never becoming ready.
 		return 0, 0, nil
 	}
@@ -899,19 +903,19 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 	newRc := newRc(1, 1)
 	fake := fake.NewSimpleClientset(oldRc)
 	updater := &RollingUpdater{
-		rcClient:  fake.Core(),
-		podClient: fake.Core(),
+		rcClient:  fake.CoreV1(),
+		podClient: fake.CoreV1(),
 		ns:        "default",
-		scaleAndWait: func(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
+		scaleAndWait: func(rc *corev1.ReplicationController, retry *RetryParams, wait *RetryParams) (*corev1.ReplicationController, error) {
 			return rc, nil
 		},
-		getOrCreateTargetController: func(controller *api.ReplicationController, sourceId string) (*api.ReplicationController, bool, error) {
+		getOrCreateTargetController: func(controller *corev1.ReplicationController, sourceID string) (*corev1.ReplicationController, bool, error) {
 			return newRc, false, nil
 		},
-		cleanup: func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error {
+		cleanup: func(oldRc, newRc *corev1.ReplicationController, config *RollingUpdaterConfig) error {
 			return nil
 		},
-		getReadyPods: func(oldRc, newRc *api.ReplicationController, minReadySeconds int32) (int32, int32, error) {
+		getReadyPods: func(oldRc, newRc *corev1.ReplicationController, minReadySeconds int32) (int32, int32, error) {
 			return 1, 1, nil
 		},
 	}
@@ -931,41 +935,42 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	updateAction := fake.Actions()[1].(testcore.UpdateAction)
-	if updateAction.GetResource().GroupResource() != api.Resource("replicationcontrollers") {
+	if updateAction.GetResource().GroupResource() != corev1.Resource("replicationcontrollers") {
 		t.Fatalf("expected rc to be updated: %#v", updateAction)
 	}
-	if e, a := "1", updateAction.GetObject().(*api.ReplicationController).Annotations[originalReplicasAnnotation]; e != a {
+	if e, a := "1", updateAction.GetObject().(*corev1.ReplicationController).Annotations[originalReplicasAnnotation]; e != a {
 		t.Fatalf("expected annotation value %s, got %s", e, a)
 	}
 }
 
 func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 	tests := []struct {
-		oldRc *api.ReplicationController
-		newRc *api.ReplicationController
-
+		name          string
+		oldRc         *corev1.ReplicationController
+		newRc         *corev1.ReplicationController
 		container     string
 		image         string
 		deploymentKey string
 	}{
 		{
-			oldRc: &api.ReplicationController{
+			name: "test1",
+			oldRc: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: corev1.ReplicationControllerSpec{
 					Selector: map[string]string{
 						"dk": "old",
 					},
-					Template: &api.PodTemplateSpec{
+					Template: &corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"dk": "old",
 							},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "container1",
 									Image: "image1",
@@ -979,23 +984,23 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 					},
 				},
 			},
-			newRc: &api.ReplicationController{
+			newRc: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: corev1.ReplicationControllerSpec{
 					Selector: map[string]string{
 						"dk": "old",
 					},
-					Template: &api.PodTemplateSpec{
+					Template: &corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"dk": "old",
 							},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "container1",
 									Image: "newimage",
@@ -1014,23 +1019,24 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 			deploymentKey: "dk",
 		},
 		{
-			oldRc: &api.ReplicationController{
+			name: "test2",
+			oldRc: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
 					Name:      "bar",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: corev1.ReplicationControllerSpec{
 					Selector: map[string]string{
 						"dk": "old",
 					},
-					Template: &api.PodTemplateSpec{
+					Template: &corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"dk": "old",
 							},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "container1",
 									Image: "image1",
@@ -1040,23 +1046,23 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 					},
 				},
 			},
-			newRc: &api.ReplicationController{
+			newRc: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
 					Name:      "bar",
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: corev1.ReplicationControllerSpec{
 					Selector: map[string]string{
 						"dk": "old",
 					},
-					Template: &api.PodTemplateSpec{
+					Template: &corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"dk": "old",
 							},
 						},
-						Spec: api.PodSpec{
-							Containers: []api.Container{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "container1",
 									Image: "newimage",
@@ -1072,35 +1078,37 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		fake := fake.NewSimpleClientset(test.oldRc)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(tt.oldRc)
 
-		codec := testapi.Default.Codec()
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-		deploymentHash, err := util.HashObject(test.newRc, codec)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+			deploymentHash, err := util.HashObject(tt.newRc, codec)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
 
-		test.newRc.Spec.Selector[test.deploymentKey] = deploymentHash
-		test.newRc.Spec.Template.Labels[test.deploymentKey] = deploymentHash
-		test.newRc.Name = fmt.Sprintf("%s-%s", test.newRc.Name, deploymentHash)
+			tt.newRc.Spec.Selector[tt.deploymentKey] = deploymentHash
+			tt.newRc.Spec.Template.Labels[tt.deploymentKey] = deploymentHash
+			tt.newRc.Name = fmt.Sprintf("%s-%s", tt.newRc.Name, deploymentHash)
 
-		config := &NewControllerConfig{
-			Namespace:     metav1.NamespaceDefault,
-			OldName:       test.oldRc.ObjectMeta.Name,
-			NewName:       test.newRc.ObjectMeta.Name,
-			Image:         test.image,
-			Container:     test.container,
-			DeploymentKey: test.deploymentKey,
-		}
-		updatedRc, err := CreateNewControllerFromCurrentController(fake.Core(), codec, config)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(updatedRc, test.newRc) {
-			t.Errorf("expected:\n%#v\ngot:\n%#v\n", test.newRc, updatedRc)
-		}
+			config := &NewControllerConfig{
+				Namespace:     metav1.NamespaceDefault,
+				OldName:       tt.oldRc.ObjectMeta.Name,
+				NewName:       tt.newRc.ObjectMeta.Name,
+				Image:         tt.image,
+				Container:     tt.container,
+				DeploymentKey: tt.deploymentKey,
+			}
+			updatedRc, err := CreateNewControllerFromCurrentController(fake.CoreV1(), codec, config)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(updatedRc, tt.newRc) {
+				t.Errorf("expected:\n%#v\ngot:\n%#v\n", tt.newRc, updatedRc)
+			}
+		})
 	}
 }
 
@@ -1162,36 +1170,38 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 		//},
 	}
 
-	for _, test := range tests {
-		objs := []runtime.Object{rc}
-		objs = append(objs, test.responses...)
-		fake := fake.NewSimpleClientset(objs...)
-		updater := &RollingUpdater{
-			ns:        "default",
-			rcClient:  fake.Core(),
-			podClient: fake.Core(),
-		}
-		config := &RollingUpdaterConfig{
-			Out:           ioutil.Discard,
-			OldRc:         rc,
-			NewRc:         rcExisting,
-			UpdatePeriod:  0,
-			Interval:      time.Millisecond,
-			Timeout:       time.Millisecond,
-			CleanupPolicy: test.policy,
-		}
-		err := updater.cleanupWithClients(rc, rcExisting, config)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if len(fake.Actions()) != len(test.expected) {
-			t.Fatalf("%s: unexpected actions: %v, expected %v", test.name, fake.Actions(), test.expected)
-		}
-		for j, action := range fake.Actions() {
-			if e, a := test.expected[j], action.GetVerb(); e != a {
-				t.Errorf("%s: unexpected action: expected %s, got %s", test.name, e, a)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objs := []runtime.Object{rc}
+			objs = append(objs, tt.responses...)
+			fake := fake.NewSimpleClientset(objs...)
+			updater := &RollingUpdater{
+				ns:        "default",
+				rcClient:  fake.CoreV1(),
+				podClient: fake.CoreV1(),
 			}
-		}
+			config := &RollingUpdaterConfig{
+				Out:           ioutil.Discard,
+				OldRc:         rc,
+				NewRc:         rcExisting,
+				UpdatePeriod:  0,
+				Interval:      time.Millisecond,
+				Timeout:       time.Millisecond,
+				CleanupPolicy: tt.policy,
+			}
+			err := updater.cleanupWithClients(rc, rcExisting, config)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if len(fake.Actions()) != len(tt.expected) {
+				t.Fatalf("%s: unexpected actions: %v, expected %v", tt.name, fake.Actions(), tt.expected)
+			}
+			for j, action := range fake.Actions() {
+				if e, a := tt.expected[j], action.GetVerb(); e != a {
+					t.Errorf("%s: unexpected action: expected %s, got %s", tt.name, e, a)
+				}
+			}
+		})
 	}
 }
 
@@ -1217,7 +1227,7 @@ func TestRollingUpdater_cleanupWithClients_Rename(t *testing.T) {
 		return false, nil, nil
 	})
 
-	err := Rename(fake.Core(), rcExisting, rc.Name)
+	err := Rename(fake.CoreV1(), rcExisting, rc.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1229,120 +1239,121 @@ func TestRollingUpdater_cleanupWithClients_Rename(t *testing.T) {
 }
 
 func TestFindSourceController(t *testing.T) {
-	ctrl1 := api.ReplicationController{
+	ctrl1 := corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceDefault,
 			Name:      "foo",
 			Annotations: map[string]string{
-				sourceIdAnnotation: "bar:1234",
+				sourceIDAnnotation: "bar:1234",
 			},
 		},
 	}
-	ctrl2 := api.ReplicationController{
+	ctrl2 := corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceDefault,
 			Name:      "bar",
 			Annotations: map[string]string{
-				sourceIdAnnotation: "foo:12345",
+				sourceIDAnnotation: "foo:12345",
 			},
 		},
 	}
-	ctrl3 := api.ReplicationController{
+	ctrl3 := corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceDefault,
 			Name:      "baz",
 			Annotations: map[string]string{
-				sourceIdAnnotation: "baz:45667",
+				sourceIDAnnotation: "baz:45667",
 			},
 		},
 	}
 	tests := []struct {
-		list               *api.ReplicationControllerList
-		expectedController *api.ReplicationController
-		err                error
+		list               *corev1.ReplicationControllerList
+		expectedController *corev1.ReplicationController
 		name               string
 		expectError        bool
 	}{
 		{
-			list:        &api.ReplicationControllerList{},
+			list:        &corev1.ReplicationControllerList{},
 			expectError: true,
 		},
 		{
-			list: &api.ReplicationControllerList{
-				Items: []api.ReplicationController{ctrl1},
+			list: &corev1.ReplicationControllerList{
+				Items: []corev1.ReplicationController{ctrl1},
 			},
 			name:        "foo",
 			expectError: true,
 		},
 		{
-			list: &api.ReplicationControllerList{
-				Items: []api.ReplicationController{ctrl1},
+			list: &corev1.ReplicationControllerList{
+				Items: []corev1.ReplicationController{ctrl1},
 			},
 			name:               "bar",
 			expectedController: &ctrl1,
 		},
 		{
-			list: &api.ReplicationControllerList{
-				Items: []api.ReplicationController{ctrl1, ctrl2},
+			list: &corev1.ReplicationControllerList{
+				Items: []corev1.ReplicationController{ctrl1, ctrl2},
 			},
 			name:               "bar",
 			expectedController: &ctrl1,
 		},
 		{
-			list: &api.ReplicationControllerList{
-				Items: []api.ReplicationController{ctrl1, ctrl2},
+			list: &corev1.ReplicationControllerList{
+				Items: []corev1.ReplicationController{ctrl1, ctrl2},
 			},
 			name:               "foo",
 			expectedController: &ctrl2,
 		},
 		{
-			list: &api.ReplicationControllerList{
-				Items: []api.ReplicationController{ctrl1, ctrl2, ctrl3},
+			list: &corev1.ReplicationControllerList{
+				Items: []corev1.ReplicationController{ctrl1, ctrl2, ctrl3},
 			},
 			name:               "baz",
 			expectedController: &ctrl3,
 		},
 	}
-	for _, test := range tests {
-		fakeClient := fake.NewSimpleClientset(test.list)
-		ctrl, err := FindSourceController(fakeClient.Core(), "default", test.name)
-		if test.expectError && err == nil {
-			t.Errorf("unexpected non-error")
-		}
-		if !test.expectError && err != nil {
-			t.Errorf("unexpected error")
-		}
-		if !reflect.DeepEqual(ctrl, test.expectedController) {
-			t.Errorf("expected:\n%v\ngot:\n%v\n", test.expectedController, ctrl)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(tt.list)
+			ctrl, err := FindSourceController(fakeClient.CoreV1(), "default", tt.name)
+			if tt.expectError && err == nil {
+				t.Errorf("unexpected non-error")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error")
+			}
+			if !reflect.DeepEqual(ctrl, tt.expectedController) {
+				t.Errorf("expected:\n%v\ngot:\n%v\n", tt.expectedController, ctrl)
+			}
+		})
 	}
 }
 
 func TestUpdateExistingReplicationController(t *testing.T) {
 	tests := []struct {
-		rc              *api.ReplicationController
+		rc              *corev1.ReplicationController
 		name            string
 		deploymentKey   string
 		deploymentValue string
 
-		expectedRc *api.ReplicationController
+		expectedRc *corev1.ReplicationController
 		expectErr  bool
 	}{
 		{
-			rc: &api.ReplicationController{
+			rc: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
 				},
-				Spec: api.ReplicationControllerSpec{
-					Template: &api.PodTemplateSpec{},
+				Spec: corev1.ReplicationControllerSpec{
+					Template: &corev1.PodTemplateSpec{},
 				},
 			},
 			name:            "foo",
 			deploymentKey:   "dk",
 			deploymentValue: "some-hash",
 
-			expectedRc: &api.ReplicationController{
+			expectedRc: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
@@ -1350,11 +1361,11 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 						"kubectl.kubernetes.io/next-controller-id": "foo",
 					},
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: corev1.ReplicationControllerSpec{
 					Selector: map[string]string{
 						"dk": "some-hash",
 					},
-					Template: &api.PodTemplateSpec{
+					Template: &corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"dk": "some-hash",
@@ -1365,13 +1376,13 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 			},
 		},
 		{
-			rc: &api.ReplicationController{
+			rc: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
 				},
-				Spec: api.ReplicationControllerSpec{
-					Template: &api.PodTemplateSpec{
+				Spec: corev1.ReplicationControllerSpec{
+					Template: &corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"dk": "some-other-hash",
@@ -1387,7 +1398,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 			deploymentKey:   "dk",
 			deploymentValue: "some-hash",
 
-			expectedRc: &api.ReplicationController{
+			expectedRc: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: metav1.NamespaceDefault,
 					Name:      "foo",
@@ -1395,11 +1406,11 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 						"kubectl.kubernetes.io/next-controller-id": "foo",
 					},
 				},
-				Spec: api.ReplicationControllerSpec{
+				Spec: corev1.ReplicationControllerSpec{
 					Selector: map[string]string{
 						"dk": "some-other-hash",
 					},
-					Template: &api.PodTemplateSpec{
+					Template: &corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
 								"dk": "some-other-hash",
@@ -1410,44 +1421,61 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 			},
 		},
 	}
-	for _, test := range tests {
-		buffer := &bytes.Buffer{}
-		fakeClient := fake.NewSimpleClientset(test.expectedRc)
-		rc, err := UpdateExistingReplicationController(fakeClient.Core(), fakeClient.Core(), test.rc, "default", test.name, test.deploymentKey, test.deploymentValue, buffer)
-		if !reflect.DeepEqual(rc, test.expectedRc) {
-			t.Errorf("expected:\n%#v\ngot:\n%#v\n", test.expectedRc, rc)
-		}
-		if test.expectErr && err == nil {
-			t.Errorf("unexpected non-error")
-		}
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buffer := &bytes.Buffer{}
+			fakeClient := fake.NewSimpleClientset(tt.expectedRc)
+			rc, err := UpdateExistingReplicationController(fakeClient.CoreV1(), fakeClient.CoreV1(), tt.rc, "default", tt.name, tt.deploymentKey, tt.deploymentValue, buffer)
+			if !reflect.DeepEqual(rc, tt.expectedRc) {
+				t.Errorf("expected:\n%#v\ngot:\n%#v\n", tt.expectedRc, rc)
+			}
+			if tt.expectErr && err == nil {
+				t.Errorf("unexpected non-error")
+			}
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 
 func TestUpdateRcWithRetries(t *testing.T) {
-	codec := testapi.Default.Codec()
-	rc := &api.ReplicationController{
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	one := int32(1)
+	grace := int64(30)
+	enableServiceLinks := corev1.DefaultEnableServiceLinks
+	rc := &corev1.ReplicationController{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ReplicationController",
+		},
 		ObjectMeta: metav1.ObjectMeta{Name: "rc",
 			Labels: map[string]string{
 				"foo": "bar",
 			},
 		},
-		Spec: api.ReplicationControllerSpec{
+		Spec: corev1.ReplicationControllerSpec{
+			Replicas: &one,
 			Selector: map[string]string{
 				"foo": "bar",
 			},
-			Template: &api.PodTemplateSpec{
+			Template: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
 				},
-				Spec: apitesting.DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 		},
 	}
+	rc.Spec.Template.Spec.SchedulerName = "default-scheduler"
 
 	// Test end to end updating of the rc with retries. Essentially make sure the update handler
 	// sees the right updates, failures in update/get are handled properly, and that the updated
@@ -1459,33 +1487,34 @@ func TestUpdateRcWithRetries(t *testing.T) {
 	header := http.Header{}
 	header.Set("Content-Type", runtime.ContentTypeJSON)
 	updates := []*http.Response{
-		{StatusCode: 409, Header: header, Body: objBody(codec, &api.ReplicationController{})}, // conflict
-		{StatusCode: 409, Header: header, Body: objBody(codec, &api.ReplicationController{})}, // conflict
+		{StatusCode: 409, Header: header, Body: objBody(codec, &corev1.ReplicationController{})}, // conflict
+		{StatusCode: 409, Header: header, Body: objBody(codec, &corev1.ReplicationController{})}, // conflict
 		{StatusCode: 200, Header: header, Body: objBody(codec, &newRc)},
 	}
 	gets := []*http.Response{
-		{StatusCode: 500, Header: header, Body: objBody(codec, &api.ReplicationController{})},
+		{StatusCode: 500, Header: header, Body: objBody(codec, &corev1.ReplicationController{})},
 		{StatusCode: 200, Header: header, Body: objBody(codec, rc)},
 	}
 	fakeClient := &manualfake.RESTClient{
-		APIRegistry:          api.Registry,
-		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		GroupVersion:         corev1.SchemeGroupVersion,
+		NegotiatedSerializer: scheme.Codecs,
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
+			case p == "/api/v1/namespaces/default/replicationcontrollers/rc" && m == "PUT":
 				update := updates[0]
 				updates = updates[1:]
 				// We should always get an update with a valid rc even when the get fails. The rc should always
 				// contain the update.
-				if c, ok := readOrDie(t, req, codec).(*api.ReplicationController); !ok || !apiequality.Semantic.DeepEqual(rc, c) {
+				if c, ok := readOrDie(t, req, codec).(*corev1.ReplicationController); !ok || !apiequality.Semantic.DeepEqual(rc, c) {
 					t.Errorf("Unexpected update body, got %+v expected %+v", c, rc)
+					t.Error(diff.ObjectDiff(rc, c))
 				} else if sel, ok := c.Spec.Selector["baz"]; !ok || sel != "foobar" {
 					t.Errorf("Expected selector label update, got %+v", c.Spec.Selector)
 				} else {
 					delete(c.Spec.Selector, "baz")
 				}
 				return update, nil
-			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "GET":
+			case p == "/api/v1/namespaces/default/replicationcontrollers/rc" && m == "GET":
 				get := gets[0]
 				gets = gets[1:]
 				return get, nil
@@ -1495,13 +1524,19 @@ func TestUpdateRcWithRetries(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	clientConfig := &restclient.Config{
+		APIPath: "/api",
+		ContentConfig: restclient.ContentConfig{
+			NegotiatedSerializer: scheme.Codecs,
+			GroupVersion:         &corev1.SchemeGroupVersion,
+		},
+	}
 	restClient, _ := restclient.RESTClientFor(clientConfig)
 	restClient.Client = fakeClient.Client
-	clientset := internalclientset.New(restClient)
+	clientset := kubernetes.New(restClient)
 
 	if rc, err := updateRcWithRetries(
-		clientset.Core(), "default", rc, func(c *api.ReplicationController) {
+		clientset.CoreV1(), "default", rc, func(c *corev1.ReplicationController) {
 			c.Spec.Selector["baz"] = "foobar"
 		}); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1519,8 +1554,10 @@ func readOrDie(t *testing.T, req *http.Request, codec runtime.Codec) runtime.Obj
 		t.Errorf("Error reading: %v", err)
 		t.FailNow()
 	}
-	obj, err := runtime.Decode(codec, data)
+	codec2 := scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	obj, err := runtime.Decode(codec2, data)
 	if err != nil {
+		t.Log(string(data))
 		t.Errorf("error decoding: %v", err)
 		t.FailNow()
 	}
@@ -1533,14 +1570,14 @@ func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
 
 func TestAddDeploymentHash(t *testing.T) {
 	buf := &bytes.Buffer{}
-	codec := testapi.Default.Codec()
-	rc := &api.ReplicationController{
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	rc := &corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "rc"},
-		Spec: api.ReplicationControllerSpec{
+		Spec: corev1.ReplicationControllerSpec{
 			Selector: map[string]string{
 				"foo": "bar",
 			},
-			Template: &api.PodTemplateSpec{
+			Template: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
@@ -1550,8 +1587,8 @@ func TestAddDeploymentHash(t *testing.T) {
 		},
 	}
 
-	podList := &api.PodList{
-		Items: []api.Pod{
+	podList := &corev1.PodList{
+		Items: []corev1.Pod{
 			{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 			{ObjectMeta: metav1.ObjectMeta{Name: "baz"}},
@@ -1561,33 +1598,33 @@ func TestAddDeploymentHash(t *testing.T) {
 	seen := sets.String{}
 	updatedRc := false
 	fakeClient := &manualfake.RESTClient{
-		APIRegistry:          api.Registry,
-		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		GroupVersion:         corev1.SchemeGroupVersion,
+		NegotiatedSerializer: scheme.Codecs,
 		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			header := http.Header{}
 			header.Set("Content-Type", runtime.ContentTypeJSON)
 			switch p, m := req.URL.Path, req.Method; {
-			case p == testapi.Default.ResourcePath("pods", "default", "") && m == "GET":
+			case p == "/api/v1/namespaces/default/pods" && m == "GET":
 				if req.URL.RawQuery != "labelSelector=foo%3Dbar" {
 					t.Errorf("Unexpected query string: %s", req.URL.RawQuery)
 				}
 				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, podList)}, nil
-			case p == testapi.Default.ResourcePath("pods", "default", "foo") && m == "PUT":
+			case p == "/api/v1/namespaces/default/pods/foo" && m == "PUT":
 				seen.Insert("foo")
 				obj := readOrDie(t, req, codec)
-				podList.Items[0] = *(obj.(*api.Pod))
+				podList.Items[0] = *(obj.(*corev1.Pod))
 				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, &podList.Items[0])}, nil
-			case p == testapi.Default.ResourcePath("pods", "default", "bar") && m == "PUT":
+			case p == "/api/v1/namespaces/default/pods/bar" && m == "PUT":
 				seen.Insert("bar")
 				obj := readOrDie(t, req, codec)
-				podList.Items[1] = *(obj.(*api.Pod))
+				podList.Items[1] = *(obj.(*corev1.Pod))
 				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, &podList.Items[1])}, nil
-			case p == testapi.Default.ResourcePath("pods", "default", "baz") && m == "PUT":
+			case p == "/api/v1/namespaces/default/pods/baz" && m == "PUT":
 				seen.Insert("baz")
 				obj := readOrDie(t, req, codec)
-				podList.Items[2] = *(obj.(*api.Pod))
+				podList.Items[2] = *(obj.(*corev1.Pod))
 				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, &podList.Items[2])}, nil
-			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
+			case p == "/api/v1/namespaces/default/replicationcontrollers/rc" && m == "PUT":
 				updatedRc = true
 				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, rc)}, nil
 			default:
@@ -1596,12 +1633,18 @@ func TestAddDeploymentHash(t *testing.T) {
 			}
 		}),
 	}
-	clientConfig := &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs, GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	clientConfig := &restclient.Config{
+		APIPath: "/api",
+		ContentConfig: restclient.ContentConfig{
+			NegotiatedSerializer: scheme.Codecs,
+			GroupVersion:         &corev1.SchemeGroupVersion,
+		},
+	}
 	restClient, _ := restclient.RESTClientFor(clientConfig)
 	restClient.Client = fakeClient.Client
-	clientset := internalclientset.New(restClient)
+	clientset := kubernetes.New(restClient)
 
-	if _, err := AddDeploymentKeyToReplicationController(rc, clientset.Core(), clientset.Core(), "dk", "hash", metav1.NamespaceDefault, buf); err != nil {
+	if _, err := AddDeploymentKeyToReplicationController(rc, clientset.CoreV1(), clientset.CoreV1(), "dk", "hash", metav1.NamespaceDefault, buf); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	for _, pod := range podList.Items {
@@ -1617,26 +1660,26 @@ func TestAddDeploymentHash(t *testing.T) {
 func TestRollingUpdater_readyPods(t *testing.T) {
 	count := 0
 	now := metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC)
-	mkpod := func(owner *api.ReplicationController, ready bool, readyTime metav1.Time) *api.Pod {
+	mkpod := func(owner *corev1.ReplicationController, ready bool, readyTime metav1.Time) *corev1.Pod {
 		count = count + 1
 		labels := map[string]string{}
 		for k, v := range owner.Spec.Selector {
 			labels[k] = v
 		}
-		status := api.ConditionTrue
+		status := corev1.ConditionTrue
 		if !ready {
-			status = api.ConditionFalse
+			status = corev1.ConditionFalse
 		}
-		return &api.Pod{
+		return &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: metav1.NamespaceDefault,
 				Name:      fmt.Sprintf("pod-%d", count),
 				Labels:    labels,
 			},
-			Status: api.PodStatus{
-				Conditions: []api.PodCondition{
+			Status: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
 					{
-						Type:               api.PodReady,
+						Type:               corev1.PodReady,
 						Status:             status,
 						LastTransitionTime: readyTime,
 					},
@@ -1646,8 +1689,9 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 	}
 
 	tests := []struct {
-		oldRc *api.ReplicationController
-		newRc *api.ReplicationController
+		name  string
+		oldRc *corev1.ReplicationController
+		newRc *corev1.ReplicationController
 		// expectated old/new ready counts
 		oldReady int32
 		newReady int32
@@ -1665,6 +1709,7 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 		nowFn           func() metav1.Time
 	}{
 		{
+			name:     "test1",
 			oldRc:    oldRc(4, 4),
 			newRc:    newRc(4, 4),
 			oldReady: 4,
@@ -1683,6 +1728,7 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 			},
 		},
 		{
+			name:     "test2",
 			oldRc:    oldRc(4, 4),
 			newRc:    newRc(4, 4),
 			oldReady: 0,
@@ -1695,6 +1741,7 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 			},
 		},
 		{
+			name:     "test3",
 			oldRc:    oldRc(4, 4),
 			newRc:    newRc(4, 4),
 			oldReady: 1,
@@ -1707,6 +1754,7 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 			},
 		},
 		{
+			name:     "test4",
 			oldRc:    oldRc(4, 4),
 			newRc:    newRc(4, 4),
 			oldReady: 0,
@@ -1721,6 +1769,7 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 			nowFn:           func() metav1.Time { return now },
 		},
 		{
+			name:     "test5",
 			oldRc:    oldRc(4, 4),
 			newRc:    newRc(4, 4),
 			oldReady: 1,
@@ -1736,6 +1785,7 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 			podReadyTimeFn:  func() metav1.Time { return now },
 		},
 		{
+			name:     "test6",
 			oldRc:    oldRc(4, 4),
 			newRc:    newRc(4, 4),
 			oldReady: 2,
@@ -1749,51 +1799,53 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
-		t.Logf("evaluating test %d", i)
-		if test.nowFn == nil {
-			test.nowFn = func() metav1.Time { return now }
-		}
-		if test.podReadyTimeFn == nil {
-			test.podReadyTimeFn = test.nowFn
-		}
-		// Populate the fake client with pods associated with their owners.
-		pods := []runtime.Object{}
-		for _, ready := range test.oldPods {
-			pod := mkpod(test.oldRc, ready, test.podReadyTimeFn())
-			if test.oldPodDeletions > 0 {
-				now := metav1.Now()
-				pod.DeletionTimestamp = &now
-				test.oldPodDeletions--
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Logf("evaluating test %d", i)
+			if tt.nowFn == nil {
+				tt.nowFn = func() metav1.Time { return now }
 			}
-			pods = append(pods, pod)
-		}
-		for _, ready := range test.newPods {
-			pod := mkpod(test.newRc, ready, test.podReadyTimeFn())
-			if test.newPodDeletions > 0 {
-				now := metav1.Now()
-				pod.DeletionTimestamp = &now
-				test.newPodDeletions--
+			if tt.podReadyTimeFn == nil {
+				tt.podReadyTimeFn = tt.nowFn
 			}
-			pods = append(pods, pod)
-		}
-		client := fake.NewSimpleClientset(pods...)
+			// Populate the fake client with pods associated with their owners.
+			pods := []runtime.Object{}
+			for _, ready := range tt.oldPods {
+				pod := mkpod(tt.oldRc, ready, tt.podReadyTimeFn())
+				if tt.oldPodDeletions > 0 {
+					now := metav1.Now()
+					pod.DeletionTimestamp = &now
+					tt.oldPodDeletions--
+				}
+				pods = append(pods, pod)
+			}
+			for _, ready := range tt.newPods {
+				pod := mkpod(tt.newRc, ready, tt.podReadyTimeFn())
+				if tt.newPodDeletions > 0 {
+					now := metav1.Now()
+					pod.DeletionTimestamp = &now
+					tt.newPodDeletions--
+				}
+				pods = append(pods, pod)
+			}
+			client := fake.NewSimpleClientset(pods...)
 
-		updater := &RollingUpdater{
-			ns:        "default",
-			rcClient:  client.Core(),
-			podClient: client.Core(),
-			nowFn:     test.nowFn,
-		}
-		oldReady, newReady, err := updater.readyPods(test.oldRc, test.newRc, test.minReadySeconds)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if e, a := test.oldReady, oldReady; e != a {
-			t.Errorf("expected old ready %d, got %d", e, a)
-		}
-		if e, a := test.newReady, newReady; e != a {
-			t.Errorf("expected new ready %d, got %d", e, a)
-		}
+			updater := &RollingUpdater{
+				ns:        "default",
+				rcClient:  client.CoreV1(),
+				podClient: client.CoreV1(),
+				nowFn:     tt.nowFn,
+			}
+			oldReady, newReady, err := updater.readyPods(tt.oldRc, tt.newRc, tt.minReadySeconds)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if e, a := tt.oldReady, oldReady; e != a {
+				t.Errorf("expected old ready %d, got %d", e, a)
+			}
+			if e, a := tt.newReady, newReady; e != a {
+				t.Errorf("expected new ready %d, got %d", e, a)
+			}
+		})
 	}
 }

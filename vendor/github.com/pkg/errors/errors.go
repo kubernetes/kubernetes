@@ -14,12 +14,17 @@
 // Adding context to an error
 //
 // The errors.Wrap function returns a new error that adds context to the
-// original error. For example
+// original error by recording a stack trace at the point Wrap is called,
+// and the supplied message. For example
 //
 //     _, err := ioutil.ReadAll(r)
 //     if err != nil {
 //             return errors.Wrap(err, "read failed")
 //     }
+//
+// If additional control is required the errors.WithStack and errors.WithMessage
+// functions destructure errors.Wrap into its component operations of annotating
+// an error with a stack trace and an a message, respectively.
 //
 // Retrieving the cause of an error
 //
@@ -127,8 +132,22 @@ func (f *fundamental) Format(s fmt.State, verb rune) {
 			return
 		}
 		fallthrough
-	case 's', 'q':
+	case 's':
 		io.WriteString(s, f.msg)
+	case 'q':
+		fmt.Fprintf(s, "%q", f.msg)
+	}
+}
+
+// WithStack annotates err with a stack trace at the point WithStack was called.
+// If err is nil, WithStack returns nil.
+func WithStack(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &withStack{
+		err,
+		callers(),
 	}
 }
 
@@ -155,7 +174,8 @@ func (w *withStack) Format(s fmt.State, verb rune) {
 	}
 }
 
-// Wrap returns an error annotating err with message.
+// Wrap returns an error annotating err with a stack trace
+// at the point Wrap is called, and the supplied message.
 // If err is nil, Wrap returns nil.
 func Wrap(err error, message string) error {
 	if err == nil {
@@ -171,7 +191,8 @@ func Wrap(err error, message string) error {
 	}
 }
 
-// Wrapf returns an error annotating err with the format specifier.
+// Wrapf returns an error annotating err with a stack trace
+// at the point Wrapf is call, and the format specifier.
 // If err is nil, Wrapf returns nil.
 func Wrapf(err error, format string, args ...interface{}) error {
 	if err == nil {
@@ -184,6 +205,18 @@ func Wrapf(err error, format string, args ...interface{}) error {
 	return &withStack{
 		err,
 		callers(),
+	}
+}
+
+// WithMessage annotates err with a new message.
+// If err is nil, WithMessage returns nil.
+func WithMessage(err error, message string) error {
+	if err == nil {
+		return nil
+	}
+	return &withMessage{
+		cause: err,
+		msg:   message,
 	}
 }
 

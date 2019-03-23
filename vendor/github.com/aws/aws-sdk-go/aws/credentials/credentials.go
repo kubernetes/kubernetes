@@ -14,7 +14,7 @@
 //
 // Example of using the environment variable credentials.
 //
-//     creds := NewEnvCredentials()
+//     creds := credentials.NewEnvCredentials()
 //
 //     // Retrieve the credentials value
 //     credValue, err := creds.Get()
@@ -26,7 +26,7 @@
 // This may be helpful to proactively expire credentials and refresh them sooner
 // than they would naturally expire on their own.
 //
-//     creds := NewCredentials(&EC2RoleProvider{})
+//     creds := credentials.NewCredentials(&ec2rolecreds.EC2RoleProvider{})
 //     creds.Expire()
 //     credsValue, err := creds.Get()
 //     // New credentials will be retrieved instead of from cache.
@@ -43,12 +43,14 @@
 //     func (m *MyProvider) Retrieve() (Value, error) {...}
 //     func (m *MyProvider) IsExpired() bool {...}
 //
-//     creds := NewCredentials(&MyProvider{})
+//     creds := credentials.NewCredentials(&MyProvider{})
 //     credValue, err := creds.Get()
 //
 package credentials
 
 import (
+	"fmt"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"sync"
 	"time"
 )
@@ -60,10 +62,10 @@ import (
 // when making service API calls. For example, when accessing public
 // s3 buckets.
 //
-//     svc := s3.New(&aws.Config{Credentials: AnonymousCredentials})
+//     svc := s3.New(session.Must(session.NewSession(&aws.Config{
+//       Credentials: credentials.AnonymousCredentials,
+//     })))
 //     // Access public S3 buckets.
-//
-// @readonly
 var AnonymousCredentials = NewStaticCredentials("", "", "")
 
 // A Value is the AWS credentials value for individual credential fields.
@@ -88,13 +90,42 @@ type Value struct {
 // The Provider should not need to implement its own mutexes, because
 // that will be managed by Credentials.
 type Provider interface {
-	// Refresh returns nil if it successfully retrieved the value.
+	// Retrieve returns nil if it successfully retrieved the value.
 	// Error is returned if the value were not obtainable, or empty.
 	Retrieve() (Value, error)
 
 	// IsExpired returns if the credentials are no longer valid, and need
 	// to be retrieved.
 	IsExpired() bool
+}
+
+// An Expirer is an interface that Providers can implement to expose the expiration
+// time, if known.  If the Provider cannot accurately provide this info,
+// it should not implement this interface.
+type Expirer interface {
+	// The time at which the credentials are no longer valid
+	ExpiresAt() time.Time
+}
+
+// An ErrorProvider is a stub credentials provider that always returns an error
+// this is used by the SDK when construction a known provider is not possible
+// due to an error.
+type ErrorProvider struct {
+	// The error to be returned from Retrieve
+	Err error
+
+	// The provider name to set on the Retrieved returned Value
+	ProviderName string
+}
+
+// Retrieve will always return the error that the ErrorProvider was created with.
+func (p ErrorProvider) Retrieve() (Value, error) {
+	return Value{ProviderName: p.ProviderName}, p.Err
+}
+
+// IsExpired will always return not expired.
+func (p ErrorProvider) IsExpired() bool {
+	return false
 }
 
 // A Expiry provides shared expiration logic to be used by credentials
@@ -135,13 +166,19 @@ func (e *Expiry) SetExpiration(expiration time.Time, window time.Duration) {
 
 // IsExpired returns if the credentials are expired.
 func (e *Expiry) IsExpired() bool {
-	if e.CurrentTime == nil {
-		e.CurrentTime = time.Now
+	curTime := e.CurrentTime
+	if curTime == nil {
+		curTime = time.Now
 	}
-	return e.expiration.Before(e.CurrentTime())
+	return e.expiration.Before(curTime())
 }
 
-// A Credentials provides synchronous safe retrieval of AWS credentials Value.
+// ExpiresAt returns the expiration time of the credential
+func (e *Expiry) ExpiresAt() time.Time {
+	return e.expiration
+}
+
+// A Credentials provides concurrency safe retrieval of AWS credentials Value.
 // Credentials will cache the credentials value until they expire. Once the value
 // expires the next Get will attempt to retrieve valid credentials.
 //
@@ -155,7 +192,8 @@ func (e *Expiry) IsExpired() bool {
 type Credentials struct {
 	creds        Value
 	forceRefresh bool
-	m            sync.Mutex
+
+	m sync.RWMutex
 
 	provider Provider
 }
@@ -178,6 +216,17 @@ func NewCredentials(provider Provider) *Credentials {
 // If Credentials.Expire() was called the credentials Value will be force
 // expired, and the next call to Get() will cause them to be refreshed.
 func (c *Credentials) Get() (Value, error) {
+	// Check the cached credentials first with just the read lock.
+	c.m.RLock()
+	if !c.isExpired() {
+		creds := c.creds
+		c.m.RUnlock()
+		return creds, nil
+	}
+	c.m.RUnlock()
+
+	// Credentials are expired need to retrieve the credentials taking the full
+	// lock.
 	c.m.Lock()
 	defer c.m.Unlock()
 
@@ -211,8 +260,8 @@ func (c *Credentials) Expire() {
 // If the Credentials were forced to be expired with Expire() this will
 // reflect that override.
 func (c *Credentials) IsExpired() bool {
-	c.m.Lock()
-	defer c.m.Unlock()
+	c.m.RLock()
+	defer c.m.RUnlock()
 
 	return c.isExpired()
 }
@@ -220,4 +269,24 @@ func (c *Credentials) IsExpired() bool {
 // isExpired helper method wrapping the definition of expired credentials.
 func (c *Credentials) isExpired() bool {
 	return c.forceRefresh || c.provider.IsExpired()
+}
+
+// ExpiresAt provides access to the functionality of the Expirer interface of
+// the underlying Provider, if it supports that interface.  Otherwise, it returns
+// an error.
+func (c *Credentials) ExpiresAt() (time.Time, error) {
+	c.m.RLock()
+	defer c.m.RUnlock()
+
+	expirer, ok := c.provider.(Expirer)
+	if !ok {
+		return time.Time{}, awserr.New("ProviderNotExpirer",
+			fmt.Sprintf("provider %s does not support ExpiresAt()", c.creds.ProviderName),
+			nil)
+	}
+	if c.forceRefresh {
+		// set expiration time to the distant past
+		return time.Time{}, nil
+	}
+	return expirer.ExpiresAt(), nil
 }

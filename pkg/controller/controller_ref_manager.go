@@ -20,15 +20,14 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/glog"
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog"
 )
 
 type BaseControllerRefManager struct {
@@ -224,7 +223,7 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 // ReleasePod sends a patch to free the pod from the control of the controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
-	glog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
+	klog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
 		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), pod.UID)
 	err := m.podControl.PatchPod(pod.Namespace, pod.Name, []byte(deleteOwnerRefPatch))
@@ -301,18 +300,18 @@ func NewReplicaSetControllerRefManager(
 // If the error is nil, either the reconciliation succeeded, or no
 // reconciliation was necessary. The list of ReplicaSets that you now own is
 // returned.
-func (m *ReplicaSetControllerRefManager) ClaimReplicaSets(sets []*extensions.ReplicaSet) ([]*extensions.ReplicaSet, error) {
-	var claimed []*extensions.ReplicaSet
+func (m *ReplicaSetControllerRefManager) ClaimReplicaSets(sets []*apps.ReplicaSet) ([]*apps.ReplicaSet, error) {
+	var claimed []*apps.ReplicaSet
 	var errlist []error
 
 	match := func(obj metav1.Object) bool {
 		return m.Selector.Matches(labels.Set(obj.GetLabels()))
 	}
 	adopt := func(obj metav1.Object) error {
-		return m.AdoptReplicaSet(obj.(*extensions.ReplicaSet))
+		return m.AdoptReplicaSet(obj.(*apps.ReplicaSet))
 	}
 	release := func(obj metav1.Object) error {
-		return m.ReleaseReplicaSet(obj.(*extensions.ReplicaSet))
+		return m.ReleaseReplicaSet(obj.(*apps.ReplicaSet))
 	}
 
 	for _, rs := range sets {
@@ -330,7 +329,7 @@ func (m *ReplicaSetControllerRefManager) ClaimReplicaSets(sets []*extensions.Rep
 
 // AdoptReplicaSet sends a patch to take control of the ReplicaSet. It returns
 // the error if the patching fails.
-func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *extensions.ReplicaSet) error {
+func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *apps.ReplicaSet) error {
 	if err := m.CanAdopt(); err != nil {
 		return fmt.Errorf("can't adopt ReplicaSet %v/%v (%v): %v", rs.Namespace, rs.Name, rs.UID, err)
 	}
@@ -345,8 +344,8 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *extensions.ReplicaS
 
 // ReleaseReplicaSet sends a patch to free the ReplicaSet from the control of the Deployment controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
-func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *extensions.ReplicaSet) error {
-	glog.V(2).Infof("patching ReplicaSet %s_%s to remove its controllerRef to %s/%s:%s",
+func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *apps.ReplicaSet) error {
+	klog.V(2).Infof("patching ReplicaSet %s_%s to remove its controllerRef to %s/%s:%s",
 		replicaSet.Namespace, replicaSet.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), replicaSet.UID)
 	err := m.rsControl.PatchReplicaSet(replicaSet.Namespace, replicaSet.Name, []byte(deleteOwnerRefPatch))
@@ -429,25 +428,25 @@ func NewControllerRevisionControllerRefManager(
 //   * Adopt orphans if the selector matches.
 //   * Release owned objects if the selector no longer matches.
 //
-// A non-nil error is returned if some form of reconciliation was attemped and
+// A non-nil error is returned if some form of reconciliation was attempted and
 // failed. Usually, controllers should try again later in case reconciliation
 // is still needed.
 //
 // If the error is nil, either the reconciliation succeeded, or no
 // reconciliation was necessary. The list of ControllerRevisions that you now own is
 // returned.
-func (m *ControllerRevisionControllerRefManager) ClaimControllerRevisions(histories []*appsv1beta1.ControllerRevision) ([]*appsv1beta1.ControllerRevision, error) {
-	var claimed []*appsv1beta1.ControllerRevision
+func (m *ControllerRevisionControllerRefManager) ClaimControllerRevisions(histories []*apps.ControllerRevision) ([]*apps.ControllerRevision, error) {
+	var claimed []*apps.ControllerRevision
 	var errlist []error
 
 	match := func(obj metav1.Object) bool {
 		return m.Selector.Matches(labels.Set(obj.GetLabels()))
 	}
 	adopt := func(obj metav1.Object) error {
-		return m.AdoptControllerRevision(obj.(*appsv1beta1.ControllerRevision))
+		return m.AdoptControllerRevision(obj.(*apps.ControllerRevision))
 	}
 	release := func(obj metav1.Object) error {
-		return m.ReleaseControllerRevision(obj.(*appsv1beta1.ControllerRevision))
+		return m.ReleaseControllerRevision(obj.(*apps.ControllerRevision))
 	}
 
 	for _, h := range histories {
@@ -465,7 +464,7 @@ func (m *ControllerRevisionControllerRefManager) ClaimControllerRevisions(histor
 
 // AdoptControllerRevision sends a patch to take control of the ControllerRevision. It returns the error if
 // the patching fails.
-func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(history *appsv1beta1.ControllerRevision) error {
+func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(history *apps.ControllerRevision) error {
 	if err := m.CanAdopt(); err != nil {
 		return fmt.Errorf("can't adopt ControllerRevision %v/%v (%v): %v", history.Namespace, history.Name, history.UID, err)
 	}
@@ -480,8 +479,8 @@ func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(history
 
 // ReleaseControllerRevision sends a patch to free the ControllerRevision from the control of its controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
-func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(history *appsv1beta1.ControllerRevision) error {
-	glog.V(2).Infof("patching ControllerRevision %s_%s to remove its controllerRef to %s/%s:%s",
+func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(history *apps.ControllerRevision) error {
+	klog.V(2).Infof("patching ControllerRevision %s_%s to remove its controllerRef to %s/%s:%s",
 		history.Namespace, history.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), history.UID)
 	err := m.crControl.PatchControllerRevision(history.Namespace, history.Name, []byte(deleteOwnerRefPatch))

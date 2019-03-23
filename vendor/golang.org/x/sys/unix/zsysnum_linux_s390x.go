@@ -306,6 +306,8 @@ const (
 	SYS_COPY_FILE_RANGE        = 375
 	SYS_PREADV2                = 376
 	SYS_PWRITEV2               = 377
+	SYS_S390_GUARDED_STORAGE   = 378
+	SYS_STATX                  = 379
 	SYS_SELECT                 = 142
 	SYS_GETRLIMIT              = 191
 	SYS_LCHOWN                 = 198

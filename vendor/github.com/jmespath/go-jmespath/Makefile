@@ -35,7 +35,7 @@ buildfuzz:
 	go-fuzz-build github.com/jmespath/go-jmespath/fuzz
 
 fuzz: buildfuzz
-	go-fuzz -bin=./jmespath-fuzz.zip -workdir=fuzz/corpus
+	go-fuzz -bin=./jmespath-fuzz.zip -workdir=fuzz/testdata
 
 bench:
 	go test -bench . -cpuprofile cpu.out

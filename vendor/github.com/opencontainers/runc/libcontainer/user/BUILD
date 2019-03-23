@@ -4,24 +4,33 @@ go_library(
     name = "go_default_library",
     srcs = [
         "lookup.go",
-        "lookup_unsupported.go",
+        "lookup_unix.go",
+        "lookup_windows.go",
         "user.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "lookup_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "lookup_unix.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/user",
     importpath = "github.com/opencontainers/runc/libcontainer/user",
     visibility = ["//visibility:public"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+        "@io_bazel_rules_go//go/platform:darwin": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],

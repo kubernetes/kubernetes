@@ -24,10 +24,14 @@ import (
 	"strings"
 	"testing"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestRunAccessCheck(t *testing.T) {
@@ -116,62 +120,133 @@ func TestRunAccessCheck(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test.o.Out = ioutil.Discard
-		test.o.Err = ioutil.Discard
+		t.Run(test.name, func(t *testing.T) {
+			test.o.Out = ioutil.Discard
+			test.o.ErrOut = ioutil.Discard
 
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			ns := scheme.Codecs
+
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					expectPath := "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews"
+					if req.URL.Path != expectPath {
+						t.Errorf("%s: expected %v, got %v", test.name, expectPath, req.URL.Path)
+						return nil, nil
+					}
+					bodyBits, err := ioutil.ReadAll(req.Body)
+					if err != nil {
+						t.Errorf("%s: %v", test.name, err)
+						return nil, nil
+					}
+					body := string(bodyBits)
+
+					for _, expectedBody := range test.expectedBodyStrings {
+						if !strings.Contains(body, expectedBody) {
+							t.Errorf("%s expecting %s in %s", test.name, expectedBody, body)
+						}
+					}
+
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body: ioutil.NopCloser(bytes.NewBufferString(
+								fmt.Sprintf(`{"kind":"SelfSubjectAccessReview","apiVersion":"authorization.k8s.io/v1","status":{"allowed":%v}}`, test.allowed),
+							)),
+						},
+						test.serverErr
+				}),
+			}
+			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
+
+			if err := test.o.Complete(tf, test.args); err != nil {
+				t.Errorf("%s: %v", test.name, err)
+				return
+			}
+
+			actualAllowed, err := test.o.RunAccessCheck()
+			switch {
+			case test.serverErr == nil && err == nil:
+				// pass
+			case err != nil && test.serverErr != nil && strings.Contains(err.Error(), test.serverErr.Error()):
+				// pass
+			default:
+				t.Errorf("%s: expected %v, got %v", test.name, test.serverErr, err)
+				return
+			}
+			if actualAllowed != test.allowed {
+				t.Errorf("%s: expected %v, got %v", test.name, test.allowed, actualAllowed)
+				return
+			}
+		})
+	}
+}
+
+func TestRunAccessList(t *testing.T) {
+	t.Run("test access list", func(t *testing.T) {
+		options := &CanIOptions{List: true}
+		expectedOutput := "Resources   Non-Resource URLs   Resource Names    Verbs\n" +
+			"job.*       []                  [test-resource]   [get list]\n" +
+			"pod.*       []                  [test-resource]   [get list]\n" +
+			"            [/apis/*]           []                [get]\n" +
+			"            [/version]          []                [get]\n"
+
+		tf := cmdtesting.NewTestFactory().WithNamespace("test")
+		defer tf.Cleanup()
+
+		ns := scheme.Codecs
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				expectPath := "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews"
-				if req.URL.Path != expectPath {
-					t.Errorf("%s: expected %v, got %v", test.name, expectPath, req.URL.Path)
+				switch req.URL.Path {
+				case "/apis/authorization.k8s.io/v1/selfsubjectrulesreviews":
+					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, getSelfSubjectRulesReview()))))
+					return &http.Response{StatusCode: http.StatusOK, Body: body}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
 				}
-				bodyBits, err := ioutil.ReadAll(req.Body)
-				if err != nil {
-					t.Errorf("%s: %v", test.name, err)
-					return nil, nil
-				}
-				body := string(bodyBits)
-
-				for _, expectedBody := range test.expectedBodyStrings {
-					if !strings.Contains(body, expectedBody) {
-						t.Errorf("%s expecting %s in %s", test.name, expectedBody, body)
-					}
-				}
-
-				return &http.Response{
-						StatusCode: http.StatusOK,
-						Body: ioutil.NopCloser(bytes.NewBufferString(
-							fmt.Sprintf(`{"kind":"SelfSubjectAccessReview","apiVersion":"authorization.k8s.io/v1","status":{"allowed":%v}}`, test.allowed),
-						)),
-					},
-					test.serverErr
 			}),
 		}
-		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
-
-		if err := test.o.Complete(f, test.args); err != nil {
-			t.Errorf("%s: %v", test.name, err)
-			continue
+		ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		options.IOStreams = ioStreams
+		if err := options.Complete(tf, []string{}); err != nil {
+			t.Errorf("got unexpected error when do Complete(): %v", err)
+			return
 		}
 
-		actualAllowed, err := test.o.RunAccessCheck()
-		switch {
-		case test.serverErr == nil && err == nil:
-			// pass
-		case err != nil && test.serverErr != nil && strings.Contains(err.Error(), test.serverErr.Error()):
-			// pass
-		default:
-			t.Errorf("%s: expected %v, got %v", test.name, test.serverErr, err)
-			continue
+		err := options.RunAccessList()
+		if err != nil {
+			t.Errorf("got unexpected error when do RunAccessList(): %v", err)
+		} else if buf.String() != expectedOutput {
+			t.Errorf("expected %v\n but got %v\n", expectedOutput, buf.String())
 		}
-		if actualAllowed != test.allowed {
-			t.Errorf("%s: expected %v, got %v", test.name, test.allowed, actualAllowed)
-			continue
-		}
+	})
+}
+
+func getSelfSubjectRulesReview() *authorizationv1.SelfSubjectRulesReview {
+	return &authorizationv1.SelfSubjectRulesReview{
+		Status: authorizationv1.SubjectRulesReviewStatus{
+			ResourceRules: []authorizationv1.ResourceRule{
+				{
+					Verbs:         []string{"get", "list"},
+					APIGroups:     []string{"*"},
+					Resources:     []string{"pod", "job"},
+					ResourceNames: []string{"test-resource"},
+				},
+			},
+			NonResourceRules: []authorizationv1.NonResourceRule{
+				{
+					Verbs:           []string{"get"},
+					NonResourceURLs: []string{"/apis/*", "/version"},
+				},
+			},
+		},
 	}
 }

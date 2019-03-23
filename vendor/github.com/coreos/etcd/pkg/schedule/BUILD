@@ -6,9 +6,9 @@ go_library(
         "doc.go",
         "schedule.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/pkg/schedule",
     importpath = "github.com/coreos/etcd/pkg/schedule",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/golang.org/x/net/context:go_default_library"],
 )
 
 filegroup(

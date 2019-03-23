@@ -21,15 +21,23 @@ limitations under the License.
 package expand
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/expand/cache"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // PVCPopulator iterates through PVCs and checks if for bound PVCs
@@ -39,11 +47,13 @@ type PVCPopulator interface {
 }
 
 type pvcPopulator struct {
-	loopPeriod time.Duration
-	resizeMap  cache.VolumeResizeMap
-	pvcLister  corelisters.PersistentVolumeClaimLister
-	pvLister   corelisters.PersistentVolumeLister
-	kubeClient clientset.Interface
+	loopPeriod      time.Duration
+	resizeMap       cache.VolumeResizeMap
+	pvcLister       corelisters.PersistentVolumeClaimLister
+	pvLister        corelisters.PersistentVolumeLister
+	kubeClient      clientset.Interface
+	volumePluginMgr *volume.VolumePluginMgr
+	recorder        record.EventRecorder
 }
 
 func NewPVCPopulator(
@@ -51,14 +61,19 @@ func NewPVCPopulator(
 	resizeMap cache.VolumeResizeMap,
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	pvLister corelisters.PersistentVolumeLister,
+	volumePluginMgr *volume.VolumePluginMgr,
 	kubeClient clientset.Interface) PVCPopulator {
 	populator := &pvcPopulator{
-		loopPeriod: loopPeriod,
-		pvcLister:  pvcLister,
-		pvLister:   pvLister,
-		resizeMap:  resizeMap,
-		kubeClient: kubeClient,
+		loopPeriod:      loopPeriod,
+		pvcLister:       pvcLister,
+		pvLister:        pvLister,
+		resizeMap:       resizeMap,
+		volumePluginMgr: volumePluginMgr,
+		kubeClient:      kubeClient,
 	}
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	populator.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "volume_expand"})
 	return populator
 }
 
@@ -69,7 +84,7 @@ func (populator *pvcPopulator) Run(stopCh <-chan struct{}) {
 func (populator *pvcPopulator) Sync() {
 	pvcs, err := populator.pvcLister.List(labels.Everything())
 	if err != nil {
-		glog.Errorf("Listing PVCs failed in populator : %v", err)
+		klog.Errorf("Listing PVCs failed in populator : %v", err)
 		return
 	}
 
@@ -77,9 +92,29 @@ func (populator *pvcPopulator) Sync() {
 		pv, err := getPersistentVolume(pvc, populator.pvLister)
 
 		if err != nil {
-			glog.V(5).Infof("Error getting persistent volume for pvc %q : %v", pvc.UID, err)
+			klog.V(5).Infof("Error getting persistent volume for PVC %q : %v", pvc.UID, err)
 			continue
 		}
+
+		// Filter PVCs for which the corresponding volume plugins don't allow expansion.
+		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+		pvcStatusSize := pvc.Status.Capacity[v1.ResourceStorage]
+		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
+		volumePlugin, err := populator.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
+		if (err != nil || volumePlugin == nil) && pvcStatusSize.Cmp(pvcSize) < 0 {
+			err = fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
+				"waiting for an external controller to process this PVC")
+			eventType := v1.EventTypeNormal
+			if err != nil {
+				eventType = v1.EventTypeWarning
+			}
+			populator.recorder.Event(pvc, eventType, events.ExternalExpanding,
+				fmt.Sprintf("Ignoring the PVC: %v.", err))
+			klog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.",
+				util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, err)
+			continue
+		}
+
 		// We are only going to add PVCs which are:
 		//  - bound
 		//  - pvc.Spec.Size > pvc.Status.Size

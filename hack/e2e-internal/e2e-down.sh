@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -18,10 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
-: ${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
+: "${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}"
+: "${KUBE_CONFIG_FILE:="config-test.sh"}"
 
 export KUBECTL KUBE_CONFIG_FILE
 
@@ -29,16 +29,4 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-if [[ "${FEDERATION:-}" == "true" ]]; then
-  source "${KUBE_ROOT}/federation/cluster/common.sh"
-
-  for zone in ${E2E_ZONES};do
-    # bring down an e2e cluster
-    (
-      set-federation-zone-vars "$zone"
-      test-teardown
-    )
-  done
-else
-  test-teardown
-fi
+test-teardown

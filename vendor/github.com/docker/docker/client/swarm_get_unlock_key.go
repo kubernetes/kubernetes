@@ -1,10 +1,10 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // SwarmGetUnlockKey retrieves the swarm's unlock key.

@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -67,7 +67,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			// events for the kube-system namespace on failures
 			namespaceName := metav1.NamespaceSystem
 			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.ClientSet.Core().Events(namespaceName).List(metav1.ListOptions{})
+			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {
@@ -98,19 +98,19 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	It("each node by ordering unclean reboot and ensure they function upon restart", func() {
 		// unclean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is shutdown.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
+		testReboot(f.ClientSet, "nohup sh -c 'echo 1 | sudo tee /proc/sys/kernel/sysrq && sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by triggering kernel panic and ensure they function upon restart", func() {
 		// kernel panic
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before kernel panic is triggered.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
+		testReboot(f.ClientSet, "nohup sh -c 'echo 1 | sudo tee /proc/sys/kernel/sysrq && sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && (sudo ifdown eth0 || sudo ip link set eth0 down) && sleep 120 && (sudo ifup eth0 || sudo ip link set eth0 up)' >/dev/null 2>&1 &", nil)
+		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo ip link set eth0 down && sleep 120 && sudo ip link set eth0 up && (sudo dhclient || true)' >/dev/null 2>&1 &", nil)
 	})
 
 	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
@@ -219,12 +219,16 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := metav1.NamespaceSystem
-	ps := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
+	ps, err := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
+	if err != nil {
+		framework.Logf("Couldn't initialize pod store: %v", err)
+		return false
+	}
 	defer ps.Stop()
 
 	// Get the node initially.
 	framework.Logf("Getting %s", name)
-	node, err := c.Core().Nodes().Get(name, metav1.GetOptions{})
+	node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 	if err != nil {
 		framework.Logf("Couldn't get node %s", name)
 		return false

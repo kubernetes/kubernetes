@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -17,7 +17,7 @@
 # Running cmd $RETRIES times in case of failures.
 function run-cmd-with-retries {
   RETRIES="${RETRIES:-3}"
-  for attempt in $(seq 1 ${RETRIES}); do
+  for attempt in $(seq 1 "${RETRIES}"); do
     local ret_val=0
     exec 5>&1 # Duplicate &1 to &5 for use below.
     # We don't use 'local' to declare result as then ret_val always gets value 0.
@@ -26,19 +26,24 @@ function run-cmd-with-retries {
     if [[ "${ret_val:-0}" -ne "0" ]]; then
       if [[ $(echo "${result}" | grep -c "already exists") -gt 0 ]]; then
         if [[ "${attempt}" == 1 ]]; then
-          echo -e "${color_red}Failed to $1 $2 $3 as the resource hasn't been deleted from a previous run.${color_norm}" >& 2
+          # shellcheck disable=SC2154 # Color defined in sourced script
+          echo -e "${color_red}Failed to $1 $2 ${3:-} as the resource hasn't been deleted from a previous run.${color_norm}" >& 2
           exit 1
         fi
-        echo -e "${color_yellow}Succeeded to $1 $2 $3 in the previous attempt, but status response wasn't received.${color_norm}"
+        # shellcheck disable=SC2154 # Color defined in sourced script
+        echo -e "${color_yellow}Succeeded to $1 $2 ${3:-} in the previous attempt, but status response wasn't received.${color_norm}"
         return 0
       fi
-      echo -e "${color_yellow}Attempt $attempt failed to $1 $2 $3. Retrying.${color_norm}" >& 2
-      sleep $(($attempt * 5))
+      # shellcheck disable=SC2154 # Color defined in sourced script
+      echo -e "${color_yellow}Attempt $attempt failed to $1 $2 ${3:-}. Retrying.${color_norm}" >& 2
+      sleep $((attempt * 5))
     else
-      echo -e "${color_green}Succeeded to $1 $2 $3.${color_norm}"
+      # shellcheck disable=SC2154 # Color defined in sourced script
+      echo -e "${color_green}Succeeded to $1 $2 ${3:-}.${color_norm}"
       return 0
     fi
   done
-  echo -e "${color_red}Failed to $1 $2 $3.${color_norm}" >& 2
+  # shellcheck disable=SC2154 # Color defined in sourced script
+  echo -e "${color_red}Failed to $1 $2 ${3:-}.${color_norm}" >& 2
   exit 1
 }

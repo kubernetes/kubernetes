@@ -2,7 +2,6 @@ package client
 
 import (
 	"fmt"
-	"net/http/httputil"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client/metadata"
@@ -16,12 +15,25 @@ type Config struct {
 	Endpoint      string
 	SigningRegion string
 	SigningName   string
+
+	// States that the signing name did not come from a modeled source but
+	// was derived based on other data. Used by service client constructors
+	// to determine if the signin name can be overridden based on metadata the
+	// service has.
+	SigningNameDerived bool
 }
 
 // ConfigProvider provides a generic way for a service client to receive
 // the ClientConfig without circular dependencies.
 type ConfigProvider interface {
 	ClientConfig(serviceName string, cfgs ...*aws.Config) Config
+}
+
+// ConfigNoResolveEndpointProvider same as ConfigProvider except it will not
+// resolve the endpoint automatically. The service client's endpoint must be
+// provided via the aws.Config.Endpoint field.
+type ConfigNoResolveEndpointProvider interface {
+	ClientConfigNoResolveEndpoint(cfgs ...*aws.Config) Config
 }
 
 // A Client implements the base client request and response handling
@@ -39,7 +51,7 @@ func New(cfg aws.Config, info metadata.ClientInfo, handlers request.Handlers, op
 	svc := &Client{
 		Config:     cfg,
 		ClientInfo: info,
-		Handlers:   handlers,
+		Handlers:   handlers.Copy(),
 	}
 
 	switch retryer, ok := cfg.Retryer.(request.Retryer); {
@@ -79,61 +91,6 @@ func (c *Client) AddDebugHandlers() {
 		return
 	}
 
-	c.Handlers.Send.PushFront(logRequest)
-	c.Handlers.Send.PushBack(logResponse)
-}
-
-const logReqMsg = `DEBUG: Request %s/%s Details:
----[ REQUEST POST-SIGN ]-----------------------------
-%s
------------------------------------------------------`
-
-const logReqErrMsg = `DEBUG ERROR: Request %s/%s:
----[ REQUEST DUMP ERROR ]-----------------------------
-%s
------------------------------------------------------`
-
-func logRequest(r *request.Request) {
-	logBody := r.Config.LogLevel.Matches(aws.LogDebugWithHTTPBody)
-	dumpedBody, err := httputil.DumpRequestOut(r.HTTPRequest, logBody)
-	if err != nil {
-		r.Config.Logger.Log(fmt.Sprintf(logReqErrMsg, r.ClientInfo.ServiceName, r.Operation.Name, err))
-		return
-	}
-
-	if logBody {
-		// Reset the request body because dumpRequest will re-wrap the r.HTTPRequest's
-		// Body as a NoOpCloser and will not be reset after read by the HTTP
-		// client reader.
-		r.ResetBody()
-	}
-
-	r.Config.Logger.Log(fmt.Sprintf(logReqMsg, r.ClientInfo.ServiceName, r.Operation.Name, string(dumpedBody)))
-}
-
-const logRespMsg = `DEBUG: Response %s/%s Details:
----[ RESPONSE ]--------------------------------------
-%s
------------------------------------------------------`
-
-const logRespErrMsg = `DEBUG ERROR: Response %s/%s:
----[ RESPONSE DUMP ERROR ]-----------------------------
-%s
------------------------------------------------------`
-
-func logResponse(r *request.Request) {
-	var msg = "no response data"
-	if r.HTTPResponse != nil {
-		logBody := r.Config.LogLevel.Matches(aws.LogDebugWithHTTPBody)
-		dumpedBody, err := httputil.DumpResponse(r.HTTPResponse, logBody)
-		if err != nil {
-			r.Config.Logger.Log(fmt.Sprintf(logRespErrMsg, r.ClientInfo.ServiceName, r.Operation.Name, err))
-			return
-		}
-
-		msg = string(dumpedBody)
-	} else if r.Error != nil {
-		msg = r.Error.Error()
-	}
-	r.Config.Logger.Log(fmt.Sprintf(logRespMsg, r.ClientInfo.ServiceName, r.Operation.Name, msg))
+	c.Handlers.Send.PushFrontNamed(LogHTTPRequestHandler)
+	c.Handlers.Send.PushBackNamed(LogHTTPResponseHandler)
 }

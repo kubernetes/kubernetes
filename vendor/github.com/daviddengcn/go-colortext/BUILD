@@ -5,12 +5,9 @@ go_library(
     srcs = [
         "ct.go",
         "ct_ansi.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "ct_win.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "ct_win.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/daviddengcn/go-colortext",
     importpath = "github.com/daviddengcn/go-colortext",
     visibility = ["//visibility:public"],
 )

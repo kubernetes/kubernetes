@@ -1,0 +1,54 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-gce-pd-controller
+spec:
+  serviceName: "csi-gce-pd"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gcp-compute-persistent-disk-csi-driver
+  template:
+    metadata:
+      labels:
+        app: gcp-compute-persistent-disk-csi-driver
+    spec:
+      serviceAccountName: csi-controller-sa
+      containers:
+        - name: csi-provisioner
+          # TODO: replace with official image
+          image: quay.io/k8scsi/csi-provisioner:tmp-test-1.14
+          args:
+            - "--v=5"
+            - "--csi-address=/csi/csi.sock"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-attacher
+          image: gcr.io/gke-release/csi-attacher:v1.0.1-gke.0
+          args:
+            - "--v=5"
+            - "--csi-address=/csi/csi.sock"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: gce-pd-driver
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.3.1-gke.0
+          args:
+            - "--v=5"
+            - "--endpoint=unix:/csi/csi.sock"
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/etc/cloud-sa/cloud-sa.json"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: cloud-sa-volume
+              readOnly: true
+              mountPath: "/etc/cloud-sa"
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
+        - name: cloud-sa-volume
+          secret:
+            secretName: cloud-sa

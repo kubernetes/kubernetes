@@ -18,24 +18,27 @@ package validation
 
 import (
 	"k8s.io/apimachinery/pkg/api/validation/path"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
+// ValidateRBACName is exported to allow types outside of the RBAC API group to reuse this validation logic
 // Minimal validation of names for roles and bindings. Identical to the validation for Openshift. See:
 // * https://github.com/kubernetes/kubernetes/blob/60db50/pkg/api/validation/name.go
 // * https://github.com/openshift/origin/blob/388478/pkg/api/helpers.go
-func minimalNameRequirements(name string, prefix bool) []string {
+func ValidateRBACName(name string, prefix bool) []string {
 	return path.IsValidPathSegmentName(name)
 }
 
 func ValidateRole(role *rbac.Role) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, true, minimalNameRequirements, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, true, ValidateRBACName, field.NewPath("metadata"))...)
 
 	for i, rule := range role.Rules {
-		if err := validatePolicyRule(rule, true, field.NewPath("rules").Index(i)); err != nil {
+		if err := ValidatePolicyRule(rule, true, field.NewPath("rules").Index(i)); err != nil {
 			allErrs = append(allErrs, err...)
 		}
 	}
@@ -54,13 +57,29 @@ func ValidateRoleUpdate(role *rbac.Role, oldRole *rbac.Role) field.ErrorList {
 
 func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, false, minimalNameRequirements, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, false, ValidateRBACName, field.NewPath("metadata"))...)
 
 	for i, rule := range role.Rules {
-		if err := validatePolicyRule(rule, false, field.NewPath("rules").Index(i)); err != nil {
+		if err := ValidatePolicyRule(rule, false, field.NewPath("rules").Index(i)); err != nil {
 			allErrs = append(allErrs, err...)
 		}
 	}
+
+	if role.AggregationRule != nil {
+		if len(role.AggregationRule.ClusterRoleSelectors) == 0 {
+			allErrs = append(allErrs, field.Required(field.NewPath("aggregationRule", "clusterRoleSelectors"), "at least one clusterRoleSelector required if aggregationRule is non-nil"))
+		}
+		for i, selector := range role.AggregationRule.ClusterRoleSelectors {
+			fieldPath := field.NewPath("aggregationRule", "clusterRoleSelectors").Index(i)
+			allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(&selector, fieldPath)...)
+
+			selector, err := metav1.LabelSelectorAsSelector(&selector)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(fieldPath, selector, "invalid label selector."))
+			}
+		}
+	}
+
 	if len(allErrs) != 0 {
 		return allErrs
 	}
@@ -74,7 +93,8 @@ func ValidateClusterRoleUpdate(role *rbac.ClusterRole, oldRole *rbac.ClusterRole
 	return allErrs
 }
 
-func validatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.Path) field.ErrorList {
+// ValidatePolicyRule is exported to allow types outside of the RBAC API group to embed a rbac.PolicyRule and reuse this validation logic
+func ValidatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(rule.Verbs) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("verbs"), "verbs must contain at least one value"))
@@ -101,7 +121,7 @@ func validatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.
 
 func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validation.ValidateObjectMeta(&roleBinding.ObjectMeta, true, minimalNameRequirements, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validation.ValidateObjectMeta(&roleBinding.ObjectMeta, true, ValidateRBACName, field.NewPath("metadata"))...)
 
 	// TODO allow multiple API groups.  For now, restrict to one, but I can envision other experimental roles in other groups taking
 	// advantage of the binding infrastructure
@@ -119,14 +139,14 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	if len(roleBinding.RoleRef.Name) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("roleRef", "name"), ""))
 	} else {
-		for _, msg := range minimalNameRequirements(roleBinding.RoleRef.Name, false) {
+		for _, msg := range ValidateRBACName(roleBinding.RoleRef.Name, false) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "name"), roleBinding.RoleRef.Name, msg))
 		}
 	}
 
 	subjectsPath := field.NewPath("subjects")
 	for i, subject := range roleBinding.Subjects {
-		allErrs = append(allErrs, validateRoleBindingSubject(subject, true, subjectsPath.Index(i))...)
+		allErrs = append(allErrs, ValidateRoleBindingSubject(subject, true, subjectsPath.Index(i))...)
 	}
 
 	return allErrs
@@ -145,7 +165,7 @@ func ValidateRoleBindingUpdate(roleBinding *rbac.RoleBinding, oldRoleBinding *rb
 
 func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validation.ValidateObjectMeta(&roleBinding.ObjectMeta, false, minimalNameRequirements, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validation.ValidateObjectMeta(&roleBinding.ObjectMeta, false, ValidateRBACName, field.NewPath("metadata"))...)
 
 	// TODO allow multiple API groups.  For now, restrict to one, but I can envision other experimental roles in other groups taking
 	// advantage of the binding infrastructure
@@ -163,14 +183,14 @@ func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.Erro
 	if len(roleBinding.RoleRef.Name) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("roleRef", "name"), ""))
 	} else {
-		for _, msg := range minimalNameRequirements(roleBinding.RoleRef.Name, false) {
+		for _, msg := range ValidateRBACName(roleBinding.RoleRef.Name, false) {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "name"), roleBinding.RoleRef.Name, msg))
 		}
 	}
 
 	subjectsPath := field.NewPath("subjects")
 	for i, subject := range roleBinding.Subjects {
-		allErrs = append(allErrs, validateRoleBindingSubject(subject, false, subjectsPath.Index(i))...)
+		allErrs = append(allErrs, ValidateRoleBindingSubject(subject, false, subjectsPath.Index(i))...)
 	}
 
 	return allErrs
@@ -187,7 +207,8 @@ func ValidateClusterRoleBindingUpdate(roleBinding *rbac.ClusterRoleBinding, oldR
 	return allErrs
 }
 
-func validateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath *field.Path) field.ErrorList {
+// ValidateRoleBindingSubject is exported to allow types outside of the RBAC API group to embed a rbac.Subject and reuse this validation logic
+func ValidateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(subject.Name) == 0 {
@@ -210,18 +231,12 @@ func validateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 
 	case rbac.UserKind:
 		// TODO(ericchiang): What other restrictions on user name are there?
-		if len(subject.Name) == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, "user name cannot be empty"))
-		}
 		if subject.APIGroup != rbac.GroupName {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), subject.APIGroup, []string{rbac.GroupName}))
 		}
 
 	case rbac.GroupKind:
 		// TODO(ericchiang): What other restrictions on group name are there?
-		if len(subject.Name) == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, "group name cannot be empty"))
-		}
 		if subject.APIGroup != rbac.GroupName {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), subject.APIGroup, []string{rbac.GroupName}))
 		}

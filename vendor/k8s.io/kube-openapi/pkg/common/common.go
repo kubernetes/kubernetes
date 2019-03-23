@@ -32,7 +32,7 @@ type OpenAPIDefinition struct {
 
 type ReferenceCallback func(path string) spec.Ref
 
-// OpenAPIDefinitions is collection of all definitions.
+// GetOpenAPIDefinitions is collection of all definitions.
 type GetOpenAPIDefinitions func(ReferenceCallback) map[string]OpenAPIDefinition
 
 // OpenAPIDefinitionGetter gets openAPI definitions for a given type. If a type implements this interface,
@@ -58,6 +58,12 @@ type Config struct {
 	// DefaultResponse will be used if an operation does not have any responses listed. It
 	// will show up as ... "responses" : {"default" : $DefaultResponse} in the spec.
 	DefaultResponse *spec.Response
+
+	// ResponseDefinitions will be added to "responses" under the top-level swagger object. This is an object
+	// that holds responses definitions that can be used across operations. This property does not define
+	// global responses for all operations. For more info please refer:
+	//     https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#fixed-fields
+	ResponseDefinitions map[string]spec.Response
 
 	// CommonResponses will be added as a response to all operation specs. This is a good place to add common
 	// responses such as authorization failed.
@@ -87,6 +93,30 @@ type Config struct {
 	// DefaultSecurity for all operations. This will pass as spec.SwaggerProps.Security to OpenAPI.
 	// For most cases, this will be list of acceptable definitions in SecurityDefinitions.
 	DefaultSecurity []map[string][]string
+}
+
+var schemaTypeFormatMap = map[string][]string{
+	"uint":        {"integer", "int32"},
+	"uint8":       {"integer", "byte"},
+	"uint16":      {"integer", "int32"},
+	"uint32":      {"integer", "int64"},
+	"uint64":      {"integer", "int64"},
+	"int":         {"integer", "int32"},
+	"int8":        {"integer", "byte"},
+	"int16":       {"integer", "int32"},
+	"int32":       {"integer", "int32"},
+	"int64":       {"integer", "int64"},
+	"byte":        {"integer", "byte"},
+	"float64":     {"number", "double"},
+	"float32":     {"number", "float"},
+	"bool":        {"boolean", ""},
+	"time.Time":   {"string", "date-time"},
+	"string":      {"string", ""},
+	"integer":     {"integer", ""},
+	"number":      {"number", ""},
+	"boolean":     {"boolean", ""},
+	"[]byte":      {"string", "byte"}, // base64 encoded characters
+	"interface{}": {"object", ""},
 }
 
 // This function is a reference for converting go (or any custom type) to a simple open API type,format pair. There are
@@ -129,29 +159,6 @@ type Config struct {
 // }
 //
 func GetOpenAPITypeFormat(typeName string) (string, string) {
-	schemaTypeFormatMap := map[string][]string{
-		"uint":        {"integer", "int32"},
-		"uint8":       {"integer", "byte"},
-		"uint16":      {"integer", "int32"},
-		"uint32":      {"integer", "int64"},
-		"uint64":      {"integer", "int64"},
-		"int":         {"integer", "int32"},
-		"int8":        {"integer", "byte"},
-		"int16":       {"integer", "int32"},
-		"int32":       {"integer", "int32"},
-		"int64":       {"integer", "int64"},
-		"byte":        {"integer", "byte"},
-		"float64":     {"number", "double"},
-		"float32":     {"number", "float"},
-		"bool":        {"boolean", ""},
-		"time.Time":   {"string", "date-time"},
-		"string":      {"string", ""},
-		"integer":     {"integer", ""},
-		"number":      {"number", ""},
-		"boolean":     {"boolean", ""},
-		"[]byte":      {"string", "byte"}, // base64 encoded characters
-		"interface{}": {"object", ""},
-	}
 	mapped, ok := schemaTypeFormatMap[typeName]
 	if !ok {
 		return "", ""

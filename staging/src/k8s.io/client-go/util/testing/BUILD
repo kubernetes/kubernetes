@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["fake_handler_test.go"],
-    importpath = "k8s.io/client-go/util/testing",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(
@@ -19,6 +18,7 @@ go_library(
         "fake_handler.go",
         "tmpdir.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/testing",
     importpath = "k8s.io/client-go/util/testing",
 )
 

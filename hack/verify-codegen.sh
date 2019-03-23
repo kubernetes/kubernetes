@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -30,7 +30,10 @@ kube::golang::setup_env
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/code-generator/hack/verify-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/kube-aggregator/hack/verify-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-apiserver/hack/verify-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-controller/hack/verify-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/hack/verify-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/metrics/hack/verify-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/csi-api/hack/verify-codegen.sh
+CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/node-api/hack/verify-codegen.sh
 
 "${KUBE_ROOT}/hack/update-codegen.sh" --verify-only

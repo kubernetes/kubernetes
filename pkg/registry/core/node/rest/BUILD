@@ -10,16 +10,15 @@ go_library(
     srcs = ["proxy.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/core/node/rest",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/registry/core/node:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/proxy:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/proxy:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
     ],
 )
 

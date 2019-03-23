@@ -25,12 +25,10 @@ import (
 
 	authorization "k8s.io/api/authorization/v1beta1"
 	capi "k8s.io/api/certificates/v1beta1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	k8s_certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/certificates"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type csrRecognizer struct {
@@ -44,7 +42,7 @@ type sarApprover struct {
 	recognizers []csrRecognizer
 }
 
-func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) (*certificates.CertificateController, error) {
+func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
 	approver := &sarApprover{
 		client:      client,
 		recognizers: recognizers(),
@@ -68,13 +66,6 @@ func recognizers() []csrRecognizer {
 			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "nodeclient"},
 			successMessage: "Auto approving kubelet client certificate after SubjectAccessReview.",
 		},
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-		recognizers = append(recognizers, csrRecognizer{
-			recognize:      isSelfNodeServerCert,
-			permission:     authorization.ResourceAttributes{Group: "certificates.k8s.io", Resource: "certificatesigningrequests", Verb: "create", Subresource: "selfnodeserver"},
-			successMessage: "Auto approving self kubelet server certificate after SubjectAccessReview.",
-		})
 	}
 	return recognizers
 }
@@ -106,7 +97,7 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 		}
 		if approved {
 			appendApprovalCondition(csr, r.successMessage)
-			_, err = a.client.Certificates().CertificateSigningRequests().UpdateApproval(csr)
+			_, err = a.client.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(csr)
 			if err != nil {
 				return fmt.Errorf("error updating approval for csr: %v", err)
 			}
@@ -115,7 +106,7 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 	}
 
 	if len(tried) != 0 {
-		return fmt.Errorf("recognized csr %q as %v but subject access review was not approved", csr.Name, tried)
+		return certificates.IgnorableError("recognized csr %q as %v but subject access review was not approved", csr.Name, tried)
 	}
 
 	return nil
@@ -194,31 +185,6 @@ func isNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.Certific
 
 func isSelfNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {
 	if !isNodeClientCert(csr, x509cr) {
-		return false
-	}
-	if csr.Spec.Username != x509cr.Subject.CommonName {
-		return false
-	}
-	return true
-}
-
-var kubeletServerUsages = []capi.KeyUsage{
-	capi.UsageKeyEncipherment,
-	capi.UsageDigitalSignature,
-	capi.UsageServerAuth,
-}
-
-func isSelfNodeServerCert(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {
-	if !reflect.DeepEqual([]string{"system:nodes"}, x509cr.Subject.Organization) {
-		return false
-	}
-	if len(x509cr.DNSNames) == 0 || len(x509cr.IPAddresses) == 0 {
-		return false
-	}
-	if !hasExactUsages(csr, kubeletServerUsages) {
-		return false
-	}
-	if !strings.HasPrefix(x509cr.Subject.CommonName, "system:node:") {
 		return false
 	}
 	if csr.Spec.Username != x509cr.Subject.CommonName {

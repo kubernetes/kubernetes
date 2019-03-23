@@ -9,22 +9,22 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["azure_test.go"],
-    importpath = "k8s.io/client-go/plugin/pkg/client/auth/azure",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["azure.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/plugin/pkg/client/auth/azure",
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/azure",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

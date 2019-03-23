@@ -17,12 +17,10 @@ limitations under the License.
 package runtime_test
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/google/gofuzz"
-	flag "github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,17 +28,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
-
-var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
 
 func TestScheme(t *testing.T) {
 	internalGV := schema.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
+	internalGVK := internalGV.WithKind("Simple")
 	externalGV := schema.GroupVersion{Group: "test.group", Version: "testExternal"}
+	externalGVK := externalGV.WithKind("Simple")
 
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &runtimetesting.InternalSimple{})
-	scheme.AddKnownTypeWithName(externalGV.WithKind("Simple"), &runtimetesting.ExternalSimple{})
+	scheme.AddKnownTypeWithName(internalGVK, &runtimetesting.InternalSimple{})
+	scheme.AddKnownTypeWithName(externalGVK, &runtimetesting.ExternalSimple{})
 
 	// If set, would clear TypeMeta during conversion.
 	//scheme.AddIgnoredConversionType(&TypeMeta{}, &TypeMeta{})
@@ -54,14 +53,26 @@ func TestScheme(t *testing.T) {
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := scheme.AddConversionFuncs(
 		func(in *runtimetesting.InternalSimple, out *runtimetesting.ExternalSimple, scope conversion.Scope) error {
-			scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
-			scope.Convert(&in.TestString, &out.TestString, 0)
+			err := scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
+			if err != nil {
+				return err
+			}
+			err = scope.Convert(&in.TestString, &out.TestString, 0)
+			if err != nil {
+				return err
+			}
 			internalToExternalCalls++
 			return nil
 		},
 		func(in *runtimetesting.ExternalSimple, out *runtimetesting.InternalSimple, scope conversion.Scope) error {
-			scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
-			scope.Convert(&in.TestString, &out.TestString, 0)
+			err := scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
+			if err != nil {
+				return err
+			}
+			err = scope.Convert(&in.TestString, &out.TestString, 0)
+			if err != nil {
+				return err
+			}
 			externalToInternalCalls++
 			return nil
 		},
@@ -70,70 +81,160 @@ func TestScheme(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	codecs := serializer.NewCodecFactory(scheme)
-	codec := codecs.LegacyCodec(externalGV)
-	info, _ := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	jsonserializer := info.Serializer
+	t.Run("Encode, Decode, DecodeInto, and DecodeToVersion", func(t *testing.T) {
+		simple := &runtimetesting.InternalSimple{
+			TestString: "foo",
+		}
 
-	simple := &runtimetesting.InternalSimple{
-		TestString: "foo",
-	}
+		codecs := serializer.NewCodecFactory(scheme)
+		codec := codecs.LegacyCodec(externalGV)
+		info, _ := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+		jsonserializer := info.Serializer
 
-	// Test Encode, Decode, DecodeInto, and DecodeToVersion
-	obj := runtime.Object(simple)
-	data, err := runtime.Encode(codec, obj)
-	if err != nil {
-		t.Fatal(err)
-	}
+		obj := runtime.Object(simple)
+		data, err := runtime.Encode(codec, obj)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	obj2, err := runtime.Decode(codec, data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := obj2.(*runtimetesting.InternalSimple); !ok {
-		t.Fatalf("Got wrong type")
-	}
-	if e, a := simple, obj2; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
-	}
+		obj2, err := runtime.Decode(codec, data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := obj2.(*runtimetesting.InternalSimple); !ok {
+			t.Fatalf("Got wrong type")
+		}
+		if e, a := simple, obj2; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
+		}
 
-	obj3 := &runtimetesting.InternalSimple{}
-	if err := runtime.DecodeInto(codec, data, obj3); err != nil {
-		t.Fatal(err)
-	}
-	// clearing TypeMeta is a function of the scheme, which we do not test here (ConvertToVersion
-	// does not automatically clear TypeMeta anymore).
-	simple.TypeMeta = runtime.TypeMeta{Kind: "Simple", APIVersion: externalGV.String()}
-	if e, a := simple, obj3; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
-	}
+		obj3 := &runtimetesting.InternalSimple{}
+		if err := runtime.DecodeInto(codec, data, obj3); err != nil {
+			t.Fatal(err)
+		}
+		// clearing TypeMeta is a function of the scheme, which we do not test here (ConvertToVersion
+		// does not automatically clear TypeMeta anymore).
+		simple.TypeMeta = runtime.TypeMeta{Kind: "Simple", APIVersion: externalGV.String()}
+		if e, a := simple, obj3; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
+		}
 
-	obj4, err := runtime.Decode(jsonserializer, data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := obj4.(*runtimetesting.ExternalSimple); !ok {
-		t.Fatalf("Got wrong type")
-	}
+		obj4, err := runtime.Decode(jsonserializer, data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := obj4.(*runtimetesting.ExternalSimple); !ok {
+			t.Fatalf("Got wrong type")
+		}
+	})
+	t.Run("Convert", func(t *testing.T) {
+		simple := &runtimetesting.InternalSimple{
+			TestString: "foo",
+		}
 
-	// Test Convert
-	external := &runtimetesting.ExternalSimple{}
-	err = scheme.Convert(simple, external, nil)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if e, a := simple.TestString, external.TestString; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
+		external := &runtimetesting.ExternalSimple{}
+		err = scheme.Convert(simple, external, nil)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if e, a := simple.TestString, external.TestString; e != a {
+			t.Errorf("Expected %q, got %q", e, a)
+		}
+	})
+	t.Run("Convert internal to unstructured", func(t *testing.T) {
+		simple := &runtimetesting.InternalSimple{
+			TestString: "foo",
+		}
 
-	// Encode and Convert should each have caused an increment.
-	if e, a := 2, internalToExternalCalls; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	// DecodeInto and Decode should each have caused an increment because of a conversion
-	if e, a := 2, externalToInternalCalls; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
+		unstructuredObj := &runtimetesting.Unstructured{}
+		err = scheme.Convert(simple, unstructuredObj, nil)
+		if err == nil || !strings.Contains(err.Error(), "to Unstructured without providing a preferred version to convert to") {
+			t.Fatalf("Unexpected non-error: %v", err)
+		}
+		err = scheme.Convert(simple, unstructuredObj, externalGV)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if e, a := simple.TestString, unstructuredObj.Object["testString"].(string); e != a {
+			t.Errorf("Expected %q, got %q", e, a)
+		}
+		if e := unstructuredObj.GetObjectKind().GroupVersionKind(); e != externalGVK {
+			t.Errorf("Unexpected object kind: %#v", e)
+		}
+		if gvks, unversioned, err := scheme.ObjectKinds(unstructuredObj); err != nil || gvks[0] != externalGVK || unversioned {
+			t.Errorf("Scheme did not recognize unversioned: %v, %#v %t", err, gvks, unversioned)
+		}
+	})
+	t.Run("Convert external to unstructured", func(t *testing.T) {
+		unstructuredObj := &runtimetesting.Unstructured{}
+		external := &runtimetesting.ExternalSimple{
+			TestString: "foo",
+		}
+
+		err = scheme.Convert(external, unstructuredObj, nil)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if e, a := external.TestString, unstructuredObj.Object["testString"].(string); e != a {
+			t.Errorf("Expected %q, got %q", e, a)
+		}
+		if e := unstructuredObj.GetObjectKind().GroupVersionKind(); e != externalGVK {
+			t.Errorf("Unexpected object kind: %#v", e)
+		}
+	})
+	t.Run("Convert unstructured to unstructured", func(t *testing.T) {
+		uIn := &runtimetesting.Unstructured{Object: map[string]interface{}{
+			"test": []interface{}{"other", "test"},
+		}}
+		uOut := &runtimetesting.Unstructured{}
+		err = scheme.Convert(uIn, uOut, nil)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(uIn.Object, uOut.Object) {
+			t.Errorf("Unexpected object contents: %#v", uOut.Object)
+		}
+	})
+	t.Run("Convert unstructured to structured", func(t *testing.T) {
+		unstructuredObj := &runtimetesting.Unstructured{
+			Object: map[string]interface{}{
+				"testString": "bla",
+			},
+		}
+		unstructuredObj.SetGroupVersionKind(externalGV.WithKind("Simple"))
+		externalOut := &runtimetesting.ExternalSimple{}
+		err = scheme.Convert(unstructuredObj, externalOut, nil)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if externalOut.TestString != "bla" {
+			t.Errorf("Unexpected object contents: %#v", externalOut)
+		}
+	})
+	t.Run("Encode and Convert should each have caused an increment", func(t *testing.T) {
+		if e, a := 3, internalToExternalCalls; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	})
+	t.Run("DecodeInto and Decode should each have caused an increment because of a conversion", func(t *testing.T) {
+		if e, a := 2, externalToInternalCalls; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	})
+	t.Run("Verify that unstructured types must have V and K set", func(t *testing.T) {
+		emptyObj := &runtimetesting.Unstructured{Object: make(map[string]interface{})}
+		if _, _, err := scheme.ObjectKinds(emptyObj); !runtime.IsMissingKind(err) {
+			t.Errorf("unexpected error: %v", err)
+		}
+		emptyObj.SetGroupVersionKind(schema.GroupVersionKind{Kind: "Test"})
+		if _, _, err := scheme.ObjectKinds(emptyObj); !runtime.IsMissingVersion(err) {
+			t.Errorf("unexpected error: %v", err)
+		}
+		emptyObj.SetGroupVersionKind(schema.GroupVersionKind{Kind: "Test", Version: "v1"})
+		if _, _, err := scheme.ObjectKinds(emptyObj); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestBadJSONRejection(t *testing.T) {
@@ -263,11 +364,13 @@ func TestExtensionMapping(t *testing.T) {
 
 func TestEncode(t *testing.T) {
 	internalGV := schema.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
+	internalGVK := internalGV.WithKind("Simple")
 	externalGV := schema.GroupVersion{Group: "test.group", Version: "testExternal"}
+	externalGVK := externalGV.WithKind("Simple")
 
 	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &runtimetesting.InternalSimple{})
-	scheme.AddKnownTypeWithName(externalGV.WithKind("Simple"), &runtimetesting.ExternalSimple{})
+	scheme.AddKnownTypeWithName(internalGVK, &runtimetesting.InternalSimple{})
+	scheme.AddKnownTypeWithName(externalGVK, &runtimetesting.ExternalSimple{})
 
 	codec := serializer.NewCodecFactory(scheme).LegacyCodec(externalGV)
 
@@ -286,20 +389,22 @@ func TestEncode(t *testing.T) {
 	if !reflect.DeepEqual(obj2, test) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", test, obj2)
 	}
-	if !reflect.DeepEqual(gvk, &schema.GroupVersionKind{Group: "test.group", Version: "testExternal", Kind: "Simple"}) {
-		t.Errorf("unexpected gvk returned by decode: %#v", gvk)
+	if *gvk != externalGVK {
+		t.Errorf("unexpected gvk returned by decode: %#v", *gvk)
 	}
 }
 
 func TestUnversionedTypes(t *testing.T) {
 	internalGV := schema.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
+	internalGVK := internalGV.WithKind("Simple")
 	externalGV := schema.GroupVersion{Group: "test.group", Version: "testExternal"}
+	externalGVK := externalGV.WithKind("Simple")
 	otherGV := schema.GroupVersion{Group: "group", Version: "other"}
 
 	scheme := runtime.NewScheme()
 	scheme.AddUnversionedTypes(externalGV, &runtimetesting.InternalSimple{})
-	scheme.AddKnownTypeWithName(internalGV.WithKind("Simple"), &runtimetesting.InternalSimple{})
-	scheme.AddKnownTypeWithName(externalGV.WithKind("Simple"), &runtimetesting.ExternalSimple{})
+	scheme.AddKnownTypeWithName(internalGVK, &runtimetesting.InternalSimple{})
+	scheme.AddKnownTypeWithName(externalGVK, &runtimetesting.ExternalSimple{})
 	scheme.AddKnownTypeWithName(otherGV.WithKind("Simple"), &runtimetesting.ExternalSimple{})
 
 	codec := serializer.NewCodecFactory(scheme).LegacyCodec(externalGV)
@@ -336,8 +441,8 @@ func TestUnversionedTypes(t *testing.T) {
 		t.Errorf("Expected:\n %#v,\n Got:\n %#v", test, obj2)
 	}
 	// object is serialized as an unversioned object (in the group and version it was defined in)
-	if !reflect.DeepEqual(gvk, &schema.GroupVersionKind{Group: "test.group", Version: "testExternal", Kind: "InternalSimple"}) {
-		t.Errorf("unexpected gvk returned by decode: %#v", gvk)
+	if *gvk != externalGV.WithKind("InternalSimple") {
+		t.Errorf("unexpected gvk returned by decode: %#v", *gvk)
 	}
 
 	// when serialized to a different group, the object is kept in its preferred name
@@ -351,22 +456,12 @@ func TestUnversionedTypes(t *testing.T) {
 	}
 }
 
-// TestObjectFuzzer can randomly populate all the above objects.
-var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
-	func(j *runtimetesting.MyWeirdCustomEmbeddedVersionKindField, c fuzz.Continue) {
-		// We have to customize the randomization of MyWeirdCustomEmbeddedVersionKindFields because their
-		// APIVersion and Kind must remain blank in memory.
-		j.APIVersion = ""
-		j.ObjectKind = ""
-		j.ID = c.RandString()
-	},
-)
-
 // Returns a new Scheme set up with the test objects.
 func GetTestScheme() *runtime.Scheme {
-	internalGV := schema.GroupVersion{Version: "__internal"}
+	internalGV := schema.GroupVersion{Version: runtime.APIVersionInternal}
 	externalGV := schema.GroupVersion{Version: "v1"}
 	alternateExternalGV := schema.GroupVersion{Group: "custom", Version: "v1"}
+	alternateInternalGV := schema.GroupVersion{Group: "custom", Version: runtime.APIVersionInternal}
 	differentExternalGV := schema.GroupVersion{Group: "other", Version: "v2"}
 
 	s := runtime.NewScheme()
@@ -380,10 +475,16 @@ func GetTestScheme() *runtime.Scheme {
 	s.AddKnownTypeWithName(internalGV.WithKind("TestType3"), &runtimetesting.TestType1{})
 	s.AddKnownTypeWithName(externalGV.WithKind("TestType3"), &runtimetesting.ExternalTestType1{})
 	s.AddKnownTypeWithName(externalGV.WithKind("TestType4"), &runtimetesting.ExternalTestType1{})
+	s.AddKnownTypeWithName(alternateInternalGV.WithKind("TestType3"), &runtimetesting.TestType1{})
 	s.AddKnownTypeWithName(alternateExternalGV.WithKind("TestType3"), &runtimetesting.ExternalTestType1{})
 	s.AddKnownTypeWithName(alternateExternalGV.WithKind("TestType5"), &runtimetesting.ExternalTestType1{})
 	s.AddKnownTypeWithName(differentExternalGV.WithKind("TestType1"), &runtimetesting.ExternalTestType1{})
 	s.AddUnversionedTypes(externalGV, &runtimetesting.UnversionedType{})
+
+	utilruntime.Must(s.AddConversionFuncs(func(in *runtimetesting.TestType1, out *runtimetesting.ExternalTestType1, s conversion.Scope) error {
+		out.A = in.A
+		return nil
+	}))
 	return s
 }
 
@@ -537,17 +638,39 @@ func TestConvertToVersion(t *testing.T) {
 		{
 			scheme: GetTestScheme(),
 			in:     &runtimetesting.ExternalTestType1{A: "test"},
-			gv:     schema.GroupVersion{Version: "__internal"},
+			gv:     schema.GroupVersion{Version: runtime.APIVersionInternal},
 			out:    &runtimetesting.TestType1{A: "test"},
+		},
+		// converts from unstructured to internal
+		{
+			scheme: GetTestScheme(),
+			in: &runtimetesting.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "custom/v1",
+				"kind":       "TestType3",
+				"A":          "test",
+			}},
+			gv:  schema.GroupVersion{Version: runtime.APIVersionInternal},
+			out: &runtimetesting.TestType1{A: "test"},
+		},
+		// converts from unstructured to external
+		{
+			scheme: GetTestScheme(),
+			in: &runtimetesting.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "custom/v1",
+				"kind":       "TestType3",
+				"A":          "test",
+			}},
+			gv:  schema.GroupVersion{Group: "custom", Version: "v1"},
+			out: &runtimetesting.ExternalTestType1{MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "custom/v1", ObjectKind: "TestType3"}, A: "test"},
 		},
 		// prefers the best match
 		{
 			scheme: GetTestScheme(),
 			in:     &runtimetesting.ExternalTestType1{A: "test"},
-			gv:     schema.GroupVersions{{Version: "__internal"}, {Version: "v1"}},
+			gv:     schema.GroupVersions{{Version: runtime.APIVersionInternal}, {Version: "v1"}},
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// unversioned type returned as-is
@@ -558,7 +681,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.UnversionedType{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "UnversionedType"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// unversioned type returned when not included in the target types
@@ -569,7 +692,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.UnversionedType{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "UnversionedType"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// detected as already being in the target version
@@ -580,29 +703,29 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// detected as already being in the first target version
 		{
 			scheme: GetTestScheme(),
 			in:     &runtimetesting.ExternalTestType1{A: "test"},
-			gv:     schema.GroupVersions{{Version: "v1"}, {Version: "__internal"}},
+			gv:     schema.GroupVersions{{Version: "v1"}, {Version: runtime.APIVersionInternal}},
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// detected as already being in the first target version
 		{
 			scheme: GetTestScheme(),
 			in:     &runtimetesting.ExternalTestType1{A: "test"},
-			gv:     schema.GroupVersions{{Version: "v1"}, {Version: "__internal"}},
+			gv:     schema.GroupVersions{{Version: "v1"}, {Version: runtime.APIVersionInternal}},
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// the external type is registered in multiple groups, versions, and kinds, and can be targeted to all of them (1/3): different kind
@@ -613,7 +736,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType3"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// the external type is registered in multiple groups, versions, and kinds, and can be targeted to all of them (2/3): different gv
@@ -624,7 +747,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "custom/v1", ObjectKind: "TestType3"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// the external type is registered in multiple groups, versions, and kinds, and can be targeted to all of them (3/3): different gvk
@@ -635,7 +758,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "custom/v1", ObjectKind: "TestType5"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// multi group versioner recognizes multiple groups and forces the output to a particular version, copies because version differs
@@ -645,7 +768,7 @@ func TestConvertToVersion(t *testing.T) {
 			gv:     runtime.NewMultiGroupVersioner(schema.GroupVersion{Group: "other", Version: "v2"}, schema.GroupKind{Group: "custom", Kind: "TestType3"}, schema.GroupKind{Kind: "TestType1"}),
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "other/v2", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// multi group versioner recognizes multiple groups and forces the output to a particular version, copies because version differs
@@ -655,7 +778,7 @@ func TestConvertToVersion(t *testing.T) {
 			gv:     runtime.NewMultiGroupVersioner(schema.GroupVersion{Group: "other", Version: "v2"}, schema.GroupKind{Kind: "TestType1"}, schema.GroupKind{Group: "custom", Kind: "TestType3"}),
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "other/v2", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// multi group versioner is unable to find a match when kind AND group don't match (there is no TestType1 kind in group "other", and no kind "TestType5" in the default group)
@@ -675,7 +798,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// multi group versioner recognizes multiple groups and forces the output to a particular version, performs no copy
@@ -686,7 +809,7 @@ func TestConvertToVersion(t *testing.T) {
 			same:   true,
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType1"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// group versioner can choose a particular target kind for a given input when kind is the same across group versions
@@ -696,7 +819,7 @@ func TestConvertToVersion(t *testing.T) {
 			gv:     testGroupVersioner{ok: true, target: schema.GroupVersionKind{Version: "v1", Kind: "TestType3"}},
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType3"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 		// group versioner can choose a different kind
@@ -706,61 +829,98 @@ func TestConvertToVersion(t *testing.T) {
 			gv:     testGroupVersioner{ok: true, target: schema.GroupVersionKind{Kind: "TestType5", Group: "custom", Version: "v1"}},
 			out: &runtimetesting.ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{APIVersion: "custom/v1", ObjectKind: "TestType5"},
-				A: "test",
+				A:                                     "test",
 			},
 		},
 	}
 	for i, test := range testCases {
-		original := test.in.DeepCopyObject()
-		out, err := test.scheme.ConvertToVersion(test.in, test.gv)
-		switch {
-		case test.errFn != nil:
-			if !test.errFn(err) {
-				t.Errorf("%d: unexpected error: %v", i, err)
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			original := test.in.DeepCopyObject()
+			out, err := test.scheme.ConvertToVersion(test.in, test.gv)
+			switch {
+			case test.errFn != nil:
+				if !test.errFn(err) {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			case err != nil:
+				t.Fatalf("unexpected error: %v", err)
 			}
-			continue
-		case err != nil:
-			t.Errorf("%d: unexpected error: %v", i, err)
-			continue
-		}
-		if out == test.in {
-			t.Errorf("%d: ConvertToVersion should always copy out: %#v", i, out)
-			continue
-		}
+			if out == test.in {
+				t.Fatalf("ConvertToVersion should always copy out: %#v", out)
+			}
 
-		if test.same {
-			if !reflect.DeepEqual(original, test.in) {
-				t.Errorf("%d: unexpected mutation of input: %s", i, diff.ObjectReflectDiff(original, test.in))
-				continue
+			if test.same {
+				if !reflect.DeepEqual(original, test.in) {
+					t.Fatalf("unexpected mutation of input: %s", diff.ObjectReflectDiff(original, test.in))
+				}
+				if !reflect.DeepEqual(out, test.out) {
+					t.Fatalf("unexpected out: %s", diff.ObjectReflectDiff(out, test.out))
+				}
+				unsafe, err := test.scheme.UnsafeConvertToVersion(test.in, test.gv)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if !reflect.DeepEqual(unsafe, test.out) {
+					t.Fatalf("unexpected unsafe: %s", diff.ObjectReflectDiff(unsafe, test.out))
+				}
+				if unsafe != test.in {
+					t.Fatalf("UnsafeConvertToVersion should return same object: %#v", unsafe)
+				}
+				return
 			}
 			if !reflect.DeepEqual(out, test.out) {
-				t.Errorf("%d: unexpected out: %s", i, diff.ObjectReflectDiff(out, test.out))
-				continue
+				t.Fatalf("unexpected out: %s", diff.ObjectReflectDiff(out, test.out))
 			}
-			unsafe, err := test.scheme.UnsafeConvertToVersion(test.in, test.gv)
-			if err != nil {
-				t.Errorf("%d: unexpected error: %v", i, err)
-				continue
+		})
+	}
+}
+
+func TestConvert(t *testing.T) {
+	testCases := []struct {
+		scheme *runtime.Scheme
+		in     runtime.Object
+		into   runtime.Object
+		gv     runtime.GroupVersioner
+		out    runtime.Object
+		errFn  func(error) bool
+	}{
+		// converts from internal to unstructured, given a target version
+		{
+			scheme: GetTestScheme(),
+			in:     &runtimetesting.TestType1{A: "test"},
+			into:   &runtimetesting.Unstructured{},
+			out: &runtimetesting.Unstructured{Object: map[string]interface{}{
+				"myVersionKey": "custom/v1",
+				"myKindKey":    "TestType3",
+				"A":            "test",
+			}},
+			gv: schema.GroupVersion{Group: "custom", Version: "v1"},
+		},
+	}
+	for i, test := range testCases {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			err := test.scheme.Convert(test.in, test.into, test.gv)
+			switch {
+			case test.errFn != nil:
+				if !test.errFn(err) {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			case err != nil:
+				t.Fatalf("unexpected error: %v", err)
+				return
 			}
-			if !reflect.DeepEqual(unsafe, test.out) {
-				t.Errorf("%d: unexpected unsafe: %s", i, diff.ObjectReflectDiff(unsafe, test.out))
-				continue
+
+			if !reflect.DeepEqual(test.into, test.out) {
+				t.Fatalf("unexpected out: %s", diff.ObjectReflectDiff(test.into, test.out))
 			}
-			if unsafe != test.in {
-				t.Errorf("%d: UnsafeConvertToVersion should return same object: %#v", i, unsafe)
-				continue
-			}
-			continue
-		}
-		if !reflect.DeepEqual(out, test.out) {
-			t.Errorf("%d: unexpected out: %s", i, diff.ObjectReflectDiff(out, test.out))
-			continue
-		}
+		})
 	}
 }
 
 func TestMetaValues(t *testing.T) {
-	internalGV := schema.GroupVersion{Group: "test.group", Version: "__internal"}
+	internalGV := schema.GroupVersion{Group: "test.group", Version: runtime.APIVersionInternal}
 	externalGV := schema.GroupVersion{Group: "test.group", Version: "externalVersion"}
 
 	s := runtime.NewScheme()

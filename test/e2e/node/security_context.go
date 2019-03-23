@@ -29,10 +29,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
@@ -50,7 +50,7 @@ func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "test-container",
-					Image: imageutils.GetBusyBoxImage(),
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
@@ -60,10 +60,10 @@ func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 	return pod
 }
 
-var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
+var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context")
 
-	It("should support pod.Spec.SecurityContext.SupplementalGroups", func() {
+	It("should support pod.Spec.SecurityContext.SupplementalGroups [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].Command = []string{"id", "-G"}
 		pod.Spec.SecurityContext.SupplementalGroups = []int64{1234, 5678}
@@ -71,53 +71,88 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		f.TestContainerOutput("pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
 	})
 
-	It("should support pod.Spec.SecurityContext.RunAsUser", func() {
+	It("should support pod.Spec.SecurityContext.RunAsUser [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
 		pod.Spec.SecurityContext.RunAsUser = &userID
-		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
 		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
-			fmt.Sprintf("%v", userID),
+			fmt.Sprintf("uid=%v", userID),
+			fmt.Sprintf("gid=%v", 0),
 		})
 	})
 
-	It("should support container.SecurityContext.RunAsUser", func() {
+	It("should support pod.Spec.SecurityContext.RunAsUser And pod.Spec.SecurityContext.RunAsGroup [LinuxOnly]", func() {
+		pod := scTestPod(false, false)
+		userID := int64(1001)
+		groupID := int64(2002)
+		pod.Spec.SecurityContext.RunAsUser = &userID
+		pod.Spec.SecurityContext.RunAsGroup = &groupID
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
+
+		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+			fmt.Sprintf("uid=%v", userID),
+			fmt.Sprintf("gid=%v", groupID),
+		})
+	})
+
+	It("should support container.SecurityContext.RunAsUser [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
 		overrideUserID := int64(1002)
 		pod.Spec.SecurityContext.RunAsUser = &userID
 		pod.Spec.Containers[0].SecurityContext = new(v1.SecurityContext)
 		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
-		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
 
 		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
-			fmt.Sprintf("%v", overrideUserID),
+			fmt.Sprintf("uid=%v", overrideUserID),
+			fmt.Sprintf("gid=%v", 0),
 		})
 	})
 
-	It("should support volume SELinux relabeling", func() {
+	It("should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [LinuxOnly]", func() {
+		pod := scTestPod(false, false)
+		userID := int64(1001)
+		groupID := int64(2001)
+		overrideUserID := int64(1002)
+		overrideGroupID := int64(2002)
+		pod.Spec.SecurityContext.RunAsUser = &userID
+		pod.Spec.SecurityContext.RunAsGroup = &groupID
+		pod.Spec.Containers[0].SecurityContext = new(v1.SecurityContext)
+		pod.Spec.Containers[0].SecurityContext.RunAsUser = &overrideUserID
+		pod.Spec.Containers[0].SecurityContext.RunAsGroup = &overrideGroupID
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id"}
+
+		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+			fmt.Sprintf("uid=%v", overrideUserID),
+			fmt.Sprintf("gid=%v", overrideGroupID),
+		})
+	})
+
+	It("should support volume SELinux relabeling [Flaky] [LinuxOnly]", func() {
 		testPodSELinuxLabeling(f, false, false)
 	})
 
-	It("should support volume SELinux relabeling when using hostIPC", func() {
+	It("should support volume SELinux relabeling when using hostIPC [Flaky] [LinuxOnly]", func() {
 		testPodSELinuxLabeling(f, true, false)
 	})
 
-	It("should support volume SELinux relabeling when using hostPID", func() {
+	It("should support volume SELinux relabeling when using hostPID [Flaky] [LinuxOnly]", func() {
 		testPodSELinuxLabeling(f, false, true)
 	})
 
-	It("should support seccomp alpha unconfined annotation on the container [Feature:Seccomp]", func() {
+	It("should support seccomp alpha unconfined annotation on the container [Feature:Seccomp] [LinuxOnly]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
 		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = "unconfined"
-		pod.Annotations[v1.SeccompPodAnnotationKey] = "docker/default"
+		pod.Annotations[v1.SeccompPodAnnotationKey] = v1.SeccompProfileRuntimeDefault
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
 		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
 	})
 
-	It("should support seccomp alpha unconfined annotation on the pod [Feature:Seccomp]", func() {
+	It("should support seccomp alpha unconfined annotation on the pod [Feature:Seccomp] [LinuxOnly]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
 		pod.Annotations[v1.SeccompPodAnnotationKey] = "unconfined"
@@ -125,15 +160,15 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
 	})
 
-	It("should support seccomp alpha docker/default annotation [Feature:Seccomp]", func() {
+	It("should support seccomp alpha runtime/default annotation [Feature:Seccomp] [LinuxOnly]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
-		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = "docker/default"
+		pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+"test-container"] = v1.SeccompProfileRuntimeDefault
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
 		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"2"}) // seccomp filtered
 	})
 
-	It("should support seccomp default which is unconfined [Feature:Seccomp]", func() {
+	It("should support seccomp default which is unconfined [Feature:Seccomp] [LinuxOnly]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
@@ -168,7 +203,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	}
 	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
 
-	client := f.ClientSet.Core().Pods(f.Namespace.Name)
+	client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 	pod, err := client.Create(pod)
 
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
@@ -182,7 +217,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	Expect(err).To(BeNil())
 	Expect(content).To(ContainSubstring(testContent))
 
-	foundPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+	foundPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	// Confirm that the file can be accessed from a second

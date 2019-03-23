@@ -12,8 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/private/protocol"
 )
 
 // UnmarshalHandler is a named request handler for unmarshaling rest protocol requests
@@ -111,7 +113,7 @@ func unmarshalLocationElements(r *request.Request, v reflect.Value) {
 			case "statusCode":
 				unmarshalStatusCode(m, r.HTTPResponse.StatusCode)
 			case "header":
-				err := unmarshalHeader(m, r.HTTPResponse.Header.Get(name))
+				err := unmarshalHeader(m, r.HTTPResponse.Header.Get(name), field.Tag)
 				if err != nil {
 					r.Error = awserr.New("SerializationError", "failed to decode REST response", err)
 					break
@@ -158,8 +160,13 @@ func unmarshalHeaderMap(r reflect.Value, headers http.Header, prefix string) err
 	return nil
 }
 
-func unmarshalHeader(v reflect.Value, header string) error {
-	if !v.IsValid() || (header == "" && v.Elem().Kind() != reflect.String) {
+func unmarshalHeader(v reflect.Value, header string, tag reflect.StructTag) error {
+	isJSONValue := tag.Get("type") == "jsonvalue"
+	if isJSONValue {
+		if len(header) == 0 {
+			return nil
+		}
+	} else if !v.IsValid() || (header == "" && v.Elem().Kind() != reflect.String) {
 		return nil
 	}
 
@@ -191,11 +198,25 @@ func unmarshalHeader(v reflect.Value, header string) error {
 		}
 		v.Set(reflect.ValueOf(&f))
 	case *time.Time:
-		t, err := time.Parse(RFC822, header)
+		format := tag.Get("timestampFormat")
+		if len(format) == 0 {
+			format = protocol.RFC822TimeFormatName
+		}
+		t, err := protocol.ParseTime(format, header)
 		if err != nil {
 			return err
 		}
 		v.Set(reflect.ValueOf(&t))
+	case aws.JSONValue:
+		escaping := protocol.NoEscape
+		if tag.Get("location") == "header" {
+			escaping = protocol.Base64Escape
+		}
+		m, err := protocol.DecodeJSONValue(header, escaping)
+		if err != nil {
+			return err
+		}
+		v.Set(reflect.ValueOf(m))
 	default:
 		err := fmt.Errorf("Unsupported value for param %v (%s)", v.Interface(), v.Type())
 		return err

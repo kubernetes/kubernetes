@@ -22,15 +22,17 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 
+	"github.com/docker/docker/pkg/parsers/operatingsystem"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils/cloudinfo"
 	"github.com/google/cadvisor/utils/sysfs"
 	"github.com/google/cadvisor/utils/sysinfo"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
+
+	"golang.org/x/sys/unix"
 )
 
 const hugepagesDirectory = "/sys/kernel/mm/hugepages/"
@@ -48,7 +50,7 @@ func getInfoFromFiles(filePaths string) string {
 			return strings.TrimSpace(string(id))
 		}
 	}
-	glog.Infof("Couldn't collect info from any of the files in %q", filePaths)
+	klog.Warningf("Couldn't collect info from any of the files in %q", filePaths)
 	return ""
 }
 
@@ -115,27 +117,27 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 
 	filesystems, err := fsInfo.GetGlobalFsInfo()
 	if err != nil {
-		glog.Errorf("Failed to get global filesystem information: %v", err)
+		klog.Errorf("Failed to get global filesystem information: %v", err)
 	}
 
 	diskMap, err := sysinfo.GetBlockDeviceInfo(sysFs)
 	if err != nil {
-		glog.Errorf("Failed to get disk map: %v", err)
+		klog.Errorf("Failed to get disk map: %v", err)
 	}
 
 	netDevices, err := sysinfo.GetNetworkDevices(sysFs)
 	if err != nil {
-		glog.Errorf("Failed to get network devices: %v", err)
+		klog.Errorf("Failed to get network devices: %v", err)
 	}
 
 	topology, numCores, err := GetTopology(sysFs, string(cpuinfo))
 	if err != nil {
-		glog.Errorf("Failed to get topology information: %v", err)
+		klog.Errorf("Failed to get topology information: %v", err)
 	}
 
 	systemUUID, err := sysinfo.GetSystemUUID(sysFs)
 	if err != nil {
-		glog.Errorf("Failed to get system UUID: %v", err)
+		klog.Errorf("Failed to get system UUID: %v", err)
 	}
 
 	realCloudInfo := cloudinfo.NewRealCloudInfo()
@@ -172,36 +174,19 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 }
 
 func ContainerOsVersion() string {
-	container_os := "Unknown"
-	os_release, err := ioutil.ReadFile("/etc/os-release")
-	if err == nil {
-		// We might be running in a busybox or some hand-crafted image.
-		// It's useful to know why cadvisor didn't come up.
-		for _, line := range strings.Split(string(os_release), "\n") {
-			parsed := strings.Split(line, "\"")
-			if len(parsed) == 3 && parsed[0] == "PRETTY_NAME=" {
-				container_os = parsed[1]
-				break
-			}
-		}
+	os, err := operatingsystem.GetOperatingSystem()
+	if err != nil {
+		os = "Unknown"
 	}
-	return container_os
+	return os
 }
 
 func KernelVersion() string {
-	uname := &syscall.Utsname{}
+	uname := &unix.Utsname{}
 
-	if err := syscall.Uname(uname); err != nil {
+	if err := unix.Uname(uname); err != nil {
 		return "Unknown"
 	}
 
-	release := make([]byte, len(uname.Release))
-	i := 0
-	for _, c := range uname.Release {
-		release[i] = byte(c)
-		i++
-	}
-	release = release[:bytes.IndexByte(release, 0)]
-
-	return string(release)
+	return string(uname.Release[:bytes.IndexByte(uname.Release[:], 0)])
 }

@@ -17,9 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
-	"net/url"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,21 +24,4 @@ import (
 // be served from apiserver cache instead of from etcd.
 func FromApiserverCache(opts *metav1.GetOptions) {
 	opts.ResourceVersion = "0"
-}
-
-func parseEndpoint(endpoint string) (string, string, error) {
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return "", "", err
-	}
-
-	if u.Scheme == "tcp" {
-		return "tcp", u.Host, nil
-	} else if u.Scheme == "unix" {
-		return "unix", u.Path, nil
-	} else if u.Scheme == "" {
-		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
-	} else {
-		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
-	}
 }

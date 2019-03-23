@@ -23,10 +23,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -58,21 +58,21 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 		// TODO(tallclair): Pass a proper timeout value.
 		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
 		if err != nil {
-			msg := fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
-			glog.V(1).Infof(msg)
+			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
+			klog.V(1).Infof(msg)
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
 		msg, err := hr.runHTTPHandler(pod, container, handler)
 		if err != nil {
-			msg := fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
-			glog.V(1).Infof(msg)
+			msg = fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", handler.HTTPGet.Path, container.Name, format.Pod(pod), err, msg)
+			klog.V(1).Infof(msg)
 		}
 		return msg, err
 	default:
 		err := fmt.Errorf("Invalid handler: %v", handler)
 		msg := fmt.Sprintf("Cannot run handler: %v", err)
-		glog.Errorf(msg)
+		klog.Errorf(msg)
 		return msg, err
 	}
 }
@@ -105,7 +105,7 @@ func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
-			glog.Errorf("Unable to get pod info, event handlers may be invalid.")
+			klog.Errorf("Unable to get pod info, event handlers may be invalid.")
 			return "", err
 		}
 		if status.IP == "" {
@@ -229,4 +229,74 @@ func noNewPrivsRequired(pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func NewProcMountAdmitHandler(runtime kubecontainer.Runtime) PodAdmitHandler {
+	return &procMountAdmitHandler{
+		Runtime: runtime,
+	}
+}
+
+type procMountAdmitHandler struct {
+	kubecontainer.Runtime
+}
+
+func (a *procMountAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	// If the pod is already running or terminated, no need to recheck NoNewPrivs.
+	if attrs.Pod.Status.Phase != v1.PodPending {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// If the containers in a pod only need the default ProcMountType, admit it.
+	if procMountIsDefault(attrs.Pod) {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// Always admit runtimes except docker.
+	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// Make sure docker api version is valid.
+	// Merged in https://github.com/moby/moby/pull/36644
+	rversion, err := a.Runtime.APIVersion()
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "ProcMount",
+			Message: fmt.Sprintf("Cannot enforce ProcMount: %v", err),
+		}
+	}
+	v, err := rversion.Compare("1.38.0")
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "ProcMount",
+			Message: fmt.Sprintf("Cannot enforce ProcMount: %v", err),
+		}
+	}
+	// If the version is less than 1.38 it will return -1 above.
+	if v == -1 {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "ProcMount",
+			Message: fmt.Sprintf("Cannot enforce ProcMount: docker runtime API version %q must be greater than or equal to 1.38", rversion.String()),
+		}
+	}
+
+	return PodAdmitResult{Admit: true}
+}
+
+func procMountIsDefault(pod *v1.Pod) bool {
+	// Iterate over pod containers and check if we are using the DefaultProcMountType
+	// for all containers.
+	for _, c := range pod.Spec.Containers {
+		if c.SecurityContext != nil {
+			if c.SecurityContext.ProcMount != nil && *c.SecurityContext.ProcMount != v1.DefaultProcMount {
+				return false
+			}
+		}
+	}
+
+	return true
 }

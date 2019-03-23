@@ -17,11 +17,12 @@ limitations under the License.
 package priorityclass
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
 )
@@ -33,27 +34,27 @@ type priorityClassStrategy struct {
 }
 
 // Strategy is the default logic that applies when creating and updating PriorityClass objects.
-var Strategy = priorityClassStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = priorityClassStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all PriorityClasses are global.
+// NamespaceScoped returns false because all PriorityClasses are global.
 func (priorityClassStrategy) NamespaceScoped() bool {
 	return false
 }
 
 // PrepareForCreate clears the status of a PriorityClass before creation.
-func (priorityClassStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (priorityClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pc := obj.(*scheduling.PriorityClass)
 	pc.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (priorityClassStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (priorityClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	_ = obj.(*scheduling.PriorityClass)
 	_ = old.(*scheduling.PriorityClass)
 }
 
 // Validate validates a new PriorityClass.
-func (priorityClassStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (priorityClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pc := obj.(*scheduling.PriorityClass)
 	return validation.ValidatePriorityClass(pc)
 }
@@ -67,10 +68,8 @@ func (priorityClassStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (priorityClassStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidatePriorityClass(obj.(*scheduling.PriorityClass))
-	updateErrorList := validation.ValidatePriorityClassUpdate(obj.(*scheduling.PriorityClass), old.(*scheduling.PriorityClass))
-	return append(validationErrorList, updateErrorList...)
+func (priorityClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	return validation.ValidatePriorityClassUpdate(obj.(*scheduling.PriorityClass), old.(*scheduling.PriorityClass))
 }
 
 // AllowUnconditionalUpdate is the default update policy for PriorityClass objects.

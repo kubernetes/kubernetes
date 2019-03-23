@@ -17,518 +17,1626 @@ limitations under the License.
 package oidc
 
 import (
+	"bytes"
+	"context"
+	"crypto"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
-	"path"
 	"reflect"
-	"sort"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
-	"github.com/coreos/go-oidc/jose"
-	"github.com/coreos/go-oidc/oidc"
+	oidc "github.com/coreos/go-oidc"
+	jose "gopkg.in/square/go-jose.v2"
 
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	oidctesting "k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/testing"
+	"k8s.io/klog"
 )
 
-func generateToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}, iat, exp time.Time, emailVerified bool) string {
-	claims := oidc.NewClaims(iss, sub, aud, iat, exp)
-	claims.Add(usernameClaim, value)
-	if groups != nil && groupsClaim != "" {
-		claims.Add(groupsClaim, groups)
-	}
-	claims.Add("email_verified", emailVerified)
+// utilities for loading JOSE keys.
 
-	signer := op.PrivKey.Signer()
-	jwt, err := jose.NewSignedJWT(claims, signer)
+func loadRSAKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
+	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
+		key, err := x509.ParsePKCS1PrivateKey(b)
+		if err != nil {
+			return nil, err
+		}
+		return key.Public(), nil
+	})
+}
+
+func loadRSAPrivKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
+	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
+		return x509.ParsePKCS1PrivateKey(b)
+	})
+}
+
+func loadECDSAKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
+	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
+		key, err := x509.ParseECPrivateKey(b)
+		if err != nil {
+			return nil, err
+		}
+		return key.Public(), nil
+	})
+}
+
+func loadECDSAPrivKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
+	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
+		return x509.ParseECPrivateKey(b)
+	})
+}
+
+func loadKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm, unmarshal func([]byte) (interface{}, error)) *jose.JSONWebKey {
+	data, err := ioutil.ReadFile(filepath)
 	if err != nil {
-		t.Fatalf("Cannot generate token: %v", err)
-		return ""
+		t.Fatalf("load file: %v", err)
 	}
-	return jwt.Encode()
+	block, _ := pem.Decode(data)
+	if block == nil {
+		t.Fatalf("file contained no PEM encoded data: %s", filepath)
+	}
+	priv, err := unmarshal(block.Bytes)
+	if err != nil {
+		t.Fatalf("unmarshal key: %v", err)
+	}
+	key := &jose.JSONWebKey{Key: priv, Use: "sig", Algorithm: string(alg)}
+	thumbprint, err := key.Thumbprint(crypto.SHA256)
+	if err != nil {
+		t.Fatalf("computing thumbprint: %v", err)
+	}
+	key.KeyID = hex.EncodeToString(thumbprint)
+	return key
 }
 
-func generateTokenWithUnverifiedEmail(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, email string) string {
-	return generateToken(t, op, iss, sub, aud, "email", email, "", nil, time.Now(), time.Now().Add(time.Hour), false)
+// staticKeySet implements oidc.KeySet.
+type staticKeySet struct {
+	keys []*jose.JSONWebKey
 }
 
-func generateGoodToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}) string {
-	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour), true)
+func (s *staticKeySet) VerifySignature(ctx context.Context, jwt string) (payload []byte, err error) {
+	jws, err := jose.ParseSigned(jwt)
+	if err != nil {
+		return nil, err
+	}
+	if len(jws.Signatures) == 0 {
+		return nil, fmt.Errorf("jwt contained no signatures")
+	}
+	kid := jws.Signatures[0].Header.KeyID
+
+	for _, key := range s.keys {
+		if key.KeyID == kid {
+			return jws.Verify(key)
+		}
+	}
+
+	return nil, fmt.Errorf("no keys matches jwk keyid")
 }
 
-func generateMalformedToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}) string {
-	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour), true) + "randombits"
+var (
+	expired, _ = time.Parse(time.RFC3339Nano, "2009-11-10T22:00:00Z")
+	now, _     = time.Parse(time.RFC3339Nano, "2009-11-10T23:00:00Z")
+	valid, _   = time.Parse(time.RFC3339Nano, "2009-11-11T00:00:00Z")
+)
+
+type claimsTest struct {
+	name               string
+	options            Options
+	now                time.Time
+	signingKey         *jose.JSONWebKey
+	pubKeys            []*jose.JSONWebKey
+	claims             string
+	want               *user.DefaultInfo
+	wantSkip           bool
+	wantErr            bool
+	wantInitErr        bool
+	claimToResponseMap map[string]string
+	openIDConfig       string
+	reqAudiences       authenticator.Audiences
 }
 
-func generateExpiredToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}) string {
-	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour), true)
+// Replace formats the contents of v into the provided template.
+func replace(tmpl string, v interface{}) string {
+	t := template.Must(template.New("test").Parse(tmpl))
+	buf := bytes.NewBuffer(nil)
+	t.Execute(buf, &v)
+	ret := buf.String()
+	klog.V(4).Infof("Replaced: %v into: %v", tmpl, ret)
+	return ret
 }
 
-func TestTLSConfig(t *testing.T) {
-	// Verify the cert/key pair works.
-	cert1 := path.Join(os.TempDir(), "oidc-cert-1")
-	key1 := path.Join(os.TempDir(), "oidc-key-1")
-	cert2 := path.Join(os.TempDir(), "oidc-cert-2")
-	key2 := path.Join(os.TempDir(), "oidc-key-2")
+// newClaimServer returns a new test HTTPS server, which is rigged to return
+// OIDC responses to requests that resolve distributed claims. signer is the
+// signer used for the served JWT tokens.  claimToResponseMap is a map of
+// responses that the server will return for each claim it is given.
+func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, claimToResponseMap map[string]string, openIDConfig *string) *httptest.Server {
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		klog.V(5).Infof("request: %+v", *r)
+		switch r.URL.Path {
+		case "/.testing/keys":
+			w.Header().Set("Content-Type", "application/json")
+			keyBytes, err := json.Marshal(keys)
+			if err != nil {
+				t.Fatalf("unexpected error while marshaling keys: %v", err)
+			}
+			klog.V(5).Infof("%v: returning: %+v", r.URL, string(keyBytes))
+			w.Write(keyBytes)
 
-	defer os.Remove(cert1)
-	defer os.Remove(key1)
-	defer os.Remove(cert2)
-	defer os.Remove(key2)
+		case "/.well-known/openid-configuration":
+			w.Header().Set("Content-Type", "application/json")
+			klog.V(5).Infof("%v: returning: %+v", r.URL, *openIDConfig)
+			w.Write([]byte(*openIDConfig))
+		// These claims are tested in the unit tests.
+		case "/groups":
+			fallthrough
+		case "/rabbits":
+			if claimToResponseMap == nil {
+				t.Errorf("no claims specified in response")
+			}
+			claim := r.URL.Path[1:] // "/groups" -> "groups"
+			expectedAuth := fmt.Sprintf("Bearer %v_token", claim)
+			auth := r.Header.Get("Authorization")
+			if auth != expectedAuth {
+				t.Errorf("bearer token expected: %q, was %q", expectedAuth, auth)
+			}
+			jws, err := signer.Sign([]byte(claimToResponseMap[claim]))
+			if err != nil {
+				t.Errorf("while signing response token: %v", err)
+			}
+			token, err := jws.CompactSerialize()
+			if err != nil {
+				t.Errorf("while serializing response token: %v", err)
+			}
+			w.Write([]byte(token))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(w, "unexpected URL: %v", r.URL)
+		}
+	}))
+	klog.V(4).Infof("Serving OIDC at: %v", ts.URL)
+	return ts
+}
 
-	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert1, key1)
-	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert2, key2)
+// writeTempCert writes out the supplied certificate into a temporary file in
+// PEM-encoded format.  Returns the name of the temporary file used.  The caller
+// is responsible for cleaning the file up.
+func writeTempCert(t *testing.T, cert []byte) string {
+	tempFile, err := ioutil.TempFile("", "ca.crt")
+	if err != nil {
+		t.Fatalf("could not open temp file: %v", err)
+	}
+	block := &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert,
+	}
+	if err := pem.Encode(tempFile, block); err != nil {
+		t.Fatalf("could not write to temp file %v: %v", tempFile.Name(), err)
+	}
+	tempFile.Close()
+	return tempFile.Name()
+}
 
+func toKeySet(keys []*jose.JSONWebKey) jose.JSONWebKeySet {
+	ret := jose.JSONWebKeySet{}
+	for _, k := range keys {
+		ret.Keys = append(ret.Keys, *k)
+	}
+	return ret
+}
+
+func (c *claimsTest) run(t *testing.T) {
+	var (
+		signer jose.Signer
+		err    error
+	)
+	if c.signingKey != nil {
+		// Initialize the signer only in the tests that make use of it.  We can
+		// not defer this initialization because the test server uses it too.
+		signer, err = jose.NewSigner(jose.SigningKey{
+			Algorithm: jose.SignatureAlgorithm(c.signingKey.Algorithm),
+			Key:       c.signingKey,
+		}, nil)
+		if err != nil {
+			t.Fatalf("initialize signer: %v", err)
+		}
+	}
+	// The HTTPS server used for requesting distributed groups claims.
+	ts := newClaimServer(t, toKeySet(c.pubKeys), signer, c.claimToResponseMap, &c.openIDConfig)
+	defer ts.Close()
+
+	// Make the certificate of the helper server available to the authenticator
+	// by writing its root CA certificate into a temporary file.
+	tempFileName := writeTempCert(t, ts.TLS.Certificates[0].Certificate[0])
+	defer os.Remove(tempFileName)
+	c.options.CAFile = tempFileName
+
+	// Allow claims to refer to the serving URL of the test server.  For this,
+	// substitute all references to {{.URL}} in appropriate places.
+	v := struct{ URL string }{URL: ts.URL}
+	c.claims = replace(c.claims, &v)
+	c.openIDConfig = replace(c.openIDConfig, &v)
+	c.options.IssuerURL = replace(c.options.IssuerURL, &v)
+	for claim, response := range c.claimToResponseMap {
+		c.claimToResponseMap[claim] = replace(response, &v)
+	}
+
+	// Initialize the authenticator.
+	a, err := newAuthenticator(c.options, func(ctx context.Context, a *Authenticator, config *oidc.Config) {
+		// Set the verifier to use the public key set instead of reading from a remote.
+		a.setVerifier(oidc.NewVerifier(
+			c.options.IssuerURL,
+			&staticKeySet{keys: c.pubKeys},
+			config,
+		))
+	})
+	if err != nil {
+		if !c.wantInitErr {
+			t.Fatalf("initialize authenticator: %v", err)
+		}
+		return
+	}
+	if c.wantInitErr {
+		t.Fatalf("wanted initialization error")
+	}
+
+	// Sign and serialize the claims in a JWT.
+	jws, err := signer.Sign([]byte(c.claims))
+	if err != nil {
+		t.Fatalf("sign claims: %v", err)
+	}
+	token, err := jws.CompactSerialize()
+	if err != nil {
+		t.Fatalf("serialize token: %v", err)
+	}
+
+	ctx := context.Background()
+	if c.reqAudiences != nil {
+		ctx = authenticator.WithAudiences(ctx, c.reqAudiences)
+	}
+
+	got, ok, err := a.AuthenticateToken(ctx, token)
+
+	if err != nil {
+		if !c.wantErr {
+			t.Fatalf("authenticate token: %v", err)
+		}
+		return
+	}
+
+	if c.wantErr {
+		t.Fatalf("expected error authenticating token")
+	}
+	if !ok {
+		if !c.wantSkip {
+			// We don't have any cases where we return (nil, false, nil)
+			t.Fatalf("no error but token not authenticated")
+		}
+		return
+	}
+	if c.wantSkip {
+		t.Fatalf("expected authenticator to skip token")
+	}
+
+	gotUser := got.User.(*user.DefaultInfo)
+	if !reflect.DeepEqual(gotUser, c.want) {
+		t.Fatalf("wanted user=%#v, got=%#v", c.want, gotUser)
+	}
+}
+
+func TestToken(t *testing.T) {
+	synchronizeTokenIDVerifierForTest = true
+	tests := []claimsTest{
+		{
+			name: "token",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "no-username",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: true,
+		},
+		{
+			name: "email",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "email",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"email": "jane@example.com",
+				"email_verified": true,
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane@example.com",
+			},
+		},
+		{
+			name: "email-not-verified",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "email",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"email": "jane@example.com",
+				"email_verified": false,
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: true,
+		},
+		{
+			// If "email_verified" isn't present, assume true
+			name: "no-email-verified-claim",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "email",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"email": "jane@example.com",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane@example.com",
+			},
+		},
+		{
+			name: "invalid-email-verified-claim",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "email",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			// string value for "email_verified"
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"email": "jane@example.com",
+				"email_verified": "false",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: true,
+		},
+		{
+			name: "groups",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name:   "jane",
+				Groups: []string{"team1", "team2"},
+			},
+		},
+		{
+			name: "groups-distributed",
+			options: Options{
+				IssuerURL:     "{{.URL}}",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"groups": "src1"
+				},
+				"_claim_sources": {
+						"src1": {
+								"endpoint": "{{.URL}}/groups",
+								"access_token": "groups_token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				"groups": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "my-client",
+					"groups": ["team1", "team2"],
+					"exp": %d
+			     }`, valid.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			want: &user.DefaultInfo{
+				Name:   "jane",
+				Groups: []string{"team1", "team2"},
+			},
+		},
+		{
+			name: "groups-distributed-malformed-claim-names",
+			options: Options{
+				IssuerURL:     "{{.URL}}",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"groups": "nonexistent-claim-source"
+				},
+				"_claim_sources": {
+						"src1": {
+								"endpoint": "{{.URL}}/groups",
+								"access_token": "groups_token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				"groups": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "my-client",
+					"groups": ["team1", "team2"],
+					"exp": %d
+			     }`, valid.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "groups-distributed-malformed-names-and-sources",
+			options: Options{
+				IssuerURL:     "{{.URL}}",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"groups": "src1"
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				"groups": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "my-client",
+					"groups": ["team1", "team2"],
+					"exp": %d
+			     }`, valid.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "groups-distributed-malformed-distributed-claim",
+			options: Options{
+				IssuerURL:     "{{.URL}}",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"groups": "src1"
+				},
+				"_claim_sources": {
+						"src1": {
+								"endpoint": "{{.URL}}/groups",
+								"access_token": "groups_token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				// Doesn't contain the "groups" claim as it promises.
+				"groups": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "my-client",
+					"exp": %d
+			     }`, valid.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			wantErr: true,
+		},
+		{
+			name: "groups-distributed-unusual-name",
+			options: Options{
+				IssuerURL:     "{{.URL}}",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "rabbits",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"rabbits": "src1"
+				},
+				"_claim_sources": {
+						"src1": {
+								"endpoint": "{{.URL}}/rabbits",
+								"access_token": "rabbits_token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				"rabbits": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "my-client",
+					"rabbits": ["team1", "team2"],
+					"exp": %d
+			     }`, valid.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			want: &user.DefaultInfo{
+				Name:   "jane",
+				Groups: []string{"team1", "team2"},
+			},
+		},
+		{
+			name: "groups-distributed-wrong-audience",
+			options: Options{
+				IssuerURL:     "{{.URL}}",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"groups": "src1"
+				},
+				"_claim_sources": {
+						"src1": {
+								"endpoint": "{{.URL}}/groups",
+								"access_token": "groups_token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				// Note mismatching "aud"
+				"groups": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "your-client",
+					"groups": ["team1", "team2"],
+					"exp": %d
+			     }`, valid.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			// "aud" was "your-client", not "my-client"
+			wantErr: true,
+		},
+		{
+			name: "groups-distributed-wrong-audience",
+			options: Options{
+				IssuerURL:     "{{.URL}}",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"groups": "src1"
+				},
+				"_claim_sources": {
+						"src1": {
+								"endpoint": "{{.URL}}/groups",
+								"access_token": "groups_token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				// Note expired timestamp.
+				"groups": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "my-client",
+					"groups": ["team1", "team2"],
+					"exp": %d
+			     }`, expired.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			// The distributed token is expired.
+			wantErr: true,
+		},
+		{
+			// Specs are unclear about this behavior.  We adopt a behavior where
+			// normal claim wins over a distributed claim by the same name.
+			name: "groups-distributed-normal-claim-wins",
+			options: Options{
+				IssuerURL:     "{{.URL}}",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": "team1",
+				"_claim_names": {
+						"groups": "src1"
+				},
+				"_claim_sources": {
+						"src1": {
+								"endpoint": "{{.URL}}/groups",
+								"access_token": "groups_token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				"groups": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "my-client",
+					"groups": ["team2"],
+					"exp": %d
+			     }`, valid.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			want: &user.DefaultInfo{
+				Name: "jane",
+				// "team1" is from the normal "groups" claim.
+				Groups: []string{"team1"},
+			},
+		},
+		{
+			// Groups should be able to be a single string, not just a slice.
+			name: "group-string-claim",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": "team1",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name:   "jane",
+				Groups: []string{"team1"},
+			},
+		},
+		{
+			// Groups should be able to be a single string, not just a slice.
+			name: "group-string-claim-distributed",
+			options: Options{
+				IssuerURL:     "{{.URL}}",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"groups": "src1"
+				},
+				"_claim_sources": {
+						"src1": {
+								"endpoint": "{{.URL}}/groups",
+								"access_token": "groups_token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				"groups": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "my-client",
+					"groups": "team1",
+					"exp": %d
+			     }`, valid.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			want: &user.DefaultInfo{
+				Name:   "jane",
+				Groups: []string{"team1"},
+			},
+		},
+		{
+			name: "group-string-claim-aggregated-not-supported",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"groups": "src1"
+				},
+				"_claim_sources": {
+						"src1": {
+								"JWT": "some.jwt.token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			// if the groups claim isn't provided, this shouldn't error out
+			name: "no-groups-claim",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "invalid-groups-claim",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": 42,
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: true,
+		},
+		{
+			name: "required-claim",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				RequiredClaims: map[string]string{
+					"hd":  "example.com",
+					"sub": "test",
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"hd": "example.com",
+				"sub": "test",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "no-required-claim",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				RequiredClaims: map[string]string{
+					"hd": "example.com",
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: true,
+		},
+		{
+			name: "invalid-required-claim",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				RequiredClaims: map[string]string{
+					"hd": "example.com",
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"hd": "example.org",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: true,
+		},
+		{
+			name: "invalid-signature",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_2.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: true,
+		},
+		{
+			name: "expired",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, expired.Unix()),
+			wantErr: true,
+		},
+		{
+			name: "invalid-aud",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "not-my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: true,
+		},
+		{
+			// ID tokens may contain multiple audiences:
+			// https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+			name: "multiple-audiences",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": ["not-my-client", "my-client"],
+				"azp": "not-my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "invalid-issuer",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			wantSkip: true,
+		},
+		{
+			name: "username-prefix",
+			options: Options{
+				IssuerURL:      "https://auth.example.com",
+				ClientID:       "my-client",
+				UsernameClaim:  "username",
+				UsernamePrefix: "oidc:",
+				now:            func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "oidc:jane",
+			},
+		},
+		{
+			name: "groups-prefix",
+			options: Options{
+				IssuerURL:      "https://auth.example.com",
+				ClientID:       "my-client",
+				UsernameClaim:  "username",
+				UsernamePrefix: "oidc:",
+				GroupsClaim:    "groups",
+				GroupsPrefix:   "groups:",
+				now:            func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name:   "oidc:jane",
+				Groups: []string{"groups:team1", "groups:team2"},
+			},
+		},
+		{
+			name: "groups-prefix-distributed",
+			options: Options{
+				IssuerURL:      "{{.URL}}",
+				ClientID:       "my-client",
+				UsernameClaim:  "username",
+				UsernamePrefix: "oidc:",
+				GroupsClaim:    "groups",
+				GroupsPrefix:   "groups:",
+				now:            func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "{{.URL}}",
+				"aud": "my-client",
+				"username": "jane",
+				"_claim_names": {
+						"groups": "src1"
+				},
+				"_claim_sources": {
+						"src1": {
+								"endpoint": "{{.URL}}/groups",
+								"access_token": "groups_token"
+						}
+				},
+				"exp": %d
+			}`, valid.Unix()),
+			claimToResponseMap: map[string]string{
+				"groups": fmt.Sprintf(`{
+					"iss": "{{.URL}}",
+				    "aud": "my-client",
+					"groups": ["team1", "team2"],
+					"exp": %d
+			     }`, valid.Unix()),
+			},
+			openIDConfig: `{
+					"issuer": "{{.URL}}",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			want: &user.DefaultInfo{
+				Name:   "oidc:jane",
+				Groups: []string{"groups:team1", "groups:team2"},
+			},
+		},
+		{
+			name: "invalid-signing-alg",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			// Correct key but invalid signature algorithm "PS256"
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.PS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: true,
+		},
+		{
+			name: "ps256",
+			options: Options{
+				IssuerURL:            "https://auth.example.com",
+				ClientID:             "my-client",
+				UsernameClaim:        "username",
+				SupportedSigningAlgs: []string{"PS256"},
+				now:                  func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.PS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.PS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "es512",
+			options: Options{
+				IssuerURL:            "https://auth.example.com",
+				ClientID:             "my-client",
+				UsernameClaim:        "username",
+				SupportedSigningAlgs: []string{"ES512"},
+				now:                  func() time.Time { return now },
+			},
+			signingKey: loadECDSAPrivKey(t, "testdata/ecdsa_2.pem", jose.ES512),
+			pubKeys: []*jose.JSONWebKey{
+				loadECDSAKey(t, "testdata/ecdsa_1.pem", jose.ES512),
+				loadECDSAKey(t, "testdata/ecdsa_2.pem", jose.ES512),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "not-https",
+			options: Options{
+				IssuerURL:     "http://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			wantInitErr: true,
+		},
+		{
+			name: "no-username-claim",
+			options: Options{
+				IssuerURL: "https://auth.example.com",
+				ClientID:  "my-client",
+				now:       func() time.Time { return now },
+			},
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			wantInitErr: true,
+		},
+		{
+			name: "invalid-sig-alg",
+			options: Options{
+				IssuerURL:            "https://auth.example.com",
+				ClientID:             "my-client",
+				UsernameClaim:        "username",
+				SupportedSigningAlgs: []string{"HS256"},
+				now:                  func() time.Time { return now },
+			},
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			wantInitErr: true,
+		},
+		{
+			name: "accounts.google.com issuer",
+			options: Options{
+				IssuerURL:     "https://accounts.google.com",
+				ClientID:      "my-client",
+				UsernameClaim: "email",
+				now:           func() time.Time { return now },
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "accounts.google.com",
+				"email": "thomas.jefferson@gmail.com",
+				"aud": "my-client",
+				"exp": %d
+			}`, valid.Unix()),
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			want: &user.DefaultInfo{
+				Name: "thomas.jefferson@gmail.com",
+			},
+		},
+		{
+			name: "good token with api req audience",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				APIAudiences:  authenticator.Audiences{"api"},
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			reqAudiences: authenticator.Audiences{"api"},
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "good token with multiple api req audience",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				APIAudiences:  authenticator.Audiences{"api", "other"},
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			reqAudiences: authenticator.Audiences{"api"},
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "good token with client_id req audience",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				APIAudiences:  authenticator.Audiences{"api"},
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			reqAudiences: authenticator.Audiences{"my-client"},
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "good token with client_id and api req audience",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				APIAudiences:  authenticator.Audiences{"api"},
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			reqAudiences: authenticator.Audiences{"my-client", "api"},
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "good token with client_id and api req audience",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				APIAudiences:  authenticator.Audiences{"api"},
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			reqAudiences: authenticator.Audiences{"my-client", "api"},
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "good token with client_id and bad req audience",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				APIAudiences:  authenticator.Audiences{"api"},
+				UsernameClaim: "username",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			reqAudiences: authenticator.Audiences{"other"},
+			wantSkip:     true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, test.run)
+	}
+}
+
+func TestUnmarshalClaimError(t *testing.T) {
+	// Ensure error strings returned by unmarshaling claims don't include the claim.
+	const token = "96bb299a-02e9-11e8-8673-54ee7553240e"
+	payload := fmt.Sprintf(`{
+		"token": "%s"
+	}`, token)
+
+	var c claims
+	if err := json.Unmarshal([]byte(payload), &c); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	err := c.unmarshalClaim("token", &n)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if strings.Contains(err.Error(), token) {
+		t.Fatalf("unmarshal error included token")
+	}
+}
+
+func TestUnmarshalClaim(t *testing.T) {
 	tests := []struct {
-		testCase string
-
-		serverCertFile string
-		serverKeyFile  string
-
-		trustedCertFile string
-
+		name    string
+		claims  string
+		do      func(claims) (interface{}, error)
+		want    interface{}
 		wantErr bool
 	}{
 		{
-			testCase:       "provider using untrusted custom cert",
-			serverCertFile: cert1,
-			serverKeyFile:  key1,
-			wantErr:        true,
+			name:   "string claim",
+			claims: `{"aud":"foo"}`,
+			do: func(c claims) (interface{}, error) {
+				var s string
+				err := c.unmarshalClaim("aud", &s)
+				return s, err
+			},
+			want: "foo",
 		},
 		{
-			testCase:        "provider using untrusted cert",
-			serverCertFile:  cert1,
-			serverKeyFile:   key1,
-			trustedCertFile: cert2,
-			wantErr:         true,
-		},
-		{
-			testCase:        "provider using trusted cert",
-			serverCertFile:  cert1,
-			serverKeyFile:   key1,
-			trustedCertFile: cert1,
-			wantErr:         false,
-		},
-	}
+			name:   "mismatched types",
+			claims: `{"aud":"foo"}`,
+			do: func(c claims) (interface{}, error) {
+				var n int
+				err := c.unmarshalClaim("aud", &n)
+				return n, err
 
-	for _, tc := range tests {
-		func() {
-			op := oidctesting.NewOIDCProvider(t, "")
-			srv, err := op.ServeTLSWithKeyPair(tc.serverCertFile, tc.serverKeyFile)
-			if err != nil {
-				t.Errorf("%s: %v", tc.testCase, err)
-				return
-			}
-			defer srv.Close()
-
-			issuer := srv.URL
-			clientID := "client-foo"
-
-			options := OIDCOptions{
-				IssuerURL:     srv.URL,
-				ClientID:      clientID,
-				CAFile:        tc.trustedCertFile,
-				UsernameClaim: "email",
-				GroupsClaim:   "groups",
-			}
-
-			authenticator, err := New(options)
-			if err != nil {
-				t.Errorf("%s: failed to initialize authenticator: %v", tc.testCase, err)
-				return
-			}
-			defer authenticator.Close()
-
-			email := "user-1@example.com"
-			groups := []string{"group1", "group2"}
-			sort.Strings(groups)
-
-			token := generateGoodToken(t, op, issuer, "user-1", clientID, "email", email, "groups", groups)
-
-			// Because this authenticator behaves differently for subsequent requests, run these
-			// tests multiple times (but expect the same result).
-			for i := 1; i < 4; i++ {
-
-				user, ok, err := authenticator.AuthenticateToken(token)
-				if err != nil {
-					if !tc.wantErr {
-						t.Errorf("%s (req #%d): failed to authenticate token: %v", tc.testCase, i, err)
-					}
-					continue
-				}
-
-				if tc.wantErr {
-					t.Errorf("%s (req #%d): expected error authenticating", tc.testCase, i)
-					continue
-				}
-				if !ok {
-					t.Errorf("%s (req #%d): did not get user or error", tc.testCase, i)
-					continue
-				}
-
-				if gotUsername := user.GetName(); email != gotUsername {
-					t.Errorf("%s (req #%d): GetName() expected=%q got %q", tc.testCase, i, email, gotUsername)
-				}
-				gotGroups := user.GetGroups()
-				sort.Strings(gotGroups)
-				if !reflect.DeepEqual(gotGroups, groups) {
-					t.Errorf("%s (req #%d): GetGroups() expected=%q got %q", tc.testCase, i, groups, gotGroups)
-				}
-			}
-		}()
-	}
-}
-
-func TestOIDCAuthentication(t *testing.T) {
-	cert := path.Join(os.TempDir(), "oidc-cert")
-	key := path.Join(os.TempDir(), "oidc-key")
-
-	defer os.Remove(cert)
-	defer os.Remove(key)
-
-	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert, key)
-
-	// Ensure all tests pass when the issuer is not at a base URL.
-	for _, path := range []string{"", "/path/with/trailing/slash/"} {
-
-		// Create a TLS server and a client.
-		op := oidctesting.NewOIDCProvider(t, path)
-		srv, err := op.ServeTLSWithKeyPair(cert, key)
-		if err != nil {
-			t.Fatalf("Cannot start server: %v", err)
-		}
-		defer srv.Close()
-
-		tests := []struct {
-			userClaim   string
-			groupsClaim string
-			token       string
-			userInfo    user.Info
-			verified    bool
-			err         string
-		}{
-			{
-				"sub",
-				"",
-				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-				&user.DefaultInfo{Name: "user-foo"},
-				true,
-				"",
-			},
-			{
-				// Use user defined claim (email here).
-				"email",
-				"",
-				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "", nil),
-				&user.DefaultInfo{Name: "foo@example.com"},
-				true,
-				"",
-			},
-			{
-				// Use user defined claim (email here).
-				"email",
-				"",
-				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
-				&user.DefaultInfo{Name: "foo@example.com"},
-				true,
-				"",
-			},
-			{
-				// Use user defined claim (email here).
-				"email",
-				"groups",
-				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
-				&user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1", "group2"}},
-				true,
-				"",
-			},
-			{
-				// Group claim is a string rather than an array. Map that string to a single group.
-				"email",
-				"groups",
-				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", "group1"),
-				&user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1"}},
-				true,
-				"",
-			},
-			{
-				// Group claim is not a string or array of strings. Throw out this as invalid.
-				"email",
-				"groups",
-				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", 1),
-				nil,
-				false,
-				"custom group claim contains invalid type: float64",
-			},
-			{
-				// Email not verified
-				"email",
-				"",
-				generateTokenWithUnverifiedEmail(t, op, srv.URL, "client-foo", "client-foo", "foo@example.com"),
-				nil,
-				false,
-				"email not verified",
-			},
-			{
-				"sub",
-				"",
-				generateMalformedToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-				nil,
-				false,
-				"oidc: unable to verify JWT signature: no matching keys",
-			},
-			{
-				// Invalid 'aud'.
-				"sub",
-				"",
-				generateGoodToken(t, op, srv.URL, "client-foo", "client-bar", "sub", "user-foo", "", nil),
-				nil,
-				false,
-				"oidc: JWT claims invalid: invalid claims, 'aud' claim and 'client_id' do not match",
-			},
-			{
-				// Invalid issuer.
-				"sub",
-				"",
-				generateGoodToken(t, op, "http://foo-bar.com", "client-foo", "client-foo", "sub", "user-foo", "", nil),
-				nil,
-				false,
-				"oidc: JWT claims invalid: invalid claim value: 'iss'.",
-			},
-			{
-				"sub",
-				"",
-				generateExpiredToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-				nil,
-				false,
-				"oidc: JWT claims invalid: token is expired",
-			},
-		}
-
-		for i, tt := range tests {
-			client, err := New(OIDCOptions{srv.URL, "client-foo", cert, tt.userClaim, "", tt.groupsClaim, ""})
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				continue
-			}
-
-			user, result, err := client.AuthenticateToken(tt.token)
-			if tt.err != "" {
-				if !strings.HasPrefix(err.Error(), tt.err) {
-					t.Errorf("#%d: Expecting: %v..., but got: %v", i, tt.err, err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("#%d: Unexpected error: %v", i, err)
-				}
-			}
-			if !reflect.DeepEqual(tt.verified, result) {
-				t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.verified, result)
-			}
-			if !reflect.DeepEqual(tt.userInfo, user) {
-				t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.userInfo, user)
-			}
-			client.Close()
-		}
-	}
-}
-
-func TestParseTokenClaims(t *testing.T) {
-	tests := []struct {
-		name string
-
-		// Note this is missing a lot of configuration options because
-		// parseTokenClaim doesn't handle:
-		//
-		// - 'iss' claim matching issuer URL
-		// - 'exp' claim having not expired
-		// - 'sub' claim matching a trusted client id
-		//
-		// That logic has coverage in other tests.
-
-		issuerURL      string
-		usernameClaim  string
-		usernamePrefix string
-		groupsClaim    string
-		groupsPrefix   string
-
-		claims jose.Claims
-
-		wantUser *user.DefaultInfo
-		wantErr  bool
-	}{
-		{
-			name:          "email username",
-			issuerURL:     "https://foo.com/",
-			usernameClaim: "email",
-			claims: jose.Claims{
-				"email":          "jane.doe@example.com",
-				"email_verified": true,
-			},
-			wantUser: &user.DefaultInfo{
-				Name: "jane.doe@example.com",
-			},
-		},
-		{
-			name:          "no email_verified claim",
-			issuerURL:     "https://foo.com/",
-			usernameClaim: "email",
-			claims: jose.Claims{
-				"email": "jane.doe@example.com",
 			},
 			wantErr: true,
 		},
 		{
-			name:          "email unverified",
-			issuerURL:     "https://foo.com/",
-			usernameClaim: "email",
-			claims: jose.Claims{
-				"email":          "jane.doe@example.com",
-				"email_verified": false,
+			name:   "bool claim",
+			claims: `{"email":"foo@coreos.com","email_verified":true}`,
+			do: func(c claims) (interface{}, error) {
+				var verified bool
+				err := c.unmarshalClaim("email_verified", &verified)
+				return verified, err
 			},
-			wantErr: true,
+			want: true,
 		},
 		{
-			name:          "non-email user claim",
-			issuerURL:     "https://foo.com/",
-			usernameClaim: "name",
-			claims: jose.Claims{
-				"name": "janedoe",
+			name:   "strings claim",
+			claims: `{"groups":["a","b","c"]}`,
+			do: func(c claims) (interface{}, error) {
+				var groups []string
+				err := c.unmarshalClaim("groups", &groups)
+				return groups, err
 			},
-			wantUser: &user.DefaultInfo{
-				Name: "janedoe",
-			},
-		},
-		{
-			name:          "groups claim",
-			issuerURL:     "https://foo.com/",
-			usernameClaim: "name",
-			groupsClaim:   "groups",
-			claims: jose.Claims{
-				"name":   "janedoe",
-				"groups": []string{"foo", "bar"},
-			},
-			wantUser: &user.DefaultInfo{
-				Name:   "janedoe",
-				Groups: []string{"foo", "bar"},
-			},
-		},
-		{
-			name:          "groups claim string",
-			issuerURL:     "https://foo.com/",
-			usernameClaim: "name",
-			groupsClaim:   "groups",
-			claims: jose.Claims{
-				"name":   "janedoe",
-				"groups": "foo",
-			},
-			wantUser: &user.DefaultInfo{
-				Name:   "janedoe",
-				Groups: []string{"foo"},
-			},
-		},
-		{
-			name:           "username prefix",
-			issuerURL:      "https://foo.com/",
-			usernameClaim:  "name",
-			groupsClaim:    "groups",
-			usernamePrefix: "oidc:",
-			claims: jose.Claims{
-				"name":   "janedoe",
-				"groups": []string{"foo", "bar"},
-			},
-			wantUser: &user.DefaultInfo{
-				Name:   "oidc:janedoe",
-				Groups: []string{"foo", "bar"},
-			},
-		},
-		{
-			name:           "username prefix with email",
-			issuerURL:      "https://foo.com/",
-			usernameClaim:  "email",
-			groupsClaim:    "groups",
-			usernamePrefix: "oidc:",
-			claims: jose.Claims{
-				"email":          "jane.doe@example.com",
-				"email_verified": true,
-				"groups":         []string{"foo", "bar"},
-			},
-			wantUser: &user.DefaultInfo{
-				Name:   "oidc:jane.doe@example.com",
-				Groups: []string{"foo", "bar"},
-			},
-		},
-		{
-			name:          "groups prefix",
-			issuerURL:     "https://foo.com/",
-			usernameClaim: "name",
-			groupsClaim:   "groups",
-			groupsPrefix:  "oidc:",
-			claims: jose.Claims{
-				"name":   "janedoe",
-				"groups": []string{"foo", "bar"},
-			},
-			wantUser: &user.DefaultInfo{
-				Name:   "janedoe",
-				Groups: []string{"oidc:foo", "oidc:bar"},
-			},
-		},
-		{
-			name:           "username and groups prefix",
-			issuerURL:      "https://foo.com/",
-			usernameClaim:  "name",
-			groupsClaim:    "groups",
-			usernamePrefix: "oidc-user:",
-			groupsPrefix:   "oidc:",
-			claims: jose.Claims{
-				"name":   "janedoe",
-				"groups": []string{"foo", "bar"},
-			},
-			wantUser: &user.DefaultInfo{
-				Name:   "oidc-user:janedoe",
-				Groups: []string{"oidc:foo", "oidc:bar"},
-			},
+			want: []string{"a", "b", "c"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			o := OIDCAuthenticator{
-				issuerURL:      test.issuerURL,
-				usernameClaim:  test.usernameClaim,
-				usernamePrefix: test.usernamePrefix,
-				groupsClaim:    test.groupsClaim,
-				groupsPrefix:   test.groupsPrefix,
+			var c claims
+			if err := json.Unmarshal([]byte(test.claims), &c); err != nil {
+				t.Fatal(err)
 			}
 
-			u, ok, err := o.parseTokenClaims(test.claims)
+			got, err := test.do(c)
 			if err != nil {
-				if !test.wantErr {
-					t.Errorf("failed to authenticate user: %v", err)
+				if test.wantErr {
+					return
 				}
-				return
+				t.Fatalf("unexpected error: %v", err)
 			}
 			if test.wantErr {
-				t.Fatalf("expected authentication to fail")
+				t.Fatalf("expected error")
 			}
 
-			if !ok {
-				// We don't have any cases today when the claims can return
-				// no error with an unauthenticated signal.
-				//
-				// In the future we might.
-				t.Fatalf("user wasn't authenticated")
-			}
-
-			got := &user.DefaultInfo{
-				Name:   u.GetName(),
-				UID:    u.GetUID(),
-				Groups: u.GetGroups(),
-				Extra:  u.GetExtra(),
-			}
-			if !reflect.DeepEqual(got, test.wantUser) {
-				t.Errorf("wanted user=%#v, got=%#v", test.wantUser, got)
+			if !reflect.DeepEqual(got, test.want) {
+				t.Errorf("wanted=%#v, got=%#v", test.want, got)
 			}
 		})
 	}

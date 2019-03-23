@@ -19,16 +19,21 @@ package eventratelimit
 import (
 	"io"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/validation"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "EventRateLimit"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("EventRateLimit",
+	plugins.Register(PluginName,
 		func(config io.Reader) (admission.Interface, error) {
 			// load the configuration provided (if any)
 			configuration, err := LoadConfiguration(config)
@@ -45,8 +50,8 @@ func Register(plugins *admission.Plugins) {
 		})
 }
 
-// eventRateLimitAdmission implements an admission controller that can enforce event rate limits
-type eventRateLimitAdmission struct {
+// Plugin implements an admission controller that can enforce event rate limits
+type Plugin struct {
 	*admission.Handler
 	// limitEnforcers is the collection of limit enforcers. There is one limit enforcer for each
 	// active limit type. As there are 4 limit types, the length of the array will be at most 4.
@@ -54,8 +59,10 @@ type eventRateLimitAdmission struct {
 	limitEnforcers []*limitEnforcer
 }
 
+var _ admission.ValidationInterface = &Plugin{}
+
 // newEventRateLimit configures an admission controller that can enforce event rate limits
-func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontrol.Clock) (admission.Interface, error) {
+func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontrol.Clock) (*Plugin, error) {
 	limitEnforcers := make([]*limitEnforcer, 0, len(config.Limits))
 	for _, limitConfig := range config.Limits {
 		enforcer, err := newLimitEnforcer(limitConfig, clock)
@@ -65,7 +72,7 @@ func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontro
 		limitEnforcers = append(limitEnforcers, enforcer)
 	}
 
-	eventRateLimitAdmission := &eventRateLimitAdmission{
+	eventRateLimitAdmission := &Plugin{
 		Handler:        admission.NewHandler(admission.Create, admission.Update),
 		limitEnforcers: limitEnforcers,
 	}
@@ -73,20 +80,31 @@ func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontro
 	return eventRateLimitAdmission, nil
 }
 
-// Admit makes admission decisions while enforcing event rate limits
-func (a *eventRateLimitAdmission) Admit(attr admission.Attributes) (err error) {
+// Validate makes admission decisions while enforcing event rate limits
+func (a *Plugin) Validate(attr admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// ignore all operations that do not correspond to an Event kind
 	if attr.GetKind().GroupKind() != api.Kind("Event") {
 		return nil
 	}
 
-	var rejectionError error
+	// ignore all requests that specify dry-run
+	// because they don't correspond to any calls to etcd,
+	// they should not be affected by the ratelimit
+	if attr.IsDryRun() {
+		return nil
+	}
+
+	var errors []error
 	// give each limit enforcer a chance to reject the event
 	for _, enforcer := range a.limitEnforcers {
 		if err := enforcer.accept(attr); err != nil {
-			rejectionError = err
+			errors = append(errors, err)
 		}
 	}
 
-	return rejectionError
+	if aggregatedErr := utilerrors.NewAggregate(errors); aggregatedErr != nil {
+		return apierrors.NewTooManyRequestsError(aggregatedErr.Error())
+	}
+
+	return nil
 }

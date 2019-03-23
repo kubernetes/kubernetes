@@ -43,7 +43,7 @@ func (g *expansionGenerator) Filter(c *generator.Context, t *types.Type) bool {
 func (g *expansionGenerator) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	for _, t := range g.types {
-		tags := util.MustParseClientGenTags(t.SecondClosestCommentLines)
+		tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 		if _, err := os.Stat(filepath.Join(g.packagePath, strings.ToLower(t.Name.Name+"_expansion.go"))); os.IsNotExist(err) {
 			sw.Do(expansionInterfaceTemplate, t)
 			if !tags.NonNamespaced {

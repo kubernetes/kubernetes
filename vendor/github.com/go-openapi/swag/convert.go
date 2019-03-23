@@ -22,8 +22,9 @@ import (
 
 // same as ECMA Number.MAX_SAFE_INTEGER and Number.MIN_SAFE_INTEGER
 const (
-	maxJSONFloat = float64(1<<53 - 1)  // 9007199254740991.0 	 	 2^53 - 1
-	minJSONFloat = -float64(1<<53 - 1) //-9007199254740991.0	-2^53 - 1
+	maxJSONFloat         = float64(1<<53 - 1)  // 9007199254740991.0 	 	 2^53 - 1
+	minJSONFloat         = -float64(1<<53 - 1) //-9007199254740991.0	-2^53 - 1
+	epsilon      float64 = 1e-9
 )
 
 // IsFloat64AJSONInteger allow for integers [-2^53, 2^53-1] inclusive
@@ -31,21 +32,39 @@ func IsFloat64AJSONInteger(f float64) bool {
 	if math.IsNaN(f) || math.IsInf(f, 0) || f < minJSONFloat || f > maxJSONFloat {
 		return false
 	}
+	fa := math.Abs(f)
+	g := float64(uint64(f))
+	ga := math.Abs(g)
 
-	return f == float64(int64(f)) || f == float64(uint64(f))
+	diff := math.Abs(f - g)
+
+	// more info: https://floating-point-gui.de/errors/comparison/#look-out-for-edge-cases
+	if f == g { // best case
+		return true
+	} else if f == float64(int64(f)) || f == float64(uint64(f)) { // optimistic case
+		return true
+	} else if f == 0 || g == 0 || diff < math.SmallestNonzeroFloat64 { // very close to 0 values
+		return diff < (epsilon * math.SmallestNonzeroFloat64)
+	}
+	// check the relative error
+	return diff/math.Min(fa+ga, math.MaxFloat64) < epsilon
 }
 
-var evaluatesAsTrue = map[string]struct{}{
-	"true":     struct{}{},
-	"1":        struct{}{},
-	"yes":      struct{}{},
-	"ok":       struct{}{},
-	"y":        struct{}{},
-	"on":       struct{}{},
-	"selected": struct{}{},
-	"checked":  struct{}{},
-	"t":        struct{}{},
-	"enabled":  struct{}{},
+var evaluatesAsTrue map[string]struct{}
+
+func init() {
+	evaluatesAsTrue = map[string]struct{}{
+		"true":     {},
+		"1":        {},
+		"yes":      {},
+		"ok":       {},
+		"y":        {},
+		"on":       {},
+		"selected": {},
+		"checked":  {},
+		"t":        {},
+		"enabled":  {},
+	}
 }
 
 // ConvertBool turn a string into a boolean

@@ -18,6 +18,7 @@ go_library(
         "version_command.go",
         "watch_command.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/ginkgo",
     importpath = "github.com/onsi/ginkgo/ginkgo",
     visibility = ["//visibility:private"],
     deps = [
@@ -35,8 +36,8 @@ go_library(
 
 go_binary(
     name = "ginkgo",
-    importpath = "github.com/onsi/ginkgo/ginkgo",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 

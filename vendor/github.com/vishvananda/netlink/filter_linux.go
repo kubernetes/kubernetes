@@ -11,6 +11,14 @@ import (
 	"github.com/vishvananda/netlink/nl"
 )
 
+// Constants used in TcU32Sel.Flags.
+const (
+	TC_U32_TERMINAL  = nl.TC_U32_TERMINAL
+	TC_U32_OFFSET    = nl.TC_U32_OFFSET
+	TC_U32_VAROFFSET = nl.TC_U32_VAROFFSET
+	TC_U32_EAT       = nl.TC_U32_EAT
+)
+
 // Fw filter filters on firewall marks
 // NOTE: this is in filter_linux because it refers to nl.TcPolice which
 //       is defined in nl/tc_linux.go
@@ -128,9 +136,11 @@ func (h *Handle) FilterAdd(filter Filter) error {
 	req.AddData(nl.NewRtAttr(nl.TCA_KIND, nl.ZeroTerminated(filter.Type())))
 
 	options := nl.NewRtAttr(nl.TCA_OPTIONS, nil)
-	if u32, ok := filter.(*U32); ok {
+
+	switch filter := filter.(type) {
+	case *U32:
 		// Convert TcU32Sel into nl.TcU32Sel as it is without copy.
-		sel := (*nl.TcU32Sel)(unsafe.Pointer(u32.Sel))
+		sel := (*nl.TcU32Sel)(unsafe.Pointer(filter.Sel))
 		if sel == nil {
 			// match all
 			sel = &nl.TcU32Sel{
@@ -158,56 +168,56 @@ func (h *Handle) FilterAdd(filter Filter) error {
 		}
 		sel.Nkeys = uint8(len(sel.Keys))
 		nl.NewRtAttrChild(options, nl.TCA_U32_SEL, sel.Serialize())
-		if u32.ClassId != 0 {
-			nl.NewRtAttrChild(options, nl.TCA_U32_CLASSID, nl.Uint32Attr(u32.ClassId))
+		if filter.ClassId != 0 {
+			nl.NewRtAttrChild(options, nl.TCA_U32_CLASSID, nl.Uint32Attr(filter.ClassId))
 		}
 		actionsAttr := nl.NewRtAttrChild(options, nl.TCA_U32_ACT, nil)
 		// backwards compatibility
-		if u32.RedirIndex != 0 {
-			u32.Actions = append([]Action{NewMirredAction(u32.RedirIndex)}, u32.Actions...)
+		if filter.RedirIndex != 0 {
+			filter.Actions = append([]Action{NewMirredAction(filter.RedirIndex)}, filter.Actions...)
 		}
-		if err := EncodeActions(actionsAttr, u32.Actions); err != nil {
+		if err := EncodeActions(actionsAttr, filter.Actions); err != nil {
 			return err
 		}
-	} else if fw, ok := filter.(*Fw); ok {
-		if fw.Mask != 0 {
+	case *Fw:
+		if filter.Mask != 0 {
 			b := make([]byte, 4)
-			native.PutUint32(b, fw.Mask)
+			native.PutUint32(b, filter.Mask)
 			nl.NewRtAttrChild(options, nl.TCA_FW_MASK, b)
 		}
-		if fw.InDev != "" {
-			nl.NewRtAttrChild(options, nl.TCA_FW_INDEV, nl.ZeroTerminated(fw.InDev))
+		if filter.InDev != "" {
+			nl.NewRtAttrChild(options, nl.TCA_FW_INDEV, nl.ZeroTerminated(filter.InDev))
 		}
-		if (fw.Police != nl.TcPolice{}) {
+		if (filter.Police != nl.TcPolice{}) {
 
 			police := nl.NewRtAttrChild(options, nl.TCA_FW_POLICE, nil)
-			nl.NewRtAttrChild(police, nl.TCA_POLICE_TBF, fw.Police.Serialize())
-			if (fw.Police.Rate != nl.TcRateSpec{}) {
-				payload := SerializeRtab(fw.Rtab)
+			nl.NewRtAttrChild(police, nl.TCA_POLICE_TBF, filter.Police.Serialize())
+			if (filter.Police.Rate != nl.TcRateSpec{}) {
+				payload := SerializeRtab(filter.Rtab)
 				nl.NewRtAttrChild(police, nl.TCA_POLICE_RATE, payload)
 			}
-			if (fw.Police.PeakRate != nl.TcRateSpec{}) {
-				payload := SerializeRtab(fw.Ptab)
+			if (filter.Police.PeakRate != nl.TcRateSpec{}) {
+				payload := SerializeRtab(filter.Ptab)
 				nl.NewRtAttrChild(police, nl.TCA_POLICE_PEAKRATE, payload)
 			}
 		}
-		if fw.ClassId != 0 {
+		if filter.ClassId != 0 {
 			b := make([]byte, 4)
-			native.PutUint32(b, fw.ClassId)
+			native.PutUint32(b, filter.ClassId)
 			nl.NewRtAttrChild(options, nl.TCA_FW_CLASSID, b)
 		}
-	} else if bpf, ok := filter.(*BpfFilter); ok {
+	case *BpfFilter:
 		var bpfFlags uint32
-		if bpf.ClassId != 0 {
-			nl.NewRtAttrChild(options, nl.TCA_BPF_CLASSID, nl.Uint32Attr(bpf.ClassId))
+		if filter.ClassId != 0 {
+			nl.NewRtAttrChild(options, nl.TCA_BPF_CLASSID, nl.Uint32Attr(filter.ClassId))
 		}
-		if bpf.Fd >= 0 {
-			nl.NewRtAttrChild(options, nl.TCA_BPF_FD, nl.Uint32Attr((uint32(bpf.Fd))))
+		if filter.Fd >= 0 {
+			nl.NewRtAttrChild(options, nl.TCA_BPF_FD, nl.Uint32Attr((uint32(filter.Fd))))
 		}
-		if bpf.Name != "" {
-			nl.NewRtAttrChild(options, nl.TCA_BPF_NAME, nl.ZeroTerminated(bpf.Name))
+		if filter.Name != "" {
+			nl.NewRtAttrChild(options, nl.TCA_BPF_NAME, nl.ZeroTerminated(filter.Name))
 		}
-		if bpf.DirectAction {
+		if filter.DirectAction {
 			bpfFlags |= nl.TCA_BPF_FLAG_ACT_DIRECT
 		}
 		nl.NewRtAttrChild(options, nl.TCA_BPF_FLAGS, nl.Uint32Attr(bpfFlags))

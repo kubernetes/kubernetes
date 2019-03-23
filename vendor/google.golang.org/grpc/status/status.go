@@ -1,33 +1,18 @@
 /*
  *
- * Copyright 2017, Google Inc.
- * All rights reserved.
+ * Copyright 2017 gRPC authors.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *     * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -43,9 +28,11 @@
 package status
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 )
@@ -59,7 +46,7 @@ func (se *statusError) Error() string {
 	return fmt.Sprintf("rpc error: code = %s desc = %s", codes.Code(p.GetCode()), p.GetMessage())
 }
 
-func (se *statusError) status() *Status {
+func (se *statusError) GRPCStatus() *Status {
 	return &Status{s: (*spb.Status)(se)}
 }
 
@@ -133,13 +120,70 @@ func FromProto(s *spb.Status) *Status {
 }
 
 // FromError returns a Status representing err if it was produced from this
-// package, otherwise it returns nil, false.
+// package or has a method `GRPCStatus() *Status`. Otherwise, ok is false and a
+// Status is returned with codes.Unknown and the original error message.
 func FromError(err error) (s *Status, ok bool) {
 	if err == nil {
 		return &Status{s: &spb.Status{Code: int32(codes.OK)}}, true
 	}
-	if s, ok := err.(*statusError); ok {
-		return s.status(), true
+	if se, ok := err.(interface{ GRPCStatus() *Status }); ok {
+		return se.GRPCStatus(), true
 	}
-	return nil, false
+	return New(codes.Unknown, err.Error()), false
+}
+
+// Convert is a convenience function which removes the need to handle the
+// boolean return value from FromError.
+func Convert(err error) *Status {
+	s, _ := FromError(err)
+	return s
+}
+
+// WithDetails returns a new status with the provided details messages appended to the status.
+// If any errors are encountered, it returns nil and the first error encountered.
+func (s *Status) WithDetails(details ...proto.Message) (*Status, error) {
+	if s.Code() == codes.OK {
+		return nil, errors.New("no error details for status with code OK")
+	}
+	// s.Code() != OK implies that s.Proto() != nil.
+	p := s.Proto()
+	for _, detail := range details {
+		any, err := ptypes.MarshalAny(detail)
+		if err != nil {
+			return nil, err
+		}
+		p.Details = append(p.Details, any)
+	}
+	return &Status{s: p}, nil
+}
+
+// Details returns a slice of details messages attached to the status.
+// If a detail cannot be decoded, the error is returned in place of the detail.
+func (s *Status) Details() []interface{} {
+	if s == nil || s.s == nil {
+		return nil
+	}
+	details := make([]interface{}, 0, len(s.s.Details))
+	for _, any := range s.s.Details {
+		detail := &ptypes.DynamicAny{}
+		if err := ptypes.UnmarshalAny(any, detail); err != nil {
+			details = append(details, err)
+			continue
+		}
+		details = append(details, detail.Message)
+	}
+	return details
+}
+
+// Code returns the Code of the error if it is a Status error, codes.OK if err
+// is nil, or codes.Unknown otherwise.
+func Code(err error) codes.Code {
+	// Don't use FromError to avoid allocation of OK status.
+	if err == nil {
+		return codes.OK
+	}
+	if se, ok := err.(interface{ GRPCStatus() *Status }); ok {
+		return se.GRPCStatus().Code()
+	}
+	return codes.Unknown
 }

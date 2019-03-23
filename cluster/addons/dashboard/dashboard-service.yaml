@@ -11,5 +11,5 @@ spec:
   selector:
     k8s-app: kubernetes-dashboard
   ports:
-  - port: 80
-    targetPort: 9090
+  - port: 443
+    targetPort: 8443

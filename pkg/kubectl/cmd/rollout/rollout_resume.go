@@ -18,146 +18,180 @@ package rollout
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
-// ResumeConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// ResumeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
-type ResumeConfig struct {
+type ResumeOptions struct {
+	PrintFlags *genericclioptions.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinter, error)
+
+	Resources []string
+
+	Builder          func() *resource.Builder
+	Resumer          polymorphichelpers.ObjectResumerFunc
+	Namespace        string
+	EnforceNamespace bool
+
 	resource.FilenameOptions
-
-	Resumer func(object *resource.Info) ([]byte, error)
-	Mapper  meta.RESTMapper
-	Typer   runtime.ObjectTyper
-	Encoder runtime.Encoder
-	Infos   []*resource.Info
-
-	Out io.Writer
+	genericclioptions.IOStreams
 }
 
 var (
-	resume_long = templates.LongDesc(`
+	resumeLong = templates.LongDesc(`
 		Resume a paused resource
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.
 		Currently only deployments support being resumed.`)
 
-	resume_example = templates.Examples(`
+	resumeExample = templates.Examples(`
 		# Resume an already paused deployment
 		kubectl rollout resume deployment/nginx`)
 )
 
-func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &ResumeConfig{}
+// NewRolloutResumeOptions returns an initialized ResumeOptions instance
+func NewRolloutResumeOptions(streams genericclioptions.IOStreams) *ResumeOptions {
+	return &ResumeOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("resumed").WithTypeSetter(scheme.Scheme),
+		IOStreams:  streams,
+	}
+}
+
+// NewCmdRolloutResume returns a Command instance for 'rollout resume' sub command
+func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewRolloutResumeOptions(streams)
 
 	validArgs := []string{"deployment"}
-	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
-		Use:     "resume RESOURCE",
-		Short:   i18n.T("Resume a paused resource"),
-		Long:    resume_long,
-		Example: resume_example,
+		Use:                   "resume RESOURCE",
+		DisableFlagsInUseLine: true,
+		Short:                 i18n.T("Resume a paused resource"),
+		Long:                  resumeLong,
+		Example:               resumeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			allErrs := []error{}
-			err := options.CompleteResume(f, cmd, out, args)
-			if err != nil {
-				allErrs = append(allErrs, err)
-			}
-			err = options.RunResume()
-			if err != nil {
-				allErrs = append(allErrs, err)
-			}
-			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunResume())
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: argAliases,
+		ValidArgs: validArgs,
 	}
 
 	usage := "identifying the resource to get from a server."
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	o.PrintFlags.AddFlags(cmd)
 	return cmd
 }
 
-func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
-		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
-	}
+// Complete completes all the required options
+func (o *ResumeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	o.Resources = args
 
-	o.Mapper, o.Typer = f.Object()
-	o.Encoder = f.JSONEncoder()
+	o.Resumer = polymorphichelpers.ObjectResumerFn
 
-	o.Resumer = f.Resumer
-	o.Out = out
-
-	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
+	var err error
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
 
-	r := f.NewBuilder().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		ResourceTypeOrNameArgs(true, args...).
-		ContinueOnError().
-		Latest().
-		Flatten().
-		Do()
-	err = r.Err()
-	if err != nil {
-		return err
+	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		return o.PrintFlags.ToPrinter()
 	}
 
-	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-		o.Infos = append(o.Infos, info)
-		return nil
-	})
-	if err != nil {
-		return err
+	o.Builder = f.NewBuilder
+
+	return nil
+}
+
+func (o *ResumeOptions) Validate() error {
+	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
+		return fmt.Errorf("required resource not specified")
 	}
 	return nil
 }
 
-func (o ResumeConfig) RunResume() error {
+// RunResume performs the execution of 'rollout resume' sub command
+func (o ResumeOptions) RunResume() error {
+	r := o.Builder().
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+		NamespaceParam(o.Namespace).DefaultNamespace().
+		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		ResourceTypeOrNameArgs(true, o.Resources...).
+		ContinueOnError().
+		Latest().
+		Flatten().
+		Do()
+	if err := r.Err(); err != nil {
+		return err
+	}
+
 	allErrs := []error{}
-	for _, patch := range set.CalculatePatches(o.Infos, o.Encoder, o.Resumer) {
+	infos, err := r.Infos()
+	if err != nil {
+		// restore previous command behavior where
+		// an error caused by retrieving infos due to
+		// at least a single broken object did not result
+		// in an immediate return, but rather an overall
+		// aggregation of errors.
+		allErrs = append(allErrs, err)
+	}
+
+	for _, patch := range set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Resumer)) {
 		info := patch.Info
 
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s %q %v", info.Mapping.Resource, info.Name, patch.Err))
+			resourceString := info.Mapping.Resource.Resource
+			if len(info.Mapping.Resource.Group) > 0 {
+				resourceString = resourceString + "." + info.Mapping.Resource.Group
+			}
+			allErrs = append(allErrs, fmt.Errorf("error: %s %q %v", resourceString, info.Name, patch.Err))
 			continue
 		}
 
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
+			printer, err := o.ToPrinter("already resumed")
+			if err != nil {
+				allErrs = append(allErrs, err)
+				continue
+			}
+			if err = printer.PrintObj(info.Object, o.Out); err != nil {
+				allErrs = append(allErrs, err)
+			}
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch: %v", err))
 			continue
 		}
 
 		info.Refresh(obj, true)
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
+		printer, err := o.ToPrinter("resumed")
+		if err != nil {
+			allErrs = append(allErrs, err)
+			continue
+		}
+		if err = printer.PrintObj(info.Object, o.Out); err != nil {
+			allErrs = append(allErrs, err)
+		}
 	}
 
 	return utilerrors.NewAggregate(allErrs)

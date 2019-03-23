@@ -7,6 +7,7 @@ go_library(
         "api.pb.go",
         "status.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/libopenstorage/openstorage/api",
     importpath = "github.com/libopenstorage/openstorage/api",
     visibility = ["//visibility:public"],
     deps = [
@@ -14,12 +15,6 @@ go_library(
         "//vendor/github.com/golang/protobuf/ptypes/timestamp:go_default_library",
         "//vendor/github.com/mohae/deepcopy:go_default_library",
     ],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["api.proto"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(

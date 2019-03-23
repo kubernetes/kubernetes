@@ -77,6 +77,16 @@ var _ = SIGDescribe("Network", func() {
 
 		zero := int64(0)
 
+		// Some distributions (Ubuntu 16.04 etc.) don't support the proc file.
+		_, err := framework.IssueSSHCommandWithResult(
+			"ls /proc/net/nf_conntrack",
+			framework.TestContext.Provider,
+			clientNodeInfo.node)
+		if err != nil && strings.Contains(err.Error(), "No such file or directory") {
+			framework.Skipf("The node %s does not support /proc/net/nf_conntrack", clientNodeInfo.name)
+		}
+		framework.ExpectNoError(err)
+
 		clientPodSpec := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "e2e-net-client",
@@ -171,19 +181,19 @@ var _ = SIGDescribe("Network", func() {
 		// If test flakes occur here, then this check should be performed
 		// in a loop as there may be a race with the client connecting.
 		framework.IssueSSHCommandWithResult(
-			fmt.Sprintf("sudo cat /proc/net/ip_conntrack | grep 'dport=%v'",
+			fmt.Sprintf("sudo cat /proc/net/nf_conntrack | grep 'dport=%v'",
 				testDaemonTcpPort),
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
 
-		// Timeout in seconds is available as the third column from
-		// /proc/net/ip_conntrack.
+		// Timeout in seconds is available as the fifth column from
+		// /proc/net/nf_conntrack.
 		result, err := framework.IssueSSHCommandWithResult(
 			fmt.Sprintf(
-				"sudo cat /proc/net/ip_conntrack "+
+				"sudo cat /proc/net/nf_conntrack "+
 					"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' "+
 					"| tail -n 1"+
-					"| awk '{print $3}' ",
+					"| awk '{print $5}' ",
 				serverNodeInfo.nodeIp,
 				testDaemonTcpPort),
 			framework.TestContext.Provider,

@@ -3,13 +3,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "sspi.go",
         "sspi_unsupported.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "sspi.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/photon-controller-go-sdk/SSPI",
     importpath = "github.com/vmware/photon-controller-go-sdk/SSPI",
     visibility = ["//visibility:public"],
 )

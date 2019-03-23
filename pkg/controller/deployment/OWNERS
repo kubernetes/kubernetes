@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - janetkuo
 - nikhiljindal
@@ -5,7 +7,8 @@ approvers:
 - mfojtik
 reviewers:
 - janetkuo
-- nikhiljindal
 - kargakis
 - mfojtik
 - tnozicka
+labels:
+- sig/apps

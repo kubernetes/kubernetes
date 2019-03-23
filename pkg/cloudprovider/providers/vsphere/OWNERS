@@ -1,7 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - abrarshivani
 - baludontu
 - divyenpatel
 - imkin
-- kerneltime
-- luomiao
+- frapposelli
+- dougm
+- SandeepPissay

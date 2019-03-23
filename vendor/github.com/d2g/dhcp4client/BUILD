@@ -6,18 +6,15 @@ go_library(
         "client.go",
         "generatexid.go",
         "inetsock.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "pktsock_linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "pktsock_linux.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/d2g/dhcp4client",
     importpath = "github.com/d2g/dhcp4client",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/d2g/dhcp4:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],

@@ -353,7 +353,7 @@ func (p *Parser) nud(token token) (ASTNode, error) {
 	case tFlatten:
 		left := ASTNode{
 			nodeType: ASTFlatten,
-			children: []ASTNode{ASTNode{nodeType: ASTIdentity}},
+			children: []ASTNode{{nodeType: ASTIdentity}},
 		}
 		right, err := p.parseProjectionRHS(bindingPowers[tFlatten])
 		if err != nil {
@@ -378,7 +378,7 @@ func (p *Parser) nud(token token) (ASTNode, error) {
 			}
 			return ASTNode{
 				nodeType: ASTProjection,
-				children: []ASTNode{ASTNode{nodeType: ASTIdentity}, right},
+				children: []ASTNode{{nodeType: ASTIdentity}, right},
 			}, nil
 		} else {
 			return p.parseMultiSelectList()

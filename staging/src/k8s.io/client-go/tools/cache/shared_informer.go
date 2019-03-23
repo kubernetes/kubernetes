@@ -25,9 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/buffer"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/buffer"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // SharedInformer has a shared data cache and is capable of distributing notifications for changes
@@ -85,7 +86,7 @@ func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, defaultEve
 		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
 		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", objType)),
-		clock: realClock,
+		clock:                           realClock,
 	}
 	return sharedIndexInformer
 }
@@ -115,11 +116,11 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 		},
 		stopCh)
 	if err != nil {
-		glog.V(2).Infof("stop requested")
+		klog.V(2).Infof("stop requested")
 		return false
 	}
 
-	glog.V(4).Infof("caches populated")
+	klog.V(4).Infof("caches populated")
 	return true
 }
 
@@ -188,7 +189,7 @@ type deleteNotification struct {
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, s.indexer)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, s.indexer)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -278,11 +279,11 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 		return desired
 	}
 	if check == 0 {
-		glog.Warningf("The specified resyncPeriod %v is invalid because this shared informer doesn't support resyncing", desired)
+		klog.Warningf("The specified resyncPeriod %v is invalid because this shared informer doesn't support resyncing", desired)
 		return 0
 	}
 	if desired < check {
-		glog.Warningf("The specified resyncPeriod %v is being increased to the minimum resyncCheckPeriod %v", desired, check)
+		klog.Warningf("The specified resyncPeriod %v is being increased to the minimum resyncCheckPeriod %v", desired, check)
 		return check
 	}
 	return desired
@@ -295,19 +296,19 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	defer s.startedLock.Unlock()
 
 	if s.stopped {
-		glog.V(2).Infof("Handler %v was not added to shared informer because it has stopped already", handler)
+		klog.V(2).Infof("Handler %v was not added to shared informer because it has stopped already", handler)
 		return
 	}
 
 	if resyncPeriod > 0 {
 		if resyncPeriod < minimumResyncPeriod {
-			glog.Warningf("resyncPeriod %d is too small. Changing it to the minimum allowed value of %d", resyncPeriod, minimumResyncPeriod)
+			klog.Warningf("resyncPeriod %d is too small. Changing it to the minimum allowed value of %d", resyncPeriod, minimumResyncPeriod)
 			resyncPeriod = minimumResyncPeriod
 		}
 
 		if resyncPeriod < s.resyncCheckPeriod {
 			if s.started {
-				glog.Warningf("resyncPeriod %d is smaller than resyncCheckPeriod %d and the informer has already started. Changing it to %d", resyncPeriod, s.resyncCheckPeriod, s.resyncCheckPeriod)
+				klog.Warningf("resyncPeriod %d is smaller than resyncCheckPeriod %d and the informer has already started. Changing it to %d", resyncPeriod, s.resyncCheckPeriod, s.resyncCheckPeriod)
 				resyncPeriod = s.resyncCheckPeriod
 			} else {
 				// if the event handler's resyncPeriod is smaller than the current resyncCheckPeriod, update
@@ -334,7 +335,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 
-	s.processor.addAndStartListener(listener)
+	s.processor.addListener(listener)
 	for _, item := range s.indexer.List() {
 		listener.add(addNotification{newObj: item})
 	}
@@ -372,6 +373,7 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 }
 
 type sharedProcessor struct {
+	listenersStarted bool
 	listenersLock    sync.RWMutex
 	listeners        []*processorListener
 	syncingListeners []*processorListener
@@ -379,20 +381,15 @@ type sharedProcessor struct {
 	wg               wait.Group
 }
 
-func (p *sharedProcessor) addAndStartListener(listener *processorListener) {
-	p.listenersLock.Lock()
-	defer p.listenersLock.Unlock()
-
-	p.addListenerLocked(listener)
-	p.wg.Start(listener.run)
-	p.wg.Start(listener.pop)
-}
-
 func (p *sharedProcessor) addListener(listener *processorListener) {
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
 
 	p.addListenerLocked(listener)
+	if p.listenersStarted {
+		p.wg.Start(listener.run)
+		p.wg.Start(listener.pop)
+	}
 }
 
 func (p *sharedProcessor) addListenerLocked(listener *processorListener) {
@@ -423,6 +420,7 @@ func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 			p.wg.Start(listener.run)
 			p.wg.Start(listener.pop)
 		}
+		p.listenersStarted = true
 	}()
 	<-stopCh
 	p.listenersLock.RLock()
@@ -540,20 +538,35 @@ func (p *processorListener) pop() {
 }
 
 func (p *processorListener) run() {
-	defer utilruntime.HandleCrash()
+	// this call blocks until the channel is closed.  When a panic happens during the notification
+	// we will catch it, **the offending item will be skipped!**, and after a short delay (one second)
+	// the next notification will be attempted.  This is usually better than the alternative of never
+	// delivering again.
+	stopCh := make(chan struct{})
+	wait.Until(func() {
+		// this gives us a few quick retries before a long pause and then a few more quick retries
+		err := wait.ExponentialBackoff(retry.DefaultRetry, func() (bool, error) {
+			for next := range p.nextCh {
+				switch notification := next.(type) {
+				case updateNotification:
+					p.handler.OnUpdate(notification.oldObj, notification.newObj)
+				case addNotification:
+					p.handler.OnAdd(notification.newObj)
+				case deleteNotification:
+					p.handler.OnDelete(notification.oldObj)
+				default:
+					utilruntime.HandleError(fmt.Errorf("unrecognized notification: %T", next))
+				}
+			}
+			// the only way to get here is if the p.nextCh is empty and closed
+			return true, nil
+		})
 
-	for next := range p.nextCh {
-		switch notification := next.(type) {
-		case updateNotification:
-			p.handler.OnUpdate(notification.oldObj, notification.newObj)
-		case addNotification:
-			p.handler.OnAdd(notification.newObj)
-		case deleteNotification:
-			p.handler.OnDelete(notification.oldObj)
-		default:
-			utilruntime.HandleError(fmt.Errorf("unrecognized notification: %#v", next))
+		// the only way to get here is if the p.nextCh is empty and closed
+		if err == nil {
+			close(stopCh)
 		}
-	}
+	}, 1*time.Minute, stopCh)
 }
 
 // shouldResync deterimines if the listener needs a resync. If the listener's resyncPeriod is 0,

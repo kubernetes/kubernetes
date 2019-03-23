@@ -16,20 +16,37 @@ limitations under the License.
 
 package app
 
-import "k8s.io/kubernetes/pkg/controller/bootstrap"
+import (
+	"fmt"
 
-func startBootstrapSignerController(ctx ControllerContext) (bool, error) {
-	go bootstrap.NewBootstrapSigner(
-		ctx.ClientBuilder.ClientGoClientOrDie("bootstrap-signer"),
+	"net/http"
+
+	"k8s.io/kubernetes/pkg/controller/bootstrap"
+)
+
+func startBootstrapSignerController(ctx ControllerContext) (http.Handler, bool, error) {
+	bsc, err := bootstrap.NewBootstrapSigner(
+		ctx.ClientBuilder.ClientOrDie("bootstrap-signer"),
+		ctx.InformerFactory.Core().V1().Secrets(),
+		ctx.InformerFactory.Core().V1().ConfigMaps(),
 		bootstrap.DefaultBootstrapSignerOptions(),
-	).Run(ctx.Stop)
-	return true, nil
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("error creating BootstrapSigner controller: %v", err)
+	}
+	go bsc.Run(ctx.Stop)
+	return nil, true, nil
 }
 
-func startTokenCleanerController(ctx ControllerContext) (bool, error) {
-	go bootstrap.NewTokenCleaner(
-		ctx.ClientBuilder.ClientGoClientOrDie("token-cleaner"),
+func startTokenCleanerController(ctx ControllerContext) (http.Handler, bool, error) {
+	tcc, err := bootstrap.NewTokenCleaner(
+		ctx.ClientBuilder.ClientOrDie("token-cleaner"),
+		ctx.InformerFactory.Core().V1().Secrets(),
 		bootstrap.DefaultTokenCleanerOptions(),
-	).Run(ctx.Stop)
-	return true, nil
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("error creating TokenCleaner controller: %v", err)
+	}
+	go tcc.Run(ctx.Stop)
+	return nil, true, nil
 }

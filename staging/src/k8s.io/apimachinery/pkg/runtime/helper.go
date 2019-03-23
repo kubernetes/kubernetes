@@ -51,7 +51,7 @@ func UnsafeObjectConvertor(scheme *Scheme) ObjectConvertor {
 func SetField(src interface{}, v reflect.Value, fieldName string) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
-		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+		return fmt.Errorf("couldn't find %v field in %T", fieldName, v.Interface())
 	}
 	srcValue := reflect.ValueOf(src)
 	if srcValue.Type().AssignableTo(field.Type()) {
@@ -70,7 +70,7 @@ func SetField(src interface{}, v reflect.Value, fieldName string) error {
 func Field(v reflect.Value, fieldName string, dest interface{}) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
-		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+		return fmt.Errorf("couldn't find %v field in %T", fieldName, v.Interface())
 	}
 	destValue, err := conversion.EnforcePtr(dest)
 	if err != nil {
@@ -87,13 +87,13 @@ func Field(v reflect.Value, fieldName string, dest interface{}) error {
 	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), destValue.Type())
 }
 
-// fieldPtr puts the address of fieldName, which must be a member of v,
+// FieldPtr puts the address of fieldName, which must be a member of v,
 // into dest, which must be an address of a variable to which this field's
 // address can be assigned.
 func FieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
-		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+		return fmt.Errorf("couldn't find %v field in %T", fieldName, v.Interface())
 	}
 	v, err := conversion.EnforcePtr(dest)
 	if err != nil {

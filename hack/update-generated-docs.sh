@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -22,7 +22,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -32,7 +32,6 @@ BINS=(
 	cmd/genkubedocs
 	cmd/genman
 	cmd/genyaml
-	federation/cmd/genfeddocs
 )
 make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 
@@ -48,6 +47,3 @@ kube::util::remove-gen-docs
 shopt -s dotglob
 cp -af "${KUBE_TEMP}"/* "${KUBE_ROOT}"
 shopt -u dotglob
-
-# Replace with placeholder docs
-kube::util::set-placeholder-gen-docs

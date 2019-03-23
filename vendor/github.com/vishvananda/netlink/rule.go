@@ -8,6 +8,7 @@ import (
 // Rule represents a netlink rule.
 type Rule struct {
 	Priority          int
+	Family            int
 	Table             int
 	Mark              int
 	Mask              int

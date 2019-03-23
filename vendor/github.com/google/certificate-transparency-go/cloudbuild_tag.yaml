@@ -1,0 +1,10 @@
+steps:
+- id: build_ctfe
+  name: gcr.io/cloud-builders/docker
+  args:
+  - build
+  - --file=trillian/examples/deployment/docker/ctfe/Dockerfile
+  - --tag=gcr.io/${PROJECT_ID}/ctfe:${TAG_NAME}
+  - .
+images:
+- gcr.io/${PROJECT_ID}/ctfe:${TAG_NAME}

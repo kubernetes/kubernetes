@@ -24,21 +24,22 @@ import (
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	. "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultHPA(t *testing.T) {
 	utilizationDefaultVal := int32(autoscaling.DefaultCPUUtilization)
-	defaultReplicas := newInt32(1)
+	defaultReplicas := utilpointer.Int32Ptr(1)
 	defaultTemplate := []autoscalingv2beta1.MetricSpec{
 		{
 			Type: autoscalingv2beta1.ResourceMetricSourceType,
 			Resource: &autoscalingv2beta1.ResourceMetricSource{
-				Name: v1.ResourceCPU,
+				Name:                     v1.ResourceCPU,
 				TargetAverageUtilization: &utilizationDefaultVal,
 			},
 		},
@@ -64,13 +65,13 @@ func TestSetDefaultHPA(t *testing.T) {
 		{ // MinReplicas update
 			original: &autoscalingv2beta1.HorizontalPodAutoscaler{
 				Spec: autoscalingv2beta1.HorizontalPodAutoscalerSpec{
-					MinReplicas: newInt32(3),
+					MinReplicas: utilpointer.Int32Ptr(3),
 					Metrics:     defaultTemplate,
 				},
 			},
 			expected: &autoscalingv2beta1.HorizontalPodAutoscaler{
 				Spec: autoscalingv2beta1.HorizontalPodAutoscalerSpec{
-					MinReplicas: newInt32(3),
+					MinReplicas: utilpointer.Int32Ptr(3),
 					Metrics:     defaultTemplate,
 				},
 			},
@@ -105,27 +106,21 @@ func TestSetDefaultHPA(t *testing.T) {
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	data, err := runtime.Encode(api.Codecs.LegacyCodec(SchemeGroupVersion), obj)
+	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
 	}
-	obj2, err := runtime.Decode(api.Codecs.UniversalDecoder(), data)
+	obj2, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), obj)
 		return nil
 	}
 	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
-	err = api.Scheme.Convert(obj2, obj3, nil)
+	err = legacyscheme.Scheme.Convert(obj2, obj3, nil)
 	if err != nil {
 		t.Errorf("%v\nSource: %#v", err, obj2)
 		return nil
 	}
 	return obj3
-}
-
-func newInt32(val int32) *int32 {
-	p := new(int32)
-	*p = val
-	return p
 }

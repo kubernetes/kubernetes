@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -28,10 +28,9 @@ set -o xtrace
 # space.
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export GOPATH=${HOME}/_gopath
-export PATH=${GOPATH}/bin:${HOME}/third_party/etcd:/usr/local/go/bin:$PATH
+export PATH=${GOPATH}/bin:${HOME}/third_party/etcd:/usr/local/go/bin:${PATH}
 
 # Install a few things needed by the verification tests.
 command -v etcd &>/dev/null || ./hack/install-etcd.sh
-go get -u github.com/tools/godep
 
 make verify

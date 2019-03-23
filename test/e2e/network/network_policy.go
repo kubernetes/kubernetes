@@ -17,10 +17,10 @@ limitations under the License.
 package network
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -65,17 +65,17 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 		})
 
 		It("should support a 'default-deny' policy [Feature:NetworkPolicy]", func() {
-			policy := &networking.NetworkPolicy{
+			policy := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "deny-all",
 				},
-				Spec: networking.NetworkPolicySpec{
+				Spec: networkingv1.NetworkPolicySpec{
 					PodSelector: metav1.LabelSelector{},
-					Ingress:     []networking.NetworkPolicyIngressRule{},
+					Ingress:     []networkingv1.NetworkPolicyIngressRule{},
 				},
 			}
 
-			policy, err := f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).Create(policy)
+			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
 			Expect(err).NotTo(HaveOccurred())
 			defer cleanupNetworkPolicy(f, policy)
 
@@ -86,11 +86,11 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 
 		It("should enforce policy based on PodSelector [Feature:NetworkPolicy]", func() {
 			By("Creating a network policy for the server which allows traffic from the pod 'client-a'.")
-			policy := &networking.NetworkPolicy{
+			policy := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "allow-client-a-via-pod-selector",
 				},
-				Spec: networking.NetworkPolicySpec{
+				Spec: networkingv1.NetworkPolicySpec{
 					// Apply this policy to the Server
 					PodSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -98,8 +98,8 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 						},
 					},
 					// Allow traffic only from client-a
-					Ingress: []networking.NetworkPolicyIngressRule{{
-						From: []networking.NetworkPolicyPeer{{
+					Ingress: []networkingv1.NetworkPolicyIngressRule{{
+						From: []networkingv1.NetworkPolicyPeer{{
 							PodSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
 									"pod-name": "client-a",
@@ -110,7 +110,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 				},
 			}
 
-			policy, err := f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).Create(policy)
+			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
 			Expect(err).NotTo(HaveOccurred())
 			defer cleanupNetworkPolicy(f, policy)
 
@@ -140,11 +140,11 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 
 			// Create Policy for that service that allows traffic only via namespace B
 			By("Creating a network policy for the server which allows traffic from namespace-b.")
-			policy := &networking.NetworkPolicy{
+			policy := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "allow-ns-b-via-namespace-selector",
 				},
-				Spec: networking.NetworkPolicySpec{
+				Spec: networkingv1.NetworkPolicySpec{
 					// Apply to server
 					PodSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -152,8 +152,8 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 						},
 					},
 					// Allow traffic only from NS-B
-					Ingress: []networking.NetworkPolicyIngressRule{{
-						From: []networking.NetworkPolicyPeer{{
+					Ingress: []networkingv1.NetworkPolicyIngressRule{{
+						From: []networkingv1.NetworkPolicyPeer{{
 							NamespaceSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
 									"ns-name": nsBName,
@@ -163,7 +163,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 					}},
 				},
 			}
-			policy, err = f.InternalClientset.Networking().NetworkPolicies(nsA.Name).Create(policy)
+			policy, err = f.ClientSet.NetworkingV1().NetworkPolicies(nsA.Name).Create(policy)
 			Expect(err).NotTo(HaveOccurred())
 			defer cleanupNetworkPolicy(f, policy)
 
@@ -173,11 +173,11 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 
 		It("should enforce policy based on Ports [Feature:NetworkPolicy]", func() {
 			By("Creating a network policy for the Service which allows traffic only to one port.")
-			policy := &networking.NetworkPolicy{
+			policy := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "allow-ingress-on-port-81",
 				},
-				Spec: networking.NetworkPolicySpec{
+				Spec: networkingv1.NetworkPolicySpec{
 					// Apply to server
 					PodSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -185,14 +185,14 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 						},
 					},
 					// Allow traffic only to one port.
-					Ingress: []networking.NetworkPolicyIngressRule{{
-						Ports: []networking.NetworkPolicyPort{{
+					Ingress: []networkingv1.NetworkPolicyIngressRule{{
+						Ports: []networkingv1.NetworkPolicyPort{{
 							Port: &intstr.IntOrString{IntVal: 81},
 						}},
 					}},
 				},
 			}
-			policy, err := f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).Create(policy)
+			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
 			Expect(err).NotTo(HaveOccurred())
 			defer cleanupNetworkPolicy(f, policy)
 
@@ -203,11 +203,11 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 
 		It("should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy]", func() {
 			By("Creating a network policy for the Service which allows traffic only to one port.")
-			policy := &networking.NetworkPolicy{
+			policy := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "allow-ingress-on-port-80",
 				},
-				Spec: networking.NetworkPolicySpec{
+				Spec: networkingv1.NetworkPolicySpec{
 					// Apply to server
 					PodSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -215,23 +215,23 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 						},
 					},
 					// Allow traffic only to one port.
-					Ingress: []networking.NetworkPolicyIngressRule{{
-						Ports: []networking.NetworkPolicyPort{{
+					Ingress: []networkingv1.NetworkPolicyIngressRule{{
+						Ports: []networkingv1.NetworkPolicyPort{{
 							Port: &intstr.IntOrString{IntVal: 80},
 						}},
 					}},
 				},
 			}
-			policy, err := f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).Create(policy)
+			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
 			Expect(err).NotTo(HaveOccurred())
 			defer cleanupNetworkPolicy(f, policy)
 
 			By("Creating a network policy for the Service which allows traffic only to another port.")
-			policy2 := &networking.NetworkPolicy{
+			policy2 := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "allow-ingress-on-port-81",
 				},
-				Spec: networking.NetworkPolicySpec{
+				Spec: networkingv1.NetworkPolicySpec{
 					// Apply to server
 					PodSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -239,14 +239,14 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 						},
 					},
 					// Allow traffic only to one port.
-					Ingress: []networking.NetworkPolicyIngressRule{{
-						Ports: []networking.NetworkPolicyPort{{
+					Ingress: []networkingv1.NetworkPolicyIngressRule{{
+						Ports: []networkingv1.NetworkPolicyPort{{
 							Port: &intstr.IntOrString{IntVal: 81},
 						}},
 					}},
 				},
 			}
-			policy2, err = f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).Create(policy2)
+			policy2, err = f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy2)
 			Expect(err).NotTo(HaveOccurred())
 			defer cleanupNetworkPolicy(f, policy2)
 
@@ -257,19 +257,19 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 
 		It("should support allow-all policy [Feature:NetworkPolicy]", func() {
 			By("Creating a network policy which allows all traffic.")
-			policy := &networking.NetworkPolicy{
+			policy := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "allow-all",
 				},
-				Spec: networking.NetworkPolicySpec{
+				Spec: networkingv1.NetworkPolicySpec{
 					// Allow all traffic
 					PodSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{},
 					},
-					Ingress: []networking.NetworkPolicyIngressRule{{}},
+					Ingress: []networkingv1.NetworkPolicyIngressRule{{}},
 				},
 			}
-			policy, err := f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).Create(policy)
+			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
 			Expect(err).NotTo(HaveOccurred())
 			defer cleanupNetworkPolicy(f, policy)
 
@@ -279,11 +279,11 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 		})
 
 		It("should allow ingress access on one named port [Feature:NetworkPolicy]", func() {
-			policy := &networking.NetworkPolicy{
+			policy := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "allow-client-a-via-named-port-ingress-rule",
 				},
-				Spec: networking.NetworkPolicySpec{
+				Spec: networkingv1.NetworkPolicySpec{
 					// Apply this policy to the Server
 					PodSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -291,15 +291,15 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 						},
 					},
 					// Allow traffic to only one named port: "serve-80".
-					Ingress: []networking.NetworkPolicyIngressRule{{
-						Ports: []networking.NetworkPolicyPort{{
+					Ingress: []networkingv1.NetworkPolicyIngressRule{{
+						Ports: []networkingv1.NetworkPolicyPort{{
 							Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"},
 						}},
 					}},
 				},
 			}
 
-			policy, err := f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).Create(policy)
+			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
 			Expect(err).NotTo(HaveOccurred())
 			defer cleanupNetworkPolicy(f, policy)
 
@@ -310,6 +310,48 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 				testCannotConnect(f, f.Namespace, "client-b", service, 81)
 			})
 		})
+
+		It("should allow egress access on one named port [Feature:NetworkPolicy]", func() {
+			clientPodName := "client-a"
+			protocolUDP := v1.ProtocolUDP
+			policy := &networkingv1.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "allow-client-a-via-named-port-egress-rule",
+				},
+				Spec: networkingv1.NetworkPolicySpec{
+					// Apply this policy to client-a
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"pod-name": clientPodName,
+						},
+					},
+					// Allow traffic to only one named port: "serve-80".
+					Egress: []networkingv1.NetworkPolicyEgressRule{{
+						Ports: []networkingv1.NetworkPolicyPort{
+							{
+								Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"},
+							},
+							// Allow DNS look-ups
+							{
+								Protocol: &protocolUDP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
+							},
+						},
+					}},
+				},
+			}
+
+			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
+			Expect(err).NotTo(HaveOccurred())
+			defer cleanupNetworkPolicy(f, policy)
+
+			By("Creating client-a which should be able to contact the server.", func() {
+				testCanConnect(f, f.Namespace, clientPodName, service, 80)
+			})
+			By("Creating client-a which should not be able to contact the server on port 81.", func() {
+				testCannotConnect(f, f.Namespace, clientPodName, service, 81)
+			})
+		})
 	})
 })
 
@@ -318,7 +360,7 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 	podClient := createNetworkClientPod(f, ns, podName, service, targetPort)
 	defer func() {
 		By(fmt.Sprintf("Cleaning up the pod %s", podName))
-		if err := f.ClientSet.Core().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
+		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
 			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
@@ -337,7 +379,7 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 		}
 
 		// Collect current NetworkPolicies applied in the test namespace.
-		policies, err := f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).List(metav1.ListOptions{})
+		policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
 		}
@@ -365,7 +407,7 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 	podClient := createNetworkClientPod(f, ns, podName, service, targetPort)
 	defer func() {
 		By(fmt.Sprintf("Cleaning up the pod %s", podName))
-		if err := f.ClientSet.Core().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
+		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
 			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
@@ -383,7 +425,7 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 		}
 
 		// Collect current NetworkPolicies applied in the test namespace.
-		policies, err := f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).List(metav1.ListOptions{})
+		policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
 		}
@@ -453,7 +495,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 	}
 
 	By(fmt.Sprintf("Creating a server pod %s in namespace %s", podName, namespace.Name))
-	pod, err := f.ClientSet.Core().Pods(namespace.Name).Create(&v1.Pod{
+	pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Create(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 			Labels: map[string]string{
@@ -470,7 +512,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 
 	svcName := fmt.Sprintf("svc-%s", podName)
 	By(fmt.Sprintf("Creating a service %s for pod %s in namespace %s", svcName, podName, namespace.Name))
-	svc, err := f.ClientSet.Core().Services(namespace.Name).Create(&v1.Service{
+	svc, err := f.ClientSet.CoreV1().Services(namespace.Name).Create(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: svcName,
 		},
@@ -489,11 +531,11 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 
 func cleanupServerPodAndService(f *framework.Framework, pod *v1.Pod, service *v1.Service) {
 	By("Cleaning up the server.")
-	if err := f.ClientSet.Core().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
+	if err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 		framework.Failf("unable to cleanup pod %v: %v", pod.Name, err)
 	}
 	By("Cleaning up the server's service.")
-	if err := f.ClientSet.Core().Services(service.Namespace).Delete(service.Name, nil); err != nil {
+	if err := f.ClientSet.CoreV1().Services(service.Namespace).Delete(service.Name, nil); err != nil {
 		framework.Failf("unable to cleanup svc %v: %v", service.Name, err)
 	}
 }
@@ -502,7 +544,7 @@ func cleanupServerPodAndService(f *framework.Framework, pod *v1.Pod, service *v1
 // This client will attempt a one-shot connection, then die, without restarting the pod.
 // Test can then be asserted based on whether the pod quit with an error or not.
 func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, podName string, targetService *v1.Service, targetPort int) *v1.Pod {
-	pod, err := f.ClientSet.Core().Pods(namespace.Name).Create(&v1.Pod{
+	pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Create(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 			Labels: map[string]string{
@@ -514,11 +556,11 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 			Containers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("%s-container", podName),
-					Image: imageutils.GetBusyBoxImage(),
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					Args: []string{
 						"/bin/sh",
 						"-c",
-						fmt.Sprintf("for i in $(seq 1 5); do wget -T 8 %s.%s:%d -O - && exit 0 || sleep 1; done; exit 1",
+						fmt.Sprintf("for i in $(seq 1 5); do nc -vz -w 8 %s.%s %d && exit 0 || sleep 1; done; exit 1",
 							targetService.Name, targetService.Namespace, targetPort),
 					},
 				},
@@ -531,9 +573,9 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 	return pod
 }
 
-func cleanupNetworkPolicy(f *framework.Framework, policy *networking.NetworkPolicy) {
+func cleanupNetworkPolicy(f *framework.Framework, policy *networkingv1.NetworkPolicy) {
 	By("Cleaning up the policy.")
-	if err := f.InternalClientset.Networking().NetworkPolicies(policy.Namespace).Delete(policy.Name, nil); err != nil {
+	if err := f.ClientSet.NetworkingV1().NetworkPolicies(policy.Namespace).Delete(policy.Name, nil); err != nil {
 		framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 	}
 }

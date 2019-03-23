@@ -17,8 +17,11 @@ limitations under the License.
 package aws
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
+	"fmt"
 	"testing"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
 func TestElbProtocolsAreEqual(t *testing.T) {
@@ -124,4 +127,98 @@ func TestAWSARNEquals(t *testing.T) {
 			t.Errorf("unexpected result from awsArnEquals(%v, %v)", g.L, g.R)
 		}
 	}
+}
+
+func TestIsNLB(t *testing.T) {
+	tests := []struct {
+		name string
+
+		annotations map[string]string
+		want        bool
+	}{
+		{
+			"NLB annotation provided",
+			map[string]string{"service.beta.kubernetes.io/aws-load-balancer-type": "nlb"},
+			true,
+		},
+		{
+			"NLB annotation has invalid value",
+			map[string]string{"service.beta.kubernetes.io/aws-load-balancer-type": "elb"},
+			false,
+		},
+		{
+			"NLB annotation absent",
+			map[string]string{},
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+		got := isNLB(test.annotations)
+
+		if got != test.want {
+			t.Errorf("Incorrect value for isNLB() case %s. Got %t, expected %t.", test.name, got, test.want)
+		}
+	}
+}
+
+func TestSecurityGroupFiltering(t *testing.T) {
+	grid := []struct {
+		in          []*ec2.SecurityGroup
+		name        string
+		expected    int
+		description string
+	}{
+		{
+			in: []*ec2.SecurityGroup{
+				{
+					IpPermissions: []*ec2.IpPermission{
+						{
+							IpRanges: []*ec2.IpRange{
+								{
+									Description: aws.String("an unmanaged"),
+								},
+							},
+						},
+					},
+				},
+			},
+			name:        "unmanaged",
+			expected:    0,
+			description: "An environment without managed LBs should have %d, but found %d SecurityGroups",
+		},
+		{
+			in: []*ec2.SecurityGroup{
+				{
+					IpPermissions: []*ec2.IpPermission{
+						{
+							IpRanges: []*ec2.IpRange{
+								{
+									Description: aws.String("an unmanaged"),
+								},
+								{
+									Description: aws.String(fmt.Sprintf("%s=%s", NLBClientRuleDescription, "managedlb")),
+								},
+								{
+									Description: aws.String(fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, "managedlb")),
+								},
+							},
+						},
+					},
+				},
+			},
+			name:        "managedlb",
+			expected:    1,
+			description: "Found %d, but should have %d Security Groups",
+		},
+	}
+
+	for _, g := range grid {
+		actual := len(filterForIPRangeDescription(g.in, g.name))
+		if actual != g.expected {
+			t.Errorf(g.description, actual, g.expected)
+		}
+	}
+
 }

@@ -23,24 +23,22 @@ import (
 	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/rancher"
-	// Network plugins
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/cni"
-	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
+	"k8s.io/utils/exec"
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/aws_ebs"
+	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
 	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/cephfs"
 	"k8s.io/kubernetes/pkg/volume/cinder"
 	"k8s.io/kubernetes/pkg/volume/configmap"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
-	"k8s.io/kubernetes/pkg/volume/empty_dir"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	"k8s.io/kubernetes/pkg/volume/fc"
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/flocker"
-	"k8s.io/kubernetes/pkg/volume/gce_pd"
+	"k8s.io/kubernetes/pkg/volume/gcepd"
 	"k8s.io/kubernetes/pkg/volume/git_repo"
 	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/host_path"
@@ -58,6 +56,9 @@ import (
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 	// Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	// features check
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // ProbeVolumePlugins collects all volume plugins into an easy to use list.
@@ -70,9 +71,9 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	//
 	// Kubelet does not currently need to configure volume plugins.
 	// If/when it does, see kube-controller-manager/app/plugins.go for example of using volume.VolumeConfig
-	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, empty_dir.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, emptydir.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(volume.VolumeConfig{})...)
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(volume.VolumeConfig{})...)
@@ -96,32 +97,15 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
+	}
 	return allPlugins
 }
 
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for kubelet.
 // Currently only Flexvolume plugins are dynamically discoverable.
-func GetDynamicPluginProber(pluginDir string) volume.DynamicPluginProber {
-	return flexvolume.GetDynamicPluginProber(pluginDir)
-}
-
-// ProbeNetworkPlugins collects all compiled-in plugins
-func ProbeNetworkPlugins(pluginDir, cniConfDir, cniBinDir string) []network.NetworkPlugin {
-	allPlugins := []network.NetworkPlugin{}
-
-	// for backwards-compat, allow pluginDir as a source of CNI config files
-	if cniConfDir == "" {
-		cniConfDir = pluginDir
-	}
-
-	binDir := cniBinDir
-	if binDir == "" {
-		binDir = pluginDir
-	}
-	// for each existing plugin, add to the list
-	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(cniConfDir, binDir)...)
-	allPlugins = append(allPlugins, kubenet.NewPlugin(binDir))
-
-	return allPlugins
+func GetDynamicPluginProber(pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
+	return flexvolume.GetDynamicPluginProber(pluginDir, runner)
 }

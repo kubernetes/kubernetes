@@ -29,11 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
-type serverResponse struct {
-	statusCode int
-	obj        interface{}
-}
-
 func TestServiceAccountCreation(t *testing.T) {
 	ns := metav1.NamespaceDefault
 
@@ -165,12 +160,15 @@ func TestServiceAccountCreation(t *testing.T) {
 		}
 		saInformer := informers.Core().V1().ServiceAccounts()
 		nsInformer := informers.Core().V1().Namespaces()
-		controller := NewServiceAccountsController(
+		controller, err := NewServiceAccountsController(
 			saInformer,
 			nsInformer,
 			client,
 			options,
 		)
+		if err != nil {
+			t.Fatalf("error creating ServiceAccounts controller: %v", err)
+		}
 		controller.saListerSynced = alwaysReady
 		controller.nsListerSynced = alwaysReady
 

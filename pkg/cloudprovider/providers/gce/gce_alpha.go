@@ -18,53 +18,38 @@ package gce
 
 import (
 	"fmt"
-
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 const (
-	// alpha: v1.8 (for Services)
+	// AlphaFeatureNetworkTiers allows Services backed by a GCP load balancer to choose
+	// what network tier to use. Currently supports "Standard" and "Premium" (default).
 	//
-	// Allows Services backed by a GCP load balancer to choose what network
-	// tier to use. Currently supports "Standard" and "Premium" (default).
+	// alpha: v1.8 (for Services)
 	AlphaFeatureNetworkTiers = "NetworkTiers"
-
-	AlphaFeatureGCEDisk = "DiskAlphaAPI"
-
-	AlphaFeatureNetworkEndpointGroup = "NetworkEndpointGroup"
 )
 
-// All known alpha features
-var knownAlphaFeatures = map[string]bool{
-	AlphaFeatureNetworkTiers:         true,
-	AlphaFeatureGCEDisk:              true,
-	AlphaFeatureNetworkEndpointGroup: true,
-}
-
+// AlphaFeatureGate contains a mapping of alpha features to whether they are enabled
 type AlphaFeatureGate struct {
 	features map[string]bool
 }
 
+// Enabled returns true if the provided alpha feature is enabled
 func (af *AlphaFeatureGate) Enabled(key string) bool {
 	return af.features[key]
 }
 
-func NewAlphaFeatureGate(features []string) (*AlphaFeatureGate, error) {
-	errList := []error{}
+// NewAlphaFeatureGate marks the provided alpha features as enabled
+func NewAlphaFeatureGate(features []string) *AlphaFeatureGate {
 	featureMap := make(map[string]bool)
 	for _, name := range features {
-		if _, ok := knownAlphaFeatures[name]; !ok {
-			errList = append(errList, fmt.Errorf("alpha feature %q is not supported.", name))
-		} else {
-			featureMap[name] = true
-		}
+		featureMap[name] = true
 	}
-	return &AlphaFeatureGate{featureMap}, utilerrors.NewAggregate(errList)
+	return &AlphaFeatureGate{featureMap}
 }
 
-func (gce *GCECloud) alphaFeatureEnabled(feature string) error {
-	if !gce.AlphaFeatureGate.Enabled(feature) {
-		return fmt.Errorf("alpha feature %q is not enabled.", feature)
+func (g *Cloud) alphaFeatureEnabled(feature string) error {
+	if !g.AlphaFeatureGate.Enabled(feature) {
+		return fmt.Errorf("alpha feature %q is not enabled", feature)
 	}
 	return nil
 }

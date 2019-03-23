@@ -18,12 +18,13 @@ package selfhosting
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 
-	apps "k8s.io/api/apps/v1beta2"
+	"github.com/pkg/errors"
+
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -33,8 +34,6 @@ const (
 apiVersion: v1
 kind: Pod
 metadata:
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
   name: kube-apiserver
   namespace: kube-system
@@ -58,14 +57,14 @@ spec:
     - --requestheader-username-headers=X-Remote-User
     - --requestheader-extra-headers-prefix=X-Remote-Extra-
     - --requestheader-allowed-names=front-proxy-client
-    - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+    - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
     - --allow-privileged=true
     - --client-ca-file=/etc/kubernetes/pki/ca.crt
     - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
     - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
     - --authorization-mode=Node,RBAC
     - --etcd-servers=http://127.0.0.1:2379
-    image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.4
+    image: k8s.gcr.io/kube-apiserver-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -90,6 +89,7 @@ spec:
       name: ca-certs-etc-pki
       readOnly: true
   hostNetwork: true
+  priorityClassName: system-cluster-critical
   volumes:
   - hostPath:
       path: /etc/kubernetes/pki
@@ -103,7 +103,7 @@ spec:
 status: {}
 `
 
-	testAPIServerDaemonSet = `apiVersion: apps/v1beta2
+	testAPIServerDaemonSet = `apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   creationTimestamp: null
@@ -112,6 +112,9 @@ metadata:
   name: self-hosted-kube-apiserver
   namespace: kube-system
 spec:
+  selector:
+    matchLabels:
+      k8s-app: self-hosted-kube-apiserver
   template:
     metadata:
       creationTimestamp: null
@@ -130,21 +133,26 @@ spec:
         - --service-cluster-ip-range=10.96.0.0/12
         - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt
         - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
-        - --advertise-address=192.168.1.115
+        - --advertise-address=$(HOST_IP)
         - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
         - --insecure-port=0
         - --experimental-bootstrap-token-auth=true
         - --requestheader-username-headers=X-Remote-User
         - --requestheader-extra-headers-prefix=X-Remote-Extra-
         - --requestheader-allowed-names=front-proxy-client
-        - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+        - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
         - --allow-privileged=true
         - --client-ca-file=/etc/kubernetes/pki/ca.crt
         - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
         - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
         - --authorization-mode=Node,RBAC
         - --etcd-servers=http://127.0.0.1:2379
-        image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.4
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        image: k8s.gcr.io/kube-apiserver-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -172,6 +180,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -198,8 +207,6 @@ status:
 apiVersion: v1
 kind: Pod
 metadata:
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
   name: kube-controller-manager
   namespace: kube-system
@@ -214,9 +221,10 @@ spec:
     - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
     - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
     - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-    - --address=127.0.0.1
+    - --bind-address=127.0.0.1
     - --use-service-account-credentials=true
-    image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.4
+    - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
+    image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -244,6 +252,7 @@ spec:
       name: ca-certs-etc-pki
       readOnly: true
   hostNetwork: true
+  priorityClassName: system-cluster-critical
   volumes:
   - hostPath:
       path: /etc/kubernetes/pki
@@ -261,7 +270,7 @@ spec:
 status: {}
 `
 
-	testControllerManagerDaemonSet = `apiVersion: apps/v1beta2
+	testControllerManagerDaemonSet = `apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   creationTimestamp: null
@@ -270,6 +279,9 @@ metadata:
   name: self-hosted-kube-controller-manager
   namespace: kube-system
 spec:
+  selector:
+    matchLabels:
+      k8s-app: self-hosted-kube-controller-manager
   template:
     metadata:
       creationTimestamp: null
@@ -286,9 +298,10 @@ spec:
         - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
         - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
         - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-        - --address=127.0.0.1
+        - --bind-address=127.0.0.1
         - --use-service-account-credentials=true
-        image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.4
+        - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
+        image: k8s.gcr.io/kube-controller-manager-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -319,6 +332,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -349,8 +363,6 @@ status:
 apiVersion: v1
 kind: Pod
 metadata:
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
   name: kube-scheduler
   namespace: kube-system
@@ -360,8 +372,8 @@ spec:
     - kube-scheduler
     - --leader-elect=true
     - --kubeconfig=/etc/kubernetes/scheduler.conf
-    - --address=127.0.0.1
-    image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.4
+    - --bind-address=127.0.0.1
+    image: k8s.gcr.io/kube-scheduler-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -380,6 +392,7 @@ spec:
       name: kubeconfig
       readOnly: true
   hostNetwork: true
+  priorityClassName: system-cluster-critical
   volumes:
   - hostPath:
       path: /etc/kubernetes/scheduler.conf
@@ -388,7 +401,7 @@ spec:
 status: {}
 `
 
-	testSchedulerDaemonSet = `apiVersion: apps/v1beta2
+	testSchedulerDaemonSet = `apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   creationTimestamp: null
@@ -397,6 +410,9 @@ metadata:
   name: self-hosted-kube-scheduler
   namespace: kube-system
 spec:
+  selector:
+    matchLabels:
+      k8s-app: self-hosted-kube-scheduler
   template:
     metadata:
       creationTimestamp: null
@@ -408,8 +424,8 @@ spec:
         - kube-scheduler
         - --leader-elect=true
         - --kubeconfig=/etc/kubernetes/scheduler.conf
-        - --address=127.0.0.1
-        image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.4
+        - --bind-address=127.0.0.1
+        image: k8s.gcr.io/kube-scheduler-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -431,6 +447,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -473,33 +490,44 @@ func TestBuildDaemonSet(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		tempFile, err := createTempFileWithContent(rt.podBytes)
-		defer os.Remove(tempFile)
+		t.Run(rt.component, func(t *testing.T) {
+			tempFile, err := createTempFileWithContent(rt.podBytes)
+			if err != nil {
+				t.Errorf("error creating tempfile with content:%v", err)
+			}
+			defer os.Remove(tempFile)
 
-		podSpec, err := loadPodSpecFromFile(tempFile)
-		if err != nil {
-			t.Fatalf("couldn't load the specified Pod")
-		}
+			podSpec, err := loadPodSpecFromFile(tempFile)
+			if err != nil {
+				t.Fatalf("couldn't load the specified Pod Spec")
+			}
 
-		ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
-		dsBytes, err := util.MarshalToYaml(ds, apps.SchemeGroupVersion)
-		if err != nil {
-			t.Fatalf("failed to marshal daemonset to YAML: %v", err)
-		}
+			ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
+			dsBytes, err := util.MarshalToYaml(ds, apps.SchemeGroupVersion)
+			if err != nil {
+				t.Fatalf("failed to marshal daemonset to YAML: %v", err)
+			}
 
-		if !bytes.Equal(dsBytes, rt.dsBytes) {
-			t.Errorf("failed TestBuildDaemonSet:\nexpected:\n%s\nsaw:\n%s", rt.dsBytes, dsBytes)
-		}
+			if !bytes.Equal(dsBytes, rt.dsBytes) {
+				t.Errorf("failed TestBuildDaemonSet:\nexpected:\n%s\nsaw:\n%s", rt.dsBytes, dsBytes)
+			}
+		})
 	}
 }
 
 func TestLoadPodSpecFromFile(t *testing.T) {
 	tests := []struct {
+		name        string
 		content     string
 		expectError bool
 	}{
 		{
-			// Good YAML
+			name:        "no content",
+			content:     "",
+			expectError: true,
+		},
+		{
+			name: "valid YAML",
 			content: `
 apiVersion: v1
 kind: Pod
@@ -507,12 +535,12 @@ metadata:
   name: testpod
 spec:
   containers:
-    - image: gcr.io/google_containers/busybox
+    - image: k8s.gcr.io/busybox
 `,
 			expectError: false,
 		},
 		{
-			// Good JSON
+			name: "valid JSON",
 			content: `
 {
   "apiVersion": "v1",
@@ -523,7 +551,7 @@ spec:
   "spec": {
     "containers": [
       {
-        "image": "gcr.io/google_containers/busybox"
+        "image": "k8s.gcr.io/busybox"
       }
     ]
   }
@@ -531,40 +559,52 @@ spec:
 			expectError: false,
 		},
 		{
-			// Bad PodSpec
+			name: "incorrect PodSpec",
 			content: `
 apiVersion: v1
 kind: Pod
 metadata:
   name: testpod
 spec:
-  - image: gcr.io/google_containers/busybox
+  - image: k8s.gcr.io/busybox
 `,
 			expectError: true,
 		},
 	}
 
 	for _, rt := range tests {
-		tempFile, err := createTempFileWithContent([]byte(rt.content))
-		defer os.Remove(tempFile)
+		t.Run(rt.name, func(t *testing.T) {
+			tempFile, err := createTempFileWithContent([]byte(rt.content))
+			if err != nil {
+				t.Errorf("error creating tempfile with content:%v", err)
+			}
+			defer os.Remove(tempFile)
 
-		_, err = loadPodSpecFromFile(tempFile)
-		if (err != nil) != rt.expectError {
-			t.Errorf("failed TestLoadPodSpecFromFile:\nexpected error:\n%t\nsaw:\n%v", rt.expectError, err)
-		}
+			_, err = loadPodSpecFromFile(tempFile)
+			if (err != nil) != rt.expectError {
+				t.Errorf("failed TestLoadPodSpecFromFile:\nexpected error:\n%t\nsaw:\n%v", rt.expectError, err)
+			}
+		})
 	}
+
+	t.Run("empty file name", func(t *testing.T) {
+		_, err := loadPodSpecFromFile("")
+		if err == nil {
+			t.Error("unexpected success: loadPodSpecFromFile should return error when no file is given")
+		}
+	})
 }
 
 func createTempFileWithContent(content []byte) (string, error) {
 	tempFile, err := ioutil.TempFile("", "")
 	if err != nil {
-		return "", fmt.Errorf("cannot create temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot create temporary file")
 	}
 	if _, err = tempFile.Write([]byte(content)); err != nil {
-		return "", fmt.Errorf("cannot save temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot save temporary file")
 	}
 	if err = tempFile.Close(); err != nil {
-		return "", fmt.Errorf("cannot close temporary file: %v", err)
+		return "", errors.Wrap(err, "cannot close temporary file")
 	}
 	return tempFile.Name(), nil
 }

@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -114,6 +115,114 @@ func TestHelperProcess(t *testing.T) {
 	}
 	fmt.Fprintf(os.Stdout, output.output)
 	os.Exit(0)
+}
+
+func Test_isCmdTokenSource(t *testing.T) {
+	c1 := map[string]string{"cmd-path": "foo"}
+	if v := isCmdTokenSource(c1); !v {
+		t.Fatalf("cmd-path present in config (%+v), but got %v", c1, v)
+	}
+
+	c2 := map[string]string{"cmd-args": "foo bar"}
+	if v := isCmdTokenSource(c2); v {
+		t.Fatalf("cmd-path not present in config (%+v), but got %v", c2, v)
+	}
+}
+
+func Test_tokenSource_cmd(t *testing.T) {
+	if _, err := tokenSource(true, map[string]string{}); err == nil {
+		t.Fatalf("expected error, cmd-args not present in config")
+	}
+
+	c := map[string]string{
+		"cmd-path": "foo",
+		"cmd-args": "bar"}
+	ts, err := tokenSource(true, c)
+	if err != nil {
+		t.Fatalf("failed to return cmd token source: %+v", err)
+	}
+	if ts == nil {
+		t.Fatal("returned nil token source")
+	}
+	if _, ok := ts.(*commandTokenSource); !ok {
+		t.Fatalf("returned token source type:(%T) expected:(*commandTokenSource)", ts)
+	}
+}
+
+func Test_tokenSource_cmdCannotBeUsedWithScopes(t *testing.T) {
+	c := map[string]string{
+		"cmd-path": "foo",
+		"scopes":   "A,B"}
+	if _, err := tokenSource(true, c); err == nil {
+		t.Fatal("expected error when scopes is used with cmd-path")
+	}
+}
+
+func Test_tokenSource_applicationDefaultCredentials_fails(t *testing.T) {
+	// try to use empty ADC file
+	fakeTokenFile, err := ioutil.TempFile("", "adctoken")
+	if err != nil {
+		t.Fatalf("failed to create fake token file: +%v", err)
+	}
+	fakeTokenFile.Close()
+	defer os.Remove(fakeTokenFile.Name())
+
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", fakeTokenFile.Name())
+	defer os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
+	if _, err := tokenSource(false, map[string]string{}); err == nil {
+		t.Fatalf("expected error because specified ADC token file is not a JSON")
+	}
+}
+
+func Test_tokenSource_applicationDefaultCredentials(t *testing.T) {
+	fakeTokenFile, err := ioutil.TempFile("", "adctoken")
+	if err != nil {
+		t.Fatalf("failed to create fake token file: +%v", err)
+	}
+	fakeTokenFile.Close()
+	defer os.Remove(fakeTokenFile.Name())
+	if err := ioutil.WriteFile(fakeTokenFile.Name(), []byte(`{"type":"service_account"}`), 0600); err != nil {
+		t.Fatalf("failed to write to fake token file: %+v", err)
+	}
+
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", fakeTokenFile.Name())
+	defer os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
+	ts, err := tokenSource(false, map[string]string{})
+	if err != nil {
+		t.Fatalf("failed to get a token source: %+v", err)
+	}
+	if ts == nil {
+		t.Fatal("returned nil token source")
+	}
+}
+
+func Test_parseScopes(t *testing.T) {
+	cases := []struct {
+		in  map[string]string
+		out []string
+	}{
+		{
+			map[string]string{},
+			[]string{
+				"https://www.googleapis.com/auth/cloud-platform",
+				"https://www.googleapis.com/auth/userinfo.email"},
+		},
+		{
+			map[string]string{"scopes": ""},
+			[]string{},
+		},
+		{
+			map[string]string{"scopes": "A,B,C"},
+			[]string{"A", "B", "C"},
+		},
+	}
+
+	for _, c := range cases {
+		got := parseScopes(c.in)
+		if !reflect.DeepEqual(got, c.out) {
+			t.Errorf("expected=%v, got=%v", c.out, got)
+		}
+	}
 }
 
 func errEquiv(got, want error) bool {
@@ -333,37 +442,61 @@ func (t *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.res, nil
 }
 
-func TestClearingCredentials(t *testing.T) {
+func Test_cmdTokenSource_roundTrip(t *testing.T) {
 
+	accessToken := "fakeToken"
 	fakeExpiry := time.Now().Add(time.Hour)
-
-	cache := map[string]string{
-		"access-token": "fakeToken",
-		"expiry":       fakeExpiry.String(),
+	fakeExpiryStr := fakeExpiry.Format(time.RFC3339Nano)
+	fs := &fakeTokenSource{
+		token: &oauth2.Token{
+			AccessToken: accessToken,
+			Expiry:      fakeExpiry,
+		},
 	}
 
-	cts := cachedTokenSource{
-		source:      nil,
-		accessToken: cache["access-token"],
-		expiry:      fakeExpiry,
-		persister:   nil,
-		cache:       nil,
+	cmdCache := map[string]string{
+		"cmd-path": "/path/to/tokensource/cmd",
+		"cmd-args": "--output=json",
+	}
+	cmdCacheUpdated := map[string]string{
+		"cmd-path":     "/path/to/tokensource/cmd",
+		"cmd-args":     "--output=json",
+		"access-token": accessToken,
+		"expiry":       fakeExpiryStr,
+	}
+	simpleCacheUpdated := map[string]string{
+		"access-token": accessToken,
+		"expiry":       fakeExpiryStr,
 	}
 
 	tests := []struct {
-		name  string
-		res   http.Response
-		cache map[string]string
+		name                     string
+		res                      http.Response
+		baseCache, expectedCache map[string]string
 	}{
 		{
 			"Unauthorized",
 			http.Response{StatusCode: 401},
 			make(map[string]string),
+			make(map[string]string),
+		},
+		{
+			"Unauthorized, nonempty defaultCache",
+			http.Response{StatusCode: 401},
+			cmdCache,
+			cmdCache,
 		},
 		{
 			"Authorized",
 			http.Response{StatusCode: 200},
-			cache,
+			make(map[string]string),
+			simpleCacheUpdated,
+		},
+		{
+			"Authorized, nonempty defaultCache",
+			http.Response{StatusCode: 200},
+			cmdCache,
+			cmdCacheUpdated,
 		},
 	}
 
@@ -371,17 +504,23 @@ func TestClearingCredentials(t *testing.T) {
 	req := http.Request{Header: http.Header{}}
 
 	for _, tc := range tests {
-		authProvider := gcpAuthProvider{&cts, persister}
+		cts, err := newCachedTokenSource(accessToken, fakeExpiry.String(), persister, fs, tc.baseCache)
+		if err != nil {
+			t.Fatalf("unexpected error from newCachedTokenSource: %v", err)
+		}
+		authProvider := gcpAuthProvider{cts, persister}
 
 		fakeTransport := MockTransport{&tc.res}
-
 		transport := (authProvider.WrapTransport(&fakeTransport))
-		persister.Persist(cache)
+		// call Token to persist/update cache
+		if _, err := cts.Token(); err != nil {
+			t.Fatalf("unexpected error from cachedTokenSource.Token(): %v", err)
+		}
 
 		transport.RoundTrip(&req)
 
-		if got := persister.read(); !reflect.DeepEqual(got, tc.cache) {
-			t.Errorf("got cache %v, want %v", got, tc.cache)
+		if got := persister.read(); !reflect.DeepEqual(got, tc.expectedCache) {
+			t.Errorf("got cache %v, want %v", got, tc.expectedCache)
 		}
 	}
 

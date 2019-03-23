@@ -40,11 +40,15 @@ const (
 	numVolumesToDetach                   = 2
 	numVolumesToVerifyAttached           = 2
 	numVolumesToVerifyControllerAttached = 2
+	numVolumesToMap                      = 2
+	numAttachableVolumesToUnmap          = 2
+	numNonAttachableVolumesToUnmap       = 2
+	numDevicesToUnmap                    = 2
 )
 
 var _ OperationGenerator = &fakeOperationGenerator{}
 
-func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachablePlugins(t *testing.T) {
+func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachableAndNonDevicemountablePlugins(t *testing.T) {
 	// Arrange
 	ch, quit, oe := setup()
 	volumesToMount := make([]VolumeToMount, numVolumesToMount)
@@ -56,10 +60,11 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachablePlugins(t 
 		podName := "pod-" + strconv.Itoa((i + 1))
 		pod := getTestPodWithSecret(podName, secretName)
 		volumesToMount[i] = VolumeToMount{
-			Pod:                pod,
-			VolumeName:         volumeName,
-			PluginIsAttachable: false, // this field determines whether the plugin is attachable
-			ReportedInUse:      true,
+			Pod:                     pod,
+			VolumeName:              volumeName,
+			PluginIsAttachable:      false, // this field determines whether the plugin is attachable
+			PluginIsDeviceMountable: false, // this field determines whether the plugin is devicemountable
+			ReportedInUse:           true,
 		}
 		oe.MountVolume(0 /* waitForAttachTimeOut */, volumesToMount[i], nil /* actualStateOfWorldMounterUpdater */, false /* isRemount */)
 	}
@@ -76,7 +81,6 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins(t *te
 	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
 	pdName := "pd-volume"
 	volumeName := v1.UniqueVolumeName(pdName)
-
 	// Act
 	for i := range volumesToMount {
 		podName := "pod-" + strconv.Itoa((i + 1))
@@ -93,6 +97,31 @@ func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins(t *te
 	// Assert
 	if !isOperationRunSerially(ch, quit) {
 		t.Fatalf("Mount operations should not start concurrently for attachable volumes")
+	}
+}
+
+func TestOperationExecutor_MountVolume_ConcurrentMountForDeviceMountablePlugins(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
+	pdName := "pd-volume"
+	volumeName := v1.UniqueVolumeName(pdName)
+	// Act
+	for i := range volumesToMount {
+		podName := "pod-" + strconv.Itoa((i + 1))
+		pod := getTestPodWithGCEPD(podName, pdName)
+		volumesToMount[i] = VolumeToMount{
+			Pod:                     pod,
+			VolumeName:              volumeName,
+			PluginIsDeviceMountable: true, // this field determines whether the plugin is devicemountable
+			ReportedInUse:           true,
+		}
+		oe.MountVolume(0 /* waitForAttachTimeout */, volumesToMount[i], nil /* actualStateOfWorldMounterUpdater */, false /* isRemount */)
+	}
+
+	// Assert
+	if !isOperationRunSerially(ch, quit) {
+		t.Fatalf("Mount operations should not start concurrently for devicemountable volumes")
 	}
 }
 
@@ -121,7 +150,7 @@ func TestOperationExecutor_UnmountVolume_ConcurrentUnmountForAllPlugins(t *testi
 				PodUID:     pod.UID,
 			}
 		}
-		oe.UnmountVolume(volumesToUnmount[i], nil /* actualStateOfWorldMounterUpdater */)
+		oe.UnmountVolume(volumesToUnmount[i], nil /* actualStateOfWorldMounterUpdater */, "" /*podsDir*/)
 	}
 
 	// Assert
@@ -228,6 +257,126 @@ func TestOperationExecutor_VerifyControllerAttachedVolumeConcurrently(t *testing
 	}
 }
 
+func TestOperationExecutor_MountVolume_ConcurrentMountForNonAttachablePlugins_VolumeMode_Block(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	volumesToMount := make([]VolumeToMount, numVolumesToMap)
+	secretName := "secret-volume"
+	volumeName := v1.UniqueVolumeName(secretName)
+	volumeMode := v1.PersistentVolumeBlock
+	tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
+
+	// Act
+	for i := range volumesToMount {
+		podName := "pod-" + strconv.Itoa((i + 1))
+		pod := getTestPodWithSecret(podName, secretName)
+		volumesToMount[i] = VolumeToMount{
+			Pod:                pod,
+			VolumeName:         volumeName,
+			PluginIsAttachable: false, // this field determines whether the plugin is attachable
+			ReportedInUse:      true,
+			VolumeSpec:         tmpSpec,
+		}
+		oe.MountVolume(0 /* waitForAttachTimeOut */, volumesToMount[i], nil /* actualStateOfWorldMounterUpdater */, false)
+	}
+
+	// Assert
+	if !isOperationRunConcurrently(ch, quit, numVolumesToMap) {
+		t.Fatalf("Unable to start map operations in Concurrent for non-attachable volumes")
+	}
+}
+
+func TestOperationExecutor_MountVolume_ConcurrentMountForAttachablePlugins_VolumeMode_Block(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	volumesToMount := make([]VolumeToMount, numVolumesToAttach)
+	pdName := "pd-volume"
+	volumeName := v1.UniqueVolumeName(pdName)
+	volumeMode := v1.PersistentVolumeBlock
+	tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
+
+	// Act
+	for i := range volumesToMount {
+		podName := "pod-" + strconv.Itoa((i + 1))
+		pod := getTestPodWithGCEPD(podName, pdName)
+		volumesToMount[i] = VolumeToMount{
+			Pod:                pod,
+			VolumeName:         volumeName,
+			PluginIsAttachable: true, // this field determines whether the plugin is attachable
+			ReportedInUse:      true,
+			VolumeSpec:         tmpSpec,
+		}
+		oe.MountVolume(0 /* waitForAttachTimeout */, volumesToMount[i], nil /* actualStateOfWorldMounterUpdater */, false)
+	}
+
+	// Assert
+	if !isOperationRunSerially(ch, quit) {
+		t.Fatalf("Map operations should not start concurrently for attachable volumes")
+	}
+}
+
+func TestOperationExecutor_UnmountVolume_ConcurrentUnmountForAllPlugins_VolumeMode_Block(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	volumesToUnmount := make([]MountedVolume, numAttachableVolumesToUnmap+numNonAttachableVolumesToUnmap)
+	pdName := "pd-volume"
+	secretName := "secret-volume"
+	volumeMode := v1.PersistentVolumeBlock
+	tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
+
+	// Act
+	for i := 0; i < numNonAttachableVolumesToUnmap+numAttachableVolumesToUnmap; i++ {
+		podName := "pod-" + strconv.Itoa(i+1)
+		if i < numNonAttachableVolumesToUnmap {
+			pod := getTestPodWithSecret(podName, secretName)
+			volumesToUnmount[i] = MountedVolume{
+				PodName:    volumetypes.UniquePodName(podName),
+				VolumeName: v1.UniqueVolumeName(secretName),
+				PodUID:     pod.UID,
+				VolumeSpec: tmpSpec,
+			}
+		} else {
+			pod := getTestPodWithGCEPD(podName, pdName)
+			volumesToUnmount[i] = MountedVolume{
+				PodName:    volumetypes.UniquePodName(podName),
+				VolumeName: v1.UniqueVolumeName(pdName),
+				PodUID:     pod.UID,
+				VolumeSpec: tmpSpec,
+			}
+		}
+		oe.UnmountVolume(volumesToUnmount[i], nil /* actualStateOfWorldMounterUpdater */, "" /* podsDir */)
+	}
+
+	// Assert
+	if !isOperationRunConcurrently(ch, quit, numNonAttachableVolumesToUnmap+numAttachableVolumesToUnmap) {
+		t.Fatalf("Unable to start unmap operations concurrently for volume plugins")
+	}
+}
+
+func TestOperationExecutor_UnmountDeviceConcurrently_VolumeMode_Block(t *testing.T) {
+	// Arrange
+	ch, quit, oe := setup()
+	attachedVolumes := make([]AttachedVolume, numDevicesToUnmap)
+	pdName := "pd-volume"
+	volumeMode := v1.PersistentVolumeBlock
+	tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
+
+	// Act
+	for i := range attachedVolumes {
+		attachedVolumes[i] = AttachedVolume{
+			VolumeName: v1.UniqueVolumeName(pdName),
+			NodeName:   "node-name",
+			VolumeSpec: tmpSpec,
+		}
+		oe.UnmountDevice(attachedVolumes[i], nil /* actualStateOfWorldMounterUpdater */, nil /* mount.Interface */)
+	}
+
+	// Assert
+	if !isOperationRunSerially(ch, quit) {
+		t.Fatalf("Unmap device operations should not start concurrently")
+	}
+}
+
 type fakeOperationGenerator struct {
 	ch   chan interface{}
 	quit chan interface{}
@@ -240,65 +389,132 @@ func newFakeOperationGenerator(ch chan interface{}, quit chan interface{}) Opera
 	}
 }
 
-func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) (func() error, string, error) {
-	return func() error {
+func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) volumetypes.GeneratedOperations {
+	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
-	}, "", nil
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}
 }
-func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (func() error, string, error) {
-	return func() error {
+func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
-	}, "", nil
-}
-func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, string, error) {
-	return func() error {
-		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
-	}, "", nil
-}
-func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, string, error) {
-	return func() error {
-		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
-	}, "", nil
-}
-func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
-	return func() error {
-		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
 	}, nil
 }
-func (fopg *fakeOperationGenerator) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (func() error, string, error) {
-	return func() error {
+func (fopg *fakeOperationGenerator) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
-	}, "", nil
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
 }
-func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, string, error) {
-	return func() error {
+func (fopg *fakeOperationGenerator) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
-	}, "", nil
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
+}
+func (fopg *fakeOperationGenerator) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
+		startOperationAndBlock(fopg.ch, fopg.quit)
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
+}
+func (fopg *fakeOperationGenerator) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
+		startOperationAndBlock(fopg.ch, fopg.quit)
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
+}
+func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
+		startOperationAndBlock(fopg.ch, fopg.quit)
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
 }
 
 func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvcWithResizeRequest *expandcache.PVCWithResizeRequest,
-	resizeMap expandcache.VolumeResizeMap) (func() error, string, error) {
-	return func() error {
+	resizeMap expandcache.VolumeResizeMap) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
-	}, "", nil
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
+}
+
+func (fopg *fakeOperationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
+		startOperationAndBlock(fopg.ch, fopg.quit)
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
 }
 
 func (fopg *fakeOperationGenerator) GenerateBulkVolumeVerifyFunc(
 	pluginNodeVolumes map[types.NodeName][]*volume.Spec,
 	pluginNane string,
 	volumeSpecMap map[*volume.Spec]v1.UniqueVolumeName,
-	actualStateOfWorldAttacherUpdater ActualStateOfWorldAttacherUpdater) (func() error, error) {
-	return func() error {
+	actualStateOfWorldAttacherUpdater ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
+}
+
+func (fopg *fakeOperationGenerator) GenerateMapVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
+		startOperationAndBlock(fopg.ch, fopg.quit)
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
+}
+
+func (fopg *fakeOperationGenerator) GenerateUnmapVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
+		startOperationAndBlock(fopg.ch, fopg.quit)
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
+	}, nil
+}
+
+func (fopg *fakeOperationGenerator) GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
+	opFunc := func() (error, error) {
+		startOperationAndBlock(fopg.ch, fopg.quit)
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationFunc: opFunc,
 	}, nil
 }
 
@@ -326,7 +542,7 @@ func getTestPodWithSecret(podName, secretName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.8",
+					Image: "k8s.gcr.io/mounttest:0.8",
 					Args: []string{
 						"--file_content=/etc/secret-volume/data-1",
 						"--file_mode=/etc/secret-volume/data-1"},
@@ -365,7 +581,7 @@ func getTestPodWithGCEPD(podName, pdName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "pd-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.8",
+					Image: "k8s.gcr.io/mounttest:0.8",
 					Args: []string{
 						"--file_content=/etc/pd-volume/data-1",
 					},

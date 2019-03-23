@@ -19,19 +19,18 @@ package secret
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ioutil "k8s.io/kubernetes/pkg/util/io"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
-// ProbeVolumePlugin is the entry point for plugin detection in a package.
+// ProbeVolumePlugins is the entry point for plugin detection in a package.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&secretPlugin{}}
 }
@@ -55,7 +54,7 @@ func wrappedVolumeSpec() volume.Spec {
 }
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(secretPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(secretPluginName), volName)
 }
 
 func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
@@ -81,6 +80,10 @@ func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Secret != nil
 }
 
+func (plugin *secretPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *secretPlugin) RequiresRemount() bool {
 	return true
 }
@@ -100,7 +103,6 @@ func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volu
 			pod.UID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			plugin.host.GetWriter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source:    *spec.Volume.Secret,
@@ -117,7 +119,6 @@ func (plugin *secretPlugin) NewUnmounter(volName string, podUID types.UID) (volu
 			podUID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			plugin.host.GetWriter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
@@ -140,7 +141,6 @@ type secretVolume struct {
 	podUID  types.UID
 	plugin  *secretPlugin
 	mounter mount.Interface
-	writer  ioutil.Writer
 	volume.MetricsProvider
 }
 
@@ -183,14 +183,11 @@ func (b *secretVolumeMounter) SetUp(fsGroup *int64) error {
 }
 
 func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
-	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
+	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
 	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod, *b.opts)
 	if err != nil {
-		return err
-	}
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		return err
 	}
 
@@ -198,7 +195,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
-			glog.Errorf("Couldn't get secret %v/%v: %v", b.pod.Namespace, b.source.SecretName, err)
+			klog.Errorf("Couldn't get secret %v/%v: %v", b.pod.Namespace, b.source.SecretName, err)
 			return err
 		}
 		secret = &v1.Secret{
@@ -210,7 +207,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	totalBytes := totalSecretBytes(secret)
-	glog.V(3).Infof("Received secret %v/%v containing (%v) pieces of data, %v total bytes",
+	klog.V(3).Infof("Received secret %v/%v containing (%v) pieces of data, %v total bytes",
 		b.pod.Namespace,
 		b.source.SecretName,
 		len(secret.Data),
@@ -221,29 +218,52 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
+	setupSuccess := false
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+		return err
+	}
+	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
+		return err
+	}
+
+	defer func() {
+		// Clean up directories if setup fails
+		if !setupSuccess {
+			unmounter, unmountCreateErr := b.plugin.NewUnmounter(b.volName, b.podUID)
+			if unmountCreateErr != nil {
+				klog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", b.volName, unmountCreateErr)
+				return
+			}
+			tearDownErr := unmounter.TearDown()
+			if tearDownErr != nil {
+				klog.Errorf("error tearing down volume %s with : %v", b.volName, tearDownErr)
+			}
+		}
+	}()
+
 	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
 	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
 	if err != nil {
-		glog.Errorf("Error creating atomic writer: %v", err)
+		klog.Errorf("Error creating atomic writer: %v", err)
 		return err
 	}
 
 	err = writer.Write(payload)
 	if err != nil {
-		glog.Errorf("Error writing payload to dir: %v", err)
+		klog.Errorf("Error writing payload to dir: %v", err)
 		return err
 	}
 
 	err = volume.SetVolumeOwnership(b, fsGroup)
 	if err != nil {
-		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		klog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
 		return err
 	}
-
+	setupSuccess = true
 	return nil
 }
 
-// Note: this function is exported so that it can be called from the projection volume driver
+// MakePayload function is exported so that it can be called from the projection volume driver
 func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
@@ -265,9 +285,9 @@ func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32,
 				if optional {
 					continue
 				}
-				err_msg := "references non-existent secret key"
-				glog.Errorf(err_msg)
-				return nil, fmt.Errorf(err_msg)
+				errMsg := fmt.Sprintf("references non-existent secret key: %s", ktp.Key)
+				klog.Errorf(errMsg)
+				return nil, fmt.Errorf(errMsg)
 			}
 
 			fileProjection.Data = []byte(content)
@@ -303,7 +323,7 @@ func (c *secretVolumeUnmounter) TearDown() error {
 }
 
 func (c *secretVolumeUnmounter) TearDownAt(dir string) error {
-	return volume.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
+	return volumeutil.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.SecretVolumeSource, bool) {

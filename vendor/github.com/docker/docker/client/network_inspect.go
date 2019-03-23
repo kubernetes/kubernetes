@@ -2,13 +2,12 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // NetworkInspect returns the information for a specific network configured in the docker host.
@@ -19,6 +18,9 @@ func (cli *Client) NetworkInspect(ctx context.Context, networkID string, options
 
 // NetworkInspectWithRaw returns the information for a specific network configured in the docker host and its raw representation.
 func (cli *Client) NetworkInspectWithRaw(ctx context.Context, networkID string, options types.NetworkInspectOptions) (types.NetworkResource, []byte, error) {
+	if networkID == "" {
+		return types.NetworkResource{}, nil, objectNotFoundError{object: "network", id: networkID}
+	}
 	var (
 		networkResource types.NetworkResource
 		resp            serverResponse
@@ -33,10 +35,7 @@ func (cli *Client) NetworkInspectWithRaw(ctx context.Context, networkID string, 
 	}
 	resp, err = cli.get(ctx, "/networks/"+networkID, query, nil)
 	if err != nil {
-		if resp.statusCode == http.StatusNotFound {
-			return networkResource, nil, networkNotFoundError{networkID}
-		}
-		return networkResource, nil, err
+		return networkResource, nil, wrapResponseError(err, resp, "network", networkID)
 	}
 	defer ensureReaderClosed(resp)
 

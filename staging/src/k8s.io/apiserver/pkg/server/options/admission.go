@@ -21,26 +21,48 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
-	"k8s.io/apiserver/pkg/admission/plugin/initialization"
+	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
+	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
+	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
+	apiserverapi "k8s.io/apiserver/pkg/apis/apiserver"
+	apiserverapiv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
+var configScheme = runtime.NewScheme()
+
+func init() {
+	utilruntime.Must(apiserverapi.AddToScheme(configScheme))
+	utilruntime.Must(apiserverapiv1alpha1.AddToScheme(configScheme))
+}
+
 // AdmissionOptions holds the admission options
 type AdmissionOptions struct {
 	// RecommendedPluginOrder holds an ordered list of plugin names we recommend to use by default
 	RecommendedPluginOrder []string
-	// DefaultOffPlugins a list of plugin names that should be disabled by default
-	DefaultOffPlugins []string
-	PluginNames       []string
-	ConfigFile        string
-	Plugins           *admission.Plugins
+	// DefaultOffPlugins is a set of plugin names that is disabled by default
+	DefaultOffPlugins sets.String
+
+	// EnablePlugins indicates plugins to be enabled passed through `--enable-admission-plugins`.
+	EnablePlugins []string
+	// DisablePlugins indicates plugins to be disabled passed through `--disable-admission-plugins`.
+	DisablePlugins []string
+	// ConfigFile is the file path with admission control configuration.
+	ConfigFile string
+	// Plugins contains all registered plugins.
+	Plugins *admission.Plugins
+	// Decorators is a list of admission decorator to wrap around the admission plugins
+	Decorators admission.Decorators
 }
 
 // NewAdmissionOptions creates a new instance of AdmissionOptions
@@ -53,10 +75,14 @@ type AdmissionOptions struct {
 //  Servers that do care can overwrite/append that field after creation.
 func NewAdmissionOptions() *AdmissionOptions {
 	options := &AdmissionOptions{
-		Plugins:                &admission.Plugins{},
-		PluginNames:            []string{},
-		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName},
-		DefaultOffPlugins:      []string{initialization.PluginName},
+		Plugins:    admission.NewPlugins(),
+		Decorators: admission.Decorators{admission.DecoratorFunc(admissionmetrics.WithControllerMetrics)},
+		// This list is mix of mutating admission plugins and validating
+		// admission plugins. The apiserver always runs the validating ones
+		// after all the mutating ones, so their relative order in this list
+		// doesn't matter.
+		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
+		DefaultOffPlugins:      sets.NewString(),
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options
@@ -64,10 +90,20 @@ func NewAdmissionOptions() *AdmissionOptions {
 
 // AddFlags adds flags related to admission for a specific APIServer to the specified FlagSet
 func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringSliceVar(&a.PluginNames, "admission-control", a.PluginNames, ""+
-		"Ordered list of plug-ins to do admission control of resources into cluster. "+
-		"Comma-delimited list of: "+strings.Join(a.Plugins.Registered(), ", ")+".")
+	if a == nil {
+		return
+	}
 
+	fs.StringSliceVar(&a.EnablePlugins, "enable-admission-plugins", a.EnablePlugins, ""+
+		"admission plugins that should be enabled in addition to default enabled ones ("+
+		strings.Join(a.defaultEnabledPluginNames(), ", ")+"). "+
+		"Comma-delimited list of admission plugins: "+strings.Join(a.Plugins.Registered(), ", ")+". "+
+		"The order of plugins in this flag does not matter.")
+	fs.StringSliceVar(&a.DisablePlugins, "disable-admission-plugins", a.DisablePlugins, ""+
+		"admission plugins that should be disabled although they are in the default enabled plugins list ("+
+		strings.Join(a.defaultEnabledPluginNames(), ", ")+"). "+
+		"Comma-delimited list of admission plugins: "+strings.Join(a.Plugins.Registered(), ", ")+". "+
+		"The order of plugins in this flag does not matter.")
 	fs.StringVar(&a.ConfigFile, "admission-control-config-file", a.ConfigFile,
 		"File with admission control configuration.")
 }
@@ -80,74 +116,115 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 func (a *AdmissionOptions) ApplyTo(
 	c *server.Config,
 	informers informers.SharedInformerFactory,
-	serverIdentifyingClientCert []byte,
-	serverIdentifyingClientKey []byte,
-	clientConfig *rest.Config,
-	scheme *runtime.Scheme,
+	kubeAPIServerClientConfig *rest.Config,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
-	pluginNames := a.PluginNames
-	if len(a.PluginNames) == 0 {
-		pluginNames = a.enabledPluginNames()
+	if a == nil {
+		return nil
 	}
 
-	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile)
+	// Admission depends on CoreAPI to set SharedInformerFactory and ClientConfig.
+	if informers == nil {
+		return fmt.Errorf("admission depends on a Kubernetes core API shared informer, it cannot be nil")
+	}
+
+	pluginNames := a.enabledPluginNames()
+
+	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile, configScheme)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}
 
-	clientset, err := kubernetes.NewForConfig(clientConfig)
+	clientset, err := kubernetes.NewForConfig(kubeAPIServerClientConfig)
 	if err != nil {
 		return err
 	}
-	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer, serverIdentifyingClientCert, serverIdentifyingClientKey, scheme)
-	if err != nil {
-		return err
-	}
+	genericInitializer := initializer.New(clientset, informers, c.Authorization.Authorizer)
 	initializersChain := admission.PluginInitializers{}
 	pluginInitializers = append(pluginInitializers, genericInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)
 
-	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain)
+	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain, a.Decorators)
 	if err != nil {
 		return err
 	}
 
-	c.AdmissionControl = admissionChain
+	c.AdmissionControl = admissionmetrics.WithStepMetrics(admissionChain)
 	return nil
 }
 
+// Validate verifies flags passed to AdmissionOptions.
 func (a *AdmissionOptions) Validate() []error {
+	if a == nil {
+		return nil
+	}
+
 	errs := []error{}
+
+	registeredPlugins := sets.NewString(a.Plugins.Registered()...)
+	for _, name := range a.EnablePlugins {
+		if !registeredPlugins.Has(name) {
+			errs = append(errs, fmt.Errorf("enable-admission-plugins plugin %q is unknown", name))
+		}
+	}
+
+	for _, name := range a.DisablePlugins {
+		if !registeredPlugins.Has(name) {
+			errs = append(errs, fmt.Errorf("disable-admission-plugins plugin %q is unknown", name))
+		}
+	}
+
+	enablePlugins := sets.NewString(a.EnablePlugins...)
+	disablePlugins := sets.NewString(a.DisablePlugins...)
+	if len(enablePlugins.Intersection(disablePlugins).List()) > 0 {
+		errs = append(errs, fmt.Errorf("%v in enable-admission-plugins and disable-admission-plugins "+
+			"overlapped", enablePlugins.Intersection(disablePlugins).List()))
+	}
+
+	// Verify RecommendedPluginOrder.
+	recommendPlugins := sets.NewString(a.RecommendedPluginOrder...)
+	intersections := registeredPlugins.Intersection(recommendPlugins)
+	if !intersections.Equal(recommendPlugins) {
+		// Developer error, this should never run in.
+		errs = append(errs, fmt.Errorf("plugins %v in RecommendedPluginOrder are not registered",
+			recommendPlugins.Difference(intersections).List()))
+	}
+	if !intersections.Equal(registeredPlugins) {
+		// Developer error, this should never run in.
+		errs = append(errs, fmt.Errorf("plugins %v registered are not in RecommendedPluginOrder",
+			registeredPlugins.Difference(intersections).List()))
+	}
+
 	return errs
 }
 
-// enabledPluginNames makes use of RecommendedPluginOrder and DefaultOffPlugins fields
-// to prepare a list of plugin names that are enabled.
-//
-// TODO(p0lyn0mial): In the end we will introduce two new flags:
-// --disable-admission-plugin this would be a list of admission plugins that a cluster-admin wants to explicitly disable.
-// --enable-admission-plugin  this would be a list of admission plugins that a cluster-admin wants to explicitly enable.
-// both flags are going to be handled by this method
+// enabledPluginNames makes use of RecommendedPluginOrder, DefaultOffPlugins,
+// EnablePlugins, DisablePlugins fields
+// to prepare a list of ordered plugin names that are enabled.
 func (a *AdmissionOptions) enabledPluginNames() []string {
-	//TODO(p0lyn0mial): first subtract plugins that a user wants to explicitly enable from allOffPlugins (DefaultOffPlugins)
-	//TODO(p0lyn0miial): then add/append plugins that a user wants to explicitly disable to allOffPlugins
-	//TODO(p0lyn0mial): so that --off=three --on=one,three default-off=one,two results in  "one" being enabled.
-	allOffPlugins := a.DefaultOffPlugins
-	onlyEnabledPluginNames := []string{}
-	for _, pluginName := range a.RecommendedPluginOrder {
-		disablePlugin := false
-		for _, disabledPluginName := range allOffPlugins {
-			if pluginName == disabledPluginName {
-				disablePlugin = true
-				break
-			}
+	allOffPlugins := append(a.DefaultOffPlugins.List(), a.DisablePlugins...)
+	disabledPlugins := sets.NewString(allOffPlugins...)
+	enabledPlugins := sets.NewString(a.EnablePlugins...)
+	disabledPlugins = disabledPlugins.Difference(enabledPlugins)
+
+	orderedPlugins := []string{}
+	for _, plugin := range a.RecommendedPluginOrder {
+		if !disabledPlugins.Has(plugin) {
+			orderedPlugins = append(orderedPlugins, plugin)
 		}
-		if disablePlugin {
-			continue
-		}
-		onlyEnabledPluginNames = append(onlyEnabledPluginNames, pluginName)
 	}
 
-	return onlyEnabledPluginNames
+	return orderedPlugins
+}
+
+//Return names of plugins which are enabled by default
+func (a *AdmissionOptions) defaultEnabledPluginNames() []string {
+	defaultOnPluginNames := []string{}
+	for _, pluginName := range a.RecommendedPluginOrder {
+		if !a.DefaultOffPlugins.Has(pluginName) {
+			defaultOnPluginNames = append(defaultOnPluginNames, pluginName)
+		}
+	}
+
+	return defaultOnPluginNames
 }

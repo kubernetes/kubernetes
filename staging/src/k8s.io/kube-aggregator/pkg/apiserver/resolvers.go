@@ -46,7 +46,7 @@ func (r *aggregatorEndpointRouting) ResolveEndpoint(namespace, name string) (*ur
 	return proxy.ResolveEndpoint(r.services, r.endpoints, namespace, name)
 }
 
-// NewEndpointServiceResolver returns a ServiceResolver that directly calls the
+// NewClusterIPServiceResolver returns a ServiceResolver that directly calls the
 // service's cluster IP.
 func NewClusterIPServiceResolver(services listersv1.ServiceLister) ServiceResolver {
 	return &aggregatorClusterRouting{
@@ -60,4 +60,24 @@ type aggregatorClusterRouting struct {
 
 func (r *aggregatorClusterRouting) ResolveEndpoint(namespace, name string) (*url.URL, error) {
 	return proxy.ResolveCluster(r.services, namespace, name)
+}
+
+// NewLoopbackServiceResolver returns a ServiceResolver that routes the kubernetes/default service to loopback.
+func NewLoopbackServiceResolver(delegate ServiceResolver, host *url.URL) ServiceResolver {
+	return &loopbackResolver{
+		delegate: delegate,
+		host:     host,
+	}
+}
+
+type loopbackResolver struct {
+	delegate ServiceResolver
+	host     *url.URL
+}
+
+func (r *loopbackResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+	if namespace == "default" && name == "kubernetes" {
+		return r.host, nil
+	}
+	return r.delegate.ResolveEndpoint(namespace, name)
 }

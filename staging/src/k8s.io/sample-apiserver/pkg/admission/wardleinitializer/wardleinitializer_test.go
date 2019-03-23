@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
-	"k8s.io/sample-apiserver/pkg/client/clientset/internalversion/fake"
-	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
+	"k8s.io/sample-apiserver/pkg/generated/clientset/versioned/fake"
+	informers "k8s.io/sample-apiserver/pkg/generated/informers/externalversions"
 )
 
 // TestWantsInternalWardleInformerFactory ensures that the informer factory is injected
@@ -31,10 +31,8 @@ import (
 func TestWantsInternalWardleInformerFactory(t *testing.T) {
 	cs := &fake.Clientset{}
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
-	target, err := wardleinitializer.New(sf)
-	if err != nil {
-		t.Fatalf("expected to create an instance of initializer but got an error = %s", err.Error())
-	}
+	target := wardleinitializer.New(sf)
+
 	wantWardleInformerFactory := &wantInternalWardleInformerFactory{}
 	target.Initialize(wantWardleInformerFactory)
 	if wantWardleInformerFactory.sf != sf {
@@ -50,9 +48,11 @@ type wantInternalWardleInformerFactory struct {
 func (self *wantInternalWardleInformerFactory) SetInternalWardleInformerFactory(sf informers.SharedInformerFactory) {
 	self.sf = sf
 }
-func (self *wantInternalWardleInformerFactory) Admit(a admission.Attributes) error { return nil }
+func (self *wantInternalWardleInformerFactory) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+	return nil
+}
 func (self *wantInternalWardleInformerFactory) Handles(o admission.Operation) bool { return false }
-func (self *wantInternalWardleInformerFactory) Validate() error                    { return nil }
+func (self *wantInternalWardleInformerFactory) ValidateInitialization() error      { return nil }
 
 var _ admission.Interface = &wantInternalWardleInformerFactory{}
 var _ wardleinitializer.WantsInternalWardleInformerFactory = &wantInternalWardleInformerFactory{}

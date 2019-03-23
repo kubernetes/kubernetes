@@ -19,9 +19,9 @@ package cpumanager
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+	"k8s.io/klog"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -29,8 +29,6 @@ import (
 
 // PolicyStatic is the name of the static policy
 const PolicyStatic policyName = "static"
-
-var _ Policy = &staticPolicy{}
 
 // staticPolicy is a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
@@ -96,7 +94,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int) Policy
 		panic(fmt.Sprintf("[cpumanager] unable to reserve the required amount of CPUs (size of %s did not equal %d)", reserved, numReservedCPUs))
 	}
 
-	glog.Infof("[cpumanager] reserved %d CPUs (\"%s\") not available for exclusive assignment", reserved.Size(), reserved)
+	klog.Infof("[cpumanager] reserved %d CPUs (\"%s\") not available for exclusive assignment", reserved.Size(), reserved)
 
 	return &staticPolicy{
 		topology: topology,
@@ -109,9 +107,62 @@ func (p *staticPolicy) Name() string {
 }
 
 func (p *staticPolicy) Start(s state.State) {
-	// Configure the shared pool to include all detected CPU IDs.
-	allCPUs := p.topology.CPUDetails.CPUs()
-	s.SetDefaultCPUSet(allCPUs)
+	if err := p.validateState(s); err != nil {
+		klog.Errorf("[cpumanager] static policy invalid state: %s\n", err.Error())
+		panic("[cpumanager] - please drain node and remove policy state file")
+	}
+}
+
+func (p *staticPolicy) validateState(s state.State) error {
+	tmpAssignments := s.GetCPUAssignments()
+	tmpDefaultCPUset := s.GetDefaultCPUSet()
+
+	// Default cpuset cannot be empty when assignments exist
+	if tmpDefaultCPUset.IsEmpty() {
+		if len(tmpAssignments) != 0 {
+			return fmt.Errorf("default cpuset cannot be empty")
+		}
+		// state is empty initialize
+		allCPUs := p.topology.CPUDetails.CPUs()
+		s.SetDefaultCPUSet(allCPUs)
+		return nil
+	}
+
+	// State has already been initialized from file (is not empty)
+	// 1. Check if the reserved cpuset is not part of default cpuset because:
+	// - kube/system reserved have changed (increased) - may lead to some containers not being able to start
+	// - user tampered with file
+	if !p.reserved.Intersection(tmpDefaultCPUset).Equals(p.reserved) {
+		return fmt.Errorf("not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
+			p.reserved.String(), tmpDefaultCPUset.String())
+	}
+
+	// 2. Check if state for static policy is consistent
+	for cID, cset := range tmpAssignments {
+		// None of the cpu in DEFAULT cset should be in s.assignments
+		if !tmpDefaultCPUset.Intersection(cset).IsEmpty() {
+			return fmt.Errorf("container id: %s cpuset: \"%s\" overlaps with default cpuset \"%s\"",
+				cID, cset.String(), tmpDefaultCPUset.String())
+		}
+	}
+
+	// 3. It's possible that the set of available CPUs has changed since
+	// the state was written. This can be due to for example
+	// offlining a CPU when kubelet is not running. If this happens,
+	// CPU manager will run into trouble when later it tries to
+	// assign non-existent CPUs to containers. Validate that the
+	// topology that was received during CPU manager startup matches with
+	// the set of CPUs stored in the state.
+	totalKnownCPUs := tmpDefaultCPUset.Clone()
+	for _, cset := range tmpAssignments {
+		totalKnownCPUs = totalKnownCPUs.Union(cset)
+	}
+	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
+		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
+			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
+	}
+
+	return nil
 }
 
 // assignableCPUs returns the set of unassigned CPUs minus the reserved set.
@@ -120,12 +171,18 @@ func (p *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
 }
 
 func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {
-	glog.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 	if numCPUs := guaranteedCPUs(pod, container); numCPUs != 0 {
+		klog.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 		// container belongs in an exclusively allocated pool
+
+		if _, ok := s.GetCPUSet(containerID); ok {
+			klog.Infof("[cpumanager] static policy: container already present in state, skipping (container: %s, container id: %s)", container.Name, containerID)
+			return nil
+		}
+
 		cpuset, err := p.allocateCPUs(s, numCPUs)
 		if err != nil {
-			glog.Errorf("[cpumanager] unable to allocate %d CPUs (container id: %s, error: %v)", numCPUs, containerID, err)
+			klog.Errorf("[cpumanager] unable to allocate %d CPUs (container id: %s, error: %v)", numCPUs, containerID, err)
 			return err
 		}
 		s.SetCPUSet(containerID, cpuset)
@@ -135,7 +192,7 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 }
 
 func (p *staticPolicy) RemoveContainer(s state.State, containerID string) error {
-	glog.Infof("[cpumanager] static policy: RemoveContainer (container id: %s)", containerID)
+	klog.Infof("[cpumanager] static policy: RemoveContainer (container id: %s)", containerID)
 	if toRelease, ok := s.GetCPUSet(containerID); ok {
 		s.Delete(containerID)
 		// Mutate the shared pool, adding released cpus.
@@ -145,7 +202,7 @@ func (p *staticPolicy) RemoveContainer(s state.State, containerID string) error 
 }
 
 func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, error) {
-	glog.Infof("[cpumanager] allocateCpus: (numCPUs: %d)", numCPUs)
+	klog.Infof("[cpumanager] allocateCpus: (numCPUs: %d)", numCPUs)
 	result, err := takeByTopology(p.topology, p.assignableCPUs(s), numCPUs)
 	if err != nil {
 		return cpuset.NewCPUSet(), err
@@ -153,7 +210,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, 
 	// Remove allocated CPUs from the shared CPUSet.
 	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result))
 
-	glog.Infof("[cpumanager] allocateCPUs: returning \"%v\"", result)
+	klog.Infof("[cpumanager] allocateCPUs: returning \"%v\"", result)
 	return result, nil
 }
 

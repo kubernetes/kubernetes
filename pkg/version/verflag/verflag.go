@@ -85,9 +85,17 @@ func Version(name string, value versionValue, usage string) *versionValue {
 	return p
 }
 
+const versionFlagName = "version"
+
 var (
-	versionFlag = Version("version", VersionFalse, "Print version information and quit")
+	versionFlag = Version(versionFlagName, VersionFalse, "Print version information and quit")
 )
+
+// AddFlags registers this package's flags on arbitrary FlagSets, such that they point to the
+// same value as the global flags.
+func AddFlags(fs *flag.FlagSet) {
+	fs.AddFlag(flag.Lookup(versionFlagName))
+}
 
 // PrintAndExitIfRequested will check if the -version flag was passed
 // and, if so, print the version and exit.

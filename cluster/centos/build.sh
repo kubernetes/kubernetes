@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Download the flannel, etcd, docker, bridge-utils and K8s binaries automatically 
+# Download the flannel, etcd, docker, bridge-utils and K8s binaries automatically
 # and store into binaries directory.
 # Run as sudoers only
 
@@ -24,84 +24,84 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-readonly ROOT=$(dirname "${BASH_SOURCE}")
-source ${ROOT}/config-build.sh
+readonly ROOT=$(dirname "${BASH_SOURCE[0]}")
+source "${ROOT}/config-build.sh"
 
 # ensure $RELEASES_DIR is an absolute file path
-mkdir -p ${RELEASES_DIR}
-RELEASES_DIR=$(cd ${RELEASES_DIR}; pwd)
+mkdir -p "${RELEASES_DIR}"
+RELEASES_DIR=$(cd "${RELEASES_DIR}"; pwd)
 
 # get absolute file path of binaries
-BINARY_DIR=$(cd ${ROOT}; pwd)/binaries
+BINARY_DIR=$(cd "${ROOT}"; pwd)/binaries
 
 function clean-up() {
-  rm -rf ${RELEASES_DIR}
-  rm -rf ${BINARY_DIR}
+  rm -rf "${RELEASES_DIR}"
+  rm -rf "${BINARY_DIR}"
 }
 
 function download-releases() {
-  rm -rf ${RELEASES_DIR}
-  mkdir -p ${RELEASES_DIR}
+  rm -rf "${RELEASES_DIR}"
+  mkdir -p "${RELEASES_DIR}"
 
   echo "Download flannel release v${FLANNEL_VERSION} ..."
-  curl -L ${FLANNEL_DOWNLOAD_URL} -o ${RELEASES_DIR}/flannel.tar.gz
+  curl -L "${FLANNEL_DOWNLOAD_URL}" -o "${RELEASES_DIR}/flannel.tar.gz"
 
   echo "Download etcd release v${ETCD_VERSION} ..."
-  curl -L ${ETCD_DOWNLOAD_URL} -o ${RELEASES_DIR}/etcd.tar.gz
+  curl -L "${ETCD_DOWNLOAD_URL}" -o "${RELEASES_DIR}/etcd.tar.gz"
 
   echo "Download kubernetes release v${K8S_VERSION} ..."
-  curl -L ${K8S_CLIENT_DOWNLOAD_URL} -o ${RELEASES_DIR}/kubernetes-client-linux-amd64.tar.gz
-  curl -L ${K8S_SERVER_DOWNLOAD_URL} -o ${RELEASES_DIR}/kubernetes-server-linux-amd64.tar.gz
+  curl -L "${K8S_CLIENT_DOWNLOAD_URL}" -o "${RELEASES_DIR}/kubernetes-client-linux-amd64.tar.gz"
+  curl -L "${K8S_SERVER_DOWNLOAD_URL}" -o "${RELEASES_DIR}/kubernetes-server-linux-amd64.tar.gz"
 
   echo "Download docker release v${DOCKER_VERSION} ..."
-  curl -L ${DOCKER_DOWNLOAD_URL} -o ${RELEASES_DIR}/docker.tar.gz
+  curl -L "${DOCKER_DOWNLOAD_URL}" -o "${RELEASES_DIR}/docker.tar.gz"
 }
 
 function unpack-releases() {
-  rm -rf ${BINARY_DIR}
-  mkdir -p ${BINARY_DIR}/master/bin
-  mkdir -p ${BINARY_DIR}/node/bin
+  rm -rf "${BINARY_DIR}"
+  mkdir -p "${BINARY_DIR}/master/bin"
+  mkdir -p "${BINARY_DIR}/node/bin"
 
   # flannel
-  if [[ -f ${RELEASES_DIR}/flannel.tar.gz ]] ; then
-    tar xzf ${RELEASES_DIR}/flannel.tar.gz -C ${RELEASES_DIR}
-    cp ${RELEASES_DIR}/flanneld ${BINARY_DIR}/master/bin
-    cp ${RELEASES_DIR}/flanneld ${BINARY_DIR}/node/bin
+  if [[ -f "${RELEASES_DIR}/flannel.tar.gz" ]] ; then
+    tar xzf "${RELEASES_DIR}/flannel.tar.gz" -C "${RELEASES_DIR}"
+    cp "${RELEASES_DIR}/flanneld" "${BINARY_DIR}/master/bin"
+    cp "${RELEASES_DIR}/flanneld" "${BINARY_DIR}/node/bin"
   fi
 
   # etcd
-  if [[ -f ${RELEASES_DIR}/etcd.tar.gz ]] ; then
-    tar xzf ${RELEASES_DIR}/etcd.tar.gz -C ${RELEASES_DIR}
+  if [[ -f "${RELEASES_DIR}/etcd.tar.gz" ]] ; then
+    tar xzf "${RELEASES_DIR}/etcd.tar.gz" -C "${RELEASES_DIR}"
     ETCD="etcd-v${ETCD_VERSION}-linux-amd64"
-    cp ${RELEASES_DIR}/$ETCD/etcd \
-       ${RELEASES_DIR}/$ETCD/etcdctl ${BINARY_DIR}/master/bin
-    cp ${RELEASES_DIR}/$ETCD/etcd \
-       ${RELEASES_DIR}/$ETCD/etcdctl ${BINARY_DIR}/node/bin
+    cp "${RELEASES_DIR}/${ETCD}/etcd" \
+       "${RELEASES_DIR}/${ETCD}/etcdctl" "${BINARY_DIR}/master/bin"
+    cp "${RELEASES_DIR}/${ETCD}/etcd" \
+       "${RELEASES_DIR}/${ETCD}/etcdctl" "${BINARY_DIR}/node/bin"
   fi
 
   # k8s
-  if [[ -f ${RELEASES_DIR}/kubernetes-client-linux-amd64.tar.gz ]] ; then
-    tar xzf ${RELEASES_DIR}/kubernetes-client-linux-amd64.tar.gz -C ${RELEASES_DIR}
-    cp ${RELEASES_DIR}/kubernetes/client/bin/kubectl ${BINARY_DIR}
+  if [[ -f "${RELEASES_DIR}/kubernetes-client-linux-amd64.tar.gz" ]] ; then
+    tar xzf "${RELEASES_DIR}/kubernetes-client-linux-amd64.tar.gz" -C "${RELEASES_DIR}"
+    cp "${RELEASES_DIR}/kubernetes/client/bin/kubectl" "${BINARY_DIR}"
   fi
 
-  if [[ -f ${RELEASES_DIR}/kubernetes-server-linux-amd64.tar.gz ]] ; then
-    tar xzf ${RELEASES_DIR}/kubernetes-server-linux-amd64.tar.gz -C ${RELEASES_DIR}
-    cp ${RELEASES_DIR}/kubernetes/server/bin/kube-apiserver \
-       ${RELEASES_DIR}/kubernetes/server/bin/kube-controller-manager \
-       ${RELEASES_DIR}/kubernetes/server/bin/kube-scheduler ${BINARY_DIR}/master/bin
-    cp ${RELEASES_DIR}/kubernetes/server/bin/kubelet \
-       ${RELEASES_DIR}/kubernetes/server/bin/kube-proxy ${BINARY_DIR}/node/bin
+  if [[ -f "${RELEASES_DIR}/kubernetes-server-linux-amd64.tar.gz" ]] ; then
+    tar xzf "${RELEASES_DIR}/kubernetes-server-linux-amd64.tar.gz" -C "${RELEASES_DIR}"
+    cp "${RELEASES_DIR}/kubernetes/server/bin/kube-apiserver" \
+       "${RELEASES_DIR}/kubernetes/server/bin/kube-controller-manager" \
+       "${RELEASES_DIR}/kubernetes/server/bin/kube-scheduler" "${BINARY_DIR}/master/bin"
+    cp "${RELEASES_DIR}/kubernetes/server/bin/kubelet" \
+       "${RELEASES_DIR}/kubernetes/server/bin/kube-proxy" "${BINARY_DIR}/node/bin"
   fi
 
   # docker
-  if [[ -f ${RELEASES_DIR}/docker.tar.gz ]]; then
-    tar xzf ${RELEASES_DIR}/docker.tar.gz -C ${RELEASES_DIR}
+  if [[ -f "${RELEASES_DIR}/docker.tar.gz" ]]; then
+    tar xzf "${RELEASES_DIR}/docker.tar.gz" -C "${RELEASES_DIR}"
 
-    cp ${RELEASES_DIR}/docker/docker* ${BINARY_DIR}/node/bin
+    cp "${RELEASES_DIR}/docker/docker*" "${BINARY_DIR}/node/bin"
   fi
 
-  chmod -R +x ${BINARY_DIR}
+  chmod -R +x "${BINARY_DIR}"
   echo "Done! All binaries are stored in ${BINARY_DIR}"
 }
 
@@ -134,4 +134,4 @@ function parse-opt() {
   esac
 }
 
-parse-opt $@
+parse-opt "${@}"

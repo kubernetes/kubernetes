@@ -1,16 +1,16 @@
-#heredoc [![Build Status](https://drone.io/github.com/MakeNowJust/heredoc/status.png)](https://drone.io/github.com/MakeNowJust/heredoc/latest) [![Go Walker](http://gowalker.org/api/v1/badge)](https://gowalker.org/github.com/MakeNowJust/heredoc)
+# heredoc [![CircleCI](https://circleci.com/gh/MakeNowJust/heredoc.svg?style=svg)](https://circleci.com/gh/MakeNowJust/heredoc) [![Go Walker](http://gowalker.org/api/v1/badge)](https://gowalker.org/github.com/MakeNowJust/heredoc)
 
-##About
+## About
 
 Package heredoc provides the here-document with keeping indent.
 
-##Install
+## Install
 
 ```console
 $ go get github.com/MakeNowJust/heredoc
 ```
 
-##Import
+## Import
 
 ```go
 // usual
@@ -19,7 +19,7 @@ import "github.com/MakeNowJust/heredoc"
 import . "github.com/MakeNowJust/heredoc/dot"
 ```
 
-##Example
+## Example
 
 ```go
 package main
@@ -43,11 +43,11 @@ func main() {
 }
 ```
 
-##API Document
+## API Document
 
  - [Go Walker - github.com/MakeNowJust/heredoc](https://gowalker.org/github.com/MakeNowJust/heredoc)
  - [Go Walker - github.com/MakeNowJust/heredoc/dot](https://gowalker.org/github.com/MakeNowJust/heredoc/dot)
 
-##License
+## License
 
 This software is released under the MIT License, see LICENSE.

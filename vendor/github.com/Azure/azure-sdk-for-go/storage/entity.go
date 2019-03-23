@@ -1,7 +1,22 @@
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/satori/uuid"
+	"github.com/satori/go.uuid"
 )
 
 // Annotating as secure for gas scanning
@@ -97,13 +112,13 @@ func (e *Entity) Get(timeout uint, ml MetadataLevel, options *GetEntityOptions) 
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err = checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err = checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
 	}
 
-	respBody, err := ioutil.ReadAll(resp.body)
+	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -139,22 +154,21 @@ func (e *Entity) Insert(ml MetadataLevel, options *EntityOptions) error {
 	if err != nil {
 		return err
 	}
-	defer resp.body.Close()
-
-	data, err := ioutil.ReadAll(resp.body)
-	if err != nil {
-		return err
-	}
+	defer drainRespBody(resp)
 
 	if ml != EmptyPayload {
-		if err = checkRespCode(resp.statusCode, []int{http.StatusCreated}); err != nil {
+		if err = checkRespCode(resp, []int{http.StatusCreated}); err != nil {
+			return err
+		}
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
 			return err
 		}
 		if err = e.UnmarshalJSON(data); err != nil {
 			return err
 		}
 	} else {
-		if err = checkRespCode(resp.statusCode, []int{http.StatusNoContent}); err != nil {
+		if err = checkRespCode(resp, []int{http.StatusNoContent}); err != nil {
 			return err
 		}
 	}
@@ -193,18 +207,18 @@ func (e *Entity) Delete(force bool, options *EntityOptions) error {
 	uri := e.Table.tsc.client.getEndpoint(tableServiceName, e.buildPath(), query)
 	resp, err := e.Table.tsc.client.exec(http.MethodDelete, uri, headers, nil, e.Table.tsc.auth)
 	if err != nil {
-		if resp.statusCode == http.StatusPreconditionFailed {
+		if resp.StatusCode == http.StatusPreconditionFailed {
 			return fmt.Errorf(etagErrorTemplate, err)
 		}
 		return err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err = checkRespCode(resp.statusCode, []int{http.StatusNoContent}); err != nil {
+	if err = checkRespCode(resp, []int{http.StatusNoContent}); err != nil {
 		return err
 	}
 
-	return e.updateTimestamp(resp.headers)
+	return e.updateTimestamp(resp.Header)
 }
 
 // InsertOrReplace inserts an entity or replaces the existing one.
@@ -233,7 +247,7 @@ func (e *Entity) MarshalJSON() ([]byte, error) {
 		switch t := v.(type) {
 		case []byte:
 			completeMap[typeKey] = OdataBinary
-			completeMap[k] = string(t)
+			completeMap[k] = t
 		case time.Time:
 			completeMap[typeKey] = OdataDateTime
 			completeMap[k] = t.Format(time.RFC3339Nano)
@@ -307,7 +321,10 @@ func (e *Entity) UnmarshalJSON(data []byte) error {
 			}
 			switch v {
 			case OdataBinary:
-				props[valueKey] = []byte(str)
+				props[valueKey], err = base64.StdEncoding.DecodeString(str)
+				if err != nil {
+					return fmt.Errorf(errorTemplate, err)
+				}
 			case OdataDateTime:
 				t, err := time.Parse("2006-01-02T15:04:05Z", str)
 				if err != nil {
@@ -382,13 +399,13 @@ func (e *Entity) insertOr(verb string, options *EntityOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err = checkRespCode(resp.statusCode, []int{http.StatusNoContent}); err != nil {
+	if err = checkRespCode(resp, []int{http.StatusNoContent}); err != nil {
 		return err
 	}
 
-	return e.updateEtagAndTimestamp(resp.headers)
+	return e.updateEtagAndTimestamp(resp.Header)
 }
 
 func (e *Entity) updateMerge(force bool, verb string, options *EntityOptions) error {
@@ -406,18 +423,18 @@ func (e *Entity) updateMerge(force bool, verb string, options *EntityOptions) er
 	uri := e.Table.tsc.client.getEndpoint(tableServiceName, e.buildPath(), query)
 	resp, err := e.Table.tsc.client.exec(verb, uri, headers, bytes.NewReader(body), e.Table.tsc.auth)
 	if err != nil {
-		if resp.statusCode == http.StatusPreconditionFailed {
+		if resp.StatusCode == http.StatusPreconditionFailed {
 			return fmt.Errorf(etagErrorTemplate, err)
 		}
 		return err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err = checkRespCode(resp.statusCode, []int{http.StatusNoContent}); err != nil {
+	if err = checkRespCode(resp, []int{http.StatusNoContent}); err != nil {
 		return err
 	}
 
-	return e.updateEtagAndTimestamp(resp.headers)
+	return e.updateEtagAndTimestamp(resp.Header)
 }
 
 func stringFromMap(props map[string]interface{}, key string) string {

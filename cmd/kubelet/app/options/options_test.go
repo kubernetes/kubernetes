@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 func newKubeletServerOrDie() *KubeletServer {
@@ -36,9 +36,7 @@ func newKubeletServerOrDie() *KubeletServer {
 }
 
 func cleanFlags(s *KubeletServer) {
-	s.KubeConfig = utilflag.NewStringFlag(s.KubeConfig.Value())
-	s.DynamicConfigDir = utilflag.NewStringFlag(s.DynamicConfigDir.Value())
-	s.InitConfigDir = utilflag.NewStringFlag(s.InitConfigDir.Value())
+	s.DynamicConfigDir = cliflag.NewStringFlag(s.DynamicConfigDir.Value())
 }
 
 // TestRoundTrip ensures that flag values from the Kubelet can be serialized
@@ -120,7 +118,12 @@ func asArgs(fn, defaultFn func(*pflag.FlagSet)) []string {
 	defaultFn(defaults)
 	var args []string
 	fs.VisitAll(func(flag *pflag.Flag) {
+		// if the flag implements cliflag.OmitEmpty and the value is Empty, then just omit it from the command line
+		if omit, ok := flag.Value.(cliflag.OmitEmpty); ok && omit.Empty() {
+			return
+		}
 		s := flag.Value.String()
+		// if the flag has the same value as the default, we can omit it without changing the meaning of the command line
 		var defaultValue string
 		if defaultFlag := defaults.Lookup(flag.Name); defaultFlag != nil {
 			defaultValue = defaultFlag.Value.String()
@@ -128,6 +131,7 @@ func asArgs(fn, defaultFn func(*pflag.FlagSet)) []string {
 				return
 			}
 		}
+		// if the flag is a string slice, each element is specified with an independent flag invocation
 		if values, err := fs.GetStringSlice(flag.Name); err == nil {
 			for _, s := range values {
 				args = append(args, fmt.Sprintf("--%s=%s", flag.Name, s))

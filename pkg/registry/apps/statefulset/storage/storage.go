@@ -17,19 +17,22 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -45,12 +48,11 @@ type StatefulSetStorage struct {
 
 func NewStorage(optsGetter generic.RESTOptionsGetter) StatefulSetStorage {
 	statefulSetRest, statefulSetStatusRest := NewREST(optsGetter)
-	statefulSetRegistry := statefulset.NewRegistry(statefulSetRest)
 
 	return StatefulSetStorage{
 		StatefulSet: statefulSetRest,
 		Status:      statefulSetStatusRest,
-		Scale:       &ScaleREST{registry: statefulSetRegistry},
+		Scale:       &ScaleREST{store: statefulSetRest.Store},
 	}
 }
 
@@ -100,13 +102,15 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
-func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return r.store.Get(ctx, name, options)
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
 // Implement ShortNamesProvider
@@ -118,27 +122,35 @@ func (r *REST) ShortNames() []string {
 }
 
 type ScaleREST struct {
-	registry statefulset.Registry
+	store *genericregistry.Store
 }
 
 // ScaleREST implements Patcher
 var _ = rest.Patcher(&ScaleREST{})
 var _ = rest.GroupVersionKindProvider(&ScaleREST{})
 
-func (r *ScaleREST) GroupVersionKind() schema.GroupVersionKind {
-	return schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Scale"}
+func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	switch containingGV {
+	case appsv1beta1.SchemeGroupVersion:
+		return appsv1beta1.SchemeGroupVersion.WithKind("Scale")
+	case appsv1beta2.SchemeGroupVersion:
+		return appsv1beta2.SchemeGroupVersion.WithKind("Scale")
+	default:
+		return autoscalingv1.SchemeGroupVersion.WithKind("Scale")
+	}
 }
 
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {
-	return &extensions.Scale{}
+	return &autoscaling.Scale{}
 }
 
-func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	ss, err := r.registry.GetStatefulSet(ctx, name, options)
+func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
+	ss := obj.(*apps.StatefulSet)
 	scale, err := scaleFromStatefulSet(ss)
 	if err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -146,39 +158,41 @@ func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *met
 	return scale, err
 }
 
-func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	ss, err := r.registry.GetStatefulSet(ctx, name, &metav1.GetOptions{})
+func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
+	ss := obj.(*apps.StatefulSet)
 
 	oldScale, err := scaleFromStatefulSet(ss)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldScale)
+	obj, err = objInfo.UpdatedObject(ctx, oldScale)
 	if err != nil {
 		return nil, false, err
 	}
 	if obj == nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("nil update passed to Scale"))
 	}
-	scale, ok := obj.(*extensions.Scale)
+	scale, ok := obj.(*autoscaling.Scale)
 	if !ok {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("wrong object passed to Scale update: %v", obj))
 	}
 
-	if errs := extvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
+	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
+		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), scale.Name, errs)
 	}
 
 	ss.Spec.Replicas = scale.Spec.Replicas
 	ss.ResourceVersion = scale.ResourceVersion
-	ss, err = r.registry.UpdateStatefulSet(ctx, ss)
+	obj, _, err = r.store.Update(ctx, ss.Name, rest.DefaultUpdatedObjectInfo(ss), createValidation, updateValidation, false, options)
 	if err != nil {
 		return nil, false, err
 	}
+	ss = obj.(*apps.StatefulSet)
 	newScale, err := scaleFromStatefulSet(ss)
 	if err != nil {
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
@@ -187,8 +201,12 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 }
 
 // scaleFromStatefulSet returns a scale subresource for a statefulset.
-func scaleFromStatefulSet(ss *apps.StatefulSet) (*extensions.Scale, error) {
-	return &extensions.Scale{
+func scaleFromStatefulSet(ss *apps.StatefulSet) (*autoscaling.Scale, error) {
+	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+	return &autoscaling.Scale{
 		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              ss.Name,
@@ -197,12 +215,12 @@ func scaleFromStatefulSet(ss *apps.StatefulSet) (*extensions.Scale, error) {
 			ResourceVersion:   ss.ResourceVersion,
 			CreationTimestamp: ss.CreationTimestamp,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: ss.Spec.Replicas,
 		},
-		Status: extensions.ScaleStatus{
+		Status: autoscaling.ScaleStatus{
 			Replicas: ss.Status.Replicas,
-			Selector: ss.Spec.Selector,
+			Selector: selector.String(),
 		},
 	}, nil
 }

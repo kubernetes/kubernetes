@@ -7,26 +7,46 @@ go_library(
         "proxy.go",
         "tc.go",
         "term.go",
+        "term_windows.go",
+        "termios_bsd.go",
+        "termios_linux.go",
         "winsize.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "termios_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "termios_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "term_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
-    cgo = True,
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/term",
     importpath = "github.com/docker/docker/pkg/term",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/golang.org/x/sys/unix:go_default_library",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+    deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/github.com/Azure/go-ansiterm/winterm:go_default_library",
             "//vendor/github.com/docker/docker/pkg/term/windows:go_default_library",
         ],

@@ -10,9 +10,9 @@ go_library(
     srcs = ["validation.go"],
     importpath = "k8s.io/kubernetes/pkg/apis/certificates/validation",
     deps = [
-        "//pkg/api/validation:go_default_library",
         "//pkg/apis/certificates:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//pkg/apis/core/validation:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 

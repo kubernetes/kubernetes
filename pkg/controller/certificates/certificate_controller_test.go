@@ -47,21 +47,18 @@ func TestCertificateController(t *testing.T) {
 			Reason:  "test reason",
 			Message: "test message",
 		})
-		_, err := client.Certificates().CertificateSigningRequests().UpdateApproval(csr)
+		_, err := client.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(csr)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
 
-	controller, err := NewCertificateController(
+	controller := NewCertificateController(
 		client,
 		informerFactory.Certificates().V1beta1().CertificateSigningRequests(),
 		handler,
 	)
-	if err != nil {
-		t.Fatalf("error creating controller: %v", err)
-	}
 	controller.csrsSynced = func() bool { return true }
 
 	stopCh := make(chan struct{})

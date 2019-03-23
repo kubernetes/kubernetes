@@ -17,15 +17,18 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 var storageOperationMetric = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Name: "storage_operation_duration_seconds",
-		Help: "Storage operation duration",
+		Name:    "storage_operation_duration_seconds",
+		Help:    "Storage operation duration",
+		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50},
 	},
 	[]string{"volume_plugin", "operation_name"},
 )
@@ -48,16 +51,28 @@ func registerMetrics() {
 }
 
 // OperationCompleteHook returns a hook to call when an operation is completed
-func OperationCompleteHook(plugin, operationName string) func(error) {
+func OperationCompleteHook(plugin, operationName string) func(*error) {
 	requestTime := time.Now()
-	opComplete := func(err error) {
+	opComplete := func(err *error) {
 		timeTaken := time.Since(requestTime).Seconds()
 		// Create metric with operation name and plugin name
-		if err != nil {
+		if *err != nil {
 			storageOperationErrorMetric.WithLabelValues(plugin, operationName).Inc()
 		} else {
 			storageOperationMetric.WithLabelValues(plugin, operationName).Observe(timeTaken)
 		}
 	}
 	return opComplete
+}
+
+// GetFullQualifiedPluginNameForVolume returns full qualified plugin name for
+// given volume. For CSI plugin, it appends plugin driver name at the end of
+// plugin name, e.g. kubernetes.io/csi:csi-hostpath. It helps to distinguish
+// between metrics emitted for CSI volumes which may be handled by different
+// CSI plugin drivers.
+func GetFullQualifiedPluginNameForVolume(pluginName string, spec *volume.Spec) string {
+	if spec != nil && spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil {
+		return fmt.Sprintf("%s:%s", pluginName, spec.PersistentVolume.Spec.CSI.Driver)
+	}
+	return pluginName
 }

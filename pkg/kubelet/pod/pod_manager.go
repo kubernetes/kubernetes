@@ -19,8 +19,12 @@ package pod
 import (
 	"sync"
 
+	"k8s.io/klog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -116,18 +120,20 @@ type basicManager struct {
 	translationByUID map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID
 
 	// basicManager is keeping secretManager and configMapManager up-to-date.
-	secretManager    secret.Manager
-	configMapManager configmap.Manager
+	secretManager     secret.Manager
+	configMapManager  configmap.Manager
+	checkpointManager checkpointmanager.CheckpointManager
 
 	// A mirror pod client to create/delete mirror pods.
 	MirrorClient
 }
 
 // NewBasicPodManager returns a functional Manager.
-func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager) Manager {
+func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager, cpm checkpointmanager.CheckpointManager) Manager {
 	pm := &basicManager{}
 	pm.secretManager = secretManager
 	pm.configMapManager = configMapManager
+	pm.checkpointManager = cpm
 	pm.MirrorClient = client
 	pm.SetPods(nil)
 	return pm
@@ -155,6 +161,15 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.updatePodsInternal(pod)
+	if pm.checkpointManager != nil {
+		if err := checkpoint.WritePod(pm.checkpointManager, pod); err != nil {
+			klog.Errorf("Error writing checkpoint for pod: %v", pod.GetName())
+		}
+	}
+}
+
+func isPodInTerminatedState(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
 }
 
 // updatePodsInternal replaces the given pods in the current state of the
@@ -163,14 +178,30 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 	for _, pod := range pods {
 		if pm.secretManager != nil {
-			// TODO: Consider detecting only status update and in such case do
-			// not register pod, as it doesn't really matter.
-			pm.secretManager.RegisterPod(pod)
+			if isPodInTerminatedState(pod) {
+				// Pods that are in terminated state and no longer running can be
+				// ignored as they no longer require access to secrets.
+				// It is especially important in watch-based manager, to avoid
+				// unnecessary watches for terminated pods waiting for GC.
+				pm.secretManager.UnregisterPod(pod)
+			} else {
+				// TODO: Consider detecting only status update and in such case do
+				// not register pod, as it doesn't really matter.
+				pm.secretManager.RegisterPod(pod)
+			}
 		}
 		if pm.configMapManager != nil {
-			// TODO: Consider detecting only status update and in such case do
-			// not register pod, as it doesn't really matter.
-			pm.configMapManager.RegisterPod(pod)
+			if isPodInTerminatedState(pod) {
+				// Pods that are in terminated state and no longer running can be
+				// ignored as they no longer require access to configmaps.
+				// It is especially important in watch-based manager, to avoid
+				// unnecessary watches for terminated pods waiting for GC.
+				pm.configMapManager.UnregisterPod(pod)
+			} else {
+				// TODO: Consider detecting only status update and in such case do
+				// not register pod, as it doesn't really matter.
+				pm.configMapManager.RegisterPod(pod)
+			}
 		}
 		podFullName := kubecontainer.GetPodFullName(pod)
 		// This logic relies on a static pod and its mirror to have the same name.
@@ -212,6 +243,11 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	} else {
 		delete(pm.podByUID, kubetypes.ResolvedPodUID(pod.UID))
 		delete(pm.podByFullName, podFullName)
+	}
+	if pm.checkpointManager != nil {
+		if err := checkpoint.DeletePod(pm.checkpointManager, pod); err != nil {
+			klog.Errorf("Error deleting checkpoint for pod: %v", pod.GetName())
+		}
 	}
 }
 

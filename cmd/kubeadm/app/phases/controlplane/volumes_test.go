@@ -30,6 +30,7 @@ import (
 
 func TestGetEtcdCertVolumes(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+	k8sCertifcatesDir := "/etc/kubernetes/pki"
 	var tests = []struct {
 		ca, cert, key string
 		vol           []v1.Volume
@@ -56,6 +57,14 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			ca:       "/etc/pki/my-etcd-ca.crt",
 			cert:     "/etc/pki/my-etcd.crt",
 			key:      "/etc/pki/my-etcd.key",
+			vol:      []v1.Volume{},
+			volMount: []v1.VolumeMount{},
+		},
+		{
+			// Should ignore files in Kubernetes PKI directory (and subdirs)
+			ca:       k8sCertifcatesDir + "/ca/my-etcd-ca.crt",
+			cert:     k8sCertifcatesDir + "/my-etcd.crt",
+			key:      k8sCertifcatesDir + "/my-etcd.key",
 			vol:      []v1.Volume{},
 			volMount: []v1.VolumeMount{},
 		},
@@ -224,11 +233,11 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actualVol, actualVolMount := getEtcdCertVolumes(kubeadmapi.Etcd{
+		actualVol, actualVolMount := getEtcdCertVolumes(&kubeadmapi.ExternalEtcd{
 			CAFile:   rt.ca,
 			CertFile: rt.cert,
 			KeyFile:  rt.key,
-		})
+		}, k8sCertifcatesDir)
 		if !reflect.DeepEqual(actualVol, rt.vol) {
 			t.Errorf(
 				"failed getEtcdCertVolumes:\n\texpected: %v\n\t  actual: %v",
@@ -249,285 +258,248 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
+	volMap := make(map[string]map[string]v1.Volume)
+	volMap[kubeadmconstants.KubeAPIServer] = map[string]v1.Volume{}
+	volMap[kubeadmconstants.KubeAPIServer]["k8s-certs"] = v1.Volume{
+		Name: "k8s-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: testCertsDir,
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap[kubeadmconstants.KubeAPIServer]["ca-certs"] = v1.Volume{
+		Name: "ca-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/ssl/certs",
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap[kubeadmconstants.KubeControllerManager] = map[string]v1.Volume{}
+	volMap[kubeadmconstants.KubeControllerManager]["k8s-certs"] = v1.Volume{
+		Name: "k8s-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: testCertsDir,
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap[kubeadmconstants.KubeControllerManager]["ca-certs"] = v1.Volume{
+		Name: "ca-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/ssl/certs",
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap[kubeadmconstants.KubeControllerManager]["kubeconfig"] = v1.Volume{
+		Name: "kubeconfig",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/kubernetes/controller-manager.conf",
+				Type: &hostPathFileOrCreate,
+			},
+		},
+	}
+	volMap[kubeadmconstants.KubeScheduler] = map[string]v1.Volume{}
+	volMap[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.Volume{
+		Name: "kubeconfig",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/kubernetes/scheduler.conf",
+				Type: &hostPathFileOrCreate,
+			},
+		},
+	}
+	volMountMap := make(map[string]map[string]v1.VolumeMount)
+	volMountMap[kubeadmconstants.KubeAPIServer] = map[string]v1.VolumeMount{}
+	volMountMap[kubeadmconstants.KubeAPIServer]["k8s-certs"] = v1.VolumeMount{
+		Name:      "k8s-certs",
+		MountPath: testCertsDir,
+		ReadOnly:  true,
+	}
+	volMountMap[kubeadmconstants.KubeAPIServer]["ca-certs"] = v1.VolumeMount{
+		Name:      "ca-certs",
+		MountPath: "/etc/ssl/certs",
+		ReadOnly:  true,
+	}
+	volMountMap[kubeadmconstants.KubeControllerManager] = map[string]v1.VolumeMount{}
+	volMountMap[kubeadmconstants.KubeControllerManager]["k8s-certs"] = v1.VolumeMount{
+		Name:      "k8s-certs",
+		MountPath: testCertsDir,
+		ReadOnly:  true,
+	}
+	volMountMap[kubeadmconstants.KubeControllerManager]["ca-certs"] = v1.VolumeMount{
+		Name:      "ca-certs",
+		MountPath: "/etc/ssl/certs",
+		ReadOnly:  true,
+	}
+	volMountMap[kubeadmconstants.KubeControllerManager]["kubeconfig"] = v1.VolumeMount{
+		Name:      "kubeconfig",
+		MountPath: "/etc/kubernetes/controller-manager.conf",
+		ReadOnly:  true,
+	}
+	volMountMap[kubeadmconstants.KubeScheduler] = map[string]v1.VolumeMount{}
+	volMountMap[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.VolumeMount{
+		Name:      "kubeconfig",
+		MountPath: "/etc/kubernetes/scheduler.conf",
+		ReadOnly:  true,
+	}
+
+	volMap2 := make(map[string]map[string]v1.Volume)
+	volMap2[kubeadmconstants.KubeAPIServer] = map[string]v1.Volume{}
+	volMap2[kubeadmconstants.KubeAPIServer]["k8s-certs"] = v1.Volume{
+		Name: "k8s-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: testCertsDir,
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap2[kubeadmconstants.KubeAPIServer]["ca-certs"] = v1.Volume{
+		Name: "ca-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/ssl/certs",
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap2[kubeadmconstants.KubeAPIServer]["etcd-certs-0"] = v1.Volume{
+		Name: "etcd-certs-0",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/certs/etcd",
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap2[kubeadmconstants.KubeAPIServer]["etcd-certs-1"] = v1.Volume{
+		Name: "etcd-certs-1",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/var/lib/etcd/certs",
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap2[kubeadmconstants.KubeControllerManager] = map[string]v1.Volume{}
+	volMap2[kubeadmconstants.KubeControllerManager]["k8s-certs"] = v1.Volume{
+		Name: "k8s-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: testCertsDir,
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap2[kubeadmconstants.KubeControllerManager]["ca-certs"] = v1.Volume{
+		Name: "ca-certs",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/ssl/certs",
+				Type: &hostPathDirectoryOrCreate,
+			},
+		},
+	}
+	volMap2[kubeadmconstants.KubeControllerManager]["kubeconfig"] = v1.Volume{
+		Name: "kubeconfig",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/kubernetes/controller-manager.conf",
+				Type: &hostPathFileOrCreate,
+			},
+		},
+	}
+	volMap2[kubeadmconstants.KubeScheduler] = map[string]v1.Volume{}
+	volMap2[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.Volume{
+		Name: "kubeconfig",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{
+				Path: "/etc/kubernetes/scheduler.conf",
+				Type: &hostPathFileOrCreate,
+			},
+		},
+	}
+	volMountMap2 := make(map[string]map[string]v1.VolumeMount)
+	volMountMap2[kubeadmconstants.KubeAPIServer] = map[string]v1.VolumeMount{}
+	volMountMap2[kubeadmconstants.KubeAPIServer]["k8s-certs"] = v1.VolumeMount{
+		Name:      "k8s-certs",
+		MountPath: testCertsDir,
+		ReadOnly:  true,
+	}
+	volMountMap2[kubeadmconstants.KubeAPIServer]["ca-certs"] = v1.VolumeMount{
+		Name:      "ca-certs",
+		MountPath: "/etc/ssl/certs",
+		ReadOnly:  true,
+	}
+	volMountMap2[kubeadmconstants.KubeAPIServer]["etcd-certs-0"] = v1.VolumeMount{
+		Name:      "etcd-certs-0",
+		MountPath: "/etc/certs/etcd",
+		ReadOnly:  true,
+	}
+	volMountMap2[kubeadmconstants.KubeAPIServer]["etcd-certs-1"] = v1.VolumeMount{
+		Name:      "etcd-certs-1",
+		MountPath: "/var/lib/etcd/certs",
+		ReadOnly:  true,
+	}
+	volMountMap2[kubeadmconstants.KubeControllerManager] = map[string]v1.VolumeMount{}
+	volMountMap2[kubeadmconstants.KubeControllerManager]["k8s-certs"] = v1.VolumeMount{
+		Name:      "k8s-certs",
+		MountPath: testCertsDir,
+		ReadOnly:  true,
+	}
+	volMountMap2[kubeadmconstants.KubeControllerManager]["ca-certs"] = v1.VolumeMount{
+		Name:      "ca-certs",
+		MountPath: "/etc/ssl/certs",
+		ReadOnly:  true,
+	}
+	volMountMap2[kubeadmconstants.KubeControllerManager]["kubeconfig"] = v1.VolumeMount{
+		Name:      "kubeconfig",
+		MountPath: "/etc/kubernetes/controller-manager.conf",
+		ReadOnly:  true,
+	}
+	volMountMap2[kubeadmconstants.KubeScheduler] = map[string]v1.VolumeMount{}
+	volMountMap2[kubeadmconstants.KubeScheduler]["kubeconfig"] = v1.VolumeMount{
+		Name:      "kubeconfig",
+		MountPath: "/etc/kubernetes/scheduler.conf",
+		ReadOnly:  true,
+	}
 	var tests = []struct {
-		cfg      *kubeadmapi.MasterConfiguration
-		vol      map[string][]v1.Volume
-		volMount map[string][]v1.VolumeMount
+		cfg      *kubeadmapi.ClusterConfiguration
+		vol      map[string]map[string]v1.Volume
+		volMount map[string]map[string]v1.VolumeMount
 	}{
 		{
 			// Should ignore files in /etc/ssl/certs
-			cfg: &kubeadmapi.MasterConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd:            kubeadmapi.Etcd{},
 			},
-			vol: map[string][]v1.Volume{
-				kubeadmconstants.KubeAPIServer: {
-					{
-						Name: "k8s-certs",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: testCertsDir,
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-					{
-						Name: "ca-certs",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/etc/ssl/certs",
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-				},
-				kubeadmconstants.KubeControllerManager: {
-					{
-						Name: "k8s-certs",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: testCertsDir,
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-					{
-						Name: "ca-certs",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/etc/ssl/certs",
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-					{
-						Name: "kubeconfig",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/etc/kubernetes/controller-manager.conf",
-								Type: &hostPathFileOrCreate,
-							},
-						},
-					},
-					{
-						Name: "flexvolume-dir",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec",
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-				},
-				kubeadmconstants.KubeScheduler: {
-					{
-						Name: "kubeconfig",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/etc/kubernetes/scheduler.conf",
-								Type: &hostPathFileOrCreate,
-							},
-						},
-					},
-				},
-			},
-			volMount: map[string][]v1.VolumeMount{
-				kubeadmconstants.KubeAPIServer: {
-					{
-						Name:      "k8s-certs",
-						MountPath: testCertsDir,
-						ReadOnly:  true,
-					},
-					{
-						Name:      "ca-certs",
-						MountPath: "/etc/ssl/certs",
-						ReadOnly:  true,
-					},
-				},
-				kubeadmconstants.KubeControllerManager: {
-					{
-						Name:      "k8s-certs",
-						MountPath: testCertsDir,
-						ReadOnly:  true,
-					},
-					{
-						Name:      "ca-certs",
-						MountPath: "/etc/ssl/certs",
-						ReadOnly:  true,
-					},
-					{
-						Name:      "kubeconfig",
-						MountPath: "/etc/kubernetes/controller-manager.conf",
-						ReadOnly:  true,
-					},
-					{
-						Name:      "flexvolume-dir",
-						MountPath: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec",
-						ReadOnly:  false,
-					},
-				},
-				kubeadmconstants.KubeScheduler: {
-					{
-						Name:      "kubeconfig",
-						MountPath: "/etc/kubernetes/scheduler.conf",
-						ReadOnly:  true,
-					},
-				},
-			},
+			vol:      volMap,
+			volMount: volMountMap,
 		},
 		{
-			// Should ignore files in /etc/ssl/certs
-			cfg: &kubeadmapi.MasterConfiguration{
+			// Should ignore files in /etc/ssl/certs and in CertificatesDir
+			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd: kubeadmapi.Etcd{
-					Endpoints: []string{"foo"},
-					CAFile:    "/etc/certs/etcd/my-etcd-ca.crt",
-					CertFile:  "/var/lib/certs/etcd/my-etcd.crt",
-					KeyFile:   "/var/lib/certs/etcd/my-etcd.key",
-				},
-			},
-			vol: map[string][]v1.Volume{
-				kubeadmconstants.KubeAPIServer: {
-					{
-						Name: "k8s-certs",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: testCertsDir,
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-					{
-						Name: "ca-certs",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/etc/ssl/certs",
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-					{
-						Name: "etcd-certs-0",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/etc/certs/etcd",
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-					{
-						Name: "etcd-certs-1",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/var/lib/certs/etcd",
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-				},
-				kubeadmconstants.KubeControllerManager: {
-					{
-						Name: "k8s-certs",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: testCertsDir,
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-					{
-						Name: "ca-certs",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/etc/ssl/certs",
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-					{
-						Name: "kubeconfig",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/etc/kubernetes/controller-manager.conf",
-								Type: &hostPathFileOrCreate,
-							},
-						},
-					},
-					{
-						Name: "flexvolume-dir",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec",
-								Type: &hostPathDirectoryOrCreate,
-							},
-						},
-					},
-				},
-				kubeadmconstants.KubeScheduler: {
-					{
-						Name: "kubeconfig",
-						VolumeSource: v1.VolumeSource{
-							HostPath: &v1.HostPathVolumeSource{
-								Path: "/etc/kubernetes/scheduler.conf",
-								Type: &hostPathFileOrCreate,
-							},
-						},
+					External: &kubeadmapi.ExternalEtcd{
+						Endpoints: []string{"foo"},
+						CAFile:    "/etc/certs/etcd/my-etcd-ca.crt",
+						CertFile:  testCertsDir + "/etcd/my-etcd.crt",
+						KeyFile:   "/var/lib/etcd/certs/my-etcd.key",
 					},
 				},
 			},
-			volMount: map[string][]v1.VolumeMount{
-				kubeadmconstants.KubeAPIServer: {
-					{
-						Name:      "k8s-certs",
-						MountPath: testCertsDir,
-						ReadOnly:  true,
-					},
-					{
-						Name:      "ca-certs",
-						MountPath: "/etc/ssl/certs",
-						ReadOnly:  true,
-					},
-					{
-						Name:      "etcd-certs-0",
-						MountPath: "/etc/certs/etcd",
-						ReadOnly:  true,
-					},
-					{
-						Name:      "etcd-certs-1",
-						MountPath: "/var/lib/certs/etcd",
-						ReadOnly:  true,
-					},
-				},
-				kubeadmconstants.KubeControllerManager: {
-					{
-						Name:      "k8s-certs",
-						MountPath: testCertsDir,
-						ReadOnly:  true,
-					},
-					{
-						Name:      "ca-certs",
-						MountPath: "/etc/ssl/certs",
-						ReadOnly:  true,
-					},
-					{
-						Name:      "kubeconfig",
-						MountPath: "/etc/kubernetes/controller-manager.conf",
-						ReadOnly:  true,
-					},
-					{
-						Name:      "flexvolume-dir",
-						MountPath: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec",
-						ReadOnly:  false,
-					},
-				},
-				kubeadmconstants.KubeScheduler: {
-					{
-						Name:      "kubeconfig",
-						MountPath: "/etc/kubernetes/scheduler.conf",
-						ReadOnly:  true,
-					},
-				},
-			},
+			vol:      volMap2,
+			volMount: volMountMap2,
 		},
 	}
 
@@ -537,12 +509,20 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	// set up tmp caCertsPkiVolumePath for testing
-	caCertsPkiVolumePath = fmt.Sprintf("%s/etc/pki", tmpdir)
-	defer func() { caCertsPkiVolumePath = "/etc/pki" }()
+	// set up tmp caCertsExtraVolumePaths for testing
+	caCertsExtraVolumePaths = []string{fmt.Sprintf("%s/etc/pki", tmpdir), fmt.Sprintf("%s/usr/share/ca-certificates", tmpdir)}
+	defer func() { caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates"} }()
 
 	for _, rt := range tests {
 		mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
+
+		// Avoid unit test errors when the flexvolume is mounted
+		if _, ok := mounts.volumes[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {
+			delete(mounts.volumes[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
+		}
+		if _, ok := mounts.volumeMounts[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {
+			delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
+		}
 		if !reflect.DeepEqual(mounts.volumes, rt.vol) {
 			t.Errorf(
 				"failed getHostPathVolumesForTheControlPlane:\n\texpected: %v\n\t  actual: %v",
@@ -556,6 +536,105 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 				rt.volMount,
 				mounts.volumeMounts,
 			)
+		}
+	}
+}
+
+func TestAddExtraHostPathMounts(t *testing.T) {
+	mounts := newControlPlaneHostPathMounts()
+	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+	hostPathFileOrCreate := v1.HostPathFileOrCreate
+	vols := []v1.Volume{
+		{
+			Name: "foo",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/tmp/foo",
+					Type: &hostPathDirectoryOrCreate,
+				},
+			},
+		},
+		{
+			Name: "bar",
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: "/tmp/bar",
+					Type: &hostPathFileOrCreate,
+				},
+			},
+		},
+	}
+	volMounts := []v1.VolumeMount{
+		{
+			Name:      "foo",
+			MountPath: "/tmp/foo",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "bar",
+			MountPath: "/tmp/bar",
+			ReadOnly:  true,
+		},
+	}
+	mounts.AddHostPathMounts("component", vols, volMounts)
+	hostPathMounts := []kubeadmapi.HostPathMount{
+		{
+			Name:      "foo-0",
+			HostPath:  "/tmp/qux-0",
+			MountPath: "/tmp/qux-0",
+			ReadOnly:  true,
+			PathType:  v1.HostPathFile,
+		},
+		{
+			Name:      "bar-0",
+			HostPath:  "/tmp/asd-0",
+			MountPath: "/tmp/asd-0",
+			ReadOnly:  false,
+			PathType:  v1.HostPathDirectory,
+		},
+		{
+			Name:      "foo-1",
+			HostPath:  "/tmp/qux-1",
+			MountPath: "/tmp/qux-1",
+			ReadOnly:  true,
+			PathType:  v1.HostPathFileOrCreate,
+		},
+		{
+			Name:      "bar-1",
+			HostPath:  "/tmp/asd-1",
+			MountPath: "/tmp/asd-1",
+			ReadOnly:  false,
+			PathType:  v1.HostPathDirectoryOrCreate,
+		},
+	}
+	mounts.AddExtraHostPathMounts("component", hostPathMounts)
+	for _, hostMount := range hostPathMounts {
+		volumeName := hostMount.Name
+		if _, ok := mounts.volumes["component"][volumeName]; !ok {
+			t.Errorf("Expected to find volume %q", volumeName)
+		}
+		vol := mounts.volumes["component"][volumeName]
+		if vol.Name != volumeName {
+			t.Errorf("Expected volume name %q", volumeName)
+		}
+		if vol.HostPath.Path != hostMount.HostPath {
+			t.Errorf("Expected host path %q", hostMount.HostPath)
+		}
+		if _, ok := mounts.volumeMounts["component"][volumeName]; !ok {
+			t.Errorf("Expected to find volume mount %q", volumeName)
+		}
+		if *vol.HostPath.Type != v1.HostPathType(hostMount.PathType) {
+			t.Errorf("Expected to host path type %q", hostMount.PathType)
+		}
+		volMount, _ := mounts.volumeMounts["component"][volumeName]
+		if volMount.Name != volumeName {
+			t.Errorf("Expected volume mount name %q", volumeName)
+		}
+		if volMount.MountPath != hostMount.MountPath {
+			t.Errorf("Expected container path %q", hostMount.MountPath)
+		}
+		if volMount.ReadOnly != hostMount.ReadOnly {
+			t.Errorf("Expected volume readOnly setting %t", hostMount.ReadOnly)
 		}
 	}
 }

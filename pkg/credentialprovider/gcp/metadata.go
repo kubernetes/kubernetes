@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
@@ -39,7 +39,6 @@ const (
 	metadataEmail            = metadataUrl + "instance/service-accounts/default/email"
 	storageScopePrefix       = "https://www.googleapis.com/auth/devstorage"
 	cloudPlatformScopePrefix = "https://www.googleapis.com/auth/cloud-platform"
-	googleProductName        = "Google"
 	defaultServiceAccount    = "default/"
 )
 
@@ -118,10 +117,11 @@ func init() {
 func onGCEVM() bool {
 	data, err := ioutil.ReadFile(gceProductNameFile)
 	if err != nil {
-		glog.V(2).Infof("Error while reading product_name: %v", err)
+		klog.V(2).Infof("Error while reading product_name: %v", err)
 		return false
 	}
-	return strings.Contains(string(data), googleProductName)
+	name := strings.TrimSpace(string(data))
+	return name == "Google" || name == "Google Compute Engine"
 }
 
 // Enabled implements DockerConfigProvider for all of the Google implementations.
@@ -139,7 +139,7 @@ func (g *dockerConfigKeyProvider) Provide() credentialprovider.DockerConfig {
 	// Read the contents of the google-dockercfg metadata key and
 	// parse them as an alternate .dockercfg
 	if cfg, err := credentialprovider.ReadDockerConfigFileFromUrl(dockerConfigKey, g.Client, metadataHeader); err != nil {
-		glog.Errorf("while reading 'google-dockercfg' metadata: %v", err)
+		klog.Errorf("while reading 'google-dockercfg' metadata: %v", err)
 	} else {
 		return cfg
 	}
@@ -156,24 +156,24 @@ func (g *dockerConfigUrlKeyProvider) LazyProvide() *credentialprovider.DockerCon
 func (g *dockerConfigUrlKeyProvider) Provide() credentialprovider.DockerConfig {
 	// Read the contents of the google-dockercfg-url key and load a .dockercfg from there
 	if url, err := credentialprovider.ReadUrl(dockerConfigUrlKey, g.Client, metadataHeader); err != nil {
-		glog.Errorf("while reading 'google-dockercfg-url' metadata: %v", err)
+		klog.Errorf("while reading 'google-dockercfg-url' metadata: %v", err)
 	} else {
 		if strings.HasPrefix(string(url), "http") {
 			if cfg, err := credentialprovider.ReadDockerConfigFileFromUrl(string(url), g.Client, nil); err != nil {
-				glog.Errorf("while reading 'google-dockercfg-url'-specified url: %s, %v", string(url), err)
+				klog.Errorf("while reading 'google-dockercfg-url'-specified url: %s, %v", string(url), err)
 			} else {
 				return cfg
 			}
 		} else {
 			// TODO(mattmoor): support reading alternate scheme URLs (e.g. gs:// or s3://)
-			glog.Errorf("Unsupported URL scheme: %s", string(url))
+			klog.Errorf("Unsupported URL scheme: %s", string(url))
 		}
 	}
 
 	return credentialprovider.DockerConfig{}
 }
 
-// runcWithBackoff runs input function `f` with an exponential backoff.
+// runWithBackoff runs input function `f` with an exponential backoff.
 // Note that this method can block indefinitely.
 func runWithBackoff(f func() ([]byte, error)) []byte {
 	var backoff = 100 * time.Millisecond
@@ -209,7 +209,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 	value := runWithBackoff(func() ([]byte, error) {
 		value, err := credentialprovider.ReadUrl(serviceAccounts, g.Client, metadataHeader)
 		if err != nil {
-			glog.V(2).Infof("Failed to Get service accounts from gce metadata server: %v", err)
+			klog.V(2).Infof("Failed to Get service accounts from gce metadata server: %v", err)
 		}
 		return value, err
 	})
@@ -225,20 +225,20 @@ func (g *containerRegistryProvider) Enabled() bool {
 		}
 	}
 	if !defaultServiceAccountExists {
-		glog.V(2).Infof("'default' service account does not exist. Found following service accounts: %q", string(value))
+		klog.V(2).Infof("'default' service account does not exist. Found following service accounts: %q", string(value))
 		return false
 	}
 	url := metadataScopes + "?alt=json"
 	value = runWithBackoff(func() ([]byte, error) {
 		value, err := credentialprovider.ReadUrl(url, g.Client, metadataHeader)
 		if err != nil {
-			glog.V(2).Infof("Failed to Get scopes in default service account from gce metadata server: %v", err)
+			klog.V(2).Infof("Failed to Get scopes in default service account from gce metadata server: %v", err)
 		}
 		return value, err
 	})
 	var scopes []string
 	if err := json.Unmarshal(value, &scopes); err != nil {
-		glog.Errorf("Failed to unmarshal scopes: %v", err)
+		klog.Errorf("Failed to unmarshal scopes: %v", err)
 		return false
 	}
 	for _, v := range scopes {
@@ -247,7 +247,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 			return true
 		}
 	}
-	glog.Warningf("Google container registry is disabled, no storage scope is available: %s", value)
+	klog.Warningf("Google container registry is disabled, no storage scope is available: %s", value)
 	return false
 }
 
@@ -268,19 +268,19 @@ func (g *containerRegistryProvider) Provide() credentialprovider.DockerConfig {
 
 	tokenJsonBlob, err := credentialprovider.ReadUrl(metadataToken, g.Client, metadataHeader)
 	if err != nil {
-		glog.Errorf("while reading access token endpoint: %v", err)
+		klog.Errorf("while reading access token endpoint: %v", err)
 		return cfg
 	}
 
 	email, err := credentialprovider.ReadUrl(metadataEmail, g.Client, metadataHeader)
 	if err != nil {
-		glog.Errorf("while reading email endpoint: %v", err)
+		klog.Errorf("while reading email endpoint: %v", err)
 		return cfg
 	}
 
 	var parsedBlob tokenBlob
 	if err := json.Unmarshal([]byte(tokenJsonBlob), &parsedBlob); err != nil {
-		glog.Errorf("while parsing json blob %s: %v", tokenJsonBlob, err)
+		klog.Errorf("while parsing json blob %s: %v", tokenJsonBlob, err)
 		return cfg
 	}
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -18,10 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
-: ${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
+: "${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}"
+: "${KUBE_CONFIG_FILE:="config-test.sh"}"
 
 export KUBECTL KUBE_CONFIG_FILE
 
@@ -29,16 +29,4 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-if [[ "${FEDERATION:-}" == "true" ]]; then
-  cur_ip_octet2=180
-  for zone in ${E2E_ZONES};do
-    (
-      export CLUSTER_IP_RANGE="10.${cur_ip_octet2}.0.0/16"
-      set-federation-zone-vars "$zone"
-      test-setup
-    )
-    cur_ip_octet2="$((cur_ip_octet2 + 1))"
-  done
-else
-  test-setup
-fi
+test-setup

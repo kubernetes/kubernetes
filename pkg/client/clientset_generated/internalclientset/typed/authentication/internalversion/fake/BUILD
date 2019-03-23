@@ -18,8 +18,8 @@ go_library(
     deps = [
         "//pkg/apis/authentication:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/testing:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

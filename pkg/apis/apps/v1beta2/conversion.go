@@ -24,12 +24,13 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -42,38 +43,38 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec,
 		Convert_v1beta2_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy,
 		Convert_apps_StatefulSetUpdateStrategy_To_v1beta2_StatefulSetUpdateStrategy,
-		Convert_extensions_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet,
-		Convert_v1beta2_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
+		Convert_apps_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet,
+		Convert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet,
 		Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus,
 		Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus,
-		Convert_v1beta2_Deployment_To_extensions_Deployment,
-		Convert_extensions_Deployment_To_v1beta2_Deployment,
-		Convert_extensions_DaemonSet_To_v1beta2_DaemonSet,
-		Convert_v1beta2_DaemonSet_To_extensions_DaemonSet,
-		Convert_extensions_DaemonSetSpec_To_v1beta2_DaemonSetSpec,
-		Convert_v1beta2_DaemonSetSpec_To_extensions_DaemonSetSpec,
-		Convert_extensions_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy,
-		Convert_v1beta2_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
+		Convert_v1beta2_Deployment_To_apps_Deployment,
+		Convert_apps_Deployment_To_v1beta2_Deployment,
+		Convert_apps_DaemonSet_To_v1beta2_DaemonSet,
+		Convert_v1beta2_DaemonSet_To_apps_DaemonSet,
+		Convert_apps_DaemonSetSpec_To_v1beta2_DaemonSetSpec,
+		Convert_v1beta2_DaemonSetSpec_To_apps_DaemonSetSpec,
+		Convert_apps_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy,
+		Convert_v1beta2_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy,
 		// extensions
 		// TODO: below conversions should be dropped in favor of auto-generated
 		// ones, see https://github.com/kubernetes/kubernetes/issues/39865
-		Convert_v1beta2_ScaleStatus_To_extensions_ScaleStatus,
-		Convert_extensions_ScaleStatus_To_v1beta2_ScaleStatus,
-		Convert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec,
-		Convert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec,
-		Convert_v1beta2_DeploymentStrategy_To_extensions_DeploymentStrategy,
-		Convert_extensions_DeploymentStrategy_To_v1beta2_DeploymentStrategy,
-		Convert_v1beta2_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
-		Convert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment,
-		Convert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec,
-		Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
+		Convert_v1beta2_ScaleStatus_To_autoscaling_ScaleStatus,
+		Convert_autoscaling_ScaleStatus_To_v1beta2_ScaleStatus,
+		Convert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec,
+		Convert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec,
+		Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy,
+		Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy,
+		Convert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment,
+		Convert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment,
+		Convert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec,
+		Convert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec,
 	)
 	if err != nil {
 		return err
 	}
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	err = scheme.AddFieldLabelConversionFunc("apps/v1beta2", "StatefulSet",
+	err = scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("StatefulSet"),
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":
@@ -89,7 +90,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func Convert_extensions_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *appsv1beta2.RollingUpdateDaemonSet, s conversion.Scope) error {
+func Convert_apps_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *appsv1beta2.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if out.MaxUnavailable == nil {
 		out.MaxUnavailable = &intstr.IntOrString{}
 	}
@@ -99,7 +100,7 @@ func Convert_extensions_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet
 	return nil
 }
 
-func Convert_v1beta2_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *appsv1beta2.RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
+func Convert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *appsv1beta2.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if err := s.Convert(in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
 		return err
 	}
@@ -119,7 +120,7 @@ func Convert_v1beta2_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta2.Sta
 	} else {
 		out.Selector = nil
 	}
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if in.VolumeClaimTemplates != nil {
@@ -159,7 +160,7 @@ func Convert_apps_StatefulSetSpec_To_v1beta2_StatefulSetSpec(in *apps.StatefulSe
 	} else {
 		out.Selector = nil
 	}
-	if err := k8s_api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := k8s_api_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if in.VolumeClaimTemplates != nil {
@@ -223,6 +224,12 @@ func Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1beta2
 		out.CollisionCount = new(int32)
 		*out.CollisionCount = *in.CollisionCount
 	}
+	out.Conditions = make([]apps.StatefulSetCondition, len(in.Conditions))
+	for i := range in.Conditions {
+		if err := Convert_v1beta2_StatefulSetCondition_To_apps_StatefulSetCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -240,29 +247,32 @@ func Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.Statef
 		out.CollisionCount = new(int32)
 		*out.CollisionCount = *in.CollisionCount
 	}
-	return nil
-}
-
-func Convert_extensions_ScaleStatus_To_v1beta2_ScaleStatus(in *extensions.ScaleStatus, out *appsv1beta2.ScaleStatus, s conversion.Scope) error {
-	out.Replicas = int32(in.Replicas)
-
-	out.Selector = nil
-	out.TargetSelector = ""
-	if in.Selector != nil {
-		if in.Selector.MatchExpressions == nil || len(in.Selector.MatchExpressions) == 0 {
-			out.Selector = in.Selector.MatchLabels
+	out.Conditions = make([]appsv1beta2.StatefulSetCondition, len(in.Conditions))
+	for i := range in.Conditions {
+		if err := Convert_apps_StatefulSetCondition_To_v1beta2_StatefulSetCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+			return err
 		}
-
-		selector, err := metav1.LabelSelectorAsSelector(in.Selector)
-		if err != nil {
-			return fmt.Errorf("invalid label selector: %v", err)
-		}
-		out.TargetSelector = selector.String()
 	}
 	return nil
 }
 
-func Convert_v1beta2_ScaleStatus_To_extensions_ScaleStatus(in *appsv1beta2.ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
+func Convert_autoscaling_ScaleStatus_To_v1beta2_ScaleStatus(in *autoscaling.ScaleStatus, out *appsv1beta2.ScaleStatus, s conversion.Scope) error {
+	out.Replicas = int32(in.Replicas)
+	out.TargetSelector = in.Selector
+
+	out.Selector = nil
+	selector, err := metav1.ParseToLabelSelector(in.Selector)
+	if err != nil {
+		return fmt.Errorf("failed to parse selector: %v", err)
+	}
+	if len(selector.MatchExpressions) == 0 {
+		out.Selector = selector.MatchLabels
+	}
+
+	return nil
+}
+
+func Convert_v1beta2_ScaleStatus_To_autoscaling_ScaleStatus(in *appsv1beta2.ScaleStatus, out *autoscaling.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 
 	// Normally when 2 fields map to the same internal value we favor the old field, since
@@ -270,34 +280,28 @@ func Convert_v1beta2_ScaleStatus_To_extensions_ScaleStatus(in *appsv1beta2.Scale
 	// new field can be expected to know about the old field (though that's not quite true, due
 	// to kubectl apply). However, these fields are readonly, so any non-nil value should work.
 	if in.TargetSelector != "" {
-		labelSelector, err := metav1.ParseToLabelSelector(in.TargetSelector)
-		if err != nil {
-			out.Selector = nil
-			return fmt.Errorf("failed to parse target selector: %v", err)
-		}
-		out.Selector = labelSelector
+		out.Selector = in.TargetSelector
 	} else if in.Selector != nil {
-		out.Selector = new(metav1.LabelSelector)
-		selector := make(map[string]string)
+		set := labels.Set{}
 		for key, val := range in.Selector {
-			selector[key] = val
+			set[key] = val
 		}
-		out.Selector.MatchLabels = selector
+		out.Selector = labels.SelectorFromSet(set).String()
 	} else {
-		out.Selector = nil
+		out.Selector = ""
 	}
 	return nil
 }
 
-func Convert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec(in *appsv1beta2.DeploymentSpec, out *extensions.DeploymentSpec, s conversion.Scope) error {
+func Convert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec(in *appsv1beta2.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta2_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
+	if err := Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
 	out.RevisionHistoryLimit = in.RevisionHistoryLimit
@@ -310,13 +314,13 @@ func Convert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec(in *appsv1beta2
 	return nil
 }
 
-func Convert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec(in *extensions.DeploymentSpec, out *appsv1beta2.DeploymentSpec, s conversion.Scope) error {
+func Convert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(in *apps.DeploymentSpec, out *appsv1beta2.DeploymentSpec, s conversion.Scope) error {
 	out.Replicas = &in.Replicas
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := k8s_api_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_DeploymentStrategy_To_v1beta2_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
+	if err := Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
 	if in.RevisionHistoryLimit != nil {
@@ -332,11 +336,11 @@ func Convert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec(in *extensions.
 	return nil
 }
 
-func Convert_extensions_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in *extensions.DeploymentStrategy, out *appsv1beta2.DeploymentStrategy, s conversion.Scope) error {
+func Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in *apps.DeploymentStrategy, out *appsv1beta2.DeploymentStrategy, s conversion.Scope) error {
 	out.Type = appsv1beta2.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(appsv1beta2.RollingUpdateDeployment)
-		if err := Convert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+		if err := Convert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
 			return err
 		}
 	} else {
@@ -345,11 +349,11 @@ func Convert_extensions_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in *ext
 	return nil
 }
 
-func Convert_v1beta2_DeploymentStrategy_To_extensions_DeploymentStrategy(in *appsv1beta2.DeploymentStrategy, out *extensions.DeploymentStrategy, s conversion.Scope) error {
-	out.Type = extensions.DeploymentStrategyType(in.Type)
+func Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(in *appsv1beta2.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
+	out.Type = apps.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
-		out.RollingUpdate = new(extensions.RollingUpdateDeployment)
-		if err := Convert_v1beta2_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+		out.RollingUpdate = new(apps.RollingUpdateDeployment)
+		if err := Convert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
 			return err
 		}
 	} else {
@@ -358,7 +362,7 @@ func Convert_v1beta2_DeploymentStrategy_To_extensions_DeploymentStrategy(in *app
 	return nil
 }
 
-func Convert_v1beta2_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *appsv1beta2.RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {
+func Convert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *appsv1beta2.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
 	if err := s.Convert(in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
 		return err
 	}
@@ -368,7 +372,7 @@ func Convert_v1beta2_RollingUpdateDeployment_To_extensions_RollingUpdateDeployme
 	return nil
 }
 
-func Convert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *appsv1beta2.RollingUpdateDeployment, s conversion.Scope) error {
+func Convert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *appsv1beta2.RollingUpdateDeployment, s conversion.Scope) error {
 	if out.MaxUnavailable == nil {
 		out.MaxUnavailable = &intstr.IntOrString{}
 	}
@@ -384,20 +388,20 @@ func Convert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployme
 	return nil
 }
 
-func Convert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *extensions.ReplicaSetSpec, out *appsv1beta2.ReplicaSetSpec, s conversion.Scope) error {
+func Convert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *appsv1beta2.ReplicaSetSpec, s conversion.Scope) error {
 	out.Replicas = new(int32)
 	*out.Replicas = int32(in.Replicas)
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := k8s_api_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Convert_v1beta2_Deployment_To_extensions_Deployment(in *appsv1beta2.Deployment, out *extensions.Deployment, s conversion.Scope) error {
+func Convert_v1beta2_Deployment_To_apps_Deployment(in *appsv1beta2.Deployment, out *apps.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 
@@ -407,35 +411,38 @@ func Convert_v1beta2_Deployment_To_extensions_Deployment(in *appsv1beta2.Deploym
 		if revision64, err := strconv.ParseInt(revision, 10, 64); err != nil {
 			return fmt.Errorf("failed to parse annotation[%s]=%s as int64: %v", appsv1beta2.DeprecatedRollbackTo, revision, err)
 		} else {
-			out.Spec.RollbackTo = new(extensions.RollbackConfig)
+			out.Spec.RollbackTo = new(apps.RollbackConfig)
 			out.Spec.RollbackTo.Revision = revision64
 		}
+		out.Annotations = deepCopyStringMap(out.Annotations)
 		delete(out.Annotations, appsv1beta2.DeprecatedRollbackTo)
 	} else {
 		out.Spec.RollbackTo = nil
 	}
 
-	if err := Convert_v1beta2_DeploymentStatus_To_extensions_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_v1beta2_DeploymentStatus_To_apps_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *appsv1beta2.ReplicaSetSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
+func Convert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *appsv1beta2.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Convert_extensions_Deployment_To_v1beta2_Deployment(in *extensions.Deployment, out *appsv1beta2.Deployment, s conversion.Scope) error {
+func Convert_apps_Deployment_To_v1beta2_Deployment(in *apps.Deployment, out *appsv1beta2.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
+	out.Annotations = deepCopyStringMap(out.Annotations) // deep copy because we modify annotations below
+
+	if err := Convert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 
@@ -450,19 +457,17 @@ func Convert_extensions_Deployment_To_v1beta2_Deployment(in *extensions.Deployme
 		delete(out.Annotations, appsv1beta2.DeprecatedRollbackTo)
 	}
 
-	if err := Convert_extensions_DeploymentStatus_To_v1beta2_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_apps_DeploymentStatus_To_v1beta2_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Convert_extensions_DaemonSet_To_v1beta2_DaemonSet(in *extensions.DaemonSet, out *appsv1beta2.DaemonSet, s conversion.Scope) error {
+func Convert_apps_DaemonSet_To_v1beta2_DaemonSet(in *apps.DaemonSet, out *appsv1beta2.DaemonSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if out.Annotations == nil {
-		out.Annotations = make(map[string]string)
-	}
+	out.Annotations = deepCopyStringMap(out.Annotations)
 	out.Annotations[appsv1beta2.DeprecatedTemplateGeneration] = strconv.FormatInt(in.Spec.TemplateGeneration, 10)
-	if err := Convert_extensions_DaemonSetSpec_To_v1beta2_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_apps_DaemonSetSpec_To_v1beta2_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
@@ -471,12 +476,12 @@ func Convert_extensions_DaemonSet_To_v1beta2_DaemonSet(in *extensions.DaemonSet,
 	return nil
 }
 
-func Convert_extensions_DaemonSetSpec_To_v1beta2_DaemonSetSpec(in *extensions.DaemonSetSpec, out *appsv1beta2.DaemonSetSpec, s conversion.Scope) error {
+func Convert_apps_DaemonSetSpec_To_v1beta2_DaemonSetSpec(in *apps.DaemonSetSpec, out *appsv1beta2.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := k8s_api_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+	if err := Convert_apps_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = int32(in.MinReadySeconds)
@@ -489,20 +494,20 @@ func Convert_extensions_DaemonSetSpec_To_v1beta2_DaemonSetSpec(in *extensions.Da
 	return nil
 }
 
-func Convert_extensions_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(in *extensions.DaemonSetUpdateStrategy, out *appsv1beta2.DaemonSetUpdateStrategy, s conversion.Scope) error {
+func Convert_apps_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy(in *apps.DaemonSetUpdateStrategy, out *appsv1beta2.DaemonSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = appsv1beta2.DaemonSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = &appsv1beta2.RollingUpdateDaemonSet{}
-		if err := Convert_extensions_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+		if err := Convert_apps_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func Convert_v1beta2_DaemonSet_To_extensions_DaemonSet(in *appsv1beta2.DaemonSet, out *extensions.DaemonSet, s conversion.Scope) error {
+func Convert_v1beta2_DaemonSet_To_apps_DaemonSet(in *appsv1beta2.DaemonSet, out *apps.DaemonSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1beta2_DaemonSetSpec_To_extensions_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1beta2_DaemonSetSpec_To_apps_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	if value, ok := in.Annotations[appsv1beta2.DeprecatedTemplateGeneration]; ok {
@@ -510,6 +515,7 @@ func Convert_v1beta2_DaemonSet_To_extensions_DaemonSet(in *appsv1beta2.DaemonSet
 			return err
 		} else {
 			out.Spec.TemplateGeneration = value64
+			out.Annotations = deepCopyStringMap(out.Annotations)
 			delete(out.Annotations, appsv1beta2.DeprecatedTemplateGeneration)
 		}
 	}
@@ -519,12 +525,12 @@ func Convert_v1beta2_DaemonSet_To_extensions_DaemonSet(in *appsv1beta2.DaemonSet
 	return nil
 }
 
-func Convert_v1beta2_DaemonSetSpec_To_extensions_DaemonSetSpec(in *appsv1beta2.DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
+func Convert_v1beta2_DaemonSetSpec_To_apps_DaemonSetSpec(in *appsv1beta2.DaemonSetSpec, out *apps.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta2_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
+	if err := Convert_v1beta2_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
 	}
 	if in.RevisionHistoryLimit != nil {
@@ -537,13 +543,21 @@ func Convert_v1beta2_DaemonSetSpec_To_extensions_DaemonSetSpec(in *appsv1beta2.D
 	return nil
 }
 
-func Convert_v1beta2_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(in *appsv1beta2.DaemonSetUpdateStrategy, out *extensions.DaemonSetUpdateStrategy, s conversion.Scope) error {
-	out.Type = extensions.DaemonSetUpdateStrategyType(in.Type)
+func Convert_v1beta2_DaemonSetUpdateStrategy_To_apps_DaemonSetUpdateStrategy(in *appsv1beta2.DaemonSetUpdateStrategy, out *apps.DaemonSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = apps.DaemonSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
-		out.RollingUpdate = &extensions.RollingUpdateDaemonSet{}
-		if err := Convert_v1beta2_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
+		out.RollingUpdate = &apps.RollingUpdateDaemonSet{}
+		if err := Convert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func deepCopyStringMap(m map[string]string) map[string]string {
+	ret := make(map[string]string, len(m))
+	for k, v := range m {
+		ret[k] = v
+	}
+	return ret
 }

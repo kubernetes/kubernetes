@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -57,17 +57,17 @@ cat /etc/*-release | grep "ID=ubuntu"
 if [ $? -eq 0 ]; then
   if ! which nsenter > /dev/null; then
      echo "Do not find nsenter. Install it."
-     mkdir -p /tmp/nsenter-install
-     cd /tmp/nsenter-install
-     curl https://www.kernel.org/pub/linux/utils/util-linux/v2.24/util-linux-2.24.tar.gz | tar -zxf-
+     NSENTER_BUILD_DIR=$(mktemp -d /tmp/nsenter-build-XXXXXX)
+     cd $NSENTER_BUILD_DIR
+     curl https://www.kernel.org/pub/linux/utils/util-linux/v2.31/util-linux-2.31.tar.gz | tar -zxf-
      sudo apt-get update
      sudo apt-get --yes install make
      sudo apt-get --yes install gcc
-     cd util-linux-2.24
+     cd util-linux-2.31
      ./configure --without-ncurses
      make nsenter
      sudo cp nsenter /usr/local/bin
-     rm -rf /tmp/nsenter-install
+     rm -rf $NSENTER_BUILD_DIR
    fi
 fi
 
@@ -100,7 +100,7 @@ if [ $? -ne 0 ]; then
     sudo apt-get install lxc -y
     lxc-checkconfig
     sudo sed -i 's/GRUB_CMDLINE_LINUX="\(.*\)"/GRUB_CMDLINE_LINUX="\1 cgroup_enable=memory"/' /etc/default/grub
-    sudo update-grub  
+    sudo update-grub
   fi
 fi
 

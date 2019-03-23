@@ -12,18 +12,14 @@ go_library(
         "doc.go",
         "oom.go",
         "oom_fake.go",
+        "oom_linux.go",
         "oom_unsupported.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "oom_linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/oom",
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/cm/util:go_default_library",
-            "//vendor/github.com/golang/glog:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -31,16 +27,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "oom_linux_test.go",
-        ],
-        "//conditions:default": [],
-    }),
-    importpath = "k8s.io/kubernetes/pkg/util/oom",
-    library = ":go_default_library",
+    srcs = ["oom_linux_test.go"],
+    embed = [":go_default_library"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
         ],
         "//conditions:default": [],

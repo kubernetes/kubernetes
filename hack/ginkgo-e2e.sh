@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -45,6 +45,17 @@ export KUBECTL KUBE_CONFIG_FILE
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
+function detect-master-from-kubeconfig() {
+    export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
+
+    local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
+    if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
+      cc="${KUBE_CONTEXT}"
+    fi
+    local cluster=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
+    KUBE_MASTER_URL=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
+}
+
 # ---- Do cloud-provider-specific setup
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
     echo "Conformance test: not doing test setup."
@@ -76,7 +87,7 @@ if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   set_num_migs
   NODE_INSTANCE_GROUP=""
   for ((i=1; i<=${NUM_MIGS}; i++)); do
-    if [[ $i == ${NUM_MIGS} ]]; then
+    if [[ ${i} == ${NUM_MIGS} ]]; then
       # We are assigning the same mig names as create-nodes function from cluster/gce/util.sh.
       NODE_INSTANCE_GROUP="${NODE_INSTANCE_GROUP}${NODE_INSTANCE_PREFIX}-group"
     else
@@ -148,7 +159,10 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
   --node-tag="${NODE_TAG:-}" \
   --master-tag="${MASTER_TAG:-}" \
-  --federated-kube-context="${FEDERATION_KUBE_CONTEXT:-e2e-federation}" \
+  --cluster-monitoring-mode="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}" \
+  --prometheus-monitoring="${KUBE_ENABLE_PROMETHEUS_MONITORING:-false}" \
+  --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
+  --ginkgo.slowSpecThreshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300}" \
   ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \

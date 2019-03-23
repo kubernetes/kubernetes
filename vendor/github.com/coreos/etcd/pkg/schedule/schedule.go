@@ -15,9 +15,8 @@
 package schedule
 
 import (
+	"context"
 	"sync"
-
-	"golang.org/x/net/context"
 )
 
 type Job func(context.Context)
@@ -88,8 +87,6 @@ func (f *fifo) Schedule(j Job) {
 		}
 	}
 	f.pendings = append(f.pendings, j)
-
-	return
 }
 
 func (f *fifo) Pending() int {

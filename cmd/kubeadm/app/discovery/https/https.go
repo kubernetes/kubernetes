@@ -20,16 +20,18 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
 )
 
-// RetrieveValidatedClusterInfo connects to the API Server and makes sure it can talk
+// RetrieveValidatedConfigInfo connects to the API Server and makes sure it can talk
 // securely to the API Server using the provided CA cert and
 // optionally refreshes the cluster-info information from the cluster-info ConfigMap
-func RetrieveValidatedClusterInfo(httpsURL string) (*clientcmdapi.Cluster, error) {
-	response, err := http.Get(httpsURL)
+func RetrieveValidatedConfigInfo(httpsURL, clustername string) (*clientcmdapi.Config, error) {
+	client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
+	response, err := client.Get(httpsURL)
 	if err != nil {
 		return nil, err
 	}
@@ -40,9 +42,9 @@ func RetrieveValidatedClusterInfo(httpsURL string) (*clientcmdapi.Cluster, error
 		return nil, err
 	}
 
-	clusterinfo, err := clientcmd.Load(kubeconfig)
+	config, err := clientcmd.Load(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
-	return file.ValidateClusterInfo(clusterinfo)
+	return file.ValidateConfigInfo(config, clustername)
 }

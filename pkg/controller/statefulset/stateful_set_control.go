@@ -20,11 +20,12 @@ import (
 	"math"
 	"sort"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
@@ -53,14 +54,16 @@ type StatefulSetControlInterface interface {
 func NewDefaultStatefulSetControl(
 	podControl StatefulPodControlInterface,
 	statusUpdater StatefulSetStatusUpdaterInterface,
-	controllerHistory history.Interface) StatefulSetControlInterface {
-	return &defaultStatefulSetControl{podControl, statusUpdater, controllerHistory}
+	controllerHistory history.Interface,
+	recorder record.EventRecorder) StatefulSetControlInterface {
+	return &defaultStatefulSetControl{podControl, statusUpdater, controllerHistory, recorder}
 }
 
 type defaultStatefulSetControl struct {
 	podControl        StatefulPodControlInterface
 	statusUpdater     StatefulSetStatusUpdaterInterface
 	controllerHistory history.Interface
+	recorder          record.EventRecorder
 }
 
 // UpdateStatefulSet executes the core logic loop for a stateful set, applying the predictable and
@@ -96,7 +99,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		return err
 	}
 
-	glog.V(4).Infof("StatefulSet %s/%s pod status replicas=%d ready=%d current=%d updated=%d",
+	klog.V(4).Infof("StatefulSet %s/%s pod status replicas=%d ready=%d current=%d updated=%d",
 		set.Namespace,
 		set.Name,
 		status.Replicas,
@@ -104,7 +107,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 		status.CurrentReplicas,
 		status.UpdatedReplicas)
 
-	glog.V(4).Infof("StatefulSet %s/%s revisions current=%s update=%s",
+	klog.V(4).Infof("StatefulSet %s/%s revisions current=%s update=%s",
 		set.Namespace,
 		set.Name,
 		status.CurrentRevision,
@@ -266,8 +269,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// set the generation, and revisions in the returned status
 	status := apps.StatefulSetStatus{}
-	status.ObservedGeneration = new(int64)
-	*status.ObservedGeneration = set.Generation
+	status.ObservedGeneration = set.Generation
 	status.CurrentRevision = currentRevision.Name
 	status.UpdateRevision = updateRevision.Name
 	status.CollisionCount = new(int32)
@@ -295,7 +297,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if isCreated(pods[i]) && !isTerminating(pods[i]) {
 			if getPodRevision(pods[i]) == currentRevision.Name {
 				status.CurrentReplicas++
-			} else if getPodRevision(pods[i]) == updateRevision.Name {
+			}
+			if getPodRevision(pods[i]) == updateRevision.Name {
 				status.UpdatedReplicas++
 			}
 		}
@@ -348,7 +351,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	if unhealthy > 0 {
-		glog.V(4).Infof("StatefulSet %s/%s has %d unhealthy Pods starting with %s",
+		klog.V(4).Infof("StatefulSet %s/%s has %d unhealthy Pods starting with %s",
 			set.Namespace,
 			set.Name,
 			unhealthy,
@@ -367,7 +370,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for i := range replicas {
 		// delete and recreate failed pods
 		if isFailed(replicas[i]) {
-			glog.V(4).Infof("StatefulSet %s/%s is recreating failed Pod %s",
+			ssc.recorder.Eventf(set, v1.EventTypeWarning, "RecreatingFailedPod",
+				"StatefulSet %s/%s is recreating failed Pod %s",
 				set.Namespace,
 				set.Name,
 				replicas[i].Name)
@@ -376,7 +380,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			}
 			if getPodRevision(replicas[i]) == currentRevision.Name {
 				status.CurrentReplicas--
-			} else if getPodRevision(replicas[i]) == updateRevision.Name {
+			}
+			if getPodRevision(replicas[i]) == updateRevision.Name {
 				status.UpdatedReplicas--
 			}
 			status.Replicas--
@@ -395,7 +400,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			status.Replicas++
 			if getPodRevision(replicas[i]) == currentRevision.Name {
 				status.CurrentReplicas++
-			} else if getPodRevision(replicas[i]) == updateRevision.Name {
+			}
+			if getPodRevision(replicas[i]) == updateRevision.Name {
 				status.UpdatedReplicas++
 			}
 
@@ -409,7 +415,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// If we find a Pod that is currently terminating, we must wait until graceful deletion
 		// completes before we continue to make progress.
 		if isTerminating(replicas[i]) && monotonic {
-			glog.V(4).Infof(
+			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to Terminate",
 				set.Namespace,
 				set.Name,
@@ -420,7 +426,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Ready.
 		if !isRunningAndReady(replicas[i]) && monotonic {
-			glog.V(4).Infof(
+			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready",
 				set.Namespace,
 				set.Name,
@@ -446,7 +452,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for target := len(condemned) - 1; target >= 0; target-- {
 		// wait for terminating pods to expire
 		if isTerminating(condemned[target]) {
-			glog.V(4).Infof(
+			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to Terminate prior to scale down",
 				set.Namespace,
 				set.Name,
@@ -459,14 +465,14 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		// if we are in monotonic mode and the condemned target is not the first unhealthy Pod block
 		if !isRunningAndReady(condemned[target]) && monotonic && condemned[target] != firstUnhealthyPod {
-			glog.V(4).Infof(
+			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready prior to scale down",
 				set.Namespace,
 				set.Name,
 				firstUnhealthyPod.Name)
 			return &status, nil
 		}
-		glog.V(4).Infof("StatefulSet %s/%s terminating Pod %s for scale dowm",
+		klog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for scale down",
 			set.Namespace,
 			set.Name,
 			condemned[target].Name)
@@ -476,7 +482,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		if getPodRevision(condemned[target]) == currentRevision.Name {
 			status.CurrentReplicas--
-		} else if getPodRevision(condemned[target]) == updateRevision.Name {
+		}
+		if getPodRevision(condemned[target]) == updateRevision.Name {
 			status.UpdatedReplicas--
 		}
 		if monotonic {
@@ -499,7 +506,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
-			glog.V(4).Infof("StatefulSet %s/%s terminating Pod %s for update",
+			klog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for update",
 				set.Namespace,
 				set.Name,
 				replicas[target].Name)
@@ -510,7 +517,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		// wait for unhealthy Pods on update
 		if !isHealthy(replicas[target]) {
-			glog.V(4).Infof(
+			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to update",
 				set.Namespace,
 				set.Name,

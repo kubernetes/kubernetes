@@ -25,13 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
 func NewSourceApiserver(c clientset.Interface, nodeName types.NodeName, updates chan<- interface{}) {
-	lw := cache.NewListWatchFromClient(c.Core().RESTClient(), "pods", metav1.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, string(nodeName)))
+	lw := cache.NewListWatchFromClient(c.CoreV1().RESTClient(), "pods", metav1.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, string(nodeName)))
 	newSourceApiserverFromLW(lw, updates)
 }
 

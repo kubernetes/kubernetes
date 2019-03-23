@@ -35,6 +35,7 @@ type genClientForType struct {
 	clientsetPackage string
 	group            string
 	version          string
+	groupGoName      string
 	typeToMatch      *types.Type
 	imports          namer.ImportTracker
 }
@@ -66,14 +67,14 @@ func genStatus(t *types.Type) bool {
 			break
 		}
 	}
-	return hasStatus && !util.MustParseClientGenTags(t.SecondClosestCommentLines).NoStatus
+	return hasStatus && !util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).NoStatus
 }
 
 // GenerateType makes the body of a file implementing the individual typed client for type t.
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
-	tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 	if err != nil {
 		return err
 	}
@@ -132,7 +133,8 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"Group":                namer.IC(g.group),
 		"subresource":          false,
 		"subresourcePath":      "",
-		"GroupVersion":         namer.IC(g.group) + namer.IC(g.version),
+		"GroupGoName":          g.groupGoName,
+		"Version":              namer.IC(g.version),
 		"DeleteOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
 		"ListOptions":          c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
 		"GetOptions":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
@@ -366,7 +368,7 @@ type $.type|privatePlural$ struct {
 
 var newStructNamespaced = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
-func new$.type|publicPlural$(c *$.GroupVersion$Client, namespace string) *$.type|privatePlural$ {
+func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
 		client: c.RESTClient(),
 		ns:     namespace,
@@ -376,7 +378,7 @@ func new$.type|publicPlural$(c *$.GroupVersion$Client, namespace string) *$.type
 
 var newStructNonNamespaced = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
-func new$.type|publicPlural$(c *$.GroupVersion$Client) *$.type|privatePlural$ {
+func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
 		client: c.RESTClient(),
 	}
@@ -385,11 +387,16 @@ func new$.type|publicPlural$(c *$.GroupVersion$Client) *$.type|privatePlural$ {
 var listTemplate = `
 // List takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) List(opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil{
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &$.resultType|raw$List{}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -399,6 +406,10 @@ func (c *$.type|privatePlural$) List(opts $.ListOptions|raw$) (result *$.resultT
 var listSubresourceTemplate = `
 // List takes $.type|raw$ name, label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
 func (c *$.type|privatePlural$) List($.type|private$Name string, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil{
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &$.resultType|raw$List{}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
@@ -406,6 +417,7 @@ func (c *$.type|privatePlural$) List($.type|private$Name string, opts $.ListOpti
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -459,10 +471,15 @@ func (c *$.type|privatePlural$) Delete(name string, options *$.DeleteOptions|raw
 var deleteCollectionTemplate = `
 // DeleteCollection deletes a collection of objects.
 func (c *$.type|privatePlural$) DeleteCollection(options *$.DeleteOptions|raw$, listOptions $.ListOptions|raw$) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil{
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		VersionedParams(&listOptions, $.schemeParameterCodec|raw$).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()
@@ -551,11 +568,16 @@ func (c *$.type|privatePlural$) UpdateStatus($.type|private$ *$.type|raw$) (resu
 var watchTemplate = `
 // Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
 func (c *$.type|privatePlural$) Watch(opts $.ListOptions|raw$) ($.watchInterface|raw$, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil{
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
+		Timeout(timeout).
 		Watch()
 }
 `

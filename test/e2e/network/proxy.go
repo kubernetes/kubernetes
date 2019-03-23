@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -53,7 +52,7 @@ const (
 )
 
 var _ = SIGDescribe("Proxy", func() {
-	version := testapi.Groups[v1.GroupName].GroupVersion().Version
+	version := "v1"
 	Context("version "+version, func() {
 		options := framework.FrameworkOptions{
 			ClientQPS: -1.0,
@@ -61,21 +60,31 @@ var _ = SIGDescribe("Proxy", func() {
 		f := framework.NewFramework("proxy", options, nil)
 		prefix := "/api/" + version
 
-		// Port here has to be kept in sync with default kubelet port.
-		It("should proxy logs on node with explicit kubelet port [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
-		It("should proxy logs on node [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
-		It("should proxy to cadvisor", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
+		/*
+			Release : v1.9
+			Testname: Proxy, logs port endpoint
+			Description: Select any node in the cluster to invoke /proxy/nodes/<nodeip>:10250/logs endpoint. This endpoint MUST be reachable.
+		*/
+		framework.ConformanceIt("should proxy logs on node with explicit kubelet port using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
 
-		It("should proxy logs on node with explicit kubelet port using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
-		It("should proxy logs on node using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
-		It("should proxy to cadvisor using proxy subresource", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
+		/*
+			Release : v1.9
+			Testname: Proxy, logs endpoint
+			Description:  Select any node in the cluster to invoke /proxy/nodes/<nodeip>//logs endpoint. This endpoint MUST be reachable.
+		*/
+		framework.ConformanceIt("should proxy logs on node using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
 
 		// using the porter image to serve content, access the content
 		// (of multiple pods?) from multiple (endpoints/services?)
-		It("should proxy through a service and a pod [Conformance]", func() {
+		/*
+			Release : v1.9
+			Testname: Proxy, logs service endpoint
+			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
+		*/
+		framework.ConformanceIt("should proxy through a service and a pod ", func() {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
-			service, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(&v1.Service{
+			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "proxy-service-",
 				},
@@ -151,20 +160,14 @@ var _ = SIGDescribe("Proxy", func() {
 				CreatedPods: &pods,
 			}
 			Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
-			defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, cfg.Name)
+			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
 
 			Expect(framework.WaitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)).NotTo(HaveOccurred())
 
 			// table constructors
 			// Try proxying through the service and directly to through the pod.
-			svcProxyURL := func(scheme, port string) string {
-				return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port)
-			}
 			subresourceServiceProxyURL := func(scheme, port string) string {
 				return prefix + "/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port) + "/proxy"
-			}
-			podProxyURL := func(scheme, port string) string {
-				return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port)
 			}
 			subresourcePodProxyURL := func(scheme, port string) string {
 				return prefix + "/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port) + "/proxy"
@@ -172,35 +175,12 @@ var _ = SIGDescribe("Proxy", func() {
 
 			// construct the table
 			expectations := map[string]string{
-				svcProxyURL("", "portname1") + "/": "foo",
-				svcProxyURL("", "80") + "/":        "foo",
-				svcProxyURL("", "portname2") + "/": "bar",
-				svcProxyURL("", "81") + "/":        "bar",
-
-				svcProxyURL("http", "portname1") + "/": "foo",
-				svcProxyURL("http", "80") + "/":        "foo",
-				svcProxyURL("http", "portname2") + "/": "bar",
-				svcProxyURL("http", "81") + "/":        "bar",
-
-				svcProxyURL("https", "tlsportname1") + "/": "tls baz",
-				svcProxyURL("https", "443") + "/":          "tls baz",
-				svcProxyURL("https", "tlsportname2") + "/": "tls qux",
-				svcProxyURL("https", "444") + "/":          "tls qux",
-
 				subresourceServiceProxyURL("", "portname1") + "/":         "foo",
 				subresourceServiceProxyURL("http", "portname1") + "/":     "foo",
 				subresourceServiceProxyURL("", "portname2") + "/":         "bar",
 				subresourceServiceProxyURL("http", "portname2") + "/":     "bar",
 				subresourceServiceProxyURL("https", "tlsportname1") + "/": "tls baz",
 				subresourceServiceProxyURL("https", "tlsportname2") + "/": "tls qux",
-
-				podProxyURL("", "1080") + "/": `<a href="` + podProxyURL("", "1080") + `/rewriteme">test</a>`,
-				podProxyURL("", "160") + "/":  "foo",
-				podProxyURL("", "162") + "/":  "bar",
-
-				podProxyURL("http", "1080") + "/": `<a href="` + podProxyURL("http", "1080") + `/rewriteme">test</a>`,
-				podProxyURL("http", "160") + "/":  "foo",
-				podProxyURL("http", "162") + "/":  "bar",
 
 				subresourcePodProxyURL("", "") + "/":         `<a href="` + subresourcePodProxyURL("", "") + `/rewriteme">test</a>`,
 				subresourcePodProxyURL("", "1080") + "/":     `<a href="` + subresourcePodProxyURL("", "1080") + `/rewriteme">test</a>`,
@@ -265,7 +245,7 @@ var _ = SIGDescribe("Proxy", func() {
 			}
 
 			if len(errs) != 0 {
-				body, err := f.ClientSet.Core().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
+				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
 				if err != nil {
 					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {
@@ -286,7 +266,7 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	//   chance of the things we are talking to being confused for an error
 	//   that apiserver would have emitted.
 	start := time.Now()
-	body, err = f.ClientSet.Core().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
+	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
 		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)

@@ -17,23 +17,34 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/authorization/path"
+	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/server"
-	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 // DelegatingAuthorizationOptions provides an easy way for composing API servers to delegate their authorization to
-// the root kube API server
+// the root kube API server.
+// WARNING: never assume that every authenticated incoming request already does authorization.
+//          The aggregator in the kube API server does this today, but this behaviour is not
+//          guaranteed in the future.
 type DelegatingAuthorizationOptions struct {
 	// RemoteKubeConfigFile is the file to use to connect to a "normal" kube API server which hosts the
 	// SubjectAccessReview.authorization.k8s.io endpoint for checking tokens.
 	RemoteKubeConfigFile string
+	// RemoteKubeConfigFileOptional is specifying whether not specifying the kubeconfig or
+	// a missing in-cluster config will be fatal.
+	RemoteKubeConfigFileOptional bool
 
 	// AllowCacheTTL is the length of time that a successful authorization response will be cached
 	AllowCacheTTL time.Duration
@@ -41,6 +52,13 @@ type DelegatingAuthorizationOptions struct {
 	// DenyCacheTTL is the length of time that an unsuccessful authorization response will be cached.
 	// You generally want more responsive, "deny, try again" flows.
 	DenyCacheTTL time.Duration
+
+	// AlwaysAllowPaths are HTTP paths which are excluded from authorization. They can be plain
+	// paths or end in * in which case prefix-match is applied. A leading / is optional.
+	AlwaysAllowPaths []string
+
+	// AlwaysAllowGroups are groups which are allowed to take any actions.  In kube, this is system:masters.
+	AlwaysAllowGroups []string
 }
 
 func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
@@ -49,6 +67,18 @@ func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
 		AllowCacheTTL: 10 * time.Second,
 		DenyCacheTTL:  10 * time.Second,
 	}
+}
+
+// WithAlwaysAllowGroups appends the list of paths to AlwaysAllowGroups
+func (s *DelegatingAuthorizationOptions) WithAlwaysAllowGroups(groups ...string) *DelegatingAuthorizationOptions {
+	s.AlwaysAllowGroups = append(s.AlwaysAllowGroups, groups...)
+	return s
+}
+
+// WithAlwaysAllowPaths appends the list of paths to AlwaysAllowPaths
+func (s *DelegatingAuthorizationOptions) WithAlwaysAllowPaths(paths ...string) *DelegatingAuthorizationOptions {
+	s.AlwaysAllowPaths = append(s.AlwaysAllowPaths, paths...)
+	return s
 }
 
 func (s *DelegatingAuthorizationOptions) Validate() []error {
@@ -61,9 +91,13 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.StringVar(&s.RemoteKubeConfigFile, "authorization-kubeconfig", s.RemoteKubeConfigFile, ""+
+	var optionalKubeConfigSentence string
+	if s.RemoteKubeConfigFileOptional {
+		optionalKubeConfigSentence = " This is optional. If empty, all requests not skipped by authorization are forbidden."
+	}
+	fs.StringVar(&s.RemoteKubeConfigFile, "authorization-kubeconfig", s.RemoteKubeConfigFile,
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
-		" subjectaccessreviews.authorization.k8s.io.")
+			"subjectaccessreviews.authorization.k8s.io."+optionalKubeConfigSentence)
 
 	fs.DurationVar(&s.AllowCacheTTL, "authorization-webhook-cache-authorized-ttl",
 		s.AllowCacheTTL,
@@ -72,42 +106,61 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.DenyCacheTTL,
 		"authorization-webhook-cache-unauthorized-ttl", s.DenyCacheTTL,
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
+
+	fs.StringSliceVar(&s.AlwaysAllowPaths, "authorization-always-allow-paths", s.AlwaysAllowPaths,
+		"A list of HTTP paths to skip during authorization, i.e. these are authorized without "+
+			"contacting the 'core' kubernetes server.")
 }
 
-func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.Config) error {
+func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.AuthorizationInfo) error {
 	if s == nil {
 		c.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 		return nil
 	}
 
-	cfg, err := s.ToAuthorizationConfig()
-	if err != nil {
-		return err
-	}
-	authorizer, err := cfg.New()
+	client, err := s.getClient()
 	if err != nil {
 		return err
 	}
 
-	c.Authorizer = authorizer
-	return nil
+	c.Authorizer, err = s.toAuthorizer(client)
+	return err
 }
 
-func (s *DelegatingAuthorizationOptions) ToAuthorizationConfig() (authorizerfactory.DelegatingAuthorizerConfig, error) {
-	sarClient, err := s.newSubjectAccessReview()
-	if err != nil {
-		return authorizerfactory.DelegatingAuthorizerConfig{}, err
+func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interface) (authorizer.Authorizer, error) {
+	var authorizers []authorizer.Authorizer
+
+	if len(s.AlwaysAllowGroups) > 0 {
+		authorizers = append(authorizers, authorizerfactory.NewPrivilegedGroups(s.AlwaysAllowGroups...))
 	}
 
-	ret := authorizerfactory.DelegatingAuthorizerConfig{
-		SubjectAccessReviewClient: sarClient,
-		AllowCacheTTL:             s.AllowCacheTTL,
-		DenyCacheTTL:              s.DenyCacheTTL,
+	if len(s.AlwaysAllowPaths) > 0 {
+		a, err := path.NewAuthorizer(s.AlwaysAllowPaths)
+		if err != nil {
+			return nil, err
+		}
+		authorizers = append(authorizers, a)
 	}
-	return ret, nil
+
+	if client == nil {
+		klog.Warningf("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
+	} else {
+		cfg := authorizerfactory.DelegatingAuthorizerConfig{
+			SubjectAccessReviewClient: client.AuthorizationV1beta1().SubjectAccessReviews(),
+			AllowCacheTTL:             s.AllowCacheTTL,
+			DenyCacheTTL:              s.DenyCacheTTL,
+		}
+		delegatedAuthorizer, err := cfg.New()
+		if err != nil {
+			return nil, err
+		}
+		authorizers = append(authorizers, delegatedAuthorizer)
+	}
+
+	return union.New(authorizers...), nil
 }
 
-func (s *DelegatingAuthorizationOptions) newSubjectAccessReview() (authorizationclient.SubjectAccessReviewInterface, error) {
+func (s *DelegatingAuthorizationOptions) getClient() (kubernetes.Interface, error) {
 	var clientConfig *rest.Config
 	var err error
 	if len(s.RemoteKubeConfigFile) > 0 {
@@ -115,24 +168,24 @@ func (s *DelegatingAuthorizationOptions) newSubjectAccessReview() (authorization
 		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
 
 		clientConfig, err = loader.ClientConfig()
-
 	} else {
 		// without the remote kubeconfig file, try to use the in-cluster config.  Most addon API servers will
-		// use this path
+		// use this path. If it is optional, ignore errors.
 		clientConfig, err = rest.InClusterConfig()
+		if err != nil && s.RemoteKubeConfigFileOptional {
+			if err != rest.ErrNotInCluster {
+				klog.Warningf("failed to read in-cluster kubeconfig for delegated authorization: %v", err)
+			}
+			return nil, nil
+		}
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get delegated authorization kubeconfig: %v", err)
 	}
 
 	// set high qps/burst limits since this will effectively limit API server responsiveness
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
 
-	client, err := authorizationclient.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.SubjectAccessReviews(), nil
+	return kubernetes.NewForConfig(clientConfig)
 }

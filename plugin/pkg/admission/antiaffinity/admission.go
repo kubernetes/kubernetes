@@ -20,34 +20,38 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
+
+const PluginName = "LimitPodHardAntiAffinityTopology"
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("LimitPodHardAntiAffinityTopology", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewInterPodAntiAffinity(), nil
 	})
 }
 
-// plugin contains the client used by the admission controller
-type plugin struct {
+// Plugin contains the client used by the admission controller
+type Plugin struct {
 	*admission.Handler
 }
 
+var _ admission.ValidationInterface = &Plugin{}
+
 // NewInterPodAntiAffinity creates a new instance of the LimitPodHardAntiAffinityTopology admission controller
-func NewInterPodAntiAffinity() admission.Interface {
-	return &plugin{
+func NewInterPodAntiAffinity() *Plugin {
+	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
 }
 
-// Admit will deny any pod that defines AntiAffinity topology key other than kubeletapis.LabelHostname i.e. "kubernetes.io/hostname"
+// Validate will deny any pod that defines AntiAffinity topology key other than v1.LabelHostname i.e. "kubernetes.io/hostname"
 // in  requiredDuringSchedulingRequiredDuringExecution and requiredDuringSchedulingIgnoredDuringExecution.
-func (p *plugin) Admit(attributes admission.Attributes) (err error) {
+func (p *Plugin) Validate(attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
@@ -67,8 +71,8 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 		//        podAntiAffinityTerms = append(podAntiAffinityTerms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
 		//}
 		for _, v := range podAntiAffinityTerms {
-			if v.TopologyKey != kubeletapis.LabelHostname {
-				return apierrors.NewForbidden(attributes.GetResource().GroupResource(), pod.Name, fmt.Errorf("affinity.PodAntiAffinity.RequiredDuringScheduling has TopologyKey %v but only key %v is allowed", v.TopologyKey, kubeletapis.LabelHostname))
+			if v.TopologyKey != v1.LabelHostname {
+				return apierrors.NewForbidden(attributes.GetResource().GroupResource(), pod.Name, fmt.Errorf("affinity.PodAntiAffinity.RequiredDuringScheduling has TopologyKey %v but only key %v is allowed", v.TopologyKey, v1.LabelHostname))
 			}
 		}
 	}

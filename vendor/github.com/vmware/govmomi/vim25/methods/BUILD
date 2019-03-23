@@ -3,10 +3,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "internal.go",
         "methods.go",
         "service_content.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/vim25/methods",
     importpath = "github.com/vmware/govmomi/vim25/methods",
     visibility = ["//visibility:public"],
     deps = [

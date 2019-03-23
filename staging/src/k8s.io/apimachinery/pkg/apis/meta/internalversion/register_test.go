@@ -59,11 +59,11 @@ func TestListOptions(t *testing.T) {
 	}
 
 	// verify kind registration
-	if gvk, unversioned, err := scheme.ObjectKind(in); err != nil || unversioned || gvk != metav1.SchemeGroupVersion.WithKind("ListOptions") {
-		t.Errorf("unexpected: %v %v %v", gvk, unversioned, err)
+	if gvks, unversioned, err := scheme.ObjectKinds(in); err != nil || unversioned || gvks[0] != metav1.SchemeGroupVersion.WithKind("ListOptions") {
+		t.Errorf("unexpected: %v %v %v", gvks[0], unversioned, err)
 	}
-	if gvk, unversioned, err := scheme.ObjectKind(out); err != nil || unversioned || gvk != SchemeGroupVersion.WithKind("ListOptions") {
-		t.Errorf("unexpected: %v %v %v", gvk, unversioned, err)
+	if gvks, unversioned, err := scheme.ObjectKinds(out); err != nil || unversioned || gvks[0] != SchemeGroupVersion.WithKind("ListOptions") {
+		t.Errorf("unexpected: %v %v %v", gvks[0], unversioned, err)
 	}
 
 	actual = &metav1.ListOptions{}

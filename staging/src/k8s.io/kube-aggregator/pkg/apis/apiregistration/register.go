@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// GroupName is the API group for apiregistration
 const GroupName = "apiregistration.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
@@ -37,11 +38,13 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
+	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	// AddToScheme is a common registration function for mapping packaged scoped group & version keys to a scheme
+	AddToScheme = SchemeBuilder.AddToScheme
 )
 
-// Adds the list of known types to api.Scheme.
+// Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&APIService{},

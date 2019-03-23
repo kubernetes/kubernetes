@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var SchemeGroupVersion = schema.GroupVersion{Group: "testgroup.k8s.io", Version: runtime.APIVersionInternal}
+var SchemeGroupVersion = schema.GroupVersion{Group: "example.api.code-generator.k8s.io", Version: runtime.APIVersionInternal}
 
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
@@ -33,7 +33,7 @@ func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-// Adds the list of known types to api.Scheme.
+// Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&TestType{},

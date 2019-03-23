@@ -1,14 +1,18 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: fluentd-gcp-v2.0.9
+  name: fluentd-gcp-{{ fluentd_gcp_yaml_version }}
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v2.0.9
+    version: {{ fluentd_gcp_yaml_version }}
 spec:
+  selector:
+    matchLabels:
+      k8s-app: fluentd-gcp
+      version: {{ fluentd_gcp_yaml_version }}
   updateStrategy:
     type: RollingUpdate
   template:
@@ -16,38 +20,36 @@ spec:
       labels:
         k8s-app: fluentd-gcp
         kubernetes.io/cluster-service: "true"
-        version: v2.0.9
+        version: {{ fluentd_gcp_yaml_version }}
       # This annotation ensures that fluentd does not get evicted if the node
       # supports critical pod annotation based priority scheme.
       # Note that this does not guarantee admission on the nodes (#40573).
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: fluentd-gcp
       dnsPolicy: Default
       hostNetwork: true
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google-containers/fluentd-gcp:2.0.9
-        env:
-        - name: FLUENTD_ARGS
-          value: --no-supervisor -q
-        resources:
-          limits:
-            memory: 300Mi
-          requests:
-            cpu: 100m
-            memory: 200Mi
+        image: gcr.io/stackdriver-agents/stackdriver-logging-agent:{{ fluentd_gcp_version }}
         volumeMounts:
         - name: varlog
           mountPath: /var/log
         - name: varlibdockercontainers
           mountPath: /var/lib/docker/containers
           readOnly: true
-        - name: libsystemddir
-          mountPath: /host/lib
-          readOnly: true
         - name: config-volume
-          mountPath: /etc/fluent/config.d
+          mountPath: /etc/google-fluentd/config.d
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: STACKDRIVER_METADATA_AGENT_URL
+          value: http://$(NODE_NAME):8799
         # Liveness probe is aimed to help in situarions where fluentd
         # silently hangs for no apparent reasons until manual restart.
         # The idea of this probe is that if fluentd is not queueing or
@@ -64,47 +66,50 @@ spec:
             - '-c'
             - >
               LIVENESS_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-300};
-              STUCK_THRESHOLD_SECONDS=${LIVENESS_THRESHOLD_SECONDS:-900};
+              STUCK_THRESHOLD_SECONDS=${STUCK_THRESHOLD_SECONDS:-900};
               if [ ! -e /var/log/fluentd-buffers ];
               then
                 exit 1;
               fi;
-              LAST_MODIFIED_DATE=`stat /var/log/fluentd-buffers | grep Modify | sed -r "s/Modify: (.*)/\1/"`;
-              LAST_MODIFIED_TIMESTAMP=`date -d "$LAST_MODIFIED_DATE" +%s`;
-              if [ `date +%s` -gt `expr $LAST_MODIFIED_TIMESTAMP + $STUCK_THRESHOLD_SECONDS` ];
+              touch -d "${STUCK_THRESHOLD_SECONDS} seconds ago" /tmp/marker-stuck;
+              if [ -z "$(find /var/log/fluentd-buffers -type d -newer /tmp/marker-stuck -print -quit)" ];
               then
                 rm -rf /var/log/fluentd-buffers;
                 exit 1;
               fi;
-              if [ `date +%s` -gt `expr $LAST_MODIFIED_TIMESTAMP + $LIVENESS_THRESHOLD_SECONDS` ];
+              touch -d "${LIVENESS_THRESHOLD_SECONDS} seconds ago" /tmp/marker-liveness;
+              if [ -z "$(find /var/log/fluentd-buffers -type d -newer /tmp/marker-liveness -print -quit)" ];
               then
                 exit 1;
               fi;
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: gcr.io/google-containers/prometheus-to-sd:v0.1.3
+        image: k8s.gcr.io/prometheus-to-sd:v0.3.1
         command:
           - /monitor
-          - --component=fluentd
-          - --target-port=31337
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
           - --api-override={{ prometheus_to_sd_endpoint }}
-          - --whitelisted-metrics=stackdriver_successful_requests_count,stackdriver_failed_requests_count,stackdriver_ingested_entries_count,stackdriver_dropped_entries_count
-        volumeMounts:
-        - name: ssl-certs
-          mountPath: /etc/ssl/certs
+          - --source=fluentd:http://localhost:24231?whitelisted=stackdriver_successful_requests_count,stackdriver_failed_requests_count,stackdriver_ingested_entries_count,stackdriver_dropped_entries_count
+          - --pod-id=$(POD_NAME)
+          - --namespace-id=$(POD_NAMESPACE)
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
       nodeSelector:
-        beta.kubernetes.io/fluentd-ds-ready: "true"
+        beta.kubernetes.io/os: linux
+      terminationGracePeriodSeconds: 60
       tolerations:
-      - key: "node.alpha.kubernetes.io/ismaster"
-        effect: "NoSchedule"
       - operator: "Exists"
         effect: "NoExecute"
-      #TODO: remove this toleration once #44445 is properly fixed.
       - operator: "Exists"
         effect: "NoSchedule"
-      terminationGracePeriodSeconds: 30
       volumes:
       - name: varlog
         hostPath:
@@ -112,12 +117,6 @@ spec:
       - name: varlibdockercontainers
         hostPath:
           path: /var/lib/docker/containers
-      - name: libsystemddir
-        hostPath:
-          path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config-v1.2.2
-      - name: ssl-certs
-        hostPath:
-          path: /etc/ssl/certs
+          name: {{ fluentd_gcp_configmap_name }}-v1.2.5

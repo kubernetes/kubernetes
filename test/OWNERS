@@ -1,10 +1,13 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
   - bowei
+  - rramkumar1
+  - MrHohn
   - deads2k
   - enisoc
   - enj # for test/integration/etcd/etcd_storage_path_test.go
   - erictune
-  - fabianofranz # for test/e2e/kubectl.go
   - foxish # for test/e2e/network-partition.go
   - gmarek
   - janetkuo
@@ -14,23 +17,30 @@ reviewers:
   - madhusudancs
   - marun
   - mikedanese
+  - msau42 # for test/e2e/commmon/{*volume,empty_dir}.go and test/e2e/framework/{pv|volume}_util.go
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
+  - shyamjvs
   - smarterclayton
   - soltysh
   - sig-testing-reviewers
   - sttts
+  - timothysc
   - zmerlynn
   - vishh
+  - MaciekPytel # for test/e2e/common/autoscaling_utils.go
+  - oomichi
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
+  - cblecker
+  - rramkumar1
+  - MrHohn
   - deads2k
   - enisoc
   - enj # for test/integration/etcd/etcd_storage_path_test.go
   - eparis
   - erictune
-  - fabianofranz # for test/e2e/kubectl.go
   - foxish # for test/e2e/network-partition.go
   - gmarek
   - janetkuo
@@ -40,12 +50,19 @@ approvers:
   - madhusudancs
   - marun
   - mikedanese
+  - msau42 # for test/e2e/commmon/{*volume,empty_dir}.go and test/e2e/framework/{pv|volume}_util.go
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
+  - shyamjvs
   - sig-testing-approvers
   - smarterclayton
   - soltysh
   - sttts
+  - timothysc
   - zmerlynn
-  - vishh 
+  - vishh
+  - MaciekPytel # for test/e2e/common/autoscaling_utils.go
+labels:
+- area/test
+- sig/testing

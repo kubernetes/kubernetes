@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -44,7 +44,7 @@ SKIP=${SKIP:-""}
 TEST_ARGS=${TEST_ARGS:-""}
 
 # REGISTRY is the image registry for node test image.
-REGISTRY=${REGISTRY:-"gcr.io/google_containers"}
+REGISTRY=${REGISTRY:-"k8s.gcr.io"}
 
 # ARCH is the architecture of current machine, the script will use this to
 # select corresponding test container image.
@@ -76,7 +76,7 @@ CNI_CONF_DIR=${CNI_CONF_DIR:-""}
 # CNI_BIN_DIR is the path to network plugin config files.
 CNI_BIN_DIR=${CNI_BIN_DIR:-""}
 
-# KUBELET_KUBECONFIG_DIR is the path to a dir for the kubelet's kubeconfig file
+# KUBELET_KUBECONFIG is the path to a kubeconfig file, specifying how to connect to the API server.
 KUBELET_KUBECONFIG=${KUBELET_KUBECONFIG:-"/var/lib/kubelet/kubeconfig"}
 
 # Creates a kubeconfig file for the kubelet.
@@ -182,7 +182,7 @@ config_dir=`mktemp -d`
 file_check_frequency=10s
 pod_cidr=10.100.0.0/24
 log_level=4
-start_kubelet --kubeconfig "${KUBELET_KUBECONFIG_DIR}/kubelet.kubeconfig" \
+start_kubelet --kubeconfig ${KUBELET_KUBECONFIG} \
   --volume-stats-agg-period $volume_stats_agg_period \
   --allow-privileged=$allow_privileged \
   --serialize-image-pulls=$serialize_image_pulls \

@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
+// +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
 
 package v1 // import "k8s.io/api/batch/v1"

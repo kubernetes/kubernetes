@@ -1,5 +1,19 @@
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"errors"
 	"fmt"
@@ -50,7 +64,7 @@ type IncrementalCopyOptionsConditions struct {
 
 // Copy starts a blob copy operation and waits for the operation to
 // complete. sourceBlob parameter must be a canonical URL to the blob (can be
-// obtained using GetBlobURL method.) There is no SLA on blob copy and therefore
+// obtained using the GetURL method.) There is no SLA on blob copy and therefore
 // this helper method works faster on smaller files.
 //
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Copy-Blob
@@ -65,7 +79,7 @@ func (b *Blob) Copy(sourceBlob string, options *CopyOptions) error {
 
 // StartCopy starts a blob copy operation.
 // sourceBlob parameter must be a canonical URL to the blob (can be
-// obtained using GetBlobURL method.)
+// obtained using the GetURL method.)
 //
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Copy-Blob
 func (b *Blob) StartCopy(sourceBlob string, options *CopyOptions) (string, error) {
@@ -96,13 +110,13 @@ func (b *Blob) StartCopy(sourceBlob string, options *CopyOptions) (string, error
 	if err != nil {
 		return "", err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusAccepted, http.StatusCreated}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusAccepted, http.StatusCreated}); err != nil {
 		return "", err
 	}
 
-	copyID := resp.headers.Get("x-ms-copy-id")
+	copyID := resp.Header.Get("x-ms-copy-id")
 	if copyID == "" {
 		return "", errors.New("Got empty copy id header")
 	}
@@ -138,8 +152,8 @@ func (b *Blob) AbortCopy(copyID string, options *AbortCopyOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusNoContent})
 }
 
 // WaitForCopy loops until a BlobCopy operation is completed (or fails with error)
@@ -209,13 +223,13 @@ func (b *Blob) IncrementalCopyBlob(sourceBlobURL string, snapshotTime time.Time,
 	if err != nil {
 		return "", err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusAccepted}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusAccepted}); err != nil {
 		return "", err
 	}
 
-	copyID := resp.headers.Get("x-ms-copy-id")
+	copyID := resp.Header.Get("x-ms-copy-id")
 	if copyID == "" {
 		return "", errors.New("Got empty copy id header")
 	}

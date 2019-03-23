@@ -19,15 +19,14 @@ package scaleio
 import (
 	"errors"
 
-	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/keymutex"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/keymutex"
 )
 
 const (
-	sioName           = "scaleio"
 	sioPluginName     = "kubernetes.io/scaleio"
 	sioConfigFileName = "sioconf.dat"
 )
@@ -37,6 +36,7 @@ type sioPlugin struct {
 	volumeMtx keymutex.KeyMutex
 }
 
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	p := &sioPlugin{
 		host: nil,
@@ -51,7 +51,7 @@ var _ volume.VolumePlugin = &sioPlugin{}
 
 func (p *sioPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
-	p.volumeMtx = keymutex.NewKeyMutex()
+	p.volumeMtx = keymutex.NewHashed(0)
 	return nil
 }
 
@@ -60,17 +60,20 @@ func (p *sioPlugin) GetPluginName() string {
 }
 
 func (p *sioPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	source, err := getVolumeSourceFromSpec(spec)
+	attribs, err := getVolumeSourceAttribs(spec)
 	if err != nil {
 		return "", err
 	}
-
-	return source.VolumeName, nil
+	return attribs.volName, nil
 }
 
 func (p *sioPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.ScaleIO != nil) ||
 		(spec.Volume != nil && spec.Volume.ScaleIO != nil)
+}
+
+func (p *sioPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (p *sioPlugin) RequiresRemount() bool {
@@ -81,31 +84,35 @@ func (p *sioPlugin) NewMounter(
 	spec *volume.Spec,
 	pod *api.Pod,
 	_ volume.VolumeOptions) (volume.Mounter, error) {
-	sioSource, err := getVolumeSourceFromSpec(spec)
+
+	// extract source info from either ScaleIOVolumeSource or ScaleIOPersistentVolumeSource type
+	attribs, err := getVolumeSourceAttribs(spec)
 	if err != nil {
-		glog.Error(log("failed to extract ScaleIOVolumeSource from spec: %v", err))
-		return nil, err
+		return nil, errors.New(log("mounter failed to extract volume attributes from spec: %v", err))
+	}
+
+	secretName, secretNS, err := getSecretAndNamespaceFromSpec(spec, pod)
+	if err != nil {
+		return nil, errors.New(log("failed to get secret name or secretNamespace: %v", err))
 	}
 
 	return &sioVolume{
-		pod:         pod,
-		spec:        spec,
-		source:      sioSource,
-		namespace:   pod.Namespace,
-		volSpecName: spec.Name(),
-		volName:     sioSource.VolumeName,
-		podUID:      pod.UID,
-		readOnly:    sioSource.ReadOnly,
-		fsType:      sioSource.FSType,
-		plugin:      p,
+		pod:             pod,
+		spec:            spec,
+		secretName:      secretName,
+		secretNamespace: secretNS,
+		volSpecName:     spec.Name(),
+		volName:         attribs.volName,
+		podUID:          pod.UID,
+		readOnly:        attribs.readOnly,
+		fsType:          attribs.fsType,
+		plugin:          p,
 	}, nil
 }
 
 // NewUnmounter creates a representation of the volume to unmount
-// The specName param can be used to carry the namespace value (if needed) using format:
-// specName = [<namespace>nsSep]<somevalue> where the specname is pre-pended with the namespace
 func (p *sioPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
-	glog.V(4).Info(log("Unmounter for %s", specName))
+	klog.V(4).Info(log("Unmounter for %s", specName))
 
 	return &sioVolume{
 		podUID:      podUID,
@@ -156,22 +163,25 @@ func (p *sioPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 var _ volume.DeletableVolumePlugin = &sioPlugin{}
 
 func (p *sioPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	sioSource, err := getVolumeSourceFromSpec(spec)
+	attribs, err := getVolumeSourceAttribs(spec)
 	if err != nil {
-		glog.Error(log("deleter failed to extract source from spec: %v", err))
+		klog.Error(log("deleter failed to extract volume attributes from spec: %v", err))
 		return nil, err
 	}
 
-	namespace := spec.PersistentVolume.Spec.ClaimRef.Namespace
+	secretName, secretNS, err := getSecretAndNamespaceFromSpec(spec, nil)
+	if err != nil {
+		return nil, errors.New(log("failed to get secret name or secretNamespace: %v", err))
+	}
 
 	return &sioVolume{
-		spec:        spec,
-		source:      sioSource,
-		namespace:   namespace,
-		volSpecName: spec.Name(),
-		volName:     sioSource.VolumeName,
-		plugin:      p,
-		readOnly:    sioSource.ReadOnly,
+		spec:            spec,
+		secretName:      secretName,
+		secretNamespace: secretNS,
+		volSpecName:     spec.Name(),
+		volName:         attribs.volName,
+		plugin:          p,
+		readOnly:        attribs.readOnly,
 	}, nil
 }
 
@@ -181,21 +191,34 @@ func (p *sioPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 var _ volume.ProvisionableVolumePlugin = &sioPlugin{}
 
 func (p *sioPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	glog.V(4).Info(log("creating Provisioner"))
+	klog.V(4).Info(log("creating Provisioner"))
 
 	configData := options.Parameters
 	if configData == nil {
-		glog.Error(log("provisioner missing parameters, unable to continue"))
+		klog.Error(log("provisioner missing parameters, unable to continue"))
 		return nil, errors.New("option parameters missing")
 	}
 
-	namespace := options.PVC.Namespace
+	// Supports ref of name of secret a couple of ways:
+	// options.Parameters["secretRef"] for backward compat, or
+	// options.Parameters["secretName"]
+	secretName := configData[confKey.secretName]
+	if secretName == "" {
+		secretName = configData["secretName"]
+		configData[confKey.secretName] = secretName
+	}
+
+	secretNS := configData[confKey.secretNamespace]
+	if secretNS == "" {
+		secretNS = options.PVC.Namespace
+	}
 
 	return &sioVolume{
-		configData:  configData,
-		plugin:      p,
-		options:     options,
-		namespace:   namespace,
-		volSpecName: options.PVName,
+		configData:      configData,
+		plugin:          p,
+		options:         options,
+		secretName:      secretName,
+		secretNamespace: secretNS,
+		volSpecName:     options.PVName,
 	}, nil
 }

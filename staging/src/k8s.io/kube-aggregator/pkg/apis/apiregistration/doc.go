@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
-
-// Package api is the internal version of the API.
+// +k8s:deepcopy-gen=package
 // +groupName=apiregistration.k8s.io
+
+// Package apiregistration is the internal version of the API.
 package apiregistration // import "k8s.io/kube-aggregator/pkg/apis/apiregistration"

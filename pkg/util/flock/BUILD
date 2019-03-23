@@ -9,21 +9,26 @@ go_library(
     name = "go_default_library",
     srcs = [
         "flock_other.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "flock_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "flock_unix.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "flock_unix.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/flock",
     deps = select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+        "@io_bazel_rules_go//go/platform:darwin": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],

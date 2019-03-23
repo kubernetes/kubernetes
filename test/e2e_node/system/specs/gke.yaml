@@ -5,7 +5,9 @@ os: Linux
 kernelSpec:
   versions:
   # GKE requires kernel version 4.4+.
-  - 4\.[4-9].*
+  - '4\.[4-9].*'
+  - '4\.[1-9][0-9].*'
+  - '[5-9].*'
 
   # Required kernel configurations -- the configuration must be set to "y" or
   # "m".
@@ -89,7 +91,7 @@ kernelSpec:
   - name: SCSI_PROC_FS
   # Currently Kubelet supports three docker graph drivers: overlay, aufs, and
   # devicemapper due to the legacy reason. But for GKE, we plan to only support
-  # overlayfs. 
+  # overlayfs.
   - name: OVERLAY_FS
     description: 'Enable OverlayFS, which will be the only docker graph driver
       supported on GKE.'
@@ -218,7 +220,6 @@ packageSpecs:
   versionRange: '>=4.2.0'
 - name: less
   versionRange: '>=481'
-- name: linux-headers-${KERNEL_RELEASE}
 - name: netcat-openbsd
   versionRange: '>=1.10'
 - name: python
@@ -233,8 +234,6 @@ packageSpecs:
   versionRange: '>=1.28'
 - name: util-linux
   versionRange: '>=2.27.1'
-- name: vim
-  versionRange: '>=7.4.712'
 - name: wget
   versionRange: '>=1.18'
 - name: gce-compute-image-packages

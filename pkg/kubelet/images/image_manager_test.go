@@ -125,7 +125,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 	fakeRuntime = &ctest.FakeRuntime{}
 	fakeRecorder := &record.FakeRecorder{}
 
-	fakeRuntime.ImageList = []Image{{ID: "docker.io/library/present_image:latest"}}
+	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
 	fakeRuntime.Err = c.pullerErr
 	fakeRuntime.InspectErr = c.inspectErr
 
@@ -151,7 +151,7 @@ func TestParallelPuller(t *testing.T) {
 		for tick, expected := range c.expected {
 			fakeRuntime.CalledFunctions = nil
 			fakeClock.Step(time.Second)
-			_, _, err := puller.EnsureImageExists(pod, container, nil)
+			_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
 			assert.NoError(t, fakeRuntime.AssertCalls(expected.calls), "in test %d tick=%d", i, tick)
 			assert.Equal(t, expected.err, err, "in test %d tick=%d", i, tick)
 		}
@@ -176,7 +176,7 @@ func TestSerializedPuller(t *testing.T) {
 		for tick, expected := range c.expected {
 			fakeRuntime.CalledFunctions = nil
 			fakeClock.Step(time.Second)
-			_, _, err := puller.EnsureImageExists(pod, container, nil)
+			_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
 			assert.NoError(t, fakeRuntime.AssertCalls(expected.calls), "in test %d tick=%d", i, tick)
 			assert.Equal(t, expected.err, err, "in test %d tick=%d", i, tick)
 		}
@@ -188,7 +188,7 @@ func TestApplyDefaultImageTag(t *testing.T) {
 		Input  string
 		Output string
 	}{
-		{Input: "root", Output: "docker.io/library/root:latest"},
+		{Input: "root", Output: "root:latest"},
 		{Input: "root:tag", Output: "root:tag"},
 		{Input: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
 	} {

@@ -24,7 +24,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // StacktracePred returns true if a stacktrace should be logged for this status.
@@ -61,7 +61,7 @@ type passthroughLogger struct{}
 
 // Addf logs info immediately.
 func (passthroughLogger) Addf(format string, data ...interface{}) {
-	glog.V(2).Info(fmt.Sprintf(format, data...))
+	klog.V(2).Info(fmt.Sprintf(format, data...))
 }
 
 // DefaultStacktracePred is the default implementation of StacktracePred.
@@ -100,14 +100,11 @@ func NewLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
 // then a passthroughLogger will be created which will log to stdout immediately
 // when Addf is called.
 func LogOf(req *http.Request, w http.ResponseWriter) logger {
-	if _, exists := w.(*respLogger); !exists {
-		pl := &passthroughLogger{}
-		return pl
-	}
 	if rl, ok := w.(*respLogger); ok {
 		return rl
 	}
-	panic("Unable to find or create the logger!")
+
+	return &passthroughLogger{}
 }
 
 // Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.
@@ -146,11 +143,11 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 // Log is intended to be called once at the end of your request handler, via defer
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
-	if glog.V(2) {
+	if klog.V(3) {
 		if !rl.hijacked {
-			glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
+			klog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.UserAgent(), rl.req.RemoteAddr))
 		} else {
-			glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) hijacked [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
+			klog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) hijacked [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.req.UserAgent(), rl.req.RemoteAddr))
 		}
 	}
 }
@@ -176,8 +173,8 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 func (rl *respLogger) Flush() {
 	if flusher, ok := rl.w.(http.Flusher); ok {
 		flusher.Flush()
-	} else if glog.V(2) {
-		glog.InfoDepth(1, fmt.Sprintf("Unable to convert %+v into http.Flusher", rl.w))
+	} else if klog.V(2) {
+		klog.InfoDepth(1, fmt.Sprintf("Unable to convert %+v into http.Flusher", rl.w))
 	}
 }
 

@@ -1,46 +1,36 @@
 # How to contribute
 
-We definitely welcome patches and contribution to grpc! Here are some guidelines
-and information about how to do so.
+We definitely welcome your patches and contributions to gRPC!
 
-## Sending patches
-
-### Getting started
-
-1. Check out the code:
-
-        $ go get google.golang.org/grpc
-        $ cd $GOPATH/src/google.golang.org/grpc
-
-1. Create a fork of the grpc-go repository.
-1. Add your fork as a remote:
-
-        $ git remote add fork git@github.com:$YOURGITHUBUSERNAME/grpc-go.git
-
-1. Make changes, commit them.
-1. Run the test suite:
-
-        $ make test
-
-1. Push your changes to your fork:
-
-        $ git push fork ...
-
-1. Open a pull request.
+If you are new to github, please start by reading [Pull Request howto](https://help.github.com/articles/about-pull-requests/)
 
 ## Legal requirements
 
 In order to protect both you and ourselves, you will need to sign the
-[Contributor License Agreement](https://cla.developers.google.com/clas).
+[Contributor License Agreement](https://identity.linuxfoundation.org/projects/cncf).
 
-## Filing Issues
-When filing an issue, make sure to answer these five questions:
+## Guidelines for Pull Requests
+How to get your contributions merged smoothly and quickly.
+ 
+- Create **small PRs** that are narrowly focused on **addressing a single concern**. We often times receive PRs that are trying to fix several things at a time, but only one fix is considered acceptable, nothing gets merged and both author's & review's time is wasted. Create more PRs to address different concerns and everyone will be happy.
+ 
+- For speculative changes, consider opening an issue and discussing it first. If you are suggesting a behavioral or API change, consider starting with a [gRFC proposal](https://github.com/grpc/proposal). 
+ 
+- Provide a good **PR description** as a record of **what** change is being made and **why** it was made. Link to a github issue if it exists.
+ 
+- Don't fix code style and formatting unless you are already changing that line to address an issue. PRs with irrelevant changes won't be merged. If you do want to fix formatting or style, do that in a separate PR.
+ 
+- Unless your PR is trivial, you should expect there will be reviewer comments that you'll need to address before merging. We expect you to be reasonably responsive to those comments, otherwise the PR will be closed after 2-3 weeks of inactivity.
+ 
+- Maintain **clean commit history** and use **meaningful commit messages**. PRs with messy commit history are difficult to review and won't be merged. Use `rebase -i upstream/master` to curate your commit history and/or to bring in latest changes from master (but avoid rebasing in the middle of a code review).
+ 
+- Keep your PR up to date with upstream/master (if there are merge conflicts, we can't really merge your change).
+ 
+- **All tests need to be passing** before your change can be merged. We recommend you **run tests locally** before creating your PR to catch breakages early on.
+  - `make all` to test everything, OR
+  - `make vet` to catch vet errors
+  - `make test` to run the tests
+  - `make testrace` to run tests in race mode
 
-1. What version of Go are you using (`go version`)?
-2. What operating system and processor architecture are you using?
-3. What did you do?
-4. What did you expect to see?
-5. What did you see instead?
-
-### Contributing code
-Unless otherwise noted, the Go source files are distributed under the BSD-style license found in the LICENSE file.
+- Exceptions to the rules can be made if there's a compelling reason for doing so.
+ 

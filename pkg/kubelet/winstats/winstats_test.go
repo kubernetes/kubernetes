@@ -1,3 +1,5 @@
+// +build windows
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -84,8 +86,9 @@ func TestWinContainerInfos(t *testing.T) {
 	infos := make(map[string]cadvisorapiv2.ContainerInfo)
 	infos["/"] = cadvisorapiv2.ContainerInfo{
 		Spec: cadvisorapiv2.ContainerSpec{
-			HasCpu:    true,
-			HasMemory: true,
+			HasCpu:     true,
+			HasMemory:  true,
+			HasNetwork: true,
 			Memory: cadvisorapiv2.MemorySpec{
 				Limit: 1.6e+10,
 			},
@@ -93,7 +96,11 @@ func TestWinContainerInfos(t *testing.T) {
 		Stats: stats,
 	}
 
-	assert.Equal(t, actualRootInfos, infos)
+	assert.Equal(t, len(actualRootInfos), len(infos))
+	assert.Equal(t, actualRootInfos["/"].Spec, infos["/"].Spec)
+	assert.Equal(t, len(actualRootInfos["/"].Stats), len(infos["/"].Stats))
+	assert.Equal(t, actualRootInfos["/"].Stats[0].Cpu, infos["/"].Stats[0].Cpu)
+	assert.Equal(t, actualRootInfos["/"].Stats[0].Memory, infos["/"].Stats[0].Memory)
 }
 
 func TestWinMachineInfo(t *testing.T) {
@@ -114,13 +121,6 @@ func TestWinVersionInfo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, versionInfo, &cadvisorapi.VersionInfo{
 		KernelVersion: "v42"})
-}
-
-func TestExtractVersionNumber(t *testing.T) {
-	fullVersion := "Microsoft Windows [Version 10.0.14393]"
-	versionNumber := extractVersionNumber(fullVersion)
-	expected := "10.0.14393"
-	assert.Equal(t, expected, versionNumber)
 }
 
 func getClient(t *testing.T) Client {

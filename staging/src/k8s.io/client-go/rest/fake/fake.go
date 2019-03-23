@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,8 +45,7 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 type RESTClient struct {
 	Client               *http.Client
 	NegotiatedSerializer runtime.NegotiatedSerializer
-	GroupName            string
-	APIRegistry          *registered.APIRegistrationManager
+	GroupVersion         schema.GroupVersion
 	VersionedAPIPath     string
 
 	Req  *http.Request
@@ -80,7 +78,7 @@ func (c *RESTClient) Verb(verb string) *restclient.Request {
 }
 
 func (c *RESTClient) APIVersion() schema.GroupVersion {
-	return c.APIRegistry.GroupOrDie("").GroupVersion
+	return c.GroupVersion
 }
 
 func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
@@ -89,29 +87,23 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 
 func (c *RESTClient) request(verb string) *restclient.Request {
 	config := restclient.ContentConfig{
-		ContentType: runtime.ContentTypeJSON,
-		// TODO this was hardcoded before, but it doesn't look right
-		GroupVersion:         &c.APIRegistry.GroupOrDie("").GroupVersion,
+		ContentType:          runtime.ContentTypeJSON,
+		GroupVersion:         &c.GroupVersion,
 		NegotiatedSerializer: c.NegotiatedSerializer,
 	}
 
 	ns := c.NegotiatedSerializer
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	internalVersion := schema.GroupVersion{
-		Group:   c.APIRegistry.GroupOrDie(c.GroupName).GroupVersion.Group,
-		Version: runtime.APIVersionInternal,
-	}
-	internalVersion.Version = runtime.APIVersionInternal
 	serializers := restclient.Serializers{
 		// TODO this was hardcoded before, but it doesn't look right
-		Encoder: ns.EncoderForVersion(info.Serializer, c.APIRegistry.GroupOrDie("").GroupVersion),
-		Decoder: ns.DecoderToVersion(info.Serializer, internalVersion),
+		Encoder: ns.EncoderForVersion(info.Serializer, c.GroupVersion),
+		Decoder: ns.DecoderToVersion(info.Serializer, c.GroupVersion),
 	}
 	if info.StreamSerializer != nil {
 		serializers.StreamingSerializer = info.StreamSerializer.Serializer
 		serializers.Framer = info.StreamSerializer.Framer
 	}
-	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil)
+	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
 }
 
 func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {

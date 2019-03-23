@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -81,7 +82,26 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 	return strconv.ParseUint(version, 10, 64)
 }
 
-// APIObjectVersioner implements Versioner
+// ParseResourceVersion takes a resource version argument and converts it to
+// the etcd version. For watch we should pass to helper.Watch(). Because resourceVersion is
+// an opaque value, the default watch behavior for non-zero watch is to watch
+// the next value (if you pass "1", you will see updates from "2" onwards).
+func (a APIObjectVersioner) ParseResourceVersion(resourceVersion string) (uint64, error) {
+	if resourceVersion == "" || resourceVersion == "0" {
+		return 0, nil
+	}
+	version, err := strconv.ParseUint(resourceVersion, 10, 64)
+	if err != nil {
+		return 0, storage.NewInvalidError(field.ErrorList{
+			// Validation errors are supposed to return version-specific field
+			// paths, but this is probably close enough.
+			field.Invalid(field.NewPath("resourceVersion"), resourceVersion, err.Error()),
+		})
+	}
+	return version, nil
+}
+
+// Versioner implements Versioner
 var Versioner storage.Versioner = APIObjectVersioner{}
 
 // CompareResourceVersion compares etcd resource versions.  Outside this API they are all strings,

@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
 // +groupName=example.k8s.io
-//
+
 // package example contains an example API used to demonstrate how to create api groups. Moreover, this is
 // used within tests.
 package example // import "k8s.io/apiserver/pkg/apis/example"

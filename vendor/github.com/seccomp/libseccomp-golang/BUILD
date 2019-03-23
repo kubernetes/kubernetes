@@ -2,21 +2,18 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "seccomp.go",
-            "seccomp_internal.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = [
+        "seccomp.go",
+        "seccomp_internal.go",
+    ],
     cgo = True,
     clinkopts = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "-lseccomp",
+        "@io_bazel_rules_go//go/platform:linux": [
             "-lseccomp",
         ],
         "//conditions:default": [],
     }),
+    importmap = "k8s.io/kubernetes/vendor/github.com/seccomp/libseccomp-golang",
     importpath = "github.com/seccomp/libseccomp-golang",
     visibility = ["//visibility:public"],
 )

@@ -9,11 +9,13 @@ go_library(
         "shared_credentials_provider.go",
         "static_provider.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/aws/credentials",
     importpath = "github.com/aws/aws-sdk-go/aws/credentials",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
-        "//vendor/github.com/go-ini/ini:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/ini:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/shareddefaults:go_default_library",
     ],
 )
 
@@ -30,6 +32,7 @@ filegroup(
         ":package-srcs",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/endpointcreds:all-srcs",
+        "//vendor/github.com/aws/aws-sdk-go/aws/credentials/processcreds:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/stscreds:all-srcs",
     ],
     tags = ["automanaged"],

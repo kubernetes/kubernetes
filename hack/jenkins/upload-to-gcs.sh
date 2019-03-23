@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -106,7 +106,7 @@ function set_kubernetes_base_path () {
 function find_version() {
   (
   # Where are we?
-  # This could be set in the global scope at some point if we need to 
+  # This could be set in the global scope at some point if we need to
   # discover the kubernetes path elsewhere.
   set_kubernetes_base_path
 
@@ -139,9 +139,9 @@ function print_started() {
     # will be available as started["metadata"][KEY.lower()].
     echo "    \"metadata\": {"
     local sep=""  # leading commas are easy to track
-    for env_var in $metadata_keys; do
+    for env_var in ${metadata_keys}; do
       local var_upper="${env_var#BUILD_METADATA_}"
-      echo "        $sep\"${var_upper,,}\": \"${!env_var}\""
+      echo "        ${sep}\"${var_upper,,}\": \"${!env_var}\""
       sep=","
     done
     echo "    },"

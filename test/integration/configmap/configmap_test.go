@@ -23,9 +23,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -35,7 +35,7 @@ func TestConfigMap(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(nil)
 	defer closeFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
 	ns := framework.CreateTestingNamespace("config-map", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -56,7 +56,7 @@ func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace)
 		},
 	}
 
-	if _, err := client.Core().ConfigMaps(cfg.Namespace).Create(&cfg); err != nil {
+	if _, err := client.CoreV1().ConfigMaps(cfg.Namespace).Create(&cfg); err != nil {
 		t.Errorf("unable to create test configMap: %v", err)
 	}
 	defer deleteConfigMapOrErrorf(t, client, cfg.Namespace, cfg.Name)
@@ -111,14 +111,14 @@ func DoTestConfigMap(t *testing.T, client clientset.Interface, ns *v1.Namespace)
 	}
 
 	pod.ObjectMeta.Name = "uses-configmap"
-	if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 }
 
 func deleteConfigMapOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.Core().ConfigMaps(ns).Delete(name, nil); err != nil {
+	if err := c.CoreV1().ConfigMaps(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete ConfigMap %v: %v", name, err)
 	}
 }

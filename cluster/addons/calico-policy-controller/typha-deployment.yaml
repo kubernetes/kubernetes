@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: calico-typha
@@ -9,6 +9,9 @@ metadata:
     k8s-app: calico-typha
 spec:
   revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      k8s-app: calico-typha
   template:
     metadata:
       labels:
@@ -16,13 +19,14 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-cluster-critical
       tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
       hostNetwork: true
       serviceAccountName: calico
       containers:
-      - image: calico/typha:v0.4.1
+      - image: gcr.io/projectcalico-org/typha:v3.3.1
         name: calico-typha
         ports:
         - containerPort: 5473
@@ -43,6 +47,8 @@ spec:
             value: "9093"
           - name: TYPHA_DATASTORETYPE
             value: "kubernetes"
+          - name: TYPHA_REPORTINGINTERVALSECS
+            value: "0"
           - name: TYPHA_MAXCONNECTIONSLOWERLIMIT
             value: "1"
           - name: TYPHA_HEALTHENABLED
@@ -55,12 +61,14 @@ spec:
           httpGet:
             path: /liveness
             port: 9098
+            host: localhost
           periodSeconds: 30
           initialDelaySeconds: 30
         readinessProbe:
           httpGet:
             path: /readiness
             port: 9098
+            host: localhost
           periodSeconds: 10
       volumes:
       - name: etc-calico

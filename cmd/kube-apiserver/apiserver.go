@@ -24,33 +24,27 @@ import (
 	"os"
 	"time"
 
-	"github.com/spf13/pflag"
-
 	"k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
-	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
-	"k8s.io/kubernetes/pkg/version/verflag"
+	_ "k8s.io/kubernetes/pkg/util/prometheusclientgo" // load all the prometheus client-go plugins
+	_ "k8s.io/kubernetes/pkg/version/prometheus"      // for version metric registration
 )
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 
-	s := options.NewServerRunOptions()
-	s.AddFlags(pflag.CommandLine)
+	command := app.NewAPIServerCommand(server.SetupSignalHandler())
 
-	flag.InitFlags()
+	// TODO: once we switch everything over to Cobra commands, we can go back to calling
+	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
+	// normalize func and add the go flag set by hand.
+	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	verflag.PrintAndExitIfRequested()
-
-	stopCh := server.SetupSignalHandler()
-	if err := app.Run(s, stopCh); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	if err := command.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }

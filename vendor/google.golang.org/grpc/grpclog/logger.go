@@ -1,52 +1,26 @@
 /*
  *
- * Copyright 2015, Google Inc.
- * All rights reserved.
+ * Copyright 2015 gRPC authors.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *     * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
-/*
-Package grpclog defines logging for grpc.
-*/
 package grpclog
 
-import (
-	"log"
-	"os"
-)
-
-// Use golang's standard logger by default.
-// Access is not mutex-protected: do not modify except in init()
-// functions.
-var logger Logger = log.New(os.Stderr, "", log.LstdFlags)
-
 // Logger mimics golang's standard Logger as an interface.
+//
+// Deprecated: use LoggerV2.
 type Logger interface {
 	Fatal(args ...interface{})
 	Fatalf(format string, args ...interface{})
@@ -58,36 +32,54 @@ type Logger interface {
 
 // SetLogger sets the logger that is used in grpc. Call only from
 // init() functions.
+//
+// Deprecated: use SetLoggerV2.
 func SetLogger(l Logger) {
-	logger = l
+	logger = &loggerWrapper{Logger: l}
 }
 
-// Fatal is equivalent to Print() followed by a call to os.Exit() with a non-zero exit code.
-func Fatal(args ...interface{}) {
-	logger.Fatal(args...)
+// loggerWrapper wraps Logger into a LoggerV2.
+type loggerWrapper struct {
+	Logger
 }
 
-// Fatalf is equivalent to Printf() followed by a call to os.Exit() with a non-zero exit code.
-func Fatalf(format string, args ...interface{}) {
-	logger.Fatalf(format, args...)
+func (g *loggerWrapper) Info(args ...interface{}) {
+	g.Logger.Print(args...)
 }
 
-// Fatalln is equivalent to Println() followed by a call to os.Exit()) with a non-zero exit code.
-func Fatalln(args ...interface{}) {
-	logger.Fatalln(args...)
+func (g *loggerWrapper) Infoln(args ...interface{}) {
+	g.Logger.Println(args...)
 }
 
-// Print prints to the logger. Arguments are handled in the manner of fmt.Print.
-func Print(args ...interface{}) {
-	logger.Print(args...)
+func (g *loggerWrapper) Infof(format string, args ...interface{}) {
+	g.Logger.Printf(format, args...)
 }
 
-// Printf prints to the logger. Arguments are handled in the manner of fmt.Printf.
-func Printf(format string, args ...interface{}) {
-	logger.Printf(format, args...)
+func (g *loggerWrapper) Warning(args ...interface{}) {
+	g.Logger.Print(args...)
 }
 
-// Println prints to the logger. Arguments are handled in the manner of fmt.Println.
-func Println(args ...interface{}) {
-	logger.Println(args...)
+func (g *loggerWrapper) Warningln(args ...interface{}) {
+	g.Logger.Println(args...)
+}
+
+func (g *loggerWrapper) Warningf(format string, args ...interface{}) {
+	g.Logger.Printf(format, args...)
+}
+
+func (g *loggerWrapper) Error(args ...interface{}) {
+	g.Logger.Print(args...)
+}
+
+func (g *loggerWrapper) Errorln(args ...interface{}) {
+	g.Logger.Println(args...)
+}
+
+func (g *loggerWrapper) Errorf(format string, args ...interface{}) {
+	g.Logger.Printf(format, args...)
+}
+
+func (g *loggerWrapper) V(l int) bool {
+	// Returns true for all verbose level.
+	return true
 }

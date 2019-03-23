@@ -1,0 +1,17 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# To be owned by sig-architecture.
+options:
+  no_parent_owners: true
+reviewers:
+  - bgrant0607
+  - smarterclayton
+  - spiffxp
+  - timothysc
+  - dims
+approvers:
+  - bgrant0607
+  - smarterclayton
+labels:
+  - area/conformance
+  - sig/architecture

@@ -56,6 +56,14 @@ func DefaultServerURL(host, apiPath string, groupVersion schema.GroupVersion, de
 	// hostURL.Path should be blank.
 	//
 	// versionedAPIPath, a path relative to baseURL.Path, points to a versioned API base
+	versionedAPIPath := DefaultVersionedAPIPath(apiPath, groupVersion)
+
+	return hostURL, versionedAPIPath, nil
+}
+
+// DefaultVersionedAPIPathFor constructs the default path for the given group version, assuming the given
+// API path, following the standard conventions of the Kubernetes API.
+func DefaultVersionedAPIPath(apiPath string, groupVersion schema.GroupVersion) string {
 	versionedAPIPath := path.Join("/", apiPath)
 
 	// Add the version to the end of the path
@@ -64,10 +72,9 @@ func DefaultServerURL(host, apiPath string, groupVersion schema.GroupVersion, de
 
 	} else {
 		versionedAPIPath = path.Join(versionedAPIPath, groupVersion.Version)
-
 	}
 
-	return hostURL, versionedAPIPath, nil
+	return versionedAPIPath
 }
 
 // defaultServerUrlFor is shared between IsConfigTransportTLS and RESTClientFor. It

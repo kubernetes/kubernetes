@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"strings"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
-	appslisters "k8s.io/client-go/listers/apps/v1beta1"
+	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -77,7 +77,7 @@ func (spc *realStatefulPodControl) CreateStatefulPod(set *apps.StatefulSet, pod 
 		return err
 	}
 	// If we created the PVCs attempt to create the Pod
-	_, err := spc.client.Core().Pods(set.Namespace).Create(pod)
+	_, err := spc.client.CoreV1().Pods(set.Namespace).Create(pod)
 	// sink already exists errors
 	if apierrors.IsAlreadyExists(err) {
 		return err
@@ -113,7 +113,7 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 
 		attemptedUpdate = true
 		// commit the update, retrying on conflicts
-		_, updateErr := spc.client.Core().Pods(set.Namespace).Update(pod)
+		_, updateErr := spc.client.CoreV1().Pods(set.Namespace).Update(pod)
 		if updateErr == nil {
 			return nil
 		}
@@ -134,7 +134,7 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 }
 
 func (spc *realStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
-	err := spc.client.Core().Pods(set.Namespace).Delete(pod.Name, nil)
+	err := spc.client.CoreV1().Pods(set.Namespace).Delete(pod.Name, nil)
 	spc.recordPodEvent("delete", set, pod, err)
 	return err
 }
@@ -172,7 +172,7 @@ func (spc *realStatefulPodControl) recordClaimEvent(verb string, set *apps.State
 	}
 }
 
-// createPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which mush be a member of
+// createPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, which must be a member of
 // set. If all of the claims for Pod are successfully created, the returned error is nil. If creation fails, this method
 // may be called again until no error is returned, indicating the PersistentVolumeClaims for pod are consistent with
 // set's Spec.
@@ -182,7 +182,7 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 		_, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
 		switch {
 		case apierrors.IsNotFound(err):
-			_, err := spc.client.Core().PersistentVolumeClaims(claim.Namespace).Create(&claim)
+			_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(&claim)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("Failed to create PVC %s: %s", claim.Name, err))
 			}

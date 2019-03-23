@@ -19,6 +19,7 @@ package autoscaling
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -45,7 +46,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 	})
 
 	SIGDescribe("[Serial] [Slow] ReplicaSet", func() {
-		// CPU tests via deployments
+		// CPU tests via ReplicaSets
 		It(titleUp, func() {
 			scaleUp("rs", common.KindReplicaSet, false, rc, f)
 		})
@@ -95,13 +96,13 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 
 // HPAScaleTest struct is used by the scale(...) function.
 type HPAScaleTest struct {
-	initPods                    int32
-	totalInitialCPUUsage        int32
+	initPods                    int
+	totalInitialCPUUsage        int
 	perPodCPURequest            int64
 	targetCPUUtilizationPercent int32
 	minPods                     int32
 	maxPods                     int32
-	firstScale                  int32
+	firstScale                  int
 	firstScaleStasis            time.Duration
 	cpuBurst                    int
 	secondScale                 int32
@@ -113,15 +114,16 @@ type HPAScaleTest struct {
 // The first state change is due to the CPU being consumed initially, which HPA responds to by changing pod counts.
 // The second state change (optional) is due to the CPU burst parameter, which HPA again responds to.
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
-func (scaleTest *HPAScaleTest) run(name, kind string, rc *common.ResourceConsumer, f *framework.Framework) {
+func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc *common.ResourceConsumer, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
-	rc = common.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, int(scaleTest.initPods), int(scaleTest.totalInitialCPUUsage), 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.InternalClientset)
+	rc = common.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.InternalClientset, f.ScalesGetter)
 	defer rc.CleanUp()
 	hpa := common.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
 	defer common.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
-	rc.WaitForReplicas(int(scaleTest.firstScale), timeToWait)
+
+	rc.WaitForReplicas(scaleTest.firstScale, timeToWait)
 	if scaleTest.firstScaleStasis > 0 {
-		rc.EnsureDesiredReplicas(int(scaleTest.firstScale), scaleTest.firstScaleStasis)
+		rc.EnsureDesiredReplicasInRange(scaleTest.firstScale, scaleTest.firstScale+1, scaleTest.firstScaleStasis, hpa.Name)
 	}
 	if scaleTest.cpuBurst > 0 && scaleTest.secondScale > 0 {
 		rc.ConsumeCPU(scaleTest.cpuBurst)
@@ -129,7 +131,7 @@ func (scaleTest *HPAScaleTest) run(name, kind string, rc *common.ResourceConsume
 	}
 }
 
-func scaleUp(name, kind string, checkStability bool, rc *common.ResourceConsumer, f *framework.Framework) {
+func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, rc *common.ResourceConsumer, f *framework.Framework) {
 	stasis := 0 * time.Minute
 	if checkStability {
 		stasis = 10 * time.Minute
@@ -149,14 +151,14 @@ func scaleUp(name, kind string, checkStability bool, rc *common.ResourceConsumer
 	scaleTest.run(name, kind, rc, f)
 }
 
-func scaleDown(name, kind string, checkStability bool, rc *common.ResourceConsumer, f *framework.Framework) {
+func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, rc *common.ResourceConsumer, f *framework.Framework) {
 	stasis := 0 * time.Minute
 	if checkStability {
 		stasis = 10 * time.Minute
 	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    5,
-		totalInitialCPUUsage:        375,
+		totalInitialCPUUsage:        325,
 		perPodCPURequest:            500,
 		targetCPUUtilizationPercent: 30,
 		minPods:                     1,

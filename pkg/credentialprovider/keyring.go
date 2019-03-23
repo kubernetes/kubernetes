@@ -17,17 +17,14 @@ limitations under the License.
 package credentialprovider
 
 import (
-	"encoding/json"
 	"net"
 	"net/url"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
-	dockertypes "github.com/docker/docker/api/types"
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -54,17 +51,39 @@ type lazyDockerKeyring struct {
 	Providers []DockerConfigProvider
 }
 
+// AuthConfig contains authorization information for connecting to a Registry
+// This type mirrors "github.com/docker/docker/api/types.AuthConfig"
+type AuthConfig struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	Auth     string `json:"auth,omitempty"`
+
+	// Email is an optional value associated with the username.
+	// This field is deprecated and will be removed in a later
+	// version of docker.
+	Email string `json:"email,omitempty"`
+
+	ServerAddress string `json:"serveraddress,omitempty"`
+
+	// IdentityToken is used to authenticate the user and get
+	// an access token for the registry.
+	IdentityToken string `json:"identitytoken,omitempty"`
+
+	// RegistryToken is a bearer token to be sent to a registry
+	RegistryToken string `json:"registrytoken,omitempty"`
+}
+
 // LazyAuthConfiguration wraps dockertypes.AuthConfig, potentially deferring its
 // binding. If Provider is non-nil, it will be used to obtain new credentials
 // by calling LazyProvide() on it.
 type LazyAuthConfiguration struct {
-	dockertypes.AuthConfig
+	AuthConfig
 	Provider DockerConfigProvider
 }
 
 func DockerConfigEntryToLazyAuthConfiguration(ident DockerConfigEntry) LazyAuthConfiguration {
 	return LazyAuthConfiguration{
-		AuthConfig: dockertypes.AuthConfig{
+		AuthConfig: AuthConfig{
 			Username: ident.Username,
 			Password: ident.Password,
 			Email:    ident.Email,
@@ -94,7 +113,7 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 		}
 		parsed, err := url.Parse(value)
 		if err != nil {
-			glog.Errorf("Entry %q in dockercfg invalid (%v), ignoring", loc, err)
+			klog.Errorf("Entry %q in dockercfg invalid (%v), ignoring", loc, err)
 			continue
 		}
 
@@ -284,14 +303,12 @@ func (f *FakeKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
 	return f.auth, f.ok
 }
 
-// unionDockerKeyring delegates to a set of keyrings.
-type unionDockerKeyring struct {
-	keyrings []DockerKeyring
-}
+// UnionDockerKeyring delegates to a set of keyrings.
+type UnionDockerKeyring []DockerKeyring
 
-func (k *unionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
+func (k UnionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool) {
 	authConfigs := []LazyAuthConfiguration{}
-	for _, subKeyring := range k.keyrings {
+	for _, subKeyring := range k {
 		if subKeyring == nil {
 			continue
 		}
@@ -301,38 +318,4 @@ func (k *unionDockerKeyring) Lookup(image string) ([]LazyAuthConfiguration, bool
 	}
 
 	return authConfigs, (len(authConfigs) > 0)
-}
-
-// MakeDockerKeyring inspects the passedSecrets to see if they contain any DockerConfig secrets.  If they do,
-// then a DockerKeyring is built based on every hit and unioned with the defaultKeyring.
-// If they do not, then the default keyring is returned
-func MakeDockerKeyring(passedSecrets []v1.Secret, defaultKeyring DockerKeyring) (DockerKeyring, error) {
-	passedCredentials := []DockerConfig{}
-	for _, passedSecret := range passedSecrets {
-		if dockerConfigJsonBytes, dockerConfigJsonExists := passedSecret.Data[v1.DockerConfigJsonKey]; (passedSecret.Type == v1.SecretTypeDockerConfigJson) && dockerConfigJsonExists && (len(dockerConfigJsonBytes) > 0) {
-			dockerConfigJson := DockerConfigJson{}
-			if err := json.Unmarshal(dockerConfigJsonBytes, &dockerConfigJson); err != nil {
-				return nil, err
-			}
-
-			passedCredentials = append(passedCredentials, dockerConfigJson.Auths)
-		} else if dockercfgBytes, dockercfgExists := passedSecret.Data[v1.DockerConfigKey]; (passedSecret.Type == v1.SecretTypeDockercfg) && dockercfgExists && (len(dockercfgBytes) > 0) {
-			dockercfg := DockerConfig{}
-			if err := json.Unmarshal(dockercfgBytes, &dockercfg); err != nil {
-				return nil, err
-			}
-
-			passedCredentials = append(passedCredentials, dockercfg)
-		}
-	}
-
-	if len(passedCredentials) > 0 {
-		basicKeyring := &BasicDockerKeyring{}
-		for _, currCredentials := range passedCredentials {
-			basicKeyring.Add(currCredentials)
-		}
-		return &unionDockerKeyring{[]DockerKeyring{basicKeyring, defaultKeyring}}, nil
-	}
-
-	return defaultKeyring, nil
 }

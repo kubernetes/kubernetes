@@ -2,23 +2,22 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // ContainerInspect returns the container information.
 func (cli *Client) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+	if containerID == "" {
+		return types.ContainerJSON{}, objectNotFoundError{object: "container", id: containerID}
+	}
 	serverResp, err := cli.get(ctx, "/containers/"+containerID+"/json", nil, nil)
 	if err != nil {
-		if serverResp.statusCode == http.StatusNotFound {
-			return types.ContainerJSON{}, containerNotFoundError{containerID}
-		}
-		return types.ContainerJSON{}, err
+		return types.ContainerJSON{}, wrapResponseError(err, serverResp, "container", containerID)
 	}
 
 	var response types.ContainerJSON
@@ -29,16 +28,16 @@ func (cli *Client) ContainerInspect(ctx context.Context, containerID string) (ty
 
 // ContainerInspectWithRaw returns the container information and its raw representation.
 func (cli *Client) ContainerInspectWithRaw(ctx context.Context, containerID string, getSize bool) (types.ContainerJSON, []byte, error) {
+	if containerID == "" {
+		return types.ContainerJSON{}, nil, objectNotFoundError{object: "container", id: containerID}
+	}
 	query := url.Values{}
 	if getSize {
 		query.Set("size", "1")
 	}
 	serverResp, err := cli.get(ctx, "/containers/"+containerID+"/json", query, nil)
 	if err != nil {
-		if serverResp.statusCode == http.StatusNotFound {
-			return types.ContainerJSON{}, nil, containerNotFoundError{containerID}
-		}
-		return types.ContainerJSON{}, nil, err
+		return types.ContainerJSON{}, nil, wrapResponseError(err, serverResp, "container", containerID)
 	}
 	defer ensureReaderClosed(serverResp)
 

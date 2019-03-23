@@ -22,39 +22,48 @@ import (
 	"os"
 	"path"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
-	"k8s.io/kubernetes/pkg/util/keymutex"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/utils/keymutex"
+	utilstrings "k8s.io/utils/strings"
 )
 
-// This is the primary entrypoint for volume plugins.
+const (
+	// DefaultCloudConfigPath is the default path for cloud configuration
+	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
+)
+
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&cinderPlugin{}}
 }
 
-type CinderProvider interface {
+// BlockStorageProvider is the interface for accessing cinder functionality.
+type BlockStorageProvider interface {
 	AttachDisk(instanceID, volumeID string) (string, error)
 	DetachDisk(instanceID, volumeID string) error
 	DeleteVolume(volumeID string) error
-	CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, bool, error)
+	CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error)
 	GetDevicePath(volumeID string) string
 	InstanceID() (string, error)
 	GetAttachmentDiskPath(instanceID, volumeID string) (string, error)
 	OperationPending(diskName string) (bool, string, error)
 	DiskIsAttached(instanceID, volumeID string) (bool, error)
-	DisksAreAttached(instanceID string, volumeIDs []string) (map[string]bool, error)
+	DiskIsAttachedByName(nodeName types.NodeName, volumeID string) (bool, string, error)
+	DisksAreAttachedByName(nodeName types.NodeName, volumeIDs []string) (map[string]bool, error)
 	ShouldTrustDevicePath() bool
 	Instances() (cloudprovider.Instances, bool)
+	ExpandVolume(volumeID string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 }
 
 type cinderPlugin struct {
@@ -72,9 +81,13 @@ const (
 	cinderVolumePluginName = "kubernetes.io/cinder"
 )
 
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(cinderVolumePluginName), volName)
+}
+
 func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
-	plugin.volumeLocks = keymutex.NewKeyMutex()
+	plugin.volumeLocks = keymutex.NewHashed(0)
 	return nil
 }
 
@@ -83,16 +96,21 @@ func (plugin *cinderPlugin) GetPluginName() string {
 }
 
 func (plugin *cinderPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err
 	}
 
-	return volumeSource.VolumeID, nil
+	return volumeID, nil
 }
 
 func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.Cinder != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder != nil)
+}
+
+func (plugin *cinderPlugin) IsMigratedToCSI() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
 }
 
 func (plugin *cinderPlugin) RequiresRemount() bool {
@@ -107,6 +125,38 @@ func (plugin *cinderPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+var _ volume.VolumePluginWithAttachLimits = &cinderPlugin{}
+
+func (plugin *cinderPlugin) GetVolumeLimits() (map[string]int64, error) {
+	volumeLimits := map[string]int64{
+		util.CinderVolumeLimitKey: util.DefaultMaxCinderVolumes,
+	}
+	cloud := plugin.host.GetCloudProvider()
+
+	// if we can't fetch cloudprovider we return an error
+	// hoping external CCM or admin can set it. Returning
+	// default values from here will mean, no one can
+	// override them.
+	if cloud == nil {
+		return nil, fmt.Errorf("No cloudprovider present")
+	}
+
+	if cloud.ProviderName() != openstack.ProviderName {
+		return nil, fmt.Errorf("Expected Openstack cloud, found %s", cloud.ProviderName())
+	}
+
+	openstackCloud, ok := cloud.(*openstack.OpenStack)
+	if ok && openstackCloud.NodeVolumeAttachLimit() > 0 {
+		volumeLimits[util.CinderVolumeLimitKey] = int64(openstackCloud.NodeVolumeAttachLimit())
+	}
+
+	return volumeLimits, nil
+}
+
+func (plugin *cinderPlugin) VolumeLimitKey(spec *volume.Spec) string {
+	return util.CinderVolumeLimitKey
+}
+
 func (plugin *cinderPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
@@ -114,49 +164,50 @@ func (plugin *cinderPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *cinderPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod.UID, &CinderDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newMounterInternal(spec, pod.UID, &DiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Mounter, error) {
-	cinder, readOnly, err := getVolumeSource(spec)
+	pdName, fsType, readOnly, err := getVolumeInfo(spec)
 	if err != nil {
 		return nil, err
 	}
 
-	pdName := cinder.VolumeID
-	fsType := cinder.FSType
-
 	return &cinderVolumeMounter{
 		cinderVolume: &cinderVolume{
-			podUID:  podUID,
-			volName: spec.Name(),
-			pdName:  pdName,
-			mounter: mounter,
-			manager: manager,
-			plugin:  plugin,
+			podUID:          podUID,
+			volName:         spec.Name(),
+			pdName:          pdName,
+			mounter:         mounter,
+			manager:         manager,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
 		fsType:             fsType,
 		readOnly:           readOnly,
-		blockDeviceMounter: volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		blockDeviceMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mountOptions:       util.MountOptionFromSpec(spec),
+	}, nil
 }
 
 func (plugin *cinderPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, &CinderDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newUnmounterInternal(volName, podUID, &DiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *cinderPlugin) newUnmounterInternal(volName string, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Unmounter, error) {
 	return &cinderVolumeUnmounter{
 		&cinderVolume{
-			podUID:  podUID,
-			volName: volName,
-			manager: manager,
-			mounter: mounter,
-			plugin:  plugin,
+			podUID:          podUID,
+			volName:         volName,
+			manager:         manager,
+			mounter:         mounter,
+			plugin:          plugin,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 		}}, nil
 }
 
 func (plugin *cinderPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	return plugin.newDeleterInternal(spec, &CinderDiskUtil{})
+	return plugin.newDeleterInternal(spec, &DiskUtil{})
 }
 
 func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdManager) (volume.Deleter, error) {
@@ -173,7 +224,7 @@ func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdMana
 }
 
 func (plugin *cinderPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	return plugin.newProvisionerInternal(options, &CinderDiskUtil{})
+	return plugin.newProvisionerInternal(options, &DiskUtil{})
 }
 
 func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions, manager cdManager) (volume.Provisioner, error) {
@@ -186,25 +237,30 @@ func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions,
 	}, nil
 }
 
-func getCloudProvider(cloudProvider cloudprovider.Interface) (CinderProvider, error) {
-	if cloud, ok := cloudProvider.(*openstack.OpenStack); ok && cloud != nil {
-		return cloud, nil
-	}
-	return nil, fmt.Errorf("wrong cloud type")
-}
-
-func (plugin *cinderPlugin) getCloudProvider() (CinderProvider, error) {
+func (plugin *cinderPlugin) getCloudProvider() (BlockStorageProvider, error) {
 	cloud := plugin.host.GetCloudProvider()
 	if cloud == nil {
-		glog.Errorf("Cloud provider not initialized properly")
-		return nil, errors.New("Cloud provider not initialized properly")
+		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
+			var config *os.File
+			config, err = os.Open(DefaultCloudConfigPath)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load OpenStack configuration from default path : %v", err)
+			}
+			defer config.Close()
+			cloud, err = cloudprovider.GetCloudProvider(openstack.ProviderName, config)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create OpenStack cloud provider from default path : %v", err)
+			}
+		} else {
+			return nil, fmt.Errorf("OpenStack cloud provider was not initialized properly : %v", err)
+		}
 	}
 
 	switch cloud := cloud.(type) {
 	case *openstack.OpenStack:
 		return cloud, nil
 	default:
-		return nil, errors.New("Invalid cloud provider: expected OpenStack.")
+		return nil, errors.New("invalid cloud provider: expected OpenStack")
 	}
 }
 
@@ -215,7 +271,7 @@ func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 	if err != nil {
 		return nil, err
 	}
-	glog.V(4).Infof("Found volume %s mounted to %s", sourceName, mountPath)
+	klog.V(4).Infof("Found volume %s mounted to %s", sourceName, mountPath)
 	cinderVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -227,6 +283,41 @@ func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 	return volume.NewSpecFromVolume(cinderVolume), nil
 }
 
+var _ volume.ExpandableVolumePlugin = &cinderPlugin{}
+
+func (plugin *cinderPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
+	volumeID, _, _, err := getVolumeInfo(spec)
+	if err != nil {
+		return oldSize, err
+	}
+	cloud, err := plugin.getCloudProvider()
+	if err != nil {
+		return oldSize, err
+	}
+
+	expandedSize, err := cloud.ExpandVolume(volumeID, oldSize, newSize)
+	if err != nil {
+		return oldSize, err
+	}
+
+	klog.V(2).Infof("volume %s expanded to new size %d successfully", volumeID, int(newSize.Value()))
+	return expandedSize, nil
+}
+
+func (plugin *cinderPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+	_, err := util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+var _ volume.NodeExpandableVolumePlugin = &cinderPlugin{}
+
+func (plugin *cinderPlugin) RequiresFSResize() bool {
+	return true
+}
+
 // Abstract interface to PD operations.
 type cdManager interface {
 	// Attaches the disk to the kubelet's host machine.
@@ -234,7 +325,7 @@ type cdManager interface {
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(unmounter *cinderVolumeUnmounter) error
 	// Creates a volume
-	CreateVolume(provisioner *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error)
+	CreateVolume(provisioner *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *cinderVolumeDeleter) error
 }
@@ -246,6 +337,7 @@ type cinderVolumeMounter struct {
 	fsType             string
 	readOnly           bool
 	blockDeviceMounter *mount.SafeFormatAndMount
+	mountOptions       []string
 }
 
 // cinderPersistentDisk volumes are disk resources provided by C3
@@ -266,7 +358,7 @@ type cinderVolume struct {
 	// diskMounter provides the interface that is used to mount the actual block device.
 	blockDeviceMounter mount.Interface
 	plugin             *cinderPlugin
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 func (b *cinderVolumeMounter) GetAttributes() volume.Attributes {
@@ -290,18 +382,18 @@ func (b *cinderVolumeMounter) SetUp(fsGroup *int64) error {
 
 // SetUp bind mounts to the volume path.
 func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
-	glog.V(5).Infof("Cinder SetUp %s to %s", b.pdName, dir)
+	klog.V(5).Infof("Cinder SetUp %s to %s", b.pdName, dir)
 
 	b.plugin.volumeLocks.LockKey(b.pdName)
 	defer b.plugin.volumeLocks.UnlockKey(b.pdName)
 
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("Cannot validate mount point: %s %v", dir, err)
+		klog.Errorf("Cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notmnt {
-		glog.V(4).Infof("Something is already mounted to target %s", dir)
+		klog.V(4).Infof("Something is already mounted to target %s", dir)
 		return nil
 	}
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pdName)
@@ -312,45 +404,46 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.V(4).Infof("Could not create directory %s: %v", dir, err)
+		klog.V(4).Infof("Could not create directory %s: %v", dir, err)
 		return err
 	}
 
+	mountOptions := util.JoinMountOptions(options, b.mountOptions)
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	glog.V(4).Infof("Attempting to mount cinder volume %s to %s with options %v", b.pdName, dir, options)
+	klog.V(4).Infof("Attempting to mount cinder volume %s to %s with options %v", b.pdName, dir, mountOptions)
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
-		glog.V(4).Infof("Mount failed: %v", err)
+		klog.V(4).Infof("Mount failed: %v", err)
 		notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notmnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
+				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
 			notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notmnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
+				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", b.GetPath())
 				return err
 			}
 		}
 		os.Remove(dir)
-		glog.Errorf("Failed to mount %s: %v", dir, err)
+		klog.Errorf("Failed to mount %s: %v", dir, err)
 		return err
 	}
 
 	if !b.readOnly {
 		volume.SetVolumeOwnership(b, fsGroup)
 	}
-	glog.V(3).Infof("Cinder volume %s mounted to %s", b.pdName, dir)
+	klog.V(3).Infof("Cinder volume %s mounted to %s", b.pdName, dir)
 
 	return nil
 }
@@ -360,8 +453,7 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 }
 
 func (cd *cinderVolume) GetPath() string {
-	name := cinderVolumePluginName
-	return cd.plugin.host.GetPodVolumeDir(cd.podUID, kstrings.EscapeQualifiedNameForDisk(name), cd.volName)
+	return getPath(cd.podUID, cd.volName, cd.plugin.host)
 }
 
 type cinderVolumeUnmounter struct {
@@ -377,63 +469,63 @@ func (c *cinderVolumeUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
-	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil
 	}
 
-	glog.V(5).Infof("Cinder TearDown of %s", dir)
+	klog.V(5).Infof("Cinder TearDown of %s", dir)
 	notmnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		glog.V(4).Infof("IsLikelyNotMountPoint check failed: %v", err)
+		klog.V(4).Infof("IsLikelyNotMountPoint check failed: %v", err)
 		return err
 	}
 	if notmnt {
-		glog.V(4).Infof("Nothing is mounted to %s, ignoring", dir)
+		klog.V(4).Infof("Nothing is mounted to %s, ignoring", dir)
 		return os.Remove(dir)
 	}
 
 	// Find Cinder volumeID to lock the right volume
 	// TODO: refactor VolumePlugin.NewUnmounter to get full volume.Spec just like
 	// NewMounter. We could then find volumeID there without probing MountRefs.
-	refs, err := mount.GetMountRefs(c.mounter, dir)
+	refs, err := c.mounter.GetMountRefs(dir)
 	if err != nil {
-		glog.V(4).Infof("GetMountRefs failed: %v", err)
+		klog.V(4).Infof("GetMountRefs failed: %v", err)
 		return err
 	}
 	if len(refs) == 0 {
-		glog.V(4).Infof("Directory %s is not mounted", dir)
+		klog.V(4).Infof("Directory %s is not mounted", dir)
 		return fmt.Errorf("directory %s is not mounted", dir)
 	}
 	c.pdName = path.Base(refs[0])
-	glog.V(4).Infof("Found volume %s mounted to %s", c.pdName, dir)
+	klog.V(4).Infof("Found volume %s mounted to %s", c.pdName, dir)
 
 	// lock the volume (and thus wait for any concurrrent SetUpAt to finish)
 	c.plugin.volumeLocks.LockKey(c.pdName)
 	defer c.plugin.volumeLocks.UnlockKey(c.pdName)
 
 	// Reload list of references, there might be SetUpAt finished in the meantime
-	refs, err = mount.GetMountRefs(c.mounter, dir)
+	refs, err = c.mounter.GetMountRefs(dir)
 	if err != nil {
-		glog.V(4).Infof("GetMountRefs failed: %v", err)
+		klog.V(4).Infof("GetMountRefs failed: %v", err)
 		return err
 	}
 	if err := c.mounter.Unmount(dir); err != nil {
-		glog.V(4).Infof("Unmount failed: %v", err)
+		klog.V(4).Infof("Unmount failed: %v", err)
 		return err
 	}
-	glog.V(3).Infof("Successfully unmounted: %s\n", dir)
+	klog.V(3).Infof("Successfully unmounted: %s\n", dir)
 
 	notmnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
-		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+		klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return err
 	}
 	if notmnt {
 		if err := os.Remove(dir); err != nil {
-			glog.V(4).Infof("Failed to remove directory after unmount: %v", err)
+			klog.V(4).Infof("Failed to remove directory after unmount: %v", err)
 			return err
 		}
 	}
@@ -447,8 +539,7 @@ type cinderVolumeDeleter struct {
 var _ volume.Deleter = &cinderVolumeDeleter{}
 
 func (r *cinderVolumeDeleter) GetPath() string {
-	name := cinderVolumePluginName
-	return r.plugin.host.GetPodVolumeDir(r.podUID, kstrings.EscapeQualifiedNameForDisk(name), r.volName)
+	return getPath(r.podUID, r.volName, r.plugin.host)
 }
 
 func (r *cinderVolumeDeleter) Delete() error {
@@ -462,14 +553,23 @@ type cinderVolumeProvisioner struct {
 
 var _ volume.Provisioner = &cinderVolumeProvisioner{}
 
-func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
-	if !volume.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+func (c *cinderVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
+	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
-	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c)
+	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c, selectedNode, allowedTopologies)
 	if err != nil {
 		return nil, err
+	}
+
+	var volumeMode *v1.PersistentVolumeMode
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode = c.options.PVC.Spec.VolumeMode
+		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+			// Block volumes should not have any FSType
+			fstype = ""
+		}
 	}
 
 	pv := &v1.PersistentVolume{
@@ -477,7 +577,7 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			Name:   c.options.PVName,
 			Labels: labels,
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "cinder-dynamic-provisioner",
+				util.VolumeDynamicallyCreatedByKey: "cinder-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -486,8 +586,9 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
+			VolumeMode: volumeMode,
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Cinder: &v1.CinderVolumeSource{
+				Cinder: &v1.CinderPersistentVolumeSource{
 					VolumeID: volumeID,
 					FSType:   fstype,
 					ReadOnly: false,
@@ -500,16 +601,29 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
+	requirements := make([]v1.NodeSelectorRequirement, 0)
+	for k, v := range labels {
+		if v != "" {
+			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
+		}
+	}
+	if len(requirements) > 0 {
+		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
+	}
+
 	return pv, nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*v1.CinderVolumeSource, bool, error) {
+func getVolumeInfo(spec *volume.Spec) (string, string, bool, error) {
 	if spec.Volume != nil && spec.Volume.Cinder != nil {
-		return spec.Volume.Cinder, spec.Volume.Cinder.ReadOnly, nil
+		return spec.Volume.Cinder.VolumeID, spec.Volume.Cinder.FSType, spec.Volume.Cinder.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.Cinder != nil {
-		return spec.PersistentVolume.Spec.Cinder, spec.ReadOnly, nil
+		return spec.PersistentVolume.Spec.Cinder.VolumeID, spec.PersistentVolume.Spec.Cinder.FSType, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a Cinder volume type")
+	return "", "", false, fmt.Errorf("Spec does not reference a Cinder volume type")
 }

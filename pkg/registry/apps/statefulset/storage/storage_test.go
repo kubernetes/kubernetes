@@ -27,11 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -41,17 +42,6 @@ func newStorage(t *testing.T) (StatefulSetStorage, *etcdtesting.EtcdTestServer) 
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "statefulsets"}
 	storage := NewStorage(restOptions)
 	return storage, server
-}
-
-// createStatefulSet is a helper function that returns a StatefulSet with the updated resource version.
-func createStatefulSet(storage *REST, ps apps.StatefulSet, t *testing.T) (apps.StatefulSet, error) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), ps.Namespace)
-	obj, err := storage.Create(ctx, &ps, false)
-	if err != nil {
-		t.Errorf("Failed to create StatefulSet, %v", err)
-	}
-	newPS := obj.(*apps.StatefulSet)
-	return *newPS, nil
 }
 
 func validNewStatefulSet() *apps.StatefulSet {
@@ -93,7 +83,7 @@ func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.StatefulSet.Store)
+	test := genericregistrytest.New(t, storage.StatefulSet.Store)
 	ps := validNewStatefulSet()
 	ps.ObjectMeta = metav1.ObjectMeta{}
 	test.TestCreate(
@@ -112,7 +102,7 @@ func TestStatusUpdate(t *testing.T) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/statefulsets/" + metav1.NamespaceDefault + "/foo"
 	validStatefulSet := validNewStatefulSet()
-	if err := storage.StatefulSet.Storage.Create(ctx, key, validStatefulSet, nil, 0); err != nil {
+	if err := storage.StatefulSet.Storage.Create(ctx, key, validStatefulSet, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	update := apps.StatefulSet{
@@ -125,7 +115,7 @@ func TestStatusUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Status.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update)); err != nil {
+	if _, _, err := storage.Status.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err := storage.StatefulSet.Get(ctx, "foo", &metav1.GetOptions{})
@@ -146,7 +136,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.StatefulSet.Store)
+	test := genericregistrytest.New(t, storage.StatefulSet.Store)
 	test.TestGet(validNewStatefulSet())
 }
 
@@ -154,7 +144,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.StatefulSet.Store)
+	test := genericregistrytest.New(t, storage.StatefulSet.Store)
 	test.TestList(validNewStatefulSet())
 }
 
@@ -162,7 +152,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.StatefulSet.Store)
+	test := genericregistrytest.New(t, storage.StatefulSet.Store)
 	test.TestDelete(validNewStatefulSet())
 }
 
@@ -170,7 +160,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.StatefulSet.Store.DestroyFunc()
-	test := registrytest.New(t, storage.StatefulSet.Store)
+	test := genericregistrytest.New(t, storage.StatefulSet.Store)
 	test.TestWatch(
 		validNewStatefulSet(),
 		// matching labels
@@ -220,11 +210,15 @@ func TestScaleGet(t *testing.T) {
 	var sts apps.StatefulSet
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/statefulsets/" + metav1.NamespaceDefault + "/" + name
-	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0); err != nil {
+	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0, false); err != nil {
 		t.Fatalf("error setting new statefulset (key: %s) %v: %v", key, validStatefulSet, err)
 	}
 
-	want := &extensions.Scale{
+	selector, err := metav1.LabelSelectorAsSelector(validStatefulSet.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &autoscaling.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              name,
 			Namespace:         metav1.NamespaceDefault,
@@ -232,16 +226,16 @@ func TestScaleGet(t *testing.T) {
 			ResourceVersion:   sts.ResourceVersion,
 			CreationTimestamp: sts.CreationTimestamp,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: validStatefulSet.Spec.Replicas,
 		},
-		Status: extensions.ScaleStatus{
+		Status: autoscaling.ScaleStatus{
 			Replicas: validStatefulSet.Status.Replicas,
-			Selector: validStatefulSet.Spec.Selector,
+			Selector: selector.String(),
 		},
 	}
 	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
-	got := obj.(*extensions.Scale)
+	got := obj.(*autoscaling.Scale)
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
@@ -260,21 +254,21 @@ func TestScaleUpdate(t *testing.T) {
 	var sts apps.StatefulSet
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/statefulsets/" + metav1.NamespaceDefault + "/" + name
-	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0); err != nil {
+	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0, false); err != nil {
 		t.Fatalf("error setting new statefulset (key: %s) %v: %v", key, validStatefulSet, err)
 	}
 	replicas := 12
-	update := extensions.Scale{
+	update := autoscaling.Scale{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: extensions.ScaleSpec{
+		Spec: autoscaling.ScaleSpec{
 			Replicas: int32(replicas),
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update)); err != nil {
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 
@@ -282,7 +276,7 @@ func TestScaleUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error fetching scale for %s: %v", name, err)
 	}
-	scale := obj.(*extensions.Scale)
+	scale := obj.(*autoscaling.Scale)
 	if scale.Spec.Replicas != int32(replicas) {
 		t.Errorf("wrong replicas count expected: %d got: %d", replicas, scale.Spec.Replicas)
 	}
@@ -290,7 +284,7 @@ func TestScaleUpdate(t *testing.T) {
 	update.ResourceVersion = sts.ResourceVersion
 	update.Spec.Replicas = 15
 
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update)); err != nil && !errors.IsConflict(err) {
+	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil && !errors.IsConflict(err) {
 		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
 	}
 }

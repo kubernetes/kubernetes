@@ -15,8 +15,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["env_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/env",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
 )
 

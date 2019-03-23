@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -56,17 +56,17 @@ func TestRemoveContainer(t *testing.T) {
 	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
 	assert.Equal(t, len(fakeContainers), 1)
 
-	containerId := fakeContainers[0].Id
+	containerID := fakeContainers[0].Id
 	fakeOS := m.osInterface.(*containertest.FakeOS)
-	err = m.removeContainer(containerId)
+	err = m.removeContainer(containerID)
 	assert.NoError(t, err)
 	// Verify container log is removed
-	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "12345678", "foo_0.log")
-	expectedContainerLogSymlink := legacyLogSymlink(containerId, "foo", "bar", "new")
+	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
+	expectedContainerLogSymlink := legacyLogSymlink(containerID, "foo", "bar", "new")
 	assert.Equal(t, fakeOS.Removes, []string{expectedContainerLogPath, expectedContainerLogSymlink})
 	// Verify container is removed
 	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
-	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerId})
+	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerID})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
 }
@@ -203,95 +203,6 @@ func TestToKubeContainerStatus(t *testing.T) {
 	}
 }
 
-func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
-	container := &pod.Spec.Containers[containerIndex]
-	podIP := ""
-	restartCount := 0
-	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
-	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
-	restartCountUint32 := uint32(restartCount)
-	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
-
-	expectedConfig := &runtimeapi.ContainerConfig{
-		Metadata: &runtimeapi.ContainerMetadata{
-			Name:    container.Name,
-			Attempt: restartCountUint32,
-		},
-		Image:       &runtimeapi.ImageSpec{Image: container.Image},
-		Command:     container.Command,
-		Args:        []string(nil),
-		WorkingDir:  container.WorkingDir,
-		Labels:      newContainerLabels(container, pod),
-		Annotations: newContainerAnnotations(container, pod, restartCount),
-		Devices:     makeDevices(opts),
-		Mounts:      m.makeMounts(opts, container),
-		LogPath:     containerLogsPath,
-		Stdin:       container.Stdin,
-		StdinOnce:   container.StdinOnce,
-		Tty:         container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container, pod, new(int64), ""),
-		Envs:        envs,
-	}
-	return expectedConfig
-}
-
-func TestGenerateContainerConfig(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
-	assert.NoError(t, err)
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "foo",
-					Image:           "busybox",
-					ImagePullPolicy: v1.PullIfNotPresent,
-					Command:         []string{"testCommand"},
-					WorkingDir:      "testWorkingDir",
-				},
-			},
-		},
-	}
-
-	expectedConfig := makeExpectedConfig(m, pod, 0)
-	containerConfig, err := m.generateContainerConfig(&pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
-
-	runAsUser := int64(0)
-	runAsNonRootTrue := true
-	podWithContainerSecurityContext := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "new",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "foo",
-					Image:           "busybox",
-					ImagePullPolicy: v1.PullIfNotPresent,
-					Command:         []string{"testCommand"},
-					WorkingDir:      "testWorkingDir",
-					SecurityContext: &v1.SecurityContext{
-						RunAsNonRoot: &runAsNonRootTrue,
-						RunAsUser:    &runAsUser,
-					},
-				},
-			},
-		},
-	}
-
-	_, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
-	assert.Error(t, err)
-}
-
 func TestLifeCycleHook(t *testing.T) {
 
 	// Setup
@@ -346,10 +257,10 @@ func TestLifeCycleHook(t *testing.T) {
 	}
 
 	fakeRunner := &containertest.FakeContainerCommandRunner{}
-	fakeHttp := &fakeHTTP{}
+	fakeHTTP := &fakeHTTP{}
 
 	lcHanlder := lifecycle.NewHandlerRunner(
-		fakeHttp,
+		fakeHTTP,
 		fakeRunner,
 		nil)
 
@@ -366,11 +277,11 @@ func TestLifeCycleHook(t *testing.T) {
 
 	// Configured and working HTTP hook
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
-		defer func() { fakeHttp.url = "" }()
+		defer func() { fakeHTTP.url = "" }()
 		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
 		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriod)
 
-		if !strings.Contains(fakeHttp.url, httpLifeCycle.PreStop.HTTPGet.Host) {
+		if !strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Prestop hook was not invoked")
 		}
 	})
@@ -384,7 +295,7 @@ func TestLifeCycleHook(t *testing.T) {
 
 		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriodLocal)
 
-		if strings.Contains(fakeHttp.url, httpLifeCycle.PreStop.HTTPGet.Host) {
+		if strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Should not execute when gracePeriod is 0")
 		}
 	})

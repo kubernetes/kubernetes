@@ -26,9 +26,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-// ContextFunc returns a Context given a request - a context must be returned
-type ContextFunc func(req *http.Request) request.Context
-
 // ScopeNamer handles accessing names from requests and objects
 type ScopeNamer interface {
 	// Namespace returns the appropriate namespace value from the request (may be empty) or an
@@ -51,7 +48,6 @@ type ScopeNamer interface {
 }
 
 type ContextBasedNaming struct {
-	GetContext    ContextFunc
 	SelfLinker    runtime.SelfLinker
 	ClusterScoped bool
 
@@ -67,7 +63,7 @@ func (n ContextBasedNaming) SetSelfLink(obj runtime.Object, url string) error {
 }
 
 func (n ContextBasedNaming) Namespace(req *http.Request) (namespace string, err error) {
-	requestInfo, ok := request.RequestInfoFrom(n.GetContext(req))
+	requestInfo, ok := request.RequestInfoFrom(req.Context())
 	if !ok {
 		return "", fmt.Errorf("missing requestInfo")
 	}
@@ -75,7 +71,7 @@ func (n ContextBasedNaming) Namespace(req *http.Request) (namespace string, err 
 }
 
 func (n ContextBasedNaming) Name(req *http.Request) (namespace, name string, err error) {
-	requestInfo, ok := request.RequestInfoFrom(n.GetContext(req))
+	requestInfo, ok := request.RequestInfoFrom(req.Context())
 	if !ok {
 		return "", "", fmt.Errorf("missing requestInfo")
 	}

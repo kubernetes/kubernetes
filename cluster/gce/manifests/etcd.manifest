@@ -1,0 +1,107 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"etcd-server{{ suffix }}",
+  "namespace": "kube-system",
+  "annotations": {
+    "scheduler.alpha.kubernetes.io/critical-pod": "",
+    "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
+  }
+},
+"spec":{
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "etcd-container",
+    "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.3.10-0') }}",
+    "resources": {
+      "requests": {
+        "cpu": {{ cpulimit }}
+      }
+    },
+    "command": [
+              "/bin/sh",
+              "-c",
+              "if [ -e /usr/local/bin/migrate-if-needed.sh ]; then /usr/local/bin/migrate-if-needed.sh 1>>/var/log/etcd{{ suffix }}.log 2>&1; fi; exec /usr/local/bin/etcd --name etcd-{{ hostname }} --listen-peer-urls {{ etcd_protocol }}://{{ host_ip }}:{{ server_port }} --initial-advertise-peer-urls {{ etcd_protocol }}://{{ hostname }}:{{ server_port }} --advertise-client-urls http://127.0.0.1:{{ port }} --listen-client-urls http://127.0.0.1:{{ port }} {{ quota_bytes }} --data-dir /var/etcd/data{{ suffix }} --initial-cluster-state {{ cluster_state }} --initial-cluster {{ etcd_cluster }} {{ etcd_creds }} {{ etcd_apiserver_creds }} {{ etcd_extra_args }} 1>>/var/log/etcd{{ suffix }}.log 2>&1"
+            ],
+    "env": [
+      { "name": "TARGET_STORAGE",
+        "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
+      },
+      { "name": "TARGET_VERSION",
+        "value": "{{ pillar.get('etcd_version', '3.3.10') }}"
+      },
+      { "name": "DATA_DIRECTORY",
+        "value": "/var/etcd/data{{ suffix }}"
+      },
+      { "name": "INITIAL_CLUSTER",
+        "value": "{{ etcd_cluster }}"
+      },
+      { "name": "LISTEN_PEER_URLS",
+        "value": "{{ etcd_protocol }}://{{ host_ip }}:{{ server_port }}"
+      },
+      { "name": "INITIAL_ADVERTISE_PEER_URLS",
+        "value": "{{ etcd_protocol }}://{{ hostname }}:{{ server_port }}"
+      },
+      { "name": "ETCD_CREDS",
+        "value": "{{ etcd_creds }}"
+      },
+      { "name": "ETCD_APISERVER_CREDS",
+        "value": "{{ etcd_apiserver_creds }}"
+      },
+      { "name": "ETCD_SNAPSHOT_COUNT",
+        "value": "10000"
+      }
+        ],
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": {{ port }},
+        "path": "/health"
+      },
+      "initialDelaySeconds": {{ liveness_probe_initial_delay }},
+      "timeoutSeconds": 15
+    },
+    "ports": [
+      { "name": "serverport",
+        "containerPort": {{ server_port }},
+        "hostPort": {{ server_port }}
+      },
+      { "name": "clientport",
+        "containerPort": {{ port }},
+        "hostPort": {{ port }}
+      }
+        ],
+    "volumeMounts": [
+      { "name": "varetcd",
+        "mountPath": "/var/etcd",
+        "readOnly": false
+      },
+      { "name": "varlogetcd",
+        "mountPath": "/var/log/etcd{{ suffix }}.log",
+        "readOnly": false
+      },
+      { "name": "etc",
+        "mountPath": "/etc/srv/kubernetes",
+        "readOnly": false
+      }
+    ]
+    }
+],
+"volumes":[
+  { "name": "varetcd",
+    "hostPath": {
+        "path": "/mnt/master-pd/var/etcd"}
+  },
+  { "name": "varlogetcd",
+    "hostPath": {
+        "path": "/var/log/etcd{{ suffix }}.log",
+        "type": "FileOrCreate"}
+  },
+  { "name": "etc",
+    "hostPath": {
+        "path": "/etc/srv/kubernetes"}
+  }
+]
+}}

@@ -23,15 +23,15 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func deleteSecretOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
-	if err := c.Core().Secrets(ns).Delete(name, nil); err != nil {
+	if err := c.CoreV1().Secrets(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete secret %v: %v", name, err)
 	}
 }
@@ -41,7 +41,7 @@ func TestSecrets(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(nil)
 	defer closeFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
 	ns := framework.CreateTestingNamespace("secret", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -62,7 +62,7 @@ func DoTestSecrets(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
 		},
 	}
 
-	if _, err := client.Core().Secrets(s.Namespace).Create(&s); err != nil {
+	if _, err := client.CoreV1().Secrets(s.Namespace).Create(&s); err != nil {
 		t.Errorf("unable to create test secret: %v", err)
 	}
 	defer deleteSecretOrErrorf(t, client, s.Namespace, s.Name)
@@ -102,14 +102,14 @@ func DoTestSecrets(t *testing.T, client clientset.Interface, ns *v1.Namespace) {
 
 	// Create a pod to consume secret.
 	pod.ObjectMeta.Name = "uses-secret"
-	if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 
 	// Create a pod that consumes non-existent secret.
 	pod.ObjectMeta.Name = "uses-non-existent-secret"
-	if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)

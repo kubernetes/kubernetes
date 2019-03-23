@@ -32,9 +32,6 @@ type Storage interface {
 	Save(st raftpb.HardState, ents []raftpb.Entry) error
 	// SaveSnap function saves snapshot to the underlying stable storage.
 	SaveSnap(snap raftpb.Snapshot) error
-	// DBFilePath returns the file path of database snapshot saved with given
-	// id.
-	DBFilePath(id uint64) (string, error)
 	// Close closes the Storage and performs finalization.
 	Close() error
 }
@@ -97,5 +94,5 @@ func readWAL(waldir string, snap walpb.Snapshot) (w *wal.WAL, id, cid types.ID, 
 	pbutil.MustUnmarshal(&metadata, wmetadata)
 	id = types.ID(metadata.NodeID)
 	cid = types.ID(metadata.ClusterID)
-	return
+	return w, id, cid, st, ents
 }

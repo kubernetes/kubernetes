@@ -18,37 +18,27 @@ package e2e_node
 
 import (
 	"os/exec"
-	"path/filepath"
-	"regexp"
+	"strconv"
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-)
-
-const (
-	devicePluginFeatureGate = "DevicePlugins=true"
-	testPodNamePrefix       = "nvidia-gpu-"
+	"github.com/prometheus/common/model"
 )
 
 // Serial because the test restarts Kubelet
-var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin] [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeature:GPUDevicePlugin][Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus-errors")
 
 	Context("DevicePlugin", func() {
-		By("Enabling support for Device Plugin")
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates[string(features.DevicePlugins)] = true
-		})
-
+		var devicePluginPod *v1.Pod
+		var err error
 		BeforeEach(func() {
 			By("Ensuring that Nvidia GPUs exists on the node")
 			if !checkIfNvidiaGPUsExistOnNode() {
@@ -56,12 +46,13 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			}
 
 			By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
-			f.PodClient().CreateSync(framework.NVIDIADevicePlugin(f.Namespace.Name))
+			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(framework.NVIDIADevicePlugin())
+			framework.ExpectNoError(err)
 
 			By("Waiting for GPUs to become available on the local node")
 			Eventually(func() bool {
 				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
-			}, 10*time.Second, framework.Poll).Should(BeTrue())
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
 
 			if framework.NumberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
 				Skip("Not enough GPUs to execute this test (at least two needed)")
@@ -83,25 +74,61 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 
 		It("checks that when Kubelet restarts exclusive GPU assignation to pods is kept.", func() {
 			By("Creating one GPU pod on a node with at least two GPUs")
-			p1 := f.PodClient().CreateSync(makeCudaPauseImage())
-			devId1 := getDeviceId(f, p1.Name, p1.Name, 1)
+			podRECMD := "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs"
+			p1 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
+
+			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
+			devId1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			p1, err := f.PodClient().Get(p1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			By("Restarting Kubelet and waiting for the current running pod to restart")
-			restartKubelet(f)
+			restartKubelet()
 
-			By("Confirming that after a kubelet and pod restart, GPU assignement is kept")
-			devIdRestart := getDeviceId(f, p1.Name, p1.Name, 2)
-			Expect(devIdRestart).To(Equal(devId1))
+			By("Confirming that after a kubelet and pod restart, GPU assignment is kept")
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIdRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
+			Expect(devIdRestart1).To(Equal(devId1))
 
 			By("Restarting Kubelet and creating another pod")
-			restartKubelet(f)
-			p2 := f.PodClient().CreateSync(makeCudaPauseImage())
+			restartKubelet()
+			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+			Eventually(func() bool {
+				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
+			p2 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
 
 			By("Checking that pods got a different GPU")
-			devId2 := getDeviceId(f, p2.Name, p2.Name, 1)
+			devId2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
+
 			Expect(devId1).To(Not(Equal(devId2)))
+
+			By("Deleting device plugin.")
+			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
+			By("Waiting for GPUs to become unavailable on the local node")
+			Eventually(func() bool {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				return framework.NumberOfNVIDIAGPUs(node) <= 0
+			}, 10*time.Minute, framework.Poll).Should(BeTrue())
+			By("Checking that scheduled pods can continue to run even after we delete device plugin.")
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
+			Expect(devIdRestart1).To(Equal(devId1))
+
+			ensurePodContainerRestart(f, p2.Name, p2.Name)
+			devIdRestart2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
+			Expect(devIdRestart2).To(Equal(devId2))
+			By("Restarting Kubelet.")
+			restartKubelet()
+			By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
+			Expect(devIdRestart1).To(Equal(devId1))
+			ensurePodContainerRestart(f, p2.Name, p2.Name)
+			devIdRestart2 = parseLog(f, p2.Name, p2.Name, deviceIDRE)
+			Expect(devIdRestart2).To(Equal(devId2))
+			logDevicePluginMetrics()
 
 			// Cleanup
 			f.PodClient().DeleteSync(p1.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
@@ -110,71 +137,40 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 	})
 })
 
-func makeCudaPauseImage() *v1.Pod {
-	podName := testPodNamePrefix + string(uuid.NewUUID())
-
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: podName},
-		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyAlways,
-			Containers: []v1.Container{{
-				Image: busyboxImage,
-				Name:  podName,
-				// Retrieves the gpu devices created in the user pod.
-				// Note the nvidia device plugin implementation doesn't do device id remapping currently.
-				// Will probably need to use nvidia-smi if that changes.
-				Command: []string{"sh", "-c", "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs"},
-
-				Resources: v1.ResourceRequirements{
-					Limits:   newDecimalResourceList(framework.NVIDIAGPUResourceName, 1),
-					Requests: newDecimalResourceList(framework.NVIDIAGPUResourceName, 1),
-				},
-			}},
-		},
-	}
-}
-
-func newDecimalResourceList(name v1.ResourceName, quantity int64) v1.ResourceList {
-	return v1.ResourceList{name: *resource.NewQuantity(quantity, resource.DecimalSI)}
-}
-
-// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
-func restartKubelet(f *framework.Framework) {
-	beforeSocks, err := filepath.Glob("/var/lib/kubelet/device-plugins/nvidiaGPU*.sock")
-	framework.ExpectNoError(err)
-	Expect(len(beforeSocks)).NotTo(BeZero())
-	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
-	framework.ExpectNoError(err)
-	regex := regexp.MustCompile("(kubelet-[0-9]+)")
-	matches := regex.FindStringSubmatch(string(stdout))
-	Expect(len(matches)).NotTo(BeZero())
-	kube := matches[0]
-	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
-	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
-	Eventually(func() ([]string, error) {
-		return filepath.Glob("/var/lib/kubelet/device-plugins/nvidiaGPU*.sock")
-	}, 5*time.Minute, framework.Poll).ShouldNot(ConsistOf(beforeSocks))
-}
-
-func getDeviceId(f *framework.Framework, podName string, contName string, restartCount int32) string {
-	// Wait till pod has been restarted at least restartCount times.
-	Eventually(func() bool {
-		p, err := f.PodClient().Get(podName, metav1.GetOptions{})
-		if err != nil || len(p.Status.ContainerStatuses) < 1 {
-			return false
-		}
-		return p.Status.ContainerStatuses[0].RestartCount >= restartCount
-	}, 5*time.Minute, framework.Poll).Should(BeTrue())
-	logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
+func checkIfNvidiaGPUsExistOnNode() bool {
+	// Cannot use `lspci` because it is not installed on all distros by default.
+	err := exec.Command("/bin/sh", "-c", "find /sys/devices/pci* -type f | grep vendor | xargs cat | grep 0x10de").Run()
 	if err != nil {
-		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+		framework.Logf("check for nvidia GPUs failed. Got Error: %v", err)
+		return false
 	}
-	framework.Logf("got pod logs: %v", logs)
-	regex := regexp.MustCompile("gpu devices: (nvidia[0-9]+)")
-	matches := regex.FindStringSubmatch(logs)
-	if len(matches) < 2 {
-		return ""
+	return true
+}
+
+func logDevicePluginMetrics() {
+	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+	framework.ExpectNoError(err)
+	for msKey, samples := range ms {
+		switch msKey {
+		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginAllocationDurationKey:
+			for _, sample := range samples {
+				latency := sample.Value
+				resource := string(sample.Metric["resource_name"])
+				var quantile float64
+				if val, ok := sample.Metric[model.QuantileLabel]; ok {
+					var err error
+					if quantile, err = strconv.ParseFloat(string(val), 64); err != nil {
+						continue
+					}
+					framework.Logf("Metric: %v ResourceName: %v Quantile: %v Latency: %v", msKey, resource, quantile, latency)
+				}
+			}
+		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginRegistrationCountKey:
+			for _, sample := range samples {
+				resource := string(sample.Metric["resource_name"])
+				count := sample.Value
+				framework.Logf("Metric: %v ResourceName: %v Count: %v", msKey, resource, count)
+			}
+		}
 	}
-	return matches[1]
 }

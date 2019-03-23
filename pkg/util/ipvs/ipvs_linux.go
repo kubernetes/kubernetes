@@ -23,85 +23,101 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"syscall"
 
-	"github.com/docker/libnetwork/ipvs"
-	"github.com/golang/glog"
+	libipvs "github.com/docker/libnetwork/ipvs"
+	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 )
 
-// runner implements Interface.
+// runner implements ipvs.Interface.
 type runner struct {
 	exec       utilexec.Interface
-	ipvsHandle *ipvs.Handle
+	ipvsHandle *libipvs.Handle
+	mu         sync.Mutex // Protect Netlink calls
 }
+
+// Protocol is the IPVS service protocol type
+type Protocol uint16
 
 // New returns a new Interface which will call ipvs APIs.
 func New(exec utilexec.Interface) Interface {
-	ihandle, err := ipvs.New("")
+	handle, err := libipvs.New("")
 	if err != nil {
-		glog.Errorf("IPVS interface can't be initialized, error: %v", err)
+		klog.Errorf("IPVS interface can't be initialized, error: %v", err)
 		return nil
 	}
 	return &runner{
 		exec:       exec,
-		ipvsHandle: ihandle,
+		ipvsHandle: handle,
 	}
 }
 
-// AddVirtualServer is part of Interface.
+// AddVirtualServer is part of ipvs.Interface.
 func (runner *runner) AddVirtualServer(vs *VirtualServer) error {
-	eSvc, err := toBackendService(vs)
+	svc, err := toIPVSService(vs)
 	if err != nil {
 		return err
 	}
-	return runner.ipvsHandle.NewService(eSvc)
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+	return runner.ipvsHandle.NewService(svc)
 }
 
-// UpdateVirtualServer is part of Interface.
+// UpdateVirtualServer is part of ipvs.Interface.
 func (runner *runner) UpdateVirtualServer(vs *VirtualServer) error {
-	bSvc, err := toBackendService(vs)
+	svc, err := toIPVSService(vs)
 	if err != nil {
 		return err
 	}
-	return runner.ipvsHandle.UpdateService(bSvc)
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+	return runner.ipvsHandle.UpdateService(svc)
 }
 
-// DeleteVirtualServer is part of Interface.
+// DeleteVirtualServer is part of ipvs.Interface.
 func (runner *runner) DeleteVirtualServer(vs *VirtualServer) error {
-	bSvc, err := toBackendService(vs)
+	svc, err := toIPVSService(vs)
 	if err != nil {
 		return err
 	}
-	return runner.ipvsHandle.DelService(bSvc)
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+	return runner.ipvsHandle.DelService(svc)
 }
 
-// GetVirtualServer is part of Interface.
+// GetVirtualServer is part of ipvs.Interface.
 func (runner *runner) GetVirtualServer(vs *VirtualServer) (*VirtualServer, error) {
-	bSvc, err := toBackendService(vs)
+	svc, err := toIPVSService(vs)
 	if err != nil {
 		return nil, err
 	}
-	ipvsService, err := runner.ipvsHandle.GetService(bSvc)
+	runner.mu.Lock()
+	ipvsSvc, err := runner.ipvsHandle.GetService(svc)
+	runner.mu.Unlock()
+
 	if err != nil {
 		return nil, err
 	}
-	virtualServer, err := toVirtualServer(ipvsService)
+	vServ, err := toVirtualServer(ipvsSvc)
 	if err != nil {
 		return nil, err
 	}
-	return virtualServer, nil
+	return vServ, nil
 }
 
-// GetVirtualServers is part of Interface.
+// GetVirtualServers is part of ipvs.Interface.
 func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
-	ipvsServices, err := runner.ipvsHandle.GetServices()
+	runner.mu.Lock()
+	ipvsSvcs, err := runner.ipvsHandle.GetServices()
+	runner.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
 	vss := make([]*VirtualServer, 0)
-	for _, ipvsService := range ipvsServices {
-		vs, err := toVirtualServer(ipvsService)
+	for _, ipvsSvc := range ipvsSvcs {
+		vs, err := toVirtualServer(ipvsSvc)
 		if err != nil {
 			return nil, err
 		}
@@ -110,61 +126,83 @@ func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
 	return vss, nil
 }
 
-// Flush is part of Interface.  Currently we delete IPVS services one by one
+// Flush is part of ipvs.Interface. Currently we delete IPVS services one by one
 func (runner *runner) Flush() error {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.Flush()
 }
 
-// AddRealServer is part of Interface.
+// AddRealServer is part of ipvs.Interface.
 func (runner *runner) AddRealServer(vs *VirtualServer, rs *RealServer) error {
-	bSvc, err := toBackendService(vs)
+	svc, err := toIPVSService(vs)
 	if err != nil {
 		return err
 	}
-	bDst, err := toBackendDestination(rs)
+	dst, err := toIPVSDestination(rs)
 	if err != nil {
 		return err
 	}
-	return runner.ipvsHandle.NewDestination(bSvc, bDst)
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+	return runner.ipvsHandle.NewDestination(svc, dst)
 }
 
-// DeleteRealServer is part of Interface.
+// DeleteRealServer is part of ipvs.Interface.
 func (runner *runner) DeleteRealServer(vs *VirtualServer, rs *RealServer) error {
-	bSvc, err := toBackendService(vs)
+	svc, err := toIPVSService(vs)
 	if err != nil {
 		return err
 	}
-	bDst, err := toBackendDestination(rs)
+	dst, err := toIPVSDestination(rs)
 	if err != nil {
 		return err
 	}
-	return runner.ipvsHandle.DelDestination(bSvc, bDst)
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+	return runner.ipvsHandle.DelDestination(svc, dst)
 }
 
-// GetRealServers is part of Interface.
+func (runner *runner) UpdateRealServer(vs *VirtualServer, rs *RealServer) error {
+	svc, err := toIPVSService(vs)
+	if err != nil {
+		return err
+	}
+	dst, err := toIPVSDestination(rs)
+	if err != nil {
+		return err
+	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+	return runner.ipvsHandle.UpdateDestination(svc, dst)
+}
+
+// GetRealServers is part of ipvs.Interface.
 func (runner *runner) GetRealServers(vs *VirtualServer) ([]*RealServer, error) {
-	bSvc, err := toBackendService(vs)
+	svc, err := toIPVSService(vs)
 	if err != nil {
 		return nil, err
 	}
-	bDestinations, err := runner.ipvsHandle.GetDestinations(bSvc)
+	runner.mu.Lock()
+	dsts, err := runner.ipvsHandle.GetDestinations(svc)
+	runner.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
-	realServers := make([]*RealServer, 0)
-	for _, dest := range bDestinations {
-		dst, err := toRealServer(dest)
+	rss := make([]*RealServer, 0)
+	for _, dst := range dsts {
+		dst, err := toRealServer(dst)
 		// TODO: aggregate errors?
 		if err != nil {
 			return nil, err
 		}
-		realServers = append(realServers, dst)
+		rss = append(rss, dst)
 	}
-	return realServers, nil
+	return rss, nil
 }
 
-// toVirtualServer converts an IPVS service representation to the equivalent virtual server structure.
-func toVirtualServer(svc *ipvs.Service) (*VirtualServer, error) {
+// toVirtualServer converts an IPVS Service to the equivalent VirtualServer structure.
+func toVirtualServer(svc *libipvs.Service) (*VirtualServer, error) {
 	if svc == nil {
 		return nil, errors.New("ipvs svc should not be empty")
 	}
@@ -172,7 +210,7 @@ func toVirtualServer(svc *ipvs.Service) (*VirtualServer, error) {
 		Address:   svc.Address,
 		Port:      svc.Port,
 		Scheduler: svc.SchedName,
-		Protocol:  protocolNumbeToString(ProtoType(svc.Protocol)),
+		Protocol:  protocolToString(Protocol(svc.Protocol)),
 		Timeout:   svc.Timeout,
 	}
 
@@ -194,26 +232,28 @@ func toVirtualServer(svc *ipvs.Service) (*VirtualServer, error) {
 	return vs, nil
 }
 
-// toRealServer converts an IPVS destination representation to the equivalent real server structure.
-func toRealServer(dst *ipvs.Destination) (*RealServer, error) {
+// toRealServer converts an IPVS Destination to the equivalent RealServer structure.
+func toRealServer(dst *libipvs.Destination) (*RealServer, error) {
 	if dst == nil {
 		return nil, errors.New("ipvs destination should not be empty")
 	}
 	return &RealServer{
-		Address: dst.Address,
-		Port:    dst.Port,
-		Weight:  dst.Weight,
+		Address:      dst.Address,
+		Port:         dst.Port,
+		Weight:       dst.Weight,
+		ActiveConn:   dst.ActiveConnections,
+		InactiveConn: dst.InactiveConnections,
 	}, nil
 }
 
-// toBackendService converts an IPVS real server representation to the equivalent "backend" service structure.
-func toBackendService(vs *VirtualServer) (*ipvs.Service, error) {
+// toIPVSService converts a VirtualServer to the equivalent IPVS Service structure.
+func toIPVSService(vs *VirtualServer) (*libipvs.Service, error) {
 	if vs == nil {
 		return nil, errors.New("virtual server should not be empty")
 	}
-	bakSvc := &ipvs.Service{
+	ipvsSvc := &libipvs.Service{
 		Address:   vs.Address,
-		Protocol:  stringToProtocolNumber(vs.Protocol),
+		Protocol:  stringToProtocol(vs.Protocol),
 		Port:      vs.Port,
 		SchedName: vs.Scheduler,
 		Flags:     uint32(vs.Flags),
@@ -221,48 +261,49 @@ func toBackendService(vs *VirtualServer) (*ipvs.Service, error) {
 	}
 
 	if ip4 := vs.Address.To4(); ip4 != nil {
-		bakSvc.AddressFamily = syscall.AF_INET
-		bakSvc.Netmask = 0xffffffff
+		ipvsSvc.AddressFamily = syscall.AF_INET
+		ipvsSvc.Netmask = 0xffffffff
 	} else {
-		bakSvc.AddressFamily = syscall.AF_INET6
-		bakSvc.Netmask = 128
+		ipvsSvc.AddressFamily = syscall.AF_INET6
+		ipvsSvc.Netmask = 128
 	}
-	return bakSvc, nil
+	return ipvsSvc, nil
 }
 
-// toBackendDestination converts an IPVS real server representation to the equivalent "backend" destination structure.
-func toBackendDestination(rs *RealServer) (*ipvs.Destination, error) {
+// toIPVSDestination converts a RealServer to the equivalent IPVS Destination structure.
+func toIPVSDestination(rs *RealServer) (*libipvs.Destination, error) {
 	if rs == nil {
 		return nil, errors.New("real server should not be empty")
 	}
-	return &ipvs.Destination{
+	return &libipvs.Destination{
 		Address: rs.Address,
 		Port:    rs.Port,
 		Weight:  rs.Weight,
 	}, nil
 }
 
-// stringToProtocolNumber returns the protocol value for the given name
-func stringToProtocolNumber(protocol string) uint16 {
+// stringToProtocolType returns the protocol type for the given name
+func stringToProtocol(protocol string) uint16 {
 	switch strings.ToLower(protocol) {
 	case "tcp":
 		return uint16(syscall.IPPROTO_TCP)
 	case "udp":
 		return uint16(syscall.IPPROTO_UDP)
+	case "sctp":
+		return uint16(syscall.IPPROTO_SCTP)
 	}
 	return uint16(0)
 }
 
-// protocolNumbeToString returns the name for the given protocol value.
-func protocolNumbeToString(proto ProtoType) string {
+// protocolTypeToString returns the name for the given protocol.
+func protocolToString(proto Protocol) string {
 	switch proto {
 	case syscall.IPPROTO_TCP:
 		return "TCP"
 	case syscall.IPPROTO_UDP:
 		return "UDP"
+	case syscall.IPPROTO_SCTP:
+		return "SCTP"
 	}
 	return ""
 }
-
-// ProtoType is IPVS service protocol type
-type ProtoType uint16

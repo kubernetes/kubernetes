@@ -17,23 +17,23 @@ limitations under the License.
 package proxy
 
 const (
-	// KubeProxyConfigMap is the proxy ConfigMap manifest
-	KubeProxyConfigMap = `
+	// KubeProxyConfigMap19 is the proxy ConfigMap manifest for Kubernetes 1.9 and above
+	KubeProxyConfigMap19 = `
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: kube-proxy
+  name: {{ .ProxyConfigMap }}
   namespace: kube-system
   labels:
     app: kube-proxy
 data:
-  kubeconfig.conf: |
+  kubeconfig.conf: |-
     apiVersion: v1
     kind: Config
     clusters:
     - cluster:
         certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        server: {{ .MasterEndpoint }}
+        server: {{ .ControlPlaneEndpoint }}
       name: default
     contexts:
     - context:
@@ -46,11 +46,13 @@ data:
     - name: default
       user:
         tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  {{ .ProxyConfigMapKey }}: |-
+{{ .ProxyConfig}}
 `
 
-	// KubeProxyDaemonSet is the proxy DaemonSet manifest
-	KubeProxyDaemonSet = `
-apiVersion: apps/v1beta2
+	// KubeProxyDaemonSet19 is the proxy DaemonSet manifest for Kubernetes 1.9 and above
+	KubeProxyDaemonSet19 = `
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
@@ -68,14 +70,15 @@ spec:
       labels:
         k8s-app: kube-proxy
     spec:
+      priorityClassName: system-node-critical
       containers:
       - name: kube-proxy
-        image: {{ if .ImageOverride }}{{ .ImageOverride }}{{ else }}{{ .ImageRepository }}/kube-proxy-{{ .Arch }}:{{ .Version }}{{ end }}
+        image: {{ .Image }}
         imagePullPolicy: IfNotPresent
         command:
         - /usr/local/bin/kube-proxy
-        - --kubeconfig=/var/lib/kube-proxy/kubeconfig.conf
-        {{ .ClusterCIDR }}
+        - --config=/var/lib/kube-proxy/{{ .ProxyConfigMapKey }}
+        - --hostname-override=$(NODE_NAME)
         securityContext:
           privileged: true
         volumeMounts:
@@ -84,21 +87,30 @@ spec:
         - mountPath: /run/xtables.lock
           name: xtables-lock
           readOnly: false
+        - mountPath: /lib/modules
+          name: lib-modules
+          readOnly: true
+        env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
       hostNetwork: true
       serviceAccountName: kube-proxy
-      tolerations:
-      - key: {{ .MasterTaintKey }}
-        effect: NoSchedule
-      - key: {{ .CloudTaintKey }}
-        value: "true"
-        effect: NoSchedule
       volumes:
       - name: kube-proxy
         configMap:
-          name: kube-proxy
+          name: {{ .ProxyConfigMap }}
       - name: xtables-lock
         hostPath:
           path: /run/xtables.lock
           type: FileOrCreate
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - operator: Exists
 `
 )

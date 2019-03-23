@@ -19,12 +19,13 @@ package framework
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,15 +38,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	azurecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -89,6 +88,14 @@ const (
 
 	// ServiceTestTimeout is used for most polling/waiting activities
 	ServiceTestTimeout = 60 * time.Second
+
+	// GCPMaxInstancesInInstanceGroup is the maximum number of instances supported in
+	// one instance group on GCP.
+	GCPMaxInstancesInInstanceGroup = 2000
+
+	// AffinityConfirmCount is the number of needed continuous requests to confirm that
+	// affinity is enabled.
+	AffinityConfirmCount = 15
 )
 
 // This should match whatever the default/configured range is
@@ -100,6 +107,14 @@ type ServiceTestJig struct {
 	Name   string
 	Client clientset.Interface
 	Labels map[string]string
+}
+
+// PodNode is a pod-node pair indicating which node a given pod is running on
+type PodNode struct {
+	// Pod represents pod name
+	Pod string
+	// Node represents node name
+	Node string
 }
 
 // NewServiceTestJig allocates and inits a new ServiceTestJig.
@@ -144,7 +159,7 @@ func (j *ServiceTestJig) CreateTCPServiceWithPort(namespace string, tweak func(s
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.Core().Services(namespace).Create(svc)
+	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
 		Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
@@ -159,7 +174,7 @@ func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.Core().Services(namespace).Create(svc)
+	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
 		Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
@@ -174,7 +189,7 @@ func (j *ServiceTestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.Core().Services(namespace).Create(svc)
+	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
 		Failf("Failed to create UDP Service %q: %v", svc.Name, err)
 	}
@@ -199,11 +214,25 @@ func (j *ServiceTestJig) CreateExternalNameServiceOrFail(namespace string, tweak
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.Core().Services(namespace).Create(svc)
+	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
 		Failf("Failed to create ExternalName Service %q: %v", svc.Name, err)
 	}
 	return result
+}
+
+// CreateServiceWithServicePort creates a new Service with ServicePort.
+func (j *ServiceTestJig) CreateServiceWithServicePort(labels map[string]string, namespace string, ports []v1.ServicePort) (*v1.Service, error) {
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: j.Name,
+		},
+		Spec: v1.ServiceSpec{
+			Selector: labels,
+			Ports:    ports,
+		},
+	}
+	return j.Client.CoreV1().Services(namespace).Create(service)
 }
 
 func (j *ServiceTestJig) ChangeServiceType(namespace, name string, newType v1.ServiceType, timeout time.Duration) {
@@ -231,7 +260,7 @@ func (j *ServiceTestJig) CreateOnlyLocalNodePortService(namespace, serviceName s
 	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
-		svc.Spec.Ports = []v1.ServicePort{{Protocol: "TCP", Port: 80}}
+		svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: 80}}
 	})
 
 	if createPod {
@@ -319,7 +348,7 @@ func GetNodePublicIps(c clientset.Interface) ([]string, error) {
 
 func PickNodeIP(c clientset.Interface) string {
 	publicIps, err := GetNodePublicIps(c)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectNoError(err)
 	if len(publicIps) == 0 {
 		Failf("got unexpected number (%d) of public IPs", len(publicIps))
 	}
@@ -327,11 +356,30 @@ func PickNodeIP(c clientset.Interface) string {
 	return ip
 }
 
+// PodNodePairs return PodNode pairs for all pods in a namespace
+func PodNodePairs(c clientset.Interface, ns string) ([]PodNode, error) {
+	var result []PodNode
+
+	podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+	if err != nil {
+		return result, err
+	}
+
+	for _, pod := range podList.Items {
+		result = append(result, PodNode{
+			Pod:  pod.Name,
+			Node: pod.Spec.NodeName,
+		})
+	}
+
+	return result, nil
+}
+
 // GetEndpointNodes returns a map of nodenames:external-ip on which the
 // endpoints of the given Service are running.
 func (j *ServiceTestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
 	nodes := j.GetNodes(MaxNodesForEndpointsTests)
-	endpoints, err := j.Client.Core().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+	endpoints, err := j.Client.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
 	if err != nil {
 		Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 	}
@@ -377,7 +425,7 @@ func (j *ServiceTestJig) GetNodesNames(maxNodesForTest int) []string {
 
 func (j *ServiceTestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName string) {
 	err := wait.PollImmediate(Poll, LoadBalancerCreateTimeoutDefault, func() (bool, error) {
-		endpoints, err := j.Client.Core().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+		endpoints, err := j.Client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
 			Logf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
 			return false, nil
@@ -457,12 +505,12 @@ func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceT
 // face of timeouts and conflicts.
 func (j *ServiceTestJig) UpdateService(namespace, name string, update func(*v1.Service)) (*v1.Service, error) {
 	for i := 0; i < 3; i++ {
-		service, err := j.Client.Core().Services(namespace).Get(name, metav1.GetOptions{})
+		service, err := j.Client.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get Service %q: %v", name, err)
 		}
 		update(service)
-		service, err = j.Client.Core().Services(namespace).Update(service)
+		service, err = j.Client.CoreV1().Services(namespace).Update(service)
 		if err == nil {
 			return service, nil
 		}
@@ -509,7 +557,7 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 		service, err = j.UpdateService(namespace, name, func(s *v1.Service) {
 			s.Spec.Ports[0].NodePort = int32(newPort)
 		})
-		if err != nil && strings.Contains(err.Error(), "provided port is already allocated") {
+		if err != nil && strings.Contains(err.Error(), portallocator.ErrAllocated.Error()) {
 			Logf("tried nodePort %d, but it is in use, will try another", newPort)
 			continue
 		}
@@ -554,7 +602,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 func (j *ServiceTestJig) waitForConditionOrFail(namespace, name string, timeout time.Duration, message string, conditionFn func(*v1.Service) bool) *v1.Service {
 	var service *v1.Service
 	pollFunc := func() (bool, error) {
-		svc, err := j.Client.Core().Services(namespace).Get(name, metav1.GetOptions{})
+		svc, err := j.Client.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -575,6 +623,7 @@ func (j *ServiceTestJig) waitForConditionOrFail(namespace, name string, timeout 
 // name as the jig and runs the "netexec" container.
 func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationController {
 	var replicas int32 = 1
+	var grace int64 = 3 // so we don't race with kube-proxy when scaling up/down
 
 	rc := &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
@@ -606,7 +655,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationControll
 							},
 						},
 					},
-					TerminationGracePeriodSeconds: new(int64),
+					TerminationGracePeriodSeconds: &grace,
 				},
 			},
 		},
@@ -635,7 +684,7 @@ func (j *ServiceTestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 
 func (j *ServiceTestJig) CreatePDBOrFail(namespace string, rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
 	pdb := j.newPDBTemplate(namespace, rc)
-	newPdb, err := j.Client.Policy().PodDisruptionBudgets(namespace).Create(pdb)
+	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Create(pdb)
 	if err != nil {
 		Failf("Failed to create PDB %q %v", pdb.Name, err)
 	}
@@ -675,7 +724,7 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 	if tweak != nil {
 		tweak(rc)
 	}
-	result, err := j.Client.Core().ReplicationControllers(namespace).Create(rc)
+	result, err := j.Client.CoreV1().ReplicationControllers(namespace).Create(rc)
 	if err != nil {
 		Failf("Failed to create RC %q: %v", rc.Name, err)
 	}
@@ -689,10 +738,32 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 	return result
 }
 
+func (j *ServiceTestJig) Scale(namespace string, replicas int) {
+	rc := j.Name
+	scale, err := j.Client.CoreV1().ReplicationControllers(namespace).GetScale(rc, metav1.GetOptions{})
+	if err != nil {
+		Failf("Failed to get scale for RC %q: %v", rc, err)
+	}
+
+	scale.Spec.Replicas = int32(replicas)
+	_, err = j.Client.CoreV1().ReplicationControllers(namespace).UpdateScale(rc, scale)
+	if err != nil {
+		Failf("Failed to scale RC %q: %v", rc, err)
+	}
+	pods, err := j.waitForPodsCreated(namespace, replicas)
+	if err != nil {
+		Failf("Failed waiting for pods: %v", err)
+	}
+	if err := j.waitForPodsReady(namespace, pods); err != nil {
+		Failf("Failed waiting for pods to be running: %v", err)
+	}
+	return
+}
+
 func (j *ServiceTestJig) waitForPdbReady(namespace string) error {
 	timeout := 2 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		pdb, err := j.Client.Policy().PodDisruptionBudgets(namespace).Get(j.Name, metav1.GetOptions{})
+		pdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Get(j.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -711,7 +782,7 @@ func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]s
 	Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := j.Client.Core().Pods(namespace).List(options)
+		pods, err := j.Client.CoreV1().Pods(namespace).List(options)
 		if err != nil {
 			return nil, err
 		}
@@ -779,7 +850,7 @@ func (j *ServiceTestJig) LaunchNetexecPodOnNode(f *Framework, nodeName, podName 
 	pod := newNetexecPodSpec(podName, httpPort, udpPort, hostNetwork)
 	pod.Spec.NodeName = nodeName
 	pod.ObjectMeta.Labels = j.Labels
-	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
+	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 	_, err := podClient.Create(pod)
 	ExpectNoError(err)
 	ExpectNoError(f.WaitForPodRunning(podName))
@@ -797,7 +868,7 @@ func newEchoServerPodSpec(podName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "echoserver",
-					Image: "gcr.io/google_containers/echoserver:1.6",
+					Image: imageutils.GetE2EImage(imageutils.EchoServer),
 					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
 				},
 			},
@@ -815,7 +886,7 @@ func (j *ServiceTestJig) LaunchEchoserverPodOnNode(f *Framework, nodeName, podNa
 	pod := newEchoServerPodSpec(podName)
 	pod.Spec.NodeName = nodeName
 	pod.ObjectMeta.Labels = j.Labels
-	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
+	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 	_, err := podClient.Create(pod)
 	ExpectNoError(err)
 	ExpectNoError(f.WaitForPodRunning(podName))
@@ -827,9 +898,19 @@ func (j *ServiceTestJig) TestReachableHTTP(host string, port int, timeout time.D
 }
 
 func (j *ServiceTestJig) TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableErrCodes []int, timeout time.Duration) {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		return TestReachableHTTPWithRetriableErrorCodes(host, port, "/echo?msg=hello", "hello", retriableErrCodes)
-	}); err != nil {
+	pollfn := func() (bool, error) {
+		result := PokeHTTP(host, port, "/echo?msg=hello",
+			&HTTPPokeParams{
+				BodyContains:   "hello",
+				RetriableCodes: retriableErrCodes,
+			})
+		if result.Status == HTTPSuccess {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
 		if err == wait.ErrWaitTimeout {
 			Failf("Could not reach HTTP service through %v:%v after %v", host, port, timeout)
 		} else {
@@ -839,48 +920,100 @@ func (j *ServiceTestJig) TestReachableHTTPWithRetriableErrorCodes(host string, p
 }
 
 func (j *ServiceTestJig) TestNotReachableHTTP(host string, port int, timeout time.Duration) {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) { return TestNotReachableHTTP(host, port) }); err != nil {
-		Failf("Could still reach HTTP service through %v:%v after %v: %v", host, port, timeout, err)
+	pollfn := func() (bool, error) {
+		result := PokeHTTP(host, port, "/", nil)
+		if result.Code == 0 {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
+		Failf("HTTP service %v:%v reachable after %v: %v", host, port, timeout, err)
+	}
+}
+
+func (j *ServiceTestJig) TestRejectedHTTP(host string, port int, timeout time.Duration) {
+	pollfn := func() (bool, error) {
+		result := PokeHTTP(host, port, "/", nil)
+		if result.Status == HTTPRefused {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
+		Failf("HTTP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 
 func (j *ServiceTestJig) TestReachableUDP(host string, port int, timeout time.Duration) {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) { return TestReachableUDP(host, port, "echo hello", "hello") }); err != nil {
+	pollfn := func() (bool, error) {
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{
+			Timeout:  3 * time.Second,
+			Response: "hello",
+		})
+		if result.Status == UDPSuccess {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
 		Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
 
 func (j *ServiceTestJig) TestNotReachableUDP(host string, port int, timeout time.Duration) {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) { return TestNotReachableUDP(host, port, "echo hello") }); err != nil {
-		Failf("Could still reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
+	pollfn := func() (bool, error) {
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
+		if result.Status != UDPSuccess && result.Status != UDPError {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
+		Failf("UDP service %v:%v reachable after %v: %v", host, port, timeout, err)
+	}
+}
+
+func (j *ServiceTestJig) TestRejectedUDP(host string, port int, timeout time.Duration) {
+	pollfn := func() (bool, error) {
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
+		if result.Status == UDPRefused {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
+		Failf("UDP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 
 func (j *ServiceTestJig) GetHTTPContent(host string, port int, timeout time.Duration, url string) bytes.Buffer {
 	var body bytes.Buffer
-	var err error
 	if pollErr := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		var result bool
-		result, err = TestReachableHTTPWithContent(host, port, url, "", &body)
-		if err != nil {
-			Logf("Error hitting %v:%v%v, retrying: %v", host, port, url, err)
-			return false, nil
+		result := PokeHTTP(host, port, url, nil)
+		if result.Status == HTTPSuccess {
+			body.Write(result.Body)
+			return true, nil
 		}
-		return result, nil
+		return false, nil
 	}); pollErr != nil {
-		Failf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, err)
+		Failf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
 	}
 	return body
 }
 
 func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, error) {
-	url := fmt.Sprintf("http://%s:%d%s", ip, port, request)
+	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
+	url := fmt.Sprintf("http://%s%s", ipPort, request)
 	if ip == "" || port == 0 {
 		Failf("Got empty IP for reachability check (%s)", url)
 		return false, fmt.Errorf("Invalid input ip or port")
 	}
 	Logf("Testing HTTP health check on %v", url)
-	resp, err := httpGetNoConnectionPool(url)
+	resp, err := httpGetNoConnectionPoolTimeout(url, 5*time.Second)
 	if err != nil {
 		Logf("Got error testing for reachability of %s: %v", url, err)
 		return false, err
@@ -989,7 +1122,7 @@ func (t *ServiceTestFixture) CreateWebserverRC(replicas int32) *v1.ReplicationCo
 
 // CreateRC creates a replication controller and records it for cleanup.
 func (t *ServiceTestFixture) CreateRC(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
-	rc, err := t.Client.Core().ReplicationControllers(t.Namespace).Create(rc)
+	rc, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Create(rc)
 	if err == nil {
 		t.rcs[rc.Name] = true
 	}
@@ -998,7 +1131,7 @@ func (t *ServiceTestFixture) CreateRC(rc *v1.ReplicationController) (*v1.Replica
 
 // Create a service, and record it for cleanup
 func (t *ServiceTestFixture) CreateService(service *v1.Service) (*v1.Service, error) {
-	result, err := t.Client.Core().Services(t.Namespace).Create(service)
+	result, err := t.Client.CoreV1().Services(t.Namespace).Create(service)
 	if err == nil {
 		t.services[service.Name] = true
 	}
@@ -1007,7 +1140,7 @@ func (t *ServiceTestFixture) CreateService(service *v1.Service) (*v1.Service, er
 
 // Delete a service, and remove it from the cleanup list
 func (t *ServiceTestFixture) DeleteService(serviceName string) error {
-	err := t.Client.Core().Services(t.Namespace).Delete(serviceName, nil)
+	err := t.Client.CoreV1().Services(t.Namespace).Delete(serviceName, nil)
 	if err == nil {
 		delete(t.services, serviceName)
 	}
@@ -1020,7 +1153,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 		By("stopping RC " + rcName + " in namespace " + t.Namespace)
 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			// First, resize the RC to 0.
-			old, err := t.Client.Core().ReplicationControllers(t.Namespace).Get(rcName, metav1.GetOptions{})
+			old, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Get(rcName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -1029,7 +1162,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 			}
 			x := int32(0)
 			old.Spec.Replicas = &x
-			if _, err := t.Client.Core().ReplicationControllers(t.Namespace).Update(old); err != nil {
+			if _, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Update(old); err != nil {
 				if errors.IsNotFound(err) {
 					return nil
 				}
@@ -1042,7 +1175,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 		}
 		// TODO(mikedanese): Wait.
 		// Then, delete the RC altogether.
-		if err := t.Client.Core().ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
+		if err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
 			if !errors.IsNotFound(err) {
 				errs = append(errs, err)
 			}
@@ -1051,7 +1184,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 
 	for serviceName := range t.services {
 		By("deleting service " + serviceName + " in namespace " + t.Namespace)
-		err := t.Client.Core().Services(t.Namespace).Delete(serviceName, nil)
+		err := t.Client.CoreV1().Services(t.Namespace).Delete(serviceName, nil)
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				errs = append(errs, err)
@@ -1077,14 +1210,14 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 	var service *v1.Service
 	var err error
 	for i := 0; i < 3; i++ {
-		service, err = c.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
+		service, err = c.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
 			return service, err
 		}
 
 		update(service)
 
-		service, err = c.Core().Services(namespace).Update(service)
+		service, err = c.CoreV1().Services(namespace).Update(service)
 
 		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
 			return service, err
@@ -1099,22 +1232,6 @@ func GetContainerPortsByPodUID(endpoints *v1.Endpoints) PortsByPodUID {
 		for _, port := range ss.Ports {
 			for _, addr := range ss.Addresses {
 				containerPort := port.Port
-				hostPort := port.Port
-
-				// use endpoint annotations to recover the container port in a Mesos setup
-				// compare contrib/mesos/pkg/service/endpoints_controller.syncService
-				key := fmt.Sprintf("k8s.mesosphere.io/containerPort_%s_%s_%d", port.Protocol, addr.IP, hostPort)
-				mesosContainerPortString := endpoints.Annotations[key]
-				if mesosContainerPortString != "" {
-					mesosContainerPort, err := strconv.Atoi(mesosContainerPortString)
-					if err != nil {
-						continue
-					}
-					containerPort = int32(mesosContainerPort)
-					Logf("Mapped mesos host port %d to container port %d via annotation %s=%s", hostPort, containerPort, key, mesosContainerPortString)
-				}
-
-				// Logf("Found pod %v, host port %d and container port %d", addr.TargetRef.UID, hostPort, containerPort)
 				if _, ok := m[addr.TargetRef.UID]; !ok {
 					m[addr.TargetRef.UID] = make([]int, 0)
 				}
@@ -1132,7 +1249,7 @@ func translatePodNameToUIDOrFail(c clientset.Interface, ns string, expectedEndpo
 	portsByUID := make(PortsByPodUID)
 
 	for name, portList := range expectedEndpoints {
-		pod, err := c.Core().Pods(ns).Get(name, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
 		}
@@ -1168,7 +1285,7 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
 	i := 1
 	for start := time.Now(); time.Since(start) < ServiceStartTimeout; time.Sleep(1 * time.Second) {
-		endpoints, err := c.Core().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+		endpoints, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
 			Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
 			continue
@@ -1192,7 +1309,7 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 		i++
 	}
 
-	if pods, err := c.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{}); err == nil {
+	if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{}); err == nil {
 		for _, pod := range pods.Items {
 			Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 		}
@@ -1202,26 +1319,13 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 	Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, ServiceStartTimeout)
 }
 
-// StartServeHostnameService creates a replication controller that serves its hostname and a service on top of it.
-func StartServeHostnameService(c clientset.Interface, internalClient internalclientset.Interface, ns, name string, port, replicas int) ([]string, string, error) {
+// StartServeHostnameService creates a replication controller that serves its
+// hostname and a service on top of it.
+func StartServeHostnameService(c clientset.Interface, internalClient internalclientset.Interface, svc *v1.Service, ns string, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
-
+	name := svc.ObjectMeta.Name
 	By("creating service " + name + " in namespace " + ns)
-	_, err := c.Core().Services(ns).Create(&v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{{
-				Port:       int32(port),
-				TargetPort: intstr.FromInt(9376),
-				Protocol:   "TCP",
-			}},
-			Selector: map[string]string{
-				"name": name,
-			},
-		},
-	})
+	_, err := c.CoreV1().Services(ns).Create(svc)
 	if err != nil {
 		return podNames, "", err
 	}
@@ -1254,7 +1358,7 @@ func StartServeHostnameService(c clientset.Interface, internalClient internalcli
 	}
 	sort.StringSlice(podNames).Sort()
 
-	service, err := c.Core().Services(ns).Get(name, metav1.GetOptions{})
+	service, err := c.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return podNames, "", err
 	}
@@ -1265,11 +1369,11 @@ func StartServeHostnameService(c clientset.Interface, internalClient internalcli
 	return podNames, serviceIP, nil
 }
 
-func StopServeHostnameService(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
-	if err := DeleteRCAndPods(clientset, internalClientset, ns, name); err != nil {
+func StopServeHostnameService(clientset clientset.Interface, ns, name string) error {
+	if err := DeleteRCAndWaitForGC(clientset, ns, name); err != nil {
 		return err
 	}
-	if err := clientset.Core().Services(ns).Delete(name, nil); err != nil {
+	if err := clientset.CoreV1().Services(ns).Delete(name, nil); err != nil {
 		return err
 	}
 	return nil
@@ -1288,8 +1392,9 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 	// Loop a bunch of times - the proxy is randomized, so we want a good
 	// chance of hitting each backend at least once.
 	buildCommand := func(wget string) string {
-		return fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s:%d 2>&1 || true; echo; done",
-			50*len(expectedPods), wget, serviceIP, servicePort)
+		serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
+		return fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s 2>&1 || true; echo; done",
+			50*len(expectedPods), wget, serviceIPPort)
 	}
 	commands := []func() string{
 		// verify service from node
@@ -1356,8 +1461,12 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 }
 
 func VerifyServeHostnameServiceDown(c clientset.Interface, host string, serviceIP string, servicePort int) error {
+	ipPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
+	// The current versions of curl included in CentOS and RHEL distros
+	// misinterpret square brackets around IPv6 as globbing, so use the -g
+	// argument to disable globbing to handle the IPv6 case.
 	command := fmt.Sprintf(
-		"curl -s --connect-timeout 2 http://%s:%d && exit 99", serviceIP, servicePort)
+		"curl -g -s --connect-timeout 2 http://%s && exit 99", ipPort)
 
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 		result, err := SSH(command, host, TestContext.Provider)
@@ -1373,24 +1482,8 @@ func VerifyServeHostnameServiceDown(c clientset.Interface, host string, serviceI
 	return fmt.Errorf("waiting for service to be down timed out")
 }
 
-func CleanupServiceResources(c clientset.Interface, loadBalancerName, zone string) {
-	if TestContext.Provider == "gce" || TestContext.Provider == "gke" {
-		CleanupServiceGCEResources(c, loadBalancerName, zone)
-	}
-
-	// TODO: we need to add this function with other cloud providers, if there is a need.
-}
-
-func CleanupServiceGCEResources(c clientset.Interface, loadBalancerName, zone string) {
-	if pollErr := wait.Poll(5*time.Second, LoadBalancerCleanupTimeout, func() (bool, error) {
-		if err := CleanupGCEResources(c, loadBalancerName, zone); err != nil {
-			Logf("Still waiting for glbc to cleanup: %v", err)
-			return false, nil
-		}
-		return true, nil
-	}); pollErr != nil {
-		Failf("Failed to cleanup service GCE resources.")
-	}
+func CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
+	TestContext.CloudConfig.Provider.CleanupServiceResources(c, loadBalancerName, region, zone)
 }
 
 func DescribeSvc(ns string) {
@@ -1414,7 +1507,7 @@ func CreateServiceSpec(serviceName, externalName string, isHeadless bool, select
 		headlessService.Spec.ExternalName = externalName
 	} else {
 		headlessService.Spec.Ports = []v1.ServicePort{
-			{Port: 80, Name: "http", Protocol: "TCP"},
+			{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 		}
 	}
 	if isHeadless {
@@ -1424,29 +1517,9 @@ func CreateServiceSpec(serviceName, externalName string, isHeadless bool, select
 }
 
 // EnableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
-// setting for the supported cloud providers: GCE/GKE and Azure
+// setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
 func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
-	enable = func(svc *v1.Service) {}
-	disable = func(svc *v1.Service) {}
-
-	switch TestContext.Provider {
-	case "gce", "gke":
-		enable = func(svc *v1.Service) {
-			svc.ObjectMeta.Annotations = map[string]string{gcecloud.ServiceAnnotationLoadBalancerType: string(gcecloud.LBTypeInternal)}
-		}
-		disable = func(svc *v1.Service) {
-			delete(svc.ObjectMeta.Annotations, gcecloud.ServiceAnnotationLoadBalancerType)
-		}
-	case "azure":
-		enable = func(svc *v1.Service) {
-			svc.ObjectMeta.Annotations = map[string]string{azurecloud.ServiceAnnotationLoadBalancerInternal: "true"}
-		}
-		disable = func(svc *v1.Service) {
-			svc.ObjectMeta.Annotations = map[string]string{azurecloud.ServiceAnnotationLoadBalancerInternal: "false"}
-		}
-	}
-
-	return
+	return TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
 }
 
 func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration {
@@ -1454,4 +1527,92 @@ func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration
 		return LoadBalancerCreateTimeoutLarge
 	}
 	return LoadBalancerCreateTimeoutDefault
+}
+
+// affinityTracker tracks the destination of a request for the affinity tests.
+type affinityTracker struct {
+	hostTrace []string
+}
+
+// Record the response going to a given host.
+func (at *affinityTracker) recordHost(host string) {
+	at.hostTrace = append(at.hostTrace, host)
+	Logf("Received response from host: %s", host)
+}
+
+// Check that we got a constant count requests going to the same host.
+func (at *affinityTracker) checkHostTrace(count int) (fulfilled, affinityHolds bool) {
+	fulfilled = (len(at.hostTrace) >= count)
+	if len(at.hostTrace) == 0 {
+		return fulfilled, true
+	}
+	last := at.hostTrace[0:]
+	if len(at.hostTrace)-count >= 0 {
+		last = at.hostTrace[len(at.hostTrace)-count:]
+	}
+	host := at.hostTrace[len(at.hostTrace)-1]
+	for _, h := range last {
+		if h != host {
+			return fulfilled, false
+		}
+	}
+	return fulfilled, true
+}
+
+func checkAffinityFailed(tracker affinityTracker, err string) {
+	Logf("%v", tracker.hostTrace)
+	Failf(err)
+}
+
+// CheckAffinity function tests whether the service affinity works as expected.
+// If affinity is expected, the test will return true once affinityConfirmCount
+// number of same response observed in a row. If affinity is not expected, the
+// test will keep observe until different responses observed. The function will
+// return false only in case of unexpected errors.
+func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIp string, targetPort int, shouldHold bool) bool {
+	targetIpPort := net.JoinHostPort(targetIp, strconv.Itoa(targetPort))
+	cmd := fmt.Sprintf(`wget -qO- http://%s/ -T 2`, targetIpPort)
+	timeout := ServiceTestTimeout
+	if execPod == nil {
+		timeout = LoadBalancerPollTimeout
+	}
+	var tracker affinityTracker
+	if pollErr := wait.PollImmediate(Poll, timeout, func() (bool, error) {
+		if execPod != nil {
+			if stdout, err := RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
+				Logf("Failed to get response from %s. Retry until timeout", targetIpPort)
+				return false, nil
+			} else {
+				tracker.recordHost(stdout)
+			}
+		} else {
+			rawResponse := jig.GetHTTPContent(targetIp, targetPort, timeout, "")
+			tracker.recordHost(rawResponse.String())
+		}
+		trackerFulfilled, affinityHolds := tracker.checkHostTrace(AffinityConfirmCount)
+		if !shouldHold && !affinityHolds {
+			return true, nil
+		}
+		if shouldHold && trackerFulfilled && affinityHolds {
+			return true, nil
+		}
+		return false, nil
+	}); pollErr != nil {
+		trackerFulfilled, _ := tracker.checkHostTrace(AffinityConfirmCount)
+		if pollErr != wait.ErrWaitTimeout {
+			checkAffinityFailed(tracker, pollErr.Error())
+			return false
+		} else {
+			if !trackerFulfilled {
+				checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", targetIpPort))
+			}
+			if shouldHold {
+				checkAffinityFailed(tracker, "Affinity should hold but didn't.")
+			} else {
+				checkAffinityFailed(tracker, "Affinity shouldn't hold but did.")
+			}
+			return true
+		}
+	}
+	return true
 }

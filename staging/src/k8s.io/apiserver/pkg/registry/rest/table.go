@@ -17,16 +17,16 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 type defaultTableConvertor struct {
@@ -40,14 +40,14 @@ func NewDefaultTableConvertor(resource schema.GroupResource) TableConvertor {
 
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
-func (c defaultTableConvertor) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
-	var table metav1alpha1.Table
+func (c defaultTableConvertor) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+	var table metav1beta1.Table
 	fn := func(obj runtime.Object) error {
 		m, err := meta.Accessor(obj)
 		if err != nil {
 			return errNotAcceptable{resource: c.qualifiedResource}
 		}
-		table.Rows = append(table.Rows, metav1alpha1.TableRow{
+		table.Rows = append(table.Rows, metav1beta1.TableRow{
 			Cells:  []interface{}{m.GetName(), m.GetCreationTimestamp().Time.UTC().Format(time.RFC3339)},
 			Object: runtime.RawExtension{Object: obj},
 		})
@@ -63,9 +63,21 @@ func (c defaultTableConvertor) ConvertToTable(ctx genericapirequest.Context, obj
 			return nil, err
 		}
 	}
-	table.ColumnDefinitions = []metav1alpha1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
-		{Name: "Created At", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},
+	if m, err := meta.ListAccessor(object); err == nil {
+		table.ResourceVersion = m.GetResourceVersion()
+		table.SelfLink = m.GetSelfLink()
+		table.Continue = m.GetContinue()
+	} else {
+		if m, err := meta.CommonAccessor(object); err == nil {
+			table.ResourceVersion = m.GetResourceVersion()
+			table.SelfLink = m.GetSelfLink()
+		}
+	}
+	if opt, ok := tableOptions.(*metav1beta1.TableOptions); !ok || !opt.NoHeaders {
+		table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
+			{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
+			{Name: "Created At", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},
+		}
 	}
 	return &table, nil
 }

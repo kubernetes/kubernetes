@@ -18,14 +18,16 @@ package auth
 
 import (
 	"fmt"
+	"path"
 	"time"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -36,10 +38,6 @@ import (
 
 var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
 
-var serviceAccountTokenNamespaceVersion = utilversion.MustParseSemantic("v1.2.0")
-
-var serviceAccountTokenAutomountVersion = utilversion.MustParseSemantic("v1.6.0-alpha.2")
-
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
 
@@ -48,7 +46,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		var secrets []v1.ObjectReference
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
 			By("waiting for a single token reference")
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
+			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				framework.Logf("default service account was not found")
 				return false, nil
@@ -74,19 +72,19 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		{
 			By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
+			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(sa.Secrets).To(Equal(secrets))
 		}
 
 		// delete the referenced secret
 		By("deleting the service account token")
-		framework.ExpectNoError(f.ClientSet.Core().Secrets(f.Namespace.Name).Delete(secrets[0].Name, nil))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secrets[0].Name, nil))
 
 		// wait for the referenced secret to be removed, and another one autocreated
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
 			By("waiting for a new token reference")
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
+			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("error getting default service account: %v", err)
 				return false, err
@@ -112,7 +110,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		{
 			By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
+			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(sa.Secrets).To(Equal(secrets))
 		}
@@ -120,17 +118,17 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		// delete the reference from the service account
 		By("deleting the reference to the service account token")
 		{
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
+			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			sa.Secrets = nil
-			_, updateErr := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Update(sa)
+			_, updateErr := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Update(sa)
 			framework.ExpectNoError(updateErr)
 		}
 
 		// wait for another one to be autocreated
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
 			By("waiting for a new token to be created and added")
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
+			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("error getting default service account: %v", err)
 				return false, err
@@ -152,40 +150,50 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		{
 			By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
+			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(sa.Secrets).To(Equal(secrets))
 		}
 	})
 
-	It("should mount an API token into pods [Conformance]", func() {
-		var tokenContent string
+	/*
+	   Release: v1.9
+	   Testname: Service Account Tokens Must AutoMount
+	   Description: Ensure that Service Account keys are mounted into the Container. Pod
+	                contains three containers each will read Service Account token,
+	                root CA and default namespace respectively from the default API
+	                Token Mount path. All these three files MUST exist and the Service
+	                Account mount path MUST be auto mounted to the Container.
+	*/
+	framework.ConformanceIt("should mount an API token into pods ", func() {
 		var rootCAContent string
+
+		sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "mount-test"}})
+		framework.ExpectNoError(err)
 
 		// Standard get, update retry loop
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
 			By("getting the auto-created API token")
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
+			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("mount-test", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
-				framework.Logf("default service account was not found")
+				framework.Logf("mount-test service account was not found")
 				return false, nil
 			}
 			if err != nil {
-				framework.Logf("error getting default service account: %v", err)
+				framework.Logf("error getting mount-test service account: %v", err)
 				return false, err
 			}
 			if len(sa.Secrets) == 0 {
-				framework.Logf("default service account has no secret references")
+				framework.Logf("mount-test service account has no secret references")
 				return false, nil
 			}
 			for _, secretRef := range sa.Secrets {
-				secret, err := f.ClientSet.Core().Secrets(f.Namespace.Name).Get(secretRef.Name, metav1.GetOptions{})
+				secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(secretRef.Name, metav1.GetOptions{})
 				if err != nil {
 					framework.Logf("Error getting secret %s: %v", secretRef.Name, err)
 					continue
 				}
 				if secret.Type == v1.SecretTypeServiceAccountToken {
-					tokenContent = string(secret.Data[v1.ServiceAccountTokenKey])
 					rootCAContent = string(secret.Data[v1.ServiceAccountRootCAKey])
 					return true, nil
 				}
@@ -195,73 +203,89 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			return false, nil
 		}))
 
-		pod := &v1.Pod{
+		zero := int64(0)
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "pod-service-account-" + string(uuid.NewUUID()) + "-",
+				Name: "pod-service-account-" + string(uuid.NewUUID()),
 			},
 			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "token-test",
-						Image: mountImage,
-						Args: []string{
-							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey),
-						},
-					},
-					{
-						Name:  "root-ca-test",
-						Image: mountImage,
-						Args: []string{
-							fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey),
-						},
-					},
-				},
-				RestartPolicy: v1.RestartPolicyNever,
+				ServiceAccountName: sa.Name,
+				Containers: []v1.Container{{
+					Name:    "test",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"sleep", "100000"}, // run and pause
+				}},
+				TerminationGracePeriodSeconds: &zero,                 // terminate quickly when deleted
+				RestartPolicy:                 v1.RestartPolicyNever, // never restart
 			},
-		}
-
-		supportsTokenNamespace, _ := framework.ServerVersionGTE(serviceAccountTokenNamespaceVersion, f.ClientSet.Discovery())
-		if supportsTokenNamespace {
-			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
-				Name:  "namespace-test",
-				Image: mountImage,
-				Args: []string{
-					fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey),
-				},
-			})
-		}
-
-		f.TestContainerOutput("consume service account token", pod, 0, []string{
-			fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey, tokenContent),
 		})
-		f.TestContainerOutput("consume service account root CA", pod, 1, []string{
-			fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey, rootCAContent),
-		})
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
-		if supportsTokenNamespace {
-			f.TestContainerOutput("consume service account namespace", pod, 2, []string{
-				fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey, f.Namespace.Name),
-			})
-		}
+		mountedToken, err := f.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey))
+		framework.ExpectNoError(err)
+		mountedCA, err := f.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey))
+		framework.ExpectNoError(err)
+		mountedNamespace, err := f.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey))
+		framework.ExpectNoError(err)
+
+		// CA and namespace should be identical
+		Expect(mountedCA).To(Equal(rootCAContent))
+		Expect(mountedNamespace).To(Equal(f.Namespace.Name))
+		// Token should be a valid credential that identifies the pod's service account
+		tokenReview := &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: mountedToken}}
+		tokenReview, err = f.ClientSet.AuthenticationV1().TokenReviews().Create(tokenReview)
+		framework.ExpectNoError(err)
+		Expect(tokenReview.Status.Authenticated).To(Equal(true))
+		Expect(tokenReview.Status.Error).To(Equal(""))
+		Expect(tokenReview.Status.User.Username).To(Equal("system:serviceaccount:" + f.Namespace.Name + ":" + sa.Name))
+		groups := sets.NewString(tokenReview.Status.User.Groups...)
+		Expect(groups.Has("system:authenticated")).To(Equal(true), fmt.Sprintf("expected system:authenticated group, had %v", groups.List()))
+		Expect(groups.Has("system:serviceaccounts")).To(Equal(true), fmt.Sprintf("expected system:serviceaccounts group, had %v", groups.List()))
+		Expect(groups.Has("system:serviceaccounts:"+f.Namespace.Name)).To(Equal(true), fmt.Sprintf("expected system:serviceaccounts:"+f.Namespace.Name+" group, had %v", groups.List()))
 	})
 
-	It("should allow opting out of API token automount [Conformance]", func() {
-		framework.SkipUnlessServerVersionGTE(serviceAccountTokenAutomountVersion, f.ClientSet.Discovery())
+	/*
+	   Release: v1.9
+	   Testname: Service account tokens auto mount optionally
+	   Description: Ensure that Service Account keys are mounted into the Pod only
+	                when AutoMountServiceToken is not set to false. We test the
+	                following scenarios here.
+	   1. Create Pod, Pod Spec has AutomountServiceAccountToken set to nil
+	      a) Service Account with default value,
+	      b) Service Account is an configured AutomountServiceAccountToken set to true,
+	      c) Service Account is an configured AutomountServiceAccountToken set to false
+	   2. Create Pod, Pod Spec has AutomountServiceAccountToken set to true
+	      a) Service Account with default value,
+	      b) Service Account is configured with AutomountServiceAccountToken set to true,
+	      c) Service Account is configured with AutomountServiceAccountToken set to false
+	   3. Create Pod, Pod Spec has AutomountServiceAccountToken set to false
+	      a) Service Account with default value,
+	      b) Service Account is configured with AutomountServiceAccountToken set to true,
+	      c) Service Account is configured with AutomountServiceAccountToken set to false
+
+	   The Containers running in these pods MUST verify that the ServiceTokenVolume path is
+	   auto mounted only when Pod Spec has AutomountServiceAccountToken not set to false
+	   and ServiceAccount object has AutomountServiceAccountToken not set to false, this
+	   include test cases 1a,1b,2a,2b and 2c.
+	   In the test cases 1c,3a,3b and 3c the ServiceTokenVolume MUST not be auto mounted.
+	*/
+	framework.ConformanceIt("should allow opting out of API token automount ", func() {
 
 		var err error
 		trueValue := true
 		falseValue := false
 		mountSA := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "mount"}, AutomountServiceAccountToken: &trueValue}
 		nomountSA := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "nomount"}, AutomountServiceAccountToken: &falseValue}
-		mountSA, err = f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Create(mountSA)
+		mountSA, err = f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(mountSA)
 		framework.ExpectNoError(err)
-		nomountSA, err = f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Create(nomountSA)
+		nomountSA, err = f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(nomountSA)
 		framework.ExpectNoError(err)
 
 		// Standard get, update retry loop
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
 			By("getting the auto-created API token")
-			sa, err := f.ClientSet.Core().ServiceAccounts(f.Namespace.Name).Get(mountSA.Name, metav1.GetOptions{})
+			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(mountSA.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				framework.Logf("mount service account was not found")
 				return false, nil
@@ -275,7 +299,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				return false, nil
 			}
 			for _, secretRef := range sa.Secrets {
-				secret, err := f.ClientSet.Core().Secrets(f.Namespace.Name).Get(secretRef.Name, metav1.GetOptions{})
+				secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(secretRef.Name, metav1.GetOptions{})
 				if err != nil {
 					framework.Logf("Error getting secret %s: %v", secretRef.Name, err)
 					continue
@@ -365,7 +389,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 					AutomountServiceAccountToken: tc.AutomountPodSpec,
 				},
 			}
-			createdPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 			framework.ExpectNoError(err)
 			framework.Logf("created pod %s", tc.PodName)
 

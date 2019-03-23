@@ -34,19 +34,26 @@ type genGroup struct {
 	outputPackage string
 	group         string
 	version       string
+	groupGoName   string
 	apiPath       string
 	// types in this group
 	types            []*types.Type
 	imports          namer.ImportTracker
 	inputPackage     string
 	clientsetPackage string
+	// If the genGroup has been called. This generator should only execute once.
+	called bool
 }
 
 var _ generator.Generator = &genGroup{}
 
 // We only want to call GenerateType() once per group.
 func (g *genGroup) Filter(c *generator.Context, t *types.Type) bool {
-	return len(g.types) == 0 || t == g.types[0]
+	if !g.called {
+		g.called = true
+		return true
+	}
+	return false
 }
 
 func (g *genGroup) Namers(c *generator.Context) namer.NameSystems {
@@ -65,13 +72,10 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
 	apiPath := func(group string) string {
-		if len(g.apiPath) > 0 {
-			return `"` + g.apiPath + `"`
-		}
 		if group == "core" {
 			return `"/api"`
 		}
-		return `"/apis"`
+		return `"` + g.apiPath + `"`
 	}
 
 	groupName := g.group
@@ -80,15 +84,16 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	}
 	// allow user to define a group name that's different from the one parsed from the directory.
 	p := c.Universe.Package(path.Vendorless(g.inputPackage))
-	if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
+	if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 		groupName = override[0]
 	}
 
 	m := map[string]interface{}{
 		"group":                          g.group,
 		"version":                        g.version,
-		"GroupVersion":                   namer.IC(g.group) + namer.IC(g.version),
 		"groupName":                      groupName,
+		"GroupGoName":                    g.groupGoName,
+		"Version":                        namer.IC(g.version),
 		"types":                          g.types,
 		"apiPath":                        apiPath(g.group),
 		"schemaGroupVersion":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
@@ -103,13 +108,14 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
 	for _, t := range g.types {
-		tags, err := util.ParseClientGenTags(t.SecondClosestCommentLines)
+		tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 		if err != nil {
 			return err
 		}
 		wrapper := map[string]interface{}{
-			"type":         t,
-			"GroupVersion": namer.IC(g.group) + namer.IC(g.version),
+			"type":        t,
+			"GroupGoName": g.groupGoName,
+			"Version":     namer.IC(g.version),
 		}
 		if tags.NonNamespaced {
 			sw.Do(getterImplNonNamespaced, wrapper)
@@ -131,7 +137,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 }
 
 var groupInterfaceTemplate = `
-type $.GroupVersion$Interface interface {
+type $.GroupGoName$$.Version$Interface interface {
     RESTClient() $.restRESTClientInterface|raw$
     $range .types$ $.|publicPlural$Getter
     $end$
@@ -139,27 +145,27 @@ type $.GroupVersion$Interface interface {
 `
 
 var groupClientTemplate = `
-// $.GroupVersion$Client is used to interact with features provided by the $.groupName$ group.
-type $.GroupVersion$Client struct {
+// $.GroupGoName$$.Version$Client is used to interact with features provided by the $.groupName$ group.
+type $.GroupGoName$$.Version$Client struct {
 	restClient $.restRESTClientInterface|raw$
 }
 `
 
 var getterImplNamespaced = `
-func (c *$.GroupVersion$Client) $.type|publicPlural$(namespace string) $.type|public$Interface {
+func (c *$.GroupGoName$$.Version$Client) $.type|publicPlural$(namespace string) $.type|public$Interface {
 	return new$.type|publicPlural$(c, namespace)
 }
 `
 
 var getterImplNonNamespaced = `
-func (c *$.GroupVersion$Client) $.type|publicPlural$() $.type|public$Interface {
+func (c *$.GroupGoName$$.Version$Client) $.type|publicPlural$() $.type|public$Interface {
 	return new$.type|publicPlural$(c)
 }
 `
 
 var newClientForConfigTemplate = `
-// NewForConfig creates a new $.GroupVersion$Client for the given config.
-func NewForConfig(c *$.restConfig|raw$) (*$.GroupVersion$Client, error) {
+// NewForConfig creates a new $.GroupGoName$$.Version$Client for the given config.
+func NewForConfig(c *$.restConfig|raw$) (*$.GroupGoName$$.Version$Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -168,14 +174,14 @@ func NewForConfig(c *$.restConfig|raw$) (*$.GroupVersion$Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &$.GroupVersion$Client{client}, nil
+	return &$.GroupGoName$$.Version$Client{client}, nil
 }
 `
 
 var newClientForConfigOrDieTemplate = `
-// NewForConfigOrDie creates a new $.GroupVersion$Client for the given config and
+// NewForConfigOrDie creates a new $.GroupGoName$$.Version$Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *$.restConfig|raw$) *$.GroupVersion$Client {
+func NewForConfigOrDie(c *$.restConfig|raw$) *$.GroupGoName$$.Version$Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -187,7 +193,7 @@ func NewForConfigOrDie(c *$.restConfig|raw$) *$.GroupVersion$Client {
 var getRESTClient = `
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *$.GroupVersion$Client) RESTClient() $.restRESTClientInterface|raw$ {
+func (c *$.GroupGoName$$.Version$Client) RESTClient() $.restRESTClientInterface|raw$ {
 	if c == nil {
 		return nil
 	}
@@ -196,25 +202,20 @@ func (c *$.GroupVersion$Client) RESTClient() $.restRESTClientInterface|raw$ {
 `
 
 var newClientForRESTClientTemplate = `
-// New creates a new $.GroupVersion$Client for the given RESTClient.
-func New(c $.restRESTClientInterface|raw$) *$.GroupVersion$Client {
-	return &$.GroupVersion$Client{c}
+// New creates a new $.GroupGoName$$.Version$Client for the given RESTClient.
+func New(c $.restRESTClientInterface|raw$) *$.GroupGoName$$.Version$Client {
+	return &$.GroupGoName$$.Version$Client{c}
 }
 `
 
 var setInternalVersionClientDefaultsTemplate = `
 func setConfigDefaults(config *$.restConfig|raw$) error {
-	g, err := scheme.Registry.Group("$.groupName$")
-	if err != nil {
-		return err
-	}
-
 	config.APIPath = $.apiPath$
 	if config.UserAgent == "" {
 		config.UserAgent = $.restDefaultKubernetesUserAgent|raw$()
 	}
-	if config.GroupVersion == nil || config.GroupVersion.Group != g.GroupVersion.Group {
-		gv := g.GroupVersion
+	if config.GroupVersion == nil || config.GroupVersion.Group != scheme.Scheme.PrioritizedVersionsForGroup("$.groupName$")[0].Group {
+		gv := scheme.Scheme.PrioritizedVersionsForGroup("$.groupName$")[0]
 		config.GroupVersion = &gv
 	}
 	config.NegotiatedSerializer = scheme.Codecs

@@ -19,32 +19,36 @@ package reconciliation
 import (
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
-func role(rules []rbac.PolicyRule, labels map[string]string, annotations map[string]string) *rbac.ClusterRole {
-	return &rbac.ClusterRole{Rules: rules, ObjectMeta: metav1.ObjectMeta{Labels: labels, Annotations: annotations}}
+func role(rules []rbacv1.PolicyRule, labels map[string]string, annotations map[string]string) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		Rules:      rules,
+		ObjectMeta: metav1.ObjectMeta{Labels: labels, Annotations: annotations},
+	}
 }
 
-func rules(resources ...string) []rbac.PolicyRule {
-	r := []rbac.PolicyRule{}
+func rules(resources ...string) []rbacv1.PolicyRule {
+	r := []rbacv1.PolicyRule{}
 	for _, resource := range resources {
-		r = append(r, rbac.PolicyRule{APIGroups: []string{""}, Verbs: []string{"get"}, Resources: []string{resource}})
+		r = append(r, rbacv1.PolicyRule{APIGroups: []string{""}, Verbs: []string{"get"}, Resources: []string{resource}})
 	}
 	return r
 }
 
 type ss map[string]string
 
-func TestComputeReconciledRole(t *testing.T) {
+func TestComputeReconciledRoleRules(t *testing.T) {
 	tests := map[string]struct {
-		expectedRole           *rbac.ClusterRole
-		actualRole             *rbac.ClusterRole
+		expectedRole           *rbacv1.ClusterRole
+		actualRole             *rbacv1.ClusterRole
 		removeExtraPermissions bool
 
-		expectedReconciledRole       *rbac.ClusterRole
+		expectedReconciledRole       *rbacv1.ClusterRole
 		expectedReconciliationNeeded bool
 	}{
 		"empty": {
@@ -270,6 +274,125 @@ func TestComputeReconciledRole(t *testing.T) {
 		}
 		if reconciliationNeeded && !helper.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
 			t.Errorf("%s: Expected\n\t%#v\ngot\n\t%#v", k, tc.expectedReconciledRole, result.Role)
+		}
+	}
+}
+
+func aggregatedRole(aggregationRule *rbacv1.AggregationRule) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		AggregationRule: aggregationRule,
+	}
+}
+
+func aggregationrule(selectors []map[string]string) *rbacv1.AggregationRule {
+	ret := &rbacv1.AggregationRule{}
+	for _, selector := range selectors {
+		ret.ClusterRoleSelectors = append(ret.ClusterRoleSelectors,
+			metav1.LabelSelector{MatchLabels: selector})
+	}
+	return ret
+}
+
+func TestComputeReconciledRoleAggregationRules(t *testing.T) {
+	tests := map[string]struct {
+		expectedRole           *rbacv1.ClusterRole
+		actualRole             *rbacv1.ClusterRole
+		removeExtraPermissions bool
+
+		expectedReconciledRole       *rbacv1.ClusterRole
+		expectedReconciliationNeeded bool
+	}{
+		"empty": {
+			expectedRole:           aggregatedRole(&rbacv1.AggregationRule{}),
+			actualRole:             aggregatedRole(nil),
+			removeExtraPermissions: true,
+
+			expectedReconciledRole:       nil,
+			expectedReconciliationNeeded: false,
+		},
+		"empty-2": {
+			expectedRole:           aggregatedRole(&rbacv1.AggregationRule{}),
+			actualRole:             aggregatedRole(&rbacv1.AggregationRule{}),
+			removeExtraPermissions: true,
+
+			expectedReconciledRole:       nil,
+			expectedReconciliationNeeded: false,
+		},
+		"match without union": {
+			expectedRole:           aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			actualRole:             aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			removeExtraPermissions: true,
+
+			expectedReconciledRole:       nil,
+			expectedReconciliationNeeded: false,
+		},
+		"match with union": {
+			expectedRole:           aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			actualRole:             aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			removeExtraPermissions: false,
+
+			expectedReconciledRole:       nil,
+			expectedReconciliationNeeded: false,
+		},
+		"different rules without union": {
+			expectedRole:           aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			actualRole:             aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}})),
+			removeExtraPermissions: true,
+
+			expectedReconciledRole:       aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			expectedReconciliationNeeded: true,
+		},
+		"different rules with union": {
+			expectedRole:           aggregatedRole(aggregationrule([]map[string]string{{"foo": "bar"}})),
+			actualRole:             aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}})),
+			removeExtraPermissions: false,
+
+			expectedReconciledRole:       aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}, {"foo": "bar"}})),
+			expectedReconciliationNeeded: true,
+		},
+		"unexpected aggregation": {
+			// desired role is not aggregated
+			expectedRole: role(rules("pods", "nodes", "secrets"), nil, nil),
+			// existing role is aggregated
+			actualRole:             aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}})),
+			removeExtraPermissions: false,
+
+			// reconciled role should have desired permissions and not be aggregated
+			expectedReconciledRole:       role(rules("pods", "nodes", "secrets"), nil, nil),
+			expectedReconciliationNeeded: true,
+		},
+		"unexpected aggregation with differing permissions": {
+			// desired role is not aggregated
+			expectedRole: role(rules("pods", "nodes", "secrets"), nil, nil),
+			// existing role is aggregated and has other permissions
+			actualRole: func() *rbacv1.ClusterRole {
+				r := aggregatedRole(aggregationrule([]map[string]string{{"alpha": "bravo"}}))
+				r.Rules = rules("deployments")
+				return r
+			}(),
+			removeExtraPermissions: false,
+
+			// reconciled role should have aggregation removed, preserve differing permissions, and include desired permissions
+			expectedReconciledRole:       role(rules("deployments", "pods", "nodes", "secrets"), nil, nil),
+			expectedReconciliationNeeded: true,
+		},
+	}
+
+	for k, tc := range tests {
+		actualRole := ClusterRoleRuleOwner{ClusterRole: tc.actualRole}
+		expectedRole := ClusterRoleRuleOwner{ClusterRole: tc.expectedRole}
+		result, err := computeReconciledRole(actualRole, expectedRole, tc.removeExtraPermissions)
+		if err != nil {
+			t.Errorf("%s: %v", k, err)
+			continue
+		}
+		reconciliationNeeded := result.Operation != ReconcileNone
+		if reconciliationNeeded != tc.expectedReconciliationNeeded {
+			t.Errorf("%s: Expected\n\t%v\ngot\n\t%v", k, tc.expectedReconciliationNeeded, reconciliationNeeded)
+			continue
+		}
+		if reconciliationNeeded && !helper.Semantic.DeepEqual(result.Role.(ClusterRoleRuleOwner).ClusterRole, tc.expectedReconciledRole) {
+			t.Errorf("%s: %v", k, diff.ObjectDiff(tc.expectedReconciledRole, result.Role.(ClusterRoleRuleOwner).ClusterRole))
 		}
 	}
 }

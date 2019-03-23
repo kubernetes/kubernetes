@@ -30,7 +30,7 @@ import (
 // Collector models the PropertyCollector managed object.
 //
 // For more information, see:
-// http://pubs.vmware.com/vsphere-55/index.jsp#com.vmware.wssdk.apiref.doc/vmodl.query.PropertyCollector.html
+// http://pubs.vmware.com/vsphere-60/index.jsp?topic=%2Fcom.vmware.wssdk.apiref.doc%2Fvmodl.query.PropertyCollector.html
 //
 type Collector struct {
 	roundTripper soap.RoundTripper
@@ -111,6 +111,12 @@ func (p *Collector) WaitForUpdates(ctx context.Context, v string) (*types.Update
 	return res.Returnval, nil
 }
 
+func (p *Collector) CancelWaitForUpdates(ctx context.Context) error {
+	req := &types.CancelWaitForUpdates{This: p.Reference()}
+	_, err := methods.CancelWaitForUpdates(ctx, p.roundTripper, req)
+	return err
+}
+
 func (p *Collector) RetrieveProperties(ctx context.Context, req types.RetrieveProperties) (*types.RetrievePropertiesResponse, error) {
 	req.This = p.Reference()
 	return methods.RetrieveProperties(ctx, p.roundTripper, &req)
@@ -121,6 +127,10 @@ func (p *Collector) RetrieveProperties(ctx context.Context, req types.RetrievePr
 // of the specified managed objects, with the relevant properties filled in. If
 // the properties slice is nil, all properties are loaded.
 func (p *Collector) Retrieve(ctx context.Context, objs []types.ManagedObjectReference, ps []string, dst interface{}) error {
+	if len(objs) == 0 {
+		return errors.New("object references is empty")
+	}
+
 	var propSpec *types.PropertySpec
 	var objectSet []types.ObjectSpec
 

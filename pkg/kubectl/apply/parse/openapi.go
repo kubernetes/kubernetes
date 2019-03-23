@@ -18,13 +18,15 @@ package parse
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"strings"
+
+	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // Contains functions for casting openapi interfaces to their underlying types
 
 // getSchemaType returns the string type of the schema - e.g. array, primitive, map, kind, reference
-func getSchemaType(schema openapi.Schema) string {
+func getSchemaType(schema proto.Schema) string {
 	if schema == nil {
 		return ""
 	}
@@ -33,8 +35,8 @@ func getSchemaType(schema openapi.Schema) string {
 	return visitor.Kind
 }
 
-// getKind converts schema to an *openapi.Kind object
-func getKind(schema openapi.Schema) (*openapi.Kind, error) {
+// getKind converts schema to an *proto.Kind object
+func getKind(schema proto.Schema) (*proto.Kind, error) {
 	if schema == nil {
 		return nil, nil
 	}
@@ -43,8 +45,8 @@ func getKind(schema openapi.Schema) (*openapi.Kind, error) {
 	return visitor.Result, visitor.Err
 }
 
-// getArray converts schema to an *openapi.Array object
-func getArray(schema openapi.Schema) (*openapi.Array, error) {
+// getArray converts schema to an *proto.Array object
+func getArray(schema proto.Schema) (*proto.Array, error) {
 	if schema == nil {
 		return nil, nil
 	}
@@ -53,8 +55,8 @@ func getArray(schema openapi.Schema) (*openapi.Array, error) {
 	return visitor.Result, visitor.Err
 }
 
-// getMap converts schema to an *openapi.Map object
-func getMap(schema openapi.Schema) (*openapi.Map, error) {
+// getMap converts schema to an *proto.Map object
+func getMap(schema proto.Schema) (*proto.Map, error) {
 	if schema == nil {
 		return nil, nil
 	}
@@ -63,8 +65,8 @@ func getMap(schema openapi.Schema) (*openapi.Map, error) {
 	return visitor.Result, visitor.Err
 }
 
-// getPrimitive converts schema to an *openapi.Primitive object
-func getPrimitive(schema openapi.Schema) (*openapi.Primitive, error) {
+// getPrimitive converts schema to an *proto.Primitive object
+func getPrimitive(schema proto.Schema) (*proto.Primitive, error) {
 	if schema == nil {
 		return nil, nil
 	}
@@ -79,95 +81,147 @@ type baseSchemaVisitor struct {
 }
 
 // VisitArray implements openapi
-func (v *baseSchemaVisitor) VisitArray(array *openapi.Array) {
+func (v *baseSchemaVisitor) VisitArray(array *proto.Array) {
 	v.Kind = "array"
 	v.Err = fmt.Errorf("Array type not expected")
 }
 
 // MergeMap implements openapi
-func (v *baseSchemaVisitor) VisitMap(*openapi.Map) {
+func (v *baseSchemaVisitor) VisitMap(*proto.Map) {
 	v.Kind = "map"
 	v.Err = fmt.Errorf("Map type not expected")
 }
 
 // MergePrimitive implements openapi
-func (v *baseSchemaVisitor) VisitPrimitive(*openapi.Primitive) {
+func (v *baseSchemaVisitor) VisitPrimitive(*proto.Primitive) {
 	v.Kind = "primitive"
 	v.Err = fmt.Errorf("Primitive type not expected")
 }
 
 // VisitKind implements openapi
-func (v *baseSchemaVisitor) VisitKind(*openapi.Kind) {
+func (v *baseSchemaVisitor) VisitKind(*proto.Kind) {
 	v.Kind = "kind"
 	v.Err = fmt.Errorf("Kind type not expected")
 }
 
 // VisitReference implements openapi
-func (v *baseSchemaVisitor) VisitReference(reference openapi.Reference) {
+func (v *baseSchemaVisitor) VisitReference(reference proto.Reference) {
 	v.Kind = "reference"
 	v.Err = fmt.Errorf("Reference type not expected")
 }
 
 type kindSchemaVisitor struct {
 	baseSchemaVisitor
-	Result *openapi.Kind
+	Result *proto.Kind
 }
 
 // VisitKind implements openapi
-func (v *kindSchemaVisitor) VisitKind(result *openapi.Kind) {
+func (v *kindSchemaVisitor) VisitKind(result *proto.Kind) {
 	v.Result = result
 	v.Kind = "kind"
 }
 
 // VisitReference implements openapi
-func (v *kindSchemaVisitor) VisitReference(reference openapi.Reference) {
+func (v *kindSchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
+	if v.Err == nil {
+		v.Err = copyExtensions(reference.GetPath().String(), reference.GetExtensions(), v.Result.Extensions)
+	}
+}
+
+func copyExtensions(field string, from, to map[string]interface{}) error {
+	// Copy extensions from field to type for references
+	for key, val := range from {
+		if curr, found := to[key]; found {
+			// Don't allow the same extension to be defined both on the field and on the type
+			return fmt.Errorf("Cannot override value for extension %s on field %s from %v to %v",
+				key, field, curr, val)
+		}
+		to[key] = val
+	}
+	return nil
 }
 
 type mapSchemaVisitor struct {
 	baseSchemaVisitor
-	Result *openapi.Map
+	Result *proto.Map
 }
 
 // MergeMap implements openapi
-func (v *mapSchemaVisitor) VisitMap(result *openapi.Map) {
+func (v *mapSchemaVisitor) VisitMap(result *proto.Map) {
 	v.Result = result
 	v.Kind = "map"
 }
 
 // VisitReference implements openapi
-func (v *mapSchemaVisitor) VisitReference(reference openapi.Reference) {
+func (v *mapSchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
+	if v.Err == nil {
+		v.Err = copyExtensions(reference.GetPath().String(), reference.GetExtensions(), v.Result.Extensions)
+	}
 }
 
 type arraySchemaVisitor struct {
 	baseSchemaVisitor
-	Result *openapi.Array
+	Result *proto.Array
 }
 
 // VisitArray implements openapi
-func (v *arraySchemaVisitor) VisitArray(result *openapi.Array) {
+func (v *arraySchemaVisitor) VisitArray(result *proto.Array) {
 	v.Result = result
 	v.Kind = "array"
+	v.Err = copySubElementPatchStrategy(result.Path.String(), result.GetExtensions(), result.SubType.GetExtensions())
+}
+
+// copyPatchStrategy copies the strategies to subelements to the subtype
+// e.g. PodTemplate.Volumes is a []Volume with "x-kubernetes-patch-strategy": "merge,retainKeys"
+// the "retainKeys" strategy applies to merging Volumes, and must be copied to the sub element
+func copySubElementPatchStrategy(field string, from, to map[string]interface{}) error {
+	// Check if the parent has a patch strategy extension
+	if ext, found := from["x-kubernetes-patch-strategy"]; found {
+		strategy, ok := ext.(string)
+		if !ok {
+			return fmt.Errorf("Expected string value for x-kubernetes-patch-strategy on %s, was %T",
+				field, ext)
+		}
+		// Check of the parent patch strategy has a sub patch strategy, and if so copy to the sub type
+		if strings.Contains(strategy, ",") {
+			strategies := strings.Split(strategy, ",")
+			if len(strategies) != 2 {
+				// Only 1 sub strategy is supported
+				return fmt.Errorf(
+					"Expected between 0 and 2 elements for x-kubernetes-patch-merge-strategy by got %v",
+					strategies)
+			}
+			to["x-kubernetes-patch-strategy"] = strategies[1]
+		}
+	}
+	return nil
 }
 
 // MergePrimitive implements openapi
-func (v *arraySchemaVisitor) VisitReference(reference openapi.Reference) {
+func (v *arraySchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
+	if v.Err == nil {
+		v.Err = copyExtensions(reference.GetPath().String(), reference.GetExtensions(), v.Result.Extensions)
+	}
 }
 
 type primitiveSchemaVisitor struct {
 	baseSchemaVisitor
-	Result *openapi.Primitive
+	Result *proto.Primitive
 }
 
 // MergePrimitive implements openapi
-func (v *primitiveSchemaVisitor) VisitPrimitive(result *openapi.Primitive) {
+func (v *primitiveSchemaVisitor) VisitPrimitive(result *proto.Primitive) {
 	v.Result = result
 	v.Kind = "primitive"
 }
 
 // VisitReference implements openapi
-func (v *primitiveSchemaVisitor) VisitReference(reference openapi.Reference) {
+func (v *primitiveSchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
+	if v.Err == nil {
+		v.Err = copyExtensions(reference.GetPath().String(), reference.GetExtensions(), v.Result.Extensions)
+	}
 }

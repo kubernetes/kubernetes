@@ -22,7 +22,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -86,7 +86,7 @@ type DefaultStorageFactory struct {
 	APIResourceConfigSource APIResourceConfigSource
 
 	// newStorageCodecFn exists to be overwritten for unit testing.
-	newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, err error)
+	newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, encodeVersioner runtime.GroupVersioner, err error)
 }
 
 type groupResourceOverrides struct {
@@ -121,7 +121,7 @@ type groupResourceOverrides struct {
 // Apply overrides the provided config and options if the override has a value in that position
 func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *StorageCodecConfig) {
 	if len(o.etcdLocation) > 0 {
-		config.ServerList = o.etcdLocation
+		config.Transport.ServerList = o.etcdLocation
 	}
 	if len(o.etcdPrefix) > 0 {
 		config.Prefix = o.etcdPrefix
@@ -151,7 +151,14 @@ var _ StorageFactory = &DefaultStorageFactory{}
 
 const AllResources = "*"
 
-func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource, specialDefaultResourcePrefixes map[schema.GroupResource]string) *DefaultStorageFactory {
+func NewDefaultStorageFactory(
+	config storagebackend.Config,
+	defaultMediaType string,
+	defaultSerializer runtime.StorageSerializer,
+	resourceEncodingConfig ResourceEncodingConfig,
+	resourceConfig APIResourceConfigSource,
+	specialDefaultResourcePrefixes map[schema.GroupResource]string,
+) *DefaultStorageFactory {
 	config.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
@@ -182,7 +189,7 @@ func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource schema.GroupResource
 }
 
 // SetDisableAPIListChunking allows a specific resource to disable paging at the storage layer, to prevent
-// exposure of key names in continuations. This may be overriden by feature gates.
+// exposure of key names in continuations. This may be overridden by feature gates.
 func (s *DefaultStorageFactory) SetDisableAPIListChunking(groupResource schema.GroupResource) {
 	overrides := s.Overrides[groupResource]
 	overrides.disablePaging = true
@@ -233,7 +240,7 @@ func getAllResourcesAlias(resource schema.GroupResource) schema.GroupResource {
 
 func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.GroupResource) schema.GroupResource {
 	for _, potentialStorageResource := range s.Overrides[groupResource].cohabitatingResources {
-		if s.APIResourceConfigSource.AnyVersionOfResourceEnabled(potentialStorageResource) {
+		if s.APIResourceConfigSource.AnyVersionForGroupEnabled(potentialStorageResource.Group) {
 			return potentialStorageResource
 		}
 	}
@@ -271,11 +278,11 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	}
 	codecConfig.Config = storageConfig
 
-	storageConfig.Codec, err = s.newStorageCodecFn(codecConfig)
+	storageConfig.Codec, storageConfig.EncodeVersioner, err = s.newStorageCodecFn(codecConfig)
 	if err != nil {
 		return nil, err
 	}
-	glog.V(3).Infof("storing %v in %v, reading as %v from %#v", groupResource, codecConfig.StorageVersion, codecConfig.MemoryVersion, codecConfig.Config)
+	klog.V(3).Infof("storing %v in %v, reading as %v from %#v", groupResource, codecConfig.StorageVersion, codecConfig.MemoryVersion, codecConfig.Config)
 
 	return &storageConfig, nil
 }
@@ -283,7 +290,7 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 // Backends returns all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
 func (s *DefaultStorageFactory) Backends() []Backend {
-	servers := sets.NewString(s.StorageConfig.ServerList...)
+	servers := sets.NewString(s.StorageConfig.Transport.ServerList...)
 
 	for _, overrides := range s.Overrides {
 		servers.Insert(overrides.etcdLocation...)
@@ -292,17 +299,17 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
 	}
-	if len(s.StorageConfig.CertFile) > 0 && len(s.StorageConfig.KeyFile) > 0 {
-		cert, err := tls.LoadX509KeyPair(s.StorageConfig.CertFile, s.StorageConfig.KeyFile)
+	if len(s.StorageConfig.Transport.CertFile) > 0 && len(s.StorageConfig.Transport.KeyFile) > 0 {
+		cert, err := tls.LoadX509KeyPair(s.StorageConfig.Transport.CertFile, s.StorageConfig.Transport.KeyFile)
 		if err != nil {
-			glog.Errorf("failed to load key pair while getting backends: %s", err)
+			klog.Errorf("failed to load key pair while getting backends: %s", err)
 		} else {
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 	}
-	if len(s.StorageConfig.CAFile) > 0 {
-		if caCert, err := ioutil.ReadFile(s.StorageConfig.CAFile); err != nil {
-			glog.Errorf("failed to read ca file while getting backends: %s", err)
+	if len(s.StorageConfig.Transport.CAFile) > 0 {
+		if caCert, err := ioutil.ReadFile(s.StorageConfig.Transport.CAFile); err != nil {
+			klog.Errorf("failed to read ca file while getting backends: %s", err)
 		} else {
 			caPool := x509.NewCertPool()
 			caPool.AppendCertsFromPEM(caCert)
@@ -314,8 +321,10 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 	backends := []Backend{}
 	for server := range servers {
 		backends = append(backends, Backend{
-			Server:    server,
-			TLSConfig: tlsConfig,
+			Server: server,
+			// We can't share TLSConfig across different backends to avoid races.
+			// For more details see: http://pr.k8s.io/59338
+			TLSConfig: tlsConfig.Clone(),
 		})
 	}
 	return backends

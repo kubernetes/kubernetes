@@ -366,4 +366,5 @@ const (
 	SYS_PREADV2                = 380
 	SYS_PWRITEV2               = 381
 	SYS_KEXEC_FILE_LOAD        = 382
+	SYS_STATX                  = 383
 )

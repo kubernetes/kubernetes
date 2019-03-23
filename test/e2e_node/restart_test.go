@@ -28,8 +28,10 @@ import (
 	"os/exec"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // waitForPods waits for timeout duration, for pod_count.
@@ -57,7 +59,7 @@ func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (
 	return runningPods
 }
 
-var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
+var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeature:ContainerRuntimeRestart]", func() {
 	const (
 		// Saturate the node. It's not necessary that all these pods enter
 		// Running/Ready, because we don't know the number of cores in the
@@ -75,11 +77,11 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 	)
 
 	f := framework.NewDefaultFramework("restart-test")
-	Context("Docker Daemon", func() {
+	Context("Container Runtime", func() {
 		Context("Network", func() {
 			It("should recover from ip leak", func() {
 
-				pods := newTestPods(podCount, false, framework.GetPauseImageNameForHostArch(), "restart-docker-test")
+				pods := newTestPods(podCount, false, imageutils.GetPauseImageName(), "restart-container-runtime-test")
 				By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
 				createBatchPodWithRateControl(f, pods, podCreationInterval)
 				defer deletePodsSync(f, pods)
@@ -88,34 +90,47 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 				// startTimeout fit on the node and the node is now saturated.
 				runningPods := waitForPods(f, podCount, startTimeout)
 				if len(runningPods) < minPods {
-					framework.Failf("Failed to start %d pods, cannot test that restarting docker doesn't leak IPs", minPods)
+					framework.Failf("Failed to start %d pods, cannot test that restarting container runtime doesn't leak IPs", minPods)
 				}
 
 				for i := 0; i < restartCount; i += 1 {
-					By(fmt.Sprintf("Restarting Docker Daemon iteration %d", i))
-
-					// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
-					if stdout, err := exec.Command("sudo", "systemctl", "restart", "docker").CombinedOutput(); err != nil {
-						framework.Logf("Failed to trigger docker restart with systemd/systemctl: %v, stdout: %q", err, string(stdout))
-						if stdout, err = exec.Command("sudo", "service", "docker", "restart").CombinedOutput(); err != nil {
-							framework.Failf("Failed to trigger docker restart with upstart/service: %v, stdout: %q", err, string(stdout))
+					By(fmt.Sprintf("Killing container runtime iteration %d", i))
+					// Wait for container runtime to be running
+					var pid int
+					Eventually(func() error {
+						runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+						if err != nil {
+							return err
 						}
+						if len(runtimePids) != 1 {
+							return fmt.Errorf("unexpected container runtime pid list: %+v", runtimePids)
+						}
+						// Make sure the container runtime is running, pid got from pid file may not be running.
+						pid = runtimePids[0]
+						if _, err := exec.Command("sudo", "ps", "-p", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
+							return err
+						}
+						return nil
+					}, 1*time.Minute, 2*time.Second).Should(BeNil())
+					if stdout, err := exec.Command("sudo", "kill", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
+						framework.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))
 					}
+					// Assume that container runtime will be restarted by systemd/supervisord etc.
 					time.Sleep(20 * time.Second)
 				}
 
 				By("Checking currently Running/Ready pods")
 				postRestartRunningPods := waitForPods(f, len(runningPods), recoverTimeout)
 				if len(postRestartRunningPods) == 0 {
-					framework.Failf("Failed to start *any* pods after docker restart, this might indicate an IP leak")
+					framework.Failf("Failed to start *any* pods after container runtime restart, this might indicate an IP leak")
 				}
 				By("Confirm no containers have terminated")
 				for _, pod := range postRestartRunningPods {
 					if c := testutils.TerminatedContainers(pod); len(c) != 0 {
-						framework.Failf("Pod %q has failed containers %+v after docker restart, this might indicate an IP leak", pod.Name, c)
+						framework.Failf("Pod %q has failed containers %+v after container runtime restart, this might indicate an IP leak", pod.Name, c)
 					}
 				}
-				By(fmt.Sprintf("Docker restart test passed with %d pods", len(postRestartRunningPods)))
+				By(fmt.Sprintf("Container runtime restart test passed with %d pods", len(postRestartRunningPods)))
 			})
 		})
 	})

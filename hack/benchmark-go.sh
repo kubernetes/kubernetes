@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -17,8 +17,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 make test \
     WHAT="$*" \

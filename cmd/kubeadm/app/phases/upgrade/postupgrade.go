@@ -17,20 +17,39 @@ limitations under the License.
 package upgrade
 
 import (
-	"k8s.io/apimachinery/pkg/util/errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/pkg/errors"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
+var expiry = 180 * 24 * time.Hour
+
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
-// Note that the markmaster phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) error {
+// Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
+func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
 	errs := []error{}
 
 	// Upload currently used configuration to the cluster
@@ -40,18 +59,35 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
+	// Create the new, version-branched kubelet ComponentConfig ConfigMap
+	if err := kubeletphase.CreateConfigMap(cfg.ClusterConfiguration.ComponentConfigs.Kubelet, cfg.KubernetesVersion, client); err != nil {
+		errs = append(errs, errors.Wrap(err, "error creating kubelet configuration ConfigMap"))
+	}
+
+	// Write the new kubelet config down to disk and the env file if needed
+	if err := writeKubeletConfigFiles(client, cfg, newK8sVer, dryRun); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
+	// --cri-socket.
+	// TODO: In the future we want to use something more official like NodeStatus or similar for detecting this properly
+	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
+		errs = append(errs, errors.Wrap(err, "error uploading crisocket"))
+	}
+
 	// Create/update RBAC rules that makes the bootstrap tokens able to post CSRs
-	if err := nodebootstraptoken.AllowBootstrapTokensToPostCSRs(client, k8sVersion); err != nil {
+	if err := nodebootstraptoken.AllowBootstrapTokensToPostCSRs(client); err != nil {
 		errs = append(errs, err)
 	}
 
 	// Create/update RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	if err := nodebootstraptoken.AutoApproveNodeBootstrapTokens(client, k8sVersion); err != nil {
+	if err := nodebootstraptoken.AutoApproveNodeBootstrapTokens(client); err != nil {
 		errs = append(errs, err)
 	}
 
-	// Create/update RBAC rules that makes the 1.8.0+ nodes to rotate certificates and get their CSRs approved automatically
-	if err := nodebootstraptoken.AutoApproveNodeCertificateRotation(client, k8sVersion); err != nil {
+	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
+	if err := nodebootstraptoken.AutoApproveNodeCertificateRotation(client); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -65,12 +101,184 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
-	// Upgrade kube-dns and kube-proxy
-	if err := dns.EnsureDNSAddon(cfg, client); err != nil {
+	// Rotate the kube-apiserver cert and key if needed
+	if err := BackupAPIServerCertIfNeeded(cfg, dryRun); err != nil {
 		errs = append(errs, err)
 	}
-	if err := proxy.EnsureProxyAddon(cfg, client); err != nil {
+
+	// Upgrade kube-dns/CoreDNS and kube-proxy
+	if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
 		errs = append(errs, err)
 	}
-	return errors.NewAggregate(errs)
+	// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
+	if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(&cfg.ClusterConfiguration, client, dryRun); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client); err != nil {
+		errs = append(errs, err)
+	}
+	return errorsutil.NewAggregate(errs)
+}
+
+func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, dryRun bool) error {
+	return apiclient.TryRunCommand(func() error {
+		installedDeploymentName := kubeadmconstants.KubeDNSDeploymentName
+		deploymentToDelete := kubeadmconstants.CoreDNSDeploymentName
+
+		if cfg.DNS.Type == kubeadmapi.CoreDNS {
+			installedDeploymentName = kubeadmconstants.CoreDNSDeploymentName
+			deploymentToDelete = kubeadmconstants.KubeDNSDeploymentName
+		}
+
+		// If we're dry-running, we don't need to wait for the new DNS addon to become ready
+		if !dryRun {
+			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(installedDeploymentName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if dnsDeployment.Status.ReadyReplicas == 0 {
+				return errors.New("the DNS deployment isn't ready yet")
+			}
+		}
+
+		// We don't want to wait for the DNS deployment above to become ready when dryrunning (as it never will)
+		// but here we should execute the DELETE command against the dryrun clientset, as it will only be logged
+		err := apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deploymentToDelete)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}, 10)
+}
+
+// BackupAPIServerCertIfNeeded rotates the kube-apiserver certificate if older than 180 days
+func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
+	certAndKeyDir := kubeadmapiv1beta1.DefaultCertificatesDir
+	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
+	if err != nil {
+		// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
+		return errors.Wrap(err, "[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key")
+	}
+
+	if !shouldBackup {
+		return nil
+	}
+
+	// If dry-running, just say that this would happen to the user and exit
+	if dryRun {
+		fmt.Println("[postupgrade] Would rotate the API server certificate and key.")
+		return nil
+	}
+
+	// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key, just continue rotating the cert
+	// TODO: We might want to reconsider this choice.
+	if err := backupAPIServerCertAndKey(certAndKeyDir); err != nil {
+		fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
+	}
+	return certsphase.CreateCertAndKeyFilesWithCA(
+		&certsphase.KubeadmCertAPIServer,
+		&certsphase.KubeadmCertRootCA,
+		cfg,
+	)
+}
+
+func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
+	kubeletDir, err := GetKubeletDir(dryRun)
+	if err != nil {
+		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
+		return err
+	}
+	errs := []error{}
+	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
+	if err := kubeletphase.DownloadConfig(client, newK8sVer, kubeletDir); err != nil {
+		// Tolerate the error being NotFound when dryrunning, as there is a pretty common scenario: the dryrun process
+		// *would* post the new kubelet-config-1.X configmap that doesn't exist now when we're trying to download it
+		// again.
+		if !(apierrors.IsNotFound(err) && dryRun) {
+			errs = append(errs, errors.Wrap(err, "error downloading kubelet configuration from the ConfigMap"))
+		}
+	}
+
+	if dryRun { // Print what contents would be written
+		dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+	}
+
+	envFilePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
+	if _, err := os.Stat(envFilePath); os.IsNotExist(err) {
+		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the control-plane,
+		// as we handle that ourselves in the mark-control-plane phase
+		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
+		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.ClusterConfiguration, &cfg.NodeRegistration, false, kubeletDir); err != nil {
+			errs = append(errs, errors.Wrap(err, "error writing a dynamic environment file for the kubelet"))
+		}
+
+		if dryRun { // Print what contents would be written
+			dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletEnvFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		}
+	}
+	return errorsutil.NewAggregate(errs)
+}
+
+// GetKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
+func GetKubeletDir(dryRun bool) (string, error) {
+	if dryRun {
+		return kubeadmconstants.CreateTempDirForKubeadm("kubeadm-upgrade-dryrun")
+	}
+	return kubeadmconstants.KubeletRunDirectory, nil
+}
+
+// backupAPIServerCertAndKey backups the old cert and key of kube-apiserver to a specified directory.
+func backupAPIServerCertAndKey(certAndKeyDir string) error {
+	subDir := filepath.Join(certAndKeyDir, "expired")
+	if err := os.Mkdir(subDir, 0766); err != nil {
+		return errors.Wrapf(err, "failed to created backup directory %s", subDir)
+	}
+
+	filesToMove := map[string]string{
+		filepath.Join(certAndKeyDir, kubeadmconstants.APIServerCertName): filepath.Join(subDir, kubeadmconstants.APIServerCertName),
+		filepath.Join(certAndKeyDir, kubeadmconstants.APIServerKeyName):  filepath.Join(subDir, kubeadmconstants.APIServerKeyName),
+	}
+	return moveFiles(filesToMove)
+}
+
+// moveFiles moves files from one directory to another.
+func moveFiles(files map[string]string) error {
+	filesToRecover := map[string]string{}
+	for from, to := range files {
+		if err := os.Rename(from, to); err != nil {
+			return rollbackFiles(filesToRecover, err)
+		}
+		filesToRecover[to] = from
+	}
+	return nil
+}
+
+// rollbackFiles moves the files back to the original directory.
+func rollbackFiles(files map[string]string, originalErr error) error {
+	errs := []error{originalErr}
+	for from, to := range files {
+		if err := os.Rename(from, to); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
+}
+
+// shouldBackupAPIServerCertAndKey checks if the cert of kube-apiserver will be expired in 180 days.
+func shouldBackupAPIServerCertAndKey(certAndKeyDir string) (bool, error) {
+	apiServerCert := filepath.Join(certAndKeyDir, kubeadmconstants.APIServerCertName)
+	certs, err := certutil.CertsFromFile(apiServerCert)
+	if err != nil {
+		return false, errors.Wrapf(err, "couldn't load the certificate file %s", apiServerCert)
+	}
+	if len(certs) == 0 {
+		return false, errors.New("no certificate data found")
+	}
+
+	if time.Now().Sub(certs[0].NotBefore) > expiry {
+		return true, nil
+	}
+
+	return false, nil
 }

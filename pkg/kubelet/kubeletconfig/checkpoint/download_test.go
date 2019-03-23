@@ -17,6 +17,7 @@ limitations under the License.
 package checkpoint
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -24,9 +25,9 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
+	"k8s.io/client-go/tools/cache"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 )
 
@@ -37,104 +38,205 @@ func TestNewRemoteConfigSource(t *testing.T) {
 		expect RemoteConfigSource
 		err    string
 	}{
-		// all NodeConfigSource subfields nil
-		{"all NodeConfigSource subfields nil",
-			&apiv1.NodeConfigSource{}, nil, "exactly one subfield must be non-nil"},
-		{"ConfigMapRef: empty name, namespace, and UID",
-			&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{}}, nil, "invalid ObjectReference"},
-		// ConfigMapRef: empty name and namespace
-		{"ConfigMapRef: empty name and namespace",
-			&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{UID: "uid"}}, nil, "invalid ObjectReference"},
-		// ConfigMapRef: empty name and UID
-		{"ConfigMapRef: empty name and UID",
-			&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Namespace: "namespace"}}, nil, "invalid ObjectReference"},
-		// ConfigMapRef: empty namespace and UID
-		{"ConfigMapRef: empty namespace and UID",
-			&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name"}}, nil, "invalid ObjectReference"},
-		// ConfigMapRef: empty UID
-		{"ConfigMapRef: empty namespace and UID",
-			&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace"}}, nil, "invalid ObjectReference"},
-		// ConfigMapRef: empty namespace
-		{"ConfigMapRef: empty namespace and UID",
-			&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", UID: "uid"}}, nil, "invalid ObjectReference"},
-		// ConfigMapRef: empty name
-		{"ConfigMapRef: empty namespace and UID",
-			&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Namespace: "namespace", UID: "uid"}}, nil, "invalid ObjectReference"},
-		// ConfigMapRef: valid reference
-		{"ConfigMapRef: valid reference",
-			&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}},
-			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}}}, ""},
+		{
+			desc:   "all NodeConfigSource subfields nil",
+			source: &apiv1.NodeConfigSource{},
+			expect: nil,
+			err:    "exactly one subfield must be non-nil",
+		},
+		{
+			desc: "ConfigMap: valid reference",
+			source: &apiv1.NodeConfigSource{
+				ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+					Name:             "name",
+					Namespace:        "namespace",
+					UID:              "uid",
+					KubeletConfigKey: "kubelet",
+				}},
+			expect: &remoteConfigMap{&apiv1.NodeConfigSource{
+				ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+					Name:             "name",
+					Namespace:        "namespace",
+					UID:              "uid",
+					KubeletConfigKey: "kubelet",
+				}}},
+			err: "",
+		},
 	}
 
 	for _, c := range cases {
-		src, _, err := NewRemoteConfigSource(c.source)
-		if utiltest.SkipRest(t, c.desc, err, c.err) {
-			continue
-		}
-		// underlying object should match the object passed in
-		if !apiequality.Semantic.DeepEqual(c.expect.object(), src.object()) {
-			t.Errorf("case %q, expect RemoteConfigSource %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(src))
-		}
+		t.Run(c.desc, func(t *testing.T) {
+			source, _, err := NewRemoteConfigSource(c.source)
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			// underlying object should match the object passed in
+			if !apiequality.Semantic.DeepEqual(c.expect.NodeConfigSource(), source.NodeConfigSource()) {
+				t.Errorf("case %q, expect RemoteConfigSource %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(source))
+			}
+		})
 	}
 }
 
 func TestRemoteConfigMapUID(t *testing.T) {
-	cases := []string{"", "uid", "376dfb73-56db-11e7-a01e-42010a800002"}
-	for _, uidIn := range cases {
-		cpt := &remoteConfigMap{
-			&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: types.UID(uidIn)}},
-		}
-		// UID method should return the correct value of the UID
-		uidOut := cpt.UID()
-		if uidIn != uidOut {
-			t.Errorf("expect UID() to return %q, but got %q", uidIn, uidOut)
-		}
+	const expect = "uid"
+	source, _, err := NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+		Name:             "name",
+		Namespace:        "namespace",
+		UID:              expect,
+		KubeletConfigKey: "kubelet",
+	}})
+	if err != nil {
+		t.Fatalf("error constructing remote config source: %v", err)
+	}
+	uid := source.UID()
+	if expect != uid {
+		t.Errorf("expect %q, but got %q", expect, uid)
+	}
+}
+
+func TestRemoteConfigMapAPIPath(t *testing.T) {
+	const (
+		name      = "name"
+		namespace = "namespace"
+	)
+	source, _, err := NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+		Name:             name,
+		Namespace:        namespace,
+		UID:              "uid",
+		KubeletConfigKey: "kubelet",
+	}})
+	if err != nil {
+		t.Fatalf("error constructing remote config source: %v", err)
+	}
+	expect := fmt.Sprintf(configMapAPIPathFmt, namespace, name)
+	path := source.APIPath()
+
+	if expect != path {
+		t.Errorf("expect %q, but got %q", expect, path)
 	}
 }
 
 func TestRemoteConfigMapDownload(t *testing.T) {
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	cm := &apiv1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "namespace",
-			UID:       "uid",
+			Name:            "name",
+			Namespace:       "namespace",
+			UID:             "uid",
+			ResourceVersion: "1",
 		}}
-	client := fakeclient.NewSimpleClientset(cm)
+
+	source := &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+		Name:             "name",
+		Namespace:        "namespace",
+		KubeletConfigKey: "kubelet",
+	}}
+
+	expectPayload, err := NewConfigMapPayload(cm)
+	if err != nil {
+		t.Fatalf("error constructing payload: %v", err)
+	}
+
+	missingStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	hasStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	if err := hasStore.Add(cm); err != nil {
+		t.Fatalf("unexpected error constructing hasStore")
+	}
+
+	missingClient := fakeclient.NewSimpleClientset()
+	hasClient := fakeclient.NewSimpleClientset(cm)
 
 	cases := []struct {
 		desc   string
-		source RemoteConfigSource
-		expect Checkpoint
+		client clientset.Interface
+		store  cache.Store
 		err    string
 	}{
-
-		// object doesn't exist
-		{"object doesn't exist",
-			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "bogus", Namespace: "namespace", UID: "bogus"}}},
-			nil, "failed to download ConfigMap"},
-		// UID of downloaded object doesn't match UID of referent found via namespace/name
-		{"UID is incorrect for namespace/name",
-			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "bogus"}}},
-			nil, "does not match UID"},
-		// successful download
-		{"object exists and reference is correct",
-			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}}},
-			&configMapCheckpoint{kubeletCodecs, cm}, ""},
+		{
+			desc:   "nil store, object does not exist in API server",
+			client: missingClient,
+			err:    "not found",
+		},
+		{
+			desc:   "nil store, object exists in API server",
+			client: hasClient,
+		},
+		{
+			desc:   "object exists in store and API server",
+			store:  hasStore,
+			client: hasClient,
+		},
+		{
+			desc:   "object exists in store, but does not exist in API server",
+			store:  hasStore,
+			client: missingClient,
+		},
+		{
+			desc:   "object does not exist in store, but exists in API server",
+			store:  missingStore,
+			client: hasClient,
+		},
+		{
+			desc:   "object does not exist in store or API server",
+			client: missingClient,
+			store:  missingStore,
+			err:    "not found",
+		},
 	}
 
 	for _, c := range cases {
-		cpt, _, err := c.source.Download(client)
-		if utiltest.SkipRest(t, c.desc, err, c.err) {
-			continue
-		}
-		// "downloaded" object should match the expected
-		if !apiequality.Semantic.DeepEqual(c.expect.object(), cpt.object()) {
-			t.Errorf("case %q, expect Checkpoint %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(cpt))
-		}
+		t.Run(c.desc, func(t *testing.T) {
+			// deep copy so we can always check the UID/ResourceVersion are set after Download
+			s, _, err := NewRemoteConfigSource(source.DeepCopy())
+			if err != nil {
+				t.Fatalf("error constructing remote config source %v", err)
+			}
+			// attempt download
+			p, _, err := s.Download(c.client, c.store)
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			// downloaded object should match the expected
+			if !apiequality.Semantic.DeepEqual(expectPayload.object(), p.object()) {
+				t.Errorf("expect Checkpoint %s but got %s", spew.Sdump(expectPayload), spew.Sdump(p))
+			}
+			// source UID and ResourceVersion should be updated by Download
+			if p.UID() != s.UID() {
+				t.Errorf("expect UID to be updated by Download to match payload: %s, but got source UID: %s", p.UID(), s.UID())
+			}
+			if p.ResourceVersion() != s.ResourceVersion() {
+				t.Errorf("expect ResourceVersion to be updated by Download to match payload: %s, but got source ResourceVersion: %s", p.ResourceVersion(), s.ResourceVersion())
+			}
+		})
+	}
+}
+
+func TestEqualRemoteConfigSources(t *testing.T) {
+	cases := []struct {
+		desc   string
+		a      RemoteConfigSource
+		b      RemoteConfigSource
+		expect bool
+	}{
+		{"both nil", nil, nil, true},
+		{"a nil", nil, &remoteConfigMap{}, false},
+		{"b nil", &remoteConfigMap{}, nil, false},
+		{"neither nil, equal", &remoteConfigMap{}, &remoteConfigMap{}, true},
+		{
+			desc:   "neither nil, not equal",
+			a:      &remoteConfigMap{&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{Name: "a"}}},
+			b:      &remoteConfigMap{&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{KubeletConfigKey: "kubelet"}}},
+			expect: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			if EqualRemoteConfigSources(c.a, c.b) != c.expect {
+				t.Errorf("expected EqualRemoteConfigSources to return %t, but got %t", c.expect, !c.expect)
+			}
+		})
 	}
 }

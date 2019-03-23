@@ -6,6 +6,7 @@ go_library(
         "build.go",
         "unmarshal.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/private/protocol/ec2query",
     importpath = "github.com/aws/aws-sdk-go/private/protocol/ec2query",
     visibility = ["//visibility:public"],
     deps = [

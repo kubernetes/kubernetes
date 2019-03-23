@@ -12,7 +12,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/util/sliceutils",
     deps = [
         "//pkg/kubelet/container:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
     ],
 )
 
@@ -32,11 +32,10 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["sliceutils_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/util/sliceutils",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/container:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )

@@ -67,6 +67,7 @@ func (s *Swagger) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// SwaggerProps captures the top-level properties of an Api specification
 type SwaggerProps struct {
 	ID                  string                 `json:"id,omitempty"`
 	Consumes            []string               `json:"consumes,omitempty"`

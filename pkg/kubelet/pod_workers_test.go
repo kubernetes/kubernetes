@@ -128,7 +128,6 @@ func drainWorkers(podWorkers *podWorkers, numPods int) {
 func TestUpdatePod(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
 
-	// Check whether all pod updates will be processed.
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		for j := i; j < numPods; j++ {
@@ -151,6 +150,7 @@ func TestUpdatePod(t *testing.T) {
 			continue
 		}
 
+		// PodWorker guarantees the first and the last event will be processed
 		first := 0
 		last := len(processed[uid]) - 1
 		if processed[uid][first].name != string(0) {

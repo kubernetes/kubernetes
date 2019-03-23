@@ -6,6 +6,8 @@ Generating man pages from a cobra command is incredibly easy. An example is as f
 package main
 
 import (
+	"log"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 )
@@ -15,12 +17,15 @@ func main() {
 		Use:   "test",
 		Short: "my test program",
 	}
-	header := &cobra.GenManHeader{
+	header := &doc.GenManHeader{
 		Title: "MINE",
 		Section: "3",
 	}
-	doc.GenManTree(cmd, header, "/tmp")
+	err := doc.GenManTree(cmd, header, "/tmp")
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 ```
 
-That will get you a man page `/tmp/test.1`
+That will get you a man page `/tmp/test.3`

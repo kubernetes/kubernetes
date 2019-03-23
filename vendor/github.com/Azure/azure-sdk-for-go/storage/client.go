@@ -1,9 +1,22 @@
 // Package storage provides clients for Microsoft Azure Storage Services.
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"bufio"
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
@@ -17,9 +30,11 @@ import (
 	"net/url"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/version"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 )
@@ -33,7 +48,9 @@ const (
 	// basic client is created.
 	DefaultAPIVersion = "2016-05-31"
 
-	defaultUseHTTPS = true
+	defaultUseHTTPS      = true
+	defaultRetryAttempts = 5
+	defaultRetryDuration = time.Second * 5
 
 	// StorageEmulatorAccountName is the fixed storage account used by Azure Storage Emulator
 	StorageEmulatorAccountName = "devstoreaccount1"
@@ -53,10 +70,28 @@ const (
 	userAgentHeader = "User-Agent"
 
 	userDefinedMetadataHeaderPrefix = "x-ms-meta-"
+
+	connectionStringAccountName      = "accountname"
+	connectionStringAccountKey       = "accountkey"
+	connectionStringEndpointSuffix   = "endpointsuffix"
+	connectionStringEndpointProtocol = "defaultendpointsprotocol"
+
+	connectionStringBlobEndpoint  = "blobendpoint"
+	connectionStringFileEndpoint  = "fileendpoint"
+	connectionStringQueueEndpoint = "queueendpoint"
+	connectionStringTableEndpoint = "tableendpoint"
+	connectionStringSAS           = "sharedaccesssignature"
 )
 
 var (
-	validStorageAccount = regexp.MustCompile("^[0-9a-z]{3,24}$")
+	validStorageAccount     = regexp.MustCompile("^[0-9a-z]{3,24}$")
+	defaultValidStatusCodes = []int{
+		http.StatusRequestTimeout,      // 408
+		http.StatusInternalServerError, // 500
+		http.StatusBadGateway,          // 502
+		http.StatusServiceUnavailable,  // 503
+		http.StatusGatewayTimeout,      // 504
+	}
 )
 
 // Sender sends a request
@@ -75,22 +110,17 @@ type DefaultSender struct {
 
 // Send is the default retry strategy in the client
 func (ds *DefaultSender) Send(c *Client, req *http.Request) (resp *http.Response, err error) {
-	b := []byte{}
-	if req.Body != nil {
-		b, err = ioutil.ReadAll(req.Body)
+	rr := autorest.NewRetriableRequest(req)
+	for attempts := 0; attempts < ds.RetryAttempts; attempts++ {
+		err = rr.Prepare()
 		if err != nil {
 			return resp, err
 		}
-	}
-
-	for attempts := 0; attempts < ds.RetryAttempts; attempts++ {
-		if len(b) > 0 {
-			req.Body = ioutil.NopCloser(bytes.NewBuffer(b))
-		}
-		resp, err = c.HTTPClient.Do(req)
+		resp, err = c.HTTPClient.Do(rr.Request())
 		if err != nil || !autorest.ResponseHasStatusCode(resp, ds.ValidStatusCodes...) {
 			return resp, err
 		}
+		drainRespBody(resp)
 		autorest.DelayForBackoff(ds.RetryDuration, attempts, req.Cancel)
 		ds.attempts = attempts
 	}
@@ -118,16 +148,12 @@ type Client struct {
 	baseURL          string
 	apiVersion       string
 	userAgent        string
-}
-
-type storageResponse struct {
-	statusCode int
-	headers    http.Header
-	body       io.ReadCloser
+	sasClient        bool
+	accountSASToken  url.Values
 }
 
 type odataResponse struct {
-	storageResponse
+	resp  *http.Response
 	odata odataErrorWrapper
 }
 
@@ -167,6 +193,7 @@ type odataErrorWrapper struct {
 type UnexpectedStatusCodeError struct {
 	allowed []int
 	got     int
+	inner   error
 }
 
 func (e UnexpectedStatusCodeError) Error() string {
@@ -177,12 +204,66 @@ func (e UnexpectedStatusCodeError) Error() string {
 	for _, v := range e.allowed {
 		expected = append(expected, s(v))
 	}
-	return fmt.Sprintf("storage: status code from service response is %s; was expecting %s", got, strings.Join(expected, " or "))
+	return fmt.Sprintf("storage: status code from service response is %s; was expecting %s.  Inner error: %+v", got, strings.Join(expected, " or "), e.inner)
 }
 
 // Got is the actual status code returned by Azure.
 func (e UnexpectedStatusCodeError) Got() int {
 	return e.got
+}
+
+// Inner returns any inner error info.
+func (e UnexpectedStatusCodeError) Inner() error {
+	return e.inner
+}
+
+// NewClientFromConnectionString creates a Client from the connection string.
+func NewClientFromConnectionString(input string) (Client, error) {
+	// build a map of connection string key/value pairs
+	parts := map[string]string{}
+	for _, pair := range strings.Split(input, ";") {
+		if pair == "" {
+			continue
+		}
+
+		equalDex := strings.IndexByte(pair, '=')
+		if equalDex <= 0 {
+			return Client{}, fmt.Errorf("Invalid connection segment %q", pair)
+		}
+
+		value := strings.TrimSpace(pair[equalDex+1:])
+		key := strings.TrimSpace(strings.ToLower(pair[:equalDex]))
+		parts[key] = value
+	}
+
+	// TODO: validate parameter sets?
+
+	if parts[connectionStringAccountName] == StorageEmulatorAccountName {
+		return NewEmulatorClient()
+	}
+
+	if parts[connectionStringSAS] != "" {
+		endpoint := ""
+		if parts[connectionStringBlobEndpoint] != "" {
+			endpoint = parts[connectionStringBlobEndpoint]
+		} else if parts[connectionStringFileEndpoint] != "" {
+			endpoint = parts[connectionStringFileEndpoint]
+		} else if parts[connectionStringQueueEndpoint] != "" {
+			endpoint = parts[connectionStringQueueEndpoint]
+		} else {
+			endpoint = parts[connectionStringTableEndpoint]
+		}
+
+		return NewAccountSASClientFromEndpointToken(endpoint, parts[connectionStringSAS])
+	}
+
+	useHTTPS := defaultUseHTTPS
+	if parts[connectionStringEndpointProtocol] != "" {
+		useHTTPS = parts[connectionStringEndpointProtocol] == "https"
+	}
+
+	return NewClient(parts[connectionStringAccountName], parts[connectionStringAccountKey],
+		parts[connectionStringEndpointSuffix], DefaultAPIVersion, useHTTPS)
 }
 
 // NewBasicClient constructs a Client with given storage service name and
@@ -212,13 +293,13 @@ func NewEmulatorClient() (Client, error) {
 // NewClient constructs a Client. This should be used if the caller wants
 // to specify whether to use HTTPS, a specific REST API version or a custom
 // storage endpoint than Azure Public Cloud.
-func NewClient(accountName, accountKey, blobServiceBaseURL, apiVersion string, useHTTPS bool) (Client, error) {
+func NewClient(accountName, accountKey, serviceBaseURL, apiVersion string, useHTTPS bool) (Client, error) {
 	var c Client
 	if !IsValidStorageAccount(accountName) {
 		return c, fmt.Errorf("azure: account name is not valid: it must be between 3 and 24 characters, and only may contain numbers and lowercase letters: %v", accountName)
 	} else if accountKey == "" {
 		return c, fmt.Errorf("azure: account key required")
-	} else if blobServiceBaseURL == "" {
+	} else if serviceBaseURL == "" {
 		return c, fmt.Errorf("azure: base storage service url required")
 	}
 
@@ -232,19 +313,14 @@ func NewClient(accountName, accountKey, blobServiceBaseURL, apiVersion string, u
 		accountName:      accountName,
 		accountKey:       key,
 		useHTTPS:         useHTTPS,
-		baseURL:          blobServiceBaseURL,
+		baseURL:          serviceBaseURL,
 		apiVersion:       apiVersion,
+		sasClient:        false,
 		UseSharedKeyLite: false,
 		Sender: &DefaultSender{
-			RetryAttempts: 5,
-			ValidStatusCodes: []int{
-				http.StatusRequestTimeout,      // 408
-				http.StatusInternalServerError, // 500
-				http.StatusBadGateway,          // 502
-				http.StatusServiceUnavailable,  // 503
-				http.StatusGatewayTimeout,      // 504
-			},
-			RetryDuration: time.Second * 5,
+			RetryAttempts:    defaultRetryAttempts,
+			ValidStatusCodes: defaultValidStatusCodes,
+			RetryDuration:    defaultRetryDuration,
 		},
 	}
 	c.userAgent = c.getDefaultUserAgent()
@@ -257,12 +333,89 @@ func IsValidStorageAccount(account string) bool {
 	return validStorageAccount.MatchString(account)
 }
 
+// NewAccountSASClient contructs a client that uses accountSAS authorization
+// for its operations.
+func NewAccountSASClient(account string, token url.Values, env azure.Environment) Client {
+	return newSASClient(account, env.StorageEndpointSuffix, token)
+}
+
+// NewAccountSASClientFromEndpointToken constructs a client that uses accountSAS authorization
+// for its operations using the specified endpoint and SAS token.
+func NewAccountSASClientFromEndpointToken(endpoint string, sasToken string) (Client, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return Client{}, err
+	}
+	_, err = url.ParseQuery(sasToken)
+	if err != nil {
+		return Client{}, err
+	}
+	u.RawQuery = sasToken
+	return newSASClientFromURL(u)
+}
+
+func newSASClient(accountName, baseURL string, sasToken url.Values) Client {
+	c := Client{
+		HTTPClient: http.DefaultClient,
+		apiVersion: DefaultAPIVersion,
+		sasClient:  true,
+		Sender: &DefaultSender{
+			RetryAttempts:    defaultRetryAttempts,
+			ValidStatusCodes: defaultValidStatusCodes,
+			RetryDuration:    defaultRetryDuration,
+		},
+		accountName:     accountName,
+		baseURL:         baseURL,
+		accountSASToken: sasToken,
+	}
+	c.userAgent = c.getDefaultUserAgent()
+	// Get API version and protocol from token
+	c.apiVersion = sasToken.Get("sv")
+	c.useHTTPS = sasToken.Get("spr") == "https"
+	return c
+}
+
+func newSASClientFromURL(u *url.URL) (Client, error) {
+	// the host name will look something like this
+	// - foo.blob.core.windows.net
+	// "foo" is the account name
+	// "core.windows.net" is the baseURL
+
+	// find the first dot to get account name
+	i1 := strings.IndexByte(u.Host, '.')
+	if i1 < 0 {
+		return Client{}, fmt.Errorf("failed to find '.' in %s", u.Host)
+	}
+
+	// now find the second dot to get the base URL
+	i2 := strings.IndexByte(u.Host[i1+1:], '.')
+	if i2 < 0 {
+		return Client{}, fmt.Errorf("failed to find '.' in %s", u.Host[i1+1:])
+	}
+
+	sasToken := u.Query()
+	c := newSASClient(u.Host[:i1], u.Host[i1+i2+2:], sasToken)
+	if spr := sasToken.Get("spr"); spr == "" {
+		// infer from URL if not in the query params set
+		c.useHTTPS = u.Scheme == "https"
+	}
+	return c, nil
+}
+
+func (c Client) isServiceSASClient() bool {
+	return c.sasClient && c.accountSASToken == nil
+}
+
+func (c Client) isAccountSASClient() bool {
+	return c.sasClient && c.accountSASToken != nil
+}
+
 func (c Client) getDefaultUserAgent() string {
 	return fmt.Sprintf("Go/%s (%s-%s) azure-storage-go/%s api-version/%s",
 		runtime.Version(),
 		runtime.GOARCH,
 		runtime.GOOS,
-		sdkVersion,
+		version.Number,
 		c.apiVersion,
 	)
 }
@@ -329,6 +482,160 @@ func (c Client) getEndpoint(service, path string, params url.Values) string {
 	return u.String()
 }
 
+// AccountSASTokenOptions includes options for constructing
+// an account SAS token.
+// https://docs.microsoft.com/en-us/rest/api/storageservices/constructing-an-account-sas
+type AccountSASTokenOptions struct {
+	APIVersion    string
+	Services      Services
+	ResourceTypes ResourceTypes
+	Permissions   Permissions
+	Start         time.Time
+	Expiry        time.Time
+	IP            string
+	UseHTTPS      bool
+}
+
+// Services specify services accessible with an account SAS.
+type Services struct {
+	Blob  bool
+	Queue bool
+	Table bool
+	File  bool
+}
+
+// ResourceTypes specify the resources accesible with an
+// account SAS.
+type ResourceTypes struct {
+	Service   bool
+	Container bool
+	Object    bool
+}
+
+// Permissions specifies permissions for an accountSAS.
+type Permissions struct {
+	Read    bool
+	Write   bool
+	Delete  bool
+	List    bool
+	Add     bool
+	Create  bool
+	Update  bool
+	Process bool
+}
+
+// GetAccountSASToken creates an account SAS token
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/constructing-an-account-sas
+func (c Client) GetAccountSASToken(options AccountSASTokenOptions) (url.Values, error) {
+	if options.APIVersion == "" {
+		options.APIVersion = c.apiVersion
+	}
+
+	if options.APIVersion < "2015-04-05" {
+		return url.Values{}, fmt.Errorf("account SAS does not support API versions prior to 2015-04-05. API version : %s", options.APIVersion)
+	}
+
+	// build services string
+	services := ""
+	if options.Services.Blob {
+		services += "b"
+	}
+	if options.Services.Queue {
+		services += "q"
+	}
+	if options.Services.Table {
+		services += "t"
+	}
+	if options.Services.File {
+		services += "f"
+	}
+
+	// build resources string
+	resources := ""
+	if options.ResourceTypes.Service {
+		resources += "s"
+	}
+	if options.ResourceTypes.Container {
+		resources += "c"
+	}
+	if options.ResourceTypes.Object {
+		resources += "o"
+	}
+
+	// build permissions string
+	permissions := ""
+	if options.Permissions.Read {
+		permissions += "r"
+	}
+	if options.Permissions.Write {
+		permissions += "w"
+	}
+	if options.Permissions.Delete {
+		permissions += "d"
+	}
+	if options.Permissions.List {
+		permissions += "l"
+	}
+	if options.Permissions.Add {
+		permissions += "a"
+	}
+	if options.Permissions.Create {
+		permissions += "c"
+	}
+	if options.Permissions.Update {
+		permissions += "u"
+	}
+	if options.Permissions.Process {
+		permissions += "p"
+	}
+
+	// build start time, if exists
+	start := ""
+	if options.Start != (time.Time{}) {
+		start = options.Start.UTC().Format(time.RFC3339)
+	}
+
+	// build expiry time
+	expiry := options.Expiry.UTC().Format(time.RFC3339)
+
+	protocol := "https,http"
+	if options.UseHTTPS {
+		protocol = "https"
+	}
+
+	stringToSign := strings.Join([]string{
+		c.accountName,
+		permissions,
+		services,
+		resources,
+		start,
+		expiry,
+		options.IP,
+		protocol,
+		options.APIVersion,
+		"",
+	}, "\n")
+	signature := c.computeHmac256(stringToSign)
+
+	sasParams := url.Values{
+		"sv":  {options.APIVersion},
+		"ss":  {services},
+		"srt": {resources},
+		"sp":  {permissions},
+		"se":  {expiry},
+		"spr": {protocol},
+		"sig": {signature},
+	}
+	if start != "" {
+		sasParams.Add("st", start)
+	}
+	if options.IP != "" {
+		sasParams.Add("sip", options.IP)
+	}
+
+	return sasParams, nil
+}
+
 // GetBlobService returns a BlobStorageClient which can operate on the blob
 // service of the storage account.
 func (c Client) GetBlobService() BlobStorageClient {
@@ -393,7 +700,7 @@ func (c Client) getStandardHeaders() map[string]string {
 	}
 }
 
-func (c Client) exec(verb, url string, headers map[string]string, body io.Reader, auth authentication) (*storageResponse, error) {
+func (c Client) exec(verb, url string, headers map[string]string, body io.Reader, auth authentication) (*http.Response, error) {
 	headers, err := c.addAuthorizationHeader(verb, url, headers, auth)
 	if err != nil {
 		return nil, err
@@ -404,8 +711,25 @@ func (c Client) exec(verb, url string, headers map[string]string, body io.Reader
 		return nil, errors.New("azure/storage: error creating request: " + err.Error())
 	}
 
+	// http.NewRequest() will automatically set req.ContentLength for a handful of types
+	// otherwise we will handle here.
+	if req.ContentLength < 1 {
+		if clstr, ok := headers["Content-Length"]; ok {
+			if cl, err := strconv.ParseInt(clstr, 10, 64); err == nil {
+				req.ContentLength = cl
+			}
+		}
+	}
+
 	for k, v := range headers {
-		req.Header.Add(k, v)
+		req.Header[k] = append(req.Header[k], v) // Must bypass case munging present in `Add` by using map functions directly. See https://github.com/Azure/azure-sdk-for-go/issues/645
+	}
+
+	if c.isAccountSASClient() {
+		// append the SAS token to the query params
+		v := req.URL.Query()
+		v = mergeParams(v, c.accountSASToken)
+		req.URL.RawQuery = v.Encode()
 	}
 
 	resp, err := c.Sender.Send(&c, req)
@@ -414,48 +738,10 @@ func (c Client) exec(verb, url string, headers map[string]string, body io.Reader
 	}
 
 	if resp.StatusCode >= 400 && resp.StatusCode <= 505 {
-		var respBody []byte
-		respBody, err = readAndCloseBody(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		requestID, date, version := getDebugHeaders(resp.Header)
-		if len(respBody) == 0 {
-			// no error in response body, might happen in HEAD requests
-			err = serviceErrFromStatusCode(resp.StatusCode, resp.Status, requestID, date, version)
-		} else {
-			storageErr := AzureStorageServiceError{
-				StatusCode: resp.StatusCode,
-				RequestID:  requestID,
-				Date:       date,
-				APIVersion: version,
-			}
-			// response contains storage service error object, unmarshal
-			if resp.Header.Get("Content-Type") == "application/xml" {
-				errIn := serviceErrFromXML(respBody, &storageErr)
-				if err != nil { // error unmarshaling the error response
-					err = errIn
-				}
-			} else {
-				errIn := serviceErrFromJSON(respBody, &storageErr)
-				if err != nil { // error unmarshaling the error response
-					err = errIn
-				}
-			}
-			err = storageErr
-		}
-		return &storageResponse{
-			statusCode: resp.StatusCode,
-			headers:    resp.Header,
-			body:       ioutil.NopCloser(bytes.NewReader(respBody)), /* restore the body */
-		}, err
+		return resp, getErrorFromResponse(resp)
 	}
 
-	return &storageResponse{
-		statusCode: resp.StatusCode,
-		headers:    resp.Header,
-		body:       resp.Body}, nil
+	return resp, nil
 }
 
 func (c Client) execInternalJSONCommon(verb, url string, headers map[string]string, body io.Reader, auth authentication) (*odataResponse, *http.Request, *http.Response, error) {
@@ -474,10 +760,7 @@ func (c Client) execInternalJSONCommon(verb, url string, headers map[string]stri
 		return nil, nil, nil, err
 	}
 
-	respToRet := &odataResponse{}
-	respToRet.body = resp.Body
-	respToRet.statusCode = resp.StatusCode
-	respToRet.headers = resp.Header
+	respToRet := &odataResponse{resp: resp}
 
 	statusCode := resp.StatusCode
 	if statusCode >= 400 && statusCode <= 505 {
@@ -562,7 +845,7 @@ func genChangesetReader(req *http.Request, respToRet *odataResponse, batchPartBu
 		if err != nil {
 			return err
 		}
-		respToRet.statusCode = changesetResp.StatusCode
+		respToRet.resp = changesetResp
 	}
 
 	return nil
@@ -595,6 +878,12 @@ func readAndCloseBody(body io.ReadCloser) ([]byte, error) {
 		err = nil
 	}
 	return out, err
+}
+
+// reads the response body then closes it
+func drainRespBody(resp *http.Response) {
+	io.Copy(ioutil.Discard, resp.Body)
+	resp.Body.Close()
 }
 
 func serviceErrFromXML(body []byte, storageErr *AzureStorageServiceError) error {
@@ -635,13 +924,18 @@ func (e AzureStorageServiceError) Error() string {
 
 // checkRespCode returns UnexpectedStatusError if the given response code is not
 // one of the allowed status codes; otherwise nil.
-func checkRespCode(respCode int, allowed []int) error {
+func checkRespCode(resp *http.Response, allowed []int) error {
 	for _, v := range allowed {
-		if respCode == v {
+		if resp.StatusCode == v {
 			return nil
 		}
 	}
-	return UnexpectedStatusCodeError{allowed, respCode}
+	err := getErrorFromResponse(resp)
+	return UnexpectedStatusCodeError{
+		allowed: allowed,
+		got:     resp.StatusCode,
+		inner:   err,
+	}
 }
 
 func (c Client) addMetadataToHeaders(h map[string]string, metadata map[string]string) map[string]string {
@@ -657,4 +951,38 @@ func getDebugHeaders(h http.Header) (requestID, date, version string) {
 	version = h.Get("x-ms-version")
 	date = h.Get("Date")
 	return
+}
+
+func getErrorFromResponse(resp *http.Response) error {
+	respBody, err := readAndCloseBody(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	requestID, date, version := getDebugHeaders(resp.Header)
+	if len(respBody) == 0 {
+		// no error in response body, might happen in HEAD requests
+		err = serviceErrFromStatusCode(resp.StatusCode, resp.Status, requestID, date, version)
+	} else {
+		storageErr := AzureStorageServiceError{
+			StatusCode: resp.StatusCode,
+			RequestID:  requestID,
+			Date:       date,
+			APIVersion: version,
+		}
+		// response contains storage service error object, unmarshal
+		if resp.Header.Get("Content-Type") == "application/xml" {
+			errIn := serviceErrFromXML(respBody, &storageErr)
+			if err != nil { // error unmarshaling the error response
+				err = errIn
+			}
+		} else {
+			errIn := serviceErrFromJSON(respBody, &storageErr)
+			if err != nil { // error unmarshaling the error response
+				err = errIn
+			}
+		}
+		err = storageErr
+	}
+	return err
 }

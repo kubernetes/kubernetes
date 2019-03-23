@@ -1,55 +1,189 @@
 aliases:
+  # sig-auth subproject aliases
+  sig-auth-audit-approvers:
+    - sttts
+    - tallclair
+  sig-auth-audit-reviewers:
+    - CaoShuFeng
+    - hzxuzhonghu
+    - lavalamp
+    - sttts
+    - tallclair
+
+  sig-auth-authenticators-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-authenticators-reviewers:
+    - deads2k
+    - enj
+    - jianhuiz
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - sttts
+    - wojtek-t
+
+  sig-auth-authorizers-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-authorizers-reviewers:
+    - david-mcmahon
+    - deads2k
+    - dims
+    - enj
+    - erictune
+    - jianhuiz
+    - krousey
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - mml
+    - ncdc
+    - nikhiljindal
+    - smarterclayton
+    - sttts
+    - thockin
+    - wojtek-t
+
+  sig-auth-certificates-approvers:
+    - liggitt
+    - mikedanese
+    - smarterclayton
+  sig-auth-certificates-reviewers:
+    - awly
+    - caesarxuchao
+    - david-mcmahon
+    - deads2k
+    - dims
+    - enj
+    - errordeveloper
+    - hongchaodeng
+    - jianhuiz
+    - lavalamp
+    - liggitt
+    - mbohlool
+    - mikedanese
+    - smarterclayton
+    - sttts
+    - thockin
+    - timothysc
+    - wojtek-t
+
+  sig-auth-encryption-at-rest-approvers:
+    - immutableT
+    - smarterclayton
+  sig-auth-encryption-at-rest-reviewers:
+    - enj
+    - immutableT
+    - lavalamp
+    - liggitt
+    - sakshamsharma
+    - smarterclayton
+    - wojtek-t
+
+  sig-auth-node-isolation-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+    - tallclair
+  sig-auth-node-isolation-reviewers:
+    - deads2k
+    - liggitt
+    - mikedanese
+    - tallclair
+
+  sig-auth-policy-approvers:
+    - deads2k
+    - liggitt
+    - tallclair
+  sig-auth-policy-reviewers:
+    - deads2k
+    - hongchaodeng
+    - jianhuiz
+    - liggitt
+    - mbohlool
+    - pweil-
+    - tallclair
+    - krmayankk
+
+  sig-auth-serviceaccounts-approvers:
+    - deads2k
+    - liggitt
+    - mikedanese
+  sig-auth-serviceaccounts-reviewers:
+    - awly
+    - deads2k
+    - enj
+    - liggitt
+    - mikedanese
+    - WanLinghao
+
+  sig-storage-reviewers:
+    - saad-ali
+    - childsb
+
   sig-scheduling-maintainers:
     - bsalamat
-    - davidopp
     - k82cn
-    - timothysc
     - wojtek-t
+    - ravisantoshgudimetla
+    - Huang-Wei
   sig-scheduling:
     - bsalamat
-    - davidopp
-    - jayunit100
     - k82cn
     - resouer
-    - timothysc
-    - wojtek-t
+    - ravisantoshgudimetla
+    - misterikkit
+    - Huang-Wei
+    - wgliang
+
   sig-cli-maintainers:
     - adohe
     - brendandburns
     - deads2k
-    - fabianofranz
     - janetkuo
     - liggitt
-    - pwittrock
+    - seans3
+    - monopole
+    - droot
+    - apelisse
+    - mengqiy
     - smarterclayton
+    - soltysh
   sig-cli:
     - adohe
     - deads2k
     - derekwaynecarr
+    - dixudx
     - dims
     - dshulyak
     - eparis
-    - ericchiang
-    - fabianofranz
     - ghodss
+    - juanvallejo
     - mengqiy
     - rootfs
+    - seans3
     - shiywang
     - smarterclayton
     - soltysh
-    - sttts
   sig-testing-reviewers:
+    - bentheelder
+    - cblecker
     - fejta
+    - krzyzacy
     - ixdy
-    - rmmh
     - spiffxp
-    - spxtr
   sig-testing-approvers:
+    - bentheelder
+    - cblecker
     - fejta
+    - krzyzacy
     - ixdy
-    - rmmh
     - spiffxp
-    - spxtr
   sig-node-reviewers:
     - Random-Liu
     - dashpole
@@ -58,15 +192,16 @@ aliases:
     - dims
     - feiskyer
     - mtaufen
-    - ncdc
     - pmorie
     - resouer
+    - sjenning
     - sjpotter
     - tallclair
     - tmrts
     - vishh
     - yifan-gu
     - yujuhong
+    - krmayankk
   sig-network-approvers:
     - bowei
     - caseydavenport
@@ -87,6 +222,7 @@ aliases:
     - mrhohn
     - nicksardo
     - thockin
+    - rramkumar1
   sig-apps-reviewers:
     - enisoc
     - erictune
@@ -101,78 +237,99 @@ aliases:
   sig-apps-api-approvers:
     - erictune
     - smarterclayton
-  milestone-maintainers:
-    - lavalamp
-    - deads2k
-    - michelleN
-    - mattfarina
-    - prydonius
-    - bgrant0607
-    - jdumars
-    - ericchiang
-    - liggitt
-    - deads2k
+  sig-autoscaling-maintainers:
+    - aleksandra-malinowska
+    - bskiba
+    - DirectXMan12
+    - MaciekPytel
     - mwielgus
-    - directxman12
-    - justinsb
-    - kris-nova
-    - chrislovecnm
-    - mfburnett
-    - slack
-    - colemickens
-    - foxish
-    - fabianofranz
-    - pwittrock
-    - AdoHe
-    - lukemarsden
-    - jbeda
-    - roberthbailey
-    - zehicle
-    - jdumars
-    - grodrigues3
-    - Phillels
-    - devin-donnelly
-    - jaredbhatti
-    - csbell
-    - quinton-hoole
-    - piosz
-    - fabxc
+  api-approvers:
+    - erictune
+    - lavalamp
+    - smarterclayton
     - thockin
-    - dcbw
-    - caseydavenport
-    - dchen1107
-    - derekwaynecarr
-    - zen
-    - marcoceppi
-    - dghubble
-    - idvoretskyi
-    - xsgordon
-    - apsinha
-    - idvoretskyi
-    - calebamiles
-    - pwittrock
-    - calebamiles
+    - liggitt
+    # - bgrant0607 # manual escalations only
+  api-reviewers:
+    - erictune
+    - lavalamp
+    - smarterclayton
+    - thockin
+    - liggitt
     - wojtek-t
-    - countspongebob
-    - jbeda
+    - deads2k
+    - yujuhong
+    - brendandburns
+    - derekwaynecarr
+    - caesarxuchao
+    - vishh
+    - mikedanese
+    - nikhiljindal
+    - gmarek
     - davidopp
-    - timothysc
     - pmorie
-    - arschles
-    - vaikas-google
-    - duglin
+    - sttts
+    - dchen1107
     - saad-ali
-    - childsb
-    - spiffxp
-    - fejta
+    - zmerlynn
+    - luxas
+    - janetkuo
+    - justinsb
+    - pwittrock
+    - roberthbailey
+    - ncdc
+    - tallclair
+    - yifan-gu
+    - eparis
+    - mwielgus
     - timothysc
-    - danielromlein
-    - floreks
-    - michmike
-    - abgworrall
-    - krzyzacy
-    - steveperry-53
-    - radhikpac
-    - jpbetz
-    - cmluciano
-
+    - soltysh
+    - piosz
+    - jsafrane
+    - jbeda
+  dep-approvers:
+    - apelisse
+    - BenTheElder
+    - cblecker
+    - dims
+    - thockin
+    - sttts
+    - soltysh
+  feature-approvers:
+    - bgrant0607      # Architecture
+    - brancz          # Instrumentation
+    - bsalamat        # Scheduling
+    - calebamiles     # Release
+    - caseydavenport  # Network
+    - childsb         # Storage
+    - countspongebob  # Scalability
+    - csbell          # Multicluster
+    - dcbw            # Network
+    - dchen1107       # Node
+    - deads2k         # API Machinery
+    - derekwaynecarr  # Node
+    - dghubble        # On Premise
+    - directxman12    # Autoscaling
+    - jdumars         # Architecture, Cluster Ops, Release
+    - kow3ns          # Apps
+    - lavalamp        # API Machinery
+    - liggitt         # Auth
+    - lukemarsden     # Cluster Lifecycle
+    - luxas           # Cluster Lifecycle
+    - marcoceppi      # On Premise
+    - mattfarina      # Apps
+    - michmike        # Windows
+    - mwielgus        # Autoscaling
+    - piosz           # Instrumentation
+    - prydonius       # Apps
+    - pwittrock       # CLI
+    - quinton-hoole   # Multicluster
+    - roberthbailey   # Cluster Lifecycle
+    - saad-ali        # Storage
+    - seans3          # CLI
+    - soltysh         # CLI
+    - tallclair       # Auth
+    - thockin         # Network
+    - timothysc       # Cluster Lifecycle, Scheduling
+    - wojtek-t        # Scalability
+    - zehicle         # Cluster Ops

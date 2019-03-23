@@ -16,6 +16,8 @@ limitations under the License.
 
 package apply
 
+import "reflect"
+
 // PrimitiveElement contains the recorded, local and remote values for a field
 // of type primitive
 type PrimitiveElement struct {
@@ -32,3 +34,21 @@ func (e PrimitiveElement) Merge(v Strategy) (Result, error) {
 }
 
 var _ Element = &PrimitiveElement{}
+
+// HasConflict returns ConflictError if primitive element has conflict field.
+// Conflicts happen when either of the following conditions:
+// 1. A field is specified in both recorded and remote values, but does not match.
+// 2. A field is specified in recorded values, but missing in remote values.
+func (e PrimitiveElement) HasConflict() error {
+	if e.HasRecorded() && e.HasRemote() {
+		if !reflect.DeepEqual(e.GetRecorded(), e.GetRemote()) {
+			return NewConflictError(e)
+		}
+	}
+	if e.HasRecorded() && !e.HasRemote() {
+		return NewConflictError(e)
+	}
+	return nil
+}
+
+var _ ConflictDetector = &PrimitiveElement{}

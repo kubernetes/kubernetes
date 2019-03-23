@@ -13,11 +13,29 @@ example, by using nonce 1 for the first message, nonce 2 for the second
 message, etc. Nonces are long enough that randomly generated nonces have
 negligible risk of collision.
 
+Messages should be small because:
+
+1. The whole message needs to be held in memory to be processed.
+
+2. Using large messages pressures implementations on small machines to decrypt
+and process plaintext before authenticating it. This is very dangerous, and
+this API does not allow it, but a protocol that uses excessive message sizes
+might present some implementations with no other choice.
+
+3. Fixed overheads will be sufficiently amortised by messages as small as 8KB.
+
+4. Performance may be improved by working with messages that fit into data caches.
+
+Thus large amounts of data should be chunked so that each message is small.
+(Each message still needs a unique nonce.) If in doubt, 16KB is a reasonable
+chunk size.
+
 This package is interoperable with NaCl: https://nacl.cr.yp.to/secretbox.html.
 */
 package secretbox
 
 import (
+	"golang.org/x/crypto/internal/subtle"
 	"golang.org/x/crypto/poly1305"
 	"golang.org/x/crypto/salsa20/salsa"
 )
@@ -70,6 +88,9 @@ func Seal(out, message []byte, nonce *[24]byte, key *[32]byte) []byte {
 	copy(poly1305Key[:], firstBlock[:])
 
 	ret, out := sliceForAppend(out, len(message)+poly1305.TagSize)
+	if subtle.AnyOverlap(out, message) {
+		panic("nacl: invalid buffer overlap")
+	}
 
 	// We XOR up to 32 bytes of message with the keystream generated from
 	// the first block.
@@ -101,7 +122,7 @@ func Seal(out, message []byte, nonce *[24]byte, key *[32]byte) []byte {
 // Open authenticates and decrypts a box produced by Seal and appends the
 // message to out, which must not overlap box. The output will be Overhead
 // bytes smaller than box.
-func Open(out []byte, box []byte, nonce *[24]byte, key *[32]byte) ([]byte, bool) {
+func Open(out, box []byte, nonce *[24]byte, key *[32]byte) ([]byte, bool) {
 	if len(box) < Overhead {
 		return nil, false
 	}
@@ -126,6 +147,9 @@ func Open(out []byte, box []byte, nonce *[24]byte, key *[32]byte) ([]byte, bool)
 	}
 
 	ret, out := sliceForAppend(out, len(box)-Overhead)
+	if subtle.AnyOverlap(out, box) {
+		panic("nacl: invalid buffer overlap")
+	}
 
 	// We XOR up to 32 bytes of box with the keystream generated from
 	// the first block.

@@ -19,13 +19,14 @@ package encryptionconfig
 import (
 	"bytes"
 	"encoding/base64"
-	"fmt"
-	"io"
-	"os"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 )
@@ -35,13 +36,40 @@ const (
 
 	sampleContextText = "0123456789"
 
-	// Modify these in all configurations if changed
-	testEnvelopeServiceConfigPath   = "testproviderconfig"
-	testEnvelopeServiceProviderName = "testprovider"
+	legacyV1Config = `
+  kind: EncryptionConfig
+  apiVersion: v1
+  resources:
+    - resources:
+      - secrets
+      - namespaces
+      providers:
+      - identity: {}
+      - aesgcm:
+          keys:
+          - name: key1
+            secret: c2VjcmV0IGlzIHNlY3VyZQ==
+          - name: key2
+            secret: dGhpcyBpcyBwYXNzd29yZA==
+      - kms:
+          name: testprovider
+          endpoint: unix:///tmp/testprovider.sock
+          cachesize: 10
+      - aescbc:
+          keys:
+          - name: key1
+            secret: c2VjcmV0IGlzIHNlY3VyZQ==
+          - name: key2
+            secret: dGhpcyBpcyBwYXNzd29yZA==
+      - secretbox:
+          keys:
+          - name: key1
+            secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+  `
 
 	correctConfigWithIdentityFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -56,7 +84,7 @@ resources:
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - kms:
         name: testprovider
-        configfile: testproviderconfig
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - aescbc:
         keys:
@@ -71,8 +99,8 @@ resources:
 `
 
 	correctConfigWithAesGcmFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -89,7 +117,7 @@ resources:
           secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
     - kms:
         name: testprovider
-        configfile: testproviderconfig
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - aescbc:
         keys:
@@ -101,8 +129,8 @@ resources:
 `
 
 	correctConfigWithAesCbcFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -115,7 +143,7 @@ resources:
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - kms:
         name: testprovider
-        configfile: testproviderconfig
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - identity: {}
     - secretbox:
@@ -131,8 +159,8 @@ resources:
 `
 
 	correctConfigWithSecretboxFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
@@ -149,7 +177,7 @@ resources:
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - kms:
         name: testprovider
-        configfile: testproviderconfig
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - identity: {}
     - aesgcm:
@@ -161,15 +189,15 @@ resources:
 `
 
 	correctConfigWithKMSFirst = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - secrets
     providers:
     - kms:
         name: testprovider
-        configfile: testproviderconfig
+        endpoint: unix:///tmp/testprovider.sock
         cachesize: 10
     - secretbox:
         keys:
@@ -191,8 +219,8 @@ resources:
 `
 
 	incorrectConfigNoSecretForKey = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - namespaces
@@ -204,8 +232,8 @@ resources:
 `
 
 	incorrectConfigInvalidKey = `
-kind: EncryptionConfig
-apiVersion: v1
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
     - namespaces
@@ -218,40 +246,87 @@ resources:
         - name: key2
           secret: YSBzZWNyZXQgYSBzZWNyZXQ=
 `
+
+	incorrectConfigNoEndpointForKMS = `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: testprovider
+        cachesize: 10
+`
 )
 
 // testEnvelopeService is a mock envelope service which can be used to simulate remote Envelope services
 // for testing of the envelope transformer with other transformers.
 type testEnvelopeService struct {
-	disabled bool
 }
 
-func (t *testEnvelopeService) Decrypt(data string) ([]byte, error) {
-	if t.disabled {
-		return nil, fmt.Errorf("Envelope service was disabled")
+func (t *testEnvelopeService) Decrypt(data []byte) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(string(data))
+}
+
+func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
+	return []byte(base64.StdEncoding.EncodeToString(data)), nil
+}
+
+// The factory method to create mock envelope service.
+func newMockEnvelopeService(endpoint string, timeout time.Duration) (envelope.Service, error) {
+	return &testEnvelopeService{}, nil
+}
+
+func TestLegacyConfig(t *testing.T) {
+	legacyConfigObject, err := loadConfig([]byte(legacyV1Config))
+	if err != nil {
+		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, legacyV1Config)
 	}
-	return base64.StdEncoding.DecodeString(data)
-}
 
-func (t *testEnvelopeService) Encrypt(data []byte) (string, error) {
-	if t.disabled {
-		return "", fmt.Errorf("Envelope service was disabled")
+	expected := &apiserverconfig.EncryptionConfiguration{
+		Resources: []apiserverconfig.ResourceConfiguration{
+			{
+				Resources: []string{"secrets", "namespaces"},
+				Providers: []apiserverconfig.ProviderConfiguration{
+					{Identity: &apiserverconfig.IdentityConfiguration{}},
+					{AESGCM: &apiserverconfig.AESConfiguration{
+						Keys: []apiserverconfig.Key{
+							{Name: "key1", Secret: "c2VjcmV0IGlzIHNlY3VyZQ=="},
+							{Name: "key2", Secret: "dGhpcyBpcyBwYXNzd29yZA=="},
+						},
+					}},
+					{KMS: &apiserverconfig.KMSConfiguration{
+						Name:      "testprovider",
+						Endpoint:  "unix:///tmp/testprovider.sock",
+						CacheSize: 10,
+					}},
+					{AESCBC: &apiserverconfig.AESConfiguration{
+						Keys: []apiserverconfig.Key{
+							{Name: "key1", Secret: "c2VjcmV0IGlzIHNlY3VyZQ=="},
+							{Name: "key2", Secret: "dGhpcyBpcyBwYXNzd29yZA=="},
+						},
+					}},
+					{Secretbox: &apiserverconfig.SecretboxConfiguration{
+						Keys: []apiserverconfig.Key{
+							{Name: "key1", Secret: "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY="},
+						},
+					}},
+				},
+			},
+		},
 	}
-	return base64.StdEncoding.EncodeToString(data), nil
+	if !reflect.DeepEqual(legacyConfigObject, expected) {
+		t.Fatal(diff.ObjectReflectDiff(expected, legacyConfigObject))
+	}
 }
-
-func (t *testEnvelopeService) SetDisabledStatus(status bool) {
-	t.disabled = status
-}
-
-var _ envelope.Service = &testEnvelopeService{}
-
 func TestEncryptionProviderConfigCorrect(t *testing.T) {
-	os.OpenFile(testEnvelopeServiceConfigPath, os.O_CREATE, 0666)
-	defer os.Remove(testEnvelopeServiceConfigPath)
-	KMSPluginRegistry.Register(testEnvelopeServiceProviderName, func(_ io.Reader) (envelope.Service, error) {
-		return &testEnvelopeService{}, nil
-	})
+	// Set factory for mock envelope service
+	factory := envelopeServiceFactory
+	envelopeServiceFactory = newMockEnvelopeService
+	defer func() {
+		envelopeServiceFactory = factory
+	}()
 
 	// Creates compound/prefix transformers with different ordering of available transformers.
 	// Transforms data using one of them, and tries to untransform using the others.
@@ -335,5 +410,100 @@ func TestEncryptionProviderConfigNoSecretForKey(t *testing.T) {
 func TestEncryptionProviderConfigInvalidKey(t *testing.T) {
 	if _, err := ParseEncryptionConfiguration(strings.NewReader(incorrectConfigInvalidKey)); err == nil {
 		t.Fatalf("invalid configuration file (bad AES key) got parsed:\n%s", incorrectConfigInvalidKey)
+	}
+}
+
+// Throw error if kms has no endpoint
+func TestEncryptionProviderConfigNoEndpointForKMS(t *testing.T) {
+	if _, err := ParseEncryptionConfiguration(strings.NewReader(incorrectConfigNoEndpointForKMS)); err == nil {
+		t.Fatalf("invalid configuration file (kms has no endpoint) got parsed:\n%s", incorrectConfigNoEndpointForKMS)
+	}
+}
+
+func TestKMSConfigTimeout(t *testing.T) {
+	testCases := []struct {
+		desc    string
+		config  string
+		want    time.Duration
+		wantErr string
+	}{
+		{
+			desc: "duration explicitly provided",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   15s
+`,
+			want: 15 * time.Second,
+		},
+		{
+			desc: "duration explicitly provided as 0 which is an invalid value, error should be returned",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   0s
+`,
+			wantErr: "timeout should be a positive value",
+		},
+		{
+			desc: "duration is not provided, default will be supplied",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+`,
+			want: kmsPluginConnectionTimeout,
+		},
+		{
+			desc: "duration is invalid (negative), error should be returned",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   -15s
+
+`,
+			wantErr: "timeout should be a positive value",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			// mocking envelopeServiceFactory to sense the value of the supplied timeout.
+			envelopeServiceFactory = func(endpoint string, callTimeout time.Duration) (envelope.Service, error) {
+				if callTimeout != tt.want {
+					t.Fatalf("got timeout: %v, want %v", callTimeout, tt.want)
+				}
+
+				return newMockEnvelopeService(endpoint, callTimeout)
+			}
+
+			// mocked envelopeServiceFactory is called during ParseEncryptionConfiguration.
+			if _, err := ParseEncryptionConfiguration(strings.NewReader(tt.config)); err != nil && !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("unable to parse yaml\n%s\nerror: %v", tt.config, err)
+			}
+		})
 	}
 }

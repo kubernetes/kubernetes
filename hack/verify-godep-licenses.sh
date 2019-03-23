@@ -18,13 +18,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
 if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
-  ! kube::util::has_changes_against_upstream_branch "${branch}" 'Godeps/' && \
-  ! kube::util::has_changes_against_upstream_branch "${branch}" 'vendor/'; then
+  ! kube::util::has_changes "${branch}" 'Godeps/' && \
+  ! kube::util::has_changes "${branch}" 'vendor/'; then
   exit 0
 fi
 
@@ -48,8 +48,8 @@ ln -s "${KUBE_ROOT}/vendor" "${_tmpdir}"
 LICENSE_ROOT="${_tmpdir}" "${KUBE_ROOT}/hack/update-godep-licenses.sh"
 
 # Compare Godep Licenses
-if ! _out="$(diff -Naupr ${KUBE_ROOT}/Godeps/LICENSES ${_tmpdir}/Godeps/LICENSES)"; then
-  echo "Your godep licenses file is out of date. Run hack/update-godep-licenses.sh and commit the results."
-  echo "${_out}"
+if ! _out="$(diff -Naupr "${KUBE_ROOT}/Godeps/LICENSES" "${_tmpdir}/Godeps/LICENSES")"; then
+  echo "Your godep licenses file is out of date. Run hack/update-godep-licenses.sh and commit the results." >&2
+  echo "${_out}" >&2
   exit 1
 fi

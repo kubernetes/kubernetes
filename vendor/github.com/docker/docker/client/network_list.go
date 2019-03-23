@@ -1,12 +1,12 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"golang.org/x/net/context"
 )
 
 // NetworkList returns the list of networks configured in the docker host.

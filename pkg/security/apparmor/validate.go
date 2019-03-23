@@ -29,14 +29,14 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
+	utilpath "k8s.io/utils/path"
 )
 
 // Whether AppArmor should be disabled by default.
 // Set to true if the wrong build tags are set (see validate_disabled.go).
 var isDisabledBuild bool
 
-// Interface for validating that a pod with with an AppArmor profile can be run by a Node.
+// Interface for validating that a pod with an AppArmor profile can be run by a Node.
 type Validator interface {
 	Validate(pod *v1.Pod) error
 	ValidateHost() error
@@ -195,7 +195,7 @@ func getAppArmorFS() (string, error) {
 		}
 		if fields[2] == "securityfs" {
 			appArmorFS := path.Join(fields[1], "apparmor")
-			if ok, err := utilfile.FileExists(appArmorFS); !ok {
+			if ok, err := utilpath.Exists(utilpath.CheckFollowSymlink, appArmorFS); !ok {
 				msg := fmt.Sprintf("path %s does not exist", appArmorFS)
 				if err != nil {
 					return "", fmt.Errorf("%s: %v", msg, err)

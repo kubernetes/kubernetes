@@ -17,6 +17,7 @@ limitations under the License.
 package tokenfile
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -85,13 +86,13 @@ token7,user7,uid7,"group1,group2",otherdata
 		},
 	}
 	for i, testCase := range testCases {
-		user, ok, err := auth.AuthenticateToken(testCase.Token)
+		resp, ok, err := auth.AuthenticateToken(context.Background(), testCase.Token)
 		if testCase.User == nil {
-			if user != nil {
-				t.Errorf("%d: unexpected non-nil user %#v", i, user)
+			if resp != nil {
+				t.Errorf("%d: unexpected non-nil user %#v", i, resp.User)
 			}
-		} else if !reflect.DeepEqual(testCase.User, user) {
-			t.Errorf("%d: expected user %#v, got %#v", i, testCase.User, user)
+		} else if !reflect.DeepEqual(testCase.User, resp.User) {
+			t.Errorf("%d: expected user %#v, got %#v", i, testCase.User, resp.User)
 		}
 
 		if testCase.Ok != ok {
@@ -122,6 +123,16 @@ func TestInsufficientColumnsTokenFile(t *testing.T) {
 	_, err := newWithContents(t, "token4\n")
 	if err == nil {
 		t.Fatalf("unexpected non error")
+	}
+}
+
+func TestEmptyTokenTokenFile(t *testing.T) {
+	auth, err := newWithContents(t, ",user5,uid5\n")
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if len(auth.tokens) != 0 {
+		t.Fatalf("empty token should not be recorded")
 	}
 }
 

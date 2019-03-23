@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -23,7 +23,7 @@
 #   b) in case of etcd3
 #      $ etcdctl --endpoints=<address> snapshot save
 #      produced .db file
-# - version.txt file is in the current directy (if it isn't it will be
+# - version.txt file is in the current directory (if it isn't it will be
 #     defaulted to "2.2.1/etcd2"). Based on this file, the script will
 #     decide to which version we are restoring (procedures are different
 #     for etcd2 and etcd3).
@@ -61,6 +61,9 @@ ETCD_API="$(echo $VERSION_CONTENTS | cut -d '/' -f 2)"
 # for the etcd data.
 # NOTE: NAME HAS TO BE EQUAL TO WHAT WE USE IN --name flag when starting etcd.
 NAME="${NAME:-etcd-$(hostname)}"
+
+INITIAL_CLUSTER="${INITIAL_CLUSTER:-${NAME}=http://localhost:2380}"
+INITIAL_ADVERTISE_PEER_URLS="${INITIAL_ADVERTISE_PEER_URLS:-http://localhost:2380}"
 
 # Port on which etcd is exposed.
 etcd_port=2379
@@ -101,7 +104,7 @@ wait_for_cluster_healthy() {
 # Wait until etcd and apiserver pods are down.
 wait_for_etcd_and_apiserver_down() {
   for i in $(seq 120); do
-    etcd=$(docker ps | grep etcd | grep -v etcd-empty-dir | grep -v etcd-monitor | wc -l)
+    etcd=$(docker ps | grep etcd-server | wc -l)
     apiserver=$(docker ps | grep apiserver | wc -l)
     # TODO: Theoretically it is possible, that apiserver and or etcd
     # are currently down, but Kubelet is now restarting them and they
@@ -134,6 +137,8 @@ if ! wait_for_etcd_and_apiserver_down; then
   exit 1
 fi
 
+read -rsp $'Press enter when all etcd instances are down...\n'
+
 # Create the sort of directory structure that etcd expects.
 # If this directory already exists, remove it.
 BACKUP_DIR="/var/tmp/backup"
@@ -155,7 +160,7 @@ if [ "${ETCD_API}" == "etcd2" ]; then
   echo "Starting etcd ${ETCD_VERSION} to restore data"
   image=$(docker run -d -v ${BACKUP_DIR}:/var/etcd/data \
     --net=host -p ${etcd_port}:${etcd_port} \
-    "gcr.io/google_containers/etcd:${ETCD_VERSION}" /bin/sh -c \
+    "k8s.gcr.io/etcd:${ETCD_VERSION}" /bin/sh -c \
     "/usr/local/bin/etcd --data-dir /var/etcd/data --force-new-cluster")
   if [ "$?" -ne "0" ]; then
     echo "Docker container didn't started correctly"
@@ -185,28 +190,20 @@ elif [ "${ETCD_API}" == "etcd3" ]; then
 
   # Run etcdctl snapshot restore command and wait until it is finished.
   # setting with --name in the etcd manifest file and then it seems to work.
-  # TODO(jsz): This command may not work in case of HA.
-  image=$(docker run -d -v ${BACKUP_DIR}:/var/tmp/backup --env ETCDCTL_API=3 \
-    "gcr.io/google_containers/etcd:${ETCD_VERSION}" /bin/sh -c \
-    "/usr/local/bin/etcdctl snapshot restore ${BACKUP_DIR}/${snapshot} --name ${NAME} --initial-cluster ${NAME}=http://localhost:2380; mv /${NAME}.etcd/member /var/tmp/backup/")
+  docker run -v ${BACKUP_DIR}:/var/tmp/backup --env ETCDCTL_API=3 \
+    "k8s.gcr.io/etcd:${ETCD_VERSION}" /bin/sh -c \
+    "/usr/local/bin/etcdctl snapshot restore ${BACKUP_DIR}/${snapshot} --name ${NAME} --initial-cluster ${INITIAL_CLUSTER} --initial-advertise-peer-urls ${INITIAL_ADVERTISE_PEER_URLS}; mv /${NAME}.etcd/member /var/tmp/backup/"
   if [ "$?" -ne "0" ]; then
     echo "Docker container didn't started correctly"
     exit 1
   fi
-  echo "Prepare container exit code: $(docker wait ${image})"
 
   rm -f "${BACKUP_DIR}/${snapshot}"
 fi
 # Also copy version.txt file.
 cp "${VERSION_FILE}" "${BACKUP_DIR}"
 
-# Find out if we are running GCI vs CVM.
-export CVM=$(curl "http://metadata/computeMetadata/v1/instance/attributes/" -H "Metadata-Flavor: Google" |& grep -q gci; echo $?)
-if [[ "$CVM" == "1" ]]; then
-  export MNT_DISK="/mnt/master-pd"
-else
-  export MNT_DISK="/mnt/disks/master-pd"
-fi
+export MNT_DISK="/mnt/disks/master-pd"
 
 # Save the corrupted data (clean directory if it is already non-empty).
 rm -rf "${MNT_DISK}/var/etcd-corrupted"
@@ -214,7 +211,7 @@ mkdir -p "${MNT_DISK}/var/etcd-corrupted"
 echo "Saving corrupted data to ${MNT_DISK}/var/etcd-corrupted"
 mv /var/etcd/data "${MNT_DISK}/var/etcd-corrupted"
 
-# Replace the corrupted data dir with the resotred data.
+# Replace the corrupted data dir with the restored data.
 echo "Copying restored data to /var/etcd/data"
 mv "${BACKUP_DIR}" /var/etcd/data
 

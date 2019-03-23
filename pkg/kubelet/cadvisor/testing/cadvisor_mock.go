@@ -84,12 +84,7 @@ func (c *Mock) WatchEvents(request *events.Request) (*events.EventChannel, error
 	return args.Get(0).(*events.EventChannel), args.Error(1)
 }
 
-func (c *Mock) HasDedicatedImageFs() (bool, error) {
-	args := c.Called()
-	return args.Get(0).(bool), args.Error(1)
-}
-
-func (c *Mock) GetFsInfoByFsUUID(uuid string) (cadvisorapiv2.FsInfo, error) {
-	args := c.Called(uuid)
+func (c *Mock) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
+	args := c.Called(path)
 	return args.Get(0).(cadvisorapiv2.FsInfo), args.Error(1)
 }

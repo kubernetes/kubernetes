@@ -15,65 +15,56 @@
 package grpcproxy
 
 import (
+	"context"
 	"sync"
-
-	"golang.org/x/net/context"
-	"golang.org/x/time/rate"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type watchProxy struct {
 	cw  clientv3.Watcher
 	ctx context.Context
 
+	leader *leader
+
 	ranges *watchRanges
 
-	// retryLimiter controls the create watch retry rate on lost leaders.
-	retryLimiter *rate.Limiter
-
-	// mu protects leaderc updates.
-	mu      sync.RWMutex
-	leaderc chan struct{}
+	// mu protects adding outstanding watch servers through wg.
+	mu sync.Mutex
 
 	// wg waits until all outstanding watch servers quit.
 	wg sync.WaitGroup
+
+	// kv is used for permission checking
+	kv clientv3.KV
 }
 
-const (
-	lostLeaderKey  = "__lostleader" // watched to detect leader loss
-	retryPerSecond = 10
-)
-
 func NewWatchProxy(c *clientv3.Client) (pb.WatchServer, <-chan struct{}) {
+	cctx, cancel := context.WithCancel(c.Ctx())
 	wp := &watchProxy{
-		cw:           c.Watcher,
-		ctx:          clientv3.WithRequireLeader(c.Ctx()),
-		retryLimiter: rate.NewLimiter(rate.Limit(retryPerSecond), retryPerSecond),
-		leaderc:      make(chan struct{}),
+		cw:     c.Watcher,
+		ctx:    cctx,
+		leader: newLeader(c.Ctx(), c.Watcher),
+
+		kv: c.KV, // for permission checking
 	}
 	wp.ranges = newWatchRanges(wp)
 	ch := make(chan struct{})
 	go func() {
 		defer close(ch)
-		// a new streams without opening any watchers won't catch
-		// a lost leader event, so have a special watch to monitor it
-		rev := int64((uint64(1) << 63) - 2)
-		for wp.ctx.Err() == nil {
-			wch := wp.cw.Watch(wp.ctx, lostLeaderKey, clientv3.WithRev(rev))
-			for range wch {
-			}
-			wp.mu.Lock()
-			close(wp.leaderc)
-			wp.leaderc = make(chan struct{})
-			wp.mu.Unlock()
-			wp.retryLimiter.Wait(wp.ctx)
-		}
+		<-wp.leader.stopNotify()
 		wp.mu.Lock()
+		select {
+		case <-wp.ctx.Done():
+		case <-wp.leader.disconnectNotify():
+			cancel()
+		}
 		<-wp.ctx.Done()
 		wp.mu.Unlock()
 		wp.wg.Wait()
@@ -87,7 +78,12 @@ func (wp *watchProxy) Watch(stream pb.Watch_WatchServer) (err error) {
 	select {
 	case <-wp.ctx.Done():
 		wp.mu.Unlock()
-		return
+		select {
+		case <-wp.leader.disconnectNotify():
+			return grpc.ErrClientConnClosing
+		default:
+			return wp.ctx.Err()
+		}
 	default:
 		wp.wg.Add(1)
 	}
@@ -101,13 +97,22 @@ func (wp *watchProxy) Watch(stream pb.Watch_WatchServer) (err error) {
 		watchCh:  make(chan *pb.WatchResponse, 1024),
 		ctx:      ctx,
 		cancel:   cancel,
+		kv:       wp.kv,
 	}
 
-	var leaderc <-chan struct{}
-	if md, ok := metadata.FromContext(stream.Context()); ok {
+	var lostLeaderC <-chan struct{}
+	if md, ok := metadata.FromOutgoingContext(stream.Context()); ok {
 		v := md[rpctypes.MetadataRequireLeaderKey]
 		if len(v) > 0 && v[0] == rpctypes.MetadataHasLeader {
-			leaderc = wp.lostLeaderNotify()
+			lostLeaderC = wp.leader.lostNotify()
+			// if leader is known to be lost at creation time, avoid
+			// letting events through at all
+			select {
+			case <-lostLeaderC:
+				wp.wg.Done()
+				return rpctypes.ErrNoLeader
+			default:
+			}
 		}
 	}
 
@@ -126,7 +131,7 @@ func (wp *watchProxy) Watch(stream pb.Watch_WatchServer) (err error) {
 	go func() {
 		defer func() { stopc <- struct{}{} }()
 		select {
-		case <-leaderc:
+		case <-lostLeaderC:
 		case <-ctx.Done():
 		case <-wp.ctx.Done():
 		}
@@ -145,17 +150,13 @@ func (wp *watchProxy) Watch(stream pb.Watch_WatchServer) (err error) {
 	}()
 
 	select {
-	case <-leaderc:
+	case <-lostLeaderC:
 		return rpctypes.ErrNoLeader
+	case <-wp.leader.disconnectNotify():
+		return grpc.ErrClientConnClosing
 	default:
 		return wps.ctx.Err()
 	}
-}
-
-func (wp *watchProxy) lostLeaderNotify() <-chan struct{} {
-	wp.mu.RLock()
-	defer wp.mu.RUnlock()
-	return wp.leaderc
 }
 
 // watchProxyStream forwards etcd watch events to a proxied client stream.
@@ -176,6 +177,9 @@ type watchProxyStream struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	// kv is used for permission checking
+	kv clientv3.KV
 }
 
 func (wps *watchProxyStream) close() {
@@ -197,6 +201,24 @@ func (wps *watchProxyStream) close() {
 	close(wps.watchCh)
 }
 
+func (wps *watchProxyStream) checkPermissionForWatch(key, rangeEnd []byte) error {
+	if len(key) == 0 {
+		// If the length of the key is 0, we need to obtain full range.
+		// look at clientv3.WithPrefix()
+		key = []byte{0}
+		rangeEnd = []byte{0}
+	}
+	req := &pb.RangeRequest{
+		Serializable: true,
+		Key:          key,
+		RangeEnd:     rangeEnd,
+		CountOnly:    true,
+		Limit:        1,
+	}
+	_, err := wps.kv.Do(wps.ctx, RangeRequestToOp(req))
+	return err
+}
+
 func (wps *watchProxyStream) recvLoop() error {
 	for {
 		req, err := wps.stream.Recv()
@@ -206,6 +228,15 @@ func (wps *watchProxyStream) recvLoop() error {
 		switch uv := req.RequestUnion.(type) {
 		case *pb.WatchRequest_CreateRequest:
 			cr := uv.CreateRequest
+
+			if err = wps.checkPermissionForWatch(cr.Key, cr.RangeEnd); err != nil && err == rpctypes.ErrPermissionDenied {
+				// Return WatchResponse which is caused by permission checking if and only if
+				// the error is permission denied. For other errors (e.g. timeout or connection closed),
+				// the permission checking mechanism should do nothing for preserving error code.
+				wps.watchCh <- &pb.WatchResponse{Header: &pb.ResponseHeader{}, WatchId: -1, Created: true, Canceled: true}
+				continue
+			}
+
 			w := &watcher{
 				wr:  watchRange{string(cr.Key), string(cr.RangeEnd)},
 				id:  wps.nextWatcherID,

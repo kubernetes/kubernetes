@@ -17,14 +17,16 @@ limitations under the License.
 package tokenfile
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/klog"
 )
 
 type TokenAuthenticator struct {
@@ -62,13 +64,19 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 		if len(record) < 3 {
 			return nil, fmt.Errorf("token file '%s' must have at least 3 columns (token, user name, user uid), found %d", path, len(record))
 		}
+
+		recordNum++
+		if record[0] == "" {
+			klog.Warningf("empty token has been found in token file '%s', record number '%d'", path, recordNum)
+			continue
+		}
+
 		obj := &user.DefaultInfo{
 			Name: record[1],
 			UID:  record[2],
 		}
-		recordNum++
 		if _, exist := tokens[record[0]]; exist {
-			glog.Warningf("duplicate token has been found in token file '%s', record number '%d'", path, recordNum)
+			klog.Warningf("duplicate token has been found in token file '%s', record number '%d'", path, recordNum)
 		}
 		tokens[record[0]] = obj
 
@@ -82,10 +90,10 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 	}, nil
 }
 
-func (a *TokenAuthenticator) AuthenticateToken(value string) (user.Info, bool, error) {
+func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string) (*authenticator.Response, bool, error) {
 	user, ok := a.tokens[value]
 	if !ok {
 		return nil, false, nil
 	}
-	return user, true, nil
+	return &authenticator.Response{User: user}, true, nil
 }

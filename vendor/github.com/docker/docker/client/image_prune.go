@@ -1,12 +1,12 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
-	"golang.org/x/net/context"
 )
 
 // ImagesPrune requests the daemon to delete unused data

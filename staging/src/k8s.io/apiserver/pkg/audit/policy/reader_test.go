@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -31,8 +32,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const policyDefV1alpha1 = `
-apiVersion: audit.k8s.io/v1alpha1
+const policyDefPattern = `
+apiVersion: audit.k8s.io/{version}
 kind: Policy
 rules:
   - level: None
@@ -51,9 +52,7 @@ rules:
   - level: Metadata
 `
 
-const policyDefV1beta1 = `
-apiVersion: audit.k8s.io/v1beta1
-kind: Policy
+const policyWithNoVersionOrKind = `
 rules:
   - level: None
     nonResourceURLs:
@@ -90,32 +89,30 @@ var expectedPolicy = &audit.Policy{
 	}},
 }
 
-func TestParserV1alpha1(t *testing.T) {
-	f, err := writePolicy(t, policyDefV1alpha1)
-	require.NoError(t, err)
-	defer os.Remove(f)
+func TestParser(t *testing.T) {
+	for _, version := range []string{"v1", "v1alpha1", "v1beta1"} {
+		policyDef := strings.Replace(policyDefPattern, "{version}", version, 1)
+		f, err := writePolicy(t, policyDef)
+		require.NoError(t, err)
+		defer os.Remove(f)
 
-	policy, err := LoadPolicyFromFile(f)
-	require.NoError(t, err)
+		policy, err := LoadPolicyFromFile(f)
+		require.NoError(t, err)
 
-	assert.Len(t, policy.Rules, 3) // Sanity check.
-	if !reflect.DeepEqual(policy, expectedPolicy) {
-		t.Errorf("Unexpected policy! Diff:\n%s", diff.ObjectDiff(policy, expectedPolicy))
+		assert.Len(t, policy.Rules, 3) // Sanity check.
+		if !reflect.DeepEqual(policy, expectedPolicy) {
+			t.Errorf("Unexpected policy! Diff:\n%s", diff.ObjectDiff(policy, expectedPolicy))
+		}
 	}
 }
 
-func TestParserV1beta1(t *testing.T) {
-	f, err := writePolicy(t, policyDefV1beta1)
+func TestParsePolicyWithNoVersionOrKind(t *testing.T) {
+	f, err := writePolicy(t, policyWithNoVersionOrKind)
 	require.NoError(t, err)
 	defer os.Remove(f)
 
-	policy, err := LoadPolicyFromFile(f)
-	require.NoError(t, err)
-
-	assert.Len(t, policy.Rules, 3) // Sanity check.
-	if !reflect.DeepEqual(policy, expectedPolicy) {
-		t.Errorf("Unexpected policy! Diff:\n%s", diff.ObjectDiff(policy, expectedPolicy))
-	}
+	_, err = LoadPolicyFromFile(f)
+	assert.Contains(t, err.Error(), "unknown group version field")
 }
 
 func TestPolicyCntCheck(t *testing.T) {
@@ -124,7 +121,7 @@ func TestPolicyCntCheck(t *testing.T) {
 	}{
 		{
 			"policyWithNoRule",
-			`apiVersion: audit.k8s.io/v1beta1
+			`apiVersion: audit.k8s.io/v1
 kind: Policy`,
 		},
 		{"emptyPolicyFile", ""},

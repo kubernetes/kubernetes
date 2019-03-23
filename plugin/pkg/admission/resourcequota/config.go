@@ -20,33 +20,28 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/install"
-	resourcequotav1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1"
+	resourcequotav1beta1 "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1"
 )
 
 var (
-	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-	registry             = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
-	scheme               = runtime.NewScheme()
-	codecs               = serializer.NewCodecFactory(scheme)
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
 )
 
 func init() {
-	install.Install(groupFactoryRegistry, registry, scheme)
+	install.Install(scheme)
 }
 
 // LoadConfiguration loads the provided configuration.
 func LoadConfiguration(config io.Reader) (*resourcequotaapi.Configuration, error) {
 	// if no config is provided, return a default configuration
 	if config == nil {
-		externalConfig := &resourcequotav1alpha1.Configuration{}
+		externalConfig := &resourcequotav1beta1.Configuration{}
 		scheme.Default(externalConfig)
 		internalConfig := &resourcequotaapi.Configuration{}
 		if err := scheme.Convert(externalConfig, internalConfig, nil); err != nil {

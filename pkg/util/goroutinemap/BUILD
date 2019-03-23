@@ -12,17 +12,16 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/util/goroutinemap",
     deps = [
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["goroutinemap_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/goroutinemap",
-    library = ":go_default_library",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
+    embed = [":go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
 )
 
 filegroup(

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	jobutil "k8s.io/kubernetes/pkg/controller/job"
 )
 
 const (
@@ -112,19 +113,19 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 
 // GetJob uses c to get the Job in namespace ns named name. If the returned error is nil, the returned Job is valid.
 func GetJob(c clientset.Interface, ns, name string) (*batch.Job, error) {
-	return c.Batch().Jobs(ns).Get(name, metav1.GetOptions{})
+	return c.BatchV1().Jobs(ns).Get(name, metav1.GetOptions{})
 }
 
 // CreateJob uses c to create job in namespace ns. If the returned error is nil, the returned Job is valid and has
 // been created.
 func CreateJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, error) {
-	return c.Batch().Jobs(ns).Create(job)
+	return c.BatchV1().Jobs(ns).Create(job)
 }
 
 // UpdateJob uses c to updated job in namespace ns. If the returned error is nil, the returned Job is valid and has
 // been updated.
 func UpdateJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, error) {
-	return c.Batch().Jobs(ns).Update(job)
+	return c.BatchV1().Jobs(ns).Update(job)
 }
 
 // UpdateJobFunc updates the job object. It retries if there is a conflict, throw out error if
@@ -153,7 +154,7 @@ func UpdateJobFunc(c clientset.Interface, ns, name string, updateFn func(job *ba
 // DeleteJob uses c to delete the Job named name in namespace ns. If the returned error is nil, the Job has been
 // deleted.
 func DeleteJob(c clientset.Interface, ns, name string) error {
-	return c.Batch().Jobs(ns).Delete(name, nil)
+	return c.BatchV1().Jobs(ns).Delete(name, nil)
 }
 
 // GetJobPods returns a list of Pods belonging to a Job.
@@ -181,10 +182,10 @@ func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, paralle
 	})
 }
 
-// WaitForJobFinish uses c to wait for compeletions to complete for the Job jobName in namespace ns.
-func WaitForJobFinish(c clientset.Interface, ns, jobName string, completions int32) error {
+// WaitForJobComplete uses c to wait for completions to complete for the Job jobName in namespace ns.
+func WaitForJobComplete(c clientset.Interface, ns, jobName string, completions int32) error {
 	return wait.Poll(Poll, JobTimeout, func() (bool, error) {
-		curr, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -192,10 +193,21 @@ func WaitForJobFinish(c clientset.Interface, ns, jobName string, completions int
 	})
 }
 
+// WaitForJobFinish uses c to wait for the Job jobName in namespace ns to finish (either Failed or Complete).
+func WaitForJobFinish(c clientset.Interface, ns, jobName string) error {
+	return wait.PollImmediate(Poll, JobTimeout, func() (bool, error) {
+		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return jobutil.IsJobFinished(curr), nil
+	})
+}
+
 // WaitForJobFailure uses c to wait for up to timeout for the Job named jobName in namespace ns to fail.
 func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.Duration, reason string) error {
 	return wait.Poll(Poll, timeout, func() (bool, error) {
-		curr, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -210,12 +222,23 @@ func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.D
 	})
 }
 
+// WaitForJobGone uses c to wait for up to timeout for the Job named jobName in namespace ns to be removed.
+func WaitForJobGone(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
+	return wait.Poll(Poll, timeout, func() (bool, error) {
+		_, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	})
+}
+
 // CheckForAllJobPodsRunning uses c to check in the Job named jobName in ns is running. If the returned error is not
 // nil the returned bool is true if the Job is running.
 func CheckForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) (bool, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := c.Core().Pods(ns).List(options)
+	pods, err := c.CoreV1().Pods(ns).List(options)
 	if err != nil {
 		return false, err
 	}
@@ -228,6 +251,18 @@ func CheckForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parall
 	return count == parallelism, nil
 }
 
+// WaitForAllJobPodsRunning wait for all pods for the Job named jobName in namespace ns
+// to be deleted.
+func WaitForAllJobPodsGone(c clientset.Interface, ns, jobName string) error {
+	return wait.PollImmediate(Poll, JobTimeout, func() (bool, error) {
+		pods, err := GetJobPods(c, ns, jobName)
+		if err != nil {
+			return false, err
+		}
+		return len(pods.Items) == 0, nil
+	})
+}
+
 func newBool(val bool) *bool {
 	p := new(bool)
 	*p = val
@@ -237,9 +272,9 @@ func newBool(val bool) *bool {
 type updateJobFunc func(*batch.Job)
 
 func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateJobFunc) (job *batch.Job, err error) {
-	jobs := c.Batch().Jobs(namespace)
+	jobs := c.BatchV1().Jobs(namespace)
 	var updateErr error
-	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+	pollErr := wait.PollImmediate(Poll, JobTimeout, func() (bool, error) {
 		if job, err = jobs.Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
@@ -256,4 +291,26 @@ func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 		pollErr = fmt.Errorf("couldn't apply the provided updated to job %q: %v", name, updateErr)
 	}
 	return job, pollErr
+}
+
+// WaitForJobDeleting uses c to wait for the Job jobName in namespace ns to have
+// a non-nil deletionTimestamp (i.e. being deleted).
+func WaitForJobDeleting(c clientset.Interface, ns, jobName string) error {
+	return wait.PollImmediate(Poll, JobTimeout, func() (bool, error) {
+		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return curr.ObjectMeta.DeletionTimestamp != nil, nil
+	})
+}
+
+func JobFinishTime(finishedJob *batch.Job) metav1.Time {
+	var finishTime metav1.Time
+	for _, c := range finishedJob.Status.Conditions {
+		if (c.Type == batch.JobComplete || c.Type == batch.JobFailed) && c.Status == v1.ConditionTrue {
+			return c.LastTransitionTime
+		}
+	}
+	return finishTime
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/exec"
 )
 
 const (
@@ -38,13 +39,13 @@ func TestProberExistingDriverBeforeInit(t *testing.T) {
 	driverPath, _, watcher, prober := initTestEnvironment(t)
 
 	// Act
-	updated, plugins, err := prober.Probe()
+	events, err := prober.Probe()
 
 	// Assert
 	// Probe occurs, 1 plugin should be returned, and 2 watches (pluginDir and all its
 	// current subdirectories) registered.
-	assert.True(t, updated)
-	assert.Equal(t, 1, len(plugins))
+	assert.Equal(t, 1, len(events))
+	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)
 	assert.Equal(t, pluginDir, watcher.watches[0])
 	assert.Equal(t, driverPath, watcher.watches[1])
 	assert.NoError(t, err)
@@ -52,67 +53,120 @@ func TestProberExistingDriverBeforeInit(t *testing.T) {
 	// Should no longer probe.
 
 	// Act
-	updated, plugins, err = prober.Probe()
+	events, err = prober.Probe()
 	// Assert
-	assert.False(t, updated)
-	assert.Equal(t, 0, len(plugins))
+	assert.Equal(t, 0, len(events))
 	assert.NoError(t, err)
 }
 
 // Probes newly added drivers after prober is running.
-func TestProberAddDriver(t *testing.T) {
+func TestProberAddRemoveDriver(t *testing.T) {
 	// Arrange
 	_, fs, watcher, prober := initTestEnvironment(t)
 	prober.Probe()
-	updated, _, _ := prober.Probe()
-	assert.False(t, updated)
+	events, err := prober.Probe()
+	assert.Equal(t, 0, len(events))
 
-	// Call probe after a file is added. Should return true.
+	// Call probe after a file is added. Should return 1 event.
 
-	// Arrange
+	// add driver
 	const driverName2 = "fake-driver2"
 	driverPath := path.Join(pluginDir, driverName2)
+	executablePath := path.Join(driverPath, driverName2)
 	installDriver(driverName2, fs)
 	watcher.TriggerEvent(fsnotify.Create, driverPath)
-	watcher.TriggerEvent(fsnotify.Create, path.Join(driverPath, driverName2))
+	watcher.TriggerEvent(fsnotify.Create, executablePath)
 
 	// Act
-	updated, plugins, err := prober.Probe()
+	events, err = prober.Probe()
 
 	// Assert
-	assert.True(t, updated)
-	assert.Equal(t, 2, len(plugins))                                     // 1 existing, 1 newly added
+	assert.Equal(t, 1, len(events))
+	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)               // 1 newly added
 	assert.Equal(t, driverPath, watcher.watches[len(watcher.watches)-1]) // Checks most recent watch
 	assert.NoError(t, err)
 
-	// Call probe again, should return false.
+	// Call probe again, should return 0 event.
 
 	// Act
-	updated, _, err = prober.Probe()
+	events, err = prober.Probe()
 	// Assert
-	assert.False(t, updated)
+	assert.Equal(t, 0, len(events))
 	assert.NoError(t, err)
 
-	// Call probe after a non-driver file is added in a subdirectory. Should return true.
-
-	// Arrange
+	// Call probe after a non-driver file is added in a subdirectory. should return 1 event.
 	fp := path.Join(driverPath, "dummyfile")
 	fs.Create(fp)
 	watcher.TriggerEvent(fsnotify.Create, fp)
 
 	// Act
-	updated, plugins, err = prober.Probe()
+	events, err = prober.Probe()
 
 	// Assert
-	assert.True(t, updated)
-	assert.Equal(t, 2, len(plugins)) // Number of plugins should not change.
+	assert.Equal(t, 1, len(events))
+	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)
 	assert.NoError(t, err)
 
-	// Call probe again, should return false.
+	// Call probe again, should return 0 event.
 	// Act
-	updated, _, err = prober.Probe()
+	events, err = prober.Probe()
 	// Assert
-	assert.False(t, updated)
+	assert.Equal(t, 0, len(events))
+	assert.NoError(t, err)
+
+	// Call probe after a subdirectory is added in a driver directory. should return 1 event.
+	subdirPath := path.Join(driverPath, "subdir")
+	fs.Create(subdirPath)
+	watcher.TriggerEvent(fsnotify.Create, subdirPath)
+
+	// Act
+	events, err = prober.Probe()
+
+	// Assert
+	assert.Equal(t, 1, len(events))
+	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)
+	assert.NoError(t, err)
+
+	// Call probe again, should return 0 event.
+	// Act
+	events, err = prober.Probe()
+	// Assert
+	assert.Equal(t, 0, len(events))
+	assert.NoError(t, err)
+
+	// Call probe after a subdirectory is removed in a driver directory. should return 1 event.
+	fs.Remove(subdirPath)
+	watcher.TriggerEvent(fsnotify.Remove, subdirPath)
+
+	// Act
+	events, err = prober.Probe()
+
+	// Assert
+	assert.Equal(t, 1, len(events))
+	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)
+	assert.NoError(t, err)
+
+	// Call probe again, should return 0 event.
+	// Act
+	events, err = prober.Probe()
+	// Assert
+	assert.Equal(t, 0, len(events))
+	assert.NoError(t, err)
+
+	// Call probe after a driver executable and driver directory is remove. should return 1 event.
+	fs.Remove(executablePath)
+	fs.Remove(driverPath)
+	watcher.TriggerEvent(fsnotify.Remove, executablePath)
+	watcher.TriggerEvent(fsnotify.Remove, driverPath)
+	// Act and Assert: 1 ProbeRemove event
+	events, err = prober.Probe()
+	assert.Equal(t, 1, len(events))
+	assert.Equal(t, volume.ProbeRemove, events[0].Op)
+	assert.NoError(t, err)
+
+	// Act and Assert: 0 event
+	events, err = prober.Probe()
+	assert.Equal(t, 0, len(events))
 	assert.NoError(t, err)
 }
 
@@ -120,7 +174,7 @@ func TestProberAddDriver(t *testing.T) {
 func TestEmptyPluginDir(t *testing.T) {
 	// Arrange
 	fs := utilfs.NewFakeFs()
-	watcher := NewFakeWatcher()
+	watcher := newFakeWatcher()
 	prober := &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   watcher,
@@ -130,11 +184,10 @@ func TestEmptyPluginDir(t *testing.T) {
 	prober.Init()
 
 	// Act
-	updated, plugins, err := prober.Probe()
+	events, err := prober.Probe()
 
 	// Assert
-	assert.True(t, updated)
-	assert.Equal(t, 0, len(plugins))
+	assert.Equal(t, 0, len(events))
 	assert.NoError(t, err)
 }
 
@@ -154,7 +207,37 @@ func TestRemovePluginDir(t *testing.T) {
 	assert.Equal(t, pluginDir, watcher.watches[len(watcher.watches)-1])
 }
 
-// Issue multiple events and probe multiple times. Should give true, false, false...
+// Issue an event to remove plugindir. New directory should still be watched.
+func TestNestedDriverDir(t *testing.T) {
+	// Arrange
+	_, fs, watcher, _ := initTestEnvironment(t)
+	// Assert
+	assert.Equal(t, 2, len(watcher.watches)) // 2 from initial setup
+
+	// test add testDriverName
+	testDriverName := "testDriverName"
+	testDriverPath := path.Join(pluginDir, testDriverName)
+	fs.MkdirAll(testDriverPath, 0666)
+	watcher.TriggerEvent(fsnotify.Create, testDriverPath)
+	// Assert
+	assert.Equal(t, 3, len(watcher.watches)) // 2 from initial setup, 1 from new watch.
+	assert.Equal(t, testDriverPath, watcher.watches[len(watcher.watches)-1])
+
+	// test add nested subdir inside testDriverName
+	basePath := testDriverPath
+	for i := 0; i < 10; i++ {
+		subdirName := "subdirName"
+		subdirPath := path.Join(basePath, subdirName)
+		fs.MkdirAll(subdirPath, 0666)
+		watcher.TriggerEvent(fsnotify.Create, subdirPath)
+		// Assert
+		assert.Equal(t, 4+i, len(watcher.watches)) // 3 + newly added
+		assert.Equal(t, subdirPath, watcher.watches[len(watcher.watches)-1])
+		basePath = subdirPath
+	}
+}
+
+// Issue multiple events and probe multiple times.
 func TestProberMultipleEvents(t *testing.T) {
 	const iterations = 5
 
@@ -169,52 +252,23 @@ func TestProberMultipleEvents(t *testing.T) {
 	}
 
 	// Act
-	updated, _, err := prober.Probe()
+	events, err := prober.Probe()
 
 	// Assert
-	assert.True(t, updated)
+	assert.Equal(t, 2, len(events))
+	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)
+	assert.Equal(t, volume.ProbeAddOrUpdate, events[1].Op)
 	assert.NoError(t, err)
 	for i := 0; i < iterations-1; i++ {
-		updated, _, err = prober.Probe()
-		assert.False(t, updated)
+		events, err = prober.Probe()
+		assert.Equal(t, 0, len(events))
 		assert.NoError(t, err)
 	}
 }
 
-// When many events are triggered quickly in succession, events should stop triggering a probe update
-// after a certain limit.
-func TestProberRateLimit(t *testing.T) {
-	// Arrange
-	driverPath, _, watcher, prober := initTestEnvironment(t)
-	for i := 0; i < watchEventLimit; i++ {
-		watcher.TriggerEvent(fsnotify.Write, path.Join(driverPath, driverName))
-	}
-
-	// Act
-	updated, plugins, err := prober.Probe()
-
-	// Assert
-	// The probe results should not be different from what it would be if none of the events
-	// are triggered.
-	assert.True(t, updated)
-	assert.Equal(t, 1, len(plugins))
-	assert.NoError(t, err)
-
-	// Arrange
-	watcher.TriggerEvent(fsnotify.Write, path.Join(driverPath, driverName))
-
-	// Act
-	updated, _, err = prober.Probe()
-
-	// Assert
-	// The last event is outside the event limit. Should not trigger a probe.
-	assert.False(t, updated)
-	assert.NoError(t, err)
-}
-
 func TestProberError(t *testing.T) {
 	fs := utilfs.NewFakeFs()
-	watcher := NewFakeWatcher()
+	watcher := newFakeWatcher()
 	prober := &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   watcher,
@@ -224,7 +278,7 @@ func TestProberError(t *testing.T) {
 	installDriver(driverName, fs)
 	prober.Init()
 
-	_, _, err := prober.Probe()
+	_, err := prober.Probe()
 	assert.Error(t, err)
 }
 
@@ -242,7 +296,7 @@ func initTestEnvironment(t *testing.T) (
 	watcher *fakeWatcher,
 	prober volume.DynamicPluginProber) {
 	fs = utilfs.NewFakeFs()
-	watcher = NewFakeWatcher()
+	watcher = newFakeWatcher()
 	prober = &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   watcher,
@@ -265,7 +319,7 @@ type fakePluginFactory struct {
 
 var _ PluginFactory = fakePluginFactory{}
 
-func (m fakePluginFactory) NewFlexVolumePlugin(_, driverName string) (volume.VolumePlugin, error) {
+func (m fakePluginFactory) NewFlexVolumePlugin(_, driverName string, _ exec.Interface) (volume.VolumePlugin, error) {
 	if m.error {
 		return nil, fmt.Errorf("Flexvolume plugin error")
 	}

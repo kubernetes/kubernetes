@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -30,10 +30,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 ALL_VERSIONS_CSV=$(IFS=',';echo "${KUBE_AVAILABLE_GROUP_VERSIONS[*]// /,}";IFS=$)
 KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS:-${ALL_VERSIONS_CSV}}"
 
-# Give integration tests longer to run
-# TODO: allow a larger value to be passed in
-#KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 240s}
-KUBE_TIMEOUT="-timeout 600s"
+# Give integration tests longer to run by default.
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 600s}
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
@@ -47,9 +45,6 @@ kube::test::find_integration_test_dirs() {
       | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
       | LC_ALL=C sort -u
     find vendor/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
-      | LC_ALL=C sort -u
-    find federation/test/integration/ -name '*_test.go' -print0 \
       | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
       | LC_ALL=C sort -u
   )
@@ -88,7 +83,7 @@ checkEtcdOnPath() {
   kube::log::status "Checking etcd is on PATH"
   which etcd && return
   kube::log::status "Cannot find etcd, cannot run integration tests."
-  kube::log::status "Please see https://github.com/kubernetes/community/blob/master/contributors/devel/testing.md#install-etcd-dependency for instructions."
+  kube::log::status "Please see https://git.k8s.io/community/contributors/devel/sig-testing/testing.md#install-etcd-dependency for instructions."
   kube::log::usage "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
   return 1
 }
@@ -97,12 +92,6 @@ checkEtcdOnPath
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
-
-# If a test case is specified, just run once with v1 API version and exit
-if [[ -n "${KUBE_TEST_ARGS}" ]]; then
-  runTests v1
-  exit 0
-fi
 
 # Convert the CSV to an array of API versions to test
 IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"

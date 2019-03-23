@@ -46,6 +46,7 @@ func parse(args []string) (flags, error) {
 	fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	get := fs.Bool("get", getDefault, "go get -u kubetest if old or not installed")
 	old := fs.Duration("old", oldDefault, "Consider kubetest old if it exceeds this")
+	verbose := fs.Bool("v", true, "this flag is translated to kubetest's --verbose-commands")
 	var a []string
 	if err := fs.Parse(args[1:]); err == flag.ErrHelp {
 		os.Stderr.WriteString("  -- kubetestArgs\n")
@@ -58,7 +59,8 @@ func parse(args []string) (flags, error) {
 		log.Print("  The -- flag separator also suppresses this message")
 		a = args[len(args)-fs.NArg()-1:]
 	} else {
-		a = fs.Args()
+		a = append(a, fmt.Sprintf("--verbose-commands=%t", *verbose))
+		a = append(a, fs.Args()...)
 	}
 	return flags{*get, *old, a}, nil
 }

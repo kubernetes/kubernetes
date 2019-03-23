@@ -42,21 +42,22 @@ func TestCORSAllowedOrigins(t *testing.T) {
 			http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
 			item.allowedOrigins, nil, nil, nil, "true",
 		)
-		server := httptest.NewServer(handler)
-		defer server.Close()
-		client := http.Client{}
+		var response *http.Response
+		func() {
+			server := httptest.NewServer(handler)
+			defer server.Close()
 
-		request, err := http.NewRequest("GET", server.URL+"/version", nil)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		request.Header.Set("Origin", item.origin)
-
-		response, err := client.Do(request)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
+			request, err := http.NewRequest("GET", server.URL+"/version", nil)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			request.Header.Set("Origin", item.origin)
+			client := http.Client{}
+			response, err = client.Do(request)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}()
 		if item.allowed {
 			if !reflect.DeepEqual(item.origin, response.Header.Get("Access-Control-Allow-Origin")) {
 				t.Errorf("Expected %#v, Got %#v", item.origin, response.Header.Get("Access-Control-Allow-Origin"))
@@ -131,20 +132,22 @@ func TestCORSAllowedMethods(t *testing.T) {
 			http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
 			[]string{".*"}, test.allowedMethods, nil, nil, "true",
 		)
-		server := httptest.NewServer(handler)
-		defer server.Close()
-		client := http.Client{}
+		var response *http.Response
+		func() {
+			server := httptest.NewServer(handler)
+			defer server.Close()
 
-		request, err := http.NewRequest(test.method, server.URL+"/version", nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		request.Header.Set("Origin", "allowed.com")
-
-		response, err := client.Do(request)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+			request, err := http.NewRequest(test.method, server.URL+"/version", nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			request.Header.Set("Origin", "allowed.com")
+			client := http.Client{}
+			response, err = client.Do(request)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		}()
 
 		methodAllowed := allowsMethod(response, test.method)
 		switch {

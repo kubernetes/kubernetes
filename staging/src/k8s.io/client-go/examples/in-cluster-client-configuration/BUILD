@@ -8,19 +8,19 @@ load(
 
 go_binary(
     name = "in-cluster-client-configuration",
-    importpath = "k8s.io/client-go/examples/in-cluster-client-configuration",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/examples/in-cluster-client-configuration",
     importpath = "k8s.io/client-go/examples/in-cluster-client-configuration",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

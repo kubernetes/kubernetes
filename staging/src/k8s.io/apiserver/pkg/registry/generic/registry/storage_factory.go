@@ -17,11 +17,14 @@ limitations under the License.
 package registry
 
 import (
-	"github.com/golang/glog"
+	"sync"
+
+	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
+	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
 	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
@@ -40,14 +43,14 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 
 		s, d := generic.NewRawStorage(storageConfig)
 		if capacity == 0 {
-			glog.V(5).Infof("Storage caching is disabled for %T", objectType)
+			klog.V(5).Infof("Storage caching is disabled for %T", objectType)
 			return s, d
 		}
-		glog.V(5).Infof("Storage caching is enabled for %T with capacity %v", objectType, capacity)
+		klog.V(5).Infof("Storage caching is enabled for %T with capacity %v", objectType, capacity)
 
 		// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
 		// Currently it has two layers of same storage interface -- cacher and low level kv.
-		cacherConfig := storage.CacherConfig{
+		cacherConfig := cacherstorage.Config{
 			CacheCapacity:        capacity,
 			Storage:              s,
 			Versioner:            etcdstorage.APIObjectVersioner{},
@@ -59,12 +62,59 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 			TriggerPublisherFunc: triggerFunc,
 			Codec:                storageConfig.Codec,
 		}
-		cacher := storage.NewCacherFromConfig(cacherConfig)
+		cacher := cacherstorage.NewCacherFromConfig(cacherConfig)
 		destroyFunc := func() {
 			cacher.Stop()
 			d()
 		}
 
+		// TODO : Remove RegisterStorageCleanup below when PR
+		// https://github.com/kubernetes/kubernetes/pull/50690
+		// merges as that shuts down storage properly
+		RegisterStorageCleanup(destroyFunc)
+
 		return cacher, destroyFunc
+	}
+}
+
+// TODO : Remove all the code below when PR
+// https://github.com/kubernetes/kubernetes/pull/50690
+// merges as that shuts down storage properly
+// HACK ALERT : Track the destroy methods to call them
+// from the test harness. TrackStorageCleanup will be called
+// only from the test harness, so Register/Cleanup will be
+// no-op at runtime.
+
+var cleanupLock sync.Mutex
+var cleanup []func() = nil
+
+func TrackStorageCleanup() {
+	cleanupLock.Lock()
+	defer cleanupLock.Unlock()
+
+	if cleanup != nil {
+		panic("Conflicting storage tracking")
+	}
+	cleanup = make([]func(), 0)
+}
+
+func RegisterStorageCleanup(fn func()) {
+	cleanupLock.Lock()
+	defer cleanupLock.Unlock()
+
+	if cleanup == nil {
+		return
+	}
+	cleanup = append(cleanup, fn)
+}
+
+func CleanupStorage() {
+	cleanupLock.Lock()
+	old := cleanup
+	cleanup = nil
+	cleanupLock.Unlock()
+
+	for _, d := range old {
+		d()
 	}
 }

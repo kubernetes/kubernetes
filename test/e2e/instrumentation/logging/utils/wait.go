@@ -55,6 +55,19 @@ func UntilFirstEntryFromLog(log string) IngestionPred {
 	}
 }
 
+// UntilFirstEntryFromLocation is a IngestionPred that checks that at least one
+// entry from the log with a given name was ingested.
+func UntilFirstEntryFromLocation(location string) IngestionPred {
+	return func(_ string, entries []LogEntry) (bool, error) {
+		for _, e := range entries {
+			if e.Location == location {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+}
+
 // TimeoutFun is a function that is called when the waiting times out.
 type TimeoutFun func([]string, []bool) error
 

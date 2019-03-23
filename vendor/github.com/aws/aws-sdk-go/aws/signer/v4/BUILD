@@ -4,15 +4,18 @@ go_library(
     name = "go_default_library",
     srcs = [
         "header_rules.go",
+        "options.go",
         "uri_path.go",
         "v4.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/aws/signer/v4",
     importpath = "github.com/aws/aws-sdk-go/aws/signer/v4",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/sdkio:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/private/protocol/rest:go_default_library",
     ],
 )

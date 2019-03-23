@@ -1,0 +1,8 @@
+/example/example
+/example/example.exe
+/rice/rice
+/rice/rice.exe
+
+*.rice-box.go
+*.rice-box.syso
+.wercker

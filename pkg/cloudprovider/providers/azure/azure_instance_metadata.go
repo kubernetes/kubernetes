@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,11 +18,17 @@ package azure
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
-const metadataURL = "http://169.254.169.254/metadata/"
+const (
+	metadataCacheTTL = time.Minute
+	metadataCacheKey = "InstanceMetadata"
+	metadataURL      = "http://169.254.169.254/metadata/instance"
+)
 
 // NetworkMetadata contains metadata about an instance's network
 type NetworkMetadata struct {
@@ -54,60 +60,100 @@ type Subnet struct {
 	Prefix  string `json:"prefix"`
 }
 
-// InstanceMetadata knows how to query the Azure instance metadata server.
+// ComputeMetadata represents compute information
+type ComputeMetadata struct {
+	SKU            string `json:"sku,omitempty"`
+	Name           string `json:"name,omitempty"`
+	Zone           string `json:"zone,omitempty"`
+	VMSize         string `json:"vmSize,omitempty"`
+	OSType         string `json:"osType,omitempty"`
+	Location       string `json:"location,omitempty"`
+	FaultDomain    string `json:"platformFaultDomain,omitempty"`
+	UpdateDomain   string `json:"platformUpdateDomain,omitempty"`
+	ResourceGroup  string `json:"resourceGroupName,omitempty"`
+	VMScaleSetName string `json:"vmScaleSetName,omitempty"`
+}
+
+// InstanceMetadata represents instance information.
 type InstanceMetadata struct {
-	baseURL string
+	Compute *ComputeMetadata `json:"compute,omitempty"`
+	Network *NetworkMetadata `json:"network,omitempty"`
 }
 
-// NewInstanceMetadata creates an instance of the InstanceMetadata accessor object.
-func NewInstanceMetadata() *InstanceMetadata {
-	return &InstanceMetadata{
-		baseURL: metadataURL,
+// InstanceMetadataService knows how to query the Azure instance metadata server.
+type InstanceMetadataService struct {
+	metadataURL string
+	imsCache    *timedCache
+}
+
+// NewInstanceMetadataService creates an instance of the InstanceMetadataService accessor object.
+func NewInstanceMetadataService(metadataURL string) (*InstanceMetadataService, error) {
+	ims := &InstanceMetadataService{
+		metadataURL: metadataURL,
 	}
-}
 
-// makeMetadataURL makes a complete metadata URL from the given path.
-func (i *InstanceMetadata) makeMetadataURL(path string) string {
-	return i.baseURL + path
-}
-
-// Object queries the metadata server and populates the passed in object
-func (i *InstanceMetadata) Object(path string, obj interface{}) error {
-	data, err := i.queryMetadataBytes(path, "json")
+	imsCache, err := newTimedcache(metadataCacheTTL, ims.getInstanceMetadata)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return json.Unmarshal(data, obj)
+
+	ims.imsCache = imsCache
+	return ims, nil
 }
 
-// Text queries the metadata server and returns the corresponding text
-func (i *InstanceMetadata) Text(path string) (string, error) {
-	data, err := i.queryMetadataBytes(path, "text")
-	if err != nil {
-		return "", err
-	}
-	return string(data), err
-}
-
-func (i *InstanceMetadata) queryMetadataBytes(path, format string) ([]byte, error) {
-	client := &http.Client{}
-
-	req, err := http.NewRequest("GET", i.makeMetadataURL(path), nil)
+func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}, error) {
+	req, err := http.NewRequest("GET", ims.metadataURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Add("Metadata", "True")
+	req.Header.Add("User-Agent", "golang/kubernetes-cloud-provider")
 
 	q := req.URL.Query()
-	q.Add("format", format)
-	q.Add("api-version", "2017-04-02")
+	q.Add("format", "json")
+	q.Add("api-version", "2017-12-01")
 	req.URL.RawQuery = q.Encode()
 
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	return ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failure of getting instance metadata with response %q", resp.Status)
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	obj := InstanceMetadata{}
+	err = json.Unmarshal(data, &obj)
+	if err != nil {
+		return nil, err
+	}
+
+	return &obj, nil
+}
+
+// GetMetadata gets instance metadata from cache.
+func (ims *InstanceMetadataService) GetMetadata() (*InstanceMetadata, error) {
+	cache, err := ims.imsCache.Get(metadataCacheKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache shouldn't be nil, but added a check incase something wrong.
+	if cache == nil {
+		return nil, fmt.Errorf("failure of getting instance metadata")
+	}
+
+	if metadata, ok := cache.(*InstanceMetadata); ok {
+		return metadata, nil
+	}
+
+	return nil, fmt.Errorf("failure of getting instance metadata")
 }

@@ -23,6 +23,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
@@ -55,6 +56,18 @@ type DryRunClientOptions struct {
 	PrintGETAndLIST bool
 }
 
+// GetDefaultDryRunClientOptions returns the default DryRunClientOptions values
+func GetDefaultDryRunClientOptions(drg DryRunGetter, w io.Writer) DryRunClientOptions {
+	return DryRunClientOptions{
+		Writer:          w,
+		Getter:          drg,
+		PrependReactors: []core.Reactor{},
+		AppendReactors:  []core.Reactor{},
+		MarshalFunc:     DefaultMarshalFunc,
+		PrintGETAndLIST: false,
+	}
+}
+
 // actionWithName is the generic interface for an action that has a name associated with it
 // This just makes it easier to catch all actions that has a name; instead of hard-coding all request that has it associated
 type actionWithName interface {
@@ -71,24 +84,17 @@ type actionWithObject interface {
 
 // NewDryRunClient is a wrapper for NewDryRunClientWithOpts using some default values
 func NewDryRunClient(drg DryRunGetter, w io.Writer) clientset.Interface {
-	return NewDryRunClientWithOpts(DryRunClientOptions{
-		Writer:          w,
-		Getter:          drg,
-		PrependReactors: []core.Reactor{},
-		AppendReactors:  []core.Reactor{},
-		MarshalFunc:     DefaultMarshalFunc,
-		PrintGETAndLIST: false,
-	})
+	return NewDryRunClientWithOpts(GetDefaultDryRunClientOptions(drg, w))
 }
 
 // NewDryRunClientWithOpts returns a clientset.Interface that can be used normally for talking to the Kubernetes API.
 // This client doesn't apply changes to the backend. The client gets GET/LIST values from the DryRunGetter implementation.
 // This client logs all I/O to the writer w in YAML format
 func NewDryRunClientWithOpts(opts DryRunClientOptions) clientset.Interface {
-	// Build a chain of reactors to act like a normal clientset; but log everything's that happening and don't change any state
+	// Build a chain of reactors to act like a normal clientset; but log everything that is happening and don't change any state
 	client := fakeclientset.NewSimpleClientset()
 
-	// Build the chain of reactors. Order matters; first item here will be invoked first on match, then the second one will be evaluted, etc.
+	// Build the chain of reactors. Order matters; first item here will be invoked first on match, then the second one will be evaluated, etc.
 	defaultReactorChain := []core.Reactor{
 		// Log everything that happens. Default the object if it's about to be created/updated so that the logged object is representative.
 		&core.SimpleReactor{
@@ -109,7 +115,7 @@ func NewDryRunClientWithOpts(opts DryRunClientOptions) clientset.Interface {
 				getAction, ok := action.(core.GetAction)
 				if !ok {
 					// something's wrong, we can't handle this event
-					return true, nil, fmt.Errorf("can't cast get reactor event action object to GetAction interface")
+					return true, nil, errors.New("can't cast get reactor event action object to GetAction interface")
 				}
 				handled, obj, err := opts.Getter.HandleGetAction(getAction)
 
@@ -134,7 +140,7 @@ func NewDryRunClientWithOpts(opts DryRunClientOptions) clientset.Interface {
 				listAction, ok := action.(core.ListAction)
 				if !ok {
 					// something's wrong, we can't handle this event
-					return true, nil, fmt.Errorf("can't cast list reactor event action object to ListAction interface")
+					return true, nil, errors.New("can't cast list reactor event action object to ListAction interface")
 				}
 				handled, objs, err := opts.Getter.HandleListAction(listAction)
 
@@ -223,7 +229,7 @@ func logDryRunAction(action core.Action, w io.Writer, marshalFunc MarshalFunc) {
 
 	patchAction, ok := action.(core.PatchAction)
 	if ok {
-		// Replace all occurences of \" with a simple " when printing
+		// Replace all occurrences of \" with a simple " when printing
 		fmt.Fprintf(w, "[dryrun] Attached patch:\n\t%s\n", strings.Replace(string(patchAction.GetPatch()), `\"`, `"`, -1))
 	}
 }

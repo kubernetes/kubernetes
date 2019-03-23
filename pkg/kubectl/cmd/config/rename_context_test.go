@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	contextData *clientcmdapi.Context = clientcmdapi.NewContext()
+	contextData = clientcmdapi.NewContext()
 )
 
 type renameContextTest struct {
@@ -62,7 +62,7 @@ func TestRenameContext(t *testing.T) {
 		initialConfig:  initialConfig,
 		expectedConfig: expectedConfig,
 		args:           []string{currentContext, newContext},
-		expectedOut:    fmt.Sprintf("Context %q was renamed to %q.\n", currentContext, newContext),
+		expectedOut:    fmt.Sprintf("Context %q renamed to %q.\n", currentContext, newContext),
 		expectedErr:    "",
 	}
 	test.run(t)

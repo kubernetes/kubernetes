@@ -23,28 +23,22 @@ import (
 
 	"fmt"
 
-	// Cloud providers
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	"k8s.io/klog"
 
+	// Cloud providers
+	cloudprovider "k8s.io/cloud-provider"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	// Volume plugins
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/aws_ebs"
+	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
 	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/cinder"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/fc"
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/flocker"
-	"k8s.io/kubernetes/pkg/volume/gce_pd"
+	"k8s.io/kubernetes/pkg/volume/gcepd"
 	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/iscsi"
@@ -58,6 +52,11 @@ import (
 	"k8s.io/kubernetes/pkg/volume/storageos"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/exec"
 )
 
 // ProbeAttachableVolumePlugins collects all volume plugins for the attach/
@@ -67,8 +66,8 @@ import (
 func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
-	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
@@ -78,28 +77,33 @@ func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
+		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
+	}
 	return allPlugins
 }
 
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for the attach/detach controller.
 // Currently only Flexvolume plugins are dynamically discoverable.
-func GetDynamicPluginProber(config componentconfig.VolumeConfiguration) volume.DynamicPluginProber {
-	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir)
+func GetDynamicPluginProber(config persistentvolumeconfig.VolumeConfiguration) volume.DynamicPluginProber {
+	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir, exec.New() /*exec.Interface*/)
 }
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
-func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeExpandableVolumePlugins(config persistentvolumeconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
-	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
@@ -110,7 +114,7 @@ func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []
 // ProbeControllerVolumePlugins collects all persistent volume plugins into an
 // easy to use list. Only volume plugins that implement any of
 // provisioner/recycler/deleter interface should be returned.
-func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persistentvolumeconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
@@ -129,7 +133,7 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 		ProvisioningEnabled:      config.EnableHostPathProvisioning,
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
-		glog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err)
+		klog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err)
 	}
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins(hostPathConfig)...)
 
@@ -139,7 +143,7 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig); err != nil {
-		glog.Fatalf("Could not create NFS recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, err)
+		klog.Fatalf("Could not create NFS recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, err)
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
@@ -154,21 +158,15 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 
-	if cloud != nil {
-		switch {
-		case aws.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
-		case gce.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
-		case openstack.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
-		case vsphere.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
-		case azure.CloudProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
-		case photon.ProviderName == cloud.ProviderName():
-			allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
-		}
+	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	}
 
 	return allPlugins
@@ -184,7 +182,7 @@ func AttemptToLoadRecycler(path string, config *volume.VolumeConfig) error {
 			return err
 		}
 		if err = volume.ValidateRecyclerPodTemplate(recyclerPod); err != nil {
-			return fmt.Errorf("Pod specification (%v): %v", path, err)
+			return fmt.Errorf("pod specification (%v): %v", path, err)
 		}
 		config.RecyclerPodTemplate = recyclerPod
 	}

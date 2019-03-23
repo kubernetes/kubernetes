@@ -4,13 +4,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "chown.go",
+        "chown_linux.go",
         "lumberjack.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "chown_linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/gopkg.in/natefinch/lumberjack.v2",
     importpath = "gopkg.in/natefinch/lumberjack.v2",
     visibility = ["//visibility:public"],
 )

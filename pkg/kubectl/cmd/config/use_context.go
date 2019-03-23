@@ -25,13 +25,13 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
-	use_context_example = templates.Examples(`
+	useContextExample = templates.Examples(`
 		# Use the context for the minikube cluster
 		kubectl config use-context minikube`)
 )
@@ -41,15 +41,17 @@ type useContextOptions struct {
 	contextName  string
 }
 
+// NewCmdConfigUseContext returns a Command instance for 'config use-context' sub command
 func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &useContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:     "use-context CONTEXT_NAME",
-		Short:   i18n.T("Sets the current-context in a kubeconfig file"),
-		Aliases: []string{"use"},
-		Long:    `Sets the current-context in a kubeconfig file`,
-		Example: use_context_example,
+		Use:                   "use-context CONTEXT_NAME",
+		DisableFlagsInUseLine: true,
+		Short:                 i18n.T("Sets the current-context in a kubeconfig file"),
+		Aliases:               []string{"use"},
+		Long:                  `Sets the current-context in a kubeconfig file`,
+		Example:               useContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
@@ -88,7 +90,7 @@ func (o *useContextOptions) complete(cmd *cobra.Command) error {
 
 func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 	if len(o.contextName) == 0 {
-		return errors.New("you must specify a current-context")
+		return errors.New("empty context names are not allowed")
 	}
 
 	for name := range config.Contexts {
@@ -97,5 +99,5 @@ func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 		}
 	}
 
-	return fmt.Errorf("no context exists with the name: %q.", o.contextName)
+	return fmt.Errorf("no context exists with the name: %q", o.contextName)
 }

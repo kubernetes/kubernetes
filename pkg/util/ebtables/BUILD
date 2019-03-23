@@ -16,8 +16,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["ebtables_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/ebtables",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",

@@ -24,7 +24,7 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// a list of values for a given metric for some set of objects
+// MetricValueList is a list of values for a given metric for some set of objects
 type MetricValueList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -35,7 +35,7 @@ type MetricValueList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// a metric value for some object
+// MetricValue is a metric value for some object
 type MetricValue struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -56,8 +56,31 @@ type MetricValue struct {
 
 	// the value of the metric for this
 	Value resource.Quantity `json:"value" protobuf:"bytes,5,name=value"`
+
+	// selector represents the label selector that could be used to select
+	// this metric, and will generally just be the selector passed in to
+	// the query used to fetch this metric.
+	// When left blank, only the metric's Name will be used to gather metrics.
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,6,opt,name=selector"`
 }
 
-// allObjects is a wildcard used to select metrics
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// MetricListOptions is used to select metrics by their label selectors
+type MetricListOptions struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// A selector to restrict the list of returned objects by their labels.
+	// Defaults to everything.
+	// +optional
+	LabelSelector string `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
+
+	// A selector to restrict the list of returned metrics by their labels
+	// +optional
+	MetricLabelSelector string `json:"metricLabelSelector,omitempty" protobuf:"bytes,2,opt,name=metricLabelSelector"`
+}
+
+// AllObjects is a wildcard used to select metrics
 // for all objects matching the given label selector
 const AllObjects = "*"

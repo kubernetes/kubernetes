@@ -15,12 +15,13 @@
 package v3rpc
 
 import (
+	"context"
 	"io"
 
 	"github.com/coreos/etcd/etcdserver"
+	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/lease"
-	"golang.org/x/net/context"
 )
 
 type LeaseServer struct {
@@ -53,20 +54,64 @@ func (ls *LeaseServer) LeaseRevoke(ctx context.Context, rr *pb.LeaseRevokeReques
 
 func (ls *LeaseServer) LeaseTimeToLive(ctx context.Context, rr *pb.LeaseTimeToLiveRequest) (*pb.LeaseTimeToLiveResponse, error) {
 	resp, err := ls.le.LeaseTimeToLive(ctx, rr)
-	if err != nil {
+	if err != nil && err != lease.ErrLeaseNotFound {
 		return nil, togRPCError(err)
+	}
+	if err == lease.ErrLeaseNotFound {
+		resp = &pb.LeaseTimeToLiveResponse{
+			Header: &pb.ResponseHeader{},
+			ID:     rr.ID,
+			TTL:    -1,
+		}
 	}
 	ls.hdr.fill(resp.Header)
 	return resp, nil
 }
 
-func (ls *LeaseServer) LeaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) error {
+func (ls *LeaseServer) LeaseLeases(ctx context.Context, rr *pb.LeaseLeasesRequest) (*pb.LeaseLeasesResponse, error) {
+	resp, err := ls.le.LeaseLeases(ctx, rr)
+	if err != nil && err != lease.ErrLeaseNotFound {
+		return nil, togRPCError(err)
+	}
+	if err == lease.ErrLeaseNotFound {
+		resp = &pb.LeaseLeasesResponse{
+			Header: &pb.ResponseHeader{},
+			Leases: []*pb.LeaseStatus{},
+		}
+	}
+	ls.hdr.fill(resp.Header)
+	return resp, nil
+}
+
+func (ls *LeaseServer) LeaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) (err error) {
+	errc := make(chan error, 1)
+	go func() {
+		errc <- ls.leaseKeepAlive(stream)
+	}()
+	select {
+	case err = <-errc:
+	case <-stream.Context().Done():
+		// the only server-side cancellation is noleader for now.
+		err = stream.Context().Err()
+		if err == context.Canceled {
+			err = rpctypes.ErrGRPCNoLeader
+		}
+	}
+	return err
+}
+
+func (ls *LeaseServer) leaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) error {
 	for {
 		req, err := stream.Recv()
 		if err == io.EOF {
 			return nil
 		}
 		if err != nil {
+			if isClientCtxErr(stream.Context().Err(), err) {
+				plog.Debugf("failed to receive lease keepalive request from gRPC stream (%q)", err.Error())
+			} else {
+				plog.Warningf("failed to receive lease keepalive request from gRPC stream (%q)", err.Error())
+			}
 			return err
 		}
 
@@ -92,6 +137,11 @@ func (ls *LeaseServer) LeaseKeepAlive(stream pb.Lease_LeaseKeepAliveServer) erro
 		resp.TTL = ttl
 		err = stream.Send(resp)
 		if err != nil {
+			if isClientCtxErr(stream.Context().Err(), err) {
+				plog.Debugf("failed to send lease keepalive response to gRPC stream (%q)", err.Error())
+			} else {
+				plog.Warningf("failed to send lease keepalive response to gRPC stream (%q)", err.Error())
+			}
 			return err
 		}
 	}

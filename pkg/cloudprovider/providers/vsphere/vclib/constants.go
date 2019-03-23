@@ -16,7 +16,7 @@ limitations under the License.
 
 package vclib
 
-// Volume Constnts
+// Volume Constants
 const (
 	ThinDiskType             = "thin"
 	PreallocatedDiskType     = "preallocated"
@@ -40,13 +40,24 @@ const (
 
 // Other Constants
 const (
-	LogLevel                 = 4
-	DatastoreProperty        = "datastore"
-	ResourcePoolProperty     = "resourcePool"
-	DatastoreInfoProperty    = "info"
-	VirtualMachineType       = "VirtualMachine"
-	RoundTripperDefaultCount = 3
-	VSANDatastoreType        = "vsan"
-	DummyVMPrefixName        = "vsphere-k8s"
-	ActivePowerState         = "poweredOn"
+	LogLevel                   = 4
+	DatastoreProperty          = "datastore"
+	ResourcePoolProperty       = "resourcePool"
+	DatastoreInfoProperty      = "info"
+	VirtualMachineType         = "VirtualMachine"
+	RoundTripperDefaultCount   = 3
+	VSANDatastoreType          = "vsan"
+	DummyVMPrefixName          = "vsphere-k8s"
+	ActivePowerState           = "poweredOn"
+	DatacenterType             = "Datacenter"
+	ClusterComputeResourceType = "ClusterComputeResource"
+	HostSystemType             = "HostSystem"
+)
+
+// Test Constants
+const (
+	TestDefaultDatacenter = "DC0"
+	TestDefaultDatastore  = "LocalDS_0"
+	TestDefaultNetwork    = "VM Network"
+	testNameNotFound      = "enoent"
 )

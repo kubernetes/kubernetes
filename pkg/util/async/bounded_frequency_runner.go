@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/client-go/util/flowcontrol"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // BoundedFrequencyRunner manages runs of a user-provided function.
@@ -109,7 +109,7 @@ var _ timer = realTimer{}
 // multiple runs are serialized. If the function needs to hold locks, it must
 // take them internally.
 //
-// Runs of the funtion will have at least minInterval between them (from
+// Runs of the function will have at least minInterval between them (from
 // completion to next start), except that up to bursts may be allowed.  Burst
 // runs are "accumulated" over time, one per minInterval up to burstRuns total.
 // This can be used, for example, to mitigate the impact of expensive operations
@@ -167,13 +167,13 @@ func construct(name string, fn func(), minInterval, maxInterval time.Duration, b
 // Loop handles the periodic timer and run requests.  This is expected to be
 // called as a goroutine.
 func (bfr *BoundedFrequencyRunner) Loop(stop <-chan struct{}) {
-	glog.V(3).Infof("%s Loop running", bfr.name)
+	klog.V(3).Infof("%s Loop running", bfr.name)
 	bfr.timer.Reset(bfr.maxInterval)
 	for {
 		select {
 		case <-stop:
 			bfr.stop()
-			glog.V(3).Infof("%s Loop stopping", bfr.name)
+			klog.V(3).Infof("%s Loop stopping", bfr.name)
 			return
 		case <-bfr.timer.C():
 			bfr.tryRun()
@@ -218,7 +218,7 @@ func (bfr *BoundedFrequencyRunner) tryRun() {
 		bfr.lastRun = bfr.timer.Now()
 		bfr.timer.Stop()
 		bfr.timer.Reset(bfr.maxInterval)
-		glog.V(3).Infof("%s: ran, next possible in %v, periodic in %v", bfr.name, bfr.minInterval, bfr.maxInterval)
+		klog.V(3).Infof("%s: ran, next possible in %v, periodic in %v", bfr.name, bfr.minInterval, bfr.maxInterval)
 		return
 	}
 
@@ -227,13 +227,13 @@ func (bfr *BoundedFrequencyRunner) tryRun() {
 	elapsed := bfr.timer.Since(bfr.lastRun)    // how long since last run
 	nextPossible := bfr.minInterval - elapsed  // time to next possible run
 	nextScheduled := bfr.maxInterval - elapsed // time to next periodic run
-	glog.V(4).Infof("%s: %v since last run, possible in %v, scheduled in %v", bfr.name, elapsed, nextPossible, nextScheduled)
+	klog.V(4).Infof("%s: %v since last run, possible in %v, scheduled in %v", bfr.name, elapsed, nextPossible, nextScheduled)
 
 	if nextPossible < nextScheduled {
 		// Set the timer for ASAP, but don't drain here.  Assuming Loop is running,
 		// it might get a delivery in the mean time, but that is OK.
 		bfr.timer.Stop()
 		bfr.timer.Reset(nextPossible)
-		glog.V(3).Infof("%s: throttled, scheduling run in %v", bfr.name, nextPossible)
+		klog.V(3).Infof("%s: throttled, scheduling run in %v", bfr.name, nextPossible)
 	}
 }

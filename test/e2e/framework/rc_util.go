@@ -25,12 +25,12 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	scaleclient "k8s.io/client-go/scale"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -45,7 +45,7 @@ func RcByNamePort(name string, replicas int32, image string, port int, protocol 
 	}, gracePeriod)
 }
 
-// RcByNameContainer returns a ReplicationControoler with specified name and container
+// RcByNameContainer returns a ReplicationController with specified name and container
 func RcByNameContainer(name string, replicas int32, image string, labels map[string]string, c v1.Container,
 	gracePeriod *int64) *v1.ReplicationController {
 
@@ -59,7 +59,7 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 	return &v1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicationController",
-			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
+			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -84,9 +84,9 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 
 // ScaleRCByLabels scales an RC via ns/label lookup. If replicas == 0 it waits till
 // none are running, otherwise it does what a synchronous scale operation would do.
-func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalclientset.Interface, ns string, l map[string]string, replicas uint) error {
+func ScaleRCByLabels(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns string, l map[string]string, replicas uint) error {
 	listOpts := metav1.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(l)).String()}
-	rcs, err := clientset.Core().ReplicationControllers(ns).List(listOpts)
+	rcs, err := clientset.CoreV1().ReplicationControllers(ns).List(listOpts)
 	if err != nil {
 		return err
 	}
@@ -96,15 +96,15 @@ func ScaleRCByLabels(clientset clientset.Interface, internalClientset internalcl
 	Logf("Scaling %v RCs with labels %v in ns %v to %v replicas.", len(rcs.Items), l, ns, replicas)
 	for _, labelRC := range rcs.Items {
 		name := labelRC.Name
-		if err := ScaleRC(clientset, internalClientset, ns, name, replicas, false); err != nil {
+		if err := ScaleRC(clientset, scalesGetter, ns, name, replicas, false); err != nil {
 			return err
 		}
-		rc, err := clientset.Core().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
+		rc, err := clientset.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		if replicas == 0 {
-			ps, err := podStoreForSelector(clientset, rc.Namespace, labels.SelectorFromSet(rc.Spec.Selector))
+			ps, err := testutils.NewPodStore(clientset, rc.Namespace, labels.SelectorFromSet(rc.Spec.Selector), fields.Everything())
 			if err != nil {
 				return err
 			}
@@ -129,12 +129,12 @@ func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		var err error
-		if rc, err = c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{}); err != nil {
+		if rc, err = c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rc)
-		if rc, err = c.Core().ReplicationControllers(namespace).Update(rc); err == nil {
+		if rc, err = c.CoreV1().ReplicationControllers(namespace).Update(rc); err == nil {
 			Logf("Updating replication controller %q", name)
 			return true, nil
 		}
@@ -152,12 +152,8 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 	return DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
 }
 
-func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
-	return DeleteResourceAndPods(clientset, internalClientset, api.Kind("ReplicationController"), ns, name)
-}
-
-func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string, size uint, wait bool) error {
-	return ScaleResource(clientset, internalClientset, ns, name, size, wait, api.Kind("ReplicationController"))
+func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
+	return ScaleResource(clientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.Resource("replicationcontrollers"))
 }
 
 func RunRC(config testutils.RCConfig) error {
@@ -180,7 +176,7 @@ func WaitForRCPodToDisappear(c clientset.Interface, ns, rcName, podName string) 
 // WaitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)
 func WaitForReplicationController(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := c.Core().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
+		_, err := c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
 			return !exist, nil
@@ -200,7 +196,7 @@ func WaitForReplicationController(c clientset.Interface, namespace, name string,
 func WaitForReplicationControllerwithSelector(c clientset.Interface, namespace string, selector labels.Selector, exist bool, interval,
 	timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		rcs, err := c.Core().ReplicationControllers(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		rcs, err := c.CoreV1().ReplicationControllers(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		switch {
 		case len(rcs.Items) != 0:
 			Logf("ReplicationController with %s in namespace %s found.", selector.String(), namespace)
@@ -220,6 +216,14 @@ func WaitForReplicationControllerwithSelector(c clientset.Interface, namespace s
 	return nil
 }
 
+// trimDockerRegistry is the function for trimming the docker.io/library from the beginning of the imagename.
+// If community docker installed it will not prefix the registry names with the dockerimages vs registry names prefixed with other runtimes or docker installed via RHEL extra repo.
+// So this function will help to trim the docker.io/library if exists
+func trimDockerRegistry(imagename string) string {
+	imagename = strings.Replace(imagename, "docker.io/", "", 1)
+	return strings.Replace(imagename, "library/", "", 1)
+}
+
 // validatorFn is the function which is individual tests will implement.
 // we may want it to return more than just an error, at some point.
 type validatorFn func(c clientset.Interface, podID string) error
@@ -231,6 +235,7 @@ type validatorFn func(c clientset.Interface, podID string) error
 // "testname":  which gets bubbled up to the logging/failure messages if errors happen.
 // "validator" function: This function is given a podID and a client, and it can do some specific validations that way.
 func ValidateController(c clientset.Interface, containerImage string, replicas int, containername string, testname string, validator validatorFn, ns string) {
+	containerImage = trimDockerRegistry(containerImage)
 	getPodsTemplate := "--template={{range.items}}{{.metadata.name}} {{end}}"
 	// NB: kubectl adds the "exists" function to the standard template functions.
 	// This lets us check to see if the "running" entry exists for each of the containers
@@ -242,7 +247,7 @@ func ValidateController(c clientset.Interface, containerImage string, replicas i
 	// You can read about the syntax here: http://golang.org/pkg/text/template/.
 	getContainerStateTemplate := fmt.Sprintf(`--template={{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "%s") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`, containername)
 
-	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
+	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "spec" "containers")}}{{range .spec.containers}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
 
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 waitLoop:
@@ -262,6 +267,7 @@ waitLoop:
 			}
 
 			currentImage := RunKubectlOrDie("get", "pods", podID, "-o", "template", getImageTemplate, fmt.Sprintf("--namespace=%v", ns))
+			currentImage = trimDockerRegistry(currentImage)
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
 				continue waitLoop

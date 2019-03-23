@@ -1,8 +1,21 @@
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -78,8 +91,8 @@ func (q *Queue) Create(options *QueueServiceOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusCreated})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusCreated})
 }
 
 // Delete operation permanently deletes the specified queue.
@@ -98,8 +111,8 @@ func (q *Queue) Delete(options *QueueServiceOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusNoContent})
 }
 
 // Exists returns true if a queue with given name exists.
@@ -107,10 +120,11 @@ func (q *Queue) Exists() (bool, error) {
 	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), url.Values{"comp": {"metadata"}})
 	resp, err := q.qsc.client.exec(http.MethodGet, uri, q.qsc.client.getStandardHeaders(), nil, q.qsc.auth)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusOK || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusOK, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusOK, nil
 		}
+		err = getErrorFromResponse(resp)
 	}
 	return false, err
 }
@@ -134,8 +148,8 @@ func (q *Queue) SetMetadata(options *QueueServiceOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusNoContent})
 }
 
 // GetMetadata operation retrieves user-defined metadata and queue
@@ -155,19 +169,19 @@ func (q *Queue) GetMetadata(options *QueueServiceOptions) error {
 		params = addTimeout(params, options.Timeout)
 		headers = mergeHeaders(headers, headersFromStruct(*options))
 	}
-	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), url.Values{"comp": {"metadata"}})
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), params)
 
 	resp, err := q.qsc.client.exec(http.MethodGet, uri, headers, nil, q.qsc.auth)
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
 	}
 
-	aproxMessagesStr := resp.headers.Get(http.CanonicalHeaderKey(approximateMessagesCountHeader))
+	aproxMessagesStr := resp.Header.Get(http.CanonicalHeaderKey(approximateMessagesCountHeader))
 	if aproxMessagesStr != "" {
 		aproxMessages, err := strconv.ParseUint(aproxMessagesStr, 10, 64)
 		if err != nil {
@@ -176,7 +190,7 @@ func (q *Queue) GetMetadata(options *QueueServiceOptions) error {
 		q.AproxMessageCount = aproxMessages
 	}
 
-	q.Metadata = getMetadataFromHeaders(resp.headers)
+	q.Metadata = getMetadataFromHeaders(resp.Header)
 	return nil
 }
 
@@ -227,10 +241,10 @@ func (q *Queue) GetMessages(options *GetMessagesOptions) ([]Message, error) {
 	if err != nil {
 		return []Message{}, err
 	}
-	defer readAndCloseBody(resp.body)
+	defer resp.Body.Close()
 
 	var out messages
-	err = xmlUnmarshal(resp.body, &out)
+	err = xmlUnmarshal(resp.Body, &out)
 	if err != nil {
 		return []Message{}, err
 	}
@@ -270,10 +284,10 @@ func (q *Queue) PeekMessages(options *PeekMessagesOptions) ([]Message, error) {
 	if err != nil {
 		return []Message{}, err
 	}
-	defer readAndCloseBody(resp.body)
+	defer resp.Body.Close()
 
 	var out messages
-	err = xmlUnmarshal(resp.body, &out)
+	err = xmlUnmarshal(resp.Body, &out)
 	if err != nil {
 		return []Message{}, err
 	}
@@ -300,8 +314,8 @@ func (q *Queue) ClearMessages(options *QueueServiceOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusNoContent})
 }
 
 // SetPermissions sets up queue permissions
@@ -327,13 +341,8 @@ func (q *Queue) SetPermissions(permissions QueuePermissions, options *SetQueuePe
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.body)
-
-	if err := checkRespCode(resp.statusCode, []int{http.StatusNoContent}); err != nil {
-		return errors.New("Unable to set permissions")
-	}
-
-	return nil
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusNoContent})
 }
 
 func generateQueueACLpayload(policies []QueueAccessPolicy) (io.Reader, int, error) {
@@ -395,14 +404,14 @@ func (q *Queue) GetPermissions(options *GetQueuePermissionOptions) (*QueuePermis
 	if err != nil {
 		return nil, err
 	}
-	defer resp.body.Close()
+	defer resp.Body.Close()
 
 	var ap AccessPolicy
-	err = xmlUnmarshal(resp.body, &ap.SignedIdentifiersList)
+	err = xmlUnmarshal(resp.Body, &ap.SignedIdentifiersList)
 	if err != nil {
 		return nil, err
 	}
-	return buildQueueAccessPolicy(ap, &resp.headers), nil
+	return buildQueueAccessPolicy(ap, &resp.Header), nil
 }
 
 func buildQueueAccessPolicy(ap AccessPolicy, headers *http.Header) *QueuePermissions {

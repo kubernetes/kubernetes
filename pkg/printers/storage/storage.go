@@ -17,9 +17,11 @@ limitations under the License.
 package storage
 
 import (
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	"context"
+	"fmt"
+
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -27,6 +29,17 @@ type TableConvertor struct {
 	printers.TablePrinter
 }
 
-func (c TableConvertor) ConvertToTable(ctx genericapirequest.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
-	return c.TablePrinter.PrintTable(obj, printers.PrintOptions{Wide: true})
+func (c TableConvertor) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+	noHeaders := false
+	if tableOptions != nil {
+		switch t := tableOptions.(type) {
+		case *metav1beta1.TableOptions:
+			if t != nil {
+				noHeaders = t.NoHeaders
+			}
+		default:
+			return nil, fmt.Errorf("unrecognized type %T for table options, can't display tabular output", tableOptions)
+		}
+	}
+	return c.TablePrinter.PrintTable(obj, printers.PrintOptions{Wide: true, NoHeaders: noHeaders})
 }

@@ -172,28 +172,20 @@ type marshalto struct {
 	*generator.Generator
 	generator.PluginImports
 	atleastOne  bool
-	unsafePkg   generator.Single
 	errorsPkg   generator.Single
 	protoPkg    generator.Single
 	sortKeysPkg generator.Single
 	mathPkg     generator.Single
 	typesPkg    generator.Single
+	binaryPkg   generator.Single
 	localName   string
-	unsafe      bool
 }
 
 func NewMarshal() *marshalto {
 	return &marshalto{}
 }
 
-func NewUnsafeMarshal() *marshalto {
-	return &marshalto{unsafe: true}
-}
-
 func (p *marshalto) Name() string {
-	if p.unsafe {
-		return "unsafemarshaler"
-	}
 	return "marshalto"
 }
 
@@ -202,11 +194,13 @@ func (p *marshalto) Init(g *generator.Generator) {
 }
 
 func (p *marshalto) callFixed64(varName ...string) {
-	p.P(`i = encodeFixed64`, p.localName, `(dAtA, i, uint64(`, strings.Join(varName, ""), `))`)
+	p.P(p.binaryPkg.Use(), `.LittleEndian.PutUint64(dAtA[i:], uint64(`, strings.Join(varName, ""), `))`)
+	p.P(`i += 8`)
 }
 
 func (p *marshalto) callFixed32(varName ...string) {
-	p.P(`i = encodeFixed32`, p.localName, `(dAtA, i, uint32(`, strings.Join(varName, ""), `))`)
+	p.P(p.binaryPkg.Use(), `.LittleEndian.PutUint32(dAtA[i:], uint32(`, strings.Join(varName, ""), `))`)
+	p.P(`i += 4`)
 }
 
 func (p *marshalto) callVarint(varName ...string) {
@@ -223,46 +217,6 @@ func (p *marshalto) encodeVarint(varName string) {
 	p.P(`}`)
 	p.P(`dAtA[i] = uint8(`, varName, `)`)
 	p.P(`i++`)
-}
-
-func (p *marshalto) encodeFixed64(varName string) {
-	p.P(`dAtA[i] = uint8(`, varName, `)`)
-	p.P(`i++`)
-	p.P(`dAtA[i] = uint8(`, varName, ` >> 8)`)
-	p.P(`i++`)
-	p.P(`dAtA[i] = uint8(`, varName, ` >> 16)`)
-	p.P(`i++`)
-	p.P(`dAtA[i] = uint8(`, varName, ` >> 24)`)
-	p.P(`i++`)
-	p.P(`dAtA[i] = uint8(`, varName, ` >> 32)`)
-	p.P(`i++`)
-	p.P(`dAtA[i] = uint8(`, varName, ` >> 40)`)
-	p.P(`i++`)
-	p.P(`dAtA[i] = uint8(`, varName, ` >> 48)`)
-	p.P(`i++`)
-	p.P(`dAtA[i] = uint8(`, varName, ` >> 56)`)
-	p.P(`i++`)
-}
-
-func (p *marshalto) unsafeFixed64(varName string, someType string) {
-	p.P(`*(*`, someType, `)(`, p.unsafePkg.Use(), `.Pointer(&dAtA[i])) = `, varName)
-	p.P(`i+=8`)
-}
-
-func (p *marshalto) encodeFixed32(varName string) {
-	p.P(`dAtA[i] = uint8(`, varName, `)`)
-	p.P(`i++`)
-	p.P(`dAtA[i] = uint8(`, varName, ` >> 8)`)
-	p.P(`i++`)
-	p.P(`dAtA[i] = uint8(`, varName, ` >> 16)`)
-	p.P(`i++`)
-	p.P(`dAtA[i] = uint8(`, varName, ` >> 24)`)
-	p.P(`i++`)
-}
-
-func (p *marshalto) unsafeFixed32(varName string, someType string) {
-	p.P(`*(*`, someType, `)(`, p.unsafePkg.Use(), `.Pointer(&dAtA[i])) = `, varName)
-	p.P(`i+=4`)
 }
 
 func (p *marshalto) encodeKey(fieldNumber int32, wireType int) {
@@ -428,132 +382,68 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 	}
 	switch *field.Type {
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		if !p.unsafe || gogoproto.IsCastType(field) {
-			if packed {
-				p.encodeKey(fieldNumber, wireType)
-				p.callVarint(`len(m.`, fieldname, `) * 8`)
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float64bits(float64(num))`)
-				p.encodeFixed64("f" + numGen.Current())
-				p.Out()
-				p.P(`}`)
-			} else if repeated {
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float64bits(float64(num))`)
-				p.encodeFixed64("f" + numGen.Current())
-				p.Out()
-				p.P(`}`)
-			} else if proto3 {
-				p.P(`if m.`, fieldname, ` != 0 {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed64(p.mathPkg.Use(), `.Float64bits(float64(m.`+fieldname, `))`)
-				p.Out()
-				p.P(`}`)
-			} else if !nullable {
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed64(p.mathPkg.Use(), `.Float64bits(float64(m.`+fieldname, `))`)
-			} else {
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed64(p.mathPkg.Use(), `.Float64bits(float64(*m.`+fieldname, `))`)
-			}
+		if packed {
+			p.encodeKey(fieldNumber, wireType)
+			p.callVarint(`len(m.`, fieldname, `) * 8`)
+			p.P(`for _, num := range m.`, fieldname, ` {`)
+			p.In()
+			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float64bits(float64(num))`)
+			p.callFixed64("f" + numGen.Current())
+			p.Out()
+			p.P(`}`)
+		} else if repeated {
+			p.P(`for _, num := range m.`, fieldname, ` {`)
+			p.In()
+			p.encodeKey(fieldNumber, wireType)
+			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float64bits(float64(num))`)
+			p.callFixed64("f" + numGen.Current())
+			p.Out()
+			p.P(`}`)
+		} else if proto3 {
+			p.P(`if m.`, fieldname, ` != 0 {`)
+			p.In()
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed64(p.mathPkg.Use(), `.Float64bits(float64(m.`+fieldname, `))`)
+			p.Out()
+			p.P(`}`)
+		} else if !nullable {
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed64(p.mathPkg.Use(), `.Float64bits(float64(m.`+fieldname, `))`)
 		} else {
-			if packed {
-				p.encodeKey(fieldNumber, wireType)
-				p.callVarint(`len(m.`, fieldname, `) * 8`)
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.unsafeFixed64("num", "float64")
-				p.Out()
-				p.P(`}`)
-			} else if repeated {
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed64("num", "float64")
-				p.Out()
-				p.P(`}`)
-			} else if proto3 {
-				p.P(`if m.`, fieldname, ` != 0 {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed64(`m.`+fieldname, "float64")
-				p.Out()
-				p.P(`}`)
-			} else if !nullable {
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed64(`m.`+fieldname, "float64")
-			} else {
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed64(`*m.`+fieldname, `float64`)
-			}
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed64(p.mathPkg.Use(), `.Float64bits(float64(*m.`+fieldname, `))`)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		if !p.unsafe || gogoproto.IsCastType(field) {
-			if packed {
-				p.encodeKey(fieldNumber, wireType)
-				p.callVarint(`len(m.`, fieldname, `) * 4`)
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float32bits(float32(num))`)
-				p.encodeFixed32("f" + numGen.Current())
-				p.Out()
-				p.P(`}`)
-			} else if repeated {
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float32bits(float32(num))`)
-				p.encodeFixed32("f" + numGen.Current())
-				p.Out()
-				p.P(`}`)
-			} else if proto3 {
-				p.P(`if m.`, fieldname, ` != 0 {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed32(p.mathPkg.Use(), `.Float32bits(float32(m.`+fieldname, `))`)
-				p.Out()
-				p.P(`}`)
-			} else if !nullable {
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed32(p.mathPkg.Use(), `.Float32bits(float32(m.`+fieldname, `))`)
-			} else {
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed32(p.mathPkg.Use(), `.Float32bits(float32(*m.`+fieldname, `))`)
-			}
+		if packed {
+			p.encodeKey(fieldNumber, wireType)
+			p.callVarint(`len(m.`, fieldname, `) * 4`)
+			p.P(`for _, num := range m.`, fieldname, ` {`)
+			p.In()
+			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float32bits(float32(num))`)
+			p.callFixed32("f" + numGen.Current())
+			p.Out()
+			p.P(`}`)
+		} else if repeated {
+			p.P(`for _, num := range m.`, fieldname, ` {`)
+			p.In()
+			p.encodeKey(fieldNumber, wireType)
+			p.P(`f`, numGen.Next(), ` := `, p.mathPkg.Use(), `.Float32bits(float32(num))`)
+			p.callFixed32("f" + numGen.Current())
+			p.Out()
+			p.P(`}`)
+		} else if proto3 {
+			p.P(`if m.`, fieldname, ` != 0 {`)
+			p.In()
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed32(p.mathPkg.Use(), `.Float32bits(float32(m.`+fieldname, `))`)
+			p.Out()
+			p.P(`}`)
+		} else if !nullable {
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed32(p.mathPkg.Use(), `.Float32bits(float32(m.`+fieldname, `))`)
 		} else {
-			if packed {
-				p.encodeKey(fieldNumber, wireType)
-				p.callVarint(`len(m.`, fieldname, `) * 4`)
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.unsafeFixed32("num", "float32")
-				p.Out()
-				p.P(`}`)
-			} else if repeated {
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed32("num", "float32")
-				p.Out()
-				p.P(`}`)
-			} else if proto3 {
-				p.P(`if m.`, fieldname, ` != 0 {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed32(`m.`+fieldname, `float32`)
-				p.Out()
-				p.P(`}`)
-			} else if !nullable {
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed32(`m.`+fieldname, `float32`)
-			} else {
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed32(`*m.`+fieldname, "float32")
-			}
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed32(p.mathPkg.Use(), `.Float32bits(float32(*m.`+fieldname, `))`)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_INT64,
 		descriptor.FieldDescriptorProto_TYPE_UINT64,
@@ -610,137 +500,65 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 		}
 	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
 		descriptor.FieldDescriptorProto_TYPE_SFIXED64:
-		if !p.unsafe {
-			if packed {
-				p.encodeKey(fieldNumber, wireType)
-				p.callVarint(`len(m.`, fieldname, `) * 8`)
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.encodeFixed64("num")
-				p.Out()
-				p.P(`}`)
-			} else if repeated {
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.encodeFixed64("num")
-				p.Out()
-				p.P(`}`)
-			} else if proto3 {
-				p.P(`if m.`, fieldname, ` != 0 {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed64("m." + fieldname)
-				p.Out()
-				p.P(`}`)
-			} else if !nullable {
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed64("m." + fieldname)
-			} else {
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed64("*m." + fieldname)
-			}
+		if packed {
+			p.encodeKey(fieldNumber, wireType)
+			p.callVarint(`len(m.`, fieldname, `) * 8`)
+			p.P(`for _, num := range m.`, fieldname, ` {`)
+			p.In()
+			p.callFixed64("num")
+			p.Out()
+			p.P(`}`)
+		} else if repeated {
+			p.P(`for _, num := range m.`, fieldname, ` {`)
+			p.In()
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed64("num")
+			p.Out()
+			p.P(`}`)
+		} else if proto3 {
+			p.P(`if m.`, fieldname, ` != 0 {`)
+			p.In()
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed64("m." + fieldname)
+			p.Out()
+			p.P(`}`)
+		} else if !nullable {
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed64("m." + fieldname)
 		} else {
-			typeName := "int64"
-			if *field.Type == descriptor.FieldDescriptorProto_TYPE_FIXED64 {
-				typeName = "uint64"
-			}
-			if packed {
-				p.encodeKey(fieldNumber, wireType)
-				p.callVarint(`len(m.`, fieldname, `) * 8`)
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.unsafeFixed64("num", typeName)
-				p.Out()
-				p.P(`}`)
-			} else if repeated {
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed64("num", typeName)
-				p.Out()
-				p.P(`}`)
-			} else if proto3 {
-				p.P(`if m.`, fieldname, ` != 0 {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed64("m."+fieldname, typeName)
-				p.Out()
-				p.P(`}`)
-			} else if !nullable {
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed64("m."+fieldname, typeName)
-			} else {
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed64("*m."+fieldname, typeName)
-			}
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed64("*m." + fieldname)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
 		descriptor.FieldDescriptorProto_TYPE_SFIXED32:
-		if !p.unsafe {
-			if packed {
-				p.encodeKey(fieldNumber, wireType)
-				p.callVarint(`len(m.`, fieldname, `) * 4`)
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.encodeFixed32("num")
-				p.Out()
-				p.P(`}`)
-			} else if repeated {
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.encodeFixed32("num")
-				p.Out()
-				p.P(`}`)
-			} else if proto3 {
-				p.P(`if m.`, fieldname, ` != 0 {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed32("m." + fieldname)
-				p.Out()
-				p.P(`}`)
-			} else if !nullable {
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed32("m." + fieldname)
-			} else {
-				p.encodeKey(fieldNumber, wireType)
-				p.callFixed32("*m." + fieldname)
-			}
+		if packed {
+			p.encodeKey(fieldNumber, wireType)
+			p.callVarint(`len(m.`, fieldname, `) * 4`)
+			p.P(`for _, num := range m.`, fieldname, ` {`)
+			p.In()
+			p.callFixed32("num")
+			p.Out()
+			p.P(`}`)
+		} else if repeated {
+			p.P(`for _, num := range m.`, fieldname, ` {`)
+			p.In()
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed32("num")
+			p.Out()
+			p.P(`}`)
+		} else if proto3 {
+			p.P(`if m.`, fieldname, ` != 0 {`)
+			p.In()
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed32("m." + fieldname)
+			p.Out()
+			p.P(`}`)
+		} else if !nullable {
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed32("m." + fieldname)
 		} else {
-			typeName := "int32"
-			if *field.Type == descriptor.FieldDescriptorProto_TYPE_FIXED32 {
-				typeName = "uint32"
-			}
-			if packed {
-				p.encodeKey(fieldNumber, wireType)
-				p.callVarint(`len(m.`, fieldname, `) * 4`)
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.unsafeFixed32("num", typeName)
-				p.Out()
-				p.P(`}`)
-			} else if repeated {
-				p.P(`for _, num := range m.`, fieldname, ` {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed32("num", typeName)
-				p.Out()
-				p.P(`}`)
-			} else if proto3 {
-				p.P(`if m.`, fieldname, ` != 0 {`)
-				p.In()
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed32("m."+fieldname, typeName)
-				p.Out()
-				p.P(`}`)
-			} else if !nullable {
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed32("m."+fieldname, typeName)
-			} else {
-				p.encodeKey(fieldNumber, wireType)
-				p.unsafeFixed32("*m."+fieldname, typeName)
-			}
+			p.encodeKey(fieldNumber, wireType)
+			p.callFixed32("*m." + fieldname)
 		}
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
 		if packed {
@@ -1240,6 +1058,7 @@ func (p *marshalto) generateField(proto3 bool, numGen NumGen, file *generator.Fi
 func (p *marshalto) Generate(file *generator.FileDescriptor) {
 	numGen := NewNumGen()
 	p.PluginImports = generator.NewPluginImports(p.Generator)
+
 	p.atleastOne = false
 	p.localName = generator.FileName(file)
 
@@ -1249,8 +1068,8 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		p.protoPkg = p.NewImport("github.com/golang/protobuf/proto")
 	}
-	p.unsafePkg = p.NewImport("unsafe")
 	p.errorsPkg = p.NewImport("errors")
+	p.binaryPkg = p.NewImport("encoding/binary")
 	p.typesPkg = p.NewImport("github.com/gogo/protobuf/types")
 
 	for _, message := range file.Messages() {
@@ -1258,21 +1077,9 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 			continue
 		}
 		ccTypeName := generator.CamelCaseSlice(message.TypeName())
-		if p.unsafe {
-			if !gogoproto.IsUnsafeMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
-				continue
-			}
-			if gogoproto.IsMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
-				panic(fmt.Sprintf("unsafe_marshaler and marshalto enabled for %v", ccTypeName))
-			}
-		}
-		if !p.unsafe {
-			if !gogoproto.IsMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
-				continue
-			}
-			if gogoproto.IsUnsafeMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
-				panic(fmt.Sprintf("unsafe_marshaler and marshalto enabled for %v", ccTypeName))
-			}
+		if !gogoproto.IsMarshaler(file.FileDescriptorProto, message.DescriptorProto) &&
+			!gogoproto.IsUnsafeMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
+			continue
 		}
 		p.atleastOne = true
 
@@ -1367,7 +1174,7 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 			p.P(`func (m *`, ccTypeName, `) MarshalTo(dAtA []byte) (int, error) {`)
 			p.In()
 			p.P(`i := 0`)
-			vanity.TurnOffNullableForNativeTypesWithoutDefaultsOnly(field)
+			vanity.TurnOffNullableForNativeTypes(field)
 			p.generateField(false, numGen, file, message, field)
 			p.P(`return i, nil`)
 			p.Out()
@@ -1376,30 +1183,6 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 	}
 
 	if p.atleastOne {
-		p.P(`func encodeFixed64`, p.localName, `(dAtA []byte, offset int, v uint64) int {`)
-		p.In()
-		p.P(`dAtA[offset] = uint8(v)`)
-		p.P(`dAtA[offset+1] = uint8(v >> 8)`)
-		p.P(`dAtA[offset+2] = uint8(v >> 16)`)
-		p.P(`dAtA[offset+3] = uint8(v >> 24)`)
-		p.P(`dAtA[offset+4] = uint8(v >> 32)`)
-		p.P(`dAtA[offset+5] = uint8(v >> 40)`)
-		p.P(`dAtA[offset+6] = uint8(v >> 48)`)
-		p.P(`dAtA[offset+7] = uint8(v >> 56)`)
-		p.P(`return offset+8`)
-		p.Out()
-		p.P(`}`)
-
-		p.P(`func encodeFixed32`, p.localName, `(dAtA []byte, offset int, v uint32) int {`)
-		p.In()
-		p.P(`dAtA[offset] = uint8(v)`)
-		p.P(`dAtA[offset+1] = uint8(v >> 8)`)
-		p.P(`dAtA[offset+2] = uint8(v >> 16)`)
-		p.P(`dAtA[offset+3] = uint8(v >> 24)`)
-		p.P(`return offset+4`)
-		p.Out()
-		p.P(`}`)
-
 		p.P(`func encodeVarint`, p.localName, `(dAtA []byte, offset int, v uint64) int {`)
 		p.In()
 		p.P(`for v >= 1<<7 {`)
@@ -1419,5 +1202,4 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 
 func init() {
 	generator.RegisterPlugin(NewMarshal())
-	generator.RegisterPlugin(NewUnsafeMarshal())
 }

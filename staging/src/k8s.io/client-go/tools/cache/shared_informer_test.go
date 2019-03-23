@@ -251,3 +251,15 @@ func TestResyncCheckPeriod(t *testing.T) {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 }
+
+// verify that https://github.com/kubernetes/kubernetes/issues/59822 is fixed
+func TestSharedInformerInitializationRace(t *testing.T) {
+	source := fcache.NewFakeControllerSource()
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	listener := newTestListener("raceListener", 0)
+
+	stop := make(chan struct{})
+	go informer.AddEventHandlerWithResyncPeriod(listener, listener.resyncPeriod)
+	go informer.Run(stop)
+	close(stop)
+}

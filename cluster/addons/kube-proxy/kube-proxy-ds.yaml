@@ -1,7 +1,7 @@
 # Please keep kube-proxy configuration in-sync with:
 # cluster/saltbase/salt/kube-proxy/kube-proxy.manifest
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
@@ -24,10 +24,16 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
-      {{pod_priority}}
+      priorityClassName: system-node-critical
       hostNetwork: true
       nodeSelector:
+        # TODO(liggitt): switch to node.kubernetes.io/kube-proxy-ds-ready in 1.16
         beta.kubernetes.io/kube-proxy-ds-ready: "true"
+      tolerations:
+      - operator: "Exists"
+        effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
       containers:
       - name: kube-proxy
         image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
@@ -52,6 +58,9 @@ spec:
         - mountPath: /run/xtables.lock
           name: xtables-lock
           readOnly: false
+        - mountPath: /lib/modules
+          name: lib-modules
+          readOnly: true
       volumes:
       - name: varlog
         hostPath:
@@ -60,4 +69,7 @@ spec:
         hostPath:
           path: /run/xtables.lock
           type: FileOrCreate
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
       serviceAccountName: kube-proxy

@@ -1,0 +1,44 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: default
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: fuseim.pri/ifs
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: nfs-client-provisioner
+  labels:
+    app: nfs-client-provisioner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      containers:
+        - name: nfs-client-provisioner
+          image: quay.io/external_storage/nfs-client-provisioner:latest
+          volumeMounts:
+            - name: nfs-client-root
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME
+              value: fuseim.pri/ifs
+            - name: NFS_SERVER
+              value: {{ hostname }}
+            - name: NFS_PATH
+              value: {{ mountpoint }}
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            server: {{ hostname }}
+            path: {{ mountpoint }}

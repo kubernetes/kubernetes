@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -18,10 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
-: ${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
+: "${KUBECTL:=${KUBE_ROOT}/cluster/kubectl.sh}"
+: "${KUBE_CONFIG_FILE:="config-test.sh"}"
 
 export KUBECTL KUBE_CONFIG_FILE
 
@@ -29,19 +29,4 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-if [[ "${FEDERATION:-}" == "true" ]];then
-    FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-system}
-    #TODO(colhom): the last cluster that was created in the loop above is the current context.
-    # Hence, it will be the cluster that hosts the federated components.
-    # In the future, we will want to loop through the all the federated contexts,
-    # select each one and call federated-up
-    for zone in ${E2E_ZONES};do
-	(
-	    set-federation-zone-vars "$zone"
-	    printf "\n\tChecking version for $OVERRIDE_CONTEXT\n"
-	    ${KUBECTL} --context="$OVERRIDE_CONTEXT" version
-	)
-    done
-else
-    ${KUBECTL} version
-fi
+${KUBECTL} version

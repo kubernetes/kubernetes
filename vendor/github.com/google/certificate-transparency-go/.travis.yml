@@ -1,0 +1,87 @@
+sudo: true  # required for CI push into Kubernetes.
+language: go
+os: linux
+go: "1.10"
+
+go_import_path: github.com/google/certificate-transparency-go
+
+env:
+  - GCE_CI=${ENABLE_GCE_CI} GOFLAGS=
+  - GOFLAGS=-race
+  - GOFLAGS=      WITH_ETCD=true WITH_COVERAGE=true
+  - GOFLAGS=-race WITH_ETCD=true
+
+matrix:
+  fast_finish: true
+
+addons:
+  apt:
+    sources:
+      - mysql-5.7-trusty
+    packages:
+      - mysql-server
+      - mysql-client
+
+services:
+  - docker
+
+before_install:
+  - sudo mysql -e "use mysql; update user set authentication_string=PASSWORD('') where User='root'; update user set plugin='mysql_native_password';FLUSH PRIVILEGES;"
+  - sudo mysql_upgrade
+  - sudo service mysql restart
+
+install:
+  - mkdir ../protoc
+  - |
+    (
+      cd ../protoc
+      wget https://github.com/google/protobuf/releases/download/v3.5.1/protoc-3.5.1-${TRAVIS_OS_NAME}-x86_64.zip
+      unzip protoc-3.5.1-${TRAVIS_OS_NAME}-x86_64.zip
+    )
+  - export PATH=$(pwd)/../protoc/bin:$PATH
+  - go get -d -t ./...
+  - go get github.com/alecthomas/gometalinter
+  - gometalinter --install
+  - go get -u github.com/golang/protobuf/proto
+  - go get -u github.com/golang/protobuf/protoc-gen-go
+  - go install github.com/golang/mock/mockgen
+  # install vendored etcd binary
+  - go install ./vendor/github.com/coreos/etcd/cmd/etcd
+  - go install ./vendor/github.com/coreos/etcd/cmd/etcdctl
+  - pushd ${GOPATH}/src/github.com/google/trillian
+  - go get -d -t ./...
+  - popd
+
+script:
+  - set -e
+  - cd $HOME/gopath/src/github.com/google/certificate-transparency-go
+  - ./scripts/presubmit.sh ${PRESUBMIT_OPTS} ${WITH_COVERAGE:+--coverage}
+  - |
+      # Check re-generation didn't change anything
+      status=$(git status --porcelain | grep -v coverage) || :
+      if [[ -n ${status} ]]; then
+        echo "Regenerated files differ from checked-in versions: ${status}"
+        git status
+        git diff
+        exit 1
+      fi
+  - |
+      if [[ "${WITH_ETCD}" == "true" ]]; then
+        export ETCD_DIR="${GOPATH}/bin"
+      fi
+  - ./trillian/integration/integration_test.sh
+  - HAMMER_OPTS="--operations=1500" ./trillian/integration/ct_hammer_test.sh
+  - set +e
+
+after_success:
+  - cp /tmp/coverage.txt .
+  - bash <(curl -s https://codecov.io/bash)
+  - |
+      # Push up to GCE CI instance if we're running after a merge to master
+      if [[ "${GCE_CI}" == "true" ]] && [[ $TRAVIS_PULL_REQUEST == "false" ]] && [[ $TRAVIS_BRANCH == "master" ]]; then
+        . scripts/install_cloud.sh
+        echo ${GCLOUD_SERVICE_KEY_CI} | base64 --decode -i > ${HOME}/gcloud-service-key.json
+        gcloud auth activate-service-account --key-file ${HOME}/gcloud-service-key.json
+        rm ${HOME}/gcloud-service-key.json
+        . scripts/deploy_gce_ci.sh
+      fi

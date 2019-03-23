@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -26,26 +27,23 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apimachineryvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper/qos"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // podStrategy implements behavior for Pods
@@ -56,7 +54,7 @@ type podStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating Pod
 // objects via the REST API.
-var Strategy = podStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = podStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for pods.
 func (podStrategy) NamespaceScoped() bool {
@@ -64,30 +62,31 @@ func (podStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
 		QOSClass: qos.GetPodQOS(pod),
 	}
 
-	podutil.DropDisabledAlphaFields(&pod.Spec)
+	podutil.DropDisabledPodFields(pod, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 
-	podutil.DropDisabledAlphaFields(&newPod.Spec)
-	podutil.DropDisabledAlphaFields(&oldPod.Spec)
+	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
 // Validate validates a new pod.
-func (podStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	return validation.ValidatePod(pod)
+	allErrs := validation.ValidatePod(pod)
+	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -99,32 +98,12 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func isUpdatingUninitializedPod(old runtime.Object) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		return false, nil
-	}
-	oldMeta, err := meta.Accessor(old)
-	if err != nil {
-		return false, err
-	}
-	oldInitializers := oldMeta.GetInitializers()
-	if oldInitializers != nil && len(oldInitializers.Pending) != 0 {
-		return true, nil
-	}
-	return false, nil
-}
-
 // ValidateUpdate is the default update validation for an end user.
-func (podStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidatePod(obj.(*api.Pod))
-	uninitializedUpdate, err := isUpdatingUninitializedPod(old)
-	if err != nil {
-		return append(errorList, field.InternalError(field.NewPath("metadata"), err))
-	}
-	if uninitializedUpdate {
-		return errorList
-	}
-	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
+	errorList = append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
+	errorList = append(errorList, validation.ValidateConditionalPod(obj.(*api.Pod), old.(*api.Pod), field.NewPath(""))...)
+	return errorList
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
@@ -134,7 +113,7 @@ func (podStrategy) AllowUnconditionalUpdate() bool {
 
 // CheckGracefulDelete allows a pod to be gracefully deleted. It updates the DeleteOptions to
 // reflect the desired grace value.
-func (podStrategy) CheckGracefulDelete(ctx genericapirequest.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
+func (podStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
 	if options == nil {
 		return false
 	}
@@ -167,7 +146,7 @@ type podStrategyWithoutGraceful struct {
 }
 
 // CheckGracefulDelete prohibits graceful deletion.
-func (podStrategyWithoutGraceful) CheckGracefulDelete(ctx genericapirequest.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
+func (podStrategyWithoutGraceful) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
 	return false
 }
 
@@ -180,7 +159,7 @@ type podStatusStrategy struct {
 
 var StatusStrategy = podStatusStrategy{Strategy}
 
-func (podStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Spec = oldPod.Spec
@@ -191,26 +170,17 @@ func (podStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, ol
 	newPod.OwnerReferences = oldPod.OwnerReferences
 }
 
-func (podStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	var errorList field.ErrorList
-	uninitializedUpdate, err := isUpdatingUninitializedPod(old)
-	if err != nil {
-		return append(errorList, field.InternalError(field.NewPath("metadata"), err))
-	}
-	if uninitializedUpdate {
-		return append(errorList, field.Forbidden(field.NewPath("status"), apimachineryvalidation.UninitializedStatusUpdateErrorMsg))
-	}
-	// TODO: merge valid fields after update
+func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod, ok := obj.(*api.Pod)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("not a pod")
+		return nil, nil, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), pod.Initializers != nil, nil
+	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.
@@ -236,21 +206,23 @@ func PodToSelectableFields(pod *api.Pod) fields.Set {
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
-	podSpecificFieldsSet := make(fields.Set, 7)
+	podSpecificFieldsSet := make(fields.Set, 9)
 	podSpecificFieldsSet["spec.nodeName"] = pod.Spec.NodeName
 	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
 	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
+	podSpecificFieldsSet["spec.serviceAccountName"] = string(pod.Spec.ServiceAccountName)
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
 	podSpecificFieldsSet["status.podIP"] = string(pod.Status.PodIP)
+	podSpecificFieldsSet["status.nominatedNodeName"] = string(pod.Status.NominatedNodeName)
 	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
 }
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.
 type ResourceGetter interface {
-	Get(genericapirequest.Context, string, *metav1.GetOptions) (runtime.Object, error)
+	Get(context.Context, string, *metav1.GetOptions) (runtime.Object, error)
 }
 
-func getPod(getter ResourceGetter, ctx genericapirequest.Context, name string) (*api.Pod, error) {
+func getPod(getter ResourceGetter, ctx context.Context, name string) (*api.Pod, error) {
 	obj, err := getter.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -263,7 +235,7 @@ func getPod(getter ResourceGetter, ctx genericapirequest.Context, name string) (
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified pod.
-func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx genericapirequest.Context, id string) (*url.URL, http.RoundTripper, error) {
+func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "podname" or "podname:port" or "scheme:podname:port".
 	// If port is not specified, try to use the first defined port on the pod.
 	scheme, name, port, valid := utilnet.SplitSchemeNamePort(id)
@@ -285,6 +257,10 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx genericap
 				break
 			}
 		}
+	}
+
+	if err := proxyutil.IsProxyableIP(pod.Status.PodIP); err != nil {
+		return nil, nil, errors.NewBadRequest(err.Error())
 	}
 
 	loc := &url.URL{
@@ -312,7 +288,7 @@ func getContainerNames(containers []api.Container) string {
 func LogLocation(
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
-	ctx genericapirequest.Context,
+	ctx context.Context,
 	name string,
 	opts *api.PodLogOptions,
 ) (*url.URL, http.RoundTripper, error) {
@@ -349,7 +325,7 @@ func LogLocation(
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, nil
 	}
-	nodeInfo, err := connInfo.GetConnectionInfo(nodeName)
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -448,7 +424,7 @@ func streamParams(params url.Values, opts runtime.Object) error {
 func AttachLocation(
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
-	ctx genericapirequest.Context,
+	ctx context.Context,
 	name string,
 	opts *api.PodAttachOptions,
 ) (*url.URL, http.RoundTripper, error) {
@@ -460,7 +436,7 @@ func AttachLocation(
 func ExecLocation(
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
-	ctx genericapirequest.Context,
+	ctx context.Context,
 	name string,
 	opts *api.PodExecOptions,
 ) (*url.URL, http.RoundTripper, error) {
@@ -470,7 +446,7 @@ func ExecLocation(
 func streamLocation(
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
-	ctx genericapirequest.Context,
+	ctx context.Context,
 	name string,
 	opts runtime.Object,
 	container,
@@ -508,7 +484,7 @@ func streamLocation(
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
-	nodeInfo, err := connInfo.GetConnectionInfo(nodeName)
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -529,7 +505,7 @@ func streamLocation(
 func PortForwardLocation(
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
-	ctx genericapirequest.Context,
+	ctx context.Context,
 	name string,
 	opts *api.PodPortForwardOptions,
 ) (*url.URL, http.RoundTripper, error) {
@@ -543,7 +519,7 @@ func PortForwardLocation(
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
-	nodeInfo, err := connInfo.GetConnectionInfo(nodeName)
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -18,7 +18,7 @@ package batch
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // +genclient
@@ -138,6 +138,18 @@ type JobSpec struct {
 
 	// Describes the pod that will be created when executing a job.
 	Template api.PodTemplateSpec
+
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Complete or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Job finishes, it is eligible to be
+	// automatically deleted. When the Job is being deleted, its lifecycle
+	// guarantees (e.g. finalizers) will be honored. If this field is unset,
+	// the Job won't be automatically deleted. If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// This field is alpha-level and is only honored by servers that enable the
+	// TTLAfterFinished feature.
+	// +optional
+	TTLSecondsAfterFinished *int32
 }
 
 // JobStatus represents the current state of a Job.
@@ -250,7 +262,10 @@ type CronJobSpec struct {
 	StartingDeadlineSeconds *int64
 
 	// Specifies how to treat concurrent executions of a Job.
-	// Defaults to Allow.
+	// Valid values are:
+	// - "Allow" (default): allows CronJobs to run concurrently;
+	// - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
+	// - "Replace": cancels currently running job and replaces it with a new one
 	// +optional
 	ConcurrencyPolicy ConcurrencyPolicy
 

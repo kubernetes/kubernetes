@@ -20,13 +20,20 @@ import (
 	. "github.com/onsi/ginkgo"
 
 	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
 var _ = Describe("Replacing fields of type map with openapi for some fields", func() {
+	var resources openapi.Resources
+	BeforeEach(func() {
+		resources = tst.NewFakeResources("test_swagger.json")
+	})
+
 	Context("where a field is has been updated", func() {
 		It("should update the field", func() {
 			recorded := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: ReplicaSet
 spec:
   template:
@@ -35,7 +42,7 @@ spec:
       image: image1
 `)
 			local := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: ReplicaSet
 spec:
   template:
@@ -44,7 +51,7 @@ spec:
       image: image1
 `)
 			remote := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: ReplicaSet
 spec:
   template:
@@ -57,7 +64,7 @@ spec:
       image: image3
 `)
 			expected := create(`
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: ReplicaSet
 spec:
   template:
@@ -67,7 +74,7 @@ spec:
 `)
 
 			// Use modified swagger for ReplicaSet spec
-			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, "test_swagger.json")
+			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, resources)
 		})
 	})
 })

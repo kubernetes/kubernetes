@@ -1,15 +1,14 @@
 package(default_visibility = ["//visibility:public"])
 
 load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
-    "go_library",
+    "//build:go.bzl",
+    go_binary = "go_binary_conditional_pure",
 )
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_binary(
     name = "genyaml",
-    importpath = "k8s.io/kubernetes/cmd/genyaml",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(
@@ -19,7 +18,6 @@ go_library(
     deps = [
         "//cmd/genutils:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",

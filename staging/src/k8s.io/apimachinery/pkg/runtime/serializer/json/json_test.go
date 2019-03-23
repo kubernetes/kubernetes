@@ -29,9 +29,31 @@ import (
 )
 
 type testDecodable struct {
-	Other string
-	Value int `json:"value"`
-	gvk   schema.GroupVersionKind
+	Other     string
+	Value     int           `json:"value"`
+	Spec      DecodableSpec `json:"spec"`
+	Interface interface{}   `json:"interface"`
+	gvk       schema.GroupVersionKind
+}
+
+// DecodableSpec has 15 fields. json-iterator treats struct with more than 10
+// fields differently from struct that has less than 10 fields.
+type DecodableSpec struct {
+	A int `json:"A"`
+	B int `json:"B"`
+	C int `json:"C"`
+	D int `json:"D"`
+	E int `json:"E"`
+	F int `json:"F"`
+	G int `json:"G"`
+	H int `json:"h"`
+	I int `json:"i"`
+	J int `json:"j"`
+	K int `json:"k"`
+	L int `json:"l"`
+	M int `json:"m"`
+	N int `json:"n"`
+	O int `json:"o"`
 }
 
 func (d *testDecodable) GetObjectKind() schema.ObjectKind                { return d }
@@ -94,6 +116,32 @@ func TestDecode(t *testing.T) {
 			expectedObject: &testDecodable{},
 			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 		},
+		// group version, kind is defaulted
+		{
+			data:           []byte(`{"apiVersion":"other1/blah1"}`),
+			defaultGVK:     &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			creater:        &mockCreater{obj: &testDecodable{}},
+			expectedObject: &testDecodable{},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other1", Version: "blah1"},
+		},
+		// gvk all provided then not defaulted at all
+		{
+			data:           []byte(`{"kind":"Test","apiVersion":"other/blah"}`),
+			defaultGVK:     &schema.GroupVersionKind{Kind: "Test1", Group: "other1", Version: "blah1"},
+			creater:        &mockCreater{obj: &testDecodable{}},
+			expectedObject: &testDecodable{},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+		},
+		//gvk defaulting if kind not provided in data and defaultGVK use into's kind
+		{
+			data:           []byte(`{"apiVersion":"b1/c1"}`),
+			into:           &testDecodable{gvk: schema.GroupVersionKind{Kind: "a3", Group: "b1", Version: "c1"}},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "a3", Group: "b1", Version: "c1"}},
+			defaultGVK:     nil,
+			creater:        &mockCreater{obj: &testDecodable{}},
+			expectedObject: &testDecodable{gvk: schema.GroupVersionKind{Kind: "a3", Group: "b1", Version: "c1"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "a3", Group: "b1", Version: "c1"},
+		},
 
 		// accept runtime.Unknown as into and bypass creator
 		{
@@ -132,7 +180,7 @@ func TestDecode(t *testing.T) {
 		{
 			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","value":1,"Other":"test"}`),
 			into:        &testDecodable{},
-			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind(schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			expectedObject: &testDecodable{
 				Other: "test",
@@ -193,6 +241,37 @@ func TestDecode(t *testing.T) {
 						Value: 2,
 					},
 				},
+			},
+		},
+		// Error on invalid number
+		{
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","interface":1e1000}`),
+			creater:     &mockCreater{obj: &testDecodable{}},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), `json_test.testDecodable.Interface: DecodeNumber: strconv.ParseFloat: parsing "1e1000": value out of range`)
+			},
+		},
+		// Unmarshalling is case-sensitive
+		{
+			// "VaLue" should have been "value"
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","VaLue":1,"Other":"test"}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Other: "test",
+			},
+		},
+		// Unmarshalling is case-sensitive for big struct.
+		{
+			// "b" should have been "B", "I" should have been "i"
+			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","spec": {"A": 1, "b": 2, "h": 3, "I": 4}}`),
+			into:        &testDecodable{},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind("mock", schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
+			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodable{
+				Spec: DecodableSpec{A: 1, H: 3},
 			},
 		},
 	}

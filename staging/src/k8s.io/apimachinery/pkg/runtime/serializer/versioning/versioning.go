@@ -18,22 +18,12 @@ package versioning
 
 import (
 	"io"
+	"reflect"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
-
-// NewCodecForScheme is a convenience method for callers that are using a scheme.
-func NewCodecForScheme(
-	// TODO: I should be a scheme interface?
-	scheme *runtime.Scheme,
-	encoder runtime.Encoder,
-	decoder runtime.Decoder,
-	encodeVersion runtime.GroupVersioner,
-	decodeVersion runtime.GroupVersioner,
-) runtime.Codec {
-	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, nil, encodeVersion, decodeVersion)
-}
 
 // NewDefaultingCodecForScheme is a convenience method for callers that are using a scheme.
 func NewDefaultingCodecForScheme(
@@ -44,7 +34,7 @@ func NewDefaultingCodecForScheme(
 	encodeVersion runtime.GroupVersioner,
 	decodeVersion runtime.GroupVersioner,
 ) runtime.Codec {
-	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, encodeVersion, decodeVersion)
+	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, encodeVersion, decodeVersion, scheme.Name())
 }
 
 // NewCodec takes objects in their internal versions and converts them to external versions before
@@ -59,6 +49,7 @@ func NewCodec(
 	defaulter runtime.ObjectDefaulter,
 	encodeVersion runtime.GroupVersioner,
 	decodeVersion runtime.GroupVersioner,
+	originalSchemeName string,
 ) runtime.Codec {
 	internal := &codec{
 		encoder:   encoder,
@@ -70,6 +61,8 @@ func NewCodec(
 
 		encodeVersion: encodeVersion,
 		decodeVersion: decodeVersion,
+
+		originalSchemeName: originalSchemeName,
 	}
 	return internal
 }
@@ -84,6 +77,9 @@ type codec struct {
 
 	encodeVersion runtime.GroupVersioner
 	decodeVersion runtime.GroupVersioner
+
+	// originalSchemeName is optional, but when filled in it holds the name of the scheme from which this codec originates
+	originalSchemeName string
 }
 
 // Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is
@@ -95,7 +91,16 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 		into = versioned.Last()
 	}
 
-	obj, gvk, err := c.decoder.Decode(data, defaultGVK, into)
+	// If the into object is unstructured and expresses an opinion about its group/version,
+	// create a new instance of the type so we always exercise the conversion path (skips short-circuiting on `into == obj`)
+	decodeInto := into
+	if into != nil {
+		if _, ok := into.(runtime.Unstructured); ok && !into.GetObjectKind().GroupVersionKind().GroupVersion().Empty() {
+			decodeInto = reflect.New(reflect.TypeOf(into).Elem()).Interface().(runtime.Object)
+		}
+	}
+
+	obj, gvk, err := c.decoder.Decode(data, defaultGVK, decodeInto)
 	if err != nil {
 		return nil, gvk, err
 	}
@@ -166,9 +171,27 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 // Encode ensures the provided object is output in the appropriate group and version, invoking
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
-	switch obj.(type) {
-	case *runtime.Unknown, runtime.Unstructured:
+	switch obj := obj.(type) {
+	case *runtime.Unknown:
 		return c.encoder.Encode(obj, w)
+	case runtime.Unstructured:
+		// An unstructured list can contain objects of multiple group version kinds. don't short-circuit just
+		// because the top-level type matches our desired destination type. actually send the object to the converter
+		// to give it a chance to convert the list items if needed.
+		if _, ok := obj.(*unstructured.UnstructuredList); !ok {
+			// avoid conversion roundtrip if GVK is the right one already or is empty (yes, this is a hack, but the old behaviour we rely on in kubectl)
+			objGVK := obj.GetObjectKind().GroupVersionKind()
+			if len(objGVK.Version) == 0 {
+				return c.encoder.Encode(obj, w)
+			}
+			targetGVK, ok := c.encodeVersion.KindForGroupVersionKinds([]schema.GroupVersionKind{objGVK})
+			if !ok {
+				return runtime.NewNotRegisteredGVKErrForTarget(c.originalSchemeName, objGVK, c.encodeVersion)
+			}
+			if targetGVK == objGVK {
+				return c.encoder.Encode(obj, w)
+			}
+		}
 	}
 
 	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)

@@ -1,0 +1,33 @@
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: gce.privileged
+  annotations:
+    kubernetes.io/description: 'privileged allows full unrestricted access to
+      pod features, as if the PodSecurityPolicy controller was not enabled.'
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  privileged: true
+  allowPrivilegeEscalation: true
+  allowedCapabilities:
+  - '*'
+  volumes:
+  - '*'
+  hostNetwork: true
+  hostPorts:
+  - min: 0
+    max: 65535
+  hostIPC: true
+  hostPID: true
+  runAsUser:
+    rule: 'RunAsAny'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: false

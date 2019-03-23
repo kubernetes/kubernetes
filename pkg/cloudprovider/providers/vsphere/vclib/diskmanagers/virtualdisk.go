@@ -17,10 +17,10 @@ limitations under the License.
 package diskmanagers
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 )
 
@@ -40,7 +40,7 @@ const (
 // VirtualDiskProvider defines interfaces for creating disk
 type VirtualDiskProvider interface {
 	Create(ctx context.Context, datastore *vclib.Datastore) (string, error)
-	Delete(ctx context.Context, datastore *vclib.Datastore) error
+	Delete(ctx context.Context, datacenter *vclib.Datacenter) error
 }
 
 // getDiskManager returns vmDiskManager or vdmDiskManager based on given volumeoptions
@@ -65,7 +65,7 @@ func (virtualDisk *VirtualDisk) Create(ctx context.Context, datastore *vclib.Dat
 		virtualDisk.VolumeOptions.DiskFormat = vclib.ThinDiskType
 	}
 	if !virtualDisk.VolumeOptions.VerifyVolumeOptions() {
-		glog.Error("VolumeOptions verification failed. volumeOptions: ", virtualDisk.VolumeOptions)
+		klog.Error("VolumeOptions verification failed. volumeOptions: ", virtualDisk.VolumeOptions)
 		return "", vclib.ErrInvalidVolumeOptions
 	}
 	if virtualDisk.VolumeOptions.StoragePolicyID != "" && virtualDisk.VolumeOptions.StoragePolicyName != "" {
@@ -75,6 +75,6 @@ func (virtualDisk *VirtualDisk) Create(ctx context.Context, datastore *vclib.Dat
 }
 
 // Delete gets appropriate disk manager and calls respective delete method
-func (virtualDisk *VirtualDisk) Delete(ctx context.Context, datastore *vclib.Datastore) error {
-	return getDiskManager(virtualDisk, VirtualDiskDeleteOperation).Delete(ctx, datastore)
+func (virtualDisk *VirtualDisk) Delete(ctx context.Context, datacenter *vclib.Datacenter) error {
+	return getDiskManager(virtualDisk, VirtualDiskDeleteOperation).Delete(ctx, datacenter)
 }

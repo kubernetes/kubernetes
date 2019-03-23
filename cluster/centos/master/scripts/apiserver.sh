@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -16,7 +16,7 @@
 
 
 MASTER_ADDRESS=${1:-"8.8.8.18"}
-ETCD_SERVERS=${2:-"http://8.8.8.18:2379"}
+ETCD_SERVERS=${2:-"https://8.8.8.18:2379"}
 SERVICE_CLUSTER_IP_RANGE=${3:-"10.10.10.0/24"}
 ADMISSION_CONTROL=${4:-""}
 
@@ -66,6 +66,8 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 #   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists,
 #   NamespaceLifecycle, NamespaceAutoProvision, AlwaysAdmit,
 #   ServiceAccount, DefaultStorageClass, DefaultTolerationSeconds, ResourceQuota
+# Mark Deprecated. Use --enable-admission-plugins or --disable-admission-plugins instead since v1.10.
+# It will be removed in a future version.
 KUBE_ADMISSION_CONTROL="--admission-control=${ADMISSION_CONTROL}"
 
 # --client-ca-file="": If set, any request presenting a client certificate signed

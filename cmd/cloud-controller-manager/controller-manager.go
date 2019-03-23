@@ -21,53 +21,34 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
-	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app"
-	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
-	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
-	"k8s.io/kubernetes/pkg/cloudprovider"
+
 	// NOTE: Importing all in-tree cloud-providers is not required when
 	// implementing an out-of-tree cloud-provider.
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
-	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
-	"k8s.io/kubernetes/pkg/version/verflag"
-
-	"github.com/golang/glog"
-	"github.com/spf13/pflag"
+	_ "k8s.io/kubernetes/pkg/util/prometheusclientgo" // load all the prometheus client-go plugins
+	_ "k8s.io/kubernetes/pkg/version/prometheus"      // for version metric registration
 )
 
 func main() {
-	s := options.NewCloudControllerManagerServer()
-	s.AddFlags(pflag.CommandLine)
+	rand.Seed(time.Now().UnixNano())
 
-	flag.InitFlags()
+	command := app.NewCloudControllerManagerCommand()
+
+	// TODO: once we switch everything over to Cobra commands, we can go back to calling
+	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
+	// normalize func and add the go flag set by hand.
+	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	verflag.PrintAndExitIfRequested()
-
-	if s.CloudProvider == "" {
-		glog.Errorf("--cloud-provider cannot be empty")
-	}
-
-	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-	if err != nil {
-		glog.Fatalf("Cloud provider could not be initialized: %v", err)
-	}
-
-	if cloud.HasClusterID() == false {
-		if s.AllowUntaggedCloud == true {
-			glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
-		} else {
-			glog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
-		}
-	}
-
-	if err := app.Run(s, cloud); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	if err := command.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }

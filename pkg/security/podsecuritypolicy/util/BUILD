@@ -14,20 +14,19 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
     ],
 )
 

@@ -8,8 +8,7 @@ load(
 
 go_binary(
     name = "serve_hostnames",
-    importpath = "k8s.io/kubernetes/test/soak/serve_hostnames",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(
@@ -17,17 +16,17 @@ go_library(
     srcs = ["serve_hostnames.go"],
     importpath = "k8s.io/kubernetes/test/soak/serve_hostnames",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

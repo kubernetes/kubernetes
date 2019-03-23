@@ -57,7 +57,22 @@ generated clients, see the Client described below.
 */
 package autorest
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
+	"context"
 	"net/http"
 	"time"
 )
@@ -73,6 +88,9 @@ const (
 // ResponseHasStatusCode returns true if the status code in the HTTP Response is in the passed set
 // and false otherwise.
 func ResponseHasStatusCode(resp *http.Response, codes ...int) bool {
+	if resp == nil {
+		return false
+	}
 	return containsInt(codes, resp.StatusCode)
 }
 
@@ -109,6 +127,23 @@ func NewPollingRequest(resp *http.Response, cancel <-chan struct{}) (*http.Reque
 		WithBaseURL(location))
 	if err != nil {
 		return nil, NewErrorWithError(err, "autorest", "NewPollingRequest", nil, "Failure creating poll request to %s", location)
+	}
+
+	return req, nil
+}
+
+// NewPollingRequestWithContext allocates and returns a new http.Request with the specified context to poll for the passed response.
+func NewPollingRequestWithContext(ctx context.Context, resp *http.Response) (*http.Request, error) {
+	location := GetLocation(resp)
+	if location == "" {
+		return nil, NewErrorWithResponse("autorest", "NewPollingRequestWithContext", resp, "Location header missing from response that requires polling")
+	}
+
+	req, err := Prepare((&http.Request{}).WithContext(ctx),
+		AsGet(),
+		WithBaseURL(location))
+	if err != nil {
+		return nil, NewErrorWithError(err, "autorest", "NewPollingRequestWithContext", nil, "Failure creating poll request to %s", location)
 	}
 
 	return req, nil

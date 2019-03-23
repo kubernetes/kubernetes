@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - thockin
+  - m1093782566
+approvers:
+  - thockin
+  - m1093782566
+labels:
+- sig/network

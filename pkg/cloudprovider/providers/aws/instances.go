@@ -19,36 +19,41 @@ package aws
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/golang/glog"
+	"k8s.io/klog"
+
 	"k8s.io/api/core/v1"
-	"sync"
-	"time"
 )
 
-// awsInstanceID represents the ID of the instance in the AWS API, e.g. i-12345678
+// awsInstanceRegMatch represents Regex Match for AWS instance.
+var awsInstanceRegMatch = regexp.MustCompile("^i-[^/]*$")
+
+// InstanceID represents the ID of the instance in the AWS API, e.g. i-12345678
 // The "traditional" format is "i-12345678"
 // A new longer format is also being introduced: "i-12345678abcdef01"
 // We should not assume anything about the length or format, though it seems
 // reasonable to assume that instances will continue to start with "i-".
-type awsInstanceID string
+type InstanceID string
 
-func (i awsInstanceID) awsString() *string {
+func (i InstanceID) awsString() *string {
 	return aws.String(string(i))
 }
 
-// kubernetesInstanceID represents the id for an instance in the kubernetes API;
+// KubernetesInstanceID represents the id for an instance in the kubernetes API;
 // the following form
 //  * aws:///<zone>/<awsInstanceId>
 //  * aws:////<awsInstanceId>
 //  * <awsInstanceId>
-type kubernetesInstanceID string
+type KubernetesInstanceID string
 
-// mapToAWSInstanceID extracts the awsInstanceID from the kubernetesInstanceID
-func (name kubernetesInstanceID) mapToAWSInstanceID() (awsInstanceID, error) {
+// MapToAWSInstanceID extracts the InstanceID from the KubernetesInstanceID
+func (name KubernetesInstanceID) MapToAWSInstanceID() (InstanceID, error) {
 	s := string(name)
 
 	if !strings.HasPrefix(s, "aws://") {
@@ -76,22 +81,21 @@ func (name kubernetesInstanceID) mapToAWSInstanceID() (awsInstanceID, error) {
 
 	// We sanity check the resulting volume; the two known formats are
 	// i-12345678 and i-12345678abcdef01
-	// TODO: Regex match?
-	if awsID == "" || strings.Contains(awsID, "/") || !strings.HasPrefix(awsID, "i-") {
+	if awsID == "" || !awsInstanceRegMatch.MatchString(awsID) {
 		return "", fmt.Errorf("Invalid format for AWS instance (%s)", name)
 	}
 
-	return awsInstanceID(awsID), nil
+	return InstanceID(awsID), nil
 }
 
-// mapToAWSInstanceID extracts the awsInstanceIDs from the Nodes, returning an error if a Node cannot be mapped
-func mapToAWSInstanceIDs(nodes []*v1.Node) ([]awsInstanceID, error) {
-	var instanceIDs []awsInstanceID
+// mapToAWSInstanceID extracts the InstanceIDs from the Nodes, returning an error if a Node cannot be mapped
+func mapToAWSInstanceIDs(nodes []*v1.Node) ([]InstanceID, error) {
+	var instanceIDs []InstanceID
 	for _, node := range nodes {
 		if node.Spec.ProviderID == "" {
 			return nil, fmt.Errorf("node %q did not have ProviderID set", node.Name)
 		}
-		instanceID, err := kubernetesInstanceID(node.Spec.ProviderID).mapToAWSInstanceID()
+		instanceID, err := KubernetesInstanceID(node.Spec.ProviderID).MapToAWSInstanceID()
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse ProviderID %q for node %q", node.Spec.ProviderID, node.Name)
 		}
@@ -101,17 +105,17 @@ func mapToAWSInstanceIDs(nodes []*v1.Node) ([]awsInstanceID, error) {
 	return instanceIDs, nil
 }
 
-// mapToAWSInstanceIDsTolerant extracts the awsInstanceIDs from the Nodes, skipping Nodes that cannot be mapped
-func mapToAWSInstanceIDsTolerant(nodes []*v1.Node) []awsInstanceID {
-	var instanceIDs []awsInstanceID
+// mapToAWSInstanceIDsTolerant extracts the InstanceIDs from the Nodes, skipping Nodes that cannot be mapped
+func mapToAWSInstanceIDsTolerant(nodes []*v1.Node) []InstanceID {
+	var instanceIDs []InstanceID
 	for _, node := range nodes {
 		if node.Spec.ProviderID == "" {
-			glog.Warningf("node %q did not have ProviderID set", node.Name)
+			klog.Warningf("node %q did not have ProviderID set", node.Name)
 			continue
 		}
-		instanceID, err := kubernetesInstanceID(node.Spec.ProviderID).mapToAWSInstanceID()
+		instanceID, err := KubernetesInstanceID(node.Spec.ProviderID).MapToAWSInstanceID()
 		if err != nil {
-			glog.Warningf("unable to parse ProviderID %q for node %q", node.Spec.ProviderID, node.Name)
+			klog.Warningf("unable to parse ProviderID %q for node %q", node.Spec.ProviderID, node.Name)
 			continue
 		}
 		instanceIDs = append(instanceIDs, instanceID)
@@ -121,7 +125,7 @@ func mapToAWSInstanceIDsTolerant(nodes []*v1.Node) []awsInstanceID {
 }
 
 // Gets the full information about this instance from the EC2 API
-func describeInstance(ec2Client EC2, instanceID awsInstanceID) (*ec2.Instance, error) {
+func describeInstance(ec2Client EC2, instanceID InstanceID) (*ec2.Instance, error) {
 	request := &ec2.DescribeInstancesInput{
 		InstanceIds: []*string{instanceID.awsString()},
 	}
@@ -152,7 +156,7 @@ type instanceCache struct {
 func (c *instanceCache) describeAllInstancesUncached() (*allInstancesSnapshot, error) {
 	now := time.Now()
 
-	glog.V(4).Infof("EC2 DescribeInstances - fetching all instances")
+	klog.V(4).Infof("EC2 DescribeInstances - fetching all instances")
 
 	filters := []*ec2.Filter{}
 	instances, err := c.cloud.describeInstances(filters)
@@ -160,9 +164,9 @@ func (c *instanceCache) describeAllInstancesUncached() (*allInstancesSnapshot, e
 		return nil, err
 	}
 
-	m := make(map[awsInstanceID]*ec2.Instance)
+	m := make(map[InstanceID]*ec2.Instance)
 	for _, i := range instances {
-		id := awsInstanceID(aws.StringValue(i.InstanceId))
+		id := InstanceID(aws.StringValue(i.InstanceId))
 		m[id] = i
 	}
 
@@ -173,7 +177,7 @@ func (c *instanceCache) describeAllInstancesUncached() (*allInstancesSnapshot, e
 
 	if c.snapshot != nil && snapshot.olderThan(c.snapshot) {
 		// If this happens a lot, we could run this function in a mutex and only return one result
-		glog.Infof("Not caching concurrent AWS DescribeInstances results")
+		klog.Infof("Not caching concurrent AWS DescribeInstances results")
 	} else {
 		c.snapshot = snapshot
 	}
@@ -187,9 +191,9 @@ type cacheCriteria struct {
 	// If set to 0 (i.e. unset), cached values will not time out because of age.
 	MaxAge time.Duration
 
-	// HasInstances is a list of awsInstanceIDs that must be in a cached snapshot for it to be considered valid.
+	// HasInstances is a list of InstanceIDs that must be in a cached snapshot for it to be considered valid.
 	// If an instance is not found in the cached snapshot, the snapshot be ignored and we will re-fetch.
-	HasInstances []awsInstanceID
+	HasInstances []InstanceID
 }
 
 // describeAllInstancesCached returns all instances, using cached results if applicable
@@ -206,7 +210,7 @@ func (c *instanceCache) describeAllInstancesCached(criteria cacheCriteria) (*all
 			return nil, err
 		}
 	} else {
-		glog.V(6).Infof("EC2 DescribeInstances - using cached results")
+		klog.V(6).Infof("EC2 DescribeInstances - using cached results")
 	}
 
 	return snapshot, nil
@@ -232,7 +236,7 @@ func (s *allInstancesSnapshot) MeetsCriteria(criteria cacheCriteria) bool {
 		// Sub() is technically broken by time changes until we have monotonic time
 		now := time.Now()
 		if now.Sub(s.timestamp) > criteria.MaxAge {
-			glog.V(6).Infof("instanceCache snapshot cannot be used as is older than MaxAge=%s", criteria.MaxAge)
+			klog.V(6).Infof("instanceCache snapshot cannot be used as is older than MaxAge=%s", criteria.MaxAge)
 			return false
 		}
 	}
@@ -240,7 +244,7 @@ func (s *allInstancesSnapshot) MeetsCriteria(criteria cacheCriteria) bool {
 	if len(criteria.HasInstances) != 0 {
 		for _, id := range criteria.HasInstances {
 			if nil == s.instances[id] {
-				glog.V(6).Infof("instanceCache snapshot cannot be used as does not contain instance %s", id)
+				klog.V(6).Infof("instanceCache snapshot cannot be used as does not contain instance %s", id)
 				return false
 			}
 		}
@@ -253,12 +257,12 @@ func (s *allInstancesSnapshot) MeetsCriteria(criteria cacheCriteria) bool {
 // along with the timestamp for cache-invalidation purposes
 type allInstancesSnapshot struct {
 	timestamp time.Time
-	instances map[awsInstanceID]*ec2.Instance
+	instances map[InstanceID]*ec2.Instance
 }
 
 // FindInstances returns the instances corresponding to the specified ids.  If an id is not found, it is ignored.
-func (s *allInstancesSnapshot) FindInstances(ids []awsInstanceID) map[awsInstanceID]*ec2.Instance {
-	m := make(map[awsInstanceID]*ec2.Instance)
+func (s *allInstancesSnapshot) FindInstances(ids []InstanceID) map[InstanceID]*ec2.Instance {
+	m := make(map[InstanceID]*ec2.Instance)
 	for _, id := range ids {
 		instance := s.instances[id]
 		if instance != nil {

@@ -23,14 +23,14 @@ import (
 	"sort"
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 // compute a hash of a policy rule so we can sort in a deterministic order
-func hashOf(p rbac.PolicyRule) string {
+func hashOf(p rbacv1.PolicyRule) string {
 	hash := fnv.New32()
 	writeStrings := func(slis ...[]string) {
 		for _, sli := range slis {
@@ -44,68 +44,68 @@ func hashOf(p rbac.PolicyRule) string {
 }
 
 // byHash sorts a set of policy rules by a hash of its fields
-type byHash []rbac.PolicyRule
+type byHash []rbacv1.PolicyRule
 
 func (b byHash) Len() int           { return len(b) }
 func (b byHash) Less(i, j int) bool { return hashOf(b[i]) < hashOf(b[j]) }
 func (b byHash) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 
 func TestDefaultRuleResolver(t *testing.T) {
-	ruleReadPods := rbac.PolicyRule{
+	ruleReadPods := rbacv1.PolicyRule{
 		Verbs:     []string{"GET", "WATCH"},
 		APIGroups: []string{"v1"},
 		Resources: []string{"pods"},
 	}
-	ruleReadServices := rbac.PolicyRule{
+	ruleReadServices := rbacv1.PolicyRule{
 		Verbs:     []string{"GET", "WATCH"},
 		APIGroups: []string{"v1"},
 		Resources: []string{"services"},
 	}
-	ruleWriteNodes := rbac.PolicyRule{
+	ruleWriteNodes := rbacv1.PolicyRule{
 		Verbs:     []string{"PUT", "CREATE", "UPDATE"},
 		APIGroups: []string{"v1"},
 		Resources: []string{"nodes"},
 	}
-	ruleAdmin := rbac.PolicyRule{
+	ruleAdmin := rbacv1.PolicyRule{
 		Verbs:     []string{"*"},
 		APIGroups: []string{"*"},
 		Resources: []string{"*"},
 	}
 
 	staticRoles1 := StaticRoles{
-		roles: []*rbac.Role{
+		roles: []*rbacv1.Role{
 			{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "namespace1", Name: "readthings"},
-				Rules:      []rbac.PolicyRule{ruleReadPods, ruleReadServices},
+				Rules:      []rbacv1.PolicyRule{ruleReadPods, ruleReadServices},
 			},
 		},
-		clusterRoles: []*rbac.ClusterRole{
+		clusterRoles: []*rbacv1.ClusterRole{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster-admin"},
-				Rules:      []rbac.PolicyRule{ruleAdmin},
+				Rules:      []rbacv1.PolicyRule{ruleAdmin},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "write-nodes"},
-				Rules:      []rbac.PolicyRule{ruleWriteNodes},
+				Rules:      []rbacv1.PolicyRule{ruleWriteNodes},
 			},
 		},
-		roleBindings: []*rbac.RoleBinding{
+		roleBindings: []*rbacv1.RoleBinding{
 			{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "namespace1"},
-				Subjects: []rbac.Subject{
-					{Kind: rbac.UserKind, Name: "foobar"},
-					{Kind: rbac.GroupKind, Name: "group1"},
+				Subjects: []rbacv1.Subject{
+					{Kind: rbacv1.UserKind, Name: "foobar"},
+					{Kind: rbacv1.GroupKind, Name: "group1"},
 				},
-				RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: "readthings"},
+				RoleRef: rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: "readthings"},
 			},
 		},
-		clusterRoleBindings: []*rbac.ClusterRoleBinding{
+		clusterRoleBindings: []*rbacv1.ClusterRoleBinding{
 			{
-				Subjects: []rbac.Subject{
-					{Kind: rbac.UserKind, Name: "admin"},
-					{Kind: rbac.GroupKind, Name: "admin"},
+				Subjects: []rbacv1.Subject{
+					{Kind: rbacv1.UserKind, Name: "admin"},
+					{Kind: rbacv1.GroupKind, Name: "admin"},
 				},
-				RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: "cluster-admin"},
+				RoleRef: rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: "cluster-admin"},
 			},
 		},
 	}
@@ -116,13 +116,13 @@ func TestDefaultRuleResolver(t *testing.T) {
 		// For a given context, what are the rules that apply?
 		user           user.Info
 		namespace      string
-		effectiveRules []rbac.PolicyRule
+		effectiveRules []rbacv1.PolicyRule
 	}{
 		{
 			StaticRoles:    staticRoles1,
 			user:           &user.DefaultInfo{Name: "foobar"},
 			namespace:      "namespace1",
-			effectiveRules: []rbac.PolicyRule{ruleReadPods, ruleReadServices},
+			effectiveRules: []rbacv1.PolicyRule{ruleReadPods, ruleReadServices},
 		},
 		{
 			StaticRoles:    staticRoles1,
@@ -134,7 +134,7 @@ func TestDefaultRuleResolver(t *testing.T) {
 			StaticRoles: staticRoles1,
 			// Same as above but without a namespace. Only cluster rules should apply.
 			user:           &user.DefaultInfo{Name: "foobar", Groups: []string{"admin"}},
-			effectiveRules: []rbac.PolicyRule{ruleAdmin},
+			effectiveRules: []rbacv1.PolicyRule{ruleAdmin},
 		},
 		{
 			StaticRoles:    staticRoles1,
@@ -164,71 +164,77 @@ func TestDefaultRuleResolver(t *testing.T) {
 
 func TestAppliesTo(t *testing.T) {
 	tests := []struct {
-		subjects  []rbac.Subject
+		subjects  []rbacv1.Subject
 		user      user.Info
 		namespace string
 		appliesTo bool
+		index     int
 		testCase  string
 	}{
 		{
-			subjects: []rbac.Subject{
-				{Kind: rbac.UserKind, Name: "foobar"},
+			subjects: []rbacv1.Subject{
+				{Kind: rbacv1.UserKind, Name: "foobar"},
 			},
 			user:      &user.DefaultInfo{Name: "foobar"},
 			appliesTo: true,
+			index:     0,
 			testCase:  "single subject that matches username",
 		},
 		{
-			subjects: []rbac.Subject{
-				{Kind: rbac.UserKind, Name: "barfoo"},
-				{Kind: rbac.UserKind, Name: "foobar"},
+			subjects: []rbacv1.Subject{
+				{Kind: rbacv1.UserKind, Name: "barfoo"},
+				{Kind: rbacv1.UserKind, Name: "foobar"},
 			},
 			user:      &user.DefaultInfo{Name: "foobar"},
 			appliesTo: true,
+			index:     1,
 			testCase:  "multiple subjects, one that matches username",
 		},
 		{
-			subjects: []rbac.Subject{
-				{Kind: rbac.UserKind, Name: "barfoo"},
-				{Kind: rbac.UserKind, Name: "foobar"},
+			subjects: []rbacv1.Subject{
+				{Kind: rbacv1.UserKind, Name: "barfoo"},
+				{Kind: rbacv1.UserKind, Name: "foobar"},
 			},
 			user:      &user.DefaultInfo{Name: "zimzam"},
 			appliesTo: false,
 			testCase:  "multiple subjects, none that match username",
 		},
 		{
-			subjects: []rbac.Subject{
-				{Kind: rbac.UserKind, Name: "barfoo"},
-				{Kind: rbac.GroupKind, Name: "foobar"},
+			subjects: []rbacv1.Subject{
+				{Kind: rbacv1.UserKind, Name: "barfoo"},
+				{Kind: rbacv1.GroupKind, Name: "foobar"},
 			},
 			user:      &user.DefaultInfo{Name: "zimzam", Groups: []string{"foobar"}},
 			appliesTo: true,
+			index:     1,
 			testCase:  "multiple subjects, one that match group",
 		},
 		{
-			subjects: []rbac.Subject{
-				{Kind: rbac.UserKind, Name: "barfoo"},
-				{Kind: rbac.GroupKind, Name: "foobar"},
+			subjects: []rbacv1.Subject{
+				{Kind: rbacv1.UserKind, Name: "barfoo"},
+				{Kind: rbacv1.GroupKind, Name: "foobar"},
 			},
 			user:      &user.DefaultInfo{Name: "zimzam", Groups: []string{"foobar"}},
 			namespace: "namespace1",
 			appliesTo: true,
+			index:     1,
 			testCase:  "multiple subjects, one that match group, should ignore namespace",
 		},
 		{
-			subjects: []rbac.Subject{
-				{Kind: rbac.UserKind, Name: "barfoo"},
-				{Kind: rbac.GroupKind, Name: "foobar"},
-				{Kind: rbac.ServiceAccountKind, Namespace: "kube-system", Name: "default"},
+			subjects: []rbacv1.Subject{
+				{Kind: rbacv1.UserKind, Name: "barfoo"},
+				{Kind: rbacv1.GroupKind, Name: "foobar"},
+				{Kind: rbacv1.ServiceAccountKind, Namespace: "kube-system", Name: "default"},
 			},
 			user:      &user.DefaultInfo{Name: "system:serviceaccount:kube-system:default"},
 			namespace: "default",
 			appliesTo: true,
+			index:     2,
 			testCase:  "multiple subjects with a service account that matches",
 		},
 		{
-			subjects: []rbac.Subject{
-				{Kind: rbac.UserKind, Name: "*"},
+			subjects: []rbacv1.Subject{
+				{Kind: rbacv1.UserKind, Name: "*"},
 			},
 			user:      &user.DefaultInfo{Name: "foobar"},
 			namespace: "default",
@@ -236,31 +242,36 @@ func TestAppliesTo(t *testing.T) {
 			testCase:  "* user subject name doesn't match all users",
 		},
 		{
-			subjects: []rbac.Subject{
-				{Kind: rbac.GroupKind, Name: user.AllAuthenticated},
-				{Kind: rbac.GroupKind, Name: user.AllUnauthenticated},
+			subjects: []rbacv1.Subject{
+				{Kind: rbacv1.GroupKind, Name: user.AllAuthenticated},
+				{Kind: rbacv1.GroupKind, Name: user.AllUnauthenticated},
 			},
 			user:      &user.DefaultInfo{Name: "foobar", Groups: []string{user.AllAuthenticated}},
 			namespace: "default",
 			appliesTo: true,
+			index:     0,
 			testCase:  "binding to all authenticated and unauthenticated subjects matches authenticated user",
 		},
 		{
-			subjects: []rbac.Subject{
-				{Kind: rbac.GroupKind, Name: user.AllAuthenticated},
-				{Kind: rbac.GroupKind, Name: user.AllUnauthenticated},
+			subjects: []rbacv1.Subject{
+				{Kind: rbacv1.GroupKind, Name: user.AllAuthenticated},
+				{Kind: rbacv1.GroupKind, Name: user.AllUnauthenticated},
 			},
 			user:      &user.DefaultInfo{Name: "system:anonymous", Groups: []string{user.AllUnauthenticated}},
 			namespace: "default",
 			appliesTo: true,
+			index:     1,
 			testCase:  "binding to all authenticated and unauthenticated subjects matches anonymous user",
 		},
 	}
 
 	for _, tc := range tests {
-		got := appliesTo(tc.user, tc.subjects, tc.namespace)
+		gotIndex, got := appliesTo(tc.user, tc.subjects, tc.namespace)
 		if got != tc.appliesTo {
 			t.Errorf("case %q want appliesTo=%t, got appliesTo=%t", tc.testCase, tc.appliesTo, got)
+		}
+		if gotIndex != tc.index {
+			t.Errorf("case %q want index %d, got %d", tc.testCase, tc.index, gotIndex)
 		}
 	}
 }

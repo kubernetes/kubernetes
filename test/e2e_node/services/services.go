@@ -22,9 +22,10 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"testing"
 
-	"github.com/golang/glog"
 	"github.com/kardianos/osext"
+	"k8s.io/klog"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -85,19 +86,19 @@ func (e *E2EServices) Stop() {
 	}()
 	if e.services != nil {
 		if err := e.services.kill(); err != nil {
-			glog.Errorf("Failed to stop services: %v", err)
+			klog.Errorf("Failed to stop services: %v", err)
 		}
 	}
 	if e.kubelet != nil {
 		if err := e.kubelet.kill(); err != nil {
-			glog.Errorf("Failed to stop kubelet: %v", err)
+			klog.Errorf("Failed to stop kubelet: %v", err)
 		}
 	}
 	if e.rmDirs != nil {
 		for _, d := range e.rmDirs {
 			err := os.RemoveAll(d)
 			if err != nil {
-				glog.Errorf("Failed to delete directory %s: %v", d, err)
+				klog.Errorf("Failed to delete directory %s: %v", d, err)
 			}
 		}
 	}
@@ -105,13 +106,13 @@ func (e *E2EServices) Stop() {
 
 // RunE2EServices actually start the e2e services. This function is used to
 // start e2e services in current process. This is only used in run-services-mode.
-func RunE2EServices() {
+func RunE2EServices(t *testing.T) {
 	// Populate global DefaultFeatureGate with value from TestContext.FeatureGates.
 	// This way, statically-linked components see the same feature gate config as the test context.
-	utilfeature.DefaultFeatureGate.Set(framework.TestContext.FeatureGates)
+	utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
 	e := newE2EServices()
-	if err := e.run(); err != nil {
-		glog.Fatalf("Failed to run e2e services: %v", err)
+	if err := e.run(t); err != nil {
+		klog.Fatalf("Failed to run e2e services: %v", err)
 	}
 }
 
@@ -142,7 +143,7 @@ func (e *E2EServices) collectLogFiles() {
 	if framework.TestContext.ReportDir == "" {
 		return
 	}
-	glog.Info("Fetching log files...")
+	klog.Info("Fetching log files...")
 	journaldFound := isJournaldAvailable()
 	for targetFileName, log := range e.logs {
 		targetLink := path.Join(framework.TestContext.ReportDir, targetFileName)
@@ -151,13 +152,13 @@ func (e *E2EServices) collectLogFiles() {
 			if len(log.JournalctlCommand) == 0 {
 				continue
 			}
-			glog.Infof("Get log file %q with journalctl command %v.", targetFileName, log.JournalctlCommand)
+			klog.Infof("Get log file %q with journalctl command %v.", targetFileName, log.JournalctlCommand)
 			out, err := exec.Command("journalctl", log.JournalctlCommand...).CombinedOutput()
 			if err != nil {
-				glog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
+				klog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
 			} else {
 				if err = ioutil.WriteFile(targetLink, out, 0644); err != nil {
-					glog.Errorf("failed to write logs to %q: %v", targetLink, err)
+					klog.Errorf("failed to write logs to %q: %v", targetLink, err)
 				}
 			}
 			continue
@@ -168,7 +169,7 @@ func (e *E2EServices) collectLogFiles() {
 				continue
 			}
 			if err := copyLogFile(file, targetLink); err != nil {
-				glog.Error(err)
+				klog.Error(err)
 			} else {
 				break
 			}

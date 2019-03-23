@@ -1,7 +1,0 @@
-kind: StorageClass
-apiVersion: storage.k8s.io/v1beta1
-metadata:
-  name: thin-disk
-provisioner: kubernetes.io/vsphere-volume
-parameters:
-    diskformat: thin

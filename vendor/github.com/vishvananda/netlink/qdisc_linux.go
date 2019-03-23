@@ -160,71 +160,73 @@ func qdiscPayload(req *nl.NetlinkRequest, qdisc Qdisc) error {
 	req.AddData(nl.NewRtAttr(nl.TCA_KIND, nl.ZeroTerminated(qdisc.Type())))
 
 	options := nl.NewRtAttr(nl.TCA_OPTIONS, nil)
-	if prio, ok := qdisc.(*Prio); ok {
+
+	switch qdisc := qdisc.(type) {
+	case *Prio:
 		tcmap := nl.TcPrioMap{
-			Bands:   int32(prio.Bands),
-			Priomap: prio.PriorityMap,
+			Bands:   int32(qdisc.Bands),
+			Priomap: qdisc.PriorityMap,
 		}
 		options = nl.NewRtAttr(nl.TCA_OPTIONS, tcmap.Serialize())
-	} else if tbf, ok := qdisc.(*Tbf); ok {
+	case *Tbf:
 		opt := nl.TcTbfQopt{}
-		opt.Rate.Rate = uint32(tbf.Rate)
-		opt.Peakrate.Rate = uint32(tbf.Peakrate)
-		opt.Limit = tbf.Limit
-		opt.Buffer = tbf.Buffer
+		opt.Rate.Rate = uint32(qdisc.Rate)
+		opt.Peakrate.Rate = uint32(qdisc.Peakrate)
+		opt.Limit = qdisc.Limit
+		opt.Buffer = qdisc.Buffer
 		nl.NewRtAttrChild(options, nl.TCA_TBF_PARMS, opt.Serialize())
-		if tbf.Rate >= uint64(1<<32) {
-			nl.NewRtAttrChild(options, nl.TCA_TBF_RATE64, nl.Uint64Attr(tbf.Rate))
+		if qdisc.Rate >= uint64(1<<32) {
+			nl.NewRtAttrChild(options, nl.TCA_TBF_RATE64, nl.Uint64Attr(qdisc.Rate))
 		}
-		if tbf.Peakrate >= uint64(1<<32) {
-			nl.NewRtAttrChild(options, nl.TCA_TBF_PRATE64, nl.Uint64Attr(tbf.Peakrate))
+		if qdisc.Peakrate >= uint64(1<<32) {
+			nl.NewRtAttrChild(options, nl.TCA_TBF_PRATE64, nl.Uint64Attr(qdisc.Peakrate))
 		}
-		if tbf.Peakrate > 0 {
-			nl.NewRtAttrChild(options, nl.TCA_TBF_PBURST, nl.Uint32Attr(tbf.Minburst))
+		if qdisc.Peakrate > 0 {
+			nl.NewRtAttrChild(options, nl.TCA_TBF_PBURST, nl.Uint32Attr(qdisc.Minburst))
 		}
-	} else if htb, ok := qdisc.(*Htb); ok {
+	case *Htb:
 		opt := nl.TcHtbGlob{}
-		opt.Version = htb.Version
-		opt.Rate2Quantum = htb.Rate2Quantum
-		opt.Defcls = htb.Defcls
+		opt.Version = qdisc.Version
+		opt.Rate2Quantum = qdisc.Rate2Quantum
+		opt.Defcls = qdisc.Defcls
 		// TODO: Handle Debug properly. For now default to 0
-		opt.Debug = htb.Debug
-		opt.DirectPkts = htb.DirectPkts
+		opt.Debug = qdisc.Debug
+		opt.DirectPkts = qdisc.DirectPkts
 		nl.NewRtAttrChild(options, nl.TCA_HTB_INIT, opt.Serialize())
 		// nl.NewRtAttrChild(options, nl.TCA_HTB_DIRECT_QLEN, opt.Serialize())
-	} else if netem, ok := qdisc.(*Netem); ok {
+	case *Netem:
 		opt := nl.TcNetemQopt{}
-		opt.Latency = netem.Latency
-		opt.Limit = netem.Limit
-		opt.Loss = netem.Loss
-		opt.Gap = netem.Gap
-		opt.Duplicate = netem.Duplicate
-		opt.Jitter = netem.Jitter
+		opt.Latency = qdisc.Latency
+		opt.Limit = qdisc.Limit
+		opt.Loss = qdisc.Loss
+		opt.Gap = qdisc.Gap
+		opt.Duplicate = qdisc.Duplicate
+		opt.Jitter = qdisc.Jitter
 		options = nl.NewRtAttr(nl.TCA_OPTIONS, opt.Serialize())
 		// Correlation
 		corr := nl.TcNetemCorr{}
-		corr.DelayCorr = netem.DelayCorr
-		corr.LossCorr = netem.LossCorr
-		corr.DupCorr = netem.DuplicateCorr
+		corr.DelayCorr = qdisc.DelayCorr
+		corr.LossCorr = qdisc.LossCorr
+		corr.DupCorr = qdisc.DuplicateCorr
 
 		if corr.DelayCorr > 0 || corr.LossCorr > 0 || corr.DupCorr > 0 {
 			nl.NewRtAttrChild(options, nl.TCA_NETEM_CORR, corr.Serialize())
 		}
 		// Corruption
 		corruption := nl.TcNetemCorrupt{}
-		corruption.Probability = netem.CorruptProb
-		corruption.Correlation = netem.CorruptCorr
+		corruption.Probability = qdisc.CorruptProb
+		corruption.Correlation = qdisc.CorruptCorr
 		if corruption.Probability > 0 {
 			nl.NewRtAttrChild(options, nl.TCA_NETEM_CORRUPT, corruption.Serialize())
 		}
 		// Reorder
 		reorder := nl.TcNetemReorder{}
-		reorder.Probability = netem.ReorderProb
-		reorder.Correlation = netem.ReorderCorr
+		reorder.Probability = qdisc.ReorderProb
+		reorder.Correlation = qdisc.ReorderCorr
 		if reorder.Probability > 0 {
 			nl.NewRtAttrChild(options, nl.TCA_NETEM_REORDER, reorder.Serialize())
 		}
-	} else if _, ok := qdisc.(*Ingress); ok {
+	case *Ingress:
 		// ingress filters must use the proper handle
 		if qdisc.Attrs().Parent != HANDLE_INGRESS {
 			return fmt.Errorf("Ingress filters must set Parent to HANDLE_INGRESS")
