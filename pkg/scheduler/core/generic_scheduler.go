@@ -94,7 +94,7 @@ func (f *FitError) Error() string {
 		for k, v := range reasons {
 			reasonStrings = append(reasonStrings, fmt.Sprintf("%5v %v", v, k))
 		}
-		sort.Strings(reasonStrings)
+		sort.Sort(sort.Reverse(sort.StringSlice(reasonStrings)))
 		return reasonStrings
 	}
 	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
