@@ -92,7 +92,7 @@ func (f *FitError) Error() string {
 	sortReasonsHistogram := func() []string {
 		reasonStrings := []string{}
 		for k, v := range reasons {
-			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
+			reasonStrings = append(reasonStrings, fmt.Sprintf("%5v %v", v, k))
 		}
 		sort.Strings(reasonStrings)
 		return reasonStrings
