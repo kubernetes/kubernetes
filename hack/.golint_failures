@@ -15,7 +15,6 @@ pkg/apis/apps/v1beta1
 pkg/apis/apps/v1beta2
 pkg/apis/apps/validation
 pkg/apis/auditregistration/v1alpha1
-pkg/apis/authentication
 pkg/apis/authentication/v1
 pkg/apis/authorization
 pkg/apis/authorization/v1
@@ -33,7 +32,6 @@ pkg/apis/batch/validation
 pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation
-pkg/apis/coordination
 pkg/apis/core
 pkg/apis/core/helper
 pkg/apis/core/helper/qos
@@ -42,11 +40,9 @@ pkg/apis/core/v1/helper
 pkg/apis/core/v1/helper/qos
 pkg/apis/core/v1/validation
 pkg/apis/core/validation
-pkg/apis/events
 pkg/apis/events/v1beta1
 pkg/apis/extensions
 pkg/apis/extensions/v1beta1
-pkg/apis/imagepolicy
 pkg/apis/networking
 pkg/apis/networking/v1
 pkg/apis/node/v1alpha1
@@ -59,7 +55,6 @@ pkg/apis/rbac/v1alpha1
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
 pkg/apis/scheduling
-pkg/apis/settings
 pkg/apis/storage
 pkg/apis/storage/util
 pkg/apis/storage/v1
