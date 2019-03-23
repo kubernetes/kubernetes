@@ -123,7 +123,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
-	ginkgo.It("should exceed active deadline", func() {
+	ginkgo.It("should fail when exceeds active deadline", func() {
 		ginkgo.By("Creating a job")
 		var activeDeadlineSeconds int64 = 1
 		job := jobutil.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
