@@ -27,7 +27,9 @@ import (
 
 	// Cloud providers
 	cloudprovider "k8s.io/cloud-provider"
+	// Providers packaged internally
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"

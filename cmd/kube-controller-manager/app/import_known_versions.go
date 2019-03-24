@@ -16,10 +16,11 @@ limitations under the License.
 
 // TODO: Remove this file when namespace controller and garbage collector
 // stops using legacyscheme.Registry.RESTMapper()
+
 package app
 
-// These imports are the API groups the client will support.
 import (
+	// These imports are the API groups the client will support.
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
