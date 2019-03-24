@@ -399,7 +399,6 @@ func (vs *VSphere) cleanUpDummyVMs(dummyVMPrefix string) {
 // Example2: The canonical path for volume path - [vsanDatastore] 25d8b159-948c-4b73-e499-02001ad1b044/volume.vmdk will be same as volume Path.
 func getcanonicalVolumePath(ctx context.Context, dc *vclib.Datacenter, volumePath string) (string, error) {
 	var folderID string
-	var folderExists bool
 	canonicalVolumePath := volumePath
 	dsPathObj, err := vclib.GetDatastorePathObjFromVMDiskPath(volumePath)
 	if err != nil {
@@ -411,29 +410,22 @@ func getcanonicalVolumePath(ctx context.Context, dc *vclib.Datacenter, volumePat
 	}
 	datastore := dsPathObj.Datastore
 	dsFolder := dsPath[0]
-	folderNameIDMap, datastoreExists := datastoreFolderIDMap[datastore]
-	if datastoreExists {
-		folderID, folderExists = folderNameIDMap[dsFolder]
-	}
-	// Get the datastore folder ID if datastore or folder doesn't exist in datastoreFolderIDMap
-	if !datastoreExists || !folderExists {
-		if !vclib.IsValidUUID(dsFolder) {
-			dummyDiskVolPath := "[" + datastore + "] " + dsFolder + "/" + DummyDiskName
-			// Querying a non-existent dummy disk on the datastore folder.
-			// It would fail and return an folder ID in the error message.
-			_, err := dc.GetVirtualDiskPage83Data(ctx, dummyDiskVolPath)
-			canonicalVolumePath, err = getPathFromFileNotFound(err)
-			if err != nil {
-				return "", fmt.Errorf("failed to get path from dummy request: %v", err)
-			}
+
+	if !vclib.IsValidUUID(dsFolder) {
+		dummyDiskVolPath := "[" + datastore + "] " + dsFolder + "/" + DummyDiskName
+		// Querying a non-existent dummy disk on the datastore folder.
+		// It would fail and return an folder ID in the error message.
+		_, err := dc.GetVirtualDiskPage83Data(ctx, dummyDiskVolPath)
+		canonicalVolumePath, err = getPathFromFileNotFound(err)
+		if err != nil {
+			return "", fmt.Errorf("failed to get path from dummy request: %v", err)
 		}
-		diskPath := vclib.GetPathFromVMDiskPath(canonicalVolumePath)
-		if diskPath == "" {
-			return "", fmt.Errorf("Failed to parse canonicalVolumePath: %s in getcanonicalVolumePath method", canonicalVolumePath)
-		}
-		folderID = strings.Split(strings.TrimSpace(diskPath), "/")[0]
-		setdatastoreFolderIDMap(datastoreFolderIDMap, datastore, dsFolder, folderID)
 	}
+	diskPath := vclib.GetPathFromVMDiskPath(canonicalVolumePath)
+	if diskPath == "" {
+		return "", fmt.Errorf("Failed to parse canonicalVolumePath: %s in getcanonicalVolumePath method", canonicalVolumePath)
+	}
+	folderID = strings.Split(strings.TrimSpace(diskPath), "/")[0]
 	canonicalVolumePath = strings.Replace(volumePath, dsFolder, folderID, 1)
 	return canonicalVolumePath, nil
 }
@@ -449,19 +441,6 @@ func getPathFromFileNotFound(err error) (string, error) {
 		return f.File, nil
 	}
 	return "", fmt.Errorf("%v is not a soap fault", err)
-}
-
-func setdatastoreFolderIDMap(
-	datastoreFolderIDMap map[string]map[string]string,
-	datastore string,
-	folderName string,
-	folderID string) {
-	folderNameIDMap := datastoreFolderIDMap[datastore]
-	if folderNameIDMap == nil {
-		folderNameIDMap = make(map[string]string)
-		datastoreFolderIDMap[datastore] = folderNameIDMap
-	}
-	folderNameIDMap[folderName] = folderID
 }
 
 func convertVolPathToDevicePath(ctx context.Context, dc *vclib.Datacenter, volPath string) (string, error) {

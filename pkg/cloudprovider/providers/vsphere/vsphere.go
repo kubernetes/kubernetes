@@ -61,7 +61,6 @@ const (
 )
 
 var cleanUpRoutineInitialized = false
-var datastoreFolderIDMap = make(map[string]map[string]string)
 
 var cleanUpRoutineInitLock sync.Mutex
 var cleanUpDummyVMLock sync.RWMutex
