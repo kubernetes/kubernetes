@@ -28,7 +28,7 @@ import (
 
 func TestCloudControllerManagerDefaultsRoundTrip(t *testing.T) {
 	ks1 := &CloudControllerManagerConfiguration{}
-	SetDefaults_CloudControllerManagerConfiguration(ks1)
+	SetDefaultsCloudControllerManagerConfiguration(ks1)
 	cm, err := convertObjToConfigMap("CloudControllerManagerConfiguration", ks1)
 	if err != nil {
 		t.Errorf("unexpected ConvertObjToConfigMap error %v", err)
