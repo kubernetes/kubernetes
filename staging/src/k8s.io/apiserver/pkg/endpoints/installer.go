@@ -115,6 +115,19 @@ var toDiscoveryKubeVerb = map[string]string{
 	"WATCHLIST":        "watch",
 }
 
+// toRESTMethod maps an action.Verb to the RESTful method
+var toRESTMethod = map[string]string{
+	"DELETE":           "DELETE",
+	"DELETECOLLECTION": "DELETE",
+	"GET":              "GET",
+	"LIST":             "GET",
+	"PATCH":            "PATCH",
+	"POST":             "POST",
+	"PUT":              "PUT",
+	"WATCH":            "GET",
+	"WATCHLIST":        "GET",
+}
+
 // Install handlers for API resources.
 func (a *APIInstaller) Install() ([]metav1.APIResource, *restful.WebService, []error) {
 	var apiResources []metav1.APIResource
@@ -685,7 +698,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if action.Verb == "CONNECT" {
 			routes, err = registerCONNECTToWebService(action, ws, namespaceScoped, isSubresource, isLister, isWatcher, isGracefulDeleter, kind, subresource, storageMeta, connecter, kubeVerbs)
 		} else {
-			routes, err = registerActionsToWebService(action, ws, namespaceScoped, isSubresource, isLister, isWatcher, isGracefulDeleter, kind, subresource)
+			doc, err := documentationAction(action, kind, subresource, isSubresource, isLister, isWatcher)
+			if err != nil {
+				return nil, err
+			}
+			routes, err = registerActionsToWebService(action, ws, namespaceScoped, isSubresource, isLister, isWatcher, isGracefulDeleter, kind, subresource, toRESTMethod[action.Verb], doc)
 		}
 		if err != nil {
 			return nil, err
@@ -852,38 +869,19 @@ func (a *action) assignReadSample(defaultVersionedObject, versionedDeleterObject
 	return a
 }
 
-func registerActionsToWebService(action *action, ws *restful.WebService, isNamespaced, isSubresource, isLister, isWatcher, isGracefulDeleter bool, kind, subresource string) ([]*restful.RouteBuilder, error) {
-	var namespaced string
-	var operationSuffix string
-	if isNamespaced {
-		namespaced = "Namespaced"
-	}
-	if strings.HasSuffix(action.Path, "/{path:*}") {
-		operationSuffix = operationSuffix + "WithPath"
-	}
-	if action.AllNamespaces {
-		operationSuffix = operationSuffix + "ForAllNamespaces"
-		namespaced = ""
-	}
-
-	routes := []*restful.RouteBuilder{}
-	var doc, method, operation string
-	var route *restful.RouteBuilder
+func documentationAction(action *action, kind, subresource string, isSubresource, isLister, isWatcher bool) (string, error) {
+	var doc string
 	switch action.Verb {
 	case "GET": // Get a resource.
 		doc = "read the specified " + kind
 		if isSubresource {
 			doc = "read " + subresource + " of the specified " + kind
 		}
-		method = "GET"
-		operation = "read"
 	case "LIST": // List all resources of a kind.
 		doc = "list objects of kind " + kind
 		if isSubresource {
 			doc = "list " + subresource + " of objects of kind " + kind
 		}
-		method = "GET"
-		operation = "list"
 		switch {
 		case isLister && isWatcher:
 			doc = "list or watch objects of kind " + kind
@@ -901,38 +899,28 @@ func registerActionsToWebService(action *action, ws *restful.WebService, isNames
 		if isSubresource {
 			doc = "replace " + subresource + " of the specified " + kind
 		}
-		method = "PUT"
-		operation = "replace"
 	case "PATCH": // Partially update a resource
 		doc = "partially update the specified " + kind
 		if isSubresource {
 			doc = "partially update " + subresource + " of the specified " + kind
 		}
-		method = "PATCH"
-		operation = "patch"
 	case "POST": // Create a resource.
 		article := GetArticleForNoun(kind, " ")
 		doc = "create" + article + kind
 		if isSubresource {
 			doc = "create " + subresource + " of" + article + kind
 		}
-		method = "POST"
-		operation = "create"
 	case "DELETE": // Delete a resource.
 		article := GetArticleForNoun(kind, " ")
 		doc = "delete" + article + kind
 		if isSubresource {
 			doc = "delete " + subresource + " of" + article + kind
 		}
-		method = "DELETE"
-		operation = "delete"
 	case "DELETECOLLECTION":
 		doc = "delete collection of " + kind
 		if isSubresource {
 			doc = "delete collection of " + subresource + " of a " + kind
 		}
-		method = "DELETE"
-		operation = "deletecollection"
 	// deprecated in 1.11
 	case "WATCH": // Watch a resource.
 		doc = "watch changes to an object of kind " + kind
@@ -940,16 +928,55 @@ func registerActionsToWebService(action *action, ws *restful.WebService, isNames
 			doc = "watch changes to " + subresource + " of an object of kind " + kind
 		}
 		doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
-		method = "GET"
-		operation = "watch"
-	// deprecated in 1.11
 	case "WATCHLIST": // Watch all resources of a kind.
 		doc = "watch individual changes to a list of " + kind
 		if isSubresource {
 			doc = "watch individual changes to a list of " + subresource + " of " + kind
 		}
 		doc += ". deprecated: use the 'watch' parameter with a list operation instead."
-		method = "GET"
+	default:
+		return "", fmt.Errorf("unrecognized action verb: %s", action.Verb)
+	}
+	return doc, nil
+}
+
+func registerActionsToWebService(action *action, ws *restful.WebService, isNamespaced, isSubresource, isLister, isWatcher, isGracefulDeleter bool, kind, subresource, method, doc string) ([]*restful.RouteBuilder, error) {
+	var namespaced string
+	var operationSuffix string
+	if isNamespaced {
+		namespaced = "Namespaced"
+	}
+	if strings.HasSuffix(action.Path, "/{path:*}") {
+		operationSuffix = operationSuffix + "WithPath"
+	}
+	if action.AllNamespaces {
+		operationSuffix = operationSuffix + "ForAllNamespaces"
+		namespaced = ""
+	}
+
+	routes := []*restful.RouteBuilder{}
+	var operation string
+	var route *restful.RouteBuilder
+	switch action.Verb {
+	case "GET": // Get a resource.
+		operation = "read"
+	case "LIST": // List all resources of a kind.
+		operation = "list"
+	case "PUT": // Update a resource.
+		operation = "replace"
+	case "PATCH": // Partially update a resource
+		operation = "patch"
+	case "POST": // Create a resource.
+		operation = "create"
+	case "DELETE": // Delete a resource.
+		operation = "delete"
+	case "DELETECOLLECTION":
+		operation = "deletecollection"
+	// deprecated in 1.11
+	case "WATCH": // Watch a resource.
+		operation = "watch"
+	// deprecated in 1.11
+	case "WATCHLIST": // Watch all resources of a kind.
 		operation = "watch"
 	default:
 		return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
