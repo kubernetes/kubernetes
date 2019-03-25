@@ -28,7 +28,7 @@ kube::log::errexit() {
 
   set +o xtrace
   local code="${1:-1}"
-  # Print out the stack trace described by $function_stack  
+  # Print out the stack trace described by $function_stack
   if [ ${#FUNCNAME[@]} -gt 2 ]
   then
     kube::log::error "Call tree:"
@@ -36,7 +36,7 @@ kube::log::errexit() {
     do
       kube::log::error " ${i}: ${BASH_SOURCE[${i}+1]}:${BASH_LINENO[${i}]} ${FUNCNAME[${i}]}(...)"
     done
-  fi  
+  fi
   kube::log::error_exit "Error in ${BASH_SOURCE[1]}:${BASH_LINENO[0]}. '${BASH_COMMAND}' exited with status ${err}" "${1:-1}" 1
 }
 

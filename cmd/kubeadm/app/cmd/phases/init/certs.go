@@ -54,16 +54,6 @@ var (
 	csrDir  string
 )
 
-// certsData defines the behavior that a runtime data struct passed to the certs phase should
-// have. Please note that we are using an interface in order to make this phase reusable in different workflows
-// (and thus with different runtime data struct, all of them requested to be compliant to this interface)
-type certsData interface {
-	Cfg() *kubeadmapi.InitConfiguration
-	ExternalCA() bool
-	CertificateDir() string
-	CertificateWriteDir() string
-}
-
 // NewCertsPhase returns the phase for the certs
 func NewCertsPhase() workflow.Phase {
 	return workflow.Phase{
@@ -193,14 +183,14 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 }
 
 func runCertsSa(c workflow.RunData) error {
-	data, ok := c.(certsData)
+	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("certs phase invoked with an invalid data struct")
 	}
 
 	// if external CA mode, skip service account key generation
 	if data.ExternalCA() {
-		fmt.Printf("[certs] External CA mode: Using existing sa keys\n")
+		fmt.Printf("[certs] Using existing sa keys\n")
 		return nil
 	}
 
@@ -209,7 +199,7 @@ func runCertsSa(c workflow.RunData) error {
 }
 
 func runCerts(c workflow.RunData) error {
-	data, ok := c.(certsData)
+	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("certs phase invoked with an invalid data struct")
 	}
@@ -220,18 +210,17 @@ func runCerts(c workflow.RunData) error {
 
 func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
-		data, ok := c.(certsData)
+		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("certs phase invoked with an invalid data struct")
 		}
 
-		// TODO(EKF): can we avoid loading these certificates every time?
 		if _, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 			if _, err := pkiutil.TryLoadKeyFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
 				return nil
 			}
-			fmt.Printf("[certs] Using existing %s keyless certificate authority", ca.BaseName)
+			fmt.Printf("[certs] Using existing %s keyless certificate authority\n", ca.BaseName)
 			return nil
 		}
 
@@ -253,12 +242,11 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 
 func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) func(c workflow.RunData) error {
 	return func(c workflow.RunData) error {
-		data, ok := c.(certsData)
+		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("certs phase invoked with an invalid data struct")
 		}
 
-		// TODO(EKF): can we avoid loading these certificates every time?
 		if certData, _, err := pkiutil.TryLoadCertAndKeyFromDisk(data.CertificateDir(), cert.BaseName); err == nil {
 			caCertData, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), caCert.BaseName)
 			if err != nil {

@@ -32,7 +32,7 @@ else
   exit 1
 fi
 
-source "${KUBE_ROOT}/cluster/gce/${WINDOWS_NODE_OS_DISTRIBUTION}/node-helper.sh"
+source "${KUBE_ROOT}/cluster/gce/windows/node-helper.sh"
 
 if [[ "${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${MASTER_OS_DISTRIBUTION}/master-helper.sh"
@@ -87,9 +87,7 @@ function set-linux-node-image() {
 #   WINDOWS_NODE_IMAGE_PROJECT
 function set-windows-node-image() {
   WINDOWS_NODE_IMAGE_PROJECT="windows-cloud"
-  if [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1803" ]]; then
-    WINDOWS_NODE_IMAGE_FAMILY="windows-1803-core-for-containers"
-  elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win2019" ]]; then
+  if [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win2019" ]]; then
     WINDOWS_NODE_IMAGE_FAMILY="windows-2019-core-for-containers"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1809" ]]; then
     WINDOWS_NODE_IMAGE_FAMILY="windows-1809-core-for-containers"
@@ -114,7 +112,10 @@ if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   fi
 fi
 
+# These prefixes must not be prefixes of each other, so that they can be used to
+# detect mutually exclusive sets of nodes.
 NODE_INSTANCE_PREFIX=${NODE_INSTANCE_PREFIX:-"${INSTANCE_PREFIX}-minion"}
+WINDOWS_NODE_INSTANCE_PREFIX=${WINDOWS_NODE_INSTANCE_PREFIX:-"${INSTANCE_PREFIX}-windows-node"}
 
 NODE_TAGS="${NODE_TAG}"
 
@@ -375,9 +376,12 @@ function upload-tars() {
 #
 # Assumed vars:
 #   NODE_INSTANCE_PREFIX
+#   WINDOWS_NODE_INSTANCE_PREFIX
 # Vars set:
 #   NODE_NAMES
 #   INSTANCE_GROUPS
+#   WINDOWS_NODE_NAMES
+#   WINDOWS_INSTANCE_GROUPS
 function detect-node-names() {
   detect-project
   INSTANCE_GROUPS=()
@@ -385,6 +389,12 @@ function detect-node-names() {
     --project "${PROJECT}" \
     --filter "name ~ '${NODE_INSTANCE_PREFIX}-.+' AND zone:(${ZONE})" \
     --format='value(name)' || true))
+  WINDOWS_INSTANCE_GROUPS=()
+  WINDOWS_INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list \
+    --project "${PROJECT}" \
+    --filter "name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+' AND zone:(${ZONE})" \
+    --format='value(name)' || true))
+
   NODE_NAMES=()
   if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
     for group in "${INSTANCE_GROUPS[@]}"; do
@@ -396,6 +406,14 @@ function detect-node-names() {
   # Add heapster node name to the list too (if it exists).
   if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
     NODE_NAMES+=("${NODE_INSTANCE_PREFIX}-heapster")
+  fi
+  WINDOWS_NODE_NAMES=()
+  if [[ -n "${WINDOWS_INSTANCE_GROUPS[@]:-}" ]]; then
+    for group in "${WINDOWS_INSTANCE_GROUPS[@]}"; do
+      WINDOWS_NODE_NAMES+=($(gcloud compute instance-groups managed \
+        list-instances "${group}" --zone "${ZONE}" --project "${PROJECT}" \
+        --format='value(instance)'))
+    done
   fi
 
   echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]:-}" >&2
@@ -582,6 +600,7 @@ function write-linux-node-env {
 
 function write-windows-node-env {
   construct-windows-kubelet-flags
+  construct-windows-kubeproxy-flags
   build-windows-kube-env "${KUBE_TEMP}/windows-node-kube-env.yaml"
   build-kubelet-config false "windows" "${KUBE_TEMP}/windows-node-kubelet-config.yaml"
 }
@@ -592,7 +611,8 @@ function build-linux-node-labels {
   if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${master}" != "true" ]]; then
     # Add kube-proxy daemonset label to node to avoid situation during cluster
     # upgrade/downgrade when there are two instances of kube-proxy running on a node.
-    node_labels="beta.kubernetes.io/kube-proxy-ds-ready=true"
+    # TODO(liggitt): drop beta.kubernetes.io/kube-proxy-ds-ready in 1.16
+    node_labels="node.kubernetes.io/kube-proxy-ds-ready=true,beta.kubernetes.io/kube-proxy-ds-ready=true"
   fi
   if [[ -n "${NODE_LABELS:-}" ]]; then
     node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
@@ -852,6 +872,37 @@ function construct-windows-kubelet-flags {
   KUBELET_ARGS="${flags}"
 }
 
+function construct-windows-kubeproxy-flags {
+  local flags=""
+
+  # Use the same log level as the Kubelet during tests.
+  flags+=" ${KUBELET_TEST_LOG_LEVEL:-"--v=2"}"
+
+  # Windows uses kernelspace proxymode
+  flags+=" --proxy-mode=kernelspace"
+
+  # Configure kube-proxy to run as a windows service.
+  flags+=" --windows-service=true"
+
+  # TODO(mtaufen): Configure logging for kube-proxy running as a service.
+  # I haven't been able to figure out how to direct stdout/stderr into log
+  # files when configuring it to run via sc.exe, so we just manually
+  # override logging config here.
+  flags+=" --log-file=${WINDOWS_LOGS_DIR}\kube-proxy.log"
+
+  # klog sets this to true internally, so need to override to false
+  # so we actually log to the file
+  flags+=" --logtostderr=false"
+
+  # Configure flags with explicit empty string values. We can't escape
+  # double-quotes, because they still break sc.exe after expansion in the
+  # binPath parameter, and single-quotes get parsed as characters instead
+  # of string delimiters.
+  flags+=" --resource-container="
+
+  KUBEPROXY_ARGS="${flags}"
+}
+
 # $1: if 'true', we're rendering config for a master, else a node
 function build-kubelet-config {
   local master="$1"
@@ -1059,6 +1110,8 @@ ENABLE_CLUSTER_UI: $(yaml-quote ${ENABLE_CLUSTER_UI:-false})
 ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote ${ENABLE_NODE_PROBLEM_DETECTOR:-none})
 NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote ${NODE_PROBLEM_DETECTOR_VERSION:-})
 NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote ${NODE_PROBLEM_DETECTOR_TAR_HASH:-})
+NODE_PROBLEM_DETECTOR_RELEASE_PATH: $(yaml-quote ${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-})
+NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS: $(yaml-quote ${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-})
 ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
 LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
 ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
@@ -1090,6 +1143,7 @@ MULTIZONE: $(yaml-quote ${MULTIZONE:-})
 NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
 ENABLE_DEFAULT_STORAGE_CLASS: $(yaml-quote ${ENABLE_DEFAULT_STORAGE_CLASS:-})
 ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote ${ENABLE_APISERVER_ADVANCED_AUDIT:-})
+ENABLE_APISERVER_DYNAMIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_DYNAMIC_AUDIT:-})
 ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-false})
 ENABLE_PATCH_CONVERSION_DETECTOR: $(yaml-quote ${ENABLE_PATCH_CONVERSION_DETECTOR:-false})
 ADVANCED_AUDIT_POLICY: $(yaml-quote ${ADVANCED_AUDIT_POLICY:-})
@@ -1111,6 +1165,8 @@ ADVANCED_AUDIT_WEBHOOK_THROTTLE_BURST: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_THR
 ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF:-})
 GCE_API_ENDPOINT: $(yaml-quote ${GCE_API_ENDPOINT:-})
 GCE_GLBC_IMAGE: $(yaml-quote ${GCE_GLBC_IMAGE:-})
+CUSTOM_INGRESS_YAML: |
+$(echo "${CUSTOM_INGRESS_YAML:-}" | sed -e "s/'/''/g")
 ENABLE_NODE_JOURNAL: $(yaml-quote ${ENABLE_NODE_JOURNAL:-false})
 PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote ${PROMETHEUS_TO_SD_ENDPOINT:-})
 PROMETHEUS_TO_SD_PREFIX: $(yaml-quote ${PROMETHEUS_TO_SD_PREFIX:-})
@@ -1405,6 +1461,7 @@ function build-windows-kube-env {
   build-linux-kube-env false $file
 
   cat >>$file <<EOF
+WINDOWS_NODE_INSTANCE_PREFIX: $(yaml-quote ${WINDOWS_NODE_INSTANCE_PREFIX})
 NODE_BINARY_TAR_URL: $(yaml-quote ${NODE_BINARY_TAR_URL})
 NODE_BINARY_TAR_HASH: $(yaml-quote ${NODE_BINARY_TAR_HASH})
 K8S_DIR: $(yaml-quote ${WINDOWS_K8S_DIR})
@@ -1415,6 +1472,7 @@ CNI_CONFIG_DIR: $(yaml-quote ${WINDOWS_CNI_CONFIG_DIR})
 MANIFESTS_DIR: $(yaml-quote ${WINDOWS_MANIFESTS_DIR})
 PKI_DIR: $(yaml-quote ${WINDOWS_PKI_DIR})
 KUBELET_CONFIG_FILE: $(yaml-quote ${WINDOWS_KUBELET_CONFIG_FILE})
+KUBEPROXY_ARGS: $(yaml-quote ${KUBEPROXY_ARGS})
 KUBECONFIG_FILE: $(yaml-quote ${WINDOWS_KUBECONFIG_FILE})
 BOOTSTRAP_KUBECONFIG_FILE: $(yaml-quote ${WINDOWS_BOOTSTRAP_KUBECONFIG_FILE})
 KUBEPROXY_KUBECONFIG_FILE: $(yaml-quote ${WINDOWS_KUBEPROXY_KUBECONFIG_FILE})
@@ -1854,9 +1912,13 @@ function make-gcloud-network-argument() {
 }
 
 # $1: version (required)
+# $2: Prefix for the template name, i.e. NODE_INSTANCE_PREFIX or
+#     WINDOWS_NODE_INSTANCE_PREFIX.
 function get-template-name-from-version() {
+  local -r version=${1}
+  local -r template_prefix=${2}
   # trim template name to pass gce name validation
-  echo "${NODE_INSTANCE_PREFIX}-template-${1}" | cut -c 1-63 | sed 's/[\.\+]/-/g;s/-*$//g'
+  echo "${template_prefix}-template-${version}" | cut -c 1-63 | sed 's/[\.\+]/-/g;s/-*$//g'
 }
 
 # validates the NODE_LOCAL_SSDS_EXT variable
@@ -2247,6 +2309,7 @@ function delete-all-firewall-rules() {
   fi
 }
 
+# Ignores firewall rule arguments that do not exist in NETWORK_PROJECT.
 function delete-firewall-rules() {
   for fw in $@; do
     if [[ -n $(gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
@@ -2628,9 +2691,8 @@ function create-nodes-template() {
 
   # NOTE: these template names and their format must match
   # create-[linux,windows]-nodes() as well as get-template()!
-  # TODO(pjh): find a better way to manage these (get-template() is annoying).
   local linux_template_name="${NODE_INSTANCE_PREFIX}-template"
-  local windows_template_name="${NODE_INSTANCE_PREFIX}-template-windows"
+  local windows_template_name="${WINDOWS_NODE_INSTANCE_PREFIX}-template"
   create-linux-node-instance-template $linux_template_name
   create-windows-node-instance-template $windows_template_name "${scope_flags[*]}"
 }
@@ -2701,22 +2763,22 @@ function create-linux-nodes() {
 
 # Assumes:
 # - NUM_WINDOWS_MIGS
-# - NODE_INSTANCE_PREFIX
+# - WINDOWS_NODE_INSTANCE_PREFIX
 # - NUM_WINDOWS_NODES
 # - PROJECT
 # - ZONE
 function create-windows-nodes() {
-  local template_name="${NODE_INSTANCE_PREFIX}-template-windows"
+  local template_name="${WINDOWS_NODE_INSTANCE_PREFIX}-template"
 
   local -r nodes="${NUM_WINDOWS_NODES}"
   local instances_left=${nodes}
 
   for ((i=1; i<=${NUM_WINDOWS_MIGS}; i++)); do
-    local group_name="${NODE_INSTANCE_PREFIX}-windows-group-$i"
+    local group_name="${WINDOWS_NODE_INSTANCE_PREFIX}-group-$i"
     if [[ $i == ${NUM_WINDOWS_MIGS} ]]; then
       # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
       # We should change it at some point, but note #18545 when changing this.
-      group_name="${NODE_INSTANCE_PREFIX}-windows-group"
+      group_name="${WINDOWS_NODE_INSTANCE_PREFIX}-group"
     fi
     # Spread the remaining number of nodes evenly
     this_mig_size=$((${instances_left} / (${NUM_WINDOWS_MIGS}-${i}+1)))
@@ -2947,6 +3009,7 @@ function remove-replica-from-etcd() {
 # Assumed vars:
 #   MASTER_NAME
 #   NODE_INSTANCE_PREFIX
+#   WINDOWS_NODE_INSTANCE_PREFIX
 #   ZONE
 # This function tears down cluster resources 10 at a time to avoid issuing too many
 # API calls and exceeding API quota. It is important to bring down the instances before bringing
@@ -2955,7 +3018,7 @@ function kube-down() {
   local -r batch=200
 
   detect-project
-  detect-node-names # For INSTANCE_GROUPS
+  detect-node-names # For INSTANCE_GROUPS and WINDOWS_INSTANCE_GROUPS
 
   echo "Bringing down cluster"
   set +e  # Do not stop on error
@@ -2966,7 +3029,8 @@ function kube-down() {
     # change during a cluster upgrade.)
     local templates=$(get-template "${PROJECT}")
 
-    for group in ${INSTANCE_GROUPS[@]:-}; do
+    local all_instance_groups=(${INSTANCE_GROUPS[@]} ${WINDOWS_INSTANCE_GROUPS[@]})
+    for group in ${all_instance_groups[@]:-}; do
       if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
         gcloud compute instance-groups managed delete \
           --project "${PROJECT}" \
@@ -3088,7 +3152,7 @@ function kube-down() {
     local -a minions
     minions=( $(gcloud compute instances list \
                   --project "${PROJECT}" \
-                  --filter="name ~ '${NODE_INSTANCE_PREFIX}-.+' AND zone:(${ZONE})" \
+                  --filter="(name ~ '${NODE_INSTANCE_PREFIX}-.+' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+') AND zone:(${ZONE})" \
                   --format='value(name)') )
     # If any minions are running, delete them in batches.
     while (( "${#minions[@]}" > 0 )); do
@@ -3139,6 +3203,7 @@ function kube-down() {
       "${CLUSTER_NAME}-default-internal-master" \
       "${CLUSTER_NAME}-default-internal-node" \
       "${NETWORK}-default-ssh" \
+      "${NETWORK}-default-rdp" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
 
     if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
@@ -3242,15 +3307,19 @@ function set-replica-name() {
   REPLICA_NAME="${MASTER_NAME}-${suffix}"
 }
 
-# Gets the instance template for given NODE_INSTANCE_PREFIX. It echos the template name so that the function
-# output can be used.
+# Gets the instance templates in use by the cluster. It echos the template names
+# so that the function output can be used.
 # Assumed vars:
 #   NODE_INSTANCE_PREFIX
+#   WINDOWS_NODE_INSTANCE_PREFIX
 #
 # $1: project
 function get-template() {
+  local linux_filter="${NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?"
+  local windows_filter="${WINDOWS_NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?"
+
   gcloud compute instance-templates list \
-    --filter="name ~ '${NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?'" \
+    --filter="name ~ '${linux_filter}' OR name ~ '${windows_filter}'" \
     --project="${1}" --format='value(name)'
 }
 
@@ -3259,6 +3328,7 @@ function get-template() {
 # Assumed vars:
 #   MASTER_NAME
 #   NODE_INSTANCE_PREFIX
+#   WINDOWS_NODE_INSTANCE_PREFIX
 #   ZONE
 #   REGION
 # Vars set:
@@ -3274,9 +3344,17 @@ function check-resources() {
     KUBE_RESOURCE_FOUND="Managed instance groups ${INSTANCE_GROUPS[@]}"
     return 1
   fi
+  if [[ -n "${WINDOWS_INSTANCE_GROUPS[@]:-}" ]]; then
+    KUBE_RESOURCE_FOUND="Managed instance groups ${WINDOWS_INSTANCE_GROUPS[@]}"
+    return 1
+  fi
 
   if gcloud compute instance-templates describe --project "${PROJECT}" "${NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Instance template ${NODE_INSTANCE_PREFIX}-template"
+    return 1
+  fi
+  if gcloud compute instance-templates describe --project "${PROJECT}" "${WINDOWS_NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
+    KUBE_RESOURCE_FOUND="Instance template ${WINDOWS_NODE_INSTANCE_PREFIX}-template"
     return 1
   fi
 
@@ -3294,10 +3372,10 @@ function check-resources() {
   local -a minions
   minions=( $(gcloud compute instances list \
                 --project "${PROJECT}" \
-                --filter="name ~ '${NODE_INSTANCE_PREFIX}-.+' AND zone:(${ZONE})" \
+                --filter="(name ~ '${NODE_INSTANCE_PREFIX}-.+' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+') AND zone:(${ZONE})" \
                 --format='value(name)') )
   if (( "${#minions[@]}" > 0 )); then
-    KUBE_RESOURCE_FOUND="${#minions[@]} matching matching ${NODE_INSTANCE_PREFIX}-.+"
+    KUBE_RESOURCE_FOUND="${#minions[@]} matching ${NODE_INSTANCE_PREFIX}-.+ or ${WINDOWS_NODE_INSTANCE_PREFIX}-.+"
     return 1
   fi
 

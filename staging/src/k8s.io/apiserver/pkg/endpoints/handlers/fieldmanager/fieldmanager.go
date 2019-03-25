@@ -23,15 +23,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/merge"
+	"sigs.k8s.io/yaml"
 )
-
-const applyManager = "apply"
 
 // FieldManager updates the managed fields and merge applied
 // configurations.
@@ -51,6 +51,7 @@ func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectC
 	if err != nil {
 		return nil, err
 	}
+
 	return &FieldManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -74,7 +75,7 @@ func NewCRDFieldManager(objectConverter runtime.ObjectConvertor, objectDefaulter
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: internal.NewVersionConverter(internal.DeducedTypeConverter{}, objectConverter, hub),
+			Converter: internal.NewCRDVersionConverter(internal.DeducedTypeConverter{}, objectConverter, hub),
 		},
 	}
 }
@@ -130,6 +131,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
+	managed = f.stripFields(managed, manager)
 
 	if err := internal.EncodeObjectManagedFields(newObj, managed); err != nil {
 		return nil, fmt.Errorf("failed to encode managed fields: %v", err)
@@ -140,7 +142,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 
 // Apply is used when server-side apply is called, as it merges the
 // object and update the managed fields.
-func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (runtime.Object, error) {
+func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager string, force bool) (runtime.Object, error) {
 	// If the object doesn't have metadata, apply isn't allowed.
 	if _, err := meta.Accessor(liveObj); err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
@@ -150,9 +152,20 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
-	// We can assume that patchObj is already on the proper version:
-	// it shouldn't have to be converted so that it's not defaulted.
-	// TODO (jennybuckley): Explicitly checkt that patchObj is in the proper version.
+	// Check that the patch object has the same version as the live object
+	patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+
+	if err := yaml.Unmarshal(patch, &patchObj.Object); err != nil {
+		return nil, fmt.Errorf("error decoding YAML: %v", err)
+	}
+	if patchObj.GetAPIVersion() != f.groupVersion.String() {
+		return nil,
+			errors.NewBadRequest(
+				fmt.Sprintf("Incorrect version specified in apply patch. "+
+					"Specified patch version: %s, expected: %s",
+					patchObj.GetAPIVersion(), f.groupVersion.String()))
+	}
+
 	liveObjVersioned, err := f.toVersioned(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert live object to proper version: %v", err)
@@ -167,7 +180,7 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
-	manager, err := f.buildManagerInfo(applyManager, metav1.ManagedFieldsOperationApply)
+	manager, err := f.buildManagerInfo(fieldManager, metav1.ManagedFieldsOperationApply)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}
@@ -176,10 +189,11 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, force bool) (
 	newObjTyped, managed, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed, manager, force)
 	if err != nil {
 		if conflicts, ok := err.(merge.Conflicts); ok {
-			return nil, errors.NewApplyConflict(conflicts)
+			return nil, internal.NewConflictError(conflicts)
 		}
 		return nil, err
 	}
+	managed = f.stripFields(managed, manager)
 
 	newObj, err := f.typeConverter.TypedToObject(newObjTyped)
 	if err != nil {
@@ -222,4 +236,35 @@ func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedF
 		managerInfo.Manager = "unknown"
 	}
 	return internal.BuildManagerIdentifier(&managerInfo)
+}
+
+// stripSet is the list of fields that should never be part of a mangedFields.
+var stripSet = fieldpath.NewSet(
+	fieldpath.MakePathOrDie("apiVersion"),
+	fieldpath.MakePathOrDie("kind"),
+	fieldpath.MakePathOrDie("metadata", "name"),
+	fieldpath.MakePathOrDie("metadata", "namespace"),
+	fieldpath.MakePathOrDie("metadata", "creationTimestamp"),
+	fieldpath.MakePathOrDie("metadata", "selfLink"),
+	fieldpath.MakePathOrDie("metadata", "uid"),
+	fieldpath.MakePathOrDie("metadata", "clusterName"),
+	fieldpath.MakePathOrDie("metadata", "generation"),
+	fieldpath.MakePathOrDie("metadata", "managedFields"),
+	fieldpath.MakePathOrDie("metadata", "resourceVersion"),
+)
+
+// stripFields removes a predefined set of paths found in typed from managed and returns the updated ManagedFields
+func (f *FieldManager) stripFields(managed fieldpath.ManagedFields, manager string) fieldpath.ManagedFields {
+	vs, ok := managed[manager]
+	if ok {
+		if vs == nil {
+			panic(fmt.Sprintf("Found unexpected nil manager which should never happen: %s", manager))
+		}
+		vs.Set = vs.Set.Difference(stripSet)
+		if vs.Set.Empty() {
+			delete(managed, manager)
+		}
+	}
+
+	return managed
 }

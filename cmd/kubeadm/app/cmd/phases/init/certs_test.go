@@ -30,6 +30,7 @@ import (
 )
 
 type testCertsData struct {
+	testInitData
 	cfg *kubeadmapi.InitConfiguration
 }
 

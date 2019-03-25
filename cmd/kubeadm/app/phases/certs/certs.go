@@ -57,7 +57,7 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 		return errors.Wrap(err, "error creating PKI assets")
 	}
 
-	fmt.Printf("[certs] valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
+	fmt.Printf("[certs] Valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	// Service accounts are not x509 certs, so handled separately
 	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir)
@@ -184,7 +184,7 @@ func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate
 
 // writeCertificateAuthorithyFilesIfNotExist write a new certificate Authority to the given path.
 // If there already is a certificate file at the given path; kubeadm tries to load it and check if the values in the
-// existing and the eexpected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
+// existing and the expected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
 func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
 
@@ -328,7 +328,7 @@ type certKeyLocation struct {
 }
 
 // SharedCertificateExists verifies if the shared certificates - the certificates that must be
-// equal across masters: ca.key, ca.crt, sa.key, sa.pub + etcd/ca.key, etcd/ca.crt if local/stacked etcd
+// equal across control-plane nodes: ca.key, ca.crt, sa.key, sa.pub + etcd/ca.key, etcd/ca.crt if local/stacked etcd
 func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
@@ -354,8 +354,9 @@ func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error)
 }
 
 // UsingExternalCA determines whether the user is relying on an external CA.  We currently implicitly determine this is the case
-// when both the CA Cert and the front proxy CA Cert are present but the CA Key and front proxy CA Key are not.
+// when the CA Cert is present but the CA Key is not.
 // This allows us to, e.g., skip generating certs or not start the csr signing controller.
+// In case we are using an external front-proxy CA, the function validates the certificates signed by front-proxy CA that should be provided by the user.
 func UsingExternalCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
@@ -364,20 +365,24 @@ func UsingExternalCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	caKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
 	if _, err := os.Stat(caKeyPath); !os.IsNotExist(err) {
-		return false, errors.Errorf("%s exists", kubeadmconstants.CAKeyName)
+		return false, nil
 	}
 
 	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, kubeadmconstants.APIServerCertAndKeyBaseName, "API server"}); err != nil {
-		return false, err
+		return true, err
 	}
 
 	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName, "API server kubelet client"}); err != nil {
-		return false, err
+		return true, err
 	}
 
-	if err := validatePrivatePublicKey(certKeyLocation{cfg.CertificatesDir, "", kubeadmconstants.ServiceAccountKeyBaseName, "service account"}); err != nil {
-		return false, err
-	}
+	return true, nil
+}
+
+// UsingExternalFrontProxyCA determines whether the user is relying on an external front-proxy CA.  We currently implicitly determine this is the case
+// when the front proxy CA Cert is present but the front proxy CA Key is not.
+// In case we are using an external front-proxy CA, the function validates the certificates signed by front-proxy CA that should be provided by the user.
+func UsingExternalFrontProxyCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, "", "front-proxy CA"}); err != nil {
 		return false, err
@@ -385,11 +390,11 @@ func UsingExternalCA(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	frontProxyCAKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)
 	if _, err := os.Stat(frontProxyCAKeyPath); !os.IsNotExist(err) {
-		return false, errors.Errorf("%s exists", kubeadmconstants.FrontProxyCAKeyName)
+		return false, nil
 	}
 
 	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, kubeadmconstants.FrontProxyClientCertAndKeyBaseName, "front-proxy client"}); err != nil {
-		return false, err
+		return true, err
 	}
 
 	return true, nil

@@ -34,6 +34,7 @@ go_library(
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/utils:go_default_library",
+        "//test/utils/crd:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/elazarl/goproxy:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

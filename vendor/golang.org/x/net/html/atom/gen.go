@@ -306,7 +306,7 @@ func (t *table) push(i uint32, depth int) bool {
 
 // The lists of element names and attribute keys were taken from
 // https://html.spec.whatwg.org/multipage/indices.html#index
-// as of the "HTML Living Standard - Last Updated 18 September 2017" version.
+// as of the "HTML Living Standard - Last Updated 16 April 2018" version.
 
 // "command", "keygen" and "menuitem" have been removed from the spec,
 // but are kept here for backwards compatibility.
@@ -665,6 +665,7 @@ var eventHandlers = []string{
 
 // extra are ad-hoc values not covered by any of the lists above.
 var extra = []string{
+	"acronym",
 	"align",
 	"annotation",
 	"annotation-xml",
@@ -700,6 +701,8 @@ var extra = []string{
 	"plaintext",
 	"prompt",
 	"public",
+	"rb",
+	"rtc",
 	"spacer",
 	"strike",
 	"svg",

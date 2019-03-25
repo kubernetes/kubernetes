@@ -672,6 +672,7 @@ func constructPodSandboxCheckpoint(config *runtimeapi.PodSandboxConfig) checkpoi
 			HostPort:      &pm.HostPort,
 			ContainerPort: &pm.ContainerPort,
 			Protocol:      &proto,
+			HostIP:        pm.HostIp,
 		})
 	}
 	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE {

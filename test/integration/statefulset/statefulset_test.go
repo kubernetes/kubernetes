@@ -85,7 +85,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	waitSTSStable(t, c, sts)
 
 	// Verify STS creates 2 pods
-	podClient := c.Core().Pods(ns.Name)
+	podClient := c.CoreV1().Pods(ns.Name)
 	pods := getPods(t, podClient, labelMap)
 	if len(pods.Items) != 2 {
 		t.Fatalf("len(pods) = %d, want 2", len(pods.Items))
@@ -97,7 +97,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	updatePod(t, podClient, deletingPod.Name, func(pod *v1.Pod) {
 		pod.Finalizers = []string{"fake.example.com/blockDeletion"}
 	})
-	if err := c.Core().Pods(ns.Name).Delete(deletingPod.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := c.CoreV1().Pods(ns.Name).Delete(deletingPod.Name, &metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("error deleting pod %s: %v", deletingPod.Name, err)
 	}
 

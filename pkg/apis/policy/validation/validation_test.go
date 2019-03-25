@@ -906,3 +906,34 @@ func TestValidatePSPRunAsGroup(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePSPSELinux(t *testing.T) {
+	var testCases = []struct {
+		name    string
+		selinux policy.SELinuxStrategyOptions
+		fail    bool
+	}{
+		{"SELinuxStrategyMustRunAs",
+			policy.SELinuxStrategyOptions{
+				Rule:           policy.SELinuxStrategyMustRunAs,
+				SELinuxOptions: &api.SELinuxOptions{Level: "s9:z0,z1"}}, false},
+		{"SELinuxStrategyMustRunAs",
+			policy.SELinuxStrategyOptions{
+				Rule:           policy.SELinuxStrategyMustRunAs,
+				SELinuxOptions: &api.SELinuxOptions{Level: "s0"}}, false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errList := validatePSPSELinux(field.NewPath("Status"), &testCase.selinux)
+			actualErrors := len(errList)
+			expectedErrors := 1
+			if !testCase.fail {
+				expectedErrors = 0
+			}
+			if actualErrors != expectedErrors {
+				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+
+}

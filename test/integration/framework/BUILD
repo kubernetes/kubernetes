@@ -4,6 +4,7 @@ load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
 )
+load("//build:platforms.bzl", "go_platform_constraint")
 
 go_library(
     name = "go_default_library",
@@ -15,16 +16,29 @@ go_library(
         "test_server.go",
         "util.go",
     ],
-    data = [
-        "@com_coreos_etcd//:etcd",
-    ],
+    data = select({
+        go_platform_constraint(
+            arch = "arm64",
+            os = "linux",
+        ): [
+            "@com_coreos_etcd_arm64//:etcd",
+        ],
+        go_platform_constraint(
+            arch = "ppc64le",
+            os = "linux",
+        ): [
+            "@com_coreos_etcd_ppc64le//:etcd",
+        ],
+        "//conditions:default": [
+            "@com_coreos_etcd_amd64//:etcd",
+        ],
+    }),
     importpath = "k8s.io/kubernetes/test/integration/framework",
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/policy/v1beta1:go_default_library",
         "//pkg/generated/openapi:go_default_library",
@@ -38,6 +52,7 @@ go_library(
         "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/node/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
@@ -408,7 +409,7 @@ func (HostnameCheck) Name() string {
 
 // Check validates if hostname match dns sub domain regex.
 func (hc HostnameCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("checking whether the given node name is reachable using net.LookupHost")
+	klog.V(1).Infoln("checking whether the given node name is reachable using net.LookupHost")
 	errorList = []error{}
 	warnings = []error{}
 	addr, err := net.LookupHost(hc.nodeName)
@@ -435,7 +436,7 @@ func (hst HTTPProxyCheck) Name() string {
 
 // Check validates http connectivity type, direct or via proxy.
 func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("validating if the connectivity type is via proxy or direct")
+	klog.V(1).Infoln("validating if the connectivity type is via proxy or direct")
 	u := (&url.URL{Scheme: hst.Proto, Host: hst.Host}).String()
 
 	req, err := http.NewRequest("GET", u, nil)
@@ -871,21 +872,25 @@ func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
 	return warnings, errorList
 }
 
-// RunInitMasterChecks executes all individual, applicable to Master node checks.
-func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
-	// First, check if we're root separately from the other preflight checks and fail fast
-	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
-		return err
+// RunInitNodeChecks executes all individual, applicable to control-plane node checks.
+// The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
+// If the flag is set to true we should skip checks already executed by RunJoinNodeChecks and RunOptionalJoinNodeChecks.
+func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String, isSecondaryControlPlane bool) error {
+	if !isSecondaryControlPlane {
+		// First, check if we're root separately from the other preflight checks and fail fast
+		if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
+			return err
+		}
 	}
 
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	checks := []Checker{
-		NumCPUCheck{NumCPU: kubeadmconstants.MasterNumCPU},
+		NumCPUCheck{NumCPU: kubeadmconstants.ControlPlaneNumCPU},
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), 10250}},
+		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), ports.KubeletPort}},
 		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort)},
-		PortOpenCheck{port: 10251},
-		PortOpenCheck{port: 10252},
+		PortOpenCheck{port: ports.InsecureSchedulerPort},
+		PortOpenCheck{port: ports.InsecureKubeControllerManagerPort},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
@@ -894,13 +899,26 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
-	checks = addCommonChecks(execer, cfg, checks)
 
-	// Check ipvs required kernel module once we use ipvs kube-proxy mode
-	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
-		checks = append(checks,
-			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
-		)
+	if !isSecondaryControlPlane {
+		checks = addCommonChecks(execer, cfg.KubernetesVersion, &cfg.NodeRegistration, checks)
+
+		// Check IVPS required kernel module once we use IVPS kube-proxy mode
+		if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
+			checks = append(checks,
+				ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
+			)
+		}
+
+		// Check if Bridge-netfilter and IPv6 relevant flags are set
+		if ip := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
+			if ip.To4() == nil && ip.To16() != nil {
+				checks = append(checks,
+					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
+				)
+			}
+		}
 	}
 
 	if cfg.Etcd.Local != nil {
@@ -926,14 +944,6 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 		checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
 	}
 
-	if ip := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-		if ip.To4() == nil && ip.To16() != nil {
-			checks = append(checks,
-				FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
-				FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
-			)
-		}
-	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
@@ -949,7 +959,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
-	checks = addCommonChecks(execer, cfg, checks)
+	checks = addCommonChecks(execer, "", &cfg.NodeRegistration, checks)
 	if cfg.ControlPlane == nil {
 		checks = append(checks, FileAvailableCheck{Path: cfg.CACertPath})
 	}
@@ -996,8 +1006,8 @@ func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.Clust
 
 // addCommonChecks is a helper function to deplicate checks that are common between both the
 // kubeadm init and join commands
-func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfiguration, checks []Checker) []Checker {
-	containerRuntime, err := utilruntime.NewContainerRuntime(execer, cfg.GetCRISocket())
+func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kubeadmapi.NodeRegistrationOptions, checks []Checker) []Checker {
+	containerRuntime, err := utilruntime.NewContainerRuntime(execer, nodeReg.CRISocket)
 	isDocker := false
 	if err != nil {
 		fmt.Printf("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
@@ -1034,10 +1044,10 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 	}
 	checks = append(checks,
 		SystemVerificationCheck{IsDocker: isDocker},
-		HostnameCheck{nodeName: cfg.GetNodeName()},
-		KubeletVersionCheck{KubernetesVersion: cfg.GetKubernetesVersion(), exec: execer},
+		HostnameCheck{nodeName: nodeReg.Name},
+		KubeletVersionCheck{KubernetesVersion: k8sVersion, exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
-		PortOpenCheck{port: 10250})
+		PortOpenCheck{port: ports.KubeletPort})
 	return checks
 }
 
@@ -1052,7 +1062,7 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 
 // RunPullImagesCheck will pull images kubeadm needs if they are not found on the system
 func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
-	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.GetCRISocket())
+	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.NodeRegistration.CRISocket)
 	if err != nil {
 		return err
 	}
@@ -1070,7 +1080,7 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 		Name   string
 		Errors []error
 	}
-	found := []checkErrors{}
+	var errsBuffer bytes.Buffer
 
 	for _, c := range checks {
 		name := c.Name()
@@ -1085,18 +1095,12 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 		for _, w := range warnings {
 			io.WriteString(ww, fmt.Sprintf("\t[WARNING %s]: %v\n", name, w))
 		}
-		if len(errs) > 0 {
-			found = append(found, checkErrors{Name: name, Errors: errs})
+		for _, i := range errs {
+			errsBuffer.WriteString(fmt.Sprintf("\t[ERROR %s]: %v\n", name, i.Error()))
 		}
 	}
-	if len(found) > 0 {
-		var errs bytes.Buffer
-		for _, c := range found {
-			for _, i := range c.Errors {
-				errs.WriteString(fmt.Sprintf("\t[ERROR %s]: %v\n", c.Name, i.Error()))
-			}
-		}
-		return &Error{Msg: errs.String()}
+	if errsBuffer.Len() > 0 {
+		return &Error{Msg: errsBuffer.String()}
 	}
 	return nil
 }

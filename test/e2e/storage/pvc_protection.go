@@ -37,6 +37,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		err                     error
 		pvc                     *v1.PersistentVolumeClaim
 		pvcCreatedAndNotDeleted bool
+		pod                     *v1.Pod
 	)
 
 	f := framework.NewDefaultFramework("pvc-protection")
@@ -57,6 +58,11 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		Expect(err).NotTo(HaveOccurred(), "Error creating PVC")
 		pvcCreatedAndNotDeleted = true
 
+		By("Creating a Pod that becomes Running and therefore is actively using the PVC")
+		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
+		pod, err = framework.CreatePod(client, nameSpace, nil, pvcClaims, false, "")
+		Expect(err).NotTo(HaveOccurred(), "While creating pod that uses the PVC or waiting for the Pod to become Running")
+
 		By("Waiting for PVC to become Bound")
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, framework.ClaimBindingTimeout)
 		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
@@ -74,6 +80,10 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 	})
 
 	It("Verify \"immediate\" deletion of a PVC that is not in active use by a pod", func() {
+		By("Deleting the pod using the PVC")
+		err = framework.DeletePodWithWait(f, client, pod)
+		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
+
 		By("Deleting the PVC")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
@@ -82,11 +92,6 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 	})
 
 	It("Verify that PVC in active use by a pod is not removed immediately", func() {
-		By("Creating a Pod that becomes Running and therefore is actively using the PVC")
-		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-		pod, err := framework.CreatePod(client, nameSpace, nil, pvcClaims, false, "")
-		Expect(err).NotTo(HaveOccurred(), "While creating pod that uses the PVC or waiting for the Pod to become Running")
-
 		By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
@@ -106,11 +111,6 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 	})
 
 	It("Verify that scheduling of a pod that uses PVC that is being deleted fails and the pod becomes Unschedulable", func() {
-		By("Creating first Pod that becomes Running and therefore is actively using the PVC")
-		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-		firstPod, err := framework.CreatePod(client, nameSpace, nil, pvcClaims, false, "")
-		Expect(err).NotTo(HaveOccurred(), "While creating pod that uses the PVC or waiting for the Pod to become Running")
-
 		By("Deleting the PVC, however, the PVC must not be removed from the system as it's in active use by a pod")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
@@ -121,7 +121,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		Expect(pvc.ObjectMeta.DeletionTimestamp).NotTo(Equal(nil))
 
 		By("Creating second Pod whose scheduling fails because it uses a PVC that is being deleted")
-		secondPod, err2 := framework.CreateUnschedulablePod(client, nameSpace, nil, pvcClaims, false, "")
+		secondPod, err2 := framework.CreateUnschedulablePod(client, nameSpace, nil, []*v1.PersistentVolumeClaim{pvc}, false, "")
 		Expect(err2).NotTo(HaveOccurred(), "While creating second pod that uses a PVC that is being deleted and that is Unschedulable")
 
 		By("Deleting the second pod that uses the PVC that is being deleted")
@@ -134,7 +134,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		Expect(pvc.ObjectMeta.DeletionTimestamp).NotTo(Equal(nil))
 
 		By("Deleting the first pod that uses the PVC")
-		err = framework.DeletePodWithWait(f, client, firstPod)
+		err = framework.DeletePodWithWait(f, client, pod)
 		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
 
 		By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")

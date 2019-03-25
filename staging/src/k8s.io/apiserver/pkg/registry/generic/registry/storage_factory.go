@@ -42,7 +42,7 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 		triggerFunc storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
 
 		s, d := generic.NewRawStorage(storageConfig)
-		if capacity == 0 {
+		if capacity <= 0 {
 			klog.V(5).Infof("Storage caching is disabled for %T", objectType)
 			return s, d
 		}

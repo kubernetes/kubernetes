@@ -36,6 +36,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
@@ -78,12 +79,20 @@ const (
 	// CheckServiceAffinityPred defines the name of predicate checkServiceAffinity.
 	CheckServiceAffinityPred = "CheckServiceAffinity"
 	// MaxEBSVolumeCountPred defines the name of predicate MaxEBSVolumeCount.
+	// DEPRECATED
+	// All cloudprovider specific predicates are deprecated in favour of MaxCSIVolumeCountPred.
 	MaxEBSVolumeCountPred = "MaxEBSVolumeCount"
 	// MaxGCEPDVolumeCountPred defines the name of predicate MaxGCEPDVolumeCount.
+	// DEPRECATED
+	// All cloudprovider specific predicates are deprecated in favour of MaxCSIVolumeCountPred.
 	MaxGCEPDVolumeCountPred = "MaxGCEPDVolumeCount"
 	// MaxAzureDiskVolumeCountPred defines the name of predicate MaxAzureDiskVolumeCount.
+	// DEPRECATED
+	// All cloudprovider specific predicates are deprecated in favour of MaxCSIVolumeCountPred.
 	MaxAzureDiskVolumeCountPred = "MaxAzureDiskVolumeCount"
 	// MaxCinderVolumeCountPred defines the name of predicate MaxCinderDiskVolumeCount.
+	// DEPRECATED
+	// All cloudprovider specific predicates are deprecated in favour of MaxCSIVolumeCountPred.
 	MaxCinderVolumeCountPred = "MaxCinderVolumeCount"
 	// MaxCSIVolumeCountPred defines the predicate that decides how many CSI volumes should be attached
 	MaxCSIVolumeCountPred = "MaxCSIVolumeCountPred"
@@ -315,6 +324,10 @@ type VolumeFilter struct {
 
 // NewMaxPDVolumeCountPredicate creates a predicate which evaluates whether a pod can fit based on the
 // number of volumes which match a filter that it requests, and those that are already present.
+//
+// DEPRECATED
+// All cloudprovider specific predicates defined here are deprecated in favour of CSI volume limit
+// predicate - MaxCSIVolumeCountPred.
 //
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
@@ -691,7 +704,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 					continue
 				}
 				nodeV, _ := nodeConstraints[k]
-				volumeVSet, err := volumeutil.LabelZonesToSet(v)
+				volumeVSet, err := volumehelpers.LabelZonesToSet(v)
 				if err != nil {
 					klog.Warningf("Failed to parse label for %q: %q. Ignoring the label. err=%v. ", k, v, err)
 					continue
@@ -965,16 +978,18 @@ func (s *ServiceAffinity) serviceAffinityMetadataProducer(pm *predicateMetadata)
 		return
 	}
 	pm.serviceAffinityInUse = true
-	var errSvc, errList error
+	var err error
 	// Store services which match the pod.
-	pm.serviceAffinityMatchingPodServices, errSvc = s.serviceLister.GetPodServices(pm.pod)
-	selector := CreateSelectorFromLabels(pm.pod.Labels)
-	allMatches, errList := s.podLister.List(selector)
-
-	// In the future maybe we will return them as part of the function.
-	if errSvc != nil || errList != nil {
-		klog.Errorf("Some Error were found while precomputing svc affinity: \nservices:%v , \npods:%v", errSvc, errList)
+	pm.serviceAffinityMatchingPodServices, err = s.serviceLister.GetPodServices(pm.pod)
+	if err != nil {
+		klog.Errorf("Error precomputing service affinity: could not list services: %v", err)
 	}
+	selector := CreateSelectorFromLabels(pm.pod.Labels)
+	allMatches, err := s.podLister.List(selector)
+	if err != nil {
+		klog.Errorf("Error precomputing service affinity: could not list pods: %v", err)
+	}
+
 	// consider only the pods that belong to the same namespace
 	pm.serviceAffinityMatchingPodList = FilterPodsByNamespace(allMatches, pm.pod.Namespace)
 }
@@ -1302,7 +1317,8 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairsOfPods(pod *v1.
 		existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				klog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
+				klog.Errorf("Pod %s has NodeName %q but node is not found",
+					podName(existingPod), existingPod.Spec.NodeName)
 				continue
 			}
 			return nil, err
@@ -1331,12 +1347,12 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 		// present in nodeInfo. Pods on other nodes pass the filter.
 		filteredPods, err := c.podLister.FilteredList(nodeInfo.Filter, labels.Everything())
 		if err != nil {
-			errMessage := fmt.Sprintf("Failed to get all pods, %+v", err)
+			errMessage := fmt.Sprintf("Failed to get all pods: %v", err)
 			klog.Error(errMessage)
 			return ErrExistingPodsAntiAffinityRulesNotMatch, errors.New(errMessage)
 		}
 		if topologyMaps, err = c.getMatchingAntiAffinityTopologyPairsOfPods(pod, filteredPods); err != nil {
-			errMessage := fmt.Sprintf("Failed to get all terms that pod %+v matches, err: %+v", podName(pod), err)
+			errMessage := fmt.Sprintf("Failed to get all terms that match pod %s: %v", podName(pod), err)
 			klog.Error(errMessage)
 			return ErrExistingPodsAntiAffinityRulesNotMatch, errors.New(errMessage)
 		}
@@ -1441,7 +1457,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			if !matchFound && len(affinityTerms) > 0 {
 				affTermsMatch, termsSelectorMatch, err := c.podMatchesPodAffinityTerms(pod, targetPod, nodeInfo, affinityTerms)
 				if err != nil {
-					errMessage := fmt.Sprintf("Cannot schedule pod %+v onto node %v, because of PodAffinity, err: %v", podName(pod), node.Name, err)
+					errMessage := fmt.Sprintf("Cannot schedule pod %s onto node %s, because of PodAffinity: %v", podName(pod), node.Name, err)
 					klog.Error(errMessage)
 					return ErrPodAffinityRulesNotMatch, errors.New(errMessage)
 				}

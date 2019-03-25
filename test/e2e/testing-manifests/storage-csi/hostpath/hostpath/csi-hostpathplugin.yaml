@@ -33,7 +33,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: hostpath
-          image: quay.io/k8scsi/hostpathplugin:v1.0.1
+          image: quay.io/k8scsi/hostpathplugin:v1.1.0-rc1
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -55,6 +55,9 @@ spec:
             - mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
               name: mountpoint-dir
+            - mountPath: /var/lib/kubelet/plugins
+              mountPropagation: Bidirectional
+              name: plugins-dir
       volumes:
         - hostPath:
             path: /var/lib/kubelet/plugins/csi-hostpath
@@ -68,3 +71,7 @@ spec:
             path: /var/lib/kubelet/plugins_registry
             type: Directory
           name: registration-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins
+            type: Directory
+          name: plugins-dir

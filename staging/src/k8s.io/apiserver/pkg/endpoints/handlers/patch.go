@@ -49,6 +49,11 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
+const (
+	// maximum number of operations a single json patch may contain.
+	maxJSONPatchOperations = 10000
+)
+
 // PatchResource returns a function that will handle a resource patch.
 func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -96,7 +101,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		patchBytes, err := readBody(req)
+		patchBytes, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -186,10 +191,12 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			subresource:     scope.Subresource,
 			dryRun:          dryrun.IsDryRun(options.DryRun),
 
+			objectInterfaces: &scope,
+
 			hubGroupVersion: scope.HubGroupVersion,
 
-			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes), scope.Authorizer, createAuthorizerAttributes),
-			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes),
+			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes, &scope), scope.Authorizer, createAuthorizerAttributes),
+			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes, &scope),
 			admissionCheck:   mutatingAdmission,
 
 			codec: codec,
@@ -252,6 +259,8 @@ type patcher struct {
 	subresource     string
 	dryRun          bool
 
+	objectInterfaces admission.ObjectInterfaces
+
 	hubGroupVersion schema.GroupVersion
 
 	// Validation functions
@@ -311,7 +320,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, prefixFromUserAgent(p.userAgent)); err != nil {
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object (json PATCH for %v) managed fields: %v", p.kind, err)
 		}
 	}
@@ -330,6 +339,11 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 		patchObj, err := jsonpatch.DecodePatch(p.patchBytes)
 		if err != nil {
 			return nil, errors.NewBadRequest(err.Error())
+		}
+		if len(patchObj) > maxJSONPatchOperations {
+			return nil, errors.NewRequestEntityTooLargeError(
+				fmt.Sprintf("The allowed maximum operations in a JSON patch is %d, got %d",
+					maxJSONPatchOperations, len(patchObj)))
 		}
 		patchedJS, err := patchObj.Apply(versionedJS)
 		if err != nil {
@@ -373,7 +387,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if newObj, err = p.fieldManager.Update(currentObject, newObj, prefixFromUserAgent(p.userAgent)); err != nil {
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, managerOrUserAgent(p.options.FieldManager, p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object (smp PATCH for %v) managed fields: %v", p.kind, err)
 		}
 	}
@@ -400,7 +414,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 	if p.fieldManager == nil {
 		panic("FieldManager must be installed to run apply")
 	}
-	return p.fieldManager.Apply(obj, p.patch, force)
+	return p.fieldManager.Apply(obj, p.patch, p.options.FieldManager, force)
 }
 
 func (p *applyPatcher) createNewObject() (runtime.Object, error) {
@@ -497,7 +511,7 @@ func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Obje
 	}
 	if p.admissionCheck != nil && p.admissionCheck.Handles(operation) {
 		attributes := p.admissionAttributes(ctx, patchedObject, currentObject, operation)
-		return patchedObject, p.admissionCheck.Admit(attributes)
+		return patchedObject, p.admissionCheck.Admit(attributes, p.objectInterfaces)
 	}
 	return patchedObject, nil
 }

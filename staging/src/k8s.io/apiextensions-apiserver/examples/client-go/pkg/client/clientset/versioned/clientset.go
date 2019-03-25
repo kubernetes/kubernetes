@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	CrV1() crv1.CrV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Cr() crv1.CrV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // CrV1 retrieves the CrV1Client
 func (c *Clientset) CrV1() crv1.CrV1Interface {
-	return c.crV1
-}
-
-// Deprecated: Cr retrieves the default version of CrClient.
-// Please explicitly pick a version.
-func (c *Clientset) Cr() crv1.CrV1Interface {
 	return c.crV1
 }
 

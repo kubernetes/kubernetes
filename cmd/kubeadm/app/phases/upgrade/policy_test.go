@@ -69,14 +69,14 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
 		},
 		{
-			name: "new version must be higher than v1.10.0",
+			name: "new version must be higher than v1.12.0",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.10.3",
+				clusterVersion: "v1.12.3",
+				kubeletVersion: "v1.12.3",
+				kubeadmVersion: "v1.12.3",
 			},
-			newK8sVersion:         "v1.9.10",
-			expectedMandatoryErrs: 1, // version must be higher than v1.10.0
+			newK8sVersion:         "v1.11.10",
+			expectedMandatoryErrs: 1, // version must be higher than v1.12.0
 			expectedSkippableErrs: 1, // can't upgrade old k8s with newer kubeadm
 		},
 		{
@@ -93,9 +93,9 @@ func TestEnforceVersionPolicies(t *testing.T) {
 		{
 			name: "downgrading two minor versions in one go is not supported",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.14.3",
-				kubeletVersion: "v1.14.3",
-				kubeadmVersion: "v1.14.0",
+				clusterVersion: "v1.15.3",
+				kubeletVersion: "v1.15.3",
+				kubeadmVersion: "v1.15.0",
 			},
 			newK8sVersion:         constants.MinimumControlPlaneVersion.WithPatch(3).String(),
 			expectedMandatoryErrs: 1, // can't downgrade two minor versions
@@ -125,7 +125,7 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			name: "the maximum skew between the cluster version and the kubelet versions should be one minor version. This may be forced through though.",
 			vg: &fakeVersionGetter{
 				clusterVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
-				kubeletVersion: "v1.11.8",
+				kubeletVersion: "v1.12.8",
 				kubeadmVersion: constants.CurrentKubernetesVersion.String(),
 			},
 			newK8sVersion:         constants.CurrentKubernetesVersion.String(),

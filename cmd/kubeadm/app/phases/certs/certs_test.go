@@ -514,47 +514,108 @@ func TestCreatePKIAssetsWithSparseCerts(t *testing.T) {
 
 func TestUsingExternalCA(t *testing.T) {
 	tests := []struct {
-		setupFuncs []func(cfg *kubeadmapi.InitConfiguration) error
-		expected   bool
+		name           string
+		setupFuncs     []func(cfg *kubeadmapi.InitConfiguration) error
+		externalCAFunc func(*kubeadmapi.ClusterConfiguration) (bool, error)
+		expected       bool
+		expectedErr    bool
 	}{
 		{
+			name: "Test External CA, when complete PKI exists",
 			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
 				CreatePKIAssets,
 			},
-			expected: false,
+			externalCAFunc: UsingExternalCA,
+			expected:       false,
 		},
 		{
+			name: "Test External CA, when ca.key missing",
 			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
 				CreatePKIAssets,
-				deleteCAKey,
-				deleteFrontProxyCAKey,
+				deleteCertOrKey(kubeadmconstants.CAKeyName),
 			},
-			expected: true,
+			externalCAFunc: UsingExternalCA,
+			expected:       true,
+		},
+		{
+			name: "Test External CA, when ca.key missing and signed certs are missing",
+			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+				CreatePKIAssets,
+				deleteCertOrKey(kubeadmconstants.CAKeyName),
+				deleteCertOrKey(kubeadmconstants.APIServerCertName),
+			},
+			externalCAFunc: UsingExternalCA,
+			expected:       true,
+			expectedErr:    true,
+		},
+		{
+			name: "Test External CA, when ca.key missing",
+			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+				CreatePKIAssets,
+				deleteCertOrKey(kubeadmconstants.CAKeyName),
+			},
+			externalCAFunc: UsingExternalCA,
+			expected:       true,
+		},
+		{
+			name: "Test External Front Proxy CA, when complete PKI exists",
+			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+				CreatePKIAssets,
+			},
+			externalCAFunc: UsingExternalFrontProxyCA,
+			expected:       false,
+		},
+		{
+			name: "Test External Front Proxy CA, when front-proxy-ca.key missing",
+			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+				CreatePKIAssets,
+				deleteCertOrKey(kubeadmconstants.FrontProxyCAKeyName),
+			},
+			externalCAFunc: UsingExternalFrontProxyCA,
+			expected:       true,
+		},
+		{
+			name: "Test External Front Proxy CA, when front-proxy-.key missing and signed certs are missing",
+			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+				CreatePKIAssets,
+				deleteCertOrKey(kubeadmconstants.FrontProxyCAKeyName),
+				deleteCertOrKey(kubeadmconstants.FrontProxyClientCertName),
+			},
+			externalCAFunc: UsingExternalFrontProxyCA,
+			expected:       true,
+			expectedErr:    true,
 		},
 	}
 
 	for _, test := range tests {
-		dir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(dir)
+		t.Run(test.name, func(t *testing.T) {
+			dir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(dir)
 
-		cfg := &kubeadmapi.InitConfiguration{
-			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
-			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-				CertificatesDir: dir,
-			},
-			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
-		}
-
-		for _, f := range test.setupFuncs {
-			if err := f(cfg); err != nil {
-				t.Errorf("error executing setup function: %v", err)
+			cfg := &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+					CertificatesDir: dir,
+				},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
 			}
-		}
 
-		if val, _ := UsingExternalCA(&cfg.ClusterConfiguration); val != test.expected {
-			t.Errorf("UsingExternalCA did not match expected: %v", test.expected)
-		}
+			for _, f := range test.setupFuncs {
+				if err := f(cfg); err != nil {
+					t.Errorf("error executing setup function: %v", err)
+				}
+			}
+
+			val, err := test.externalCAFunc(&cfg.ClusterConfiguration)
+			if val != test.expected {
+				t.Errorf("UsingExternalCA did not match expected: %v", test.expected)
+			}
+
+			if (err != nil) != test.expectedErr {
+				t.Errorf("UsingExternalCA returned un expected err: %v", err)
+			}
+		})
 	}
 }
 
@@ -742,18 +803,13 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 	}
 }
 
-func deleteCAKey(cfg *kubeadmapi.InitConfiguration) error {
-	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
-		return errors.Wrapf(err, "failed removing %s", kubeadmconstants.CAKeyName)
+func deleteCertOrKey(name string) func(*kubeadmapi.InitConfiguration) error {
+	return func(cfg *kubeadmapi.InitConfiguration) error {
+		if err := os.Remove(filepath.Join(cfg.CertificatesDir, name)); err != nil {
+			return errors.Wrapf(err, "failed removing %s", name)
+		}
+		return nil
 	}
-	return nil
-}
-
-func deleteFrontProxyCAKey(cfg *kubeadmapi.InitConfiguration) error {
-	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
-		return errors.Wrapf(err, "failed removing %s", kubeadmconstants.FrontProxyCAKeyName)
-	}
-	return nil
 }
 
 func assertCertsExist(t *testing.T, dir string) {

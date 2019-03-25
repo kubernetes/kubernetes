@@ -40,8 +40,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
@@ -68,6 +68,7 @@ type ApplyOptions struct {
 
 	ServerSideApply bool
 	ForceConflicts  bool
+	FieldManager    string
 	Selector        string
 	DryRun          bool
 	ServerDryRun    bool
@@ -115,6 +116,9 @@ var (
 		# Apply the configuration in pod.json to a pod.
 		kubectl apply -f ./pod.json
 
+		# Apply resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml.
+		kubectl apply -k dir/
+
 		# Apply the JSON passed into stdin to a pod.
 		cat pod.json | kubectl apply -f -
 
@@ -152,7 +156,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	o.cmdBaseName = baseName
 
 	cmd := &cobra.Command{
-		Use:                   "apply -f FILENAME",
+		Use:                   "apply (-f FILENAME | -k DIRECTORY)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Apply a configuration to a resource by filename or stdin"),
 		Long:                  applyLong,
@@ -170,7 +174,6 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	o.RecordFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 
-	cmd.MarkFlagRequired("filename")
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmd.Flags().BoolVar(&o.Prune, "prune", o.Prune, "Automatically delete resource objects, including the uninitialized ones, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
 	cmdutil.AddValidateFlags(cmd)
@@ -194,14 +197,15 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
+	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.ForceConflicts && !o.ServerSideApply {
-		return fmt.Errorf("--force-conflicts only works with --server-side")
+		return fmt.Errorf("--experimental-force-conflicts only works with --experimental-server-side")
 	}
 
 	if o.DryRun && o.ServerSideApply {
-		return fmt.Errorf("--dry-run doesn't work with --server-side")
+		return fmt.Errorf("--dry-run doesn't work with --experimental-server-side (did you mean --server-dry-run instead?)")
 	}
 
 	if o.DryRun && o.ServerDryRun {
@@ -237,6 +241,10 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 	o.DeleteOptions = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	err = o.DeleteOptions.FilenameOptions.RequireFilenameOrKustomize()
+	if err != nil {
+		return err
+	}
 
 	o.OpenAPISchema, _ = f.OpenAPISchema()
 	o.Validator, err = f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
@@ -387,7 +395,8 @@ func (o *ApplyOptions) Run() error {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
 			options := metav1.PatchOptions{
-				Force: &o.ForceConflicts,
+				Force:        &o.ForceConflicts,
+				FieldManager: o.FieldManager,
 			}
 			if o.ServerDryRun {
 				options.DryRun = []string{metav1.DryRunAll}

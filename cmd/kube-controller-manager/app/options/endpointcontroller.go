@@ -19,12 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 )
 
 // EndpointControllerOptions holds the EndPointController options.
 type EndpointControllerOptions struct {
-	*kubectrlmgrconfig.EndpointControllerConfiguration
+	*endpointconfig.EndpointControllerConfiguration
 }
 
 // AddFlags adds flags related to EndPointController for controller manager to the specified FlagSet.
@@ -37,7 +37,7 @@ func (o *EndpointControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up EndPointController config with options.
-func (o *EndpointControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.EndpointControllerConfiguration) error {
+func (o *EndpointControllerOptions) ApplyTo(cfg *endpointconfig.EndpointControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

@@ -29,6 +29,21 @@
 #    * ppc64le
 #    * s390x
 #
+#  Set KUBERNETES_CLIENT_OS to choose the client OS to download:
+#    * current OS [default]
+#    * linux
+#    * darwin
+#    * windows
+#
+#  Set KUBERNETES_CLIENT_ARCH to choose the client architecture to download:
+#    * current architecture [default]
+#    * amd64
+#    * arm
+#    * arm64
+#    * ppc64le
+#    * s390x
+#    * windows
+#
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
 #    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
@@ -59,48 +74,57 @@ function detect_kube_release() {
 }
 
 function detect_client_info() {
-  local kernel machine
-  kernel="$(uname -s)"
-  case "${kernel}" in
-    Darwin)
-      CLIENT_PLATFORM="darwin"
-      ;;
-    Linux)
-      CLIENT_PLATFORM="linux"
-      ;;
-    *)
-      echo "Unknown, unsupported platform: ${kernel}." >&2
-      echo "Supported platforms: Linux, Darwin." >&2
-      echo "Bailing out." >&2
-      exit 2
-  esac
+  if [ -n "${KUBERNETES_CLIENT_OS-}" ]; then
+    CLIENT_PLATFORM="${KUBERNETES_CLIENT_OS}"
+  else
+    local kernel
+    kernel="$(uname -s)"
+    case "${kernel}" in
+      Darwin)
+        CLIENT_PLATFORM="darwin"
+        ;;
+      Linux)
+        CLIENT_PLATFORM="linux"
+        ;;
+      *)
+        echo "Unknown, unsupported platform: ${kernel}." >&2
+        echo "Supported platforms: Linux, Darwin." >&2
+        echo "Bailing out." >&2
+        exit 2
+    esac
+  fi
 
-  # TODO: migrate the kube::util::host_platform function out of hack/lib and
-  # use it here.
-  machine="$(uname -m)"
-  case "${machine}" in
-    x86_64*|i?86_64*|amd64*)
-      CLIENT_ARCH="amd64"
-      ;;
-    aarch64*|arm64*)
-      CLIENT_ARCH="arm64"
-      ;;
-    arm*)
-      CLIENT_ARCH="arm"
-      ;;
-    i?86*)
-      CLIENT_ARCH="386"
-      ;;
-    s390x*)
-      CLIENT_ARCH="s390x"
-      ;;
-    *)
-      echo "Unknown, unsupported architecture (${machine})." >&2
-      echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
-      echo "Bailing out." >&2
-      exit 3
-      ;;
-  esac
+  if [ -n "${KUBERNETES_CLIENT_ARCH-}" ]; then
+    CLIENT_ARCH="${KUBERNETES_CLIENT_ARCH}"
+  else
+    # TODO: migrate the kube::util::host_platform function out of hack/lib and
+    # use it here.
+    local machine
+    machine="$(uname -m)"
+    case "${machine}" in
+      x86_64*|i?86_64*|amd64*)
+        CLIENT_ARCH="amd64"
+        ;;
+      aarch64*|arm64*)
+        CLIENT_ARCH="arm64"
+        ;;
+      arm*)
+        CLIENT_ARCH="arm"
+        ;;
+      i?86*)
+        CLIENT_ARCH="386"
+        ;;
+      s390x*)
+        CLIENT_ARCH="s390x"
+        ;;
+      *)
+        echo "Unknown, unsupported architecture (${machine})." >&2
+        echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
+        echo "Bailing out." >&2
+        exit 3
+        ;;
+    esac
+  fi
 }
 
 function md5sum_file() {
@@ -150,11 +174,8 @@ function extract_arch_tarball() {
   platforms_dir="${KUBE_ROOT}/platforms/${platform}/${arch}"
   echo "Extracting ${tarfile} into ${platforms_dir}"
   mkdir -p "${platforms_dir}"
-  # Tarball looks like kubernetes/{client,server}/bin/BINARY"
+  # Tarball looks like kubernetes/{client,server,test}/bin/BINARY"
   tar -xzf "${tarfile}" --strip-components 3 -C "${platforms_dir}"
-  # Create convenience symlink
-  ln -sf "${platforms_dir}" "$(dirname "${tarfile}")/bin"
-  echo "Add '$(dirname "${tarfile}")/bin' to your PATH to use newly-installed binaries."
 }
 
 detect_kube_release
@@ -164,8 +185,8 @@ SERVER_PLATFORM="linux"
 SERVER_ARCH="${KUBERNETES_SERVER_ARCH:-amd64}"
 SERVER_TAR="kubernetes-server-${SERVER_PLATFORM}-${SERVER_ARCH}.tar.gz"
 if [[ -n "${KUBERNETES_NODE_PLATFORM-}" || -n "${KUBERNETES_NODE_ARCH-}" ]]; then
-  NODE_PLATFORM="${KUBERNETES_NODE_PLATFORM:${SERVER_PLATFORM}}"
-  NODE_ARCH="${KUBERNETES_NODE_ARCH:${SERVER_ARCH}}"
+  NODE_PLATFORM="${KUBERNETES_NODE_PLATFORM:-${SERVER_PLATFORM}}"
+  NODE_ARCH="${KUBERNETES_NODE_ARCH:-${SERVER_ARCH}}"
   NODE_TAR="kubernetes-node-${NODE_PLATFORM}-${NODE_ARCH}.tar.gz"
 fi
 
@@ -174,24 +195,15 @@ CLIENT_TAR="kubernetes-client-${CLIENT_PLATFORM}-${CLIENT_ARCH}.tar.gz"
 
 echo "Kubernetes release: ${KUBE_VERSION}"
 echo "Server: ${SERVER_PLATFORM}/${SERVER_ARCH}  (to override, set KUBERNETES_SERVER_ARCH)"
-echo "Client: ${CLIENT_PLATFORM}/${CLIENT_ARCH}  (autodetected)"
+printf "Client: %s/%s" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
+if [ -z "${KUBERNETES_CLIENT_OS-}" ] && [ -z "${KUBERNETES_CLIENT_ARCH-}" ]; then
+  printf "  (autodetected)"
+fi
+echo "  (to override, set KUBERNETES_CLIENT_OS and/or KUBERNETES_CLIENT_ARCH)"
 echo
 
-# TODO: remove this check and default to true when we stop shipping server
-# tarballs in kubernetes.tar.gz
-DOWNLOAD_SERVER_TAR=false
-if [[ ! -e "${KUBE_ROOT}/server/${SERVER_TAR}" ]]; then
-  DOWNLOAD_SERVER_TAR=true
-  echo "Will download ${SERVER_TAR} from ${DOWNLOAD_URL_PREFIX}"
-fi
-
-# TODO: remove this check and default to true when we stop shipping kubectl
-# in kubernetes.tar.gz
-DOWNLOAD_CLIENT_TAR=false
-if [[ ! -x "${KUBE_ROOT}/platforms/${CLIENT_PLATFORM}/${CLIENT_ARCH}/kubectl" ]]; then
-  DOWNLOAD_CLIENT_TAR=true
-  echo "Will download and extract ${CLIENT_TAR} from ${DOWNLOAD_URL_PREFIX}"
-fi
+echo "Will download ${SERVER_TAR} from ${DOWNLOAD_URL_PREFIX}"
+echo "Will download and extract ${CLIENT_TAR} from ${DOWNLOAD_URL_PREFIX}"
 
 DOWNLOAD_NODE_TAR=false
 if [[ -n "${NODE_TAR:-}" ]]; then
@@ -199,18 +211,10 @@ if [[ -n "${NODE_TAR:-}" ]]; then
   echo "Will download and extract ${NODE_TAR} from ${DOWNLOAD_URL_PREFIX}"
 fi
 
-TESTS_TAR="kubernetes-test.tar.gz"
 DOWNLOAD_TESTS_TAR=false
 if [[ -n "${KUBERNETES_DOWNLOAD_TESTS-}" ]]; then
   DOWNLOAD_TESTS_TAR=true
-  echo "Will download and extract ${TESTS_TAR} from ${DOWNLOAD_URL_PREFIX}"
-fi
-
-if [[ "${DOWNLOAD_CLIENT_TAR}" == false && \
-      "${DOWNLOAD_SERVER_TAR}" == false && \
-      "${DOWNLOAD_TESTS_TAR}" == false ]]; then
-  echo "Nothing additional to download."
-  exit 0
+  echo "Will download and extract kubernetes-test tarball(s) from ${DOWNLOAD_URL_PREFIX}"
 fi
 
 if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
@@ -222,22 +226,47 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   fi
 fi
 
-if "${DOWNLOAD_SERVER_TAR}"; then
-  download_tarball "${KUBE_ROOT}/server" "${SERVER_TAR}"
-fi
+download_tarball "${KUBE_ROOT}/server" "${SERVER_TAR}"
 
 if "${DOWNLOAD_NODE_TAR}"; then
   download_tarball "${KUBE_ROOT}/node" "${NODE_TAR}"
 fi
 
-if "${DOWNLOAD_CLIENT_TAR}"; then
-  download_tarball "${KUBE_ROOT}/client" "${CLIENT_TAR}"
-  extract_arch_tarball "${KUBE_ROOT}/client/${CLIENT_TAR}" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
-fi
+download_tarball "${KUBE_ROOT}/client" "${CLIENT_TAR}"
+extract_arch_tarball "${KUBE_ROOT}/client/${CLIENT_TAR}" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
+ln -s "${KUBE_ROOT}/platforms/${CLIENT_PLATFORM}/${CLIENT_ARCH}" "${KUBE_ROOT}/client/bin"
+echo "Add '${KUBE_ROOT}/client/bin' to your PATH to use newly-installed binaries."
 
 if "${DOWNLOAD_TESTS_TAR}"; then
-  download_tarball "${KUBE_ROOT}/test" "${TESTS_TAR}"
-  echo "Extracting ${TESTS_TAR} into ${KUBE_ROOT}"
-  # Strip leading "kubernetes/"
-  tar -xzf "${KUBE_ROOT}/test/${TESTS_TAR}" --strip-components 1 -C "${KUBE_ROOT}"
+  TESTS_PORTABLE_TAR="kubernetes-test-portable.tar.gz"
+  download_tarball "${KUBE_ROOT}/test" "${TESTS_PORTABLE_TAR}" || true
+  if [[ -f "${KUBE_ROOT}/test/${TESTS_PORTABLE_TAR}" ]]; then
+    echo "Extracting ${TESTS_PORTABLE_TAR} into ${KUBE_ROOT}"
+    # Strip leading "kubernetes/"
+    tar -xzf "${KUBE_ROOT}/test/${TESTS_PORTABLE_TAR}" --strip-components 1 -C "${KUBE_ROOT}"
+
+    # Next, download platform-specific test tarballs for all relevant platforms
+    TEST_PLATFORM_TUPLES=(
+      "${CLIENT_PLATFORM}/${CLIENT_ARCH}"
+      "${SERVER_PLATFORM}/${SERVER_ARCH}"
+      )
+    if [[ -n "${NODE_PLATFORM:-}" && -n "${NODE_ARCH:-}" ]]; then
+      TEST_PLATFORM_TUPLES+=("${NODE_PLATFORM}/${NODE_ARCH}")
+    fi
+    # Loop over only the unique tuples
+    for TUPLE in $(printf "%s\n" "${TEST_PLATFORM_TUPLES[@]}" | sort -u); do
+        OS=$(echo "${TUPLE}" | cut -d/ -f1)
+        ARCH=$(echo "${TUPLE}" | cut -d/ -f2)
+        TEST_PLATFORM_TAR="kubernetes-test-${OS}-${ARCH}.tar.gz"
+        download_tarball "${KUBE_ROOT}/test" "${TEST_PLATFORM_TAR}"
+        extract_arch_tarball "${KUBE_ROOT}/test/${TEST_PLATFORM_TAR}" "${OS}" "${ARCH}"
+    done
+  else
+    echo "Failed to download portable test tarball, falling back to mondo test tarball."
+    TESTS_MONDO_TAR="kubernetes-test.tar.gz"
+    download_tarball "${KUBE_ROOT}/test" "${TESTS_MONDO_TAR}"
+    echo "Extracting ${TESTS_MONDO_TAR} into ${KUBE_ROOT}"
+    # Strip leading "kubernetes/"
+    tar -xzf "${KUBE_ROOT}/test/${TESTS_MONDO_TAR}" --strip-components 1 -C "${KUBE_ROOT}"
+  fi
 fi

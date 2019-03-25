@@ -265,7 +265,7 @@ func addKeyFromLiteralToSecret(secret *v1.Secret, keyName string, data []byte) e
 	}
 
 	if _, entryExists := secret.Data[keyName]; entryExists {
-		return fmt.Errorf("cannot add key %s, another key by that name already exists: %v", keyName, secret.Data)
+		return fmt.Errorf("cannot add key %s, another key by that name already exists", keyName)
 	}
 	secret.Data[keyName] = data
 	return nil

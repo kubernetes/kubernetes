@@ -31,6 +31,7 @@ import (
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	schedulerapi "k8s.io/api/scheduling/v1beta1"
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
@@ -40,7 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/discovery"
+	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/gengo/examples/set-gen/sets"
@@ -133,6 +134,8 @@ var missingHanlders = sets.NewString(
 	"PriorityClass",
 	"PodPreset",
 	"AuditSink",
+	"CSINode",
+	"CSIDriver",
 )
 
 func TestServerSidePrint(t *testing.T) {
@@ -148,6 +151,7 @@ func TestServerSidePrint(t *testing.T) {
 			appsv1beta1.SchemeGroupVersion,
 			appsv1beta2.SchemeGroupVersion,
 			extensionsv1beta1.SchemeGroupVersion,
+			nodev1alpha1.SchemeGroupVersion,
 		},
 		[]schema.GroupVersionResource{
 			extensionsv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
@@ -181,7 +185,7 @@ func TestServerSidePrint(t *testing.T) {
 		os.Remove(cacheDir)
 	}()
 
-	cachedClient, err := discovery.NewCachedDiscoveryClientForConfig(restConfig, cacheDir, "", time.Duration(10*time.Minute))
+	cachedClient, err := diskcached.NewCachedDiscoveryClientForConfig(restConfig, cacheDir, "", time.Duration(10*time.Minute))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

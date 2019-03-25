@@ -42,6 +42,7 @@ func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGett
 	return &KubeletAuth{authenticator, authorizerAttributeGetter, authorizer}
 }
 
+// NewNodeAuthorizerAttributesGetter creates a new authorizer.RequestAttributesGetter for the node.
 func NewNodeAuthorizerAttributesGetter(nodeName types.NodeName) authorizer.RequestAttributesGetter {
 	return nodeAuthorizerAttributesGetter{nodeName: nodeName}
 }

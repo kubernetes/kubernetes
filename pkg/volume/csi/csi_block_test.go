@@ -52,7 +52,7 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 func TestBlockMapperGetGlobalMapPath(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
 	// TODO (vladimirvivien) specName with slashes will not work
@@ -93,7 +93,7 @@ func TestBlockMapperGetGlobalMapPath(t *testing.T) {
 func TestBlockMapperGetStagingPath(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
@@ -130,7 +130,7 @@ func TestBlockMapperGetStagingPath(t *testing.T) {
 func TestBlockMapperGetPublishPath(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
@@ -167,7 +167,7 @@ func TestBlockMapperGetPublishPath(t *testing.T) {
 func TestBlockMapperGetDeviceMapPath(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
@@ -208,13 +208,12 @@ func TestBlockMapperGetDeviceMapPath(t *testing.T) {
 func TestBlockMapperSetupDevice(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 	fakeClient := fakeclient.NewSimpleClientset()
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
-		nil,
 		nil,
 		"fakeNode",
 	)
@@ -233,7 +232,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(attachment)
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
@@ -275,13 +274,12 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 func TestBlockMapperMapDevice(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 	fakeClient := fakeclient.NewSimpleClientset()
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
-		nil,
 		nil,
 		"fakeNode",
 	)
@@ -300,7 +298,7 @@ func TestBlockMapperMapDevice(t *testing.T) {
 	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(attachment)
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
@@ -358,13 +356,12 @@ func TestBlockMapperMapDevice(t *testing.T) {
 func TestBlockMapperTearDownDevice(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
-	plug, tmpDir := newTestPlugin(t, nil, nil)
+	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 	fakeClient := fakeclient.NewSimpleClientset()
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
-		nil,
 		nil,
 		"fakeNode",
 	)

@@ -61,8 +61,6 @@ const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 const isNotPositiveErrorMsg string = `must be greater than zero`
-const csiDriverNameRexpErrMsg string = "must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
-const csiDriverNameRexpFmt string = `^[a-zA-Z0-9][-a-zA-Z0-9_.]{0,61}[a-zA-Z-0-9]$`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var fileModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
@@ -73,8 +71,6 @@ var BannedOwners = apimachineryvalidation.BannedOwners
 var iscsiInitiatorIqnRegex = regexp.MustCompile(`iqn\.\d{4}-\d{2}\.([[:alnum:]-.]+)(:[^,;*&$|\s]+)$`)
 var iscsiInitiatorEuiRegex = regexp.MustCompile(`^eui.[[:alnum:]]{16}$`)
 var iscsiInitiatorNaaRegex = regexp.MustCompile(`^naa.[[:alnum:]]{32}$`)
-
-var csiDriverNameRexp = regexp.MustCompile(csiDriverNameRexpFmt)
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -628,6 +624,14 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateScaleIOVolumeSource(source.ScaleIO, fldPath.Child("scaleIO"))...)
+		}
+	}
+	if source.CSI != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("csi"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateCSIVolumeSource(source.CSI, fldPath.Child("csi"))...)
 		}
 	}
 
@@ -1446,9 +1450,10 @@ func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorLi
 		allErrs = append(allErrs, field.TooLong(fldPath, driverName, 63))
 	}
 
-	if !csiDriverNameRexp.MatchString(driverName) {
-		allErrs = append(allErrs, field.Invalid(fldPath, driverName, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
+	for _, msg := range validation.IsDNS1123Subdomain(strings.ToLower(driverName)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, driverName, msg))
 	}
+
 	return allErrs
 }
 
@@ -1487,16 +1492,20 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 		}
 	}
 
-	if csi.NodeStageSecretRef != nil {
-		if len(csi.NodeStageSecretRef.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("nodeStageSecretRef", "name"), ""))
+	return allErrs
+}
+
+func validateCSIVolumeSource(csi *core.CSIVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateCSIDriverName(csi.Driver, fldPath.Child("driver"))...)
+
+	if csi.NodePublishSecretRef != nil {
+		if len(csi.NodePublishSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "name"), ""))
 		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeStageSecretRef.Name, fldPath.Child("name"))...)
-		}
-		if len(csi.NodeStageSecretRef.Namespace) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("nodeStageSecretRef", "namespace"), ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeStageSecretRef.Namespace, fldPath.Child("namespace"))...)
+			for _, msg := range ValidateSecretName(csi.NodePublishSecretRef.Name, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), csi.NodePublishSecretRef.Name, msg))
+			}
 		}
 	}
 
@@ -2082,13 +2091,6 @@ func validateObjectFieldSelector(fs *core.ObjectFieldSelector, expressions *sets
 	return allErrs
 }
 
-func fsResourceIsEphemeralStorage(resource string) bool {
-	if resource == "limits.ephemeral-storage" || resource == "requests.ephemeral-storage" {
-		return true
-	}
-	return false
-}
-
 func validateContainerResourceFieldSelector(fs *core.ResourceFieldSelector, expressions *sets.String, fldPath *field.Path, volume bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -2269,6 +2271,14 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 
 		if len(mnt.SubPath) > 0 {
 			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPath, fldPath.Child("subPath"))...)
+		}
+
+		if len(mnt.SubPathExpr) > 0 {
+			if len(mnt.SubPath) > 0 {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("subPathExpr"), mnt.SubPathExpr, "subPathExpr and subPath are mutually exclusive"))
+			}
+
+			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPathExpr, fldPath.Child("subPathExpr"))...)
 		}
 
 		if mnt.MountPropagation != nil {
@@ -2694,6 +2704,10 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, "must not have more than 256 characters (including spaces) in the search list"))
 		}
 		for i, search := range dnsConfig.Searches {
+			// it is fine to have a trailing dot
+			if strings.HasSuffix(search, ".") {
+				search = search[0 : len(search)-1]
+			}
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
 		}
 		// Validate options.
@@ -4014,7 +4028,7 @@ func ValidateReadOnlyPersistentDisks(volumes []core.Volume, fldPath *field.Path)
 		vol := &volumes[i]
 		idxPath := fldPath.Index(i)
 		if vol.GCEPersistentDisk != nil {
-			if vol.GCEPersistentDisk.ReadOnly == false {
+			if !vol.GCEPersistentDisk.ReadOnly {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("gcePersistentDisk", "readOnly"), false, "must be true for replicated pods > 1; GCE PD can only be mounted on multiple machines if it is read-only"))
 			}
 		}
@@ -4358,15 +4372,6 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 		}
 	}
 	return allErrs
-}
-
-// isLocalStorageResource checks whether the resource is local ephemeral storage
-func isLocalStorageResource(name string) bool {
-	if name == string(core.ResourceEphemeralStorage) || name == string(core.ResourceRequestsEphemeralStorage) ||
-		name == string(core.ResourceLimitsEphemeralStorage) {
-		return true
-	}
-	return false
 }
 
 // Validate resource names that can go in a resource quota
@@ -4975,10 +4980,7 @@ func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
 // Validate finalizer names
 func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := apimachineryvalidation.ValidateFinalizerName(stringValue, fldPath)
-	for _, err := range validateKubeFinalizerName(stringValue, fldPath) {
-		allErrs = append(allErrs, err)
-	}
-
+	allErrs = append(allErrs, validateKubeFinalizerName(stringValue, fldPath)...)
 	return allErrs
 }
 

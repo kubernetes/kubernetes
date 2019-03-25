@@ -66,8 +66,7 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	libcontainerStats := &libcontainer.Stats{
 		CgroupStats: cgroupStats,
 	}
-	withPerCPU := h.includedMetrics.Has(container.PerCpuUsageMetrics)
-	stats := newContainerStats(libcontainerStats, withPerCPU)
+	stats := newContainerStats(libcontainerStats, h.includedMetrics)
 
 	if h.includedMetrics.Has(container.ProcessSchedulerMetrics) {
 		pids, err := h.cgroupManager.GetAllPids()
@@ -599,14 +598,16 @@ func setNetworkStats(libcontainerStats *libcontainer.Stats, ret *info.ContainerS
 	}
 }
 
-func newContainerStats(libcontainerStats *libcontainer.Stats, withPerCPU bool) *info.ContainerStats {
+func newContainerStats(libcontainerStats *libcontainer.Stats, includedMetrics container.MetricSet) *info.ContainerStats {
 	ret := &info.ContainerStats{
 		Timestamp: time.Now(),
 	}
 
 	if s := libcontainerStats.CgroupStats; s != nil {
-		setCpuStats(s, ret, withPerCPU)
-		setDiskIoStats(s, ret)
+		setCpuStats(s, ret, includedMetrics.Has(container.PerCpuUsageMetrics))
+		if includedMetrics.Has(container.DiskIOMetrics) {
+			setDiskIoStats(s, ret)
+		}
 		setMemoryStats(s, ret)
 	}
 	if len(libcontainerStats.Interfaces) > 0 {

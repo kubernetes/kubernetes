@@ -113,6 +113,16 @@ message CustomResourceConversion {
   // alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
   // +optional
   optional WebhookClientConfig webhookClientConfig = 2;
+
+  // ConversionReviewVersions is an ordered list of preferred `ConversionReview`
+  // versions the Webhook expects. API server will try to use first version in
+  // the list which it supports. If none of the versions specified in this list
+  // supported by API server, conversion will fail for this object.
+  // If a persisted Webhook configuration specifies allowed versions and does not
+  // include any versions known to the API Server, calls to the webhook will fail.
+  // Default to `['v1beta1']`.
+  // +optional
+  repeated string conversionReviewVersions = 3;
 }
 
 // CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
@@ -431,6 +441,8 @@ message JSONSchemaProps {
   optional ExternalDocumentation externalDocs = 35;
 
   optional JSON example = 36;
+
+  optional bool nullable = 37;
 }
 
 // JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps

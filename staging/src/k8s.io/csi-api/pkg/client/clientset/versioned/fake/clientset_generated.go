@@ -75,8 +75,3 @@ var _ clientset.Interface = &Clientset{}
 func (c *Clientset) CsiV1alpha1() csiv1alpha1.CsiV1alpha1Interface {
 	return &fakecsiv1alpha1.FakeCsiV1alpha1{Fake: &c.Fake}
 }
-
-// Csi retrieves the CsiV1alpha1Client
-func (c *Clientset) Csi() csiv1alpha1.CsiV1alpha1Interface {
-	return &fakecsiv1alpha1.FakeCsiV1alpha1{Fake: &c.Fake}
-}

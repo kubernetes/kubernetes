@@ -56,4 +56,3 @@ go install ./cmd/...
 
 make test-cmd
 make test-integration
-./hack/test-update-storage-objects.sh

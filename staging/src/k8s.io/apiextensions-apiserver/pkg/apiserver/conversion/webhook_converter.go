@@ -18,7 +18,6 @@ package conversion
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,11 +54,12 @@ func newWebhookConverterFactory(serviceResolver webhook.ServiceResolver, authRes
 
 // webhookConverter is a converter that calls an external webhook to do the CR conversion.
 type webhookConverter struct {
-	validVersions map[schema.GroupVersion]bool
 	clientManager webhook.ClientManager
 	restClient    *rest.RESTClient
 	name          string
 	nopConverter  nopConverter
+
+	conversionReviewVersions []string
 }
 
 func webhookClientConfigForCRD(crd *internal.CustomResourceDefinition) *webhook.ClientConfig {
@@ -83,57 +83,31 @@ func webhookClientConfigForCRD(crd *internal.CustomResourceDefinition) *webhook.
 	return &ret
 }
 
-var _ runtime.ObjectConvertor = &webhookConverter{}
+var _ crConverterInterface = &webhookConverter{}
 
-func (f *webhookConverterFactory) NewWebhookConverter(validVersions map[schema.GroupVersion]bool, crd *internal.CustomResourceDefinition) (*webhookConverter, error) {
+func (f *webhookConverterFactory) NewWebhookConverter(crd *internal.CustomResourceDefinition) (*webhookConverter, error) {
 	restClient, err := f.clientManager.HookClient(*webhookClientConfigForCRD(crd))
 	if err != nil {
 		return nil, err
 	}
 	return &webhookConverter{
 		clientManager: f.clientManager,
-		validVersions: validVersions,
 		restClient:    restClient,
 		name:          crd.Name,
-		nopConverter:  nopConverter{validVersions: validVersions},
+		nopConverter:  nopConverter{},
+
+		conversionReviewVersions: crd.Spec.Conversion.ConversionReviewVersions,
 	}, nil
 }
 
-func (webhookConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
-	return "", "", errors.New("unstructured cannot convert field labels")
-}
-
-func (c *webhookConverter) Convert(in, out, context interface{}) error {
-	unstructIn, ok := in.(*unstructured.Unstructured)
-	if !ok {
-		return fmt.Errorf("input type %T in not valid for unstructured conversion", in)
+// hasConversionReviewVersion check whether a version is accepted by a given webhook.
+func (c *webhookConverter) hasConversionReviewVersion(v string) bool {
+	for _, b := range c.conversionReviewVersions {
+		if b == v {
+			return true
+		}
 	}
-
-	unstructOut, ok := out.(*unstructured.Unstructured)
-	if !ok {
-		return fmt.Errorf("output type %T in not valid for unstructured conversion", out)
-	}
-
-	outGVK := unstructOut.GroupVersionKind()
-	if !c.validVersions[outGVK.GroupVersion()] {
-		return fmt.Errorf("request to convert CR from an invalid group/version: %s", outGVK.String())
-	}
-	inGVK := unstructIn.GroupVersionKind()
-	if !c.validVersions[inGVK.GroupVersion()] {
-		return fmt.Errorf("request to convert CR to an invalid group/version: %s", inGVK.String())
-	}
-
-	converted, err := c.ConvertToVersion(unstructIn, outGVK.GroupVersion())
-	if err != nil {
-		return err
-	}
-	unstructuredConverted, ok := converted.(runtime.Unstructured)
-	if !ok {
-		// this should not happened
-		return fmt.Errorf("CR conversion failed")
-	}
-	unstructOut.SetUnstructuredContent(unstructuredConverted.UnstructuredContent())
-	return nil
+	return false
 }
 
 func createConversionReview(obj runtime.Object, apiVersion string) *v1beta1.ConversionReview {
@@ -173,47 +147,22 @@ func getRawExtensionObject(rx runtime.RawExtension) (runtime.Object, error) {
 	return &u, nil
 }
 
-// getTargetGroupVersion returns group/version which should be used to convert in objects to.
-// String version of the return item is APIVersion.
-func getTargetGroupVersion(in runtime.Object, target runtime.GroupVersioner) (schema.GroupVersion, error) {
-	fromGVK := in.GetObjectKind().GroupVersionKind()
-	toGVK, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{fromGVK})
-	if !ok {
-		// TODO: should this be a typed error?
-		return schema.GroupVersion{}, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", fromGVK.String(), target)
-	}
-	return toGVK.GroupVersion(), nil
-}
-
-func (c *webhookConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
+func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) (runtime.Object, error) {
 	// In general, the webhook should not do any defaulting or validation. A special case of that is an empty object
 	// conversion that must result an empty object and practically is the same as nopConverter.
 	// A smoke test in API machinery calls the converter on empty objects. As this case happens consistently
 	// it special cased here not to call webhook converter. The test initiated here:
 	// https://github.com/kubernetes/kubernetes/blob/dbb448bbdcb9e440eee57024ffa5f1698956a054/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go#L201
 	if isEmptyUnstructuredObject(in) {
-		return c.nopConverter.ConvertToVersion(in, target)
+		return c.nopConverter.Convert(in, toGV)
 	}
 
-	toGV, err := getTargetGroupVersion(in, target)
-	if err != nil {
-		return nil, err
-	}
-	if !c.validVersions[toGV] {
-		return nil, fmt.Errorf("request to convert CR to an invalid group/version: %s", toGV.String())
-	}
-	fromGV := in.GetObjectKind().GroupVersionKind().GroupVersion()
-	if !c.validVersions[fromGV] {
-		return nil, fmt.Errorf("request to convert CR from an invalid group/version: %s", fromGV.String())
-	}
 	listObj, isList := in.(*unstructured.UnstructuredList)
-	if isList {
-		for i, item := range listObj.Items {
-			fromGV := item.GroupVersionKind().GroupVersion()
-			if !c.validVersions[fromGV] {
-				return nil, fmt.Errorf("input list has invalid group/version `%v` at `%v` index", fromGV, i)
-			}
-		}
+
+	// Currently converter only supports `v1beta1` ConversionReview
+	// TODO: Make CRD webhooks caller capable of sending/receiving multiple ConversionReview versions
+	if !c.hasConversionReviewVersion(v1beta1.SchemeGroupVersion.Version) {
+		return nil, fmt.Errorf("webhook does not accept v1beta1 ConversionReview")
 	}
 
 	request := createConversionReview(in, toGV.String())

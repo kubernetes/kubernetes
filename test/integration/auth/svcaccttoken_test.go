@@ -41,7 +41,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/pkg/apis/core"
 	serviceaccountgetter "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
@@ -59,7 +59,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequest, true)()
 
 	// Build client config, clientset, and informers
-	sk, err := certutil.ParsePrivateKeyPEM([]byte(ecdsaPrivateKey))
+	sk, err := keyutil.ParsePrivateKeyPEM([]byte(ecdsaPrivateKey))
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}

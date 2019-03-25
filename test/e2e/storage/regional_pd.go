@@ -27,7 +27,7 @@ import (
 	"encoding/json"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,8 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -49,6 +49,7 @@ const (
 	pvDeletionTimeout       = 3 * time.Minute
 	statefulSetReadyTimeout = 3 * time.Minute
 	taintKeyPrefix          = "zoneTaint_"
+	repdMinSize             = "200Gi"
 )
 
 var _ = utils.SIGDescribe("Regional PD", func() {
@@ -106,14 +107,16 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 				"zones":            strings.Join(cloudZones, ","),
 				"replication-type": "regional-pd",
 			},
-			ClaimSize:    "1.5Gi",
-			ExpectedSize: "2Gi",
-			PvCheck: func(volume *v1.PersistentVolume) error {
-				err := checkGCEPD(volume, "pd-standard")
-				if err != nil {
-					return err
-				}
-				return verifyZonesInPV(volume, sets.NewString(cloudZones...), true /* match */)
+			ClaimSize:    repdMinSize,
+			ExpectedSize: repdMinSize,
+			PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+				var err error
+				err = checkGCEPD(volume, "pd-standard")
+				Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
+				err = verifyZonesInPV(volume, sets.NewString(cloudZones...), true /* match */)
+				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
+
+				testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
 			},
 		},
 		{
@@ -124,27 +127,28 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 				"type":             "pd-standard",
 				"replication-type": "regional-pd",
 			},
-			ClaimSize:    "1.5Gi",
-			ExpectedSize: "2Gi",
-			PvCheck: func(volume *v1.PersistentVolume) error {
-				err := checkGCEPD(volume, "pd-standard")
-				if err != nil {
-					return err
-				}
+			ClaimSize:    repdMinSize,
+			ExpectedSize: repdMinSize,
+			PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+				var err error
+				err = checkGCEPD(volume, "pd-standard")
+				Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
 				zones, err := framework.GetClusterZones(c)
-				if err != nil {
-					return err
-				}
-				return verifyZonesInPV(volume, zones, false /* match */)
+				Expect(err).NotTo(HaveOccurred(), "GetClusterZones")
+				err = verifyZonesInPV(volume, zones, false /* match */)
+				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
+
+				testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
 			},
 		},
 	}
 
 	for _, test := range tests {
-		class := newStorageClass(test, ns, "" /* suffix */)
-		claim := newClaim(test, ns, "" /* suffix */)
-		claim.Spec.StorageClassName = &class.Name
-		testsuites.TestDynamicProvisioning(test, c, claim, class)
+		test.Client = c
+		test.Class = newStorageClass(test, ns, "" /* suffix */)
+		test.Claim = newClaim(test, ns, "" /* suffix */)
+		test.Claim.Spec.StorageClassName = &test.Class.Name
+		test.TestDynamicProvisioning()
 	}
 }
 
@@ -299,25 +303,26 @@ func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string)
 
 func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) {
 	test := testsuites.StorageClassTest{
+		Client:      c,
 		Name:        "Regional PD storage class with waitForFirstConsumer test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
 		Parameters: map[string]string{
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
 		},
-		ClaimSize:    "2Gi",
+		ClaimSize:    repdMinSize,
 		DelayBinding: true,
 	}
 
 	suffix := "delayed-regional"
-	class := newStorageClass(test, ns, suffix)
+	test.Class = newStorageClass(test, ns, suffix)
 	var claims []*v1.PersistentVolumeClaim
 	for i := 0; i < pvcCount; i++ {
 		claim := newClaim(test, ns, suffix)
-		claim.Spec.StorageClassName = &class.Name
+		claim.Spec.StorageClassName = &test.Class.Name
 		claims = append(claims, claim)
 	}
-	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class)
+	pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
@@ -338,43 +343,46 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
 		},
-		ClaimSize:    "2Gi",
-		ExpectedSize: "2Gi",
+		ClaimSize:    repdMinSize,
+		ExpectedSize: repdMinSize,
 	}
 
 	suffix := "topo-regional"
-	class := newStorageClass(test, ns, suffix)
+	test.Client = c
+	test.Class = newStorageClass(test, ns, suffix)
 	zones := getTwoRandomZones(c)
-	addAllowedTopologiesToStorageClass(c, class, zones)
-	claim := newClaim(test, ns, suffix)
-	claim.Spec.StorageClassName = &class.Name
-	pv := testsuites.TestDynamicProvisioning(test, c, claim, class)
+	addAllowedTopologiesToStorageClass(c, test.Class, zones)
+	test.Claim = newClaim(test, ns, suffix)
+	test.Claim.Spec.StorageClassName = &test.Class.Name
+
+	pv := test.TestDynamicProvisioning()
 	checkZonesFromLabelAndAffinity(pv, sets.NewString(zones...), true)
 }
 
 func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns string, pvcCount int) {
 	test := testsuites.StorageClassTest{
+		Client:      c,
 		Name:        "Regional PD storage class with allowedTopologies and waitForFirstConsumer test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
 		Parameters: map[string]string{
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
 		},
-		ClaimSize:    "2Gi",
+		ClaimSize:    repdMinSize,
 		DelayBinding: true,
 	}
 
 	suffix := "topo-delayed-regional"
-	class := newStorageClass(test, ns, suffix)
+	test.Class = newStorageClass(test, ns, suffix)
 	topoZones := getTwoRandomZones(c)
-	addAllowedTopologiesToStorageClass(c, class, topoZones)
+	addAllowedTopologiesToStorageClass(c, test.Class, topoZones)
 	var claims []*v1.PersistentVolumeClaim
 	for i := 0; i < pvcCount; i++ {
 		claim := newClaim(test, ns, suffix)
-		claim.Spec.StorageClassName = &class.Name
+		claim.Spec.StorageClassName = &test.Class.Name
 		claims = append(claims, claim)
 	}
-	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class)
+	pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
@@ -583,7 +591,7 @@ func waitForStatefulSetReplicasNotReady(statefulSetName, ns string, c clientset.
 // If match is true, check if zones in PV exactly match zones given.
 // Otherwise, check whether zones in PV is superset of zones given.
 func verifyZonesInPV(volume *v1.PersistentVolume, zones sets.String, match bool) error {
-	pvZones, err := util.LabelZonesToSet(volume.Labels[v1.LabelZoneFailureDomain])
+	pvZones, err := volumehelpers.LabelZonesToSet(volume.Labels[v1.LabelZoneFailureDomain])
 	if err != nil {
 		return err
 	}

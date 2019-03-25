@@ -31,16 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/gomega"
-)
-
-const (
-	FirewallTimeoutDefault = 3 * time.Minute
-	FirewallTestTcpTimeout = time.Duration(1 * time.Second)
-	// Set ports outside of 30000-32767, 80 and 8080 to avoid being whitelisted by the e2e cluster
-	FirewallTestHttpPort = int32(29999)
-	FirewallTestUdpPort  = int32(29998)
 )
 
 // MakeFirewallNameForLBService return the expected firewall name for a LB service.
@@ -71,6 +61,8 @@ func ConstructFirewallForLBService(svc *v1.Service, nodeTag string) *compute.Fir
 	return &fw
 }
 
+// MakeHealthCheckFirewallNameForLBService returns the firewall name used by the GCE load
+// balancers for performing health checks.
 func MakeHealthCheckFirewallNameForLBService(clusterID, name string, isNodesHealthCheck bool) string {
 	return gcecloud.MakeHealthCheckFirewallName(clusterID, name, isNodesHealthCheck)
 }
@@ -116,9 +108,9 @@ func GetClusterName(instancePrefix string) string {
 
 // GetE2eFirewalls returns all firewall rules we create for an e2e cluster.
 // From cluster/gce/util.sh, all firewall rules should be consistent with the ones created by startup scripts.
-func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIpRange string) []*compute.Firewall {
+func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange string) []*compute.Firewall {
 	instancePrefix, err := GetInstancePrefix(masterName)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	clusterName := GetClusterName(instancePrefix)
 
 	fws := []*compute.Firewall{}
@@ -200,7 +192,7 @@ func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIpRange str
 	})
 	fws = append(fws, &compute.Firewall{
 		Name:         nodeTag + "-all",
-		SourceRanges: []string{clusterIpRange},
+		SourceRanges: []string{clusterIPRange},
 		TargetTags:   []string{nodeTag},
 		Allowed: []*compute.FirewallAllowed{
 			{
@@ -401,6 +393,7 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 	return nil
 }
 
+// WaitForFirewallRule waits for the specified firewall existence
 func WaitForFirewallRule(gceCloud *gcecloud.Cloud, fwName string, exist bool, timeout time.Duration) (*compute.Firewall, error) {
 	framework.Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
 	var fw *compute.Firewall

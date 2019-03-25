@@ -58,6 +58,7 @@ type nodeMetrics struct {
 	memoryPrivWorkingSetBytes uint64
 	memoryCommittedBytes      uint64
 	timeStamp                 time.Time
+	interfaceStats            []cadvisorapi.InterfaceStats
 }
 
 type nodeInfo struct {
@@ -113,11 +114,6 @@ func (c *StatsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, e
 		return nil, err
 	}
 
-	netAdapterStats, err := getNetAdapterStats()
-	if err != nil {
-		return nil, err
-	}
-
 	var stats []*cadvisorapiv2.ContainerStats
 	stats = append(stats, &cadvisorapiv2.ContainerStats{
 		Timestamp: nodeMetrics.timeStamp,
@@ -131,7 +127,7 @@ func (c *StatsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, e
 			Usage:      nodeMetrics.memoryCommittedBytes,
 		},
 		Network: &cadvisorapiv2.NetworkStats{
-			Interfaces: netAdapterStats,
+			Interfaces: nodeMetrics.interfaceStats,
 		},
 	})
 

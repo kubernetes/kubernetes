@@ -17,10 +17,13 @@ limitations under the License.
 package gcepd
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -138,6 +141,49 @@ func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Sp
 	return volumesAttachedCheck, nil
 }
 
+// search Windows disk number by LUN
+func getDiskID(pdName string, exec mount.Exec) (string, error) {
+	// TODO: replace Get-GcePdName with native windows support of Get-Disk, see issue #74674
+	cmd := `Get-GcePdName | select Name, DeviceId | ConvertTo-Json`
+	output, err := exec.Run("powershell", "/c", cmd)
+	if err != nil {
+		klog.Errorf("Get-GcePdName failed, error: %v, output: %q", err, string(output))
+		err = errors.New(err.Error() + " " + string(output))
+		return "", err
+	}
+
+	var data []map[string]interface{}
+	if err = json.Unmarshal(output, &data); err != nil {
+		klog.Errorf("Get-Disk output is not a json array, output: %q", string(output))
+		return "", err
+	}
+
+	for _, pd := range data {
+		if jsonName, ok := pd["Name"]; ok {
+			if name, ok := jsonName.(string); ok {
+				if name == pdName {
+					klog.Infof("found the disk %q", name)
+					if diskNum, ok := pd["DeviceId"]; ok {
+						switch v := diskNum.(type) {
+						case int:
+							return strconv.Itoa(v), nil
+						case float64:
+							return strconv.Itoa(int(v)), nil
+						case string:
+							return v, nil
+						default:
+							// diskNum isn't one of the types above
+							klog.Warningf("Disk %q found, but disknumber (%q) is not in one of the recongnized type", name, diskNum)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("Could not found disk number for disk %q", pdName)
+}
+
 func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
 	ticker := time.NewTicker(checkSleepDuration)
 	defer ticker.Stop()
@@ -150,6 +196,16 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 	}
 
 	pdName := volumeSource.PDName
+
+	if runtime.GOOS == "windows" {
+		exec := attacher.host.GetExec(gcePersistentDiskPluginName)
+		id, err := getDiskID(pdName, exec)
+		if err != nil {
+			klog.Errorf("WaitForAttach (windows) failed with error %s", err)
+		}
+		return id, err
+	}
+
 	partition := ""
 	if volumeSource.Partition != 0 {
 		partition = strconv.Itoa(int(volumeSource.Partition))
@@ -197,8 +253,13 @@ func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, device
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
-				return err
+			dir := deviceMountPath
+			if runtime.GOOS == "windows" {
+				// in windows, as we use mklink, only need to MkdirAll for parent directory
+				dir = filepath.Dir(deviceMountPath)
+			}
+			if err := os.MkdirAll(dir, 0750); err != nil {
+				return fmt.Errorf("MountDevice:CreateDirectory failed with %s", err)
 			}
 			notMnt = true
 		} else {

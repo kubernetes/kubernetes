@@ -49,13 +49,16 @@ func newInstrumentedImageManagerService(service internalapi.ImageManagerService)
 // recordOperation records the duration of the operation.
 func recordOperation(operation string, start time.Time) {
 	metrics.RuntimeOperations.WithLabelValues(operation).Inc()
-	metrics.RuntimeOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
+	metrics.DeprecatedRuntimeOperations.WithLabelValues(operation).Inc()
+	metrics.RuntimeOperationsDuration.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
+	metrics.DeprecatedRuntimeOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInMicroseconds(start))
 }
 
 // recordError records error for metric if an error occurred.
 func recordError(operation string, err error) {
 	if err != nil {
 		metrics.RuntimeOperationsErrors.WithLabelValues(operation).Inc()
+		metrics.DeprecatedRuntimeOperationsErrors.WithLabelValues(operation).Inc()
 	}
 }
 
@@ -180,7 +183,7 @@ func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandbox
 	const operation = "run_podsandbox"
 	startTime := time.Now()
 	defer recordOperation(operation, startTime)
-	defer metrics.RunPodSandboxLatencies.WithLabelValues(runtimeHandler).Observe(metrics.SinceInMicroseconds(startTime))
+	defer metrics.RunPodSandboxDuration.WithLabelValues(runtimeHandler).Observe(metrics.SinceInSeconds(startTime))
 
 	out, err := in.service.RunPodSandbox(config, runtimeHandler)
 	recordError(operation, err)

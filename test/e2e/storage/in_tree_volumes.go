@@ -18,15 +18,13 @@ package storage
 
 import (
 	. "github.com/onsi/ginkgo"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // List of testDrivers to be executed in below loop
-var testDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
+var testDrivers = []func() testsuites.TestDriver{
 	drivers.InitNFSDriver,
 	drivers.InitGlusterFSDriver,
 	drivers.InitISCSIDriver,
@@ -59,41 +57,13 @@ var testSuites = []func() testsuites.TestSuite{
 	testsuites.InitProvisioningTestSuite,
 }
 
-func intreeTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestPattern {
-	return patterns
-}
-
 // This executes testSuites for in-tree volumes.
 var _ = utils.SIGDescribe("In-tree Volumes", func() {
-	f := framework.NewDefaultFramework("volumes")
-
-	var (
-		// Common configuration options for all drivers.
-		config = testsuites.TestConfig{
-			Framework: f,
-			Prefix:    "in-tree",
-		}
-	)
-
 	for _, initDriver := range testDrivers {
-		curDriver := initDriver(config)
-		curConfig := curDriver.GetDriverInfo().Config
+		curDriver := initDriver()
+
 		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			BeforeEach(func() {
-				// Reset config. The driver might have modified its copy
-				// in a previous test.
-				curDriver.GetDriverInfo().Config = curConfig
-
-				// setupDriver
-				curDriver.CreateDriver()
-			})
-
-			AfterEach(func() {
-				// Cleanup driver
-				curDriver.CleanupDriver()
-			})
-
-			testsuites.RunTestSuite(f, curDriver, testSuites, intreeTunePattern)
+			testsuites.DefineTestSuite(curDriver, testSuites)
 		})
 	}
 })

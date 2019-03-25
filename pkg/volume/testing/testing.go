@@ -37,11 +37,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/util/mount"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -64,13 +64,13 @@ const (
 type fakeVolumeHost struct {
 	rootDir    string
 	kubeClient clientset.Interface
-	csiClient  csiclientset.Interface
 	pluginMgr  VolumePluginMgr
 	cloud      cloudprovider.Interface
 	mounter    mount.Interface
 	exec       mount.Exec
 	nodeLabels map[string]string
 	nodeName   string
+	subpather  subpath.Interface
 }
 
 func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
@@ -87,10 +87,9 @@ func NewFakeVolumeHostWithNodeLabels(rootDir string, kubeClient clientset.Interf
 	return volHost
 }
 
-func NewFakeVolumeHostWithCSINodeName(rootDir string, kubeClient clientset.Interface, csiClient csiclientset.Interface, plugins []VolumePlugin, nodeName string) *fakeVolumeHost {
+func NewFakeVolumeHostWithCSINodeName(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string) *fakeVolumeHost {
 	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
 	volHost.nodeName = nodeName
-	volHost.csiClient = csiClient
 	return volHost
 }
 
@@ -101,6 +100,7 @@ func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins [
 	}
 	host.exec = mount.NewFakeExec(nil)
 	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
+	host.subpather = &subpath.FakeSubpath{}
 	return host
 }
 
@@ -137,16 +137,16 @@ func (f *fakeVolumeHost) GetKubeClient() clientset.Interface {
 	return f.kubeClient
 }
 
-func (f *fakeVolumeHost) GetCSIClient() csiclientset.Interface {
-	return f.csiClient
-}
-
 func (f *fakeVolumeHost) GetCloudProvider() cloudprovider.Interface {
 	return f.cloud
 }
 
 func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return f.mounter
+}
+
+func (f *fakeVolumeHost) GetSubpather() subpath.Interface {
+	return f.subpather
 }
 
 func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {
@@ -280,7 +280,7 @@ var _ ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ AttachableVolumePlugin = &FakeVolumePlugin{}
 var _ VolumePluginWithAttachLimits = &FakeVolumePlugin{}
 var _ DeviceMountableVolumePlugin = &FakeVolumePlugin{}
-var _ FSResizableVolumePlugin = &FakeVolumePlugin{}
+var _ NodeExpandableVolumePlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	volumeList := *list
@@ -537,8 +537,8 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) ExpandFS(spec *Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
-	return nil
+func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions NodeResizeOptions) (bool, error) {
+	return true, nil
 }
 
 func (plugin *FakeVolumePlugin) GetVolumeLimits() (map[string]int64, error) {

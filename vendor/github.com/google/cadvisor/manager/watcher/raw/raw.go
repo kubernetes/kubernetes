@@ -45,7 +45,7 @@ type rawContainerWatcher struct {
 }
 
 func NewRawContainerWatcher() (watcher.ContainerWatcher, error) {
-	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
+	cgroupSubsystems, err := libcontainer.GetAllCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}

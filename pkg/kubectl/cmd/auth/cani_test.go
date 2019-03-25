@@ -24,7 +24,10 @@ import (
 	"strings"
 	"testing"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -179,5 +182,71 @@ func TestRunAccessCheck(t *testing.T) {
 				return
 			}
 		})
+	}
+}
+
+func TestRunAccessList(t *testing.T) {
+	t.Run("test access list", func(t *testing.T) {
+		options := &CanIOptions{List: true}
+		expectedOutput := "Resources   Non-Resource URLs   Resource Names    Verbs\n" +
+			"job.*       []                  [test-resource]   [get list]\n" +
+			"pod.*       []                  [test-resource]   [get list]\n" +
+			"            [/apis/*]           []                [get]\n" +
+			"            [/version]          []                [get]\n"
+
+		tf := cmdtesting.NewTestFactory().WithNamespace("test")
+		defer tf.Cleanup()
+
+		ns := scheme.Codecs
+		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+		tf.Client = &fake.RESTClient{
+			GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+			NegotiatedSerializer: ns,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch req.URL.Path {
+				case "/apis/authorization.k8s.io/v1/selfsubjectrulesreviews":
+					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, getSelfSubjectRulesReview()))))
+					return &http.Response{StatusCode: http.StatusOK, Body: body}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			}),
+		}
+		ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		options.IOStreams = ioStreams
+		if err := options.Complete(tf, []string{}); err != nil {
+			t.Errorf("got unexpected error when do Complete(): %v", err)
+			return
+		}
+
+		err := options.RunAccessList()
+		if err != nil {
+			t.Errorf("got unexpected error when do RunAccessList(): %v", err)
+		} else if buf.String() != expectedOutput {
+			t.Errorf("expected %v\n but got %v\n", expectedOutput, buf.String())
+		}
+	})
+}
+
+func getSelfSubjectRulesReview() *authorizationv1.SelfSubjectRulesReview {
+	return &authorizationv1.SelfSubjectRulesReview{
+		Status: authorizationv1.SubjectRulesReviewStatus{
+			ResourceRules: []authorizationv1.ResourceRule{
+				{
+					Verbs:         []string{"get", "list"},
+					APIGroups:     []string{"*"},
+					Resources:     []string{"pod", "job"},
+					ResourceNames: []string{"test-resource"},
+				},
+			},
+			NonResourceRules: []authorizationv1.NonResourceRule{
+				{
+					Verbs:           []string{"get"},
+					NonResourceURLs: []string{"/apis/*", "/version"},
+				},
+			},
+		},
 	}
 }

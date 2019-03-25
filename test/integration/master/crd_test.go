@@ -18,8 +18,11 @@ package master
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/go-openapi/spec"
 
 	networkingv1 "k8s.io/api/networking/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -27,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -128,6 +132,90 @@ func TestCRD(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to list foos.cr.bar.com instances: %v", err)
 	}
+}
+
+func TestCRDOpenAPI(t *testing.T) {
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--feature-gates=CustomResourcePublishOpenAPI=true"}, framework.SharedEtcd())
+	defer result.TearDownFn()
+	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	apiextensionsclient, err := apiextensionsclientset.NewForConfig(result.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	t.Logf("Trying to create a custom resource without conflict")
+	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foos.cr.bar.com",
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "cr.bar.com",
+			Version: "v1",
+			Scope:   apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural: "foos",
+				Kind:   "Foo",
+			},
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"foo": {Type: "string"},
+					},
+				},
+			},
+		},
+	}
+	etcd.CreateTestCRDs(t, apiextensionsclient, false, crd)
+	waitForSpec := func(expectedType string) {
+		t.Logf(`Waiting for {properties: {"foo": {"type":"%s"}}} to show up in schema`, expectedType)
+		lastMsg := ""
+		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+			lastMsg = ""
+			bs, err := kubeclient.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+			if err != nil {
+				return false, err
+			}
+			spec := spec.Swagger{}
+			if err := json.Unmarshal(bs, &spec); err != nil {
+				return false, err
+			}
+			if spec.SwaggerProps.Paths == nil {
+				lastMsg = "spec.SwaggerProps.Paths is nil"
+				return false, nil
+			}
+			d, ok := spec.SwaggerProps.Definitions["com.bar.cr.v1.Foo"]
+			if !ok {
+				lastMsg = `spec.SwaggerProps.Definitions["com.bar.cr.v1.Foo"] not found`
+				return false, nil
+			}
+			p, ok := d.Properties["foo"]
+			if !ok {
+				lastMsg = `spec.SwaggerProps.Definitions["com.bar.cr.v1.Foo"].Properties["foo"] not found`
+				return false, nil
+			}
+			if !p.Type.Contains(expectedType) {
+				lastMsg = fmt.Sprintf(`spec.SwaggerProps.Definitions["com.bar.cr.v1.Foo"].Properties["foo"].Type should be %q, but got: %q`, expectedType, p.Type)
+				return false, nil
+			}
+			return true, nil
+		}); err != nil {
+			t.Fatalf("Failed to see %s OpenAPI spec in discovery: %v, last message: %s", crd.Name, err, lastMsg)
+		}
+	}
+	waitForSpec("string")
+	crd, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prop := crd.Spec.Validation.OpenAPIV3Schema.Properties["foo"]
+	prop.Type = "boolean"
+	crd.Spec.Validation.OpenAPIV3Schema.Properties["foo"] = prop
+	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd); err != nil {
+		t.Fatal(err)
+	}
+	waitForSpec("boolean")
 }
 
 type Foo struct {

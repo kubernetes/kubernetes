@@ -374,6 +374,21 @@ function setup-logrotate() {
 }
 EOF
 
+  # Configure log rotation for pod logs in /var/log/pods/NAMESPACE_NAME_UID.
+  cat > /etc/logrotate.d/allpodlogs <<EOF
+/var/log/pods/*/*.log {
+    rotate ${POD_LOG_MAX_FILE:-5}
+    copytruncate
+    missingok
+    notifempty
+    compress
+    maxsize ${POD_LOG_MAX_SIZE:-5M}
+    daily
+    dateext
+    dateformat -%Y%m%d-%s
+    create 0644 root root
+}
+EOF
 }
 
 # Finds the master PD device; returns it in MASTER_PD_DEVICE
@@ -773,6 +788,7 @@ function create-master-audit-policy {
       - group: "extensions"
       - group: "metrics.k8s.io"
       - group: "networking.k8s.io"
+      - group: "node.k8s.io"
       - group: "policy"
       - group: "rbac.authorization.k8s.io"
       - group: "scheduling.k8s.io"
@@ -1257,21 +1273,25 @@ EOF
 function start-node-problem-detector {
   echo "Start node problem detector"
   local -r npd_bin="${KUBE_HOME}/bin/node-problem-detector"
-  local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
-  # TODO(random-liu): Handle this for alternative container runtime.
-  local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
-  local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/docker-monitor-counter.json"
   echo "Using node problem detector binary at ${npd_bin}"
-  local flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
-  flags+=" --logtostderr"
-  flags+=" --system-log-monitors=${km_config},${dm_config}"
-  flags+=" --custom-plugin-monitors=${custom_km_config}"
-  flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
-  local -r npd_port=${NODE_PROBLEM_DETECTOR_PORT:-20256}
-  flags+=" --port=${npd_port}"
-  if [[ -n "${EXTRA_NPD_ARGS:-}" ]]; then
-    flags+=" ${EXTRA_NPD_ARGS}"
+
+  local flags="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
+  if [[ -z "${flags}" ]]; then
+    local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
+    # TODO(random-liu): Handle this for alternative container runtime.
+    local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
+    local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/docker-monitor-counter.json"
+    flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
+    flags+=" --logtostderr"
+    flags+=" --system-log-monitors=${km_config},${dm_config}"
+    flags+=" --custom-plugin-monitors=${custom_km_config}"
+    local -r npd_port=${NODE_PROBLEM_DETECTOR_PORT:-20256}
+    flags+=" --port=${npd_port}"
+    if [[ -n "${EXTRA_NPD_ARGS:-}" ]]; then
+      flags+=" ${EXTRA_NPD_ARGS}"
+    fi
   fi
+  flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
 
   # Write the systemd service file for node problem detector.
   cat <<EOF >/etc/systemd/system/node-problem-detector.service
@@ -1705,6 +1725,11 @@ function start-kube-apiserver {
     fi
   fi
 
+  if [[ "${ENABLE_APISERVER_DYNAMIC_AUDIT:-}" == "true" ]]; then
+    params+=" --audit-dynamic-configuration"
+    RUNTIME_CONFIG="${RUNTIME_CONFIG},auditconfiguration.k8s.io/v1alpha1=true"
+  fi
+
   if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
     params+=" --enable-logs-handler=false"
   fi
@@ -1737,6 +1762,9 @@ function start-kube-apiserver {
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
+  fi
+  if [[ "${FEATURE_GATES:-}" =~ "RuntimeClass=true" ]]; then
+    params+=" --runtime-config=node.k8s.io/v1alpha1=true"
   fi
   if [[ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]]; then
     params+=" --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
@@ -1927,6 +1955,35 @@ function setup-etcd-encryption {
   fi
 }
 
+# Updates node labels used by addons.
+function update-legacy-addon-node-labels() {
+  # need kube-apiserver to be ready
+  until kubectl get nodes; do
+    sleep 5
+  done
+  update-node-label "beta.kubernetes.io/metadata-proxy-ready=true,cloud.google.com/metadata-proxy-ready!=true" "cloud.google.com/metadata-proxy-ready=true"
+  update-node-label "beta.kubernetes.io/kube-proxy-ds-ready=true,node.kubernetes.io/kube-proxy-ds-ready!=true" "node.kubernetes.io/kube-proxy-ds-ready=true"
+  update-node-label "beta.kubernetes.io/masq-agent-ds-ready=true,node.kubernetes.io/masq-agent-ds-ready!=true" "node.kubernetes.io/masq-agent-ds-ready=true"
+}
+
+# A helper function for labeling all nodes matching a given selector.
+# Runs: kubectl label --overwrite nodes -l "${1}" "${2}"
+# Retries on failure
+#
+# $1: label selector of nodes
+# $2: label to apply
+function update-node-label() {
+  local selector="$1"
+  local label="$2"
+  local retries=5
+  until (( retries == 0 )); do
+    if kubectl label --overwrite nodes -l "${selector}" "${label}"; then
+      break
+    fi
+    (( retries-- ))
+    sleep 3
+  done
+}
 
 # Applies encryption provider config.
 # This function may be triggered in two scenarios:
@@ -2652,9 +2709,6 @@ EOF
       setup-addon-manifests "addons" "istio/noauth"
     fi
   fi
-  if [[ "${FEATURE_GATES:-}" =~ "RuntimeClass=true" ]]; then
-    setup-addon-manifests "addons" "runtimeclass"
-  fi
   if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
     download-extra-addons
     setup-addon-manifests "addons" "gce-extras"
@@ -2899,6 +2953,7 @@ function main() {
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
+    update-legacy-addon-node-labels &
     apply-encryption-config &
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then

@@ -94,6 +94,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/garbagecollector/config:all-srcs",
         "//pkg/controller/garbagecollector/metaonly:all-srcs",
     ],
     tags = ["automanaged"],

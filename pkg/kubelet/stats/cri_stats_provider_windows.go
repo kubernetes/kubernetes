@@ -1,7 +1,7 @@
 // +build windows
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"github.com/Microsoft/hcsshim"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
@@ -41,13 +42,13 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 	for _, c := range containers {
 		container, err := hcsshim.OpenContainer(c.ID)
 		if err != nil {
-			klog.Warningf("Failed to open container %q with error '%v', continue to get stats for other containers", c.ID, err)
+			klog.V(4).Infof("Failed to open container %q with error '%v', continue to get stats for other containers", c.ID, err)
 			continue
 		}
 
 		cstats, err := container.Statistics()
 		if err != nil {
-			klog.Warningf("Failed to get statistics for container %q with error '%v', continue to get stats for other containers", c.ID, err)
+			klog.V(4).Infof("Failed to get statistics for container %q with error '%v', continue to get stats for other containers", c.ID, err)
 			continue
 		}
 
@@ -66,11 +67,21 @@ func hcsStatsToNetworkStats(timestamp time.Time, hcsStats []hcsshim.NetworkStats
 		Interfaces: make([]statsapi.InterfaceStats, 0),
 	}
 
+	adapters := sets.NewString()
 	for _, stat := range hcsStats {
-		iStat := hcsStatsToInterfaceStats(stat)
-		if iStat != nil {
-			result.Interfaces = append(result.Interfaces, *iStat)
+		iStat, err := hcsStatsToInterfaceStats(stat)
+		if err != nil {
+			klog.Warningf("Failed to get HNS endpoint %q with error '%v', continue to get stats for other endpoints", stat.EndpointId, err)
+			continue
 		}
+
+		// Only count each adapter once.
+		if adapters.Has(iStat.Name) {
+			continue
+		}
+
+		result.Interfaces = append(result.Interfaces, *iStat)
+		adapters.Insert(iStat.Name)
 	}
 
 	// TODO(feiskyer): add support of multiple interfaces for getting default interface.
@@ -82,10 +93,15 @@ func hcsStatsToNetworkStats(timestamp time.Time, hcsStats []hcsshim.NetworkStats
 }
 
 // hcsStatsToInterfaceStats converts hcsshim.NetworkStats to statsapi.InterfaceStats.
-func hcsStatsToInterfaceStats(stat hcsshim.NetworkStats) *statsapi.InterfaceStats {
+func hcsStatsToInterfaceStats(stat hcsshim.NetworkStats) (*statsapi.InterfaceStats, error) {
+	endpoint, err := hcsshim.GetHNSEndpointByID(stat.EndpointId)
+	if err != nil {
+		return nil, err
+	}
+
 	return &statsapi.InterfaceStats{
-		Name:    stat.EndpointId,
+		Name:    endpoint.Name,
 		RxBytes: &stat.BytesReceived,
 		TxBytes: &stat.BytesSent,
-	}
+	}, nil
 }

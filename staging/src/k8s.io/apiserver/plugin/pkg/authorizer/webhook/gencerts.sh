@@ -17,7 +17,7 @@
 set -e
 
 # gencerts.sh generates the certificates for the webhook authz plugin tests.
-# 
+#
 # It is not expected to be run often (there is no go generate rule), and mainly
 # exists for documentation purposes.
 

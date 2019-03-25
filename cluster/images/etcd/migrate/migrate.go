@@ -120,7 +120,7 @@ func runMigrate() {
 	}
 	err = validateBundledVersions(bundledVersions, opts.binDir)
 	if err != nil {
-		klog.Errorf("Failed to validate that 'etcd-<version>' and 'etcdctl-<version>' binaries exist in --bin-dir '%s' for all --bundled-verions '%s': %v",
+		klog.Errorf("Failed to validate that 'etcd-<version>' and 'etcdctl-<version>' binaries exist in --bin-dir '%s' for all --bundled-versions '%s': %v",
 			opts.binDir, opts.bundledVersionString, err)
 		os.Exit(1)
 	}

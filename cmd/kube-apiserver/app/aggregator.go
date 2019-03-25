@@ -30,6 +30,7 @@ import (
 
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
@@ -70,7 +71,6 @@ func createAggregatorConfig(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
-		aggregatorscheme.Scheme,
 		pluginInitializers...)
 	if err != nil {
 		return nil, err
@@ -80,6 +80,7 @@ func createAggregatorConfig(
 	etcdOptions := *commandOptions.Etcd
 	etcdOptions.StorageConfig.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	etcdOptions.StorageConfig.Codec = aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion)
+	etcdOptions.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(v1beta1.SchemeGroupVersion, schema.GroupKind{Group: v1beta1.GroupName})
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
 	// override MergedResourceConfig with aggregator defaults and registry
@@ -131,7 +132,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	}
 	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(), apiRegistrationClient)
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
-	crdRegistrationController := crdregistration.NewAutoRegistrationController(
+	crdRegistrationController := crdregistration.NewCRDRegistrationController(
 		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
 		autoRegistrationController)
 
@@ -259,6 +260,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "batch", Version: "v2alpha1"}:                       {group: 17400, version: 9},
 	{Group: "certificates.k8s.io", Version: "v1beta1"}:          {group: 17300, version: 9},
 	{Group: "networking.k8s.io", Version: "v1"}:                 {group: 17200, version: 15},
+	{Group: "networking.k8s.io", Version: "v1beta1"}:            {group: 17200, version: 9},
 	{Group: "policy", Version: "v1beta1"}:                       {group: 17100, version: 9},
 	{Group: "rbac.authorization.k8s.io", Version: "v1"}:         {group: 17000, version: 15},
 	{Group: "rbac.authorization.k8s.io", Version: "v1beta1"}:    {group: 17000, version: 12},
@@ -270,11 +272,14 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "apiextensions.k8s.io", Version: "v1beta1"}:         {group: 16700, version: 9},
 	{Group: "admissionregistration.k8s.io", Version: "v1"}:      {group: 16700, version: 15},
 	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}: {group: 16700, version: 12},
+	{Group: "scheduling.k8s.io", Version: "v1"}:                 {group: 16600, version: 15},
 	{Group: "scheduling.k8s.io", Version: "v1beta1"}:            {group: 16600, version: 12},
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:           {group: 16600, version: 9},
 	{Group: "coordination.k8s.io", Version: "v1"}:               {group: 16500, version: 15},
 	{Group: "coordination.k8s.io", Version: "v1beta1"}:          {group: 16500, version: 9},
 	{Group: "auditregistration.k8s.io", Version: "v1alpha1"}:    {group: 16400, version: 1},
+	{Group: "node.k8s.io", Version: "v1alpha1"}:                 {group: 16300, version: 1},
+	{Group: "node.k8s.io", Version: "v1beta1"}:                  {group: 16300, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.

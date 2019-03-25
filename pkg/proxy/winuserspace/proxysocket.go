@@ -507,9 +507,7 @@ func (udp *udpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serv
 		ipconfigInterface := ipconfig.New(execer)
 		suffixList, err := ipconfigInterface.GetDNSSuffixSearchList()
 		if err == nil {
-			for _, suffix := range suffixList {
-				dnsSearch = append(dnsSearch, suffix)
-			}
+			dnsSearch = append(dnsSearch, suffixList...)
 		}
 	}
 

@@ -125,7 +125,7 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, err
 			// If there is already in-flight List() for a given namespace, we should wait until
 			// it is finished and cache is updated instead of doing the same, also to avoid
 			// throttling - see #22422 for details.
-			liveList, err := e.client.Core().ResourceQuotas(namespace).List(metav1.ListOptions{})
+			liveList, err := e.client.CoreV1().ResourceQuotas(namespace).List(metav1.ListOptions{})
 			if err != nil {
 				return nil, err
 			}

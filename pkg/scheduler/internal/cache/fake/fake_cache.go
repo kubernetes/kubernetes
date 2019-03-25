@@ -20,8 +20,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 // Cache is used for testing
@@ -75,8 +74,8 @@ func (c *Cache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
 // RemoveNode is a fake method for testing.
 func (c *Cache) RemoveNode(node *v1.Node) error { return nil }
 
-// UpdateNodeNameToInfoMap is a fake method for testing.
-func (c *Cache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulernodeinfo.NodeInfo) error {
+// UpdateNodeInfoSnapshot is a fake method for testing.
+func (c *Cache) UpdateNodeInfoSnapshot(nodeSnapshot *internalcache.NodeInfoSnapshot) error {
 	return nil
 }
 
@@ -89,9 +88,9 @@ func (c *Cache) FilteredList(filter algorithm.PodFilter, selector labels.Selecto
 }
 
 // Snapshot is a fake method for testing
-func (c *Cache) Snapshot() *schedulerinternalcache.Snapshot {
-	return &schedulerinternalcache.Snapshot{}
+func (c *Cache) Snapshot() *internalcache.Snapshot {
+	return &internalcache.Snapshot{}
 }
 
 // NodeTree is a fake method for testing.
-func (c *Cache) NodeTree() *schedulerinternalcache.NodeTree { return nil }
+func (c *Cache) NodeTree() *internalcache.NodeTree { return nil }

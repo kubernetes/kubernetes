@@ -69,7 +69,7 @@ func TestMutatePodSpec(t *testing.T) {
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -83,7 +83,7 @@ func TestMutatePodSpec(t *testing.T) {
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -97,7 +97,7 @@ func TestMutatePodSpec(t *testing.T) {
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -157,7 +157,7 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 	}
 }
 
-func TestSetMasterTolerationOnPodSpec(t *testing.T) {
+func TestSetControlPlaneTolerationOnPodSpec(t *testing.T) {
 	var tests = []struct {
 		name     string
 		podSpec  *v1.PodSpec
@@ -168,7 +168,7 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 			podSpec: &v1.PodSpec{},
 			expected: v1.PodSpec{
 				Tolerations: []v1.Toleration{
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 			},
 		},
@@ -182,7 +182,7 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 			expected: v1.PodSpec{
 				Tolerations: []v1.Toleration{
 					{Key: "foo", Value: "bar"},
-					kubeadmconstants.MasterToleration,
+					kubeadmconstants.ControlPlaneToleration,
 				},
 			},
 		},
@@ -190,10 +190,10 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			setMasterTolerationOnPodSpec(rt.podSpec)
+			setControlPlaneTolerationOnPodSpec(rt.podSpec)
 
 			if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-				t.Errorf("failed setMasterTolerationOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+				t.Errorf("failed setControlPlaneTolerationOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
 			}
 		})
 	}

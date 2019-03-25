@@ -15,6 +15,7 @@ go_library(
         "delete_resources.go",
         "density_utils.go",
         "deployment.go",
+        "node.go",
         "paths.go",
         "pod_store.go",
         "replicaset.go",
@@ -75,6 +76,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/utils/crd:all-srcs",
         "//test/utils/harness:all-srcs",
         "//test/utils/image:all-srcs",
         "//test/utils/junit:all-srcs",

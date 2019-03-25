@@ -39,7 +39,7 @@ var _ = SIGDescribe("DNS", func() {
 	/*
 		Release : v1.9
 		Testname: DNS, cluster
-		Description: When a Pod is created, the pod MUST be able to resolve cluster dns entries such as kubernetes.default via DNS and /etc/hosts.
+		Description: When a Pod is created, the pod MUST be able to resolve cluster dns entries such as kubernetes.default via DNS.
 	*/
 	framework.ConformanceIt("should provide DNS for the cluster ", func() {
 		// All the names we need to be able to resolve.
@@ -51,12 +51,14 @@ var _ = SIGDescribe("DNS", func() {
 		// Added due to #8512. This is critical for GCE and GKE deployments.
 		if framework.ProviderIs("gce", "gke") {
 			namesToResolve = append(namesToResolve, "google.com")
-			namesToResolve = append(namesToResolve, "metadata")
+			// Windows containers do not have a route to the GCE
+			// metadata server by default.
+			if !framework.NodeOSDistroIs("windows") {
+				namesToResolve = append(namesToResolve, "metadata")
+			}
 		}
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		hostEntries := []string{hostFQDN, dnsTestPodHostName}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -76,7 +78,11 @@ var _ = SIGDescribe("DNS", func() {
 		// Added due to #8512. This is critical for GCE and GKE deployments.
 		if framework.ProviderIs("gce", "gke") {
 			namesToResolve = append(namesToResolve, "google.com")
-			namesToResolve = append(namesToResolve, "metadata")
+			// Windows containers do not have a route to the GCE
+			// metadata server by default.
+			if !framework.NodeOSDistroIs("windows") {
+				namesToResolve = append(namesToResolve, "metadata")
+			}
 		}
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
@@ -87,6 +93,25 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
+		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
+		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+	})
+
+	/*
+		Release : v1.14
+		Testname: DNS, cluster
+		Description: When a Pod is created, the pod MUST be able to resolve cluster dns entries such as kubernetes.default via /etc/hosts.
+	*/
+	framework.ConformanceIt("should provide /etc/hosts entries for the cluster [LinuxOnly]", func() {
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		hostEntries := []string{hostFQDN, dnsTestPodHostName}
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+
+		// Run a pod which probes /etc/hosts and exposes the results by HTTP.
+		By("creating a pod to probe /etc/hosts")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})

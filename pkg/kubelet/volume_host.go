@@ -30,7 +30,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/container"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 // NewInitializedVolumePluginMgr returns a new instance of
@@ -80,6 +80,7 @@ func NewInitializedVolumePluginMgr(
 
 // Compile-time check to ensure kubeletVolumeHost implements the VolumeHost interface
 var _ volume.VolumeHost = &kubeletVolumeHost{}
+var _ volume.KubeletVolumeHost = &kubeletVolumeHost{}
 
 func (kvh *kubeletVolumeHost) GetPluginDir(pluginName string) string {
 	return kvh.kubelet.getPluginDir(pluginName)
@@ -92,6 +93,10 @@ type kubeletVolumeHost struct {
 	tokenManager     *token.Manager
 	configMapManager configmap.Manager
 	mountPodManager  mountpod.Manager
+}
+
+func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
+	kvh.kubelet.runtimeState.setStorageState(err)
 }
 
 func (kvh *kubeletVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {
@@ -122,8 +127,8 @@ func (kvh *kubeletVolumeHost) GetKubeClient() clientset.Interface {
 	return kvh.kubelet.kubeClient
 }
 
-func (kvh *kubeletVolumeHost) GetCSIClient() csiclientset.Interface {
-	return kvh.kubelet.csiClient
+func (kvh *kubeletVolumeHost) GetSubpather() subpath.Interface {
+	return kvh.kubelet.subpather
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperMounter(

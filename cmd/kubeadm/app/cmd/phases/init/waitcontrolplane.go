@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -56,14 +55,6 @@ var (
 	`)))
 )
 
-type waitControlPlaneData interface {
-	Cfg() *kubeadmapi.InitConfiguration
-	ManifestDir() string
-	DryRun() bool
-	Client() (clientset.Interface, error)
-	OutputWriter() io.Writer
-}
-
 // NewWaitControlPlanePhase is a hidden phase that runs after the control-plane and etcd phases
 func NewWaitControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
@@ -75,7 +66,7 @@ func NewWaitControlPlanePhase() workflow.Phase {
 }
 
 func runWaitControlPlanePhase(c workflow.RunData) error {
-	data, ok := c.(waitControlPlaneData)
+	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("wait-control-plane phase invoked with an invalid data struct")
 	}
@@ -86,7 +77,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
-	klog.V(1).Infof("[wait-control-plane] Waiting for the API server to be healthy")
+	klog.V(1).Infoln("[wait-control-plane] Waiting for the API server to be healthy")
 
 	client, err := data.Client()
 	if err != nil {
@@ -113,7 +104,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 }
 
 // printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
-func printFilesIfDryRunning(data waitControlPlaneData) error {
+func printFilesIfDryRunning(data InitData) error {
 	if !data.DryRun() {
 		return nil
 	}
@@ -126,7 +117,7 @@ func printFilesIfDryRunning(data waitControlPlaneData) error {
 	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
 	files := []dryrunutil.FileToPrint{}
 	// Print static pod manifests
-	for _, component := range kubeadmconstants.MasterComponents {
+	for _, component := range kubeadmconstants.ControlPlaneComponents {
 		realPath := kubeadmconstants.GetStaticPodFilepath(component, manifestDir)
 		outputPath := kubeadmconstants.GetStaticPodFilepath(component, kubeadmconstants.GetStaticPodDirectory())
 		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))

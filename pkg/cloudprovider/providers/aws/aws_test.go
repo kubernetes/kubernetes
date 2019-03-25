@@ -35,7 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/volume"
+	cloudvolume "k8s.io/cloud-provider/volume"
 )
 
 const TestClusterID = "clusterid.test"
@@ -1221,7 +1221,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 				Spec: v1.PersistentVolumeSpec{
 					PersistentVolumeSource: v1.PersistentVolumeSource{
 						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-							VolumeID: volume.ProvisionedVolumeName,
+							VolumeID: cloudvolume.ProvisionedVolumeName,
 						},
 					},
 				},
@@ -1793,11 +1793,18 @@ func TestCreateDisk(t *testing.T) {
 			}},
 		},
 	}
+
 	volume := &ec2.Volume{
 		AvailabilityZone: aws.String("us-east-1a"),
 		VolumeId:         aws.String("vol-volumeId0"),
+		State:            aws.String("available"),
 	}
 	awsServices.ec2.(*MockedFakeEC2).On("CreateVolume", request).Return(volume, nil)
+
+	describeVolumesRequest := &ec2.DescribeVolumesInput{
+		VolumeIds: []*string{aws.String("vol-volumeId0")},
+	}
+	awsServices.ec2.(*MockedFakeEC2).On("DescribeVolumes", describeVolumesRequest).Return([]*ec2.Volume{volume}, nil)
 
 	volumeID, err := c.CreateDisk(volumeOptions)
 	assert.Nil(t, err, "Error creating disk: %v", err)

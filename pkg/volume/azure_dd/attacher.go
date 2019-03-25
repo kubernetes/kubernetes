@@ -165,8 +165,16 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 	nodeName := types.NodeName(a.plugin.host.GetHostName())
 	diskName := volumeSource.DiskName
 
-	var lun int32
-	if runtime.GOOS == "windows" {
+	lun := int32(-1)
+	if runtime.GOOS != "windows" {
+		// on Linux, usually devicePath is like "/dev/disk/azure/scsi1/lun2", get LUN directly
+		lun, err = getDiskLUN(devicePath)
+		if err != nil {
+			klog.V(2).Infof("azureDisk - WaitForAttach: getDiskLUN(%s) failed with error: %v", devicePath, err)
+		}
+	}
+
+	if lun < 0 {
 		klog.V(2).Infof("azureDisk - WaitForAttach: begin to GetDiskLun by diskName(%s), DataDiskURI(%s), nodeName(%s), devicePath(%s)",
 			diskName, volumeSource.DataDiskURI, nodeName, devicePath)
 		lun, err = diskController.GetDiskLun(diskName, volumeSource.DataDiskURI, nodeName)
@@ -174,11 +182,6 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 			return "", err
 		}
 		klog.V(2).Infof("azureDisk - WaitForAttach: GetDiskLun succeeded, got lun(%v)", lun)
-	} else {
-		lun, err = getDiskLUN(devicePath)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	exec := a.plugin.host.GetExec(a.plugin.GetPluginName())

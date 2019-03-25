@@ -37,8 +37,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
     deps = [
         "//pkg/cloudprovider/providers/azure/auth:go_default_library",
-        "//pkg/volume:go_default_library",
-        "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -57,6 +55,9 @@ go_library(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume/errors:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage:go_default_library",

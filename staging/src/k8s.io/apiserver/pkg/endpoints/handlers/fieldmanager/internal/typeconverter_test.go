@@ -23,7 +23,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"k8s.io/kube-openapi/pkg/util/proto"
@@ -67,7 +68,6 @@ metadata:
   labels:
     app: nginx
 spec:
-  replicas: 3
   selector:
     matchLabels:
       app: nginx
@@ -90,7 +90,6 @@ metadata:
   labels:
     app: nginx
 spec:
-  replicas: 3
   selector:
     matchLabels:
       app: nginx

@@ -57,6 +57,8 @@ type managerImpl struct {
 	config Config
 	// the function to invoke to kill a pod
 	killPodFunc KillPodFunc
+	// the function to get the mirror pod by a given statid pod
+	mirrorPodFunc MirrorPodFunc
 	// the interface that knows how to do image gc
 	imageGC ImageGC
 	// the interface that knows how to do container gc
@@ -99,6 +101,7 @@ func NewManager(
 	summaryProvider stats.SummaryProvider,
 	config Config,
 	killPodFunc KillPodFunc,
+	mirrorPodFunc MirrorPodFunc,
 	imageGC ImageGC,
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
@@ -108,6 +111,7 @@ func NewManager(
 	manager := &managerImpl{
 		clock:                        clock,
 		killPodFunc:                  killPodFunc,
+		mirrorPodFunc:                mirrorPodFunc,
 		imageGC:                      imageGC,
 		containerGC:                  containerGC,
 		config:                       config,
@@ -361,7 +365,8 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	for _, t := range thresholds {
 		timeObserved := observations[t.Signal].time
 		if !timeObserved.IsZero() {
-			metrics.EvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(metrics.SinceInMicroseconds(timeObserved.Time))
+			metrics.EvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(metrics.SinceInSeconds(timeObserved.Time))
+			metrics.DeprecatedEvictionStatsAge.WithLabelValues(string(t.Signal)).Observe(metrics.SinceInMicroseconds(timeObserved.Time))
 		}
 	}
 
@@ -544,9 +549,19 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if kubelettypes.IsCriticalPod(pod) && kubepod.IsStaticPod(pod) {
-		klog.Errorf("eviction manager: cannot evict a critical static pod %s", format.Pod(pod))
-		return false
+	if kubepod.IsStaticPod(pod) {
+		// need mirrorPod to check its "priority" value; static pod doesn't carry it
+		if mirrorPod, ok := m.mirrorPodFunc(pod); ok && mirrorPod != nil {
+			// skip only when it's a static and critical pod
+			if kubelettypes.IsCriticalPod(mirrorPod) {
+				klog.Errorf("eviction manager: cannot evict a critical static pod %s", format.Pod(pod))
+				return false
+			}
+		} else {
+			// we should never hit this
+			klog.Errorf("eviction manager: cannot get mirror pod from static pod %s, so cannot evict it", format.Pod(pod))
+			return false
+		}
 	}
 	status := v1.PodStatus{
 		Phase:   v1.PodFailed,

@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	ApiextensionsV1beta1() apiextensionsv1beta1.ApiextensionsV1beta1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Apiextensions() apiextensionsv1beta1.ApiextensionsV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // ApiextensionsV1beta1 retrieves the ApiextensionsV1beta1Client
 func (c *Clientset) ApiextensionsV1beta1() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
-	return c.apiextensionsV1beta1
-}
-
-// Deprecated: Apiextensions retrieves the default version of ApiextensionsClient.
-// Please explicitly pick a version.
-func (c *Clientset) Apiextensions() apiextensionsv1beta1.ApiextensionsV1beta1Interface {
 	return c.apiextensionsV1beta1
 }
 

@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog"
@@ -118,7 +118,6 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	usage := "contains the configuration to diff"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
-	cmd.MarkFlagRequired("filename")
 
 	return cmd
 }
@@ -395,10 +394,15 @@ func isConflict(err error) bool {
 func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 
+	err = o.FilenameOptions.RequireFilenameOrKustomize()
+	if err != nil {
+		return err
+	}
+
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	if o.ForceConflicts && !o.ServerSideApply {
-		return fmt.Errorf("--force-conflicts only works with --server-side")
+		return fmt.Errorf("--experimental-force-conflicts only works with --experimental-server-side")
 	}
 
 	if !o.ServerSideApply {

@@ -9,7 +9,9 @@ go_library(
         "exec_mount_unsupported.go",
         "fake.go",
         "mount.go",
-        "mount_helper.go",
+        "mount_helper_common.go",
+        "mount_helper_unix.go",
+        "mount_helper_windows.go",
         "mount_linux.go",
         "mount_unsupported.go",
         "mount_windows.go",
@@ -57,6 +59,7 @@ go_library(
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/k8s.io/utils/keymutex:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
             "//vendor/k8s.io/utils/path:go_default_library",
         ],
@@ -80,8 +83,6 @@ go_test(
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],

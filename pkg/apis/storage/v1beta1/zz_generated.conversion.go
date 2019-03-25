@@ -38,6 +38,76 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CSIDriver)(nil), (*storage.CSIDriver)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CSIDriver_To_storage_CSIDriver(a.(*v1beta1.CSIDriver), b.(*storage.CSIDriver), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSIDriver)(nil), (*v1beta1.CSIDriver)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSIDriver_To_v1beta1_CSIDriver(a.(*storage.CSIDriver), b.(*v1beta1.CSIDriver), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CSIDriverList)(nil), (*storage.CSIDriverList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CSIDriverList_To_storage_CSIDriverList(a.(*v1beta1.CSIDriverList), b.(*storage.CSIDriverList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSIDriverList)(nil), (*v1beta1.CSIDriverList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSIDriverList_To_v1beta1_CSIDriverList(a.(*storage.CSIDriverList), b.(*v1beta1.CSIDriverList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CSIDriverSpec)(nil), (*storage.CSIDriverSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(a.(*v1beta1.CSIDriverSpec), b.(*storage.CSIDriverSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSIDriverSpec)(nil), (*v1beta1.CSIDriverSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSIDriverSpec_To_v1beta1_CSIDriverSpec(a.(*storage.CSIDriverSpec), b.(*v1beta1.CSIDriverSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CSINode)(nil), (*storage.CSINode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CSINode_To_storage_CSINode(a.(*v1beta1.CSINode), b.(*storage.CSINode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSINode)(nil), (*v1beta1.CSINode)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSINode_To_v1beta1_CSINode(a.(*storage.CSINode), b.(*v1beta1.CSINode), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CSINodeDriver)(nil), (*storage.CSINodeDriver)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CSINodeDriver_To_storage_CSINodeDriver(a.(*v1beta1.CSINodeDriver), b.(*storage.CSINodeDriver), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSINodeDriver)(nil), (*v1beta1.CSINodeDriver)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSINodeDriver_To_v1beta1_CSINodeDriver(a.(*storage.CSINodeDriver), b.(*v1beta1.CSINodeDriver), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CSINodeList)(nil), (*storage.CSINodeList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CSINodeList_To_storage_CSINodeList(a.(*v1beta1.CSINodeList), b.(*storage.CSINodeList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSINodeList)(nil), (*v1beta1.CSINodeList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSINodeList_To_v1beta1_CSINodeList(a.(*storage.CSINodeList), b.(*v1beta1.CSINodeList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CSINodeSpec)(nil), (*storage.CSINodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CSINodeSpec_To_storage_CSINodeSpec(a.(*v1beta1.CSINodeSpec), b.(*storage.CSINodeSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSINodeSpec)(nil), (*v1beta1.CSINodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSINodeSpec_To_v1beta1_CSINodeSpec(a.(*storage.CSINodeSpec), b.(*v1beta1.CSINodeSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1beta1.StorageClass)(nil), (*storage.StorageClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_StorageClass_To_storage_StorageClass(a.(*v1beta1.StorageClass), b.(*storage.StorageClass), scope)
 	}); err != nil {
@@ -119,6 +189,168 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	return nil
+}
+
+func autoConvert_v1beta1_CSIDriver_To_storage_CSIDriver(in *v1beta1.CSIDriver, out *storage.CSIDriver, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_CSIDriver_To_storage_CSIDriver is an autogenerated conversion function.
+func Convert_v1beta1_CSIDriver_To_storage_CSIDriver(in *v1beta1.CSIDriver, out *storage.CSIDriver, s conversion.Scope) error {
+	return autoConvert_v1beta1_CSIDriver_To_storage_CSIDriver(in, out, s)
+}
+
+func autoConvert_storage_CSIDriver_To_v1beta1_CSIDriver(in *storage.CSIDriver, out *v1beta1.CSIDriver, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_storage_CSIDriverSpec_To_v1beta1_CSIDriverSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_storage_CSIDriver_To_v1beta1_CSIDriver is an autogenerated conversion function.
+func Convert_storage_CSIDriver_To_v1beta1_CSIDriver(in *storage.CSIDriver, out *v1beta1.CSIDriver, s conversion.Scope) error {
+	return autoConvert_storage_CSIDriver_To_v1beta1_CSIDriver(in, out, s)
+}
+
+func autoConvert_v1beta1_CSIDriverList_To_storage_CSIDriverList(in *v1beta1.CSIDriverList, out *storage.CSIDriverList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]storage.CSIDriver)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1beta1_CSIDriverList_To_storage_CSIDriverList is an autogenerated conversion function.
+func Convert_v1beta1_CSIDriverList_To_storage_CSIDriverList(in *v1beta1.CSIDriverList, out *storage.CSIDriverList, s conversion.Scope) error {
+	return autoConvert_v1beta1_CSIDriverList_To_storage_CSIDriverList(in, out, s)
+}
+
+func autoConvert_storage_CSIDriverList_To_v1beta1_CSIDriverList(in *storage.CSIDriverList, out *v1beta1.CSIDriverList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]v1beta1.CSIDriver)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_storage_CSIDriverList_To_v1beta1_CSIDriverList is an autogenerated conversion function.
+func Convert_storage_CSIDriverList_To_v1beta1_CSIDriverList(in *storage.CSIDriverList, out *v1beta1.CSIDriverList, s conversion.Scope) error {
+	return autoConvert_storage_CSIDriverList_To_v1beta1_CSIDriverList(in, out, s)
+}
+
+func autoConvert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(in *v1beta1.CSIDriverSpec, out *storage.CSIDriverSpec, s conversion.Scope) error {
+	out.AttachRequired = (*bool)(unsafe.Pointer(in.AttachRequired))
+	out.PodInfoOnMount = (*bool)(unsafe.Pointer(in.PodInfoOnMount))
+	return nil
+}
+
+// Convert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec is an autogenerated conversion function.
+func Convert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(in *v1beta1.CSIDriverSpec, out *storage.CSIDriverSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(in, out, s)
+}
+
+func autoConvert_storage_CSIDriverSpec_To_v1beta1_CSIDriverSpec(in *storage.CSIDriverSpec, out *v1beta1.CSIDriverSpec, s conversion.Scope) error {
+	out.AttachRequired = (*bool)(unsafe.Pointer(in.AttachRequired))
+	out.PodInfoOnMount = (*bool)(unsafe.Pointer(in.PodInfoOnMount))
+	return nil
+}
+
+// Convert_storage_CSIDriverSpec_To_v1beta1_CSIDriverSpec is an autogenerated conversion function.
+func Convert_storage_CSIDriverSpec_To_v1beta1_CSIDriverSpec(in *storage.CSIDriverSpec, out *v1beta1.CSIDriverSpec, s conversion.Scope) error {
+	return autoConvert_storage_CSIDriverSpec_To_v1beta1_CSIDriverSpec(in, out, s)
+}
+
+func autoConvert_v1beta1_CSINode_To_storage_CSINode(in *v1beta1.CSINode, out *storage.CSINode, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1beta1_CSINodeSpec_To_storage_CSINodeSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_CSINode_To_storage_CSINode is an autogenerated conversion function.
+func Convert_v1beta1_CSINode_To_storage_CSINode(in *v1beta1.CSINode, out *storage.CSINode, s conversion.Scope) error {
+	return autoConvert_v1beta1_CSINode_To_storage_CSINode(in, out, s)
+}
+
+func autoConvert_storage_CSINode_To_v1beta1_CSINode(in *storage.CSINode, out *v1beta1.CSINode, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_storage_CSINodeSpec_To_v1beta1_CSINodeSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_storage_CSINode_To_v1beta1_CSINode is an autogenerated conversion function.
+func Convert_storage_CSINode_To_v1beta1_CSINode(in *storage.CSINode, out *v1beta1.CSINode, s conversion.Scope) error {
+	return autoConvert_storage_CSINode_To_v1beta1_CSINode(in, out, s)
+}
+
+func autoConvert_v1beta1_CSINodeDriver_To_storage_CSINodeDriver(in *v1beta1.CSINodeDriver, out *storage.CSINodeDriver, s conversion.Scope) error {
+	out.Name = in.Name
+	out.NodeID = in.NodeID
+	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
+	return nil
+}
+
+// Convert_v1beta1_CSINodeDriver_To_storage_CSINodeDriver is an autogenerated conversion function.
+func Convert_v1beta1_CSINodeDriver_To_storage_CSINodeDriver(in *v1beta1.CSINodeDriver, out *storage.CSINodeDriver, s conversion.Scope) error {
+	return autoConvert_v1beta1_CSINodeDriver_To_storage_CSINodeDriver(in, out, s)
+}
+
+func autoConvert_storage_CSINodeDriver_To_v1beta1_CSINodeDriver(in *storage.CSINodeDriver, out *v1beta1.CSINodeDriver, s conversion.Scope) error {
+	out.Name = in.Name
+	out.NodeID = in.NodeID
+	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
+	return nil
+}
+
+// Convert_storage_CSINodeDriver_To_v1beta1_CSINodeDriver is an autogenerated conversion function.
+func Convert_storage_CSINodeDriver_To_v1beta1_CSINodeDriver(in *storage.CSINodeDriver, out *v1beta1.CSINodeDriver, s conversion.Scope) error {
+	return autoConvert_storage_CSINodeDriver_To_v1beta1_CSINodeDriver(in, out, s)
+}
+
+func autoConvert_v1beta1_CSINodeList_To_storage_CSINodeList(in *v1beta1.CSINodeList, out *storage.CSINodeList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]storage.CSINode)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1beta1_CSINodeList_To_storage_CSINodeList is an autogenerated conversion function.
+func Convert_v1beta1_CSINodeList_To_storage_CSINodeList(in *v1beta1.CSINodeList, out *storage.CSINodeList, s conversion.Scope) error {
+	return autoConvert_v1beta1_CSINodeList_To_storage_CSINodeList(in, out, s)
+}
+
+func autoConvert_storage_CSINodeList_To_v1beta1_CSINodeList(in *storage.CSINodeList, out *v1beta1.CSINodeList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]v1beta1.CSINode)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_storage_CSINodeList_To_v1beta1_CSINodeList is an autogenerated conversion function.
+func Convert_storage_CSINodeList_To_v1beta1_CSINodeList(in *storage.CSINodeList, out *v1beta1.CSINodeList, s conversion.Scope) error {
+	return autoConvert_storage_CSINodeList_To_v1beta1_CSINodeList(in, out, s)
+}
+
+func autoConvert_v1beta1_CSINodeSpec_To_storage_CSINodeSpec(in *v1beta1.CSINodeSpec, out *storage.CSINodeSpec, s conversion.Scope) error {
+	out.Drivers = *(*[]storage.CSINodeDriver)(unsafe.Pointer(&in.Drivers))
+	return nil
+}
+
+// Convert_v1beta1_CSINodeSpec_To_storage_CSINodeSpec is an autogenerated conversion function.
+func Convert_v1beta1_CSINodeSpec_To_storage_CSINodeSpec(in *v1beta1.CSINodeSpec, out *storage.CSINodeSpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_CSINodeSpec_To_storage_CSINodeSpec(in, out, s)
+}
+
+func autoConvert_storage_CSINodeSpec_To_v1beta1_CSINodeSpec(in *storage.CSINodeSpec, out *v1beta1.CSINodeSpec, s conversion.Scope) error {
+	out.Drivers = *(*[]v1beta1.CSINodeDriver)(unsafe.Pointer(&in.Drivers))
+	return nil
+}
+
+// Convert_storage_CSINodeSpec_To_v1beta1_CSINodeSpec is an autogenerated conversion function.
+func Convert_storage_CSINodeSpec_To_v1beta1_CSINodeSpec(in *storage.CSINodeSpec, out *v1beta1.CSINodeSpec, s conversion.Scope) error {
+	return autoConvert_storage_CSINodeSpec_To_v1beta1_CSINodeSpec(in, out, s)
 }
 
 func autoConvert_v1beta1_StorageClass_To_storage_StorageClass(in *v1beta1.StorageClass, out *storage.StorageClass, s conversion.Scope) error {

@@ -16,6 +16,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/algorithmprovider/defaults:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

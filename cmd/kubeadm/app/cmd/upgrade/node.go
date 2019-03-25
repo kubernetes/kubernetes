@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -43,7 +42,7 @@ var (
 	upgradeNodeConfigLongDesc = normalizer.LongDesc(`
 		Downloads the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
 		where X is the minor version of the kubelet. kubeadm uses the --kubelet-version parameter to determine
-		what the _desired_ kubelet version is. Give 
+		what the _desired_ kubelet version is. Give
 		`)
 
 	upgradeNodeConfigExample = normalizer.Examples(fmt.Sprintf(`
@@ -162,7 +161,7 @@ func RunUpgradeNodeConfig(flags *nodeUpgradeFlags) error {
 	}
 
 	// Set up the kubelet directory to use. If dry-running, use a fake directory
-	kubeletDir, err := getKubeletDir(flags.dryRun)
+	kubeletDir, err := upgrade.GetKubeletDir(flags.dryRun)
 	if err != nil {
 		return err
 	}
@@ -192,18 +191,6 @@ func RunUpgradeNodeConfig(flags *nodeUpgradeFlags) error {
 	return nil
 }
 
-// getKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
-func getKubeletDir(dryRun bool) (string, error) {
-	if dryRun {
-		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
-		if err != nil {
-			return "", errors.Wrap(err, "couldn't create a temporary directory")
-		}
-		return dryRunDir, nil
-	}
-	return constants.KubeletRunDirectory, nil
-}
-
 // printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
 func printFilesIfDryRunning(dryRun bool, kubeletDir string) error {
 	if !dryRun {
@@ -229,7 +216,7 @@ func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
 	waiter := apiclient.NewKubeWaiter(client, upgrade.UpgradeManifestTimeout, os.Stdout)
 
 	// Fetches the cluster configuration
-	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade", "", false)
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade", false)
 	if err != nil {
 		return errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

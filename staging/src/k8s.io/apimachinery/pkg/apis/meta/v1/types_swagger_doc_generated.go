@@ -87,8 +87,9 @@ func (APIVersions) SwaggerDoc() map[string]string {
 }
 
 var map_CreateOptions = map[string]string{
-	"":       "CreateOptions may be provided when creating an API object.",
-	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"":             "CreateOptions may be provided when creating an API object.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
 }
 
 func (CreateOptions) SwaggerDoc() map[string]string {
@@ -109,9 +110,9 @@ func (DeleteOptions) SwaggerDoc() map[string]string {
 }
 
 var map_ExportOptions = map[string]string{
-	"":       "ExportOptions is the query options to the standard REST get call.",
-	"export": "Should this value be exported.  Export strips fields that a user can not specify.",
-	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+	"":       "ExportOptions is the query options to the standard REST get call. Deprecated. Planned for removal in 1.18.",
+	"export": "Should this value be exported.  Export strips fields that a user can not specify. Deprecated. Planned for removal in 1.18.",
+	"exact":  "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'. Deprecated. Planned for removal in 1.18.",
 }
 
 func (ExportOptions) SwaggerDoc() map[string]string {
@@ -282,9 +283,10 @@ func (Patch) SwaggerDoc() map[string]string {
 }
 
 var map_PatchOptions = map[string]string{
-	"":       "PatchOptions may be provided when patching an API object. PatchOptions is meant to be a superset of UpdateOptions.",
-	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-	"force":  "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+	"":             "PatchOptions may be provided when patching an API object. PatchOptions is meant to be a superset of UpdateOptions.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"force":        "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
 }
 
 func (PatchOptions) SwaggerDoc() map[string]string {
@@ -292,8 +294,9 @@ func (PatchOptions) SwaggerDoc() map[string]string {
 }
 
 var map_Preconditions = map[string]string{
-	"":    "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
-	"uid": "Specifies the target UID.",
+	"":                "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
+	"uid":             "Specifies the target UID.",
+	"resourceVersion": "Specifies the target ResourceVersion",
 }
 
 func (Preconditions) SwaggerDoc() map[string]string {
@@ -369,8 +372,9 @@ func (TypeMeta) SwaggerDoc() map[string]string {
 }
 
 var map_UpdateOptions = map[string]string{
-	"":       "UpdateOptions may be provided when updating an API object. All fields in UpdateOptions should also be present in PatchOptions.",
-	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"":             "UpdateOptions may be provided when updating an API object. All fields in UpdateOptions should also be present in PatchOptions.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
 }
 
 func (UpdateOptions) SwaggerDoc() map[string]string {

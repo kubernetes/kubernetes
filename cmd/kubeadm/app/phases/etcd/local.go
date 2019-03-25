@@ -63,7 +63,7 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, nodeName string, c
 
 // CheckLocalEtcdClusterStatus verifies health state of local/stacked etcd cluster before installing a new etcd member
 func CheckLocalEtcdClusterStatus(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration) error {
-	fmt.Println("[etcd] Checking etcd cluster health")
+	klog.V(1).Info("[etcd] Checking etcd cluster health")
 
 	// creates an etcd client that connects to all the local/stacked etcd members
 	klog.V(1).Info("creating etcd client that connects to etcd pods")
@@ -77,6 +77,35 @@ func CheckLocalEtcdClusterStatus(client clientset.Interface, cfg *kubeadmapi.Clu
 	if err != nil {
 		return errors.Wrap(err, "etcd cluster is not healthy")
 	}
+
+	return nil
+}
+
+// RemoveStackedEtcdMemberFromCluster will remove a local etcd member from etcd cluster,
+// when reset the control plane node.
+func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadmapi.InitConfiguration) error {
+	// creates an etcd client that connects to all the local/stacked etcd members
+	klog.V(1).Info("[etcd] creating etcd client that connects to etcd pods")
+	etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
+	if err != nil {
+		return err
+	}
+
+	// notifies the other members of the etcd cluster about the removing member
+	etcdPeerAddress := etcdutil.GetPeerURL(&cfg.LocalAPIEndpoint)
+
+	klog.V(2).Infof("[etcd] get the member id from peer: %s", etcdPeerAddress)
+	id, err := etcdClient.GetMemberID(etcdPeerAddress)
+	if err != nil {
+		return err
+	}
+
+	klog.V(1).Infof("[etcd] removing etcd member: %s, id: %d", etcdPeerAddress, id)
+	members, err := etcdClient.RemoveMember(id)
+	if err != nil {
+		return err
+	}
+	klog.V(1).Infof("[etcd] Updated etcd member list: %v", members)
 
 	return nil
 }

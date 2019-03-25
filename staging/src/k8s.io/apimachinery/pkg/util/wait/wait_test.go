@@ -664,3 +664,33 @@ func TestBackoff_Step(t *testing.T) {
 		}
 	}
 }
+
+func TestContextForChannel(t *testing.T) {
+	var wg sync.WaitGroup
+	parentCh := make(chan struct{})
+	done := make(chan struct{})
+
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := contextForChannel(parentCh)
+			defer cancel()
+			<-ctx.Done()
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	// Closing parent channel should cancel all children contexts
+	close(parentCh)
+
+	select {
+	case <-done:
+	case <-time.After(ForeverTestTimeout):
+		t.Errorf("unexepcted timeout waiting for parent to cancel child contexts")
+	}
+}

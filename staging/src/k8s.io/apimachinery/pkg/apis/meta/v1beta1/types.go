@@ -133,6 +133,10 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TableOptions struct {
 	v1.TypeMeta `json:",inline"`
+
+	// NoHeaders is only exposed for internal callers.
+	NoHeaders bool `json:"-"`
+
 	// includeObject decides whether to include each object along with its columnar information.
 	// Specifying "None" will return no object, specifying "Object" will return the full object contents, and
 	// specifying "Metadata" (the default) will return the object's metadata in the PartialObjectMetadata kind

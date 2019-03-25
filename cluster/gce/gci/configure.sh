@@ -24,8 +24,8 @@ set -o nounset
 set -o pipefail
 
 ### Hardcoded constants
-DEFAULT_CNI_VERSION="v0.6.0"
-DEFAULT_CNI_SHA1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f"
+DEFAULT_CNI_VERSION="v0.7.5"
+DEFAULT_CNI_SHA1="52e9d2de8a5f927307d9397308735658ee44ab8d"
 DEFAULT_NPD_VERSION="v0.6.0"
 DEFAULT_NPD_SHA1="a28e960a21bb74bc0ae09c267b6a340f30e5b3a6"
 DEFAULT_CRICTL_VERSION="v1.12.0"
@@ -123,6 +123,17 @@ function validate-hash {
   fi
 }
 
+# Get default service account credentials of the VM.
+GCE_METADATA_INTERNAL="http://metadata.google.internal/computeMetadata/v1/instance"
+function get-credentials {
+  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
+    'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
+}
+
+function valid-storage-scope {
+  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -q "auth/devstorage"
+}
+
 # Retry a download until we get it. Takes a hash and a set of URLs.
 #
 # $1 is the sha1 of the URL. Can be "" if the sha1 is unknown.
@@ -136,7 +147,12 @@ function download-or-bust {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
+      # if the url belongs to GCS API we should use oauth2_token in the headers
+      local curl_headers=""
+      if [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
+        curl_headers="Authorization: Bearer $(get-credentials)"
+      fi
+      if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
@@ -202,12 +218,12 @@ function install-node-problem-detector {
   local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
 
   if is-preloaded "${npd_tar}" "${npd_sha1}"; then
-    echo "node-problem-detector is preloaded."
+    echo "${npd_tar} is preloaded."
     return
   fi
 
-  echo "Downloading node problem detector."
-  local -r npd_release_path="https://storage.googleapis.com/kubernetes-release"
+  echo "Downloading ${npd_tar}."
+  local -r npd_release_path="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-https://storage.googleapis.com/kubernetes-release}"
   download-or-bust "${npd_sha1}" "${npd_release_path}/node-problem-detector/${npd_tar}"
   local -r npd_dir="${KUBE_HOME}/node-problem-detector"
   mkdir -p "${npd_dir}"

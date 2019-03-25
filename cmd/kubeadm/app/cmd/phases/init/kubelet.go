@@ -19,7 +19,6 @@ package phases
 import (
 	"github.com/pkg/errors"
 	"k8s.io/klog"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
@@ -32,15 +31,6 @@ var (
 		kubeadm init phase kubelet-start --config config.yaml
 		`)
 )
-
-// kubeletStartData defines the behavior that a runtime data struct passed to the kubelet start phase
-// should have. Please note that we are using an interface in order to make this phase reusable in different workflows
-// (and thus with different runtime data struct, all of them requested to be compliant to this interface)
-type kubeletStartData interface {
-	Cfg() *kubeadmapi.InitConfiguration
-	DryRun() bool
-	KubeletDir() string
-}
 
 // NewKubeletStartPhase creates a kubeadm workflow phase that start kubelet on a node.
 func NewKubeletStartPhase() workflow.Phase {
@@ -60,7 +50,7 @@ func NewKubeletStartPhase() workflow.Phase {
 
 // runKubeletStart executes kubelet start logic.
 func runKubeletStart(c workflow.RunData) error {
-	data, ok := c.(kubeletStartData)
+	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubelet-start phase invoked with an invalid data struct")
 	}
@@ -68,13 +58,13 @@ func runKubeletStart(c workflow.RunData) error {
 	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
 	if !data.DryRun() {
-		klog.V(1).Infof("Stopping the kubelet")
+		klog.V(1).Infoln("Stopping the kubelet")
 		kubeletphase.TryStopKubelet()
 	}
 
-	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
-	// as we handle that ourselves in the markmaster phase
-	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
+	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the control-plane,
+	// as we handle that ourselves in the mark-control-plane phase
+	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
 	if err := kubeletphase.WriteKubeletDynamicEnvFile(&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
 		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
 	}
@@ -86,7 +76,7 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
-		klog.V(1).Infof("Starting the kubelet")
+		klog.V(1).Infoln("Starting the kubelet")
 		kubeletphase.TryStartKubelet()
 	}
 

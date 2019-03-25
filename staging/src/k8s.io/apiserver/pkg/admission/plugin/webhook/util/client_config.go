@@ -40,3 +40,13 @@ func HookClientConfigForWebhook(w *v1beta1.Webhook) webhook.ClientConfig {
 	}
 	return ret
 }
+
+// HasAdmissionReviewVersion check whether a version is accepted by a given webhook.
+func HasAdmissionReviewVersion(a string, w *v1beta1.Webhook) bool {
+	for _, b := range w.AdmissionReviewVersions {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}

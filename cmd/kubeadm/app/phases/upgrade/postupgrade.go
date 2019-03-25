@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -49,7 +48,7 @@ import (
 var expiry = 180 * 24 * time.Hour
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
-// Note that the markmaster phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
+// Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
 func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
 	errs := []error{}
 
@@ -185,7 +184,7 @@ func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool)
 }
 
 func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
-	kubeletDir, err := getKubeletDir(dryRun)
+	kubeletDir, err := GetKubeletDir(dryRun)
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
 		return err
@@ -207,9 +206,9 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 	envFilePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
 	if _, err := os.Stat(envFilePath); os.IsNotExist(err) {
-		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
-		// as we handle that ourselves in the markmaster phase
-		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
+		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the control-plane,
+		// as we handle that ourselves in the mark-control-plane phase
+		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
 		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.ClusterConfiguration, &cfg.NodeRegistration, false, kubeletDir); err != nil {
 			errs = append(errs, errors.Wrap(err, "error writing a dynamic environment file for the kubelet"))
 		}
@@ -221,11 +220,10 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 	return errorsutil.NewAggregate(errs)
 }
 
-// getKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
-// TODO: Consolidate this with similar funcs?
-func getKubeletDir(dryRun bool) (string, error) {
+// GetKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
+func GetKubeletDir(dryRun bool) (string, error) {
 	if dryRun {
-		return ioutil.TempDir("", "kubeadm-upgrade-dryrun")
+		return kubeadmconstants.CreateTempDirForKubeadm("kubeadm-upgrade-dryrun")
 	}
 	return kubeadmconstants.KubeletRunDirectory, nil
 }

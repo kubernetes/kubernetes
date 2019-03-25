@@ -38,6 +38,7 @@ import (
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
+	"k8s.io/client-go/util/keyutil"
 )
 
 // certificateWaitTimeout controls the amount of time we wait for certificate
@@ -547,7 +548,7 @@ func (m *manager) generateCSR() (template *x509.CertificateRequest, csrPEM []byt
 		return nil, nil, nil, nil, fmt.Errorf("unable to marshal the new key to DER: %v", err)
 	}
 
-	keyPEM = pem.EncodeToMemory(&pem.Block{Type: cert.ECPrivateKeyBlockType, Bytes: der})
+	keyPEM = pem.EncodeToMemory(&pem.Block{Type: keyutil.ECPrivateKeyBlockType, Bytes: der})
 
 	template = m.getTemplate()
 	if template == nil {

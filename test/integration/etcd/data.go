@@ -20,13 +20,15 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // GetEtcdStorageData returns etcd data for all persisted objects.
 // It is exported so that it can be reused across multiple tests.
 // It returns a new map on every invocation to prevent different tests from mutating shared state.
 func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
-	return map[schema.GroupVersionResource]StorageData{
+	etcdStorageData := map[schema.GroupVersionResource]StorageData{
 		// k8s.io/kubernetes/pkg/api/v1
 		gvr("", "v1", "configmaps"): {
 			Stub:             `{"data": {"foo": "bar"}, "metadata": {"name": "cm1"}}`,
@@ -266,6 +268,14 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/networking/v1beta1
+		gvr("networking.k8s.io", "v1beta1", "ingresses"): {
+			Stub:             `{"metadata": {"name": "ingress2"}, "spec": {"backend": {"serviceName": "service", "servicePort": 5000}}}`,
+			ExpectedEtcdPath: "/registry/ingress/etcdstoragepathtestnamespace/ingress2",
+			ExpectedGVK:      gvkP("extensions", "v1beta1", "Ingress"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/networking/v1
 		gvr("networking.k8s.io", "v1", "networkpolicies"): {
 			Stub:             `{"metadata": {"name": "np2"}, "spec": {"podSelector": {"matchLabels": {"e": "f"}}}}`,
@@ -288,7 +298,7 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		gvr("storage.k8s.io", "v1alpha1", "volumeattachments"): {
 			Stub:             `{"metadata": {"name": "va1"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv1"}}}`,
 			ExpectedEtcdPath: "/registry/volumeattachments/va1",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "VolumeAttachment"),
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "VolumeAttachment"),
 		},
 		// --
 
@@ -296,6 +306,7 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		gvr("storage.k8s.io", "v1beta1", "volumeattachments"): {
 			Stub:             `{"metadata": {"name": "va2"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv2"}}}`,
 			ExpectedEtcdPath: "/registry/volumeattachments/va2",
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "VolumeAttachment"),
 		},
 		// --
 
@@ -303,7 +314,6 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		gvr("storage.k8s.io", "v1", "volumeattachments"): {
 			Stub:             `{"metadata": {"name": "va3"}, "spec": {"attacher": "gce", "nodeName": "localhost", "source": {"persistentVolumeName": "pv3"}}}`,
 			ExpectedEtcdPath: "/registry/volumeattachments/va3",
-			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "VolumeAttachment"),
 		},
 		// --
 
@@ -420,6 +430,14 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/scheduling/v1
+		gvr("scheduling.k8s.io", "v1", "priorityclasses"): {
+			Stub:             `{"metadata":{"name":"pc3"},"Value":1000}`,
+			ExpectedEtcdPath: "/registry/priorityclasses/pc3",
+			ExpectedGVK:      gvkP("scheduling.k8s.io", "v1beta1", "PriorityClass"),
+		},
+		// --
+
 		// k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 		// depends on aggregator using the same ungrouped RESTOptionsGetter as the kube apiserver, not SimpleRestOptionsFactory in aggregator.go
 		gvr("apiregistration.k8s.io", "v1beta1", "apiservices"): {
@@ -467,7 +485,42 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 			ExpectedEtcdPath: "/registry/auditsinks/sink1",
 		},
 		// --
+
+		// k8s.io/kubernetes/pkg/apis/node/v1alpha1
+		gvr("node.k8s.io", "v1alpha1", "runtimeclasses"): {
+			Stub:             `{"metadata": {"name": "rc1"}, "spec": {"runtimeHandler": "h1"}}`,
+			ExpectedEtcdPath: "/registry/runtimeclasses/rc1",
+			ExpectedGVK:      gvkP("node.k8s.io", "v1beta1", "RuntimeClass"),
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/node/v1beta1
+		gvr("node.k8s.io", "v1beta1", "runtimeclasses"): {
+			Stub:             `{"metadata": {"name": "rc2"}, "handler": "h2"}`,
+			ExpectedEtcdPath: "/registry/runtimeclasses/rc2",
+		},
+		// --
 	}
+
+	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
+	// add csinodes if CSINodeInfo feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csinodes")] = StorageData{
+			Stub:             `{"metadata": {"name": "csini1"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
+			ExpectedEtcdPath: "/registry/csinodes/csini1",
+		}
+	}
+
+	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
+	// add csidrivers if CSIDriverRegistry feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csidrivers")] = StorageData{
+			Stub:             `{"metadata": {"name": "csid1"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
+			ExpectedEtcdPath: "/registry/csidrivers/csid1",
+		}
+	}
+
+	return etcdStorageData
 }
 
 // StorageData contains information required to create an object and verify its storage in etcd

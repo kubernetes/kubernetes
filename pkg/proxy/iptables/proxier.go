@@ -369,6 +369,7 @@ var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeExternalServicesChain, utiliptables.ChainInput, "kubernetes externally-visible service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainForward, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
+	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainInput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals", nil},
@@ -613,6 +614,18 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 			if err != nil {
 				klog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
 			}
+			for _, extIP := range svcInfo.ExternalIPStrings() {
+				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, v1.ProtocolUDP)
+				if err != nil {
+					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
+				}
+			}
+			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, v1.ProtocolUDP)
+				if err != nil {
+					klog.Errorf("Failed to delete %s endpoint connections for LoabBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
+				}
+			}
 		}
 	}
 }
@@ -661,6 +674,9 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.GetProtocol() == v1.ProtocolUDP {
 			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIPString())
 			staleServices.Insert(svcInfo.ClusterIPString())
+			for _, extIP := range svcInfo.ExternalIPStrings() {
+				staleServices.Insert(extIP)
+			}
 		}
 	}
 
@@ -835,6 +851,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
 		} else {
+			// No endpoints.
 			writeLine(proxier.filterRules,
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
@@ -905,6 +922,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// This covers cases like GCE load-balancers which get added to the local routing table.
 				writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(svcChain))...)
 			} else {
+				// No endpoints.
 				writeLine(proxier.filterRules,
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
@@ -917,10 +935,10 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		if hasEndpoints {
-			fwChain := svcInfo.serviceFirewallChainName
-			for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
-				if ingress.IP != "" {
+		fwChain := svcInfo.serviceFirewallChainName
+		for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
+			if ingress.IP != "" {
+				if hasEndpoints {
 					// create service firewall chain
 					if chain, ok := existingNATChains[fwChain]; ok {
 						writeBytesLine(proxier.natChains, chain)
@@ -981,10 +999,19 @@ func (proxier *Proxier) syncProxyRules() {
 					// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
 					// It means the packet cannot go thru the firewall, then mark it for DROP
 					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkDropChain))...)
+				} else {
+					// No endpoints.
+					writeLine(proxier.filterRules,
+						"-A", string(kubeServicesChain),
+						"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
+						"-m", protocol, "-p", protocol,
+						"-d", utilproxy.ToCIDR(net.ParseIP(ingress.IP)),
+						"--dport", strconv.Itoa(svcInfo.Port),
+						"-j", "REJECT",
+					)
 				}
 			}
 		}
-		// FIXME: do we need REJECT rules for load-balancer ingress if !hasEndpoints?
 
 		// Capture nodeports.  If we had more than 2 rules it might be
 		// worthwhile to make a new per-service chain for nodeport rules, but
@@ -1066,6 +1093,7 @@ func (proxier *Proxier) syncProxyRules() {
 					writeLine(proxier.natRules, append(args, "-j", string(svcXlbChain))...)
 				}
 			} else {
+				// No endpoints.
 				writeLine(proxier.filterRules,
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
@@ -1340,6 +1368,11 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(2).Infof("Closing local ports after iptables-restore failure")
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
+	}
+	for _, lastChangeTriggerTime := range endpointUpdateResult.LastChangeTriggerTimes {
+		latency := metrics.SinceInSeconds(lastChangeTriggerTime)
+		metrics.NetworkProgrammingLatency.Observe(latency)
+		klog.V(4).Infof("Network programming took %f seconds", latency)
 	}
 
 	// Close old local ports and save new ones.

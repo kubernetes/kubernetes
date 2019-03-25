@@ -144,6 +144,6 @@ func testCleanupVSpherePVClabelselector(c clientset.Interface, ns string, nodeIn
 		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc_vvol.Name, ns), "Failed to delete PVC ", pvc_vvol.Name)
 	}
 	if pv_ssd != nil {
-		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv_ssd.Name), "Faled to delete PV ", pv_ssd.Name)
+		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv_ssd.Name), "Failed to delete PV ", pv_ssd.Name)
 	}
 }

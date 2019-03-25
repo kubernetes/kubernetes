@@ -67,7 +67,7 @@ func (a KubeletLatencyMetrics) Less(i, j int) bool { return a[i].Latency > a[j].
 // or else, the function will try to get kubelet metrics directly from the node.
 func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (metrics.KubeletMetrics, error) {
 	if c == nil {
-		return metrics.GrabKubeletMetricsWithoutProxy(nodeName)
+		return metrics.GrabKubeletMetricsWithoutProxy(nodeName, "/metrics")
 	}
 	grabber, err := metrics.NewMetricsGrabber(c, nil, true, false, false, false, false)
 	if err != nil {
@@ -102,13 +102,13 @@ func getKubeletMetrics(c clientset.Interface, nodeName string) (metrics.KubeletM
 // Note that the KubeletMetrics passed in should not contain subsystem prefix.
 func GetDefaultKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
 	latencyMetricNames := sets.NewString(
-		kubeletmetrics.PodWorkerLatencyKey,
-		kubeletmetrics.PodWorkerStartLatencyKey,
-		kubeletmetrics.PodStartLatencyKey,
+		kubeletmetrics.PodWorkerDurationKey,
+		kubeletmetrics.PodWorkerStartDurationKey,
+		kubeletmetrics.PodStartDurationKey,
 		kubeletmetrics.CgroupManagerOperationsKey,
 		dockermetrics.DockerOperationsLatencyKey,
-		kubeletmetrics.PodWorkerStartLatencyKey,
-		kubeletmetrics.PLEGRelistLatencyKey,
+		kubeletmetrics.PodWorkerStartDurationKey,
+		kubeletmetrics.PLEGRelistDurationKey,
 	)
 	return GetKubeletLatencyMetrics(ms, latencyMetricNames)
 }
@@ -281,8 +281,8 @@ func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration
 	return badMetrics, nil
 }
 
-// getStatsSummary contacts kubelet for the container information.
-func getStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
+// GetStatsSummary contacts kubelet for the container information.
+func GetStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
 	defer cancel()
 
@@ -348,7 +348,7 @@ func getOneTimeResourceUsageOnNode(
 		return nil, fmt.Errorf("numStats needs to be > 1 and < %d", maxNumStatsToRequest)
 	}
 	// Get information of all containers on the node.
-	summary, err := getStatsSummary(c, nodeName)
+	summary, err := GetStatsSummary(c, nodeName)
 	if err != nil {
 		return nil, err
 	}

@@ -40,6 +40,7 @@ source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
+source "${KUBE_ROOT}/test/cmd/kubeadm.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
 source "${KUBE_ROOT}/test/cmd/old-print.sh"
@@ -385,6 +386,26 @@ runTests() {
     kubectl get "${kube_flags[@]}" -f hack/testdata/kubernetes-service.yaml
   fi
 
+  cleanup_tests(){
+    kube::test::clear_all
+    if [[ -n "${foundError}" ]]; then
+      echo "FAILED TESTS: ""${foundError}"
+      exit 1
+    fi
+  }
+
+   if [[ -n "${WHAT-}" ]]; then
+    for pkg in ${WHAT}
+    do 
+      # running of kubeadm is captured in hack/make-targets/test-cmd.sh
+      if [[ "${pkg}" != "kubeadm" ]]; then 
+        record_command run_${pkg}_tests
+      fi
+    done
+    cleanup_tests
+    return
+  fi
+
   #########################
   # Kubectl version #
   #########################
@@ -491,6 +512,9 @@ runTests() {
   ######################
   if kube::test::if_supports_resource "${secrets}" ; then
     record_command run_create_secret_tests
+  fi
+  if kube::test::if_supports_resource "${deployments}"; then
+    record_command run_kubectl_create_kustomization_directory_tests
   fi
 
   ######################
@@ -836,6 +860,7 @@ runTests() {
 
   record_command run_plugins_tests
 
+
   #################
   # Impersonation #
   #################
@@ -847,10 +872,5 @@ runTests() {
 
   record_command run_wait_tests
 
-  kube::test::clear_all
-
-  if [[ -n "${foundError}" ]]; then
-    echo "FAILED TESTS: ""${foundError}"
-    exit 1
-  fi
+  cleanup_tests
 }

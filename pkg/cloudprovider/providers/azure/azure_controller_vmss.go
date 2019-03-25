@@ -86,17 +86,17 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 	key := buildVmssCacheKey(nodeResourceGroup, ss.makeVmssVMName(ssName, instanceID))
 	defer ss.vmssVMCache.Delete(key)
 
-	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s)", nodeResourceGroup, nodeName, diskName)
+	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s, %s)", nodeResourceGroup, nodeName, diskName, diskURI)
 	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM)
 	if err != nil {
 		detail := err.Error()
 		if strings.Contains(detail, errLeaseFailed) || strings.Contains(detail, errDiskBlobNotFound) {
 			// if lease cannot be acquired or disk not found, immediately detach the disk and return the original error
-			klog.Infof("azureDisk - err %s, try detach disk(%s)", detail, diskName)
+			klog.Infof("azureDisk - err %s, try detach disk(%s, %s)", detail, diskName, diskURI)
 			ss.DetachDiskByName(diskName, diskURI, nodeName)
 		}
 	} else {
-		klog.V(2).Infof("azureDisk - attach disk(%s) succeeded", diskName)
+		klog.V(2).Infof("azureDisk - attach disk(%s, %s) succeeded", diskName, diskURI)
 	}
 	return err
 }
@@ -155,12 +155,20 @@ func (ss *scaleSet) DetachDiskByName(diskName, diskURI string, nodeName types.No
 	key := buildVmssCacheKey(nodeResourceGroup, ss.makeVmssVMName(ssName, instanceID))
 	defer ss.vmssVMCache.Delete(key)
 
-	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk(%s)", nodeResourceGroup, nodeName, diskName)
-	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM)
+	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk(%s, %s)", nodeResourceGroup, nodeName, diskName, diskURI)
+	resp, err := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM)
+	if ss.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
+		klog.V(2).Infof("azureDisk - update(%s) backing off: vm(%s) detach disk(%s, %s), err: %v", nodeResourceGroup, nodeName, diskName, diskURI, err)
+		retryErr := ss.UpdateVmssVMWithRetry(nodeResourceGroup, ssName, instanceID, newVM)
+		if retryErr != nil {
+			err = retryErr
+			klog.V(2).Infof("azureDisk - update(%s) abort backoff: vm(%s) detach disk(%s, %s), err: %v", nodeResourceGroup, nodeName, diskName, diskURI, err)
+		}
+	}
 	if err != nil {
-		klog.Errorf("azureDisk - detach disk(%s) from %s failed, err: %v", diskName, nodeName, err)
+		klog.Errorf("azureDisk - detach disk(%s, %s) from %s failed, err: %v", diskName, diskURI, nodeName, err)
 	} else {
-		klog.V(2).Infof("azureDisk - detach disk(%s) succeeded", diskName)
+		klog.V(2).Infof("azureDisk - detach disk(%s, %s) succeeded", diskName, diskURI)
 	}
 
 	return err

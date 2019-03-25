@@ -22,11 +22,13 @@ import (
 
 	coordv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-
-	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -102,20 +104,47 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			By("verify NodeStatus report period is longer than lease duration")
 			// NodeStatus is reported from node to master when there is some change or
 			// enough time has passed. So for here, keep checking the time diff
-			// between 2 NodeStatus report, until it is longer than lease duration (
-			// the same as nodeMonitorGracePeriod).
-			heartbeatTime := getNextReadyConditionHeartbeatTime(f.ClientSet, nodeName, metav1.Time{})
-			Eventually(func() error {
-				nextHeartbeatTime := getNextReadyConditionHeartbeatTime(f.ClientSet, nodeName, heartbeatTime)
+			// between 2 NodeStatus report, until it is longer than lease duration
+			// (the same as nodeMonitorGracePeriod), or it doesn't change for at least leaseDuration
+			lastHeartbeatTime, lastStatus := getHeartbeatTimeAndStatus(f.ClientSet, nodeName)
+			lastObserved := time.Now()
+			err = wait.Poll(time.Second, 5*time.Minute, func() (bool, error) {
+				currentHeartbeatTime, currentStatus := getHeartbeatTimeAndStatus(f.ClientSet, nodeName)
+				currentObserved := time.Now()
 
-				if nextHeartbeatTime.Time.After(heartbeatTime.Time.Add(leaseDuration)) {
-					return nil
+				if currentHeartbeatTime == lastHeartbeatTime {
+					if currentObserved.Sub(lastObserved) > 2*leaseDuration {
+						// heartbeat hasn't changed while watching for at least 2*leaseDuration, success!
+						framework.Logf("node status heartbeat is unchanged for %s, was waiting for at least %s, success!", currentObserved.Sub(lastObserved), 2*leaseDuration)
+						return true, nil
+					}
+					framework.Logf("node status heartbeat is unchanged for %s, waiting for %s", currentObserved.Sub(lastObserved), 2*leaseDuration)
+					return false, nil
 				}
-				heartbeatTime = nextHeartbeatTime
-				return fmt.Errorf("node status report period is shorter than lease duration")
 
-				// Enter next round immediately.
-			}, 5*time.Minute, time.Nanosecond).Should(BeNil())
+				if currentHeartbeatTime.Sub(lastHeartbeatTime) >= leaseDuration {
+					// heartbeat time changed, but the diff was greater than leaseDuration, success!
+					framework.Logf("node status heartbeat changed in %s, was waiting for at least %s, success!", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
+					return true, nil
+				}
+
+				if !apiequality.Semantic.DeepEqual(lastStatus, currentStatus) {
+					// heartbeat time changed, but there were relevant changes in the status, keep waiting
+					framework.Logf("node status heartbeat changed in %s (with other status changes), waiting for %s", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
+					framework.Logf("%s", diff.ObjectReflectDiff(lastStatus, currentStatus))
+					lastHeartbeatTime = currentHeartbeatTime
+					lastObserved = currentObserved
+					lastStatus = currentStatus
+					return false, nil
+				}
+
+				// heartbeat time changed, with no other status changes, in less time than we expected, so fail.
+				return false, fmt.Errorf("node status heartbeat changed in %s (with no other status changes), was waiting for %s", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
+			})
+			// a timeout is acceptable, since it means we waited 5 minutes and didn't see any unwarranted node status updates
+			if err != nil && err != wait.ErrWaitTimeout {
+				Expect(err).NotTo(HaveOccurred(), "error waiting for infrequent nodestatus update")
+			}
 
 			By("verify node is still in ready status even though node status report is infrequent")
 			// This check on node status is only meaningful when this e2e test is
@@ -123,28 +152,20 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			// run controller manager, i.e., no node lifecycle controller.
 			node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 			Expect(err).To(BeNil())
-			_, readyCondition := v1node.GetNodeCondition(&node.Status, corev1.NodeReady)
+			_, readyCondition := testutils.GetNodeCondition(&node.Status, corev1.NodeReady)
 			Expect(readyCondition.Status).To(Equal(corev1.ConditionTrue))
 		})
 	})
 })
 
-func getNextReadyConditionHeartbeatTime(clientSet clientset.Interface, nodeName string, prevHeartbeatTime metav1.Time) metav1.Time {
-	var newHeartbeatTime metav1.Time
-	Eventually(func() error {
-		node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		_, readyCondition := v1node.GetNodeCondition(&node.Status, corev1.NodeReady)
-		Expect(readyCondition.Status).To(Equal(corev1.ConditionTrue))
-		newHeartbeatTime = readyCondition.LastHeartbeatTime
-		if prevHeartbeatTime.Before(&newHeartbeatTime) {
-			return nil
-		}
-		return fmt.Errorf("heartbeat has not changed yet")
-	}, 5*time.Minute, 5*time.Second).Should(BeNil())
-	return newHeartbeatTime
+func getHeartbeatTimeAndStatus(clientSet clientset.Interface, nodeName string) (time.Time, corev1.NodeStatus) {
+	node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	Expect(err).To(BeNil())
+	_, readyCondition := testutils.GetNodeCondition(&node.Status, corev1.NodeReady)
+	Expect(readyCondition.Status).To(Equal(corev1.ConditionTrue))
+	heartbeatTime := readyCondition.LastHeartbeatTime.Time
+	readyCondition.LastHeartbeatTime = metav1.Time{}
+	return heartbeatTime, node.Status
 }
 
 func expectLease(lease *coordv1beta1.Lease, nodeName string) error {

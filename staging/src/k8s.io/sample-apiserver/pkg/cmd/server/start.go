@@ -23,16 +23,19 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/sample-apiserver/pkg/apiserver"
-	clientset "k8s.io/sample-apiserver/pkg/client/clientset/versioned"
-	informers "k8s.io/sample-apiserver/pkg/client/informers/externalversions"
+	clientset "k8s.io/sample-apiserver/pkg/generated/clientset/versioned"
+	informers "k8s.io/sample-apiserver/pkg/generated/informers/externalversions"
 )
 
 const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
@@ -56,7 +59,7 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 		StdOut: out,
 		StdErr: errOut,
 	}
-
+	o.RecommendedOptions.Etcd.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(v1alpha1.SchemeGroupVersion, schema.GroupKind{Group: v1alpha1.GroupName})
 	return o
 }
 
@@ -83,6 +86,7 @@ func NewCommandStartWardleServer(defaults *WardleServerOptions, stopCh <-chan st
 
 	flags := cmd.Flags()
 	o.RecommendedOptions.AddFlags(flags)
+	utilfeature.DefaultMutableFeatureGate.AddFlag(flags)
 
 	return cmd
 }
@@ -120,7 +124,7 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
-	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
+	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}
 
@@ -142,7 +146,7 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	server.GenericAPIServer.AddPostStartHook("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
+	server.GenericAPIServer.AddPostStartHookOrDie("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
 		config.GenericConfig.SharedInformerFactory.Start(context.StopCh)
 		o.SharedInformerFactory.Start(context.StopCh)
 		return nil
