@@ -196,6 +196,11 @@ func asV1Beta1PartialObjectMetadataList(result runtime.Object) (runtime.Object, 
 		return nil, newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadataList, but the requested object is not a list (%T)", result))
 	}
 	list := &metav1beta1.PartialObjectMetadataList{}
+	if li, ok := result.(metav1.ListInterface); ok {
+		list.SelfLink = li.GetSelfLink()
+		list.ResourceVersion = li.GetResourceVersion()
+		list.Continue = li.GetContinue()
+	}
 	err := meta.EachListItem(result, func(obj runtime.Object) error {
 		m, err := meta.Accessor(obj)
 		if err != nil {
