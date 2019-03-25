@@ -31,7 +31,7 @@ type MetricsV1beta1Interface interface {
 	PodMetricsesGetter
 }
 
-// MetricsV1beta1Client is used to interact with features provided by the metrics group.
+// MetricsV1beta1Client is used to interact with features provided by the metrics.k8s.io group.
 type MetricsV1beta1Client struct {
 	restClient rest.Interface
 }
