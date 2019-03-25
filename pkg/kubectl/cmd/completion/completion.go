@@ -48,7 +48,7 @@ var (
 		Output shell completion code for the specified shell (bash or zsh).
 		The shell code must be evaluated to provide interactive
 		completion of kubectl commands.  This can be done by sourcing it from
-		the .bash_profile.
+		the .bashrc.
 
 		Detailed instructions on how to do this are available here:
 		https://kubernetes.io/docs/tasks/tools/install-kubectl/#enabling-shell-autocompletion
@@ -71,13 +71,13 @@ var (
 		## via your distribution's package manager.
 		## Load the kubectl completion code for bash into the current shell
 		    source <(kubectl completion bash)
-		## Write bash completion code to a file and source if from .bash_profile
+		## Write bash completion code to a file and source if from .bashrc
 		    kubectl completion bash > ~/.kube/completion.bash.inc
 		    printf "
 		      # Kubectl shell completion
 		      source '$HOME/.kube/completion.bash.inc'
-		      " >> $HOME/.bash_profile
-		    source $HOME/.bash_profile
+		      " >> $HOME/.bashrc
+		    source $HOME/.bashrc
 
 		# Load the kubectl completion code for zsh[1] into the current shell
 		    source <(kubectl completion zsh)
