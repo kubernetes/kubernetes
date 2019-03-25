@@ -97,6 +97,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 		Example:               cpExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Validate(cmd, args))
 			cmdutil.CheckErr(o.Run(args))
 		},
 	}
@@ -172,9 +173,6 @@ func (o *CopyOptions) Validate(cmd *cobra.Command, args []string) error {
 
 // Run performs the execution
 func (o *CopyOptions) Run(args []string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("source and destination are required")
-	}
 	srcSpec, err := extractFileSpec(args[0])
 	if err != nil {
 		return err
