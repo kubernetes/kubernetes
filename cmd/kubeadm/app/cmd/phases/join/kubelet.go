@@ -101,8 +101,8 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 	}
 	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
 
-	// Write the bootstrap kubelet config file or the TLS-Boostrapped kubelet config file down to disk
-	klog.V(1).Infoln("[kubelet-start] writing bootstrap kubelet config file at", bootstrapKubeConfigFile)
+	// Write the bootstrap kubelet config file or the TLS-Bootstrapped kubelet config file down to disk
+	klog.V(1).Infof("[kubelet-start] writing bootstrap kubelet config file at %s", bootstrapKubeConfigFile)
 	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, tlsBootstrapCfg); err != nil {
 		return errors.Wrap(err, "couldn't save bootstrap-kubelet.conf to disk")
 	}
@@ -110,6 +110,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 	// Write the ca certificate to disk so kubelet can use it for authentication
 	cluster := tlsBootstrapCfg.Contexts[tlsBootstrapCfg.CurrentContext].Cluster
 	if _, err := os.Stat(cfg.CACertPath); os.IsNotExist(err) {
+		klog.V(1).Infof("[kubelet-start] writing CA certificate at %s", cfg.CACertPath)
 		if err := certutil.WriteCert(cfg.CACertPath, tlsBootstrapCfg.Clusters[cluster].CertificateAuthorityData); err != nil {
 			return errors.Wrap(err, "couldn't save the CA certificate to disk")
 		}
