@@ -361,7 +361,7 @@ type ListOptions struct {
 	// This field is alpha and can be changed or removed without notice.
 	//
 	// +optional
-	AllowWatchBookmarks bool `json:"allowWatchBookmarks,omitempty"`
+	AllowWatchBookmarks bool `json:"allowWatchBookmarks,omitempty" protobuf:"varint,9,opt,name=allowWatchBookmarks"`
 
 	// When specified with a watch call, shows changes that occur after that particular version of a resource.
 	// Defaults to changes from the beginning of history.
