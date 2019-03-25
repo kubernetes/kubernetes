@@ -25,6 +25,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/component-base/config/serializer:all-srcs",
+        "//staging/src/k8s.io/component-base/config/testing:all-srcs",
         "//staging/src/k8s.io/component-base/config/v1alpha1:all-srcs",
         "//staging/src/k8s.io/component-base/config/validation:all-srcs",
     ],
