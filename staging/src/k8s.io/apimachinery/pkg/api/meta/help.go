@@ -58,10 +58,11 @@ func IsListType(obj runtime.Object) bool {
 
 		// cache only the first 1024 types
 		isListCache.lock.RLock()
-		defer isListCache.lock.RUnlock()
 		if len(isListCache.byType) >= 1024 {
+			isListCache.lock.RUnlock()
 			return ok
 		}
+		isListCache.lock.RUnlock()
 		isListCache.lock.Lock()
 		if len(isListCache.byType) < 1024 {
 			isListCache.byType[t] = ok
