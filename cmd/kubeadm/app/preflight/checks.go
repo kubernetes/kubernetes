@@ -872,6 +872,16 @@ func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
 	return warnings, errorList
 }
 
+// IPVSProxierCheck tests if IPVS proxier can be used.
+type IPVSProxierCheck struct {
+	exec utilsexec.Interface
+}
+
+// Name returns label for IPVSProxierCheck
+func (r IPVSProxierCheck) Name() string {
+	return "IPVSProxierCheck"
+}
+
 // RunInitNodeChecks executes all individual, applicable to control-plane node checks.
 // The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
 // If the flag is set to true we should skip checks already executed by RunJoinNodeChecks and RunOptionalJoinNodeChecks.
@@ -903,11 +913,9 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 	if !isSecondaryControlPlane {
 		checks = addCommonChecks(execer, cfg.KubernetesVersion, &cfg.NodeRegistration, checks)
 
-		// Check IVPS required kernel module once we use IVPS kube-proxy mode
+		// Check if IVPS kube-proxy mode is supported
 		if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
-			checks = append(checks,
-				ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
-			)
+			checks = append(checks, IPVSProxierCheck{exec: execer})
 		}
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
@@ -994,11 +1002,9 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.ClusterConfiguration, ignorePreflightErrors sets.String) error {
 	checks := []Checker{}
 
-	// Check ipvs required kernel module if we use ipvs kube-proxy mode
+	// Check if IVPS kube-proxy mode is supported
 	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
-		checks = append(checks,
-			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
-		)
+		checks = append(checks, IPVSProxierCheck{exec: execer})
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
