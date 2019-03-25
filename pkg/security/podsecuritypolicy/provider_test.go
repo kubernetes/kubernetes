@@ -31,7 +31,6 @@ import (
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -41,7 +40,7 @@ import (
 
 const defaultContainerName = "test-c"
 
-func TestDefaultPodSecurityContextNonmutating(t *testing.T) {
+func TestMutatePodNonmutating(t *testing.T) {
 	// Create a pod with a security context that needs filling in
 	createPod := func() *api.Pod {
 		return &api.Pod{
@@ -89,7 +88,7 @@ func TestDefaultPodSecurityContextNonmutating(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create provider %v", err)
 	}
-	err = provider.DefaultPodSecurityContext(pod)
+	err = provider.MutatePod(pod)
 	if err != nil {
 		t.Fatalf("unable to create psc %v", err)
 	}
@@ -98,14 +97,14 @@ func TestDefaultPodSecurityContextNonmutating(t *testing.T) {
 	// since all the strategies were permissive
 	if !reflect.DeepEqual(createPod(), pod) {
 		diffs := diff.ObjectDiff(createPod(), pod)
-		t.Errorf("pod was mutated by DefaultPodSecurityContext. diff:\n%s", diffs)
+		t.Errorf("pod was mutated by MutatePod. diff:\n%s", diffs)
 	}
 	if !reflect.DeepEqual(createPSP(), psp) {
-		t.Error("psp was mutated by DefaultPodSecurityContext")
+		t.Error("psp was mutated by MutatePod")
 	}
 }
 
-func TestDefaultContainerSecurityContextNonmutating(t *testing.T) {
+func TestMutateContainerNonmutating(t *testing.T) {
 	untrue := false
 	tests := []struct {
 		security *api.SecurityContext
@@ -134,7 +133,6 @@ func TestDefaultContainerSecurityContextNonmutating(t *testing.T) {
 					Name: "psp-sa",
 					Annotations: map[string]string{
 						seccomp.AllowedProfilesAnnotationKey: "*",
-						seccomp.DefaultProfileAnnotationKey:  "foo",
 					},
 				},
 				Spec: policy.PodSecurityPolicySpec{
@@ -165,7 +163,7 @@ func TestDefaultContainerSecurityContextNonmutating(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		err = provider.DefaultContainerSecurityContext(pod, &pod.Spec.Containers[0])
+		err = provider.MutatePod(pod)
 		if err != nil {
 			t.Fatalf("unable to create container security context %v", err)
 		}
@@ -174,15 +172,15 @@ func TestDefaultContainerSecurityContextNonmutating(t *testing.T) {
 		// since all the strategies were permissive
 		if !reflect.DeepEqual(createPod(), pod) {
 			diffs := diff.ObjectDiff(createPod(), pod)
-			t.Errorf("pod was mutated by DefaultContainerSecurityContext. diff:\n%s", diffs)
+			t.Errorf("pod was mutated. diff:\n%s", diffs)
 		}
 		if !reflect.DeepEqual(createPSP(), psp) {
-			t.Error("psp was mutated by DefaultContainerSecurityContext")
+			t.Error("psp was mutated")
 		}
 	}
 }
 
-func TestValidatePodSecurityContextFailures(t *testing.T) {
+func TestValidatePodFailures(t *testing.T) {
 	failHostNetworkPod := defaultPod()
 	failHostNetworkPod.Spec.SecurityContext.HostNetwork = true
 
@@ -504,6 +502,7 @@ func TestValidateContainerFailures(t *testing.T) {
 		},
 	}
 	failSELinuxPod := defaultPod()
+	failSELinuxPod.Spec.SecurityContext.SELinuxOptions = &api.SELinuxOptions{Level: "foo"}
 	failSELinuxPod.Spec.Containers[0].SecurityContext.SELinuxOptions = &api.SELinuxOptions{
 		Level: "bar",
 	}
@@ -620,22 +619,24 @@ func TestValidateContainerFailures(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
-		if err != nil {
-			t.Fatalf("unable to create provider %v", err)
-		}
-		errs := provider.ValidateContainer(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
-		if len(errs) == 0 {
-			t.Errorf("%s expected validation failure but did not receive errors", k)
-			continue
-		}
-		if !strings.Contains(errs[0].Error(), v.expectedError) {
-			t.Errorf("%s received unexpected error %v\nexpected: %s", k, errs, v.expectedError)
-		}
+		t.Run(k, func(t *testing.T) {
+			provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
+			if err != nil {
+				t.Fatalf("unable to create provider %v", err)
+			}
+			errs := provider.ValidatePod(v.pod)
+			if len(errs) == 0 {
+				t.Errorf("expected validation failure but did not receive errors")
+				return
+			}
+			if !strings.Contains(errs[0].Error(), v.expectedError) {
+				t.Errorf("unexpected error %v\nexpected: %s", errs, v.expectedError)
+			}
+		})
 	}
 }
 
-func TestValidatePodSecurityContextSuccess(t *testing.T) {
+func TestValidatePodSuccess(t *testing.T) {
 	hostNetworkPSP := defaultPSP()
 	hostNetworkPSP.Spec.HostNetwork = true
 	hostNetworkPod := defaultPod()
@@ -941,6 +942,7 @@ func TestValidateContainerSuccess(t *testing.T) {
 		},
 	}
 	seLinuxPod := defaultPod()
+	seLinuxPod.Spec.SecurityContext.SELinuxOptions = &api.SELinuxOptions{Level: "foo"}
 	seLinuxPod.Spec.Containers[0].SecurityContext.SELinuxOptions = &api.SELinuxOptions{
 		Level: "foo",
 	}
@@ -1007,6 +1009,7 @@ func TestValidateContainerSuccess(t *testing.T) {
 
 	seccompPod := defaultPod()
 	seccompPod.Annotations = map[string]string{
+		api.SeccompPodAnnotationKey: "foo",
 		api.SeccompContainerAnnotationKeyPrefix + seccompPod.Spec.Containers[0].Name: "foo",
 	}
 
@@ -1074,15 +1077,16 @@ func TestValidateContainerSuccess(t *testing.T) {
 	}
 
 	for k, v := range successCases {
-		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
-		if err != nil {
-			t.Fatalf("unable to create provider %v", err)
-		}
-		errs := provider.ValidateContainer(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
-		if len(errs) != 0 {
-			t.Errorf("%s expected validation pass but received errors %v\n%s", k, errs, spew.Sdump(v.pod.ObjectMeta))
-			continue
-		}
+		t.Run(k, func(t *testing.T) {
+			provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
+			if err != nil {
+				t.Fatalf("unable to create provider %v", err)
+			}
+			errs := provider.ValidatePod(v.pod)
+			if len(errs) != 0 {
+				t.Errorf("%s expected validation pass but received errors %v\n%s", k, errs, spew.Sdump(v.pod.ObjectMeta))
+			}
+		})
 	}
 }
 
@@ -1146,7 +1150,7 @@ func TestGenerateContainerSecurityContextReadOnlyRootFS(t *testing.T) {
 			t.Errorf("%s unable to create provider %v", k, err)
 			continue
 		}
-		err = provider.DefaultContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0])
+		err = provider.MutatePod(v.pod)
 		if err != nil {
 			t.Errorf("%s unable to create container security context %v", k, err)
 			continue
@@ -1351,10 +1355,10 @@ func TestAllowPrivilegeEscalation(t *testing.T) {
 			provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
 			require.NoError(t, err)
 
-			err = provider.DefaultContainerSecurityContext(pod, &pod.Spec.Containers[0])
+			err = provider.MutatePod(pod)
 			require.NoError(t, err)
 
-			errs := provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
+			errs := provider.ValidatePod(pod)
 			if test.expectErr {
 				assert.NotEmpty(t, errs, "expected validation error")
 			} else {
