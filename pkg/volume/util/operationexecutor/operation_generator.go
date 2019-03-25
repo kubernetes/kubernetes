@@ -917,7 +917,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 
 		// Update actual state of world
 		markDeviceUnmountedErr := actualStateOfWorld.MarkDeviceAsUnmounted(
-			deviceToDetach.VolumeName)
+			deviceToDetach.VolumeName, deviceToDetach.DevicePath)
 		if markDeviceUnmountedErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return deviceToDetach.GenerateError("MarkDeviceAsUnmounted failed", markDeviceUnmountedErr)
@@ -1268,7 +1268,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 
 		// Update actual state of world
 		markDeviceUnmountedErr := actualStateOfWorld.MarkDeviceAsUnmounted(
-			deviceToDetach.VolumeName)
+			deviceToDetach.VolumeName, deviceToDetach.DevicePath)
 		if markDeviceUnmountedErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return deviceToDetach.GenerateError("MarkDeviceAsUnmounted failed", markDeviceUnmountedErr)

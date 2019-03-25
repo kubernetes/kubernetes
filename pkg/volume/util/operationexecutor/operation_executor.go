@@ -174,7 +174,7 @@ type ActualStateOfWorldMounterUpdater interface {
 	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
 
 	// Marks the specified volume as having its global mount unmounted.
-	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
+	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName, devicePath string) error
 
 	// Marks the specified volume's file system resize request is finished.
 	MarkVolumeAsResized(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error

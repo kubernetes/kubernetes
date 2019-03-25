@@ -363,8 +363,8 @@ func (asw *actualStateOfWorld) MarkDeviceAsMounted(
 }
 
 func (asw *actualStateOfWorld) MarkDeviceAsUnmounted(
-	volumeName v1.UniqueVolumeName) error {
-	return asw.SetVolumeGloballyMounted(volumeName, false /* globallyMounted */, "", "")
+	volumeName v1.UniqueVolumeName, devicePath string) error {
+	return asw.SetVolumeGloballyMounted(volumeName, false /* globallyMounted */, devicePath, "")
 }
 
 // addVolume adds the given volume to the cache indicating the specified
