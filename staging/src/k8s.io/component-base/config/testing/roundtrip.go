@@ -6,14 +6,13 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
-	configserializer "k8s.io/component/pkg/serializer"
+	configserializer "k8s.io/component-base/config/serializer"
 )
 
 type TestCase struct {
@@ -54,6 +53,8 @@ func GetRoundtripTestCases(scheme *runtime.Scheme, disallowMarshalGroupVersions 
 }
 
 func RunTestsOnYAMLData(t *testing.T, tests []TestCase, scheme *runtime.Scheme, codecs *serializer.CodecFactory) {
+	sz := configserializer.NewStrictYAMLJSONSerializer(scheme, codecs)
+
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
@@ -62,7 +63,7 @@ func RunTestsOnYAMLData(t *testing.T, tests []TestCase, scheme *runtime.Scheme, 
 				t2.Fatal(err)
 			}
 
-			actual, err := configserializer.Encode(configserializer.YAML, rt.outGV, obj, scheme, codecs)
+			actual, err := sz.Encode(configserializer.ContentTypeYAML, rt.outGV, obj)
 			if err != nil {
 				t2.Fatal(err)
 			}
@@ -81,6 +82,8 @@ func RunTestsOnYAMLData(t *testing.T, tests []TestCase, scheme *runtime.Scheme, 
 }
 
 func decodeTestData(path string, gvk schema.GroupVersionKind, scheme *runtime.Scheme, codecs *serializer.CodecFactory) (runtime.Object, error) {
+	sz := configserializer.NewStrictYAMLJSONSerializer(scheme, codecs)
+
 	obj, err := scheme.New(gvk)
 	if err != nil {
 		return nil, err
@@ -91,14 +94,10 @@ func decodeTestData(path string, gvk schema.GroupVersionKind, scheme *runtime.Sc
 		return nil, err
 	}
 
-	var buf bytes.Buffer
-	if err := configserializer.DecodeInto(content, obj, codecs, &buf); err != nil {
+	if err := sz.DecodeInto(content, obj); err != nil {
 		return nil, err
 	}
-	if buf.Len() > 0 {
-		// If the buffer contains anything
-		return nil, errors.Errorf("the input test YAML file invalid with strict validation errors: %s", buf.Bytes())
-	}
+
 	return obj, nil
 }
 
