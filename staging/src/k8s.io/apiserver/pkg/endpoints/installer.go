@@ -266,7 +266,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	watcher, isWatcher := storage.(rest.Watcher)
 	connecter, isConnecter := storage.(rest.Connecter)
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
-	storageVersionProvider, isStorageVersionProvider := storage.(rest.StorageVersionProvider)
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
 	}
@@ -703,10 +702,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// Note: update GetAuthorizerAttributes() when adding a custom handler.
 	}
 
+	return a.constructAPIResource(storage, kubeVerbs, namespaceScoped, path, resourceKind)
+}
+
+func (a *APIInstaller) constructAPIResource(storage rest.Storage, kubeVerbs map[string]struct{}, namespaceScoped bool, path, resourceKind string) (*metav1.APIResource, error) {
 	var apiResource metav1.APIResource
 	apiResource.Name = path
 	apiResource.Namespaced = namespaceScoped
 	apiResource.Kind = resourceKind
+	storageVersionProvider, isStorageVersionProvider := storage.(rest.StorageVersionProvider)
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&
 		isStorageVersionProvider &&
 		storageVersionProvider.StorageVersion() != nil {
