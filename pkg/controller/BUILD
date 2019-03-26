@@ -43,6 +43,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client_builder.go",
+        "client_builder_dynamic.go",
         "controller_ref_manager.go",
         "controller_utils.go",
         "doc.go",
@@ -85,10 +86,13 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
+        "//staging/src/k8s.io/client-go/transport:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
+        "//vendor/golang.org/x/oauth2:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

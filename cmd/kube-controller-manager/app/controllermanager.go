@@ -31,6 +31,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,9 +40,11 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/term"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/leaderelection"
@@ -58,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -199,11 +203,22 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 				// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
 				klog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
 			}
-			clientBuilder = controller.SAControllerClientBuilder{
-				ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
-				CoreClient:           c.Client.CoreV1(),
-				AuthenticationClient: c.Client.AuthenticationV1(),
-				Namespace:            "kube-system",
+
+			if shouldTurnOnDynamicClient(c.Client) {
+				klog.V(1).Infof("using dynamic client builder")
+				//Dynamic builder will use TokenRequest feature and refresh service account token periodically
+				clientBuilder = controller.NewDynamicClientBuilder(
+					restclient.AnonymousClientConfig(c.Kubeconfig),
+					c.Client.CoreV1(),
+					"kube-system")
+			} else {
+				klog.V(1).Infof("using legacy client builder")
+				clientBuilder = controller.SAControllerClientBuilder{
+					ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
+					CoreClient:           c.Client.CoreV1(),
+					AuthenticationClient: c.Client.AuthenticationV1(),
+					Namespace:            "kube-system",
+				}
 			}
 		} else {
 			clientBuilder = rootClientBuilder
@@ -565,4 +580,25 @@ func readCA(file string) ([]byte, error) {
 	}
 
 	return rootCA, err
+}
+
+func shouldTurnOnDynamicClient(client clientset.Interface) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		return false
+	}
+	apiResourceList, err := client.Discovery().ServerResourcesForGroupVersion(v1.SchemeGroupVersion.String())
+	if err != nil {
+		klog.Warningf("fetch api resource lists failed, use legacy client builder: %v", err)
+		return false
+	}
+
+	for _, resource := range apiResourceList.APIResources {
+		if resource.Name == "serviceaccounts/token" &&
+			resource.Group == "authentication.k8s.io" &&
+			sets.NewString(resource.Verbs...).Has("create") {
+			return true
+		}
+	}
+
+	return false
 }

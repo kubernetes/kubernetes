@@ -160,7 +160,8 @@
         "k8s.io/client-go/util/cert",
         "k8s.io/client-go/util/flowcontrol",
         "k8s.io/client-go/util/retry",
-        "k8s.io/client-go/util/workqueue"
+        "k8s.io/client-go/util/workqueue",
+	"k8s.io/client-go/transport"
       ]
     },
     {
