@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,22 +16,8 @@ limitations under the License.
 
 package e2e_kubeadm
 
-import (
-	"github.com/onsi/gomega"
-	"github.com/onsi/gomega/gstruct"
-	corev1 "k8s.io/api/core/v1"
-)
+import "k8s.io/kubernetes/test/e2e/framework"
 
-func subject(name, kind string) gomega.OmegaMatcher {
-	return gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-		"Name": gomega.Equal(name),
-		"Kind": gomega.Equal(kind),
-	})
-}
-
-func taint(key string, effect corev1.TaintEffect) gomega.OmegaMatcher {
-	return gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-		"Key":    gomega.Equal(key),
-		"Effect": gomega.Equal(effect),
-	})
+func KubeadmDescribe(text string, body func()) bool {
+	return framework.KubeDescribe("[sig-cluster-lifecycle] [area-kubeadm] "+text, body)
 }
