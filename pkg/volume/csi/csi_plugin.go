@@ -87,13 +87,15 @@ const ephemeralDriverMode driverMode = "ephemeral"
 // PluginHandler is only needed for the kubelet to add the CSI plugin as a pluginwatcher handler
 // as soon as the kubelet discovers the CSI plugin via name and not via this
 // package-global variable, we can remove that singleton again.
-// TODO(hoergaarden) remove when kubelet changes to get volume plugin by name are merged
+// TODO(hoergaarden) remove when kubelet changes to get volume plugin by name
+//                   (#74963) are merged
 var PluginHandler *csiPlugin
 var once sync.Once
 
 // ProbeVolumePlugins returns implemented plugins
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	// TODO(hoergaarden) remove when kubelet changes to get volume plugin by name are merged
+	//                   (#74963) are merged
 	once.Do(func() {
 		PluginHandler = &csiPlugin{
 			host:         nil,

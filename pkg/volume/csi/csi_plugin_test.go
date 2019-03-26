@@ -43,7 +43,8 @@ import (
 // create a plugin mgr to load plugins and setup a fake client
 func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, string) {
 	// Only for the test cases, ensure we get a new plugin all the time
-	// TODO(hoergaarden) remove when kubelet changes to get volume plugin by name are merged
+	// TODO(hoergaarden) remove when kubelet changes to get volume plugin by name
+	//                   (#74963) are merged
 	once = sync.Once{}
 
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
