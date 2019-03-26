@@ -35,7 +35,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 	// and other fields, and add a created-by reference.
 
 	var one int64 = 1
-	var no bool = false
+	var no bool
 
 	sj := batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
