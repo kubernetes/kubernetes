@@ -100,6 +100,19 @@ type documentable interface {
 	SwaggerDoc() map[string]string
 }
 
+var supportedVerbs = map[string]bool{
+	"CONNECT":          true,
+	"GET":              true, // Get a resource.
+	"LIST":             true, // List all resources of a kind.
+	"PUT":              true, // Update a resource.
+	"PATCH":            true, // Partially update a resource
+	"POST":             true, // Create a resource.
+	"DELETE":           true, // Delete a resource.
+	"DELETECOLLECTION": true,
+	"WATCH":            true, // Watch a resource.
+	"WATCHLIST":        true, // Watch all resources of a kind.
+}
+
 // toDiscoveryKubeVerb maps an action.Verb to the logical kube verb, used for discovery
 var toDiscoveryKubeVerb = map[string]string{
 	"CONNECT":          "", // do not list in discovery.
@@ -126,6 +139,18 @@ var toRESTMethod = map[string]string{
 	"PUT":              "PUT",
 	"WATCH":            "GET",
 	"WATCHLIST":        "GET",
+}
+
+var toOperationPrefix = map[string]string{
+	"GET":              "read",
+	"LIST":             "list",
+	"PUT":              "replace",
+	"PATCH":            "patch",
+	"POST":             "create",
+	"DELETE":           "delete",
+	"DELETECOLLECTION": "deletecollection",
+	"WATCH":            "watch",
+	"WATCHLIST":        "watch",
 }
 
 // Install handlers for API resources.
@@ -667,6 +692,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				action.Params = append(action.Params, params...)
 			}
 		}
+		if action.Verb != "CONNECT" {
+			action.Params = append(action.Params, ws.QueryParameter("pretty", "If 'true', then the output is pretty printed."))
+		}
 	}
 
 	// If there is a subresource, kind should be the parent's kind.
@@ -696,13 +724,37 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		var routes []*restful.RouteBuilder
 		var err error
 		if action.Verb == "CONNECT" {
-			routes, err = registerCONNECTToWebService(action, ws, namespaceScoped, isSubresource, isLister, isWatcher, isGracefulDeleter, kind, subresource, storageMeta, connecter, kubeVerbs)
+			for _, method := range connecter.ConnectMethods() {
+				connectProducedObject := storageMeta.ProducesObject(method)
+				if connectProducedObject == nil {
+					connectProducedObject = "string"
+				}
+				// NOTE: we override the write sample per connect method here, but it's
+				// fine for now
+				action.writeSample = connectProducedObject
+				doc := "connect " + method + " requests to " + kind
+				if isSubresource {
+					doc = "connect " + method + " requests to " + subresource + " of " + kind
+				}
+				r, err := registerActionsToWebService(action, ws, namespaceScoped, isGracefulDeleter, kind, subresource, method, doc, "connect"+strings.Title(strings.ToLower(method)))
+				if err != nil {
+					return nil, err
+				}
+				routes = append(routes, r...)
+
+				// transform ConnectMethods to kube verbs
+				if kubeVerb, found := toDiscoveryKubeVerb[method]; found {
+					if len(kubeVerb) != 0 {
+						kubeVerbs[kubeVerb] = struct{}{}
+					}
+				}
+			}
 		} else {
 			doc, err := documentationAction(action, kind, subresource, isSubresource, isLister, isWatcher)
 			if err != nil {
 				return nil, err
 			}
-			routes, err = registerActionsToWebService(action, ws, namespaceScoped, isSubresource, isLister, isWatcher, isGracefulDeleter, kind, subresource, toRESTMethod[action.Verb], doc)
+			routes, err = registerActionsToWebService(action, ws, namespaceScoped, isGracefulDeleter, kind, subresource, toRESTMethod[action.Verb], doc, toOperationPrefix[action.Verb])
 		}
 		if err != nil {
 			return nil, err
@@ -940,7 +992,7 @@ func documentationAction(action *action, kind, subresource string, isSubresource
 	return doc, nil
 }
 
-func registerActionsToWebService(action *action, ws *restful.WebService, isNamespaced, isSubresource, isLister, isWatcher, isGracefulDeleter bool, kind, subresource, method, doc string) ([]*restful.RouteBuilder, error) {
+func registerActionsToWebService(action *action, ws *restful.WebService, isNamespaced, isGracefulDeleter bool, kind, subresource, method, doc, operation string) ([]*restful.RouteBuilder, error) {
 	var namespaced string
 	var operationSuffix string
 	if isNamespaced {
@@ -953,38 +1005,13 @@ func registerActionsToWebService(action *action, ws *restful.WebService, isNames
 		operationSuffix = operationSuffix + "ForAllNamespaces"
 		namespaced = ""
 	}
-
 	routes := []*restful.RouteBuilder{}
-	var operation string
-	var route *restful.RouteBuilder
-	switch action.Verb {
-	case "GET": // Get a resource.
-		operation = "read"
-	case "LIST": // List all resources of a kind.
-		operation = "list"
-	case "PUT": // Update a resource.
-		operation = "replace"
-	case "PATCH": // Partially update a resource
-		operation = "patch"
-	case "POST": // Create a resource.
-		operation = "create"
-	case "DELETE": // Delete a resource.
-		operation = "delete"
-	case "DELETECOLLECTION":
-		operation = "deletecollection"
-	// deprecated in 1.11
-	case "WATCH": // Watch a resource.
-		operation = "watch"
-	// deprecated in 1.11
-	case "WATCHLIST": // Watch all resources of a kind.
-		operation = "watch"
-	default:
+	if !supportedVerbs[action.Verb] {
 		return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
 	}
-
+	var route *restful.RouteBuilder
 	route = ws.Method(method).Path(action.Path).To(action.handler).
 		Doc(doc).
-		Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 		Operation(operation + namespaced + kind + strings.Title(subresource) + operationSuffix).
 		Produces(action.producedMIMETypes...).
 		Writes(action.writeSample)
@@ -1012,50 +1039,6 @@ func registerActionsToWebService(action *action, ws *restful.WebService, isNames
 	}
 	addParams(route, action.Params)
 	routes = append(routes, route)
-	return routes, nil
-}
-
-func registerCONNECTToWebService(action *action, ws *restful.WebService, isNamespaced, isSubresource, isLister, isWatcher, isGracefulDeleter bool, kind, subresource string, storageMeta rest.StorageMetadata, connecter rest.Connecter, kubeVerbs map[string]struct{}) ([]*restful.RouteBuilder, error) {
-	var namespaced string
-	var operationSuffix string
-	if isNamespaced {
-		namespaced = "Namespaced"
-	}
-	if strings.HasSuffix(action.Path, "/{path:*}") {
-		operationSuffix = operationSuffix + "WithPath"
-	}
-	if action.AllNamespaces {
-		operationSuffix = operationSuffix + "ForAllNamespaces"
-		namespaced = ""
-	}
-
-	routes := []*restful.RouteBuilder{}
-	for _, method := range connecter.ConnectMethods() {
-		connectProducedObject := storageMeta.ProducesObject(method)
-		if connectProducedObject == nil {
-			connectProducedObject = "string"
-		}
-		doc := "connect " + method + " requests to " + kind
-		if isSubresource {
-			doc = "connect " + method + " requests to " + subresource + " of " + kind
-		}
-		route := ws.Method(method).Path(action.Path).
-			To(action.handler).
-			Doc(doc).
-			Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource) + operationSuffix).
-			Produces(action.producedMIMETypes...).
-			Consumes(action.consumedMIMETypes...).
-			Writes(connectProducedObject)
-		addParams(route, action.Params)
-		routes = append(routes, route)
-
-		// transform ConnectMethods to kube verbs
-		if kubeVerb, found := toDiscoveryKubeVerb[method]; found {
-			if len(kubeVerb) != 0 {
-				kubeVerbs[kubeVerb] = struct{}{}
-			}
-		}
-	}
 	return routes, nil
 }
 
