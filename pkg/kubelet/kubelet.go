@@ -26,13 +26,12 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -99,7 +98,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
-	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -2019,7 +2017,7 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *v1.Pod, start time.Time) {
 // a config source.
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
-	sort.Sort(sliceutils.PodsByCreationTime(pods))
+	//sort.Sort(sliceutils.PodsByCreationTime(pods))
 	for _, pod := range pods {
 		// Responsible for checking limits in resolv.conf
 		if kl.dnsConfigurer != nil && kl.dnsConfigurer.ResolverConfig != "" {
