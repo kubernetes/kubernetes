@@ -639,7 +639,6 @@ staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller
 staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1
-test/e2e
 test/e2e/apimachinery
 test/e2e/apps
 test/e2e/auth
