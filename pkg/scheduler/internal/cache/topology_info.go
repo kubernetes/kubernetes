@@ -29,7 +29,8 @@ type TopologyPair struct {
 	Value string
 }
 
-// TopologyInfo denotes a mapping from TopologyPair to a set of node names
+// TopologyInfo denotes a mapping from TopologyPair to a set of strings.
+// The strings can be node names or pod names.
 type TopologyInfo map[TopologyPair]sets.String
 
 // AddNode updates TopologyInfo when a node is added

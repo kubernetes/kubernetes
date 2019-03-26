@@ -75,9 +75,11 @@ type topologyPairsMaps struct {
 	podToTopologyPairs map[string]topologyPairSet
 }
 
-// affinityQuery represents how an incoming pod's affinity terms are matched:
-// - [region/region1 => matched on which pods, region/region2 => matched on which pods, ...]
-// - [zone/zone1 => matched on which pods, zone/zone2 => matched on which pods, ...]
+// affinityQuery is an aggregated result that presents affinityTerms[i] matches
+// on which pods via which topology domains.
+// For example:
+// - {<region/region1>: {pod names}, <region/region2>: {pod names}, ...}
+// - {<zone/zone1>: <pod names}, <zone/zone2>: {pod names}, ...}
 type affinityQuery []internalcache.TopologyInfo
 
 // NOTE: When new fields are added/removed or logic is changed, please make sure that
@@ -274,11 +276,11 @@ func (aq affinityQuery) removePod(delPod *v1.Pod) bool {
 	var updated bool
 	delPodFullName := podName(delPod)
 	for _, querySet := range aq {
-		for pair, nodeNames := range querySet {
-			if _, ok := nodeNames[delPodFullName]; ok {
+		for pair, podNames := range querySet {
+			if _, ok := podNames[delPodFullName]; ok {
 				updated = true
-				delete(nodeNames, delPodFullName)
-				if len(nodeNames) == 0 {
+				delete(podNames, delPodFullName)
+				if len(podNames) == 0 {
 					delete(querySet, pair)
 				}
 			}
@@ -393,6 +395,8 @@ func (meta *predicateMetadata) getPodAffinityFits() sets.String {
 		nodeSets := make([]sets.String, len(meta.podAffinityQuery[i]))
 		j := 0
 		for pair := range meta.podAffinityQuery[i] {
+			// by leveraging meta.topologyInfo, we can quickly get the node names
+			// where affinityTerm[i] has pods matched on
 			if nodeSet, ok := meta.topologyInfo[pair]; ok {
 				nodeSets[j] = nodeSet
 			} else {
@@ -400,7 +404,7 @@ func (meta *predicateMetadata) getPodAffinityFits() sets.String {
 			}
 			j++
 		}
-		// nodeNames[i] represents nodes which satisfy on the ith term
+		// nodeNames[i] represents nodes which satisfy on affinityTerm[i]
 		nodeNames[i] = Union(nodeSets)
 	}
 	// return nodes which satisfy on all terms

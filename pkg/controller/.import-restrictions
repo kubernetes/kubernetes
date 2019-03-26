@@ -229,6 +229,7 @@
         "k8s.io/kubernetes/pkg/scheduler/algorithm",
         "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates",
         "k8s.io/kubernetes/pkg/scheduler/nodeinfo",
+        "k8s.io/kubernetes/pkg/scheduler/internal/cache",
         "k8s.io/kubernetes/pkg/serviceaccount",
         "k8s.io/kubernetes/pkg/util/goroutinemap",
         "k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff",
