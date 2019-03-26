@@ -404,34 +404,6 @@ kube::util::ensure_clean_working_dir() {
   done 1>&2
 }
 
-# Ensure that the given godep version is installed and in the path.  Almost
-# nobody should use any version but the default.
-#
-# Sets:
-#  KUBE_GODEP: The path to the godep binary
-#
-kube::util::ensure_godep_version() {
-  local godep_target_version=${1:-"v80-k8s-r1"} # this version is known to work
-
-  # If KUBE_GODEP is already set, and it's the right version, then use it.
-  if [[ -n "${KUBE_GODEP:-}" && "$(${KUBE_GODEP:?} version 2>/dev/null)" == *"godep ${godep_target_version}"* ]]; then
-    kube::log::status "Using ${KUBE_GODEP}"
-    return
-  fi
-
-  # Otherwise, install forked godep
-  kube::log::status "Installing godep version ${godep_target_version}"
-  GOBIN="${KUBE_OUTPUT_BINPATH}" go install k8s.io/kubernetes/third_party/forked/godep
-  export KUBE_GODEP="${KUBE_OUTPUT_BINPATH}/godep"
-  kube::log::status "Installed ${KUBE_GODEP}"
-
-  # Verify that the installed godep from fork is what we expect
-  if [[ "$(${KUBE_GODEP:?} version 2>/dev/null)" != *"godep ${godep_target_version}"* ]]; then
-    kube::log::error "Expected godep ${godep_target_version} from ${KUBE_GODEP}, got $(${KUBE_GODEP:?} version)"
-    return 1
-  fi
-}
-
 # Ensure that none of the staging repos is checked out in the GOPATH because this
 # easily confused godep.
 kube::util::ensure_no_staging_repos_in_gopath() {
