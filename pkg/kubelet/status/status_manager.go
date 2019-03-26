@@ -681,7 +681,7 @@ func SidecarsStatus(pod *v1.Pod) (bool, bool, bool) {
 	for _, container := range pod.Spec.Containers {
 		for _, status := range pod.Status.ContainerStatuses {
 			if status.Name == container.Name {
-				if container.Sidecar {
+				if container.ContainerLifecycle == v1.ContainerLifecycleSidecar {
 					sidecars++
 					if !status.Ready {
 						sidecarsReady = false

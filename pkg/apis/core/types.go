@@ -1935,6 +1935,16 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
+// ContainerLifecycle describes the lifecyle of the container
+type ContainerLifecycle string
+
+const (
+	//ContainerLifecycleStandard means that the container will obey the normal container lifecyle
+	ContainerLifecycleStandard ContainerLifecycle = "Standard"
+	//ContainerLifecycleSidecar means that the container will start up before standard containers and be terminated after
+	ContainerLifecycleSidecar ContainerLifecycle = "Sidecar"
+)
+
 // TerminationMessagePolicy describes how termination messages are retrieved from a container.
 type TerminationMessagePolicy string
 
@@ -2045,7 +2055,7 @@ type Container struct {
 	// +optional
 	TTY bool
 	// +optional
-	Sidecar bool
+	ContainerLifecycle ContainerLifecycle
 }
 
 // Handler defines a specific action that should be taken

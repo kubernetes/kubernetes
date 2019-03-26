@@ -303,7 +303,7 @@ func dropDisabledFields(
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		for k := range podSpec.Containers {
-			podSpec.Containers[k].Sidecar = false
+			podSpec.Containers[k].ContainerLifecycle = api.ContainerLifecycleStandard
 		}
 	}
 

@@ -84,6 +84,9 @@ func SetDefaults_Container(obj *v1.Container) {
 			obj.ImagePullPolicy = v1.PullIfNotPresent
 		}
 	}
+	if obj.ContainerLifecycle == "" {
+		obj.ContainerLifecycle = v1.ContainerLifecycleStandard
+	}
 	if obj.TerminationMessagePath == "" {
 		obj.TerminationMessagePath = v1.TerminationMessagePathDefault
 	}

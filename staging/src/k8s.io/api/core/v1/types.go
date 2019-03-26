@@ -2050,6 +2050,16 @@ const (
 	TerminationMessageFallbackToLogsOnError TerminationMessagePolicy = "FallbackToLogsOnError"
 )
 
+// ContainerLifecycle describes the lifecycle of the container
+type ContainerLifecycle string
+
+const (
+	//ContainerLifecycleStandard means that the container will obey the normal container lifecycle
+	ContainerLifecycleStandard ContainerLifecycle = "Standard"
+	//ContainerLifecycleSidecar means that the container will start up before standard containers and be terminated after
+	ContainerLifecycleSidecar ContainerLifecycle = "Sidecar"
+)
+
 // Capability represent POSIX capabilities type
 type Capability string
 
@@ -2233,10 +2243,11 @@ type Container struct {
 	// Default is false.
 	// +optional
 	TTY bool `json:"tty,omitempty" protobuf:"varint,18,opt,name=tty"`
-	//Sidecar
-	//Default is false
+	//Container Lifecycle.
+	//One of Standard, Sidecar.
+	//Defaults to Standard
 	//+optional
-	Sidecar bool `json:"sidecar,omitempty" protobuf:"varint,22,opt,name=sidecar"`
+	ContainerLifecycle ContainerLifecycle `json:"containerLifecycle,omitempty" protobuf:"bytes,22,opt,name=containerLifecycle,casttype=ContainerLifecycle"`
 }
 
 // Handler defines a specific action that should be taken

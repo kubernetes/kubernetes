@@ -595,7 +595,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 //returns true if the container is a sidecar
 func isSidecar(containers []v1.Container, name string) bool {
 	for _, container := range containers {
-		if container.Name == name && container.Sidecar {
+		if container.Name == name && container.ContainerLifecycle == v1.ContainerLifecycleSidecar {
 			return true
 		}
 	}

@@ -465,7 +465,7 @@ func getSidecarIDs(pod *v1.Pod) []int {
 	var sidecars []int
 
 	for idx, container := range pod.Spec.Containers {
-		if container.Sidecar {
+		if container.ContainerLifecycle == v1.ContainerLifecycleSidecar {
 			sidecars = append(sidecars, idx)
 		}
 	}
@@ -556,7 +556,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	for idx, container := range pod.Spec.Containers {
 
 		//if sidecars are still becoming ready skip any non sidecars
-		if containersNotRunning && hasSidecars && !sidecarsReady && !container.Sidecar {
+		if containersNotRunning && hasSidecars && !sidecarsReady && container.ContainerLifecycle != v1.ContainerLifecycleSidecar {
 			continue
 		}
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
@@ -636,7 +636,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		//if there are none, we can kill the remaining sidecars
 		for _, container := range pod.Spec.Containers {
 			containerStatus := podStatus.FindContainerStatusByName(container.Name)
-			if !container.Sidecar {
+			if container.ContainerLifecycle != v1.ContainerLifecycleSidecar {
 				if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) || containerStatus.State == kubecontainer.ContainerStateRunning {
 					onlySidecars = false
 				}
@@ -648,7 +648,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			for idx, container := range pod.Spec.Containers {
 				containerStatus := podStatus.FindContainerStatusByName(container.Name)
 				// we don't need to terminate non sidecars or exited sidecars
-				if container.Sidecar && containerStatus.State == kubecontainer.ContainerStateRunning {
+				if container.ContainerLifecycle == v1.ContainerLifecycleSidecar && containerStatus.State == kubecontainer.ContainerStateRunning {
 					message := " All containers have permanently exited, sidecar container will be killed"
 					changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
 						name:      containerStatus.Name,

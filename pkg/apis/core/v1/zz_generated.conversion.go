@@ -2810,7 +2810,7 @@ func autoConvert_v1_Container_To_core_Container(in *v1.Container, out *core.Cont
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
-	out.Sidecar = in.Sidecar
+	out.ContainerLifecycle = core.ContainerLifecycle(in.ContainerLifecycle)
 	return nil
 }
 
@@ -2851,7 +2851,7 @@ func autoConvert_core_Container_To_v1_Container(in *core.Container, out *v1.Cont
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
-	out.Sidecar = in.Sidecar
+	out.ContainerLifecycle = v1.ContainerLifecycle(in.ContainerLifecycle)
 	return nil
 }
 

@@ -2521,6 +2521,23 @@ func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.Error
 	return allErrors
 }
 
+var supportedContainerLifecycles = sets.NewString(string(core.ContainerLifecycleStandard), string(core.ContainerLifecycleSidecar))
+
+func validateContainerLifecycle(containerLifecycle core.ContainerLifecycle, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	switch containerLifecycle {
+	case core.ContainerLifecycleSidecar, core.ContainerLifecycleStandard, "":
+		break
+	// case "":
+	// 	allErrors = append(allErrors, field.Required(fldPath, ""))
+	default:
+		allErrors = append(allErrors, field.NotSupported(fldPath, containerLifecycle, supportedContainerLifecycles.List()))
+	}
+
+	return allErrors
+}
+
 func validateInitContainers(containers, otherContainers []core.Container, deviceVolumes map[string]core.VolumeSource, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(containers) > 0 {
@@ -2608,6 +2625,7 @@ func validateContainers(containers []core.Container, isInitContainers bool, volu
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
 		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
 		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"))...)
+		allErrs = append(allErrs, validateContainerLifecycle(ctr.ContainerLifecycle, idxPath.Child("containerLifecycle"))...)
 	}
 
 	if isInitContainers {

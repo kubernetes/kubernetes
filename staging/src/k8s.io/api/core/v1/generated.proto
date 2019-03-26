@@ -752,10 +752,11 @@ message Container {
   // +optional
   optional bool tty = 18;
 
-  // Sidecar
-  // Default is false
+  // Container Lifecycle.
+  // One of Standard, Sidecar.
+  // Defaults to Standard
   // +optional
-  optional bool sidecar = 22;
+  optional string containerLifecycle = 22;
 }
 
 // Describe a container image
