@@ -28,11 +28,11 @@ import (
 	validatingwebhookconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration/storage"
 )
 
-// StorageProvider defines an empty struct acting as a method receiver
-type StorageProvider struct{}
+// RESTStorageProvider defines an empty struct acting as a method receiver
+type RESTStorageProvider struct{}
 
 // NewRESTStorage returns the version of the API server used
-func (p StorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(admissionregistration.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
@@ -43,7 +43,7 @@ func (p StorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 	return apiGroupInfo, true
 }
 
-func (p StorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// validatingwebhookconfigurations
 	validatingStorage := validatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
@@ -57,6 +57,6 @@ func (p StorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.AP
 }
 
 // GroupName return the name of the group of admissionregistration api
-func (p StorageProvider) GroupName() string {
+func (p RESTStorageProvider) GroupName() string {
 	return admissionregistration.GroupName
 }
