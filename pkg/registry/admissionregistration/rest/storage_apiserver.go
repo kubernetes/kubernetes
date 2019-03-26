@@ -28,9 +28,11 @@ import (
 	validatingwebhookconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration/storage"
 )
 
-type RESTStorageProvider struct{}
+// StorageProvider defines an empty struct acting as a method receiver
+type StorageProvider struct{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+// NewRESTStorage returns the version of the API server used
+func (p StorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(admissionregistration.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
@@ -41,7 +43,7 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	return apiGroupInfo, true
 }
 
-func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p StorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// validatingwebhookconfigurations
 	validatingStorage := validatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
@@ -54,6 +56,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	return storage
 }
 
-func (p RESTStorageProvider) GroupName() string {
+// GroupName return the name of the group of admissionregistration api
+func (p StorageProvider) GroupName() string {
 	return admissionregistration.GroupName
 }

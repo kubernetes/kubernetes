@@ -236,10 +236,6 @@ pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/v1/evaluator/core
-pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage
-pkg/registry/admissionregistration/rest
-pkg/registry/admissionregistration/validatingwebhookconfiguration/storage
-pkg/registry/apps/daemonset/storage
 pkg/registry/apps/deployment/storage
 pkg/registry/apps/replicaset
 pkg/registry/apps/replicaset/storage

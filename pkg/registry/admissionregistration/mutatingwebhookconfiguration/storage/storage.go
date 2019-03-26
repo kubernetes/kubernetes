@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/mutatingwebhookconfiguration"
 )
 
-// rest implements a RESTStorage for pod disruption budgets against etcd
+// REST implements a RESTStorage for pod disruption budgets against etcd
 type REST struct {
 	*genericregistry.Store
 }
