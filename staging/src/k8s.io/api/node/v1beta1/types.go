@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -48,6 +49,27 @@ type RuntimeClass struct {
 	// The Handler must conform to the DNS Label (RFC 1123) requirements, and is
 	// immutable.
 	Handler string `json:"handler" protobuf:"bytes,2,opt,name=handler"`
+
+	// Topology describes the set of nodes in the cluster that support this RuntimeClass. The rules are applied to the pod during scheduling time.
+	// If topology is nil, this RuntimeClass is assumed to be supported by all nodes.
+	// pods to the right node
+	// +optional
+	Topology *Topology `json:"topology,omitempty" protobuf:"bytes,3,opt,name=topology"`
+}
+
+// Topology specifies the scheduling constraints for nodes supporting a RuntimeClass.
+type Topology struct {
+	// nodeSelector selects the set of nodes that support this RuntimeClass.
+	// Pods using this RuntimeClass can only be scheduled to a node matched by
+	// this selector. The nodeSelector is intersected (AND) with a pod's other
+	// node affinity or node selector requirements. A nil nodeSelector selects all nodes.
+	// +optional
+	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,1,rep,name=nodeSelector"`
+
+	// tolerations adds tolerations to pods running with this RuntimeClass.
+	// the tolerations are appended (excluding duplicates) to the pod's tolerations during admission.
+	// +optional
+	Tolerations []v1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,2,opt,name=tolerations"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

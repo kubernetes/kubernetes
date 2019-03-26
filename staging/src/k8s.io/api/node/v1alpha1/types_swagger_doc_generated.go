@@ -50,10 +50,21 @@ func (RuntimeClassList) SwaggerDoc() map[string]string {
 var map_RuntimeClassSpec = map[string]string{
 	"":               "RuntimeClassSpec is a specification of a RuntimeClass. It contains parameters that are required to describe the RuntimeClass to the Container Runtime Interface (CRI) implementation, as well as any other components that need to understand how the pod will be run. The RuntimeClassSpec is immutable.",
 	"runtimeHandler": "RuntimeHandler specifies the underlying runtime and configuration that the CRI implementation will use to handle pods of this class. The possible values are specific to the node & CRI configuration.  It is assumed that all handlers are available on every node, and handlers of the same name are equivalent on every node. For example, a handler called \"runc\" might specify that the runc OCI runtime (using native Linux containers) will be used to run the containers in a pod. The RuntimeHandler must conform to the DNS Label (RFC 1123) requirements and is immutable.",
+	"topology":       "Topology specifies the scheduling constrains that are necessary to assign pods to the right node",
 }
 
 func (RuntimeClassSpec) SwaggerDoc() map[string]string {
 	return map_RuntimeClassSpec
+}
+
+var map_Topology = map[string]string{
+	"":             "Topology specifies the structure of scheduling constrains for the runtime class",
+	"nodeSelector": "nodeSelector selects the set of nodes that support this RuntimeClass. Pods using this RuntimeClass can only be scheduled to a node matched by this selector. The nodeSelector is intersected (AND) with a pod's other node affinity or node selector requirements.",
+	"tolerations":  "tolerations adds tolerations to pods running with this RuntimeClass.",
+}
+
+func (Topology) SwaggerDoc() map[string]string {
+	return map_Topology
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

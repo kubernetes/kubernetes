@@ -21,6 +21,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	node "k8s.io/kubernetes/pkg/apis/node"
+	"unsafe"
 )
 
 func addConversionFuncs(s *runtime.Scheme) error {
@@ -33,11 +34,13 @@ func addConversionFuncs(s *runtime.Scheme) error {
 func Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Handler = in.Spec.RuntimeHandler
+	out.Topology = (*node.Topology)(unsafe.Pointer(in.Spec.Topology))
 	return nil
 }
 
 func Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass(in *node.RuntimeClass, out *v1alpha1.RuntimeClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Spec.RuntimeHandler = in.Handler
+	out.Spec.Topology = (*v1alpha1.Topology)(unsafe.Pointer(in.Topology))
 	return nil
 }
