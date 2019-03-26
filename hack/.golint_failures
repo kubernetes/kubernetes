@@ -236,6 +236,7 @@ pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/v1/evaluator/core
+pkg/registry/admissionregistration/rest
 pkg/registry/apps/deployment/storage
 pkg/registry/apps/replicaset
 pkg/registry/apps/replicaset/storage
