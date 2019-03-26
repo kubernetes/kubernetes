@@ -363,7 +363,7 @@ loop:
 		}
 	}
 
-	watchDuration := r.clock.Now().Sub(start)
+	watchDuration := r.clock.Since(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
 		return fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", r.name)
 	}

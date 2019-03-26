@@ -531,7 +531,7 @@ func TestWaitForWithEarlyClosingWaitFunc(t *testing.T) {
 	}, func() (bool, error) {
 		return false, nil
 	}, stopCh)
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 
 	// The WaitFor should return immediately, so the duration is close to 0s.
 	if duration >= ForeverTestTimeout/2 {
@@ -555,7 +555,7 @@ func TestWaitForWithClosedChannel(t *testing.T) {
 	}, func() (bool, error) {
 		return false, nil
 	}, stopCh)
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 	// The WaitFor should return immediately, so the duration is close to 0s.
 	if duration >= ForeverTestTimeout/2 {
 		t.Errorf("expected short timeout duration")

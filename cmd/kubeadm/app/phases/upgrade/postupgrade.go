@@ -276,7 +276,7 @@ func shouldBackupAPIServerCertAndKey(certAndKeyDir string) (bool, error) {
 		return false, errors.New("no certificate data found")
 	}
 
-	if time.Now().Sub(certs[0].NotBefore) > expiry {
+	if time.Since(certs[0].NotBefore) > expiry {
 		return true, nil
 	}
 

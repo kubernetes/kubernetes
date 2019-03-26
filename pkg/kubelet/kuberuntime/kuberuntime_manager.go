@@ -854,7 +854,7 @@ func (m *kubeGenericRuntimeManager) cleanupErrorTimeouts() {
 	m.errorMapLock.Lock()
 	defer m.errorMapLock.Unlock()
 	for name, timeout := range m.errorPrinted {
-		if time.Now().Sub(timeout) >= identicalErrorDelay {
+		if time.Since(timeout) >= identicalErrorDelay {
 			delete(m.errorPrinted, name)
 			delete(m.lastError, name)
 		}
@@ -913,7 +913,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	defer m.errorMapLock.Unlock()
 	if err != nil {
 		lastMsg, ok := m.lastError[podFullName]
-		if !ok || err.Error() != lastMsg || time.Now().Sub(m.errorPrinted[podFullName]) >= identicalErrorDelay {
+		if !ok || err.Error() != lastMsg || time.Since(m.errorPrinted[podFullName]) >= identicalErrorDelay {
 			klog.Errorf("getPodContainerStatuses for pod %q failed: %v", podFullName, err)
 			m.errorPrinted[podFullName] = time.Now()
 			m.lastError[podFullName] = err.Error()

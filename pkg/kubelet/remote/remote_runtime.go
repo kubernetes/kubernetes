@@ -296,7 +296,7 @@ func (r *RemoteRuntimeService) cleanupErrorTimeouts() {
 	r.errorMapLock.Lock()
 	defer r.errorMapLock.Unlock()
 	for ID, timeout := range r.errorPrinted {
-		if time.Now().Sub(timeout) >= identicalErrorDelay {
+		if time.Since(timeout) >= identicalErrorDelay {
 			delete(r.lastError, ID)
 			delete(r.errorPrinted, ID)
 		}
@@ -317,7 +317,7 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeapi.
 	if err != nil {
 		// Don't spam the log with endless messages about the same failure.
 		lastMsg, ok := r.lastError[containerID]
-		if !ok || err.Error() != lastMsg || time.Now().Sub(r.errorPrinted[containerID]) >= identicalErrorDelay {
+		if !ok || err.Error() != lastMsg || time.Since(r.errorPrinted[containerID]) >= identicalErrorDelay {
 			klog.Errorf("ContainerStatus %q from runtime service failed: %v", containerID, err)
 			r.errorPrinted[containerID] = time.Now()
 			r.lastError[containerID] = err.Error()
@@ -505,7 +505,7 @@ func (r *RemoteRuntimeService) ContainerStats(containerID string) (*runtimeapi.C
 	defer r.errorMapLock.Unlock()
 	if err != nil {
 		lastMsg, ok := r.lastError[containerID]
-		if !ok || err.Error() != lastMsg || time.Now().Sub(r.errorPrinted[containerID]) >= identicalErrorDelay {
+		if !ok || err.Error() != lastMsg || time.Since(r.errorPrinted[containerID]) >= identicalErrorDelay {
 			klog.Errorf("ContainerStatus %q from runtime service failed: %v", containerID, err)
 			r.errorPrinted[containerID] = time.Now()
 			r.lastError[containerID] = err.Error()
