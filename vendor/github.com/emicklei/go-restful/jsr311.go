@@ -42,10 +42,12 @@ func (r RouterJSR311) SelectRoute(
 // http://jsr311.java.net/nonav/releases/1.1/spec/spec3.html#x3-360003.7.2
 func (r RouterJSR311) detectRoute(routes []Route, httpRequest *http.Request) (*Route, error) {
 	// http method
-	methodOk := []Route{}
-	for _, each := range routes {
+	contentType := httpRequest.Header.Get(HEADER_ContentType)
+
+	methodOk := make([]*Route, 0, 8)
+	for i, each := range routes {
 		if httpRequest.Method == each.Method {
-			methodOk = append(methodOk, each)
+			methodOk = append(methodOk, &routes[i])
 		}
 	}
 	if len(methodOk) == 0 {
@@ -54,11 +56,9 @@ func (r RouterJSR311) detectRoute(routes []Route, httpRequest *http.Request) (*R
 		}
 		return nil, NewError(http.StatusMethodNotAllowed, "405: Method Not Allowed")
 	}
-	inputMediaOk := methodOk
 
 	// content-type
-	contentType := httpRequest.Header.Get(HEADER_ContentType)
-	inputMediaOk = []Route{}
+	inputMediaOk := methodOk[:0]
 	for _, each := range methodOk {
 		if each.matchesContentType(contentType) {
 			inputMediaOk = append(inputMediaOk, each)
@@ -72,7 +72,7 @@ func (r RouterJSR311) detectRoute(routes []Route, httpRequest *http.Request) (*R
 	}
 
 	// accept
-	outputMediaOk := []Route{}
+	outputMediaOk := inputMediaOk[:0]
 	accept := httpRequest.Header.Get(HEADER_Accept)
 	if len(accept) == 0 {
 		accept = "*/*"
@@ -89,7 +89,7 @@ func (r RouterJSR311) detectRoute(routes []Route, httpRequest *http.Request) (*R
 		return nil, NewError(http.StatusNotAcceptable, "406: Not Acceptable")
 	}
 	// return r.bestMatchByMedia(outputMediaOk, contentType, accept), nil
-	return &outputMediaOk[0], nil
+	return outputMediaOk[0], nil
 }
 
 // http://jsr311.java.net/nonav/releases/1.1/spec/spec3.html#x3-360003.7.2
