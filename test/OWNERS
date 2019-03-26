@@ -31,6 +31,7 @@ reviewers:
   - vishh
   - MaciekPytel # for test/e2e/common/autoscaling_utils.go
   - oomichi
+  - xichengliudui
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker
