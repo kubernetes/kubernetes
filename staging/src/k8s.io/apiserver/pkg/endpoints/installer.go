@@ -75,17 +75,41 @@ type action struct {
 	producedMIMETypes []string
 }
 
-func newAction(verb, path string, params []*restful.Parameter, allNamespaces bool, additionalReturnStatusCodes ...int) *action {
+func newAction(verb, path string, params []*restful.Parameter, allNamespaces bool) *action {
 	a := &action{
 		Verb:          verb,
 		Path:          path,
 		Params:        params,
 		AllNamespaces: allNamespaces,
 	}
+	// assign return status codes per verb
 	a.returnStatusCodes = []int{http.StatusOK}
 	// TODO: in some cases, the API may return a v1.Status instead of the versioned object
 	// but currently go-restful can't handle multiple different objects being returned.
-	a.returnStatusCodes = append(a.returnStatusCodes, additionalReturnStatusCodes...)
+	switch verb {
+	case "POST":
+		a.returnStatusCodes = []int{http.StatusOK, http.StatusCreated, http.StatusAccepted}
+	case "PUT":
+		a.returnStatusCodes = []int{http.StatusOK, http.StatusCreated}
+	case "DELETE":
+		a.returnStatusCodes = []int{http.StatusOK, http.StatusAccepted}
+	}
+	// TODO: Add status documentation using Returns()
+	// Errors (see api/errors/errors.go as well as go-restful router):
+	// http.StatusNotFound, http.StatusMethodNotAllowed,
+	// http.StatusUnsupportedMediaType, http.StatusNotAcceptable,
+	// http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
+	// http.StatusRequestTimeout, http.StatusConflict, http.StatusPreconditionFailed,
+	// http.StatusUnprocessableEntity, http.StatusInternalServerError,
+	// http.StatusServiceUnavailable
+	// and api error codes
+	// Note that if we specify a versioned Status object here, we may need to
+	// create one for the tests, also
+	// Success:
+	// http.StatusOK, http.StatusCreated, http.StatusAccepted, http.StatusNoContent
+	//
+	// test/integration/auth_test.go is currently the most comprehensive status code test
+
 	return a
 }
 
@@ -307,19 +331,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
 	}
-	exporter, isExporter := storage.(rest.Exporter)
-	if !isExporter {
-		exporter = nil
-	}
-
-	versionedExportOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ExportOptions"))
-	if err != nil {
-		return nil, err
-	}
-
-	if isNamedCreater {
-		isCreater = true
-	}
+	exporter, _ := storage.(rest.Exporter)
 
 	var versionedList interface{}
 	if isLister {
@@ -333,23 +345,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, err
 		}
 		versionedList = indirectArbitraryPointer(versionedListPtr)
-	}
-
-	versionedListOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ListOptions"))
-	if err != nil {
-		return nil, err
-	}
-	versionedCreateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("CreateOptions"))
-	if err != nil {
-		return nil, err
-	}
-	versionedPatchOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("PatchOptions"))
-	if err != nil {
-		return nil, err
-	}
-	versionedUpdateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("UpdateOptions"))
-	if err != nil {
-		return nil, err
 	}
 
 	var versionedDeleteOptions runtime.Object
@@ -367,28 +362,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, err
 	}
 	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
-	var (
-		getOptions             runtime.Object
-		versionedGetOptions    runtime.Object
-		getOptionsInternalKind schema.GroupVersionKind
-		getSubpath             bool
-	)
-	if isGetterWithOptions {
-		getOptions, getSubpath, _ = getterWithOptions.NewGetOptions()
-		getOptionsInternalKinds, _, err := a.group.Typer.ObjectKinds(getOptions)
-		if err != nil {
-			return nil, err
-		}
-		getOptionsInternalKind = getOptionsInternalKinds[0]
-		versionedGetOptions, err = a.group.Creater.New(a.group.GroupVersion.WithKind(getOptionsInternalKind.Kind))
-		if err != nil {
-			versionedGetOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(getOptionsInternalKind.Kind))
-			if err != nil {
-				return nil, err
-			}
-		}
-		isGetter = true
-	}
 
 	var versionedWatchEvent interface{}
 	if isWatcher {
@@ -397,31 +370,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, err
 		}
 		versionedWatchEvent = indirectArbitraryPointer(versionedWatchEventPtr)
-	}
-
-	var (
-		connectOptions             runtime.Object
-		versionedConnectOptions    runtime.Object
-		connectOptionsInternalKind schema.GroupVersionKind
-		connectSubpath             bool
-	)
-	if isConnecter {
-		connectOptions, connectSubpath, _ = connecter.NewConnectOptions()
-		if connectOptions != nil {
-			connectOptionsInternalKinds, _, err := a.group.Typer.ObjectKinds(connectOptions)
-			if err != nil {
-				return nil, err
-			}
-
-			connectOptionsInternalKind = connectOptionsInternalKinds[0]
-			versionedConnectOptions, err = a.group.Creater.New(a.group.GroupVersion.WithKind(connectOptionsInternalKind.Kind))
-			if err != nil {
-				versionedConnectOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind))
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
 	}
 
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
@@ -505,40 +453,32 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 	// Add actions at the resource path: /api/apiVersion/resource
 	actions = appendIf(actions, newAction("LIST", resourcePath, resourceParams, false), isLister)
-	actions = appendIf(actions, newAction("POST", resourcePath, resourceParams, false, http.StatusCreated, http.StatusAccepted), isCreater)
+	actions = appendIf(actions, newAction("POST", resourcePath, resourceParams, false), isCreater || isNamedCreater)
 	actions = appendIf(actions, newAction("DELETECOLLECTION", resourcePath, resourceParams, false), isCollectionDeleter)
 
 	// DEPRECATED in 1.11
 	actions = appendIf(actions, newAction("WATCHLIST", "watch/"+resourcePath, resourceParams, false), allowWatchList)
 
 	// Add actions at the item path: /api/apiVersion/resource/{name}
-	actions = appendIf(actions, newAction("GET", itemPath, nameParams, false), isGetter)
-	if getSubpath {
-		actions = appendIf(actions, newAction("GET", itemPath+"/{path:*}", proxyParams, false), isGetter)
+	actions = appendIf(actions, newAction("GET", itemPath, nameParams, false), isGetter || isGetterWithOptions)
+	var getSubpath bool
+	if isGetterWithOptions {
+		_, getSubpath, _ = getterWithOptions.NewGetOptions()
 	}
-	actions = appendIf(actions, newAction("PUT", itemPath, nameParams, false, http.StatusCreated), isUpdater)
+	if getSubpath {
+		actions = appendIf(actions, newAction("GET", itemPath+"/{path:*}", proxyParams, false), isGetter || isGetterWithOptions)
+	}
+	actions = appendIf(actions, newAction("PUT", itemPath, nameParams, false), isUpdater)
 	actions = appendIf(actions, newAction("PATCH", itemPath, nameParams, false), isPatcher)
-	actions = appendIf(actions, newAction("DELETE", itemPath, nameParams, false, http.StatusAccepted), isGracefulDeleter)
+	actions = appendIf(actions, newAction("DELETE", itemPath, nameParams, false), isGracefulDeleter)
 	// DEPRECATED in 1.11
 	actions = appendIf(actions, newAction("WATCH", "watch/"+itemPath, nameParams, false), isWatcher)
 	actions = appendIf(actions, newAction("CONNECT", itemPath, nameParams, false), isConnecter)
+	var connectSubpath bool
+	if isConnecter {
+		_, connectSubpath, _ = connecter.NewConnectOptions()
+	}
 	actions = appendIf(actions, newAction("CONNECT", itemPath+"/{path:*}", proxyParams, false), isConnecter && connectSubpath)
-
-	// TODO: Add status documentation using Returns()
-	// Errors (see api/errors/errors.go as well as go-restful router):
-	// http.StatusNotFound, http.StatusMethodNotAllowed,
-	// http.StatusUnsupportedMediaType, http.StatusNotAcceptable,
-	// http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
-	// http.StatusRequestTimeout, http.StatusConflict, http.StatusPreconditionFailed,
-	// http.StatusUnprocessableEntity, http.StatusInternalServerError,
-	// http.StatusServiceUnavailable
-	// and api error codes
-	// Note that if we specify a versioned Status object here, we may need to
-	// create one for the tests, also
-	// Success:
-	// http.StatusOK, http.StatusCreated, http.StatusAccepted, http.StatusNoContent
-	//
-	// test/integration/auth_test.go is currently the most comprehensive status code test
 
 	for _, s := range a.group.Serializer.SupportedMediaTypes() {
 		if len(s.MediaTypeSubType) == 0 || len(s.MediaTypeType) == 0 {
@@ -615,85 +555,22 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	// complete actions
 	for _, action := range actions {
-		// assign producedMIMETypes
 		producedMIMETypes := storageMeta.ProducesMIMETypes(action.Verb)
 		action = action.assignProducedMIMETypes(producedMIMETypes, mediaTypes, allMediaTypes)
 
-		// assign consumedMIMETypes
 		action = action.assignConsumedMIMETypes()
 
-		// assign writeSample
 		writeSample := storageMeta.ProducesObject(action.Verb)
 		if writeSample == nil {
 			writeSample = defaultVersionedObject
 		}
 		action = action.assignWriteSample(writeSample, versionedList, versionedStatus, versionedWatchEvent)
 
-		// assign readSample
 		action = action.assignReadSample(defaultVersionedObject, versionedDeleterObject)
-	}
 
-	// add object params for each action
-	for _, action := range actions {
-		switch action.Verb {
-		case "GET":
-			if isGetterWithOptions {
-				params, err := addObjectParams(ws, versionedGetOptions)
-				if err != nil {
-					return nil, err
-				}
-				action.Params = append(action.Params, params...)
-			}
-			if isExporter {
-				params, err := addObjectParams(ws, versionedExportOptions)
-				if err != nil {
-					return nil, err
-				}
-				action.Params = append(action.Params, params...)
-			}
-		case "LIST", "DELETECOLLECTION", "WATCH", "WATCHLIST":
-			params, err := addObjectParams(ws, versionedListOptions)
-			if err != nil {
-				return nil, err
-			}
-			action.Params = append(action.Params, params...)
-		case "PUT":
-			params, err := addObjectParams(ws, versionedUpdateOptions)
-			if err != nil {
-				return nil, err
-			}
-			action.Params = append(action.Params, params...)
-		case "PATCH":
-			params, err := addObjectParams(ws, versionedPatchOptions)
-			if err != nil {
-				return nil, err
-			}
-			action.Params = append(action.Params, params...)
-		case "POST":
-			params, err := addObjectParams(ws, versionedCreateOptions)
-			if err != nil {
-				return nil, err
-			}
-			action.Params = append(action.Params, params...)
-		case "DELETE":
-			if isGracefulDeleter {
-				params, err := addObjectParams(ws, versionedDeleteOptions)
-				if err != nil {
-					return nil, err
-				}
-				action.Params = append(action.Params, params...)
-			}
-		case "CONNECT":
-			if versionedConnectOptions != nil {
-				params, err := addObjectParams(ws, versionedConnectOptions)
-				if err != nil {
-					return nil, err
-				}
-				action.Params = append(action.Params, params...)
-			}
-		}
-		if action.Verb != "CONNECT" {
-			action.Params = append(action.Params, ws.QueryParameter("pretty", "If 'true', then the output is pretty printed."))
+		action, err = action.assignParameters(a.group.Creater, a.group.Typer, optionsExternalVersion, a.group.GroupVersion, storage)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -772,6 +649,107 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	return a.constructAPIResource(storage, kubeVerbs, namespaceScoped, path, resourceKind)
+}
+
+func (a *action) assignParameters(creater runtime.ObjectCreater, typer runtime.ObjectTyper, externalVersion, internalVersion schema.GroupVersion, storage rest.Storage) (*action, error) {
+	switch a.Verb {
+	case "GET":
+		getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
+		if isGetterWithOptions {
+			getOptions, _, _ := getterWithOptions.NewGetOptions()
+			getOptionsInternalKinds, _, err := typer.ObjectKinds(getOptions)
+			if err != nil {
+				return nil, err
+			}
+			getOptionsInternalKind := getOptionsInternalKinds[0]
+			versionedGetOptions, err := creater.New(internalVersion.WithKind(getOptionsInternalKind.Kind))
+			if err != nil {
+				versionedGetOptions, err = creater.New(externalVersion.WithKind(getOptionsInternalKind.Kind))
+				if err != nil {
+					return nil, err
+				}
+			}
+			params, err := addObjectParams(versionedGetOptions)
+			if err != nil {
+				return nil, err
+			}
+			a.Params = append(a.Params, params...)
+		}
+		_, isExporter := storage.(rest.Exporter)
+		if isExporter {
+			if err := a.addOptions(creater, externalVersion, "ExportOptions"); err != nil {
+				return nil, err
+			}
+		}
+	case "LIST", "DELETECOLLECTION", "WATCH", "WATCHLIST":
+		if err := a.addOptions(creater, externalVersion, "ListOptions"); err != nil {
+			return nil, err
+		}
+	case "PUT":
+		if err := a.addOptions(creater, externalVersion, "UpdateOptions"); err != nil {
+			return nil, err
+		}
+	case "PATCH":
+		if err := a.addOptions(creater, externalVersion, "PatchOptions"); err != nil {
+			return nil, err
+		}
+	case "POST":
+		if err := a.addOptions(creater, externalVersion, "CreateOptions"); err != nil {
+			return nil, err
+		}
+	case "DELETE":
+		_, isGracefulDeleter := storage.(rest.GracefulDeleter)
+		if isGracefulDeleter {
+			if err := a.addOptions(creater, externalVersion, "DeleteOptions"); err != nil {
+				return nil, err
+			}
+		}
+	case "CONNECT":
+		var versionedConnectOptions runtime.Object
+		connecter, isConnecter := storage.(rest.Connecter)
+		if isConnecter {
+			connectOptions, _, _ := connecter.NewConnectOptions()
+			if connectOptions != nil {
+				connectOptionsInternalKinds, _, err := typer.ObjectKinds(connectOptions)
+				if err != nil {
+					return nil, err
+				}
+				connectOptionsInternalKind := connectOptionsInternalKinds[0]
+				versionedConnectOptions, err = creater.New(internalVersion.WithKind(connectOptionsInternalKind.Kind))
+				if err != nil {
+					versionedConnectOptions, err = creater.New(externalVersion.WithKind(connectOptionsInternalKind.Kind))
+					if err != nil {
+						return nil, err
+					}
+				}
+			}
+		}
+
+		if versionedConnectOptions != nil {
+			params, err := addObjectParams(versionedConnectOptions)
+			if err != nil {
+				return nil, err
+			}
+			a.Params = append(a.Params, params...)
+		}
+	}
+	if a.Verb != "CONNECT" {
+		a.Params = append(a.Params, restful.QueryParameter("pretty", "If 'true', then the output is pretty printed."))
+	}
+	return a, nil
+}
+
+func (a *action) addOptions(creater runtime.ObjectCreater, groupVersion schema.GroupVersion, options string) error {
+	versionedOptions, err := creater.New(groupVersion.WithKind(options))
+	if err != nil {
+		return err
+	}
+	params, err := addObjectParams(versionedOptions)
+	if err != nil {
+		return err
+	}
+	a.Params = append(a.Params, params...)
+	return nil
 }
 
 func (a *APIInstaller) constructAPIResource(storage rest.Storage, kubeVerbs map[string]struct{}, namespaceScoped bool, path, resourceKind string) (*metav1.APIResource, error) {
@@ -1115,7 +1093,7 @@ func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 // Go JSON behavior for omitting a field) become query parameters. The name of the query parameter is
 // the JSON field name. If a description struct tag is set on the field, that description is used on the
 // query parameter. In essence, it converts a standard JSON top level object into a query param schema.
-func addObjectParams(ws *restful.WebService, obj interface{}) ([]*restful.Parameter, error) {
+func addObjectParams(obj interface{}) ([]*restful.Parameter, error) {
 	params := []*restful.Parameter{}
 	sv, err := conversion.EnforcePtr(obj)
 	if err != nil {
@@ -1152,7 +1130,7 @@ func addObjectParams(ws *restful.WebService, obj interface{}) ([]*restful.Parame
 				if docable, ok := obj.(documentable); ok {
 					desc = docable.SwaggerDoc()[jsonName]
 				}
-				params = append(params, ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.String())))
+				params = append(params, restful.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.String())))
 			}
 		}
 	}
