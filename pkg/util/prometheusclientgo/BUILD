@@ -8,7 +8,6 @@ go_library(
     deps = [
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/util/prometheusclientgo/leaderelection:go_default_library",
-        "//pkg/util/reflector/prometheus:go_default_library",
         "//pkg/util/workqueue/prometheus:go_default_library",
     ],
 )
