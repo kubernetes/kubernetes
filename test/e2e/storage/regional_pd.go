@@ -28,8 +28,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -49,6 +47,7 @@ const (
 	statefulSetReadyTimeout = 3 * time.Minute
 	repdMinSize             = "200Gi"
 	taintKeyPrefix          = "zoneTaint_"
+	pvcName                 = "regional-pd-vol"
 )
 
 var _ = utils.SIGDescribe("Regional PD", func() {
@@ -137,8 +136,21 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 
 func testZonalFailover(c clientset.Interface, ns string) {
 	cloudZones := getTwoRandomZones(c)
-	class := newRegionalStorageClass(ns, cloudZones)
-	claimTemplate := newClaimTemplate(ns)
+	testSpec := storageClassTest{
+		name:           "Regional PD Failover on GCE/GKE",
+		cloudProviders: []string{"gce", "gke"},
+		provisioner:    "kubernetes.io/gce-pd",
+		parameters: map[string]string{
+			"type":             "pd-standard",
+			"zones":            strings.Join(cloudZones, ","),
+			"replication-type": "regional-pd",
+		},
+		claimSize:    repdMinSize,
+		expectedSize: repdMinSize,
+	}
+	class := newStorageClass(testSpec, ns, "" /* suffix */)
+	claimTemplate := newClaim(testSpec, ns, "" /* suffix */)
+	claimTemplate.Name = pvcName
 	claimTemplate.Spec.StorageClassName = &class.Name
 	statefulSet, service, regionalPDLabels := newStatefulSet(claimTemplate, ns)
 
@@ -375,47 +387,11 @@ func newPodTemplate(labels map[string]string) *v1.PodTemplateSpec {
 						Name:          "web",
 					}},
 					VolumeMounts: []v1.VolumeMount{{
-						Name:      "regional-pd-vol",
+						Name:      pvcName,
 						MountPath: "/mnt/data/regional-pd",
 					}},
 				},
 			},
-		},
-	}
-}
-
-func newClaimTemplate(ns string) *v1.PersistentVolumeClaim {
-	return &v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "regional-pd-vol",
-			Namespace: ns,
-		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-			},
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
-				},
-			},
-		},
-	}
-}
-
-func newRegionalStorageClass(namespace string, zones []string) *storage.StorageClass {
-	return &storage.StorageClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace + "-sc",
-		},
-		Provisioner: "kubernetes.io/gce-pd",
-		Parameters: map[string]string{
-			"type":             "pd-standard",
-			"zones":            strings.Join(zones, ","),
-			"replication-type": "regional-pd",
 		},
 	}
 }
