@@ -161,8 +161,11 @@ func (r Route) matchesContentType(mimeTypes string) bool {
 
 // Extract the parameters from the request url path
 func (r Route) extractParameters(urlPath string) map[string]string {
+	if len(r.pathParts) == 0 {
+		return nil
+	}
 	urlParts := tokenizePath(urlPath)
-	pathParameters := map[string]string{}
+	var pathParameters map[string]string
 	for i, key := range r.pathParts {
 		var value string
 		if i >= len(urlParts) {
@@ -171,6 +174,9 @@ func (r Route) extractParameters(urlPath string) map[string]string {
 			value = urlParts[i]
 		}
 		if strings.HasPrefix(key, "{") { // path-parameter
+			if pathParameters == nil {
+				pathParameters = make(map[string]string, len(r.pathParts))
+			}
 			if colon := strings.Index(key, ":"); colon != -1 {
 				// extract by regex
 				regPart := key[colon+1 : len(key)-1]
@@ -178,9 +184,9 @@ func (r Route) extractParameters(urlPath string) map[string]string {
 				if regPart == "*" {
 					pathParameters[keyPart] = untokenizePath(i, urlParts)
 					break
-				} else {
-					pathParameters[keyPart] = value
 				}
+				pathParameters[keyPart] = value
+
 			} else {
 				// without enclosing {}
 				pathParameters[key[1:len(key)-1]] = value
@@ -206,7 +212,7 @@ func untokenizePath(offset int, parts []string) string {
 // Tokenize an URL path using the slash separator ; the result does not have empty tokens
 func tokenizePath(path string) []string {
 	if "/" == path {
-		return []string{}
+		return nil
 	}
 	return strings.Split(strings.Trim(path, "/"), "/")
 }
