@@ -31,22 +31,22 @@ func (s sortableCurlyRoutes) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 func (s sortableCurlyRoutes) Less(i, j int) bool {
-	ci := s[i]
-	cj := s[j]
+	a := s[i]
+	b := s[j]
 
 	// primary key
-	if ci.staticCount < cj.staticCount {
+	if a.staticCount < b.staticCount {
 		return true
 	}
-	if ci.staticCount > cj.staticCount {
+	if a.staticCount > b.staticCount {
 		return false
 	}
 	// secundary key
-	if ci.paramCount < cj.paramCount {
+	if a.paramCount < b.paramCount {
 		return true
 	}
-	if ci.paramCount > cj.paramCount {
+	if a.paramCount > b.paramCount {
 		return false
 	}
-	return ci.route.Path < cj.route.Path
+	return a.route.Path < b.route.Path
 }
