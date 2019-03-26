@@ -1514,7 +1514,7 @@ func TestHighestSupportedVersion(t *testing.T) {
 	}
 }
 
-func TestToPluginHandler(t *testing.T) {
+func TestPluginConversionToPluginHandler(t *testing.T) {
 	testCases := map[string]struct {
 		genericPlugin  volume.VolumePlugin
 		expectedErrMsg string
