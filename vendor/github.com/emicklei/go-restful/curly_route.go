@@ -18,6 +18,7 @@ func (s *sortableCurlyRoutes) add(route curlyRoute) {
 }
 
 func (s sortableCurlyRoutes) routes() (routes []Route) {
+	routes = make([]Route, 0, len(s))
 	for _, each := range s {
 		routes = append(routes, each.route) // TODO change return type
 	}
