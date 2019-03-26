@@ -21,6 +21,7 @@ reviewers:
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
+  - SataQiu
   - shyamjvs
   - smarterclayton
   - soltysh
