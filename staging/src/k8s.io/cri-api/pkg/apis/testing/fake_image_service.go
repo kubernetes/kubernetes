@@ -22,8 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 type FakeImageService struct {
@@ -77,6 +76,17 @@ func (r *FakeImageService) makeFakeImage(image string) *runtimeapi.Image {
 	}
 }
 
+// stringInSlice returns true if s is in list
+func stringInSlice(s string, list []string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (r *FakeImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	r.Lock()
 	defer r.Unlock()
@@ -86,7 +96,7 @@ func (r *FakeImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtim
 	images := make([]*runtimeapi.Image, 0)
 	for _, img := range r.Images {
 		if filter != nil && filter.Image != nil {
-			if !sliceutils.StringInSlice(filter.Image.Image, img.RepoTags) {
+			if !stringInSlice(filter.Image.Image, img.RepoTags) {
 				continue
 			}
 		}

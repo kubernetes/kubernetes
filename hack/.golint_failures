@@ -175,7 +175,6 @@ pkg/kubelet
 pkg/kubelet/apis
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
-pkg/kubelet/apis/cri/testing
 pkg/kubelet/apis/deviceplugin/v1beta1
 pkg/kubelet/cadvisor
 pkg/kubelet/cadvisor/testing
@@ -614,6 +613,7 @@ staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 staging/src/k8s.io/code-generator/cmd/lister-gen/generators
 staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
+staging/src/k8s.io/cri-api/pkg/apis/testing
 staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
 staging/src/k8s.io/kube-proxy/config/v1alpha1
 staging/src/k8s.io/kubelet/config/v1beta1

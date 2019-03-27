@@ -49,8 +49,8 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/tools/remotecommand"
 	utiltesting "k8s.io/client-go/util/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 
 	// Do some initialization to decode the query parameters correctly.
