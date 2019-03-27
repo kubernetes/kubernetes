@@ -1668,6 +1668,7 @@ var map_Probe = map[string]string{
 	"periodSeconds":       "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
 	"successThreshold":    "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness. Minimum value is 1.",
 	"failureThreshold":    "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
+	"tty":                 "Set tty for container running probe exec command.",
 }
 
 func (Probe) SwaggerDoc() map[string]string {

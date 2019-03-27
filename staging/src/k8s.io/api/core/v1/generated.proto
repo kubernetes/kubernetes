@@ -3416,6 +3416,10 @@ message Probe {
   // Defaults to 3. Minimum value is 1.
   // +optional
   optional int32 failureThreshold = 6;
+
+  // Set tty for container running probe exec command.
+  // +optional
+  optional bool tty = 7;
 }
 
 // Represents a projected volume source
