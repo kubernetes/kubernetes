@@ -52,6 +52,7 @@ import (
 	"k8s.io/utils/integer"
 
 	"k8s.io/klog"
+	"strconv"
 )
 
 const (
@@ -82,6 +83,7 @@ const (
 	//      1+floor(log_2(ceil(N/SlowStartInitialBatchSize)))
 	SlowStartInitialBatchSize = 1
 )
+const DeletePriorityPodAnnotationKey = "controller.alpha.kubernetes.io/delete-priority"
 
 var UpdateTaintBackoff = wait.Backoff{
 	Steps:    5,
@@ -738,6 +740,15 @@ func (s ActivePods) Len() int      { return len(s) }
 func (s ActivePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s ActivePods) Less(i, j int) bool {
+	//0. controller.alpha.kubernetes.io/delete-priority=1 < controller.alpha.kubernetes.io/delete-priority=0
+	//If pod has annotation controller.alpha.kubernetes.io/delete-priority the larger is small
+	if s[i].Annotations[DeletePriorityPodAnnotationKey] != s[j].Annotations[DeletePriorityPodAnnotationKey] {
+		s1, err1 := strconv.Atoi(s[i].Annotations[DeletePriorityPodAnnotationKey])
+		s2, err2 := strconv.Atoi(s[j].Annotations[DeletePriorityPodAnnotationKey])
+		if err1 == nil && err2 == nil {
+			return s1 > s2
+		}
+	}
 	// 1. Unassigned < assigned
 	// If only one of the pods is unassigned, the unassigned one is smaller
 	if s[i].Spec.NodeName != s[j].Spec.NodeName && (len(s[i].Spec.NodeName) == 0 || len(s[j].Spec.NodeName) == 0) {
