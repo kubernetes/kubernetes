@@ -377,7 +377,7 @@ func (a *HorizontalController) computeStatusForResourceMetric(currentReplicas in
 			return 0, time.Time{}, "", fmt.Errorf("failed to get %s utilization: %v", metricSpec.Resource.Name, err)
 		}
 		metricNameProposal := fmt.Sprintf("%s resource", metricSpec.Resource.Name)
-		status = &autoscalingv2.MetricStatus{
+		*status = autoscalingv2.MetricStatus{
 			Type: autoscalingv2.ResourceMetricSourceType,
 			Resource: &autoscalingv2.ResourceMetricStatus{
 				Name: metricSpec.Resource.Name,
