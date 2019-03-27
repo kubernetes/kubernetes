@@ -46,6 +46,7 @@ go_library(
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/runtimeclass:go_default_library",
+        "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",

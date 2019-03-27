@@ -672,7 +672,7 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 	return false
 }
 
-//SidecarsStatus contains three bools, wheter the pod has sidecars, if the all the sidecars are ready and if the non sidecars are in a waiting state.
+//SidecarsStatus contains three bools, whether the pod has sidecars, if the all the sidecars are ready and if the non sidecars are in a waiting state.
 type SidecarsStatus struct {
 	SidecarsPresent   bool
 	SidecarsReady     bool

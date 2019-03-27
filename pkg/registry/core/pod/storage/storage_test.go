@@ -71,9 +71,10 @@ func validNewPod() *api.Pod {
 			TerminationGracePeriodSeconds: &grace,
 			Containers: []api.Container{
 				{
-					Name:            "foo",
-					Image:           "test",
-					ImagePullPolicy: api.PullAlways,
+					Name:               "foo",
+					Image:              "test",
+					ImagePullPolicy:    api.PullAlways,
+					ContainerLifecycle: api.ContainerLifecycleStandard,
 
 					TerminationMessagePath:   api.TerminationMessagePathDefault,
 					TerminationMessagePolicy: api.TerminationMessageReadFile,
@@ -796,6 +797,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 				Name:                     "foobar",
 				Image:                    "foo:v2",
 				ImagePullPolicy:          api.PullIfNotPresent,
+				ContainerLifecycle:       api.ContainerLifecycleStandard,
 				TerminationMessagePath:   api.TerminationMessagePathDefault,
 				TerminationMessagePolicy: api.TerminationMessageReadFile,
 				SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
@@ -892,6 +894,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	expected.Spec.Containers[0].ImagePullPolicy = api.PullIfNotPresent
 	expected.Spec.Containers[0].TerminationMessagePath = api.TerminationMessagePathDefault
 	expected.Spec.Containers[0].TerminationMessagePolicy = api.TerminationMessageReadFile
+	expected.Spec.Containers[0].ContainerLifecycle = api.ContainerLifecycleStandard
 	expected.Labels = podIn.Labels
 	expected.Status = podIn.Status
 

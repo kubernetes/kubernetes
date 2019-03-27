@@ -55,6 +55,7 @@ func TestDecodeSinglePod(t *testing.T) {
 				Name:                     "image",
 				Image:                    "test/image",
 				ImagePullPolicy:          "IfNotPresent",
+				ContainerLifecycle:       "Standard",
 				TerminationMessagePath:   "/dev/termination-log",
 				TerminationMessagePolicy: v1.TerminationMessageReadFile,
 				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
@@ -119,6 +120,7 @@ func TestDecodePodList(t *testing.T) {
 				Name:                     "image",
 				Image:                    "test/image",
 				ImagePullPolicy:          "IfNotPresent",
+				ContainerLifecycle:       "Standard",
 				TerminationMessagePath:   "/dev/termination-log",
 				TerminationMessagePolicy: v1.TerminationMessageReadFile,
 
