@@ -1098,7 +1098,7 @@ func (proxier *Proxier) syncProxyRules() {
 					}
 				}
 			}
-			
+
 			if newHnsEndpoint == nil {
 				if ep.isLocal {
 					klog.Errorf("Local endpoint not found for %v: err: %v on network %s", ep.ip, err, hnsNetworkName)
