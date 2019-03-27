@@ -90,7 +90,8 @@ type Config struct {
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
 	PodConditionUpdater PodConditionUpdater
-	// PodPreemptor is used to evict pods and update pod annotations.
+	// PodPreemptor is used to evict pods and update 'NominatedNode' field of
+	// the preemptor pod.
 	PodPreemptor PodPreemptor
 	// PlugingSet has a set of plugins and data used to run them.
 	PluginSet pluginsv1alpha1.PluginSet
@@ -125,8 +126,8 @@ type Config struct {
 	SchedulingQueue internalqueue.SchedulingQueue
 }
 
-// PodPreemptor has methods needed to delete a pod and to update
-// annotations of the preemptor pod.
+// PodPreemptor has methods needed to delete a pod and to update 'NominatedPod'
+// field of the preemptor pod.
 type PodPreemptor interface {
 	GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error)
 	DeletePod(pod *v1.Pod) error
