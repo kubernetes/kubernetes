@@ -83,7 +83,7 @@ checkEtcdOnPath() {
   kube::log::status "Checking etcd is on PATH"
   which etcd && return
   kube::log::status "Cannot find etcd, cannot run integration tests."
-  kube::log::status "Please see https://git.k8s.io/community/contributors/devel/sig-testing/testing.md#install-etcd-dependency for instructions."
+  kube::log::status "Please see https://git.k8s.io/community/contributors/devel/sig-testing/integration-tests.md#install-etcd-dependency for instructions."
   kube::log::usage "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
   return 1
 }
