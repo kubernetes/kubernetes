@@ -29,8 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+// APIVersionRegexp is used to match external APIVersions (ex: v1, v1alpha2, v1beta2)
 var APIVersionRegexp = regexp.MustCompile(`^v\d+((alpha|beta){1}\d+)?$`)
 
+// ComponentConfigPackage details the dependencies and feature flags for testing a ComponentConfig API
 type ComponentConfigPackage struct {
 	ComponentName               string
 	GroupName                   string
@@ -43,52 +45,82 @@ type ComponentConfigPackage struct {
 
 type testingFunc func(*runtime.Scheme, *ComponentConfigPackage) error
 
+// These constants may be used to specify test functions to skip for ComponentConfigPackage.SkipTests
 const (
+	// default for both internal and external
 	VerifyTagNaming                 = "VerifyTagNaming"
 	VerifyGroupNameSuffix           = "VerifyGroupNameSuffix"
 	VerifyGroupNameMatch            = "VerifyGroupNameMatch"
 	VerifyCorrectGroupName          = "VerifyCorrectGroupName"
 	VerifyComponentConfigKindExists = "VerifyComponentConfigKindExists"
-	VerifyExternalAPIVersion        = "VerifyExternalAPIVersion"
-	VerifyInternalAPIVersion        = "VerifyInternalAPIVersion"
+	VerifySchemeBuilderInit         = "VerifySchemeBuilderInit"
+	VerifyTypeRegistration          = "VerifyTypeRegistration"
+	// non-default
+	VerifyExternalAPIVersion = "VerifyExternalAPIVersion"
+	VerifyInternalAPIVersion = "VerifyInternalAPIVersion"
 )
 
+// This is the default collection of test functions to run, regardless of whether we are testing the internal or external API
 var testingFuncs = map[string]testingFunc{
 	VerifyTagNaming:                 verifyTagNaming,
 	VerifyGroupNameSuffix:           verifyGroupNameSuffix,
 	VerifyGroupNameMatch:            verifyGroupNameMatch,
 	VerifyCorrectGroupName:          verifyCorrectGroupName,
 	VerifyComponentConfigKindExists: verifyComponentConfigKindExists,
+	VerifySchemeBuilderInit:         verifySchemeBuilderInit,
+	VerifyTypeRegistration:          verifyTypeRegistration,
 }
 
+// VerifyExternalTypePackage validates the ComponentConfigPackage and runs all of the default testingFuncs.
+// Additionally, it also runs VerifyExternalAPIVersion.
 func VerifyExternalTypePackage(pkginfo *ComponentConfigPackage) error {
-	// Test tag naming (json name should match Go name)
-	// Test that GroupName has the k8s.io suffix
-	// Test that GroupName == SchemeGroupVersion.GroupName
-	// Test that the API version follows the right pattern and isn't internal
-	// Test that the SchemeBuilder contains exactly one init func, addKnownTypes
+	// Test external tag naming (json name should match Go name)
+	// Test GroupName has the k8s.io suffix
+	// Test GroupName == SchemeGroupVersion.GroupName
+	// Test GroupName is named correctly (based on ComponentName)
+	// Test there is a {Component}Configuration kind in the scheme
+	// Test that the SchemeBuilder contains exactly one init func: addKnownTypes
 	// Test that addKnownTypes and AddToScheme registers at least one type and doesn't error
-	// Test that the GroupName is named correctly (based on ComponentName), and there is a {Component}Configuration kind in the scheme
 
 	scheme, err := setup(pkginfo)
 	if err != nil {
 		return fmt.Errorf("test setup error: %v", err)
 	}
+
+	// Test that the API version follows the right pattern and isn't internal
 	extraFns := map[string]testingFunc{
 		VerifyExternalAPIVersion: verifyExternalAPIVersion,
 	}
+
 	return runFuncs(scheme, pkginfo, extraFns)
 }
 
-func VerifyInternalTypePackage() {
-	// Test tag naming (no tags allowed)
-	// Test that GroupName has the k8s.io suffix
-	// Test that GroupName == SchemeGroupVersion.GroupName
-	// API version should be internal
-	// Test that the SchemeBuilder contains exactly one init func, addKnownTypes
+// VerifyInternalTypePackage validates the ComponentConfigPackage and runs all of the default testingFuncs.
+// Additionally, it also runs VerifyInternalAPIVersion.
+func VerifyInternalTypePackage(pkginfo *ComponentConfigPackage) error {
+	// Test internal tag naming (no tags allowed)
+	// Test GroupName has the k8s.io suffix
+	// Test GroupName == SchemeGroupVersion.GroupName
+	// Test GroupName is named correctly (based on ComponentName)
+	// Test there is a {Component}Configuration kind in the scheme
+	// Test that the SchemeBuilder contains exactly one init func: addKnownTypes
 	// Test that addKnownTypes and AddToScheme registers at least one type and doesn't error
+
+	scheme, err := setup(pkginfo)
+	if err != nil {
+		return fmt.Errorf("test setup error: %v", err)
+	}
+
+	// Test that API version should be internal
+	extraFns := map[string]testingFunc{
+		VerifyInternalAPIVersion: verifyInternalAPIVersion,
+	}
+
+	return runFuncs(scheme, pkginfo, extraFns)
 }
 
+// setup validates that all necessary inputs are present in pkginfo and that the pkginfo can be added to a scheme.
+// On success, a new scheme mutated by pkginfo.AddToScheme is returned for use with the testing functions.
 func setup(pkginfo *ComponentConfigPackage) (*runtime.Scheme, error) {
 	if len(pkginfo.ComponentName) == 0 ||
 		len(pkginfo.GroupName) == 0 ||
@@ -104,6 +136,9 @@ func setup(pkginfo *ComponentConfigPackage) (*runtime.Scheme, error) {
 	return scheme, nil
 }
 
+// runFuncs runs all of the default testFuncs and non-default extraFuncs.
+// Test functions whose keys are contained in pkginfo.SkipTests are skipped.
+// All functions are guaranteed to run (regardless of previous error conditions), and all errors are aggregated.
 func runFuncs(scheme *runtime.Scheme, pkginfo *ComponentConfigPackage, extraFns map[string]testingFunc) error {
 	verifyFns := []testingFunc{}
 	for name, fn := range testingFuncs {
@@ -156,6 +191,18 @@ func verifyComponentConfigKindExists(scheme *runtime.Scheme, pkginfo *ComponentC
 	if !scheme.Recognizes(expectedGVK) {
 		return fmt.Errorf("Kind %s not registered in the scheme as expected", expectedKind)
 	}
+	return nil
+}
+
+func verifySchemeBuilderInit(_ *runtime.Scheme, pkginfo *ComponentConfigPackage) error {
+	// TODO(stealthybox): implement missing SchemeBuilder verification
+	//   Test that the SchemeBuilder contains exactly one init func: addKnownTypes
+	return nil
+}
+
+func verifyTypeRegistration(_ *runtime.Scheme, pkginfo *ComponentConfigPackage) error {
+	// TODO(stealthybox): implement missing SchemeBuilder verification
+	//   Test that addKnownTypes and AddToScheme registers at least one type and doesn't error
 	return nil
 }
 
