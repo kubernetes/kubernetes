@@ -15,9 +15,13 @@ go_test(
         "map_string_bool_test.go",
         "map_string_string_test.go",
         "namedcertkey_flag_test.go",
+        "quantity_test.go",
     ],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+    ],
 )
 
 go_library(
@@ -33,6 +37,7 @@ go_library(
         "namedcertkey_flag.go",
         "noop.go",
         "omitempty.go",
+        "quantity.go",
         "sectioned.go",
         "string_flag.go",
         "tristate.go",
@@ -40,6 +45,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/cli/flag",
     importpath = "k8s.io/component-base/cli/flag",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
