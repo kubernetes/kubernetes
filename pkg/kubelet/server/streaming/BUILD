@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -14,9 +8,10 @@ go_library(
         "server.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/server/streaming",
+    visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubelet/server/portforward:go_default_library",
-        "//pkg/kubelet/server/remotecommand:go_default_library",
+        "//pkg/kubelet/server/streaming/portforward:go_default_library",
+        "//pkg/kubelet/server/streaming/remotecommand:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/remotecommand:go_default_library",
@@ -38,7 +33,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/kubelet/server/portforward:go_default_library",
+        "//pkg/kubelet/server/streaming/portforward:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
@@ -58,6 +53,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/server/streaming/portforward:all-srcs",
+        "//pkg/kubelet/server/streaming/remotecommand:all-srcs",
+    ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

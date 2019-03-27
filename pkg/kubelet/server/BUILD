@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -14,6 +8,7 @@ go_library(
         "server.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/server",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
@@ -24,10 +19,10 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/prober:go_default_library",
         "//pkg/kubelet/server/metrics:go_default_library",
-        "//pkg/kubelet/server/portforward:go_default_library",
-        "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
+        "//pkg/kubelet/server/streaming/portforward:go_default_library",
+        "//pkg/kubelet/server/streaming/remotecommand:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//pkg/util/configz:go_default_library",
@@ -72,10 +67,10 @@ go_test(
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
-        "//pkg/kubelet/server/portforward:go_default_library",
-        "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
+        "//pkg/kubelet/server/streaming/portforward:go_default_library",
+        "//pkg/kubelet/server/streaming/remotecommand:go_default_library",
         "//pkg/volume:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -108,10 +103,9 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubelet/server/metrics:all-srcs",
-        "//pkg/kubelet/server/portforward:all-srcs",
-        "//pkg/kubelet/server/remotecommand:all-srcs",
         "//pkg/kubelet/server/stats:all-srcs",
         "//pkg/kubelet/server/streaming:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

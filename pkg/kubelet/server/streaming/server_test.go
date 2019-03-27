@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/transport/spdy"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeletportforward "k8s.io/kubernetes/pkg/kubelet/server/portforward"
+	kubeletportforward "k8s.io/kubernetes/pkg/kubelet/server/streaming/portforward"
 )
 
 const (

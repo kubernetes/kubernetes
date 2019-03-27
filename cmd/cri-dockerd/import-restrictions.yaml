@@ -30,8 +30,8 @@
     - k8s.io/client-go/transport/spdy
     - k8s.io/kubernetes/pkg/apis/core
     - k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2
-    - k8s.io/kubernetes/pkg/kubelet/server/portforward
-    - k8s.io/kubernetes/pkg/kubelet/server/remotecommand
+    - k8s.io/kubernetes/pkg/kubelet/server/streaming/portforward
+    - k8s.io/kubernetes/pkg/kubelet/server/streaming/remotecommand
 
 # The aim of restricting imports here is to remove things that dockershim depends
 # on in "pkg/kubelet" and avoid adding more debt.
