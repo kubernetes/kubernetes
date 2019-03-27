@@ -216,6 +216,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	var unknown runtime.Unknown
 	internalEvent := &metav1.InternalEvent{}
+	outEvent := &metav1.WatchEvent{}
 	buf := &bytes.Buffer{}
 	ch := s.Watching.ResultChan()
 	for {
@@ -242,10 +243,11 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			unknown.Raw = buf.Bytes()
 			event.Object = &unknown
 
+			*outEvent = metav1.WatchEvent{}
+
 			// create the external type directly and encode it.  Clients will only recognize the serialization we provide.
 			// The internal event is being reused, not reallocated so its just a few extra assignments to do it this way
 			// and we get the benefit of using conversion functions which already have to stay in sync
-			outEvent := &metav1.WatchEvent{}
 			*internalEvent = metav1.InternalEvent(event)
 			err := metav1.Convert_v1_InternalEvent_To_v1_WatchEvent(internalEvent, outEvent, nil)
 			if err != nil {
