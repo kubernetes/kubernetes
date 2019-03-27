@@ -672,31 +672,39 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 	return false
 }
 
-//SidecarsStatus returns three bools, whether the pod has sidecars, whether the sidecars are ready and wheter the non-sidecar containers are in waiting state
-// this should probably return a struct instead, postional values aren't pretty
-func SidecarsStatus(pod *v1.Pod) (bool, bool, bool) {
-	sidecars := 0
-	var hasSidecars, sidecarsReady, containersNotRunning bool
-	sidecarsReady = true
+//SidecarsStatus contains three bools, wheter the pod has sidecars, if the all the sidecars are ready and if the non sidecars are in a waiting state.
+type SidecarsStatus struct {
+	SidecarsPresent   bool
+	SidecarsReady     bool
+	ContainersWaiting bool
+}
+
+//GetSidecarsStatus returns the SidecarsStatus for the given pod
+func GetSidecarsStatus(pod *v1.Pod) SidecarsStatus {
+
+	if pod == nil {
+		return SidecarsStatus{}
+	}
+	if pod.Spec.Containers == nil || pod.Status.ContainerStatuses == nil {
+		return SidecarsStatus{}
+	}
+
+	sidecarsStatus := SidecarsStatus{SidecarsPresent: false, SidecarsReady: true, ContainersWaiting: false}
 	for _, container := range pod.Spec.Containers {
 		for _, status := range pod.Status.ContainerStatuses {
 			if status.Name == container.Name {
 				if container.ContainerLifecycle == v1.ContainerLifecycleSidecar {
-					sidecars++
+					sidecarsStatus.SidecarsPresent = true
 					if !status.Ready {
-						sidecarsReady = false
+						sidecarsStatus.SidecarsReady = false
 					}
 					//check if non-sidecars have started
 				} else if status.State.Waiting != nil {
-					containersNotRunning = true
+					sidecarsStatus.ContainersWaiting = true
 				}
 			}
 		}
 	}
 
-	if sidecars != 0 {
-		hasSidecars = true
-	}
-
-	return hasSidecars, sidecarsReady, containersNotRunning
+	return sidecarsStatus
 }

@@ -548,7 +548,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	}
 
 	//check sidecars status
-	hasSidecars, sidecarsReady, containersNotRunning := status.SidecarsStatus(pod)
+	sidecarStatus := status.GetSidecarsStatus(pod)
 
 	// Number of running containers to keep.
 	keepCount := 0
@@ -556,7 +556,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	for idx, container := range pod.Spec.Containers {
 
 		//if sidecars are still becoming ready skip any non sidecars
-		if containersNotRunning && hasSidecars && !sidecarsReady && container.ContainerLifecycle != v1.ContainerLifecycleSidecar {
+		if sidecarStatus.ContainersWaiting && sidecarStatus.SidecarsPresent && !sidecarStatus.SidecarsReady && container.ContainerLifecycle != v1.ContainerLifecycleSidecar {
 			continue
 		}
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
