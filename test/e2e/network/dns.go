@@ -170,7 +170,12 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	It("should resolve DNS of partial qualified names for services ", func() {
+	/*
+		Release: v1.15
+		Testname: DNS, PQDN for services
+		Description: Create a headless service and normal service. Both the services MUST be able to resolve partial qualified DNS entries of their service endpoints by serving A records and SRV records e.g. serviceName, serviceName.namespace, _http._tcp.serviceName.namespace.svc. at that endpoints pointing to reguler service IP.
+	*/
+	framework.ConformanceIt("should resolve DNS of partial qualified names for services ", func() {
 		// Create a test headless service.
 		By("Creating a test headless service")
 		testServiceSelector := map[string]string{
