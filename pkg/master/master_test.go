@@ -311,7 +311,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(master.GenericAPIServer.Handler.RESTMux)
 
 	// /api exists in release-1.1
 	resp, err := http.Get(server.URL + "/api")
@@ -387,7 +387,7 @@ func TestStorageVersionHashes(t *testing.T) {
 	master, etcdserver, _, _ := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(master.GenericAPIServer.Handler.RESTMux)
 
 	c := &restclient.Config{
 		Host:          server.URL,
@@ -432,7 +432,7 @@ func TestStorageVersionHashEqualities(t *testing.T) {
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(master.GenericAPIServer.Handler.RESTMux)
 
 	// Test 1: extensions/v1beta1/replicasets and apps/v1/replicasets have
 	// the same storage version hash.

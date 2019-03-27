@@ -37,7 +37,9 @@ import (
 	"testing"
 	"time"
 
+	mux "github.com/dimfeld/httptreemux"
 	restful "github.com/emicklei/go-restful"
+
 	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -216,7 +218,7 @@ func handleLinker(storage map[string]rest.Storage, selfLinker runtime.SelfLinker
 func handleInternal(storage map[string]rest.Storage, admissionControl admission.Interface, selfLinker runtime.SelfLinker, auditSink audit.Sink) http.Handler {
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
-	mux := container.ServeMux
+	router := mux.New()
 
 	template := APIGroupVersion{
 		Storage: storage,
@@ -241,7 +243,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = grouplessGroupVersion
 		group.OptionsExternalVersion = &grouplessGroupVersion
 		group.Serializer = codecs
-		if err := (&group).InstallREST(container); err != nil {
+		if err := (&group).InstallREST(container, router); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -253,7 +255,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = testGroupVersion
 		group.OptionsExternalVersion = &testGroupVersion
 		group.Serializer = codecs
-		if err := (&group).InstallREST(container); err != nil {
+		if err := (&group).InstallREST(container, router); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
@@ -265,11 +267,13 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group.GroupVersion = newGroupVersion
 		group.OptionsExternalVersion = &newGroupVersion
 		group.Serializer = codecs
-		if err := (&group).InstallREST(container); err != nil {
+		if err := (&group).InstallREST(container, router); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
-	handler := genericapifilters.WithAudit(mux, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil), func(r *http.Request, requestInfo *request.RequestInfo) bool {
+	//fmt.Printf("DEBUG: %s\n", router.Dump())
+
+	handler := genericapifilters.WithAudit(router, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil), func(r *http.Request, requestInfo *request.RequestInfo) bool {
 		// simplified long-running check
 		return requestInfo.Verb == "watch" || requestInfo.Verb == "proxy"
 	})
@@ -2474,77 +2478,72 @@ func TestGetWithOptions(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		simpleStorage := GetWithOptionsRESTStorage{
-			SimpleRESTStorage: &SimpleRESTStorage{
-				item: genericapitesting.Simple{
-					Other: "foo",
+		t.Run(test.name, func(t *testing.T) {
+			simpleStorage := GetWithOptionsRESTStorage{
+				SimpleRESTStorage: &SimpleRESTStorage{
+					item: genericapitesting.Simple{
+						Other: "foo",
+					},
 				},
-			},
-			takesPath: "atAPath",
-		}
-		simpleRootStorage := GetWithOptionsRootRESTStorage{
-			SimpleTypedStorage: &SimpleTypedStorage{
-				baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
-				item: &genericapitesting.SimpleRoot{
-					Other: "foo",
+				takesPath: "atAPath",
+			}
+			simpleRootStorage := GetWithOptionsRootRESTStorage{
+				SimpleTypedStorage: &SimpleTypedStorage{
+					baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
+					item: &genericapitesting.SimpleRoot{
+						Other: "foo",
+					},
 				},
-			},
-			takesPath: "atAPath",
-		}
+				takesPath: "atAPath",
+			}
 
-		storage := map[string]rest.Storage{}
-		if test.rootScoped {
-			storage["simple"] = &simpleRootStorage
-			storage["simple/subresource"] = &simpleRootStorage
-		} else {
-			storage["simple"] = &simpleStorage
-			storage["simple/subresource"] = &simpleStorage
-		}
-		handler := handle(storage)
-		server := httptest.NewServer(handler)
-		defer server.Close()
+			storage := map[string]rest.Storage{}
+			if test.rootScoped {
+				storage["simple"] = &simpleRootStorage
+				storage["simple/subresource"] = &simpleRootStorage
+			} else {
+				storage["simple"] = &simpleStorage
+				storage["simple/subresource"] = &simpleStorage
+			}
+			handler := handle(storage)
+			server := httptest.NewServer(handler)
+			defer server.Close()
 
-		resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + test.requestURL)
-		if err != nil {
-			t.Errorf("%s: %v", test.name, err)
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("%s: unexpected response: %#v", test.name, resp)
-			continue
-		}
-		var itemOut genericapitesting.Simple
-		body, err := extractBody(resp, &itemOut)
-		if err != nil {
-			t.Errorf("%s: %v", test.name, err)
-			continue
-		}
+			resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + test.requestURL)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("unexpected response: %s %d", resp.Request.URL, resp.StatusCode)
+			}
+			var itemOut genericapitesting.Simple
+			body, err := extractBody(resp, &itemOut)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
 
-		if itemOut.Name != simpleStorage.item.Name {
-			t.Errorf("%s: Unexpected data: %#v, expected %#v (%s)", test.name, itemOut, simpleStorage.item, string(body))
-			continue
-		}
+			if itemOut.Name != simpleStorage.item.Name {
+				t.Fatalf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+			}
 
-		var opts *genericapitesting.SimpleGetOptions
-		var ok bool
-		if test.rootScoped {
-			opts, ok = simpleRootStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
-		} else {
-			opts, ok = simpleStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
+			var opts *genericapitesting.SimpleGetOptions
+			var ok bool
+			if test.rootScoped {
+				opts, ok = simpleRootStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
+			} else {
+				opts, ok = simpleStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
 
-		}
-		if !ok {
-			t.Errorf("%s: Unexpected options object received: %#v", test.name, simpleStorage.optionsReceived)
-			continue
-		}
-		if opts.Param1 != "test1" || opts.Param2 != "test2" {
-			t.Errorf("%s: Did not receive expected options: %#v", test.name, opts)
-			continue
-		}
-		if opts.Path != test.expectedPath {
-			t.Errorf("%s: Unexpected path value. Expected: %s. Actual: %s.", test.name, test.expectedPath, opts.Path)
-			continue
-		}
+			}
+			if !ok {
+				t.Fatalf("Unexpected options object received: %#v", simpleStorage.optionsReceived)
+			}
+			if opts.Param1 != "test1" || opts.Param2 != "test2" {
+				t.Fatalf("Did not receive expected options: %#v", opts)
+			}
+			if opts.Path != test.expectedPath {
+				t.Fatalf("Unexpected path value for %s. Expected: %s. Actual: %s.", resp.Request.URL.Path, test.expectedPath, opts.Path)
+			}
+		})
 	}
 }
 
@@ -3451,7 +3450,9 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container := restful.NewContainer()
-	if err := group.InstallREST(container); err == nil {
+	router := mux.New()
+
+	if err := group.InstallREST(container, router); err == nil {
 		t.Fatal("expected error")
 	}
 
@@ -3481,11 +3482,11 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container = restful.NewContainer()
-	if err := group.InstallREST(container); err != nil {
+	if err := group.InstallREST(container, router); err != nil {
 		t.Fatal(err)
 	}
 
-	handler := genericapifilters.WithRequestInfo(container, newTestRequestInfoResolver())
+	handler := genericapifilters.WithRequestInfo(router, newTestRequestInfoResolver())
 
 	// resource is NOT registered in the root scope
 	w := httptest.NewRecorder()
@@ -4165,7 +4166,7 @@ func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV sch
 func TestXGSubresource(t *testing.T) {
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
-	mux := container.ServeMux
+	router := mux.New()
 
 	itemID := "theID"
 	subresourceStorage := &SimpleXGSubresourceRESTStorage{
@@ -4199,11 +4200,11 @@ func TestXGSubresource(t *testing.T) {
 		Serializer:             codecs,
 	}
 
-	if err := (&group).InstallREST(container); err != nil {
+	if err := (&group).InstallREST(container, router); err != nil {
 		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 	}
 
-	server := newTestServer(defaultAPIServer{mux, container})
+	server := newTestServer(defaultAPIServer{router, container})
 	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/subsimple")

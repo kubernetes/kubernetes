@@ -19,8 +19,7 @@ package discovery
 import (
 	"net/http"
 
-	"github.com/emicklei/go-restful"
-
+	restful "github.com/emicklei/go-restful"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -66,11 +65,15 @@ func (s *legacyRootAPIHandler) WebService() *restful.WebService {
 }
 
 func (s *legacyRootAPIHandler) handle(req *restful.Request, resp *restful.Response) {
-	clientIP := utilnet.GetClientIP(req.Request)
+	panic("not implemented")
+}
+
+func (s *legacyRootAPIHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	clientIP := utilnet.GetClientIP(req)
 	apiVersions := &metav1.APIVersions{
 		ServerAddressByClientCIDRs: s.addresses.ServerAddressByClientCIDRs(clientIP),
 		Versions:                   []string{"v1"},
 	}
 
-	responsewriters.WriteObjectNegotiated(s.serializer, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, apiVersions)
+	responsewriters.WriteObjectNegotiated(s.serializer, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, w, req, http.StatusOK, apiVersions)
 }

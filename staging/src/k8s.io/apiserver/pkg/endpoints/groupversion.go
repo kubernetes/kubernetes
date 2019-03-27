@@ -17,10 +17,12 @@ limitations under the License.
 package endpoints
 
 import (
+	"net/http"
 	"path"
 	"time"
 
-	"github.com/emicklei/go-restful"
+	mux "github.com/dimfeld/httptreemux"
+	restful "github.com/emicklei/go-restful"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -96,7 +98,7 @@ type APIGroupVersion struct {
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash.
-func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+func (g *APIGroupVersion) InstallREST(container *restful.Container, router *mux.TreeMux) error {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
 		group:                        g,
@@ -105,10 +107,15 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 		enableAPIResponseCompression: g.EnableAPIResponseCompression,
 	}
 
-	apiResources, ws, registrationErrors := installer.Install()
+	group := router.NewGroup(prefix)
+	apiResources, ws, registrationErrors := installer.Install(group)
 	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
 	versionDiscoveryHandler.AddToWebService(ws)
+	group.GET("/", func(w http.ResponseWriter, req *http.Request, _ map[string]string) {
+		versionDiscoveryHandler.ServeHTTP(w, req)
+	})
 	container.Add(ws)
+
 	return utilerrors.NewAggregate(registrationErrors)
 }
 

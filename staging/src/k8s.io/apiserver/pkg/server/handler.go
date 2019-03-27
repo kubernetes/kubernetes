@@ -22,9 +22,10 @@ import (
 	"net/http"
 	rt "runtime"
 	"sort"
-	"strings"
 
-	"github.com/emicklei/go-restful"
+	"github.com/dimfeld/httptreemux"
+
+	restful "github.com/emicklei/go-restful"
 	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,11 +39,13 @@ import (
 // This includes the full handler chain, the director (which chooses between gorestful and nonGoRestful,
 // the gorestful handler (used for the API) which falls through to the nonGoRestful handler on unregistered paths,
 // and the nonGoRestful handler (which can contain a fallthrough of its own)
-// FullHandlerChain -> Director -> {GoRestfulContainer,NonGoRestfulMux} based on inspection of registered web services
+// FullHandlerChain -> Director -> {RESTMux,NonGoRestfulMux} based on inspection of registered web services
 type APIServerHandler struct {
 	// FullHandlerChain is the one that is eventually served with.  It should include the full filter
 	// chain and then call the Director.
 	FullHandlerChain http.Handler
+	// The registered APIs, used by InstallAPIs. Other servers probably shouldn't access this directly.
+	RESTMux *httptreemux.TreeMux
 	// The registered APIs.  InstallAPIs uses this.  Other servers probably shouldn't access this directly.
 	GoRestfulContainer *restful.Container
 	// NonGoRestfulMux is the final HTTP handler in the chain.
@@ -79,6 +82,9 @@ func NewAPIServerHandler(name string, s runtime.NegotiatedSerializer, handlerCha
 	gorestfulContainer := restful.NewContainer()
 	gorestfulContainer.ServeMux = http.NewServeMux()
 	gorestfulContainer.Router(restful.CurlyRouter{}) // e.g. for proxy/{kind}/{name}/{*}
+
+	mux := httptreemux.New()
+
 	gorestfulContainer.RecoverHandler(func(panicReason interface{}, httpWriter http.ResponseWriter) {
 		logStackOnRecover(s, panicReason, httpWriter)
 	})
@@ -88,12 +94,14 @@ func NewAPIServerHandler(name string, s runtime.NegotiatedSerializer, handlerCha
 
 	director := director{
 		name:               name,
+		mux:                mux,
 		goRestfulContainer: gorestfulContainer,
 		nonGoRestfulMux:    nonGoRestfulMux,
 	}
 
 	return &APIServerHandler{
 		FullHandlerChain:   handlerChainBuilder(director),
+		RESTMux:            mux,
 		GoRestfulContainer: gorestfulContainer,
 		NonGoRestfulMux:    nonGoRestfulMux,
 		Director:           director,
@@ -115,39 +123,44 @@ func (a *APIServerHandler) ListedPaths() []string {
 
 type director struct {
 	name               string
+	mux                *httptreemux.TreeMux
 	goRestfulContainer *restful.Container
 	nonGoRestfulMux    *mux.PathRecorderMux
 }
 
 func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
-
-	// check to see if our webservices want to claim this path
-	for _, ws := range d.goRestfulContainer.RegisteredWebServices() {
-		switch {
-		case ws.RootPath() == "/apis":
-			// if we are exactly /apis or /apis/, then we need special handling in loop.
-			// normally these are passed to the nonGoRestfulMux, but if discovery is enabled, it will go directly.
-			// We can't rely on a prefix match since /apis matches everything (see the big comment on Director above)
-			if path == "/apis" || path == "/apis/" {
-				klog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
-				// don't use servemux here because gorestful servemuxes get messed up when removing webservices
-				// TODO fix gorestful, remove TPRs, or stop using gorestful
-				d.goRestfulContainer.Dispatch(w, req)
-				return
-			}
-
-		case strings.HasPrefix(path, ws.RootPath()):
-			// ensure an exact match or a path boundary match
-			if len(path) == len(ws.RootPath()) || path[len(ws.RootPath())] == '/' {
-				klog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
-				// don't use servemux here because gorestful servemuxes get messed up when removing webservices
-				// TODO fix gorestful, remove TPRs, or stop using gorestful
-				d.goRestfulContainer.Dispatch(w, req)
-				return
-			}
-		}
+	if _, ok := d.mux.Lookup(w, req); ok {
+		d.mux.ServeHTTP(w, req)
+		return
 	}
+
+	// // check to see if our webservices want to claim this path
+	// for _, ws := range d.goRestfulContainer.RegisteredWebServices() {
+	// 	switch {
+	// 	case ws.RootPath() == "/apis":
+	// 		// if we are exactly /apis or /apis/, then we need special handling in loop.
+	// 		// normally these are passed to the nonGoRestfulMux, but if discovery is enabled, it will go directly.
+	// 		// We can't rely on a prefix match since /apis matches everything (see the big comment on Director above)
+	// 		if path == "/apis" || path == "/apis/" {
+	// 			klog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
+	// 			// don't use servemux here because gorestful servemuxes get messed up when removing webservices
+	// 			// TODO fix gorestful, remove TPRs, or stop using gorestful
+	// 			d.nonGoRestfulMux.ServeHTTP(w, req)
+	// 			return
+	// 		}
+
+	// 	case strings.HasPrefix(path, ws.RootPath()):
+	// 		// ensure an exact match or a path boundary match
+	// 		if len(path) == len(ws.RootPath()) || path[len(ws.RootPath())] == '/' {
+	// 			klog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
+	// 			// don't use servemux here because gorestful servemuxes get messed up when removing webservices
+	// 			// TODO fix gorestful, remove TPRs, or stop using gorestful
+	// 			d.nonGoRestfulMux.ServeHTTP(w, req)
+	// 			return
+	// 		}
+	// 	}
+	// }
 
 	// if we didn't find a match, then we just skip gorestful altogether
 	klog.V(5).Infof("%v: %v %q satisfied by nonGoRestful", d.name, req.Method, path)

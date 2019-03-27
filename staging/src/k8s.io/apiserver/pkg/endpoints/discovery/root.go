@@ -37,6 +37,7 @@ type GroupManager interface {
 	RemoveGroup(groupName string)
 
 	WebService() *restful.WebService
+	ServeHTTP(w http.ResponseWriter, req *http.Request)
 }
 
 // rootAPIsHandler creates a webservice serving api group discovery.
@@ -115,7 +116,7 @@ func (s *rootAPIsHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request)
 }
 
 func (s *rootAPIsHandler) restfulHandle(req *restful.Request, resp *restful.Response) {
-	s.ServeHTTP(resp.ResponseWriter, req.Request)
+	panic("not implemented")
 }
 
 // WebService returns a webservice serving api group discovery.

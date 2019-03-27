@@ -25,8 +25,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/emicklei/go-restful"
-
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -47,7 +45,12 @@ const (
 
 // WithCompression wraps an http.Handler with the Compression Handler
 func WithCompression(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	return http.HandlerFunc(WithCompressionFunc(handler.ServeHTTP))
+}
+
+// WithCompressionFunc wraps an http.HandlerFunc with the Compression handler.
+func WithCompressionFunc(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 		wantsCompression, encoding := wantsCompressedResponse(req)
 		w.Header().Set("Vary", "Accept-Encoding")
 		if wantsCompression {
@@ -63,7 +66,7 @@ func WithCompression(handler http.Handler) http.Handler {
 		} else {
 			handler.ServeHTTP(w, req)
 		}
-	})
+	}
 }
 
 // wantsCompressedResponse reads the Accept-Encoding header to see if and which encoding is requested.
@@ -166,16 +169,4 @@ func (c *compressionResponseWriter) Flush() {
 
 func (c *compressionResponseWriter) compressorClosed() bool {
 	return nil == c.compressor
-}
-
-// RestfulWithCompression wraps WithCompression to be compatible with go-restful
-func RestfulWithCompression(function restful.RouteFunction) restful.RouteFunction {
-	return restful.RouteFunction(func(request *restful.Request, response *restful.Response) {
-		handler := WithCompression(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			response.ResponseWriter = w
-			request.Request = req
-			function(request, response)
-		}))
-		handler.ServeHTTP(response.ResponseWriter, request.Request)
-	})
 }

@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 )
 
 // Logs adds handlers for the /logs path serving log files from /var/log.

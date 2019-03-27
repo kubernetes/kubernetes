@@ -19,7 +19,9 @@ package routes
 import (
 	"net/http"
 
-	"github.com/emicklei/go-restful"
+	"github.com/dimfeld/httptreemux"
+
+	restful "github.com/emicklei/go-restful"
 
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
@@ -31,7 +33,7 @@ type Version struct {
 }
 
 // Install registers the APIServer's `/version` handler.
-func (v Version) Install(c *restful.Container) {
+func (v Version) Install(c *restful.Container, mux *httptreemux.TreeMux) {
 	if v.Version == nil {
 		return
 	}
@@ -41,7 +43,7 @@ func (v Version) Install(c *restful.Container) {
 	versionWS.Path("/version")
 	versionWS.Doc("git code version from which this is built")
 	versionWS.Route(
-		versionWS.GET("/").To(v.handleVersion).
+		versionWS.GET("/").To(v.handleRestfulVersion).
 			Doc("get the code version").
 			Operation("getCodeVersion").
 			Produces(restful.MIME_JSON).
@@ -49,9 +51,16 @@ func (v Version) Install(c *restful.Container) {
 			Writes(version.Info{}))
 
 	c.Add(versionWS)
+
+	mux.GET("/version", func(w http.ResponseWriter, req *http.Request, _ map[string]string) { v.handleVersion(w, req) })
 }
 
 // handleVersion writes the server's version information.
-func (v Version) handleVersion(req *restful.Request, resp *restful.Response) {
-	responsewriters.WriteRawJSON(http.StatusOK, *v.Version, resp.ResponseWriter)
+func (v Version) handleRestfulVersion(req *restful.Request, resp *restful.Response) {
+	panic("not implemented")
+}
+
+// handleVersion writes the server's version information.
+func (v Version) handleVersion(w http.ResponseWriter, req *http.Request) {
+	responsewriters.WriteRawJSON(http.StatusOK, *v.Version, w)
 }

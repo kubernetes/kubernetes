@@ -107,6 +107,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//vendor/github.com/coreos/go-systemd/daemon:go_default_library",
+        "//vendor/github.com/dimfeld/httptreemux:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",

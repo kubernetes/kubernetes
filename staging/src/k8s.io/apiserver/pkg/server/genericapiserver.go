@@ -355,7 +355,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		apiGroupVersion.OpenAPIModels = openAPIModels
 		apiGroupVersion.MaxRequestBodyBytes = s.maxRequestBodyBytes
 
-		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
+		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer, s.Handler.RESTMux); err != nil {
 			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)
 		}
 	}
@@ -379,7 +379,11 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
-	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix).WebService())
+	discovery := discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix)
+	s.Handler.RESTMux.GET(apiPrefix, func(w http.ResponseWriter, req *http.Request, _ map[string]string) {
+		discovery.ServeHTTP(w, req)
+	})
+	s.Handler.GoRestfulContainer.Add(discovery.WebService())
 
 	return nil
 }
@@ -432,7 +436,11 @@ func (s *GenericAPIServer) InstallAPIGroups(apiGroupInfos ...*APIGroupInfo) erro
 		}
 
 		s.DiscoveryGroupManager.AddGroup(apiGroup)
-		s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup).WebService())
+		discoveryGroup := discovery.NewAPIGroupHandler(s.Serializer, apiGroup)
+		s.Handler.RESTMux.GET(discovery.APIGroupPrefix+"/"+apiGroup.Name, func(w http.ResponseWriter, req *http.Request, _ map[string]string) {
+			discoveryGroup.ServeHTTP(w, req)
+		})
+		s.Handler.GoRestfulContainer.Add(discoveryGroup.WebService())
 	}
 	return nil
 }

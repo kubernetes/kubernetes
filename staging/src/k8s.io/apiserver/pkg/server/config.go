@@ -576,10 +576,17 @@ func installAPI(s *GenericAPIServer, c *Config) {
 		}
 	}
 
-	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
+	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer, s.Handler.RESTMux)
 
 	if c.EnableDiscovery {
-		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
+		ws := s.DiscoveryGroupManager.WebService()
+		for _, route := range ws.Routes() {
+			fmt.Printf("DEBUG: %s\n", route.Path)
+			s.Handler.RESTMux.Handle(route.Method, route.Path, func(w http.ResponseWriter, req *http.Request, _ map[string]string) {
+				s.DiscoveryGroupManager.ServeHTTP(w, req)
+			})
+		}
+		s.Handler.GoRestfulContainer.Add(ws)
 	}
 }
 

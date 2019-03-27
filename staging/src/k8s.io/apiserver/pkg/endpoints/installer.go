@@ -21,12 +21,15 @@ import (
 	"net/http"
 	gpath "path"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 	"unicode"
 
+	mux "github.com/dimfeld/httptreemux"
 	restful "github.com/emicklei/go-restful"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,7 +95,7 @@ var toDiscoveryKubeVerb = map[string]string{
 }
 
 // Install handlers for API resources.
-func (a *APIInstaller) Install() ([]metav1.APIResource, *restful.WebService, []error) {
+func (a *APIInstaller) Install(router *mux.Group) ([]metav1.APIResource, *restful.WebService, []error) {
 	var apiResources []metav1.APIResource
 	var errors []error
 	ws := a.newWebService()
@@ -106,7 +109,7 @@ func (a *APIInstaller) Install() ([]metav1.APIResource, *restful.WebService, []e
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
-		apiResource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws)
+		apiResource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws, router)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("error in registering resource: %s, %v", path, err))
 		}
@@ -180,7 +183,7 @@ func GetResourceKind(groupVersion schema.GroupVersion, storage rest.Storage, typ
 	return fqKindToRegister, nil
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, error) {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, router *mux.Group) (*metav1.APIResource, error) {
 	admit := a.group.Admit
 
 	optionsExternalVersion := a.group.GroupVersion
@@ -614,7 +617,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		switch action.Verb {
 		case "GET": // Get a resource.
-			var handler restful.RouteFunction
+			var handler http.HandlerFunc
 			if isGetterWithOptions {
 				handler = restfulGetResourceWithOptions(getterWithOptions, reqScope, isSubresource)
 			} else {
@@ -623,19 +626,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 			if needOverride {
 				// need change the reported verb
-				handler = metrics.InstrumentRouteFunc(verbOverrider.OverrideMetricsVerb(action.Verb), group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+				handler = metrics.InstrumentHandlerFunc(verbOverrider.OverrideMetricsVerb(action.Verb), group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
 			} else {
-				handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+				handler = metrics.InstrumentHandlerFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
 			}
 
 			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler)
+				handler = genericfilters.WithCompressionFunc(handler)
 			}
 			doc := "read the specified " + kind
 			if isSubresource {
 				doc = "read " + subresource + " of the specified " + kind
 			}
-			route := ws.GET(action.Path).To(handler).
+			route := ws.GET(action.Path).To(restfulUnreachable).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -654,16 +657,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
+
+			installAction(router, action, handler, "GET")
+
 		case "LIST": // List all resources of a kind.
 			doc := "list objects of kind " + kind
 			if isSubresource {
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+			handler := metrics.InstrumentHandlerFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
 			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler)
+				handler = genericfilters.WithCompressionFunc(handler)
 			}
-			route := ws.GET(action.Path).To(handler).
+			route := ws.GET(action.Path).To(restfulUnreachable).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -689,13 +695,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
+			installAction(router, action, handler, "GET")
+
 		case "PUT": // Update a resource.
 			doc := "replace the specified " + kind
 			if isSubresource {
 				doc = "replace " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulUpdateResource(updater, reqScope, admit))
-			route := ws.PUT(action.Path).To(handler).
+			handler := metrics.InstrumentHandlerFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulUpdateResource(updater, reqScope, admit))
+			route := ws.PUT(action.Path).To(restfulUnreachable).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -711,6 +719,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
+			installAction(router, action, handler, "PUT")
+
 		case "PATCH": // Partially update a resource
 			doc := "partially update the specified " + kind
 			if isSubresource {
@@ -724,8 +734,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
-			route := ws.PATCH(action.Path).To(handler).
+			handler := metrics.InstrumentHandlerFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
+			route := ws.PATCH(action.Path).To(restfulUnreachable).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Consumes(supportedTypes...).
@@ -739,20 +749,22 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
+			installAction(router, action, handler, "PATCH")
+
 		case "POST": // Create a resource.
-			var handler restful.RouteFunction
+			var handler http.HandlerFunc
 			if isNamedCreater {
 				handler = restfulCreateNamedResource(namedCreater, reqScope, admit)
 			} else {
 				handler = restfulCreateResource(creater, reqScope, admit)
 			}
-			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
+			handler = metrics.InstrumentHandlerFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
 			article := GetArticleForNoun(kind, " ")
 			doc := "create" + article + kind
 			if isSubresource {
 				doc = "create " + subresource + " of" + article + kind
 			}
-			route := ws.POST(action.Path).To(handler).
+			route := ws.POST(action.Path).To(restfulUnreachable).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -769,14 +781,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
+			installAction(router, action, handler, "POST")
+
 		case "DELETE": // Delete a resource.
 			article := GetArticleForNoun(kind, " ")
 			doc := "delete" + article + kind
 			if isSubresource {
 				doc = "delete " + subresource + " of" + article + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
-			route := ws.DELETE(action.Path).To(handler).
+			handler := metrics.InstrumentHandlerFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
+			route := ws.DELETE(action.Path).To(restfulUnreachable).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -793,13 +807,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
+			installAction(router, action, handler, "DELETE")
+
 		case "DELETECOLLECTION":
 			doc := "delete collection of " + kind
 			if isSubresource {
 				doc = "delete collection of " + subresource + " of a " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
-			route := ws.DELETE(action.Path).To(handler).
+			handler := metrics.InstrumentHandlerFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
+			route := ws.DELETE(action.Path).To(restfulUnreachable).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -811,15 +827,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		// deprecated in 1.11
+			installAction(router, action, handler, "DELETE")
+
+			// deprecated in 1.11
 		case "WATCH": // Watch a resource.
 			doc := "watch changes to an object of kind " + kind
 			if isSubresource {
 				doc = "watch changes to " + subresource + " of an object of kind " + kind
 			}
 			doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
-			route := ws.GET(action.Path).To(handler).
+			handler := metrics.InstrumentHandlerFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			route := ws.GET(action.Path).To(restfulUnreachable).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -831,15 +849,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
-		// deprecated in 1.11
+			installAction(router, action, handler, "GET")
+
+			// deprecated in 1.11
 		case "WATCHLIST": // Watch all resources of a kind.
 			doc := "watch individual changes to a list of " + kind
 			if isSubresource {
 				doc = "watch individual changes to a list of " + subresource + " of " + kind
 			}
 			doc += ". deprecated: use the 'watch' parameter with a list operation instead."
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
-			route := ws.GET(action.Path).To(handler).
+			handler := metrics.InstrumentHandlerFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+			route := ws.GET(action.Path).To(restfulUnreachable).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List"+operationSuffix).
@@ -851,6 +871,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
+			installAction(router, action, handler, "GET")
+
 		case "CONNECT":
 			for _, method := range connecter.ConnectMethods() {
 				connectProducedObject := storageMeta.ProducesObject(method)
@@ -861,9 +883,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				if isSubresource {
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
-				handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
-				route := ws.Method(method).Path(action.Path).
-					To(handler).
+				route := ws.Method(method).Path("/" + action.Path).
+					To(restfulUnreachable).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource) + operationSuffix).
 					Produces("*/*").
@@ -884,6 +905,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					}
 				}
 			}
+			handler := metrics.InstrumentHandlerFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
+			installAction(router, action, handler, connecter.ConnectMethods()...)
+
 		default:
 			return nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
@@ -1074,62 +1098,62 @@ func isVowel(c rune) bool {
 	return false
 }
 
-func restfulListResource(r rest.Lister, rw rest.Watcher, scope handlers.RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		handlers.ListResource(r, rw, &scope, forceWatch, minRequestTimeout)(res.ResponseWriter, req.Request)
+var rePathTransform = regexp.MustCompile(`\{([^\}]+)\}`)
+
+func installAction(group *mux.Group, action action, handler http.HandlerFunc, methods ...string) {
+	path := action.Path
+	hasPathSuffix := strings.HasSuffix(path, "/{path:*}")
+	if hasPathSuffix {
+		path = strings.TrimSuffix(path, "/{path:*}")
+		path += "/*path"
+	}
+	path = rePathTransform.ReplaceAllString(path, ":$1")
+
+	for _, method := range methods {
+		group.Handle(method, "/"+path, func(w http.ResponseWriter, req *http.Request, _ map[string]string) { handler(w, req) })
 	}
 }
 
-func restfulCreateNamedResource(r rest.NamedCreater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		handlers.CreateNamedResource(r, &scope, admit)(res.ResponseWriter, req.Request)
-	}
+func restfulUnreachable(req *restful.Request, resp *restful.Response) {
+	panic("unreachable code")
 }
 
-func restfulCreateResource(r rest.Creater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		handlers.CreateResource(r, &scope, admit)(res.ResponseWriter, req.Request)
-	}
+func restfulListResource(r rest.Lister, rw rest.Watcher, scope handlers.RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
+	return handlers.ListResource(r, rw, &scope, forceWatch, minRequestTimeout)
 }
 
-func restfulDeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		handlers.DeleteResource(r, allowsOptions, &scope, admit)(res.ResponseWriter, req.Request)
-	}
+func restfulCreateNamedResource(r rest.NamedCreater, scope handlers.RequestScope, admit admission.Interface) http.HandlerFunc {
+	return handlers.CreateNamedResource(r, &scope, admit)
 }
 
-func restfulDeleteCollection(r rest.CollectionDeleter, checkBody bool, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		handlers.DeleteCollection(r, checkBody, &scope, admit)(res.ResponseWriter, req.Request)
-	}
+func restfulCreateResource(r rest.Creater, scope handlers.RequestScope, admit admission.Interface) http.HandlerFunc {
+	return handlers.CreateResource(r, &scope, admit)
 }
 
-func restfulUpdateResource(r rest.Updater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		handlers.UpdateResource(r, &scope, admit)(res.ResponseWriter, req.Request)
-	}
+func restfulDeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope handlers.RequestScope, admit admission.Interface) http.HandlerFunc {
+	return handlers.DeleteResource(r, allowsOptions, &scope, admit)
 }
 
-func restfulPatchResource(r rest.Patcher, scope handlers.RequestScope, admit admission.Interface, supportedTypes []string) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		handlers.PatchResource(r, &scope, admit, supportedTypes)(res.ResponseWriter, req.Request)
-	}
+func restfulDeleteCollection(r rest.CollectionDeleter, checkBody bool, scope handlers.RequestScope, admit admission.Interface) http.HandlerFunc {
+	return handlers.DeleteCollection(r, checkBody, &scope, admit)
 }
 
-func restfulGetResource(r rest.Getter, e rest.Exporter, scope handlers.RequestScope) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		handlers.GetResource(r, e, &scope)(res.ResponseWriter, req.Request)
-	}
+func restfulUpdateResource(r rest.Updater, scope handlers.RequestScope, admit admission.Interface) http.HandlerFunc {
+	return handlers.UpdateResource(r, &scope, admit)
 }
 
-func restfulGetResourceWithOptions(r rest.GetterWithOptions, scope handlers.RequestScope, isSubresource bool) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		handlers.GetResourceWithOptions(r, &scope, isSubresource)(res.ResponseWriter, req.Request)
-	}
+func restfulPatchResource(r rest.Patcher, scope handlers.RequestScope, admit admission.Interface, supportedTypes []string) http.HandlerFunc {
+	return handlers.PatchResource(r, &scope, admit, supportedTypes)
 }
 
-func restfulConnectResource(connecter rest.Connecter, scope handlers.RequestScope, admit admission.Interface, restPath string, isSubresource bool) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		handlers.ConnectResource(connecter, &scope, admit, restPath, isSubresource)(res.ResponseWriter, req.Request)
-	}
+func restfulGetResource(r rest.Getter, e rest.Exporter, scope handlers.RequestScope) http.HandlerFunc {
+	return handlers.GetResource(r, e, &scope)
+}
+
+func restfulGetResourceWithOptions(r rest.GetterWithOptions, scope handlers.RequestScope, isSubresource bool) http.HandlerFunc {
+	return handlers.GetResourceWithOptions(r, &scope, isSubresource)
+}
+
+func restfulConnectResource(connecter rest.Connecter, scope handlers.RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
+	return handlers.ConnectResource(connecter, &scope, admit, restPath, isSubresource)
 }

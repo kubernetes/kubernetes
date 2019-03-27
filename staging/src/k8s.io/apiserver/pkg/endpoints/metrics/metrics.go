@@ -35,7 +35,6 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
-	restful "github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -248,31 +247,6 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	if verb == "GET" || verb == "LIST" {
 		responseSizes.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))
 	}
-}
-
-// InstrumentRouteFunc works like Prometheus' InstrumentHandlerFunc but wraps
-// the go-restful RouteFunction instead of a HandlerFunc plus some Kubernetes endpoint specific information.
-func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, component string, routeFunc restful.RouteFunction) restful.RouteFunction {
-	return restful.RouteFunction(func(request *restful.Request, response *restful.Response) {
-		now := time.Now()
-
-		delegate := &ResponseWriterDelegator{ResponseWriter: response.ResponseWriter}
-
-		_, cn := response.ResponseWriter.(http.CloseNotifier)
-		_, fl := response.ResponseWriter.(http.Flusher)
-		_, hj := response.ResponseWriter.(http.Hijacker)
-		var rw http.ResponseWriter
-		if cn && fl && hj {
-			rw = &fancyResponseWriterDelegator{delegate}
-		} else {
-			rw = delegate
-		}
-		response.ResponseWriter = rw
-
-		routeFunc(request, response)
-
-		MonitorRequest(request.Request, verb, group, version, resource, subresource, scope, component, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(now))
-	})
 }
 
 // InstrumentHandlerFunc works like Prometheus' InstrumentHandlerFunc but adds some Kubernetes endpoint specific information.
