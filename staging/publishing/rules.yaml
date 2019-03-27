@@ -877,6 +877,22 @@ rules:
         branch: release-1.14
       - repository: component-base
         branch: release-1.14
+- destination: kubectl
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/kubectl
+    name: master
+    dependencies:
+    - repository: apimachinery
+      branch: master
+    - repository: api
+      branch: master
+    - repository: cli-runtime
+      branch: master
+    - repository: client-go
+      branch: master
 - destination: kubelet
   library: true
   branches:

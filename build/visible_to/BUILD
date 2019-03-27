@@ -75,25 +75,6 @@ package_group(
 )
 
 package_group(
-    name = "pkg_kubectl_CONSUMERS",
-    includes = [
-        ":COMMON_generators",
-    ],
-    packages = [
-        "//cmd/kubectl",
-        "//cmd/kubectl/app",
-        "//pkg/kubectl/cmd",
-        "//pkg/kubectl/cmd/auth",
-        "//pkg/kubectl/cmd/config",
-        "//pkg/kubectl/cmd/rollout",
-        "//pkg/kubectl/cmd/set",
-        "//pkg/kubectl/cmd/testing",
-        "//pkg/kubectl/cmd/util",
-        "//pkg/kubectl/cmd/util/editor",
-    ],
-)
-
-package_group(
     name = "pkg_kubectl_cmd_CONSUMERS_BAD",
     packages = [
         "//cmd/clicheck",
@@ -161,185 +142,9 @@ package_group(
 )
 
 package_group(
-    name = "pkg_kubectl_util_templates_CONSUMERS",
-    includes = [
-        ":COMMON_generators",
-        ":COMMON_testing",
-    ],
-    packages = [
-        "//cmd/kubectl",
-        "//cmd/kubectl/app",
-        "//pkg/kubectl/cmd",
-        "//pkg/kubectl/cmd/annotate",
-        "//pkg/kubectl/cmd/apiresources",
-        "//pkg/kubectl/cmd/apply",
-        "//pkg/kubectl/cmd/attach",
-        "//pkg/kubectl/cmd/auth",
-        "//pkg/kubectl/cmd/autoscale",
-        "//pkg/kubectl/cmd/certificates",
-        "//pkg/kubectl/cmd/clusterinfo",
-        "//pkg/kubectl/cmd/completion",
-        "//pkg/kubectl/cmd/config",
-        "//pkg/kubectl/cmd/convert",
-        "//pkg/kubectl/cmd/cp",
-        "//pkg/kubectl/cmd/create",
-        "//pkg/kubectl/cmd/delete",
-        "//pkg/kubectl/cmd/describe",
-        "//pkg/kubectl/cmd/diff",
-        "//pkg/kubectl/cmd/drain",
-        "//pkg/kubectl/cmd/edit",
-        "//pkg/kubectl/cmd/exec",
-        "//pkg/kubectl/cmd/explain",
-        "//pkg/kubectl/cmd/expose",
-        "//pkg/kubectl/cmd/get",
-        "//pkg/kubectl/cmd/help",
-        "//pkg/kubectl/cmd/kustomize",
-        "//pkg/kubectl/cmd/label",
-        "//pkg/kubectl/cmd/logs",
-        "//pkg/kubectl/cmd/options",
-        "//pkg/kubectl/cmd/patch",
-        "//pkg/kubectl/cmd/plugin",
-        "//pkg/kubectl/cmd/portforward",
-        "//pkg/kubectl/cmd/proxy",
-        "//pkg/kubectl/cmd/replace",
-        "//pkg/kubectl/cmd/rollingupdate",
-        "//pkg/kubectl/cmd/rollout",
-        "//pkg/kubectl/cmd/run",
-        "//pkg/kubectl/cmd/scale",
-        "//pkg/kubectl/cmd/set",
-        "//pkg/kubectl/cmd/taint",
-        "//pkg/kubectl/cmd/top",
-        "//pkg/kubectl/cmd/util",
-        "//pkg/kubectl/cmd/util/sanity",
-        "//pkg/kubectl/cmd/version",
-        "//pkg/kubectl/cmd/wait",
-        "//pkg/kubectl/util",
-    ],
-)
-
-package_group(
     name = "pkg_kubectl_cmd_edit_testdata_CONSUMERS",
     packages = [
         "//pkg/kubectl/cmd/edit",
-    ],
-)
-
-package_group(
-    name = "pkg_kubectl_cmd_testing_CONSUMERS",
-    packages = [
-        "//pkg/kubectl/cmd",
-        "//pkg/kubectl/cmd/annotate",
-        "//pkg/kubectl/cmd/apply",
-        "//pkg/kubectl/cmd/attach",
-        "//pkg/kubectl/cmd/auth",
-        "//pkg/kubectl/cmd/clusterinfo",
-        "//pkg/kubectl/cmd/convert",
-        "//pkg/kubectl/cmd/cp",
-        "//pkg/kubectl/cmd/create",
-        "//pkg/kubectl/cmd/delete",
-        "//pkg/kubectl/cmd/describe",
-        "//pkg/kubectl/cmd/drain",
-        "//pkg/kubectl/cmd/edit",
-        "//pkg/kubectl/cmd/exec",
-        "//pkg/kubectl/cmd/expose",
-        "//pkg/kubectl/cmd/get",
-        "//pkg/kubectl/cmd/label",
-        "//pkg/kubectl/cmd/logs",
-        "//pkg/kubectl/cmd/patch",
-        "//pkg/kubectl/cmd/portforward",
-        "//pkg/kubectl/cmd/replace",
-        "//pkg/kubectl/cmd/rollingupdate",
-        "//pkg/kubectl/cmd/rollout",
-        "//pkg/kubectl/cmd/run",
-        "//pkg/kubectl/cmd/set",
-        "//pkg/kubectl/cmd/taint",
-        "//pkg/kubectl/cmd/testing",
-        "//pkg/kubectl/cmd/top",
-        "//pkg/kubectl/explain",
-    ],
-)
-
-package_group(
-    name = "pkg_kubectl_cmd_util_CONSUMERS",
-    includes = [
-        ":COMMON_generators",
-        ":COMMON_testing",
-        ":KUBEADM_BAD",
-    ],
-    packages = [
-        "//cmd/kubectl",
-        "//cmd/kubectl/app",
-        "//pkg/kubectl/cmd",
-        "//pkg/kubectl/cmd/annotate",
-        "//pkg/kubectl/cmd/apiresources",
-        "//pkg/kubectl/cmd/apply",
-        "//pkg/kubectl/cmd/attach",
-        "//pkg/kubectl/cmd/auth",
-        "//pkg/kubectl/cmd/autoscale",
-        "//pkg/kubectl/cmd/certificates",
-        "//pkg/kubectl/cmd/clusterinfo",
-        "//pkg/kubectl/cmd/completion",
-        "//pkg/kubectl/cmd/config",
-        "//pkg/kubectl/cmd/convert",
-        "//pkg/kubectl/cmd/cp",
-        "//pkg/kubectl/cmd/create",
-        "//pkg/kubectl/cmd/delete",
-        "//pkg/kubectl/cmd/describe",
-        "//pkg/kubectl/cmd/diff",
-        "//pkg/kubectl/cmd/drain",
-        "//pkg/kubectl/cmd/edit",
-        "//pkg/kubectl/cmd/exec",
-        "//pkg/kubectl/cmd/explain",
-        "//pkg/kubectl/cmd/expose",
-        "//pkg/kubectl/cmd/get",
-        "//pkg/kubectl/cmd/help",
-        "//pkg/kubectl/cmd/label",
-        "//pkg/kubectl/cmd/logs",
-        "//pkg/kubectl/cmd/patch",
-        "//pkg/kubectl/cmd/plugin",
-        "//pkg/kubectl/cmd/portforward",
-        "//pkg/kubectl/cmd/proxy",
-        "//pkg/kubectl/cmd/replace",
-        "//pkg/kubectl/cmd/rollingupdate",
-        "//pkg/kubectl/cmd/rollout",
-        "//pkg/kubectl/cmd/run",
-        "//pkg/kubectl/cmd/scale",
-        "//pkg/kubectl/cmd/set",
-        "//pkg/kubectl/cmd/taint",
-        "//pkg/kubectl/cmd/testing",
-        "//pkg/kubectl/cmd/top",
-        "//pkg/kubectl/cmd/util",
-        "//pkg/kubectl/cmd/util/editor",
-        "//pkg/kubectl/cmd/util/sanity",
-        "//pkg/kubectl/cmd/version",
-        "//pkg/kubectl/cmd/wait",
-    ],
-)
-
-package_group(
-    name = "pkg_kubectl_cmd_util_editor_CONSUMERS",
-    packages = [
-        "//pkg/kubectl/cmd",
-        "//pkg/kubectl/cmd/apply",
-        "//pkg/kubectl/cmd/create",
-        "//pkg/kubectl/cmd/edit",
-        "//pkg/kubectl/cmd/util",
-    ],
-)
-
-package_group(
-    name = "pkg_kubectl_cmd_util_jsonmerge_CONSUMERS",
-    packages = [
-        "//pkg/kubectl/cmd",
-        "//pkg/kubectl/cmd/util",
-    ],
-)
-
-package_group(
-    name = "pkg_kubectl_cmd_util_sanity_CONSUMERS",
-    packages = [
-        "//cmd/clicheck",
-        "//pkg/kubectl/cmd/util",
     ],
 )
 
@@ -354,29 +159,6 @@ package_group(
         "//pkg/kubectl",
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/top",
-    ],
-)
-
-package_group(
-    name = "pkg_kubectl_resource_CONSUMERS",
-    includes = [
-        ":COMMON_generators",
-        ":COMMON_testing",
-    ],
-    packages = [
-        "//cmd/kubectl",
-        "//cmd/kubectl/app",
-        "//pkg/kubectl",
-        "//pkg/kubectl/cmd",
-        "//pkg/kubectl/cmd/auth",
-        "//pkg/kubectl/cmd/config",
-        "//pkg/kubectl/cmd/create",
-        "//pkg/kubectl/cmd/get",
-        "//pkg/kubectl/cmd/rollout",
-        "//pkg/kubectl/cmd/set",
-        "//pkg/kubectl/cmd/testing",
-        "//pkg/kubectl/cmd/util",
-        "//pkg/kubectl/cmd/util/editor",
     ],
 )
 
@@ -396,20 +178,6 @@ package_group(
         "//pkg/kubectl/generate",
         "//pkg/kubectl/generate/versioned",
         "//pkg/kubectl/proxy",
-    ],
-)
-
-package_group(
-    name = "pkg_kubectl_validation_CONSUMERS",
-    packages = [
-        "//pkg/kubectl",
-        "//pkg/kubectl/cmd",
-        "//pkg/kubectl/cmd/apply",
-        "//pkg/kubectl/cmd/convert",
-        "//pkg/kubectl/cmd/replace",
-        "//pkg/kubectl/cmd/rollingupdate",
-        "//pkg/kubectl/cmd/testing",
-        "//pkg/kubectl/cmd/util",
     ],
 )
 

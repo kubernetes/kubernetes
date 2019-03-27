@@ -32,6 +32,7 @@ filegroup(
         "//staging/src/k8s.io/kube-controller-manager:all-srcs",
         "//staging/src/k8s.io/kube-proxy:all-srcs",
         "//staging/src/k8s.io/kube-scheduler:all-srcs",
+        "//staging/src/k8s.io/kubectl:all-srcs",
         "//staging/src/k8s.io/kubelet:all-srcs",
         "//staging/src/k8s.io/metrics:all-srcs",
         "//staging/src/k8s.io/node-api:all-srcs",
