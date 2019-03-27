@@ -423,8 +423,7 @@ func NewCmdConfigImagesPull() *cobra.Command {
 			kubeadmutil.CheckErr(err)
 			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.NodeRegistration.CRISocket)
 			kubeadmutil.CheckErr(err)
-			imagesPull := NewImagesPull(containerRuntime, images.GetAllImages(&internalcfg.ClusterConfiguration))
-			kubeadmutil.CheckErr(imagesPull.PullAll())
+			PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
 		},
 	}
 	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalcfg, &cfgPath, &featureGatesString)
@@ -447,10 +446,11 @@ func NewImagesPull(runtime utilruntime.ContainerRuntime, images []string) *Image
 	}
 }
 
-// PullAll pulls all images that the ImagesPull knows about
-func (ip *ImagesPull) PullAll() error {
-	for _, image := range ip.images {
-		if err := ip.runtime.PullImage(image); err != nil {
+// PullControlPlaneImages pulls all images that the ImagesPull knows about
+func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmapi.ClusterConfiguration) error {
+	images := images.GetControlPlaneImages(cfg)
+	for _, image := range images {
+		if err := runtime.PullImage(image); err != nil {
 			return errors.Wrapf(err, "failed to pull image %q", image)
 		}
 		fmt.Printf("[config/images] Pulled %s\n", image)
@@ -505,7 +505,7 @@ type ImagesList struct {
 
 // Run runs the images command and writes the result to the io.Writer passed in
 func (i *ImagesList) Run(out io.Writer) error {
-	imgs := images.GetAllImages(&i.cfg.ClusterConfiguration)
+	imgs := images.GetControlPlaneImages(&i.cfg.ClusterConfiguration)
 	for _, img := range imgs {
 		fmt.Fprintln(out, img)
 	}
