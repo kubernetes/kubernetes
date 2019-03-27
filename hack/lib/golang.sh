@@ -718,7 +718,7 @@ kube::golang::build_binaries() {
       platforms=("${host_platform}")
     fi
 
-    local binaries
+    local -a binaries
     while IFS="" read -r binary; do binaries+=("$binary"); done < <(kube::golang::binaries_from_targets "${targets[@]}")
 
     local parallel=false
