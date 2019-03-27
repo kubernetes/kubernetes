@@ -63,7 +63,8 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	}
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
-	w = newCacheWatcher(0, 0, initEvents, filter, forget, testVersioner{})
+	w = newCacheWatcher(0, filter, forget, testVersioner{})
+	go w.process(initEvents, 0)
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
 		lock.RLock()
@@ -181,7 +182,8 @@ TestCase:
 		for j := range testCase.events {
 			testCase.events[j].ResourceVersion = uint64(j) + 1
 		}
-		w := newCacheWatcher(0, 0, testCase.events, filter, forget, testVersioner{})
+		w := newCacheWatcher(0, filter, forget, testVersioner{})
+		go w.process(testCase.events, 0)
 		ch := w.ResultChan()
 		for j, event := range testCase.expected {
 			e := <-ch
