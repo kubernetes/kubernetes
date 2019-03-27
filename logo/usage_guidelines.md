@@ -1,9 +1,6 @@
 # Kubernetes Branding Guidelines
 
-These guidelines provide you with guidance for using the Kubernetes logo. You
-can use the logo on your website or in print without pre-approval, provided you
-follow these basic guidelines.
-
+These guidelines provide you with guidance for using the Kubernetes logo.
 All artwork is made available under the Linux Foundation trademark usage
 [guidelines](https://www.linuxfoundation.org/trademark-usage/). This text from
 those guidelines, and the correct and incorrect usage examples, are particularly
