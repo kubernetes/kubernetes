@@ -276,7 +276,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 						err := checkGCEPD(volume, "pd-ssd")
 						Expect(err).NotTo(HaveOccurred(), "checkGCEPD pd-ssd")
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 				{
@@ -291,7 +291,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 						err := checkGCEPD(volume, "pd-standard")
 						Expect(err).NotTo(HaveOccurred(), "checkGCEPD pd-standard")
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 				// AWS
@@ -308,7 +308,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 						err := checkAWSEBS(volume, "gp2", false)
 						Expect(err).NotTo(HaveOccurred(), "checkAWSEBS gp2")
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 				{
@@ -324,7 +324,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 						err := checkAWSEBS(volume, "io1", false)
 						Expect(err).NotTo(HaveOccurred(), "checkAWSEBS io1")
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 				{
@@ -339,7 +339,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 						err := checkAWSEBS(volume, "sc1", false)
 						Expect(err).NotTo(HaveOccurred(), "checkAWSEBS sc1")
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 				{
@@ -354,7 +354,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 						err := checkAWSEBS(volume, "st1", false)
 						Expect(err).NotTo(HaveOccurred(), "checkAWSEBS st1")
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 				{
@@ -369,7 +369,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 						err := checkAWSEBS(volume, "gp2", true)
 						Expect(err).NotTo(HaveOccurred(), "checkAWSEBS gp2 encrypted")
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 				// OpenStack generic tests (works on all OpenStack deployments)
@@ -381,7 +381,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:      "1.5Gi",
 					ExpectedSize:   "2Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 				{
@@ -395,7 +395,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:    "1.5Gi",
 					ExpectedSize: "2Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 				// vSphere generic test
@@ -407,7 +407,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:      "1.5Gi",
 					ExpectedSize:   "1.5Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 				// Azure
@@ -419,7 +419,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:      "1Gi",
 					ExpectedSize:   "1Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 					},
 				},
 			}
@@ -480,7 +480,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
 					err := checkGCEPD(volume, "pd-standard")
 					Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
-					testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+					testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 				},
 			}
 			test.Class = newStorageClass(test, ns, "reclaimpolicy")

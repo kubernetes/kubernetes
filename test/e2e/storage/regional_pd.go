@@ -115,7 +115,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 				err = verifyZonesInPV(volume, sets.NewString(cloudZones...), true /* match */)
 				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
 
-				testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+				testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 			},
 		},
 		{
@@ -137,7 +137,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 				err = verifyZonesInPV(volume, zones, false /* match */)
 				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
 
-				testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, testsuites.NodeSelection{})
+				testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 			},
 		},
 	}

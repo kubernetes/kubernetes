@@ -93,6 +93,14 @@ type PersistentVolumeClaimConfig struct {
 	VolumeMode       *v1.PersistentVolumeMode
 }
 
+// NodeSelection specifies where to run a pod, using a combination of fixed node name,
+// node selector and/or affinity.
+type NodeSelection struct {
+	Name     string
+	Selector map[string]string
+	Affinity *v1.Affinity
+}
+
 // Clean up a pv and pvc in a single pv/pvc test case.
 // Note: delete errors are appended to []error so that we can attempt to delete both the pvc and pv.
 func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) []error {
@@ -873,14 +881,16 @@ func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector m
 
 // create security pod with given claims
 func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*v1.Pod, error) {
-	return CreateSecPodWithNodeName(client, namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup, "", timeout)
+	return CreateSecPodWithNodeSelection(client, namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup, NodeSelection{}, timeout)
 }
 
 // create security pod with given claims
-func CreateSecPodWithNodeName(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, nodeName string, timeout time.Duration) (*v1.Pod, error) {
+func CreateSecPodWithNodeSelection(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, node NodeSelection, timeout time.Duration) (*v1.Pod, error) {
 	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
-	// Setting nodeName
-	pod.Spec.NodeName = nodeName
+	// Setting node
+	pod.Spec.NodeName = node.Name
+	pod.Spec.NodeSelector = node.Selector
+	pod.Spec.Affinity = node.Affinity
 
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
@@ -898,6 +908,44 @@ func CreateSecPodWithNodeName(client clientset.Interface, namespace string, pvcl
 		return pod, fmt.Errorf("pod Get API error: %v", err)
 	}
 	return pod, nil
+}
+
+// SetNodeAffinityRequirement sets affinity with specified operator to nodeName to nodeSelection
+func SetNodeAffinityRequirement(nodeSelection *NodeSelection, operator v1.NodeSelectorOperator, nodeName string) {
+	// Add node-anti-affinity.
+	if nodeSelection.Affinity == nil {
+		nodeSelection.Affinity = &v1.Affinity{}
+	}
+	if nodeSelection.Affinity.NodeAffinity == nil {
+		nodeSelection.Affinity.NodeAffinity = &v1.NodeAffinity{}
+	}
+	if nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{}
+	}
+	nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+		v1.NodeSelectorTerm{
+			// https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity warns
+			// that "the value of kubernetes.io/hostname may be the same as the Node name in some environments and a different value in other environments".
+			// So this might be cleaner:
+			// MatchFields: []v1.NodeSelectorRequirement{
+			// 	{Key: "name", Operator: v1.NodeSelectorOpNotIn, Values: []string{nodeName}},
+			// },
+			// However, "name", "Name", "ObjectMeta.Name" all got rejected with "not a valid field selector key".
+
+			MatchExpressions: []v1.NodeSelectorRequirement{
+				{Key: "kubernetes.io/hostname", Operator: operator, Values: []string{nodeName}},
+			},
+		})
+}
+
+// SetAffinity sets affinity to nodeName to nodeSelection
+func SetAffinity(nodeSelection *NodeSelection, nodeName string) {
+	SetNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpIn, nodeName)
+}
+
+// SetAntiAffinity sets anti-affinity to nodeName to nodeSelection
+func SetAntiAffinity(nodeSelection *NodeSelection, nodeName string) {
+	SetNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpNotIn, nodeName)
 }
 
 // Define and create a pod with a mounted PV.  Pod runs infinite loop until killed.
