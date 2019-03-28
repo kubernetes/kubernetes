@@ -48,10 +48,10 @@ rules:
     verbs: ["create", "update", "patch"]
   - apiGroups: [""]
     resources: ["configmaps"]
-    verbs: ["create"]
+    verbs: ["create","list","watch"]
   - apiGroups: [""]
     resources: ["configmaps"]
-    resourceNames: ["cluster-autoscaler-status"]
+    resourceNames: ["cluster-autoscaler-status", "cluster-autoscaler-priority-expander"]
     verbs: ["get", "update", "patch", "delete"]
 ---
 kind: ClusterRoleBinding
