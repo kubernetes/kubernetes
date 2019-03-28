@@ -579,6 +579,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 
 	// Setup a new watchserver
 	watchServer := &handlers.WatchServer{
+		Scope:    &handlers.RequestScope{},
 		Watching: watcher,
 
 		MediaType:       "testcase/json",
@@ -639,6 +640,7 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 
 	// Setup a new watchserver
 	watchServer := &handlers.WatchServer{
+		Scope:    &handlers.RequestScope{},
 		Watching: watcher,
 
 		MediaType:       "testcase/json",
@@ -701,6 +703,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 
 	// Setup a new watchserver
 	watchServer := &handlers.WatchServer{
+		Scope:    &handlers.RequestScope{},
 		Watching: watcher,
 
 		MediaType:       "testcase/json",

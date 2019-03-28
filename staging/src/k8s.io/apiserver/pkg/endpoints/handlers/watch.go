@@ -63,7 +63,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatch will serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatch(watcher watch.Interface, scope RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
+func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		scope.err(err, w, req)
@@ -71,7 +71,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, mediaTypeOptions ne
 	}
 
 	// negotiate for the stream serializer from the scope's serializer
-	serializer, err := negotiation.NegotiateOutputMediaTypeStream(req, scope.Serializer, &scope)
+	serializer, err := negotiation.NegotiateOutputMediaTypeStream(req, scope.Serializer, scope)
 	if err != nil {
 		scope.err(err, w, req)
 		return
@@ -92,7 +92,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, mediaTypeOptions ne
 
 	// locate the appropriate embedded encoder based on the transform
 	var embeddedEncoder runtime.Encoder
-	contentKind, contentSerializer, transform := targetEncodingForTransform(&scope, mediaTypeOptions, req)
+	contentKind, contentSerializer, transform := targetEncodingForTransform(scope, mediaTypeOptions, req)
 	if transform {
 		var embedded runtime.Serializer
 		for _, supported := range contentSerializer.SupportedMediaTypes() {
@@ -145,7 +145,7 @@ func serveWatch(watcher watch.Interface, scope RequestScope, mediaTypeOptions ne
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
 	Watching watch.Interface
-	Scope    RequestScope
+	Scope    *RequestScope
 
 	// true if websocket messages should use text framing (as opposed to binary framing)
 	UseTextFraming bool

@@ -113,13 +113,13 @@ type crdInfo struct {
 	storages map[string]customresource.CustomResourceStorage
 
 	// Request scope per version
-	requestScopes map[string]handlers.RequestScope
+	requestScopes map[string]*handlers.RequestScope
 
 	// Scale scope per version
-	scaleRequestScopes map[string]handlers.RequestScope
+	scaleRequestScopes map[string]*handlers.RequestScope
 
 	// Status scope per version
-	statusRequestScopes map[string]handlers.RequestScope
+	statusRequestScopes map[string]*handlers.RequestScope
 
 	// storageVersion is the CRD version used when storing the object in etcd.
 	storageVersion string
@@ -444,10 +444,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	}
 
 	// Scope/Storages per version.
-	requestScopes := map[string]handlers.RequestScope{}
+	requestScopes := map[string]*handlers.RequestScope{}
 	storages := map[string]customresource.CustomResourceStorage{}
-	statusScopes := map[string]handlers.RequestScope{}
-	scaleScopes := map[string]handlers.RequestScope{}
+	statusScopes := map[string]*handlers.RequestScope{}
+	scaleScopes := map[string]*handlers.RequestScope{}
 
 	for _, v := range crd.Spec.Versions {
 		safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
@@ -548,7 +548,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 		clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
 
-		requestScopes[v.Name] = handlers.RequestScope{
+		requestScopes[v.Name] = &handlers.RequestScope{
 			Namer: handlers.ContextBasedNaming{
 				SelfLinker:         meta.NewAccessor(),
 				ClusterScoped:      clusterScoped,
@@ -576,19 +576,19 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			Authorizer: r.authorizer,
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-			reqScope := requestScopes[v.Name]
+			reqScope := *requestScopes[v.Name]
 			reqScope.FieldManager = fieldmanager.NewCRDFieldManager(
 				reqScope.Convertor,
 				reqScope.Defaulter,
 				reqScope.Kind.GroupVersion(),
 				reqScope.HubGroupVersion,
 			)
-			requestScopes[v.Name] = reqScope
+			requestScopes[v.Name] = &reqScope
 		}
 
 		// override scaleSpec subresource values
 		// shallow copy
-		scaleScope := requestScopes[v.Name]
+		scaleScope := *requestScopes[v.Name]
 		scaleConverter := scale.NewScaleConverter()
 		scaleScope.Subresource = "scale"
 		scaleScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme())
@@ -599,11 +599,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/scale",
 		}
-		scaleScopes[v.Name] = scaleScope
+		scaleScopes[v.Name] = &scaleScope
 
 		// override status subresource values
 		// shallow copy
-		statusScope := requestScopes[v.Name]
+		statusScope := *requestScopes[v.Name]
 		statusScope.Subresource = "status"
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
@@ -611,7 +611,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/status",
 		}
-		statusScopes[v.Name] = statusScope
+		statusScopes[v.Name] = &statusScope
 	}
 
 	ret := &crdInfo{

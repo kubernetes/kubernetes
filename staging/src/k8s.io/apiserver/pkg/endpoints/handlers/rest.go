@@ -42,7 +42,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/klog"
-	utiltrace "k8s.io/utils/trace"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -58,7 +57,6 @@ type RequestScope struct {
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
 	Authorizer      authorizer.Authorizer
-	Trace           *utiltrace.Trace
 
 	TableConvertor rest.TableConvertor
 	FieldManager   *fieldmanager.FieldManager
@@ -113,7 +111,7 @@ func (r *RequestScope) GetObjectDefaulter() runtime.ObjectDefaulter { return r.D
 func (r *RequestScope) GetObjectConvertor() runtime.ObjectConvertor { return r.Convertor }
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
-func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
+func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		if isDryRun(req.URL) {
 			scope.err(errors.NewBadRequest("dryRun is not supported"), w, req)
@@ -140,14 +138,14 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			userInfo, _ := request.UserFrom(ctx)
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo), &scope)
+				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo), scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo), &scope)
+				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo), scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -168,13 +166,13 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
 type responder struct {
-	scope RequestScope
+	scope *RequestScope
 	req   *http.Request
 	w     http.ResponseWriter
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	responsewriters.WriteObjectNegotiated(r.scope.Serializer, &r.scope, r.scope.Kind.GroupVersion(), r.w, r.req, statusCode, obj)
+	responsewriters.WriteObjectNegotiated(r.scope.Serializer, r.scope, r.scope.Kind.GroupVersion(), r.w, r.req, statusCode, obj)
 }
 
 func (r *responder) Error(err error) {
