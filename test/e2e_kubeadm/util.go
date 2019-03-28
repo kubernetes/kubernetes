@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_kubeadm
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	authv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -28,6 +29,25 @@ import (
 	"github.com/onsi/gomega/gstruct"
 )
 
+// ServiceAccounts utils
+
+func ExpectServiceAccount(c clientset.Interface, namespace, name string) {
+	_, err := c.CoreV1().
+		ServiceAccounts(namespace).
+		Get(name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "error getting ServiceAccount %q from namespace %q", name, namespace)
+}
+
+// Secret utils
+
+func GetSecret(c clientset.Interface, namespace, name string) *corev1.Secret {
+	r, err := c.CoreV1().
+		Secrets(namespace).
+		Get(name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "error getting Secret %q from namespace %q", name, namespace)
+	return r
+}
+
 // ConfigMaps utils
 
 func GetConfigMap(c clientset.Interface, namespace, name string) *corev1.ConfigMap {
@@ -35,6 +55,35 @@ func GetConfigMap(c clientset.Interface, namespace, name string) *corev1.ConfigM
 		ConfigMaps(namespace).
 		Get(name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting ConfigMap %q from namespace %q", name, namespace)
+	return r
+}
+
+// Service utils
+
+func ExpectService(c clientset.Interface, namespace, name string) {
+	_, err := c.CoreV1().
+		Services(namespace).
+		Get(name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "error getting Service %q from namespace %q", name, namespace)
+}
+
+// Deployments utils
+
+func GetDeployment(c clientset.Interface, namespace, name string) *appsv1.Deployment {
+	r, err := c.AppsV1().
+		Deployments(namespace).
+		Get(name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "error getting Deployment %q from namespace %q", name, namespace)
+	return r
+}
+
+// DaemonSets utils
+
+func GetDaemonSet(c clientset.Interface, namespace, name string) *appsv1.DaemonSet {
+	r, err := c.AppsV1().
+		DaemonSets(namespace).
+		Get(name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "error getting DaemonSet %q from namespace %q", name, namespace)
 	return r
 }
 
