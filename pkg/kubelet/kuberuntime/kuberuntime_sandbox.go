@@ -178,6 +178,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 	}
 
 	sysctls := make(map[string]string)
+	applyPodSysctls(sysctls, PodSysctls, pod)
 	if pod.Spec.SecurityContext != nil {
 		for _, c := range pod.Spec.SecurityContext.Sysctls {
 			sysctls[c.Name] = c.Value
