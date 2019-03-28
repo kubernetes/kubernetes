@@ -312,46 +312,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			Expect(hcAfterSync.HttpHealthCheck.RequestPath).To(Equal(hcToChange.HttpHealthCheck.RequestPath))
 		})
 
-		It("should create ingress with pre-shared certificate", func() {
-			executePresharedCertTest(f, jig, "")
-		})
-
-		It("should support multiple TLS certs", func() {
-			By("Creating an ingress with no certs.")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "multiple-certs"), ns, map[string]string{
-				ingress.IngressStaticIPKey: ns,
-			}, map[string]string{})
-
-			By("Adding multiple certs to the ingress.")
-			hosts := []string{"test1.ingress.com", "test2.ingress.com", "test3.ingress.com", "test4.ingress.com"}
-			secrets := []string{"tls-secret-1", "tls-secret-2", "tls-secret-3", "tls-secret-4"}
-			certs := [][]byte{}
-			for i, host := range hosts {
-				jig.AddHTTPS(secrets[i], host)
-				certs = append(certs, jig.GetRootCA(secrets[i]))
-			}
-			for i, host := range hosts {
-				err := jig.WaitForIngressWithCert(true, []string{host}, certs[i])
-				Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
-			}
-
-			By("Remove all but one of the certs on the ingress.")
-			jig.RemoveHTTPS(secrets[1])
-			jig.RemoveHTTPS(secrets[2])
-			jig.RemoveHTTPS(secrets[3])
-
-			By("Test that the remaining cert is properly served.")
-			err := jig.WaitForIngressWithCert(true, []string{hosts[0]}, certs[0])
-			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
-
-			By("Add back one of the certs that was removed and check that all certs are served.")
-			jig.AddHTTPS(secrets[1], hosts[1])
-			for i, host := range hosts[:2] {
-				err := jig.WaitForIngressWithCert(true, []string{host}, certs[i])
-				Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
-			}
-		})
-
 		It("multicluster ingress should get instance group annotation", func() {
 			name := "echomap"
 			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "http"), ns, map[string]string{
