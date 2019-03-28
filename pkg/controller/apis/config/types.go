@@ -37,6 +37,7 @@ import (
 	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
+	expandconfig "k8s.io/kubernetes/pkg/controller/volume/expand/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 )
 
@@ -70,6 +71,9 @@ type KubeControllerManagerConfiguration struct {
 	// EndpointControllerConfiguration holds configuration for EndpointController
 	// related features.
 	EndpointController endpointconfig.EndpointControllerConfiguration
+	// ExpandControllerConfiguration holds configuration for ExpandController
+	// related features.
+	ExpandController expandconfig.ExpandControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController garbagecollectorconfig.GarbageCollectorControllerConfiguration

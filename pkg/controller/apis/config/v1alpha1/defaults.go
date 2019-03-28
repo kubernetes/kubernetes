@@ -41,6 +41,7 @@ import (
 	serviceaccountconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1"
 	ttlafterfinishedconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config/v1alpha1"
 	attachdetachconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config/v1alpha1"
+	expandconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/expand/config/v1alpha1"
 	persistentvolumeconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config/v1alpha1"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -75,6 +76,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	deploymentconfigv1alpha1.RecommendedDefaultDeploymentControllerConfiguration(&obj.DeploymentController)
 	// Use the default RecommendedDefaultEndpointControllerConfiguration options
 	endpointconfigv1alpha1.RecommendedDefaultEndpointControllerConfiguration(&obj.EndpointController)
+	// Use the default RecommendedDefaultExpandControllerConfiguration options
+	expandconfigv1alpha1.RecommendedDefaultExpandControllerConfiguration(&obj.ExpandController)
 	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options
 	garbagecollectorconfigv1alpha1.RecommendedDefaultGarbageCollectorControllerConfiguration(&obj.GarbageCollectorController)
 	// Use the default RecommendedDefaultJobControllerConfiguration options
