@@ -2,16 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "context.go",
-        "framework.go",
-        "interface.go",
-        "registry.go",
-    ],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1",
+    srcs = ["stateful.go"],
+    importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/examples/stateful",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/scheduler/internal/cache:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
