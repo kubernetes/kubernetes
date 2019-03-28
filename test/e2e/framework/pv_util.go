@@ -21,7 +21,7 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1006,4 +1006,16 @@ func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
 
 func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
 	return TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
+}
+
+func GetBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
+	// Get new copy of the claim
+	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the bound PV
+	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+	return pv, err
 }

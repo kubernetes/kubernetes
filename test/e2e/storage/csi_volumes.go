@@ -153,7 +153,7 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 	if delayBinding {
 		test.TestBindingWaitForFirstConsumer(nodeSelector, true /* expect unschedulable */)
 	} else {
-		test.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+		test.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			// Ensure that a pod cannot be scheduled in an unsuitable zone.
 			pod := testsuites.StartInPodWithVolume(cs, namespace, claim.Name, "pvc-tester-unschedulable", "sleep 100000",
 				framework.NodeSelection{Selector: nodeSelector})
