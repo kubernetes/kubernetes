@@ -17,9 +17,12 @@ limitations under the License.
 package options
 
 import (
+	"strings"
+
 	"github.com/spf13/pflag"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 // AddKubeConfigFlag adds the --kubeconfig flag to the given flagset
@@ -57,4 +60,15 @@ func AddControlPlanExtraArgsFlags(fs *pflag.FlagSet, apiServerExtraArgs, control
 // AddImageMetaFlags adds the --image-repository flag to the given flagset
 func AddImageMetaFlags(fs *pflag.FlagSet, imageRepository *string) {
 	fs.StringVar(imageRepository, ImageRepository, *imageRepository, "Choose a container registry to pull control plane images from")
+}
+
+// AddFeatureGatesStringFlag adds the --feature-gates flag to the given flagset
+func AddFeatureGatesStringFlag(fs *pflag.FlagSet, featureGatesString *string) {
+	if knownFeatures := features.KnownFeatures(&features.InitFeatureGates); len(knownFeatures) > 0 {
+		fs.StringVar(featureGatesString, FeatureGatesString, *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
+			"Options are:\n"+strings.Join(knownFeatures, "\n"))
+	} else {
+		fs.StringVar(featureGatesString, FeatureGatesString, *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
+			"No feature gates are available in this release.")
+	}
 }
