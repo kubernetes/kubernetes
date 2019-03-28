@@ -27,7 +27,7 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
+	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 )
 
 // Stores info about the kubernetes node

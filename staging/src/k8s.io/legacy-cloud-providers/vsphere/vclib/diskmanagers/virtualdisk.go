@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
+	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 )
 
 // VirtualDisk is for the Disk Management
