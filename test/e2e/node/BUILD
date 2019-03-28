@@ -10,6 +10,7 @@ go_library(
         "kubelet.go",
         "kubelet_perf.go",
         "mount_propagation.go",
+        "node_problem_detector.go",
         "pod_gc.go",
         "pods.go",
         "pre_stop.go",
@@ -19,6 +20,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/node",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/api/v1/node:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
