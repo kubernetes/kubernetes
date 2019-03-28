@@ -1326,6 +1326,12 @@ run_namespace_tests() {
   output_message=$(! kubectl get ns/my-namespace 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" ' not found'
 
+  kubectl create namespace my-namespace
+  kube::test::get_object_assert 'namespaces/my-namespace' "{{$id_field}}" 'my-namespace'
+  output_message=$(! kubectl delete namespace -n my-namespace --all 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'warning: deleting cluster-scoped resources'
+  kube::test::if_has_string "${output_message}" 'namespace "my-namespace" deleted'
+
   ######################
   # Pods in Namespaces #
   ######################
