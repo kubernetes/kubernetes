@@ -25,7 +25,7 @@ service Registration {
 }
 
 message DevicePluginOptions {
-        // Indicates if PreStartContainer call is required before each container start
+	// Indicates if PreStartContainer call is required before each container start
 	bool pre_start_required = 1;
 }
 
@@ -37,8 +37,8 @@ message RegisterRequest {
 	string endpoint = 2;
 	// Schedulable resource name. As of now it's expected to be a DNS Label
 	string resource_name = 3;
-        // Options to be communicated with Device Manager
-        DevicePluginOptions options = 4;
+	// Options to be communicated with Device Manager
+	DevicePluginOptions options = 4;
 }
 
 message Empty {
@@ -47,7 +47,7 @@ message Empty {
 // DevicePlugin is the service advertised by Device Plugins
 service DevicePlugin {
 	// GetDevicePluginOptions returns options to be communicated with Device
-        // Manager
+	// Manager
 	rpc GetDevicePluginOptions(Empty) returns (DevicePluginOptions) {}
 
 	// ListAndWatch returns a stream of List of Devices
@@ -60,9 +60,9 @@ service DevicePlugin {
 	// of the steps to make the Device available in the container
 	rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
 
-        // PreStartContainer is called, if indicated by Device Plugin during registeration phase,
-        // before each container start. Device plugin can run device specific operations
-        // such as reseting the device before making devices available to the container
+	// PreStartContainer is called, if indicated by Device Plugin during registration phase,
+	// before each container start. Device plugin can run device specific operations
+	// such as resetting the device before making devices available to the container
 	rpc PreStartContainer(PreStartContainerRequest) returns (PreStartContainerResponse) {}
 }
 
@@ -92,7 +92,7 @@ message Device {
 // - PreStartContainer allows Device Plugin to run device specific operations on
 //   the Devices requested
 message PreStartContainerRequest {
-        repeated string devicesIDs = 1;
+	repeated string devicesIDs = 1;
 }
 
 // PreStartContainerResponse will be send by plugin in response to PreStartContainerRequest
@@ -126,7 +126,7 @@ message AllocateResponse {
 }
 
 message ContainerAllocateResponse {
-  	// List of environment variable to be set in the container to access one of more devices.
+	// List of environment variables to be set in the container to access one or more devices.
 	map<string, string> envs = 1;
 	// Mounts for the container.
 	repeated Mount mounts = 2;
@@ -149,13 +149,13 @@ message Mount {
 
 // DeviceSpec specifies a host device to mount into a container.
 message DeviceSpec {
-    // Path of the device within the container.
-    string container_path = 1;
-    // Path of the device on the host.
-    string host_path = 2;
-    // Cgroups permissions of the device, candidates are one or more of
-    // * r - allows container to read from the specified device.
-    // * w - allows container to write to the specified device.
-    // * m - allows container to create device files that do not yet exist.
-    string permissions = 3;
+	// Path of the device within the container.
+	string container_path = 1;
+	// Path of the device on the host.
+	string host_path = 2;
+	// Cgroups permissions of the device, candidates are one or more of
+	// * r - allows container to read from the specified device.
+	// * w - allows container to write to the specified device.
+	// * m - allows container to create device files that do not yet exist.
+	string permissions = 3;
 }

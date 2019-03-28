@@ -184,7 +184,7 @@ func (m *AllocateRequest) GetDevicesIDs() []string {
 // The Device plugin should send a ListAndWatch update and fail the
 // Allocation request
 type AllocateResponse struct {
-	// List of environment variable to be set in the container to access one of more devices.
+	// List of environment variables to be set in the container to access one or more devices.
 	Envs map[string]string `protobuf:"bytes,1,rep,name=envs" json:"envs,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Mounts for the container.
 	Mounts []*Mount `protobuf:"bytes,2,rep,name=mounts" json:"mounts,omitempty"`

@@ -271,7 +271,7 @@ func (m *AllocateResponse) GetContainerResponses() []*ContainerAllocateResponse 
 }
 
 type ContainerAllocateResponse struct {
-	// List of environment variable to be set in the container to access one of more devices.
+	// List of environment variables to be set in the container to access one or more devices.
 	Envs map[string]string `protobuf:"bytes,1,rep,name=envs" json:"envs,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Mounts for the container.
 	Mounts []*Mount `protobuf:"bytes,2,rep,name=mounts" json:"mounts,omitempty"`
@@ -489,9 +489,9 @@ type DevicePluginClient interface {
 	// Plugin can run device specific operations and instruct Kubelet
 	// of the steps to make the Device available in the container
 	Allocate(ctx context.Context, in *AllocateRequest, opts ...grpc.CallOption) (*AllocateResponse, error)
-	// PreStartContainer is called, if indicated by Device Plugin during registeration phase,
+	// PreStartContainer is called, if indicated by Device Plugin during registration phase,
 	// before each container start. Device plugin can run device specific operations
-	// such as reseting the device before making devices available to the container
+	// such as resetting the device before making devices available to the container
 	PreStartContainer(ctx context.Context, in *PreStartContainerRequest, opts ...grpc.CallOption) (*PreStartContainerResponse, error)
 }
 

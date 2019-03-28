@@ -90,7 +90,7 @@ message AllocateRequest {
 // The Device plugin should send a ListAndWatch update and fail the
 // Allocation request
 message AllocateResponse {
-  	// List of environment variable to be set in the container to access one of more devices.
+	// List of environment variables to be set in the container to access one or more devices.
 	map<string, string> envs = 1;
 	// Mounts for the container.
 	repeated Mount mounts = 2;
@@ -113,13 +113,13 @@ message Mount {
 
 // DeviceSpec specifies a host device to mount into a container.
 message DeviceSpec {
-    // Path of the device within the container.
-    string container_path = 1;
-    // Path of the device on the host.
-    string host_path = 2;
-    // Cgroups permissions of the device, candidates are one or more of
-    // * r - allows container to read from the specified device.
-    // * w - allows container to write to the specified device.
-    // * m - allows container to create device files that do not yet exist.
-    string permissions = 3;
+	// Path of the device within the container.
+	string container_path = 1;
+	// Path of the device on the host.
+	string host_path = 2;
+	// Cgroups permissions of the device, candidates are one or more of
+	// * r - allows container to read from the specified device.
+	// * w - allows container to write to the specified device.
+	// * m - allows container to create device files that do not yet exist.
+	string permissions = 3;
 }
