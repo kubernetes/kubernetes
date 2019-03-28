@@ -115,7 +115,7 @@ func main() {
 	}()
 
 	// start the leader election code loop
-	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(ctx, leaderelection.Config{
 		Lock: lock,
 		// IMPORTANT: you MUST ensure that any code you have that
 		// is protected by the lease must terminate **before**

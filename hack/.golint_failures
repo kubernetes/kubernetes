@@ -591,7 +591,6 @@ staging/src/k8s.io/client-go/tools/clientcmd
 staging/src/k8s.io/client-go/tools/clientcmd/api
 staging/src/k8s.io/client-go/tools/clientcmd/api/latest
 staging/src/k8s.io/client-go/tools/clientcmd/api/v1
-staging/src/k8s.io/client-go/tools/leaderelection
 staging/src/k8s.io/client-go/tools/leaderelection/resourcelock
 staging/src/k8s.io/client-go/tools/portforward
 staging/src/k8s.io/client-go/tools/record

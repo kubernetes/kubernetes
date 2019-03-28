@@ -50,7 +50,7 @@ type Config struct {
 	Broadcaster     record.EventBroadcaster
 
 	// LeaderElection is optional.
-	LeaderElection *leaderelection.LeaderElectionConfig
+	LeaderElection *leaderelection.Config
 }
 
 type completedConfig struct {

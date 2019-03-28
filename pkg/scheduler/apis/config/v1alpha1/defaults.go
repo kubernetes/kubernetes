@@ -101,7 +101,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.Kube
 	}
 
 	// Use the default LeaderElectionConfiguration options
-	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection.LeaderElectionConfiguration)
+	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.leaderelection.Configuration)
 
 	if obj.BindTimeoutSeconds == nil {
 		defaultBindTimeoutSeconds := int64(600)

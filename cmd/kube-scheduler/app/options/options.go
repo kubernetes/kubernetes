@@ -152,7 +152,7 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 	o.Authorization.AddFlags(nfs.FlagSet("authorization"))
 	o.Deprecated.AddFlags(nfs.FlagSet("deprecated"), &o.ComponentConfig)
 
-	leaderelectionconfig.BindFlags(&o.ComponentConfig.LeaderElection.LeaderElectionConfiguration, nfs.FlagSet("leader election"))
+	leaderelectionconfig.BindFlags(&o.ComponentConfig.leaderelection.Configuration, nfs.FlagSet("leader election"))
 	utilfeature.DefaultMutableFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
 
 	return nfs
@@ -241,7 +241,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, corev1.EventSource{Component: c.ComponentConfig.SchedulerName})
 
 	// Set up leader election if enabled.
-	var leaderElectionConfig *leaderelection.LeaderElectionConfig
+	var leaderElectionConfig *leaderelection.Config
 	if c.ComponentConfig.LeaderElection.LeaderElect {
 		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, leaderElectionClient, recorder)
 		if err != nil {
@@ -262,7 +262,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 
 // makeLeaderElectionConfig builds a leader election configuration. It will
 // create a new resource lock associated with the configuration.
-func makeLeaderElectionConfig(config kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
+func makeLeaderElectionConfig(config kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.Config, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get hostname: %v", err)
@@ -283,7 +283,7 @@ func makeLeaderElectionConfig(config kubeschedulerconfig.KubeSchedulerLeaderElec
 		return nil, fmt.Errorf("couldn't create resource lock: %v", err)
 	}
 
-	return &leaderelection.LeaderElectionConfig{
+	return &leaderelection.Config{
 		Lock:          rl,
 		LeaseDuration: config.LeaseDuration.Duration,
 		RenewDeadline: config.RenewDeadline.Duration,

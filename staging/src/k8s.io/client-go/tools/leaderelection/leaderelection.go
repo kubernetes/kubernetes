@@ -64,12 +64,13 @@ import (
 	"k8s.io/klog"
 )
 
+//JitterFactor is a constant
 const (
 	JitterFactor = 1.2
 )
 
-// NewLeaderElector creates a LeaderElector from a LeaderElectionConfig
-func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
+// NewLeaderElector creates a LeaderElector from a Config
+func NewLeaderElector(lec Config) (*LeaderElector, error) {
 	if lec.LeaseDuration <= lec.RenewDeadline {
 		return nil, fmt.Errorf("leaseDuration must be greater than renewDeadline")
 	}
@@ -87,7 +88,7 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	}
 
 	if lec.Lock == nil {
-		return nil, fmt.Errorf("Lock must not be nil.")
+		return nil, fmt.Errorf("lock must not be nil")
 	}
 	le := LeaderElector{
 		config:  lec,
@@ -98,7 +99,8 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	return &le, nil
 }
 
-type LeaderElectionConfig struct {
+//Config structure for leader election.
+type Config struct {
 	// Lock is the resource that will be used for locking
 	Lock rl.Interface
 
@@ -150,7 +152,7 @@ type LeaderCallbacks struct {
 
 // LeaderElector is a leader election client.
 type LeaderElector struct {
-	config LeaderElectionConfig
+	config Config
 	// internal bookkeeping
 	observedRecord rl.LeaderElectionRecord
 	observedTime   time.Time
@@ -185,7 +187,7 @@ func (le *LeaderElector) Run(ctx context.Context) {
 
 // RunOrDie starts a client with the provided config or panics if the config
 // fails to validate.
-func RunOrDie(ctx context.Context, lec LeaderElectionConfig) {
+func RunOrDie(ctx context.Context, lec Config) {
 	le, err := NewLeaderElector(lec)
 	if err != nil {
 		panic(err)

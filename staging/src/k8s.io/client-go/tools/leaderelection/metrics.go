@@ -28,7 +28,7 @@ type leaderMetricsAdapter interface {
 	leaderOff(name string)
 }
 
-// GaugeMetric represents a single numerical value that can arbitrarily go up
+// SwitchMetric represents a single numerical value that can arbitrarily go up
 // and down.
 type SwitchMetric interface {
 	On(name string)
@@ -72,7 +72,7 @@ type MetricsProvider interface {
 
 type noopMetricsProvider struct{}
 
-func (_ noopMetricsProvider) NewLeaderMetric() SwitchMetric {
+func (noopMetricsProvider) NewLeaderMetric() SwitchMetric {
 	return noopMetric{}
 }
 
