@@ -116,6 +116,7 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 		StoragePrefix:           etcdOptions.StorageConfig.Prefix,
 		EnableWatchCache:        etcdOptions.EnableWatchCache,
 		DefaultWatchCacheSize:   etcdOptions.DefaultWatchCacheSize,
+		WatchCacheSizes:         etcdOptions.WatchCacheSizes,
 		EnableGarbageCollection: etcdOptions.EnableGarbageCollection,
 		DeleteCollectionWorkers: etcdOptions.DeleteCollectionWorkers,
 		CountMetricPollPeriod:   etcdOptions.StorageConfig.CountMetricPollPeriod,

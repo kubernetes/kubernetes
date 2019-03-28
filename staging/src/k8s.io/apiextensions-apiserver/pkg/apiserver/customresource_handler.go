@@ -62,6 +62,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -722,6 +723,7 @@ type CRDRESTOptionsGetter struct {
 	StoragePrefix           string
 	EnableWatchCache        bool
 	DefaultWatchCacheSize   int
+	WatchCacheSizes         []string
 	EnableGarbageCollection bool
 	DeleteCollectionWorkers int
 	CountMetricPollPeriod   time.Duration
@@ -737,7 +739,15 @@ func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (gen
 		CountMetricPollPeriod:   t.CountMetricPollPeriod,
 	}
 	if t.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher(t.DefaultWatchCacheSize)
+		sizes, err := serveroptions.ParseWatchCacheSizes(t.WatchCacheSizes)
+		if err != nil {
+			return generic.RESTOptions{}, err
+		}
+		cacheSize, ok := sizes[resource]
+		if !ok {
+			cacheSize = t.DefaultWatchCacheSize
+		}
+		ret.Decorator = genericregistry.StorageWithCacher(cacheSize)
 	}
 	return ret, nil
 }
