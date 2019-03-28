@@ -576,9 +576,9 @@ type DevicePluginServer interface {
 	// Plugin can run device specific operations and instruct Kubelet
 	// of the steps to make the Device available in the container
 	Allocate(context.Context, *AllocateRequest) (*AllocateResponse, error)
-	// PreStartContainer is called, if indicated by Device Plugin during registeration phase,
+	// PreStartContainer is called, if indicated by Device Plugin during registration phase,
 	// before each container start. Device plugin can run device specific operations
-	// such as reseting the device before making devices available to the container
+	// such as resetting the device before making devices available to the container
 	PreStartContainer(context.Context, *PreStartContainerRequest) (*PreStartContainerResponse, error)
 }
 
