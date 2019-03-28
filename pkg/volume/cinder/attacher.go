@@ -410,6 +410,10 @@ func (plugin *cinderPlugin) CanAttach(spec *volume.Spec) bool {
 	return true
 }
 
+func (plugin *cinderPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
 func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (string, error) {
 	instances, res := attacher.cinderProvider.Instances()
 	if !res {

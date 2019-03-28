@@ -311,3 +311,7 @@ func (detacher *photonPersistentDiskDetacher) UnmountDevice(deviceMountPath stri
 func (plugin *photonPersistentDiskPlugin) CanAttach(spec *volume.Spec) bool {
 	return true
 }
+
+func (plugin *photonPersistentDiskPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
