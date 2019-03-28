@@ -120,7 +120,8 @@ func runPreflight(c workflow.RunData) error {
 
 		// run kubeadm init preflight checks for checking all the prerequisites
 		fmt.Println("[preflight] Running pre-flight checks before initializing the new control plane instance")
-		if err := preflight.RunInitNodeChecks(utilsexec.New(), initCfg, j.IgnorePreflightErrors(), true); err != nil {
+
+		if err := preflight.RunInitNodeChecks(utilsexec.New(), initCfg, j.IgnorePreflightErrors(), true, hasCertificateKey); err != nil {
 			return err
 		}
 
