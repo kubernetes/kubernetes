@@ -113,6 +113,7 @@ pkg/controller/volume/attachdetach/statusupdater
 pkg/controller/volume/attachdetach/testing
 pkg/controller/volume/events
 pkg/controller/volume/expand
+pkg/controller/volume/expand/config/v1alpha1
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
 pkg/controller/volume/persistentvolume/options

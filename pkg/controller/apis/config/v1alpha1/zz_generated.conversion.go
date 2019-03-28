@@ -47,6 +47,7 @@ import (
 	serviceaccountconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/serviceaccount/config/v1alpha1"
 	ttlafterfinishedconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config/v1alpha1"
 	attachdetachconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config/v1alpha1"
+	expandconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/expand/config/v1alpha1"
 	persistentvolumeconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config/v1alpha1"
 )
 
@@ -309,6 +310,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := endpointconfigv1alpha1.Convert_v1alpha1_EndpointControllerConfiguration_To_config_EndpointControllerConfiguration(&in.EndpointController, &out.EndpointController, s); err != nil {
 		return err
 	}
+	if err := expandconfigv1alpha1.Convert_v1alpha1_ExpandControllerConfiguration_To_config_ExpandControllerConfiguration(&in.ExpandController, &out.ExpandController, s); err != nil {
+		return err
+	}
 	if err := garbagecollectorconfigv1alpha1.Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_config_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {
 		return err
 	}
@@ -382,6 +386,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := endpointconfigv1alpha1.Convert_config_EndpointControllerConfiguration_To_v1alpha1_EndpointControllerConfiguration(&in.EndpointController, &out.EndpointController, s); err != nil {
+		return err
+	}
+	if err := expandconfigv1alpha1.Convert_config_ExpandControllerConfiguration_To_v1alpha1_ExpandControllerConfiguration(&in.ExpandController, &out.ExpandController, s); err != nil {
 		return err
 	}
 	if err := garbagecollectorconfigv1alpha1.Convert_config_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {
