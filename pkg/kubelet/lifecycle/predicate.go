@@ -79,6 +79,9 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 
+	// ensure the node has other enough extended resources for that required in pods, except plugin resources
+	setNodeAllocatableScalarResources(nodeInfo, admitPod)
+
 	// Remove the requests of the extended resources that are missing in the
 	// node info. This is required to support cluster-level resources, which
 	// are extended resources unknown to nodes.
@@ -171,4 +174,51 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulernodeinfo.Nod
 		}
 	}
 	return podCopy
+}
+
+// setNodeAllocatableScalarResources scans pod requested scalar resources, and if necessary,
+// updates allocatable Resource in nodeInfo to at least equal to
+// the requested capacity. This allows pods that have already been scheduled on
+// the node to pass GeneralPredicates admission checking.
+func setNodeAllocatableScalarResources(nodeInfo *schedulercache.NodeInfo, admitPod *v1.Pod) {
+	var newAllocatableResource *schedulercache.Resource
+	var needUpdate bool = false
+	allocatableResource := nodeInfo.AllocatableResource()
+	if allocatableResource.ScalarResources == nil {
+		allocatableResource.ScalarResources = make(map[v1.ResourceName]int64)
+	}
+
+	scalarResources := predicates.GetResourceRequest(admitPod).ScalarResources
+	// if pod has no scalar resources, just return
+	if scalarResources == nil {
+		return
+	}
+
+	for rName, rSize := range scalarResources {
+		if value, ok := allocatableResource.ScalarResources[rName]; ok {
+			// allocatable resource has been set, just skip
+			if value != 0 {
+				continue
+			}
+		}
+
+		// Needs to update nodeInfo.AllocatableResource to make sure
+		// NodeInfo.allocatableResource at least equal to the capacity already allocated.
+		if newAllocatableResource == nil {
+			newAllocatableResource = allocatableResource.Clone()
+		}
+		newAllocatableResource.SetScalar(rName, rSize)
+
+		// add other pods' requested resources if existed
+		if nodeInfo.RequestedResource().ScalarResources != nil {
+			if requestSize, ok := nodeInfo.RequestedResource().ScalarResources[rName]; ok {
+				newAllocatableResource.AddScalar(rName, requestSize)
+			}
+		}
+		needUpdate = true
+	}
+
+	if needUpdate {
+		nodeInfo.SetAllocatableResource(newAllocatableResource)
+	}
 }
