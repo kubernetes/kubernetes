@@ -109,6 +109,8 @@ func startPodAndGetBackOffs(podClient *framework.PodClient, pod *v1.Pod, sleepAm
 
 func getRestartDelay(podClient *framework.PodClient, podName string, containerName string) (time.Duration, error) {
 	beginTime := time.Now()
+	var previousRestartCount int32 = -1
+	var previousFinishedAt time.Time
 	for time.Since(beginTime) < (2 * maxBackOffTolerance) { // may just miss the 1st MaxContainerBackOff delay
 		time.Sleep(time.Second)
 		pod, err := podClient.Get(podName, metav1.GetOptions{})
@@ -119,11 +121,37 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 			continue
 		}
 
-		if status.State.Waiting == nil && status.State.Terminated != nil && status.LastTerminationState.Terminated != nil && status.State.Terminated.StartedAt.Time.After(beginTime) {
-			startedAt := status.State.Terminated.StartedAt.Time
-			finishedAt := status.LastTerminationState.Terminated.FinishedAt.Time
-			framework.Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, finishedAt, startedAt, startedAt.Sub(finishedAt))
-			return startedAt.Sub(finishedAt), nil
+		// the only case this happens is if this is the first time the Pod is running and there is no "Last State".
+		if status.LastTerminationState.Terminated == nil {
+			framework.Logf("Container's last state is not \"Terminated\".")
+			continue
+		}
+
+		if previousRestartCount == -1 {
+			if status.State.Running != nil {
+				// container is still Running, there is no "FinishedAt" time.
+				continue
+			} else if status.State.Terminated != nil {
+				previousFinishedAt = status.State.Terminated.FinishedAt.Time
+			} else {
+				previousFinishedAt = status.LastTerminationState.Terminated.FinishedAt.Time
+			}
+			previousRestartCount = status.RestartCount
+		}
+
+		// when the RestartCount is changed, the Containers will be in one of the following states:
+		//Running, Terminated, Waiting (it already is waiting for the backoff period to expire, and the last state details have been stored into status.LastTerminationState).
+		if status.RestartCount > previousRestartCount {
+			var startedAt time.Time
+			if status.State.Running != nil {
+				startedAt = status.State.Running.StartedAt.Time
+			} else if status.State.Terminated != nil {
+				startedAt = status.State.Terminated.StartedAt.Time
+			} else {
+				startedAt = status.LastTerminationState.Terminated.StartedAt.Time
+			}
+			framework.Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, previousFinishedAt, startedAt, startedAt.Sub(previousFinishedAt))
+			return startedAt.Sub(previousFinishedAt), nil
 		}
 	}
 	return 0, fmt.Errorf("timeout getting pod restart delay")
