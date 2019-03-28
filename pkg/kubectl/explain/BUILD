@@ -52,9 +52,9 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
-        "//pkg/kubectl/scheme:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta/testrestmapper:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util/openapi/testing:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
     ],
 )

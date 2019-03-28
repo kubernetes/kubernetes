@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func TestValidateArgs(t *testing.T) {

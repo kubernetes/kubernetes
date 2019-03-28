@@ -42,11 +42,11 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/i18n"
+	utilprinters "k8s.io/kubectl/pkg/util/printers"
+	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	utilprinters "k8s.io/kubernetes/pkg/kubectl/util/printers"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 

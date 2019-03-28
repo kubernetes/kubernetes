@@ -23,11 +23,11 @@ import (
 	"reflect"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"k8s.io/client-go/tools/clientcmd"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/i18n"
 )
 
 type unsetOptions struct {

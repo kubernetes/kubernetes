@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 func generateNodeAndTaintedNode(oldTaints []corev1.Taint, newTaints []corev1.Taint) (*corev1.Node, *corev1.Node) {

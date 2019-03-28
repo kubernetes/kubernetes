@@ -17,8 +17,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubectl/apply:go_default_library",
-        "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util/openapi:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )

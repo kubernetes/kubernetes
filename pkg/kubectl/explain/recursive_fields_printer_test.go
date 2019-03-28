@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
+	tst "k8s.io/kubectl/pkg/cmd/util/openapi/testing"
 )
 
 func TestRecursiveFields(t *testing.T) {

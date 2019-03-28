@@ -6,17 +6,17 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/logs",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/polymorphichelpers:go_default_library",
-        "//pkg/kubectl/scheme:go_default_library",
-        "//pkg/kubectl/util:go_default_library",
-        "//pkg/kubectl/util/i18n:go_default_library",
-        "//pkg/kubectl/util/templates:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
@@ -26,12 +26,12 @@ go_test(
     srcs = ["logs_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/cmd/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/testing:go_default_library",
     ],
 )
 

@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
+	tst "k8s.io/kubectl/pkg/cmd/util/openapi/testing"
 )
 
 var resources = tst.NewFakeResources("test-swagger.json")

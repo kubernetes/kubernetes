@@ -34,11 +34,11 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/printers"
+	rbacutil "k8s.io/kubectl/pkg/util/rbac"
+	"k8s.io/kubectl/pkg/util/templates"
 	describeutil "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
-	"k8s.io/kubernetes/pkg/kubectl/util/printers"
-	rbacutil "k8s.io/kubernetes/pkg/kubectl/util/rbac"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of

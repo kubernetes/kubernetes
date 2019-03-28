@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/kubectl/util"
+	"k8s.io/kubectl/pkg/util"
 )
 
 const (

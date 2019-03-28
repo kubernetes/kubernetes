@@ -47,10 +47,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/drain"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 const (

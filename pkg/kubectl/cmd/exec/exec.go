@@ -30,12 +30,11 @@ import (
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/util/term"
-	"k8s.io/kubernetes/pkg/util/interrupt"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 )
 
 var (
@@ -124,7 +123,7 @@ type StreamOptions struct {
 	// minimize unnecessary output
 	Quiet bool
 	// InterruptParent, if set, is used to handle interrupts while attached
-	InterruptParent *interrupt.Handler
+	InterruptParent *term.Handler
 
 	genericclioptions.IOStreams
 
