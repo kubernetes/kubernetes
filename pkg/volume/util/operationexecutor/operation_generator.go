@@ -813,6 +813,16 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 			return volumeToUnmount.GenerateError("UnmountVolume.TearDown failed", unmountErr)
 		}
 
+		// Successful unmount event is useful for user debugging
+		simpleMsg, _ := volumeToUnmount.GenerateMsg("UnmountVolume.TearDown succeeded", "")
+
+		if volumeToUnmount.VolumeSpec != nil && volumeToUnmount.VolumeSpec.PersistentVolume != nil && volumeToUnmount.VolumeSpec.PersistentVolume.Spec.ClaimRef != nil {
+			pod, _ := og.kubeClient.CoreV1().Pods(volumeToUnmount.VolumeSpec.PersistentVolume.Spec.ClaimRef.Namespace).Get(string(volumeToUnmount.PodName), metav1.GetOptions{})
+			if pod != nil {
+				og.recorder.Eventf(pod, v1.EventTypeNormal, kevents.SuccessfulUnMountVolume, simpleMsg)
+			}
+		}
+
 		klog.Infof(
 			"UnmountVolume.TearDown succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGidValue %q",
 			volumeToUnmount.VolumeName,
@@ -834,11 +844,22 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		return nil, nil
 	}
 
+	eventRecorderFunc := func(err *error) {
+		if *err != nil {
+			if volumeToUnmount.VolumeSpec != nil && volumeToUnmount.VolumeSpec.PersistentVolume != nil && volumeToUnmount.VolumeSpec.PersistentVolume.Spec.ClaimRef != nil {
+				pod, _ := og.kubeClient.CoreV1().Pods(volumeToUnmount.VolumeSpec.PersistentVolume.Spec.ClaimRef.Namespace).Get(string(volumeToUnmount.PodName), metav1.GetOptions{})
+				if pod != nil {
+					og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedUnMountVolume, (*err).Error())
+				}
+			}
+		}
+	}
+
 	return volumetypes.GeneratedOperations{
 		OperationName:     "volume_unmount",
 		OperationFunc:     unmountVolumeFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToUnmount.VolumeSpec), "volume_unmount"),
-		EventRecorderFunc: nil, // nil because we do not want to generate event on error
+		EventRecorderFunc: eventRecorderFunc,
 	}, nil
 }
 
