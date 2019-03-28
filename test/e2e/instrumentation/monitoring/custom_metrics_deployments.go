@@ -221,7 +221,7 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 			},
 			{
 				Name:            "prometheus-to-sd",
-				Image:           "k8s.gcr.io/prometheus-to-sd:v0.3.1",
+				Image:           "k8s.gcr.io/prometheus-to-sd:v0.5.0",
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command: []string{"/monitor", fmt.Sprintf("--source=:http://localhost:%d", port),
 					"--stackdriver-prefix=custom.googleapis.com", "--pod-id=$(POD_ID)", "--namespace-id=$(POD_NAMESPACE)"},
