@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.12",
-	"GodepVersion": "v80-k8s-r1",
+	"GodepVersion": "v80",
 	"Packages": [
 		"golang.org/x/net/internal/nettest",
 		"golang.org/x/net/internal/socks",
@@ -4237,43 +4237,43 @@
 		},
 		{
 			"ImportPath": "k8s.io/gengo/args",
-			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+			"Rev": "e17681d19d3ac4837a019ece36c2a0ec31ffe985"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/deepcopy-gen/generators",
-			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+			"Rev": "e17681d19d3ac4837a019ece36c2a0ec31ffe985"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/defaulter-gen/generators",
-			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+			"Rev": "e17681d19d3ac4837a019ece36c2a0ec31ffe985"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
-			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+			"Rev": "e17681d19d3ac4837a019ece36c2a0ec31ffe985"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/generators",
-			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+			"Rev": "e17681d19d3ac4837a019ece36c2a0ec31ffe985"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/sets",
-			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+			"Rev": "e17681d19d3ac4837a019ece36c2a0ec31ffe985"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/generator",
-			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+			"Rev": "e17681d19d3ac4837a019ece36c2a0ec31ffe985"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/namer",
-			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+			"Rev": "e17681d19d3ac4837a019ece36c2a0ec31ffe985"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/parser",
-			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+			"Rev": "e17681d19d3ac4837a019ece36c2a0ec31ffe985"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/types",
-			"Rev": "51747d6e00da1fc578d5a333a93bb2abcbce7a95"
+			"Rev": "e17681d19d3ac4837a019ece36c2a0ec31ffe985"
 		},
 		{
 			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",
