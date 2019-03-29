@@ -58,7 +58,7 @@ func factory() (framework.ProviderInterface, error) {
 	}
 
 	gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
-		APIEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
+		APIEndpoint:        framework.TestContext.CloudConfig.APIEndpoint,
 		ProjectID:          framework.TestContext.CloudConfig.ProjectID,
 		Region:             region,
 		Zone:               zone,

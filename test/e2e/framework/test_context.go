@@ -203,8 +203,9 @@ type NodeTestContextType struct {
 	ExtraEnvs map[string]string
 }
 
+// CloudConfig holds the cloud configuration for e2e test suites.
 type CloudConfig struct {
-	ApiEndpoint       string
+	APIEndpoint       string
 	ProjectID         string
 	Zone              string // for multizone tests, arbitrarily chosen zone
 	Region            string
@@ -224,9 +225,10 @@ type CloudConfig struct {
 	Provider ProviderInterface
 }
 
+// TestContext should be used by all tests to access common context data.
 var TestContext TestContextType
 
-// Register flags common to all e2e test suites.
+// RegisterCommonFlags registers flags common to all e2e test suites.
 func RegisterCommonFlags() {
 	// Turn on verbose by default to get spec names
 	config.DefaultReporterConfig.Verbose = true
@@ -269,7 +271,7 @@ func RegisterCommonFlags() {
 	flag.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
 }
 
-// Register flags specific to the cluster e2e test suite.
+// RegisterClusterFlags registers flags specific to the cluster e2e test suite.
 func RegisterClusterFlags() {
 	flag.BoolVar(&TestContext.VerifyServiceAccount, "e2e-verify-service-account", true, "If true tests will verify the service account before running.")
 	flag.StringVar(&TestContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, os.Getenv(clientcmd.RecommendedConfigPathEnvVar), "Path to kubeconfig containing embedded authinfo.")
@@ -293,7 +295,7 @@ func RegisterClusterFlags() {
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
-	flag.StringVar(&cloudConfig.ApiEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
+	flag.StringVar(&cloudConfig.APIEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 	flag.StringVar(&cloudConfig.Region, "gce-region", "", "GCE region being used, if applicable")
@@ -326,7 +328,7 @@ func RegisterClusterFlags() {
 	flag.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
-// Register flags specific to the node e2e test suite.
+// RegisterNodeFlags registers flags specific to the node e2e test suite.
 func RegisterNodeFlags() {
 	// Mark the test as node e2e when node flags are api.Registry.
 	TestContext.NodeE2E = true
