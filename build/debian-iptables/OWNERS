@@ -2,11 +2,17 @@
 
 reviewers:
   - BenTheElder
+  - bowei
+  - freehan
+  - jingax10
   - mkumatag
+  - mrhohn
   - tallclair
 approvers:
   - BenTheElder
+  - bowei
+  - freehan
+  - jingax10
   - mkumatag
+  - mrhohn
   - tallclair
-labels:
-- sig/release
