@@ -36,6 +36,10 @@ function get-windows-node-instance-metadata-from-file {
 function get-windows-node-instance-metadata {
   local metadata=""
   metadata+="k8s-version=${KUBE_VERSION:-v1.13.2},"
+  # Prevent the GCE Windows agent from managing IP addresses, since kube-proxy
+  # and these cluster setup scripts should take care of everything. See
+  # https://github.com/kubernetes/kubernetes/issues/75561.
+  metadata+="disable-address-manager=true,"
   metadata+="serial-port-enable=1,"
   # This enables logging the serial port output.
   # https://cloud.google.com/compute/docs/instances/viewing-serial-port-output
