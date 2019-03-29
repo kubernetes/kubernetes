@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -30,6 +31,8 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
+
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -115,7 +118,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed getting the kubeadm images command: %v", err)
 			}
 			var output bytes.Buffer
-			if i.Run(&output) != nil {
+			if i.Run(&output, "text") != nil {
 				t.Fatalf("Error from running the images command: %v", err)
 			}
 			actual := strings.Split(strings.TrimSpace(output.String()), "\n")
@@ -204,13 +207,78 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			}
 
 			var output bytes.Buffer
-			if i.Run(&output) != nil {
+			if i.Run(&output, "text") != nil {
 				t.Fatalf("did not expect an error running the Images command: %v", err)
 			}
 
 			actual := strings.Split(strings.TrimSpace(output.String()), "\n")
 			if len(actual) != tc.expectedImages {
 				t.Fatalf("expected %v images but got %v", tc.expectedImages, actual)
+			}
+		})
+	}
+}
+
+func TestConfigImagesListJsonYaml(t *testing.T) {
+	testcases := []struct {
+		name                string
+		cfg                 kubeadmapiv1beta1.InitConfiguration
+		expectedImagesCount int
+		outputFormat        string
+	}{
+		{
+			name: "JSON",
+			cfg: kubeadmapiv1beta1.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+					KubernetesVersion: dummyKubernetesVersion,
+				},
+				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+					CRISocket: constants.DefaultDockerCRISocket,
+				},
+			},
+			expectedImagesCount: defaultNumberOfImages,
+			outputFormat:        "JSON",
+		},
+		{
+			name: "YAML",
+			cfg: kubeadmapiv1beta1.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+					KubernetesVersion: dummyKubernetesVersion,
+				},
+				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+					CRISocket: constants.DefaultDockerCRISocket,
+				},
+			},
+			expectedImagesCount: defaultNumberOfImages,
+			outputFormat:        "YAML",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			i, err := NewImagesList("", &tc.cfg)
+			if err != nil {
+				t.Fatalf("did not expect an error while creating the Images list command: %v", err)
+			}
+
+			var output bytes.Buffer
+			if i.Run(&output, tc.outputFormat) != nil {
+				t.Fatalf("did not expect an error running the Images list command: %v", err)
+			}
+
+			var imagesList ConfigImagesList
+			if tc.outputFormat == "YAML" {
+				err = yaml.Unmarshal(output.Bytes(), &imagesList)
+			} else {
+				err = json.Unmarshal(output.Bytes(), &imagesList)
+			}
+			if err != nil {
+				t.Fatalf("did not expect an error while unmarshaling: %v", err)
+			}
+
+			actual := len(imagesList.Images)
+			if actual != tc.expectedImagesCount {
+				t.Fatalf("expected %v images but got %v", tc.expectedImagesCount, actual)
 			}
 		})
 	}

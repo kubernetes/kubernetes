@@ -26,10 +26,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
-	"k8s.io/klog"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
+	utilsexec "k8s.io/utils/exec"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -45,7 +46,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	utilsexec "k8s.io/utils/exec"
 )
 
 var (
@@ -461,7 +461,7 @@ func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmap
 func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
 	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
-	var cfgPath, featureGatesString string
+	var cfgPath, featureGatesString, outputFormat string
 	var err error
 
 	// This just sets the Kubernetes version for unit testing so kubeadm won't try to
@@ -478,10 +478,11 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 			kubeadmutil.CheckErr(err)
 			imagesList, err := NewImagesList(cfgPath, externalcfg)
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(imagesList.Run(out))
+			kubeadmutil.CheckErr(imagesList.Run(out, outputFormat))
 		},
 	}
 	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalcfg, &cfgPath, &featureGatesString)
+	options.AddOutputFlag(cmd.Flags(), &outputFormat)
 	return cmd
 }
 
@@ -502,13 +503,36 @@ type ImagesList struct {
 	cfg *kubeadmapi.InitConfiguration
 }
 
+// ConfigImagesList represents information for JSON and YAML output produced by 'kubeadm config images list'
+type ConfigImagesList struct {
+	Images []string `json:"images"`
+}
+
+// Text implements TextOutput interface for ConfigImagesList
+func (imgList *ConfigImagesList) Text() string {
+	var output bytes.Buffer
+	for _, img := range imgList.Images {
+		fmt.Fprintln(&output, img)
+	}
+	return output.String()
+}
+
+// Short is the same as Text for ConfigImagesList structure
+func (imgList *ConfigImagesList) Short() string {
+	return imgList.Text()
+}
+
 // Run runs the images command and writes the result to the io.Writer passed in
-func (i *ImagesList) Run(out io.Writer) error {
-	imgs := images.GetControlPlaneImages(&i.cfg.ClusterConfiguration)
-	for _, img := range imgs {
-		fmt.Fprintln(out, img)
+func (i *ImagesList) Run(out io.Writer, outputFormat string) error {
+	configImagesList := ConfigImagesList{
+		Images: images.GetControlPlaneImages(&i.cfg.ClusterConfiguration),
 	}
 
+	output, err := kubeadmutil.ConvertToOutputFormat(&configImagesList, outputFormat)
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(out, output)
 	return nil
 }
 
