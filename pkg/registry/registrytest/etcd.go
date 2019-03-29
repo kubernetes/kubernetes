@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/options"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -43,6 +44,7 @@ func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*st
 	if err != nil {
 		t.Fatal(err)
 	}
+	completedConfig.ApiResourceConfig = serverstorage.NewResourceConfig()
 	factory, err := completedConfig.New()
 	if err != nil {
 		t.Fatal(err)
