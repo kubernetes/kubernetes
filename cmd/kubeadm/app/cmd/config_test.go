@@ -41,7 +41,7 @@ import (
 )
 
 const (
-	defaultNumberOfImages = 8
+	defaultNumberOfImages = 7
 )
 
 // dummyKubernetesVersion is just used for unit testing, in order to not make
@@ -53,7 +53,7 @@ func TestNewCmdConfigImagesList(t *testing.T) {
 	mockK8sVersion := dummyKubernetesVersion
 	images := NewCmdConfigImagesList(&output, &mockK8sVersion)
 	images.Run(nil, nil)
-	actual := strings.Split(output.String(), "\n")
+	actual := strings.Split(strings.TrimSpace(output.String()), "\n")
 	if len(actual) != defaultNumberOfImages {
 		t.Fatalf("Expected %v but found %v images", defaultNumberOfImages, len(actual))
 	}
@@ -118,7 +118,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			if i.Run(&output) != nil {
 				t.Fatalf("Error from running the images command: %v", err)
 			}
-			actual := strings.Split(output.String(), "\n")
+			actual := strings.Split(strings.TrimSpace(output.String()), "\n")
 			if len(actual) != tc.expectedImageCount {
 				t.Fatalf("did not get the same number of images: actual: %v expected: %v. Actual value: %v", len(actual), tc.expectedImageCount, actual)
 			}
@@ -208,7 +208,7 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 				t.Fatalf("did not expect an error running the Images command: %v", err)
 			}
 
-			actual := strings.Split(output.String(), "\n")
+			actual := strings.Split(strings.TrimSpace(output.String()), "\n")
 			if len(actual) != tc.expectedImages {
 				t.Fatalf("expected %v images but got %v", tc.expectedImages, actual)
 			}
