@@ -74,7 +74,7 @@ func Test(t *testing.T) {
 	}
 	provider.loadConfig(bytes.NewBufferString(configStr))
 
-	creds := provider.Provide()
+	creds := provider.Provide("")
 
 	if len(creds) != len(result)+1 {
 		t.Errorf("Unexpected list: %v, expected length %d", creds, len(result)+1)

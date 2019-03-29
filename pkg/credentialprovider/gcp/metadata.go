@@ -130,12 +130,12 @@ func (g *metadataProvider) Enabled() bool {
 }
 
 // LazyProvide implements DockerConfigProvider. Should never be called.
-func (g *dockerConfigKeyProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
+func (g *dockerConfigKeyProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
 	return nil
 }
 
 // Provide implements DockerConfigProvider
-func (g *dockerConfigKeyProvider) Provide() credentialprovider.DockerConfig {
+func (g *dockerConfigKeyProvider) Provide(image string) credentialprovider.DockerConfig {
 	// Read the contents of the google-dockercfg metadata key and
 	// parse them as an alternate .dockercfg
 	if cfg, err := credentialprovider.ReadDockerConfigFileFromUrl(dockerConfigKey, g.Client, metadataHeader); err != nil {
@@ -148,12 +148,12 @@ func (g *dockerConfigKeyProvider) Provide() credentialprovider.DockerConfig {
 }
 
 // LazyProvide implements DockerConfigProvider. Should never be called.
-func (g *dockerConfigUrlKeyProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
+func (g *dockerConfigUrlKeyProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
 	return nil
 }
 
 // Provide implements DockerConfigProvider
-func (g *dockerConfigUrlKeyProvider) Provide() credentialprovider.DockerConfig {
+func (g *dockerConfigUrlKeyProvider) Provide(image string) credentialprovider.DockerConfig {
 	// Read the contents of the google-dockercfg-url key and load a .dockercfg from there
 	if url, err := credentialprovider.ReadUrl(dockerConfigUrlKey, g.Client, metadataHeader); err != nil {
 		klog.Errorf("while reading 'google-dockercfg-url' metadata: %v", err)
@@ -258,12 +258,12 @@ type tokenBlob struct {
 }
 
 // LazyProvide implements DockerConfigProvider. Should never be called.
-func (g *containerRegistryProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
+func (g *containerRegistryProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
 	return nil
 }
 
 // Provide implements DockerConfigProvider
-func (g *containerRegistryProvider) Provide() credentialprovider.DockerConfig {
+func (g *containerRegistryProvider) Provide(image string) credentialprovider.DockerConfig {
 	cfg := credentialprovider.DockerConfig{}
 
 	tokenJsonBlob, err := credentialprovider.ReadUrl(metadataToken, g.Client, metadataHeader)
