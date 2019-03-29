@@ -31,12 +31,16 @@ import (
 	configserializer "k8s.io/component-base/config/serializer"
 )
 
+// TestCase describes the the expectations for round-tripping an object of a specific GroupVersionKind
 type TestCase struct {
 	name, in, out string
 	inGVK         schema.GroupVersionKind
 	outGV         schema.GroupVersion
 }
 
+// GetRoundtripTestCases returns TestCases for all source-external version pairs within each GroupKind of scheme.AllKnownTypes.
+// TestCases will be generated such that `in` and `out` will refer to relative paths of YAML files in a testdata/ directory.
+// Destination-GroupVersions contained in `disallowMarshalGroupVersions` are excluded from the generated TestCases.
 func GetRoundtripTestCases(scheme *runtime.Scheme, disallowMarshalGroupVersions sets.String) []TestCase {
 	cases := []TestCase{}
 	versionsForKind := map[schema.GroupKind][]string{}
@@ -68,6 +72,8 @@ func GetRoundtripTestCases(scheme *runtime.Scheme, disallowMarshalGroupVersions 
 	return cases
 }
 
+// RunTestsOnYAMLData runs the passed in test cases. It checks that we can decode the test in-file without issue,
+// and that re-encoding (round-tripping) that object produces the same bytes as the out-file supplied in testdata/.
 func RunTestsOnYAMLData(t *testing.T, tests []TestCase, scheme *runtime.Scheme, codecs *serializer.CodecFactory) {
 	sz := configserializer.NewStrictYAMLJSONSerializer(scheme, codecs)
 
@@ -97,6 +103,7 @@ func RunTestsOnYAMLData(t *testing.T, tests []TestCase, scheme *runtime.Scheme, 
 	}
 }
 
+// decodeTestData is a helper function for reading a file and decoding it into a new object of the proper GroupVersionKind
 func decodeTestData(path string, gvk schema.GroupVersionKind, scheme *runtime.Scheme, sz configserializer.StrictYAMLJSONSerializer) (runtime.Object, error) {
 	obj, err := scheme.New(gvk)
 	if err != nil {
@@ -115,6 +122,7 @@ func decodeTestData(path string, gvk schema.GroupVersionKind, scheme *runtime.Sc
 	return obj, nil
 }
 
+// DiffBytes outputs a human-readable diff of two byte slices
 func DiffBytes(expected, actual []byte) string {
 	var diffBytes bytes.Buffer
 	difflib.WriteUnifiedDiff(&diffBytes, difflib.UnifiedDiff{

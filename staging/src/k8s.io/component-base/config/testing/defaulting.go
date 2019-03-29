@@ -26,6 +26,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
+// GetDefaultingTestCases generates test cases for every yaml file in testdata/<kind>/before/.
+// The corresponding named file in the testdata/<kind>/after/ directory is indicated for comparison.
 func GetDefaultingTestCases(scheme *runtime.Scheme) []TestCase {
 	cases := []TestCase{}
 	for gvk := range scheme.AllKnownTypes() {
