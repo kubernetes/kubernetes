@@ -73,7 +73,6 @@ type Config struct {
 
 	// The Cache will be caching objects of a given Type and assumes that they
 	// are all stored under ResourcePrefix directory in the underlying database.
-	Type           interface{}
 	ResourcePrefix string
 
 	// KeyFunc is used to get a key in the underlying storage for a given object.
@@ -85,6 +84,9 @@ type Config struct {
 	// TriggerPublisherFunc is used for optimizing amount of watchers that
 	// needs to process an incoming event.
 	TriggerPublisherFunc storage.TriggerPublisherFunc
+
+	// NewFunc is a function that creates new empty object storing a object of type Type.
+	NewFunc func() runtime.Object
 
 	// NewList is a function that creates new empty object storing a list of
 	// objects of type Type.
@@ -230,21 +232,20 @@ func NewCacherFromConfig(config Config) *Cacher {
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
+	obj := config.NewFunc()
 	// Give this error when it is constructed rather than when you get the
 	// first watch item, because it's much easier to track down that way.
-	if obj, ok := config.Type.(runtime.Object); ok {
-		if err := runtime.CheckCodec(config.Codec, obj); err != nil {
-			panic("storage codec doesn't seem to match given type: " + err.Error())
-		}
+	if err := runtime.CheckCodec(config.Codec, obj); err != nil {
+		panic("storage codec doesn't seem to match given type: " + err.Error())
 	}
 
 	stopCh := make(chan struct{})
 	cacher := &Cacher{
 		ready:       newReady(),
 		storage:     config.Storage,
-		objectType:  reflect.TypeOf(config.Type),
+		objectType:  reflect.TypeOf(obj),
 		watchCache:  watchCache,
-		reflector:   cache.NewNamedReflector(reflectorName, listerWatcher, config.Type, watchCache, 0),
+		reflector:   cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0),
 		versioner:   config.Versioner,
 		triggerFunc: config.TriggerPublisherFunc,
 		watcherIdx:  0,

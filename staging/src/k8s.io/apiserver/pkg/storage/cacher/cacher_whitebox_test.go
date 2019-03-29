@@ -252,10 +252,10 @@ func newTestCacher(s storage.Interface, cap int) (*Cacher, storage.Versioner) {
 		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      testVersioner{},
-		Type:           &example.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		GetAttrsFunc:   func(obj runtime.Object) (labels.Set, fields.Set, error) { return nil, nil, nil },
+		NewFunc:        func() runtime.Object { return &example.Pod{} },
 		NewListFunc:    func() runtime.Object { return &example.PodList{} },
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 	}
