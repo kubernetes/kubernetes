@@ -324,7 +324,7 @@ data:
     template: |-
       initContainers:
       - name: istio-init
-        image: "gcr.io/gke-release/istio/proxy_init:1.0.6-gke.1"
+        image: "gcr.io/gke-release/istio/proxy_init:1.0.6-gke.3"
         args:
         - "-p"
         - [[ .MeshConfig.ProxyListenPort ]]
@@ -349,7 +349,7 @@ data:
         restartPolicy: Always
       containers:
       - name: istio-proxy
-        image: [[ annotation .ObjectMeta `sidecar.istio.io/proxyImage`  "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"  ]]
+        image: [[ annotation .ObjectMeta `sidecar.istio.io/proxyImage`  "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.3"  ]]
 
         ports:
         - containerPort: 15090
@@ -2467,7 +2467,7 @@ spec:
       serviceAccountName: istio-galley-service-account
       containers:
         - name: validator
-          image: "gcr.io/gke-release/istio/galley:1.0.6-gke.1"
+          image: "gcr.io/gke-release/istio/galley:1.0.6-gke.3"
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 443
@@ -2580,7 +2580,7 @@ spec:
       serviceAccountName: istio-egressgateway-service-account
       containers:
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.3"
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -2718,7 +2718,7 @@ spec:
       serviceAccountName: istio-ingressgateway-service-account
       containers:
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.3"
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -2905,7 +2905,7 @@ spec:
                 - s390x
       containers:
       - name: mixer
-        image: "gcr.io/gke-release/istio/mixer:1.0.6-gke.1"
+        image: "gcr.io/gke-release/istio/mixer:1.0.6-gke.3"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9093
@@ -2931,7 +2931,7 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       - name: istio-proxy
-        image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"
+        image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.3"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9091
@@ -3008,7 +3008,7 @@ spec:
         emptyDir: {}
       containers:
       - name: mixer
-        image: "gcr.io/gke-release/istio/mixer:1.0.6-gke.1"
+        image: "gcr.io/gke-release/istio/mixer:1.0.6-gke.3"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9093
@@ -3033,7 +3033,7 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       - name: istio-proxy
-        image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"
+        image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.3"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9091
@@ -3110,7 +3110,7 @@ spec:
       serviceAccountName: istio-pilot-service-account
       containers:
         - name: discovery
-          image: "gcr.io/gke-release/istio/pilot:1.0.6-gke.1"
+          image: "gcr.io/gke-release/istio/pilot:1.0.6-gke.3"
           imagePullPolicy: IfNotPresent
           args:
           - "discovery"
@@ -3153,7 +3153,7 @@ spec:
             mountPath: /etc/certs
             readOnly: true
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.1"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.6-gke.3"
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 15003
@@ -3260,7 +3260,7 @@ spec:
       serviceAccountName: istio-citadel-service-account
       containers:
         - name: citadel
-          image: "gcr.io/gke-release/istio/citadel:1.0.6-gke.1"
+          image: "gcr.io/gke-release/istio/citadel:1.0.6-gke.3"
           imagePullPolicy: IfNotPresent
           args:
             - --append-dns-names=true
@@ -3332,7 +3332,7 @@ spec:
       serviceAccountName: istio-sidecar-injector-service-account
       containers:
         - name: sidecar-injector-webhook
-          image: "gcr.io/gke-release/istio/sidecar_injector:1.0.6-gke.1"
+          image: "gcr.io/gke-release/istio/sidecar_injector:1.0.6-gke.3"
           imagePullPolicy: IfNotPresent
           args:
             - --caCertFile=/etc/istio/certs/root-cert.pem
