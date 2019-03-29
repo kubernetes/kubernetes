@@ -334,11 +334,18 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	Expect(found).To(Equal(true))
 	cpuAllocatableMil := cpuAllocatable.MilliValue()
 
+	floatOne := float64(1)
 	cpuFraction := float64(totalRequestedCpuResource) / float64(cpuAllocatableMil)
+	if cpuFraction >  floatOne {
+		cpuFraction = floatOne
+	}
 	memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
 	Expect(found).To(Equal(true))
 	memAllocatableVal := memAllocatable.Value()
 	memFraction := float64(totalRequestedMemResource) / float64(memAllocatableVal)
+	if memFraction > floatOne {
+		memFraction = floatOne
+	}
 
 	framework.Logf("Node: %v, totalRequestedCpuResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCpuResource, cpuAllocatableMil, cpuFraction)
 	framework.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, totalRequestedMemResource, memAllocatableVal, memFraction)
