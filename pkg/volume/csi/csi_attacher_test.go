@@ -198,7 +198,7 @@ func TestAttacherAttach(t *testing.T) {
 
 		csiAttacher := attacher.(*csiAttacher)
 
-		go func(spec *volume.Spec, id, nodename string, fail bool) {
+		go func(spec *volume.Spec, nodename string, fail bool) {
 			attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
 			if !fail && err != nil {
 				t.Errorf("expecting no failure, but got err: %v", err)
@@ -206,10 +206,10 @@ func TestAttacherAttach(t *testing.T) {
 			if fail && err == nil {
 				t.Errorf("expecting failure, but got no err")
 			}
-			if attachID != id && !fail {
-				t.Errorf("expecting attachID %v, got %v", id, attachID)
+			if attachID != "" {
+				t.Errorf("expecting empty attachID, got %v", attachID)
 			}
-		}(tc.spec, tc.attachID, tc.nodeName, tc.shouldFail)
+		}(tc.spec, tc.nodeName, tc.shouldFail)
 
 		var status storage.VolumeAttachmentStatus
 		if tc.injectAttacherError {
@@ -277,15 +277,15 @@ func TestAttacherAttachWithInline(t *testing.T) {
 		}
 		csiAttacher := attacher.(*csiAttacher)
 
-		go func(spec *volume.Spec, id, nodename string, fail bool) {
+		go func(spec *volume.Spec, nodename string, fail bool) {
 			attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
 			if fail != (err != nil) {
 				t.Errorf("expecting no failure, but got err: %v", err)
 			}
-			if attachID != id && !fail {
-				t.Errorf("expecting attachID %v, got %v", id, attachID)
+			if attachID != "" {
+				t.Errorf("expecting empty attachID, got %v", attachID)
 			}
-		}(tc.spec, tc.attachID, tc.nodeName, tc.shouldFail)
+		}(tc.spec, tc.nodeName, tc.shouldFail)
 
 		var status storage.VolumeAttachmentStatus
 		if tc.injectAttacherError {
@@ -362,10 +362,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				if err != nil {
 					t.Errorf("Attach() failed: %s", err)
 				}
-				if expectAttach && attachID == "" {
-					t.Errorf("Expected attachID, got nothing")
-				}
-				if !expectAttach && attachID != "" {
+				if attachID != "" {
 					t.Errorf("Expected empty attachID, got %q", attachID)
 				}
 			}(spec, test.expectVolumeAttachment)
