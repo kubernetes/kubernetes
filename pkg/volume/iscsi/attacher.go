@@ -180,6 +180,10 @@ func (plugin *iscsiPlugin) CanAttach(spec *volume.Spec) bool {
 	return true
 }
 
+func (plugin *iscsiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
 func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks keymutex.KeyMutex, pod *v1.Pod) (*iscsiDiskMounter, error) {
 	var secret map[string]string
 	readOnly, fsType, err := getISCSIVolumeInfo(spec)

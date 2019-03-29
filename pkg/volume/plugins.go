@@ -241,6 +241,8 @@ type DeviceMountableVolumePlugin interface {
 	NewDeviceMounter() (DeviceMounter, error)
 	NewDeviceUnmounter() (DeviceUnmounter, error)
 	GetDeviceMountRefs(deviceMountPath string) ([]string, error)
+	// CanDeviceMount determines if device in volume.Spec is mountable
+	CanDeviceMount(spec *Spec) (bool, error)
 }
 
 // ExpandableVolumePlugin is an extended interface of VolumePlugin and is used for volumes that can be
@@ -902,7 +904,11 @@ func (pm *VolumePluginMgr) FindDeviceMountablePluginBySpec(spec *Spec) (DeviceMo
 		return nil, err
 	}
 	if deviceMountableVolumePlugin, ok := volumePlugin.(DeviceMountableVolumePlugin); ok {
-		return deviceMountableVolumePlugin, nil
+		if canMount, err := deviceMountableVolumePlugin.CanDeviceMount(spec); err != nil {
+			return nil, err
+		} else if canMount {
+			return deviceMountableVolumePlugin, nil
+		}
 	}
 	return nil, nil
 }

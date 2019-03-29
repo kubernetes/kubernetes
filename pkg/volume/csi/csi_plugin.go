@@ -604,6 +604,11 @@ func (p *csiPlugin) CanAttach(spec *volume.Spec) bool {
 	return !skipAttach
 }
 
+// TODO (#75352) add proper logic to determine device moutability by inspecting the spec.
+func (p *csiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
 func (p *csiPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return p.NewDetacher()
 }

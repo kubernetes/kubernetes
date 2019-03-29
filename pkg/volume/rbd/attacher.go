@@ -75,6 +75,10 @@ func (plugin *rbdPlugin) CanAttach(spec *volume.Spec) bool {
 	return true
 }
 
+func (plugin *rbdPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
 // rbdAttacher implements volume.Attacher interface.
 type rbdAttacher struct {
 	plugin  *rbdPlugin

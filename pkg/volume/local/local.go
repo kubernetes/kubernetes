@@ -253,6 +253,10 @@ type deviceMounter struct {
 
 var _ volume.DeviceMounter = &deviceMounter{}
 
+func (plugin *localVolumePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
 func (plugin *localVolumePlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 	return &deviceMounter{
 		plugin:  plugin,
