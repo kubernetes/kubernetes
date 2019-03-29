@@ -300,7 +300,7 @@ func TestGetClientset(t *testing.T) {
 	}
 }
 
-func TestRunDeleteToken(t *testing.T) {
+func TestRunDeleteTokens(t *testing.T) {
 	var buf bytes.Buffer
 
 	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
@@ -327,12 +327,12 @@ func TestRunDeleteToken(t *testing.T) {
 
 	// test valid; should not fail
 	// for some reason Secrets().Delete() does not fail even for this dummy config
-	if err = RunDeleteToken(&buf, client, "abcdef.1234567890123456"); err != nil {
+	if err = RunDeleteTokens(&buf, client, []string{"abcdef.1234567890123456", "abcdef.2345678901234567"}); err != nil {
 		t.Errorf("RunDeleteToken() failed for a valid token: %v", err)
 	}
 
 	// test invalid token; should fail
-	if err = RunDeleteToken(&buf, client, "invalid-token"); err == nil {
+	if err = RunDeleteTokens(&buf, client, []string{"invalid-token"}); err == nil {
 		t.Errorf("RunDeleteToken() succeeded for an invalid token: %v", err)
 	}
 }

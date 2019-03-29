@@ -158,11 +158,11 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd.AddCommand(listCmd)
 
 	deleteCmd := &cobra.Command{
-		Use:                   "delete [token-value]",
+		Use:                   "delete [token-value] ...",
 		DisableFlagsInUseLine: true,
 		Short:                 "Delete bootstrap tokens on the server.",
 		Long: dedent.Dedent(`
-			This command will delete a given bootstrap token for you.
+			This command will delete a list of bootstrap tokens for you.
 
 			The [token-value] is the full Token of the form "[a-z0-9]{6}.[a-z0-9]{16}" or the
 			Token ID of the form "[a-z0-9]{6}" to delete.
@@ -175,7 +175,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
-			err = RunDeleteToken(out, client, args[0])
+			err = RunDeleteTokens(out, client, args)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -296,27 +296,29 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 	return nil
 }
 
-// RunDeleteToken removes a bootstrap token from the server.
-func RunDeleteToken(out io.Writer, client clientset.Interface, tokenIDOrToken string) error {
-	// Assume the given first argument is a token id and try to parse it
-	tokenID := tokenIDOrToken
-	klog.V(1).Infoln("[token] parsing token ID")
-	if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
-		// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
-		bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tokenIDOrToken)
-		if err != nil {
-			return errors.Errorf("given token or token id %q didn't match pattern %q or %q",
-				tokenIDOrToken, bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
+// RunDeleteTokens removes a bootstrap tokens from the server.
+func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens []string) error {
+	for _, tokenIDOrToken := range tokenIDsOrTokens {
+		// Assume this is a token id and try to parse it
+		tokenID := tokenIDOrToken
+		klog.V(1).Infof("[token] parsing token %q", tokenIDOrToken)
+		if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
+			// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
+			bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tokenIDOrToken)
+			if err != nil {
+				return errors.Errorf("given token %q didn't match pattern %q or %q",
+					tokenIDOrToken, bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
+			}
+			tokenID = bts.ID
 		}
-		tokenID = bts.ID
-	}
 
-	tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
-	klog.V(1).Infoln("[token] deleting token")
-	if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
-		return errors.Wrap(err, "failed to delete bootstrap token")
+		tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
+		klog.V(1).Infof("[token] deleting token %q", tokenID)
+		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
+			return errors.Wrapf(err, "failed to delete bootstrap token %q", tokenID)
+		}
+		fmt.Fprintf(out, "bootstrap token %q deleted\n", tokenID)
 	}
-	fmt.Fprintf(out, "bootstrap token with id %q deleted\n", tokenID)
 	return nil
 }
 
