@@ -11,8 +11,6 @@ go_library(
     srcs = [
         "container_runtime.go",
         "globalflags.go",
-        "globalflags_linux.go",
-        "globalflags_other.go",
         "options.go",
         "osflags_others.go",
         "osflags_windows.go",
@@ -41,18 +39,7 @@ go_library(
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/github.com/google/cadvisor/container/common:go_default_library",
-            "//vendor/github.com/google/cadvisor/container/containerd:go_default_library",
-            "//vendor/github.com/google/cadvisor/container/docker:go_default_library",
-            "//vendor/github.com/google/cadvisor/container/raw:go_default_library",
-            "//vendor/github.com/google/cadvisor/machine:go_default_library",
-            "//vendor/github.com/google/cadvisor/manager:go_default_library",
-            "//vendor/github.com/google/cadvisor/storage:go_default_library",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 filegroup(

@@ -39,7 +39,6 @@ import (
 // We do this in order to prevent unwanted flags from leaking into the Kubelet's flagset.
 func AddGlobalFlags(fs *pflag.FlagSet) {
 	addGlogFlags(fs)
-	addCadvisorFlags(fs)
 	addCredentialProviderFlags(fs)
 	verflag.AddFlags(fs)
 	logs.AddFlags(fs)
@@ -70,12 +69,6 @@ func pflagRegister(global, local *pflag.FlagSet, globalName string) {
 	} else {
 		panic(fmt.Sprintf("failed to find flag in global flagset (pflag): %s", globalName))
 	}
-}
-
-// registerDeprecated registers the flag with register, and then marks it deprecated
-func registerDeprecated(global *flag.FlagSet, local *pflag.FlagSet, globalName, deprecated string) {
-	register(global, local, globalName)
-	local.Lookup(normalize(globalName)).Deprecated = deprecated
 }
 
 // addCredentialProviderFlags adds flags from k8s.io/kubernetes/pkg/credentialprovider

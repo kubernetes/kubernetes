@@ -335,7 +335,6 @@ func getCadvisorPod() *v1.Pod {
 					},
 					Args: []string{
 						"--profiling",
-						fmt.Sprintf("--housekeeping_interval=%ds", houseKeepingInterval),
 						fmt.Sprintf("--port=%d", cadvisorPort),
 					},
 				},
