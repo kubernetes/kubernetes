@@ -29,11 +29,9 @@ import (
 func GetDefaultingTestCases(scheme *runtime.Scheme) []TestCase {
 	cases := []TestCase{}
 	for gvk := range scheme.AllKnownTypes() {
-		fmt.Println(gvk)
 		beforeDir := fmt.Sprintf("testdata/%s/before", gvk.Kind)
 		afterDir := fmt.Sprintf("testdata/%s/after", gvk.Kind)
 		utilruntime.Must(filepath.Walk(beforeDir, func(path string, info os.FileInfo, err error) error {
-			fmt.Println(info.Name(), path)
 			if err != nil {
 				return err
 			}
@@ -47,7 +45,7 @@ func GetDefaultingTestCases(scheme *runtime.Scheme) []TestCase {
 				return nil
 			}
 			cases = append(cases, TestCase{
-				name:  fmt.Sprintf("default_%s", info.Name()),
+				name:  fmt.Sprintf("default_%s_%s", gvk.Kind, info.Name()),
 				in:    filepath.Join(beforeDir, info.Name()),
 				inGVK: gvk,
 				out:   filepath.Join(afterDir, info.Name()),
