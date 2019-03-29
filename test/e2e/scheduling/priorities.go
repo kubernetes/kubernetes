@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 type Resource struct {
@@ -326,6 +327,10 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	for _, pod := range allpods.Items {
 		if pod.Spec.NodeName == node.Name {
 			framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
+			// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
+			if v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
+				continue
+			}
 			totalRequestedCpuResource += getNonZeroRequests(&pod).MilliCPU
 			totalRequestedMemResource += getNonZeroRequests(&pod).Memory
 		}
