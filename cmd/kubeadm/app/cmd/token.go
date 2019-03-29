@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -27,14 +28,14 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/duration"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	"k8s.io/klog"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -140,6 +141,8 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd.AddCommand(createCmd)
 	tokenCmd.AddCommand(NewCmdTokenGenerate(out))
 
+	var outputFormat string
+
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List bootstrap tokens on the server.",
@@ -151,10 +154,12 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
-			err = RunListTokens(out, errW, client)
+			err = RunListTokens(out, errW, client, kubeConfigFile, outputFormat)
 			kubeadmutil.CheckErr(err)
 		},
 	}
+
+	options.AddOutputFlag(listCmd.Flags(), &outputFormat)
 	tokenCmd.AddCommand(listCmd)
 
 	deleteCmd := &cobra.Command{
@@ -255,8 +260,40 @@ func RunGenerateToken(out io.Writer) error {
 	return nil
 }
 
+// BootstrapTokenList represents information for JSON and YAML output produced by 'kubeadm token list'
+type BootstrapTokenList struct {
+	PublicKeyPins        []string                            `json:"publicKeyPins"`        // yaml:"publicKeyPins"`
+	ControlPlaneHostPort string                              `json:"controlPlaneHostPort"` // yaml:"controlPlaneHostPort"`
+	Tokens               []*kubeadmapiv1beta1.BootstrapToken `json:"tokens"`               // yaml:"tokens"`
+}
+
+func (tokenList *BootstrapTokenList) Text() string {
+	var out bytes.Buffer
+	w := tabwriter.NewWriter(&out, 10, 4, 3, ' ', 0)
+	fmt.Fprintln(w, "TOKEN\tTTL\tEXPIRES\tUSAGES\tDESCRIPTION\tEXTRA GROUPS")
+	for _, token := range tokenList.Tokens {
+		// Get the human-friendly string representation for the token
+		humanFriendlyTokenOutput := humanReadableBootstrapToken(token)
+		fmt.Fprintln(w, humanFriendlyTokenOutput)
+	}
+	w.Flush()
+
+	return out.String()
+}
+
+func (tokenList *BootstrapTokenList) Short() string {
+	var out bytes.Buffer
+	w := tabwriter.NewWriter(&out, 10, 4, 3, ' ', 0)
+	fmt.Fprintln(w, "TOKEN\tDESCRIPTION\tEXPIRES\tTTL")
+	for _, token := range tokenList.Tokens {
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", token.Token, token.Description, token.Expires, token.TTL)
+	}
+	w.Flush()
+	return out.String()
+}
+
 // RunListTokens lists details on all existing bootstrap tokens on the server.
-func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) error {
+func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, kubeConfigFile, outputFormat string) error {
 	// First, build our selector for bootstrap tokens only
 	klog.V(1).Infoln("[token] preparing selector for bootstrap token")
 	tokenSelector := fields.SelectorFromSet(
@@ -277,22 +314,51 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 		return errors.Wrap(err, "failed to list bootstrap tokens")
 	}
 
-	w := tabwriter.NewWriter(out, 10, 4, 3, ' ', 0)
-	fmt.Fprintln(w, "TOKEN\tTTL\tEXPIRES\tUSAGES\tDESCRIPTION\tEXTRA GROUPS")
+	var tokens []*kubeadmapi.BootstrapToken
 	for _, secret := range secrets.Items {
-
 		// Get the BootstrapToken struct representation from the Secret object
 		token, err := kubeadmapi.BootstrapTokenFromSecret(&secret)
 		if err != nil {
 			fmt.Fprintf(errW, "%v", err)
 			continue
 		}
-
-		// Get the human-friendly string representation for the token
-		humanFriendlyTokenOutput := humanReadableBootstrapToken(token)
-		fmt.Fprintln(w, humanFriendlyTokenOutput)
+		tokens = append(tokens, token)
 	}
-	w.Flush()
+
+	// Convert tokens to the pubic type for marshaling
+	var bootstrapTokens []*kubeadmapiv1beta1.BootstrapToken
+	for _, token := range tokens {
+		bootstrapToken := kubeadmapiv1beta1.BootstrapToken{}
+		err = kubeadmscheme.Scheme.Convert(token, &bootstrapToken, nil)
+		if err != nil {
+			return err
+		}
+		bootstrapTokens = append(bootstrapTokens, &bootstrapToken)
+	}
+
+	clusterConfig, err := cmdutil.GetClusterConfig(kubeConfigFile)
+	if err != nil {
+		return errors.Wrapf(err, "failed to load cluster config from %s", kubeConfigFile)
+	}
+
+	publicKeyPins, err := cmdutil.GetCAPubKeyPins(clusterConfig)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get CA certs hashes from cluster config")
+	}
+
+	tokenList := BootstrapTokenList{
+		PublicKeyPins:        publicKeyPins,
+		ControlPlaneHostPort: strings.Replace(clusterConfig.Server, "https://", "", -1),
+		Tokens:               bootstrapTokens,
+	}
+
+	output, err := kubeadmutil.ConvertToOutputFormat(&tokenList, outputFormat)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(out, output)
+
 	return nil
 }
 
@@ -320,7 +386,7 @@ func RunDeleteToken(out io.Writer, client clientset.Interface, tokenIDOrToken st
 	return nil
 }
 
-func humanReadableBootstrapToken(token *kubeadmapi.BootstrapToken) string {
+func humanReadableBootstrapToken(token *kubeadmapiv1beta1.BootstrapToken) string {
 	description := token.Description
 	if len(description) == 0 {
 		description = "<none>"

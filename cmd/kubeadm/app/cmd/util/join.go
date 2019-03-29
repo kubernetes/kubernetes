@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcertutil "k8s.io/client-go/util/cert"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
@@ -47,39 +48,60 @@ func GetJoinControlPlaneCommand(kubeConfigFile, token, key string, skipTokenPrin
 	return getJoinCommand(kubeConfigFile, token, key, true, skipTokenPrint, skipCertificateKeyPrint)
 }
 
-func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
+// GetClusterConfig loads kubeconfig file and loads default cluster config from it
+func GetClusterConfig(kubeConfigFile string) (*clientcmdapi.Cluster, error) {
 	// load the kubeconfig file to get the CA certificate and endpoint
 	config, err := clientcmd.LoadFromFile(kubeConfigFile)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to load kubeconfig")
+		return nil, errors.Wrap(err, "failed to load kubeconfig")
 	}
 
 	// load the default cluster config
 	clusterConfig := kubeconfigutil.GetClusterFromKubeConfig(config)
 	if clusterConfig == nil {
-		return "", errors.New("failed to get default cluster config")
+		return nil, errors.New("failed to get default cluster config")
 	}
 
+	return clusterConfig, nil
+}
+
+// GetCAPubKeyPins returns public key pins of the CA certificates' hashes
+func GetCAPubKeyPins(clusterConfig *clientcmdapi.Cluster) ([]string, error) {
 	// load CA certificates from the kubeconfig (either from PEM data or by file path)
 	var caCerts []*x509.Certificate
+	var err error
 	if clusterConfig.CertificateAuthorityData != nil {
 		caCerts, err = clientcertutil.ParseCertsPEM(clusterConfig.CertificateAuthorityData)
 		if err != nil {
-			return "", errors.Wrap(err, "failed to parse CA certificate from kubeconfig")
+			return nil, errors.Wrap(err, "failed to parse CA certificate from kubeconfig")
 		}
 	} else if clusterConfig.CertificateAuthority != "" {
 		caCerts, err = clientcertutil.CertsFromFile(clusterConfig.CertificateAuthority)
 		if err != nil {
-			return "", errors.Wrap(err, "failed to load CA certificate referenced by kubeconfig")
+			return nil, errors.Wrap(err, "failed to load CA certificate referenced by kubeconfig")
 		}
 	} else {
-		return "", errors.New("no CA certificates found in kubeconfig")
+		return nil, errors.New("no CA certificates found in kubeconfig")
 	}
 
 	// hash all the CA certs and include their public key pins as trusted values
 	publicKeyPins := make([]string, 0, len(caCerts))
 	for _, caCert := range caCerts {
 		publicKeyPins = append(publicKeyPins, pubkeypin.Hash(caCert))
+	}
+
+	return publicKeyPins, nil
+}
+
+func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
+	clusterConfig, err := GetClusterConfig(kubeConfigFile)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to load cluster config from %s", kubeConfigFile)
+	}
+
+	publicKeyPins, err := GetCAPubKeyPins(clusterConfig)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get CA certs hashes from cluster config")
 	}
 
 	ctx := map[string]interface{}{

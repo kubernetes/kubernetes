@@ -16,6 +16,7 @@ go_library(
         "//cmd/kubeadm/app/util/pubkeypin:go_default_library",
         "//pkg/util/normalizer:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
