@@ -31,12 +31,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 type Resource struct {
@@ -341,7 +341,7 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 
 	floatOne := float64(1)
 	cpuFraction := float64(totalRequestedCpuResource) / float64(cpuAllocatableMil)
-	if cpuFraction >  floatOne {
+	if cpuFraction > floatOne {
 		cpuFraction = floatOne
 	}
 	memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
