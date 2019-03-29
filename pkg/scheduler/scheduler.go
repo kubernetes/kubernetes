@@ -542,7 +542,9 @@ func (sched *Scheduler) scheduleOne() {
 				metrics.PodScheduleErrors.Inc()
 			}
 			if !approved {
-				sched.Cache().ForgetPod(assumedPod)
+				if forgetErr := sched.Cache().ForgetPod(assumedPod); forgetErr != nil {
+					klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
+				}
 				var reason string
 				if err == nil {
 					msg := fmt.Sprintf("prebind plugin %v rejected pod %v.", pl.Name(), assumedPod.Name)
