@@ -74,7 +74,7 @@ func RunTestsOnYAMLData(t *testing.T, tests []TestCase, scheme *runtime.Scheme, 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			obj, err := decodeTestData(rt.in, rt.inGVK, scheme, codecs)
+			obj, err := decodeTestData(rt.in, rt.inGVK, scheme, sz)
 			if err != nil {
 				t2.Fatal(err)
 			}
@@ -97,9 +97,7 @@ func RunTestsOnYAMLData(t *testing.T, tests []TestCase, scheme *runtime.Scheme, 
 	}
 }
 
-func decodeTestData(path string, gvk schema.GroupVersionKind, scheme *runtime.Scheme, codecs *serializer.CodecFactory) (runtime.Object, error) {
-	sz := configserializer.NewStrictYAMLJSONSerializer(scheme, codecs)
-
+func decodeTestData(path string, gvk schema.GroupVersionKind, scheme *runtime.Scheme, sz configserializer.StrictYAMLJSONSerializer) (runtime.Object, error) {
 	obj, err := scheme.New(gvk)
 	if err != nil {
 		return nil, err
