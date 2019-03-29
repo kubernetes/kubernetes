@@ -72,3 +72,11 @@ func AddFeatureGatesStringFlag(fs *pflag.FlagSet, featureGatesString *string) {
 			"No feature gates are available in this release.")
 	}
 }
+
+// AddKubernetesVersionFlag adds the --kubernetes-version flag to the given flagset
+func AddKubernetesVersionFlag(fs *pflag.FlagSet, kubernetesVersion *string) {
+	fs.StringVar(
+		kubernetesVersion, KubernetesVersion, *kubernetesVersion,
+		`Choose a specific Kubernetes version for the control plane.`,
+	)
+}
