@@ -542,7 +542,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			return volumeToMount.GenerateError("MountVolume.FindPluginBySpec failed", err)
 		}
 
-		affinityErr := checkNodeAffinity(og, volumeToMount, volumePlugin)
+		affinityErr := checkNodeAffinity(og, volumeToMount)
 		if affinityErr != nil {
 			return volumeToMount.GenerateError("MountVolume.NodeAffinity check failed", affinityErr)
 		}
@@ -948,17 +948,29 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
 
+	originalSpec := volumeToMount.VolumeSpec
+	// Translate to CSI spec if migration enabled
+	if useCSIPlugin(og.volumePluginMgr, originalSpec) {
+		csiSpec, err := translateSpec(originalSpec)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.TranslateSpec failed", err)
+		}
+
+		volumeToMount.VolumeSpec = csiSpec
+	}
+
 	// Get block volume mapper plugin
-	var blockVolumeMapper volume.BlockVolumeMapper
 	blockVolumePlugin, err :=
 		og.volumePluginMgr.FindMapperPluginBySpec(volumeToMount.VolumeSpec)
 	if err != nil {
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.FindMapperPluginBySpec failed", err)
 	}
+
 	if blockVolumePlugin == nil {
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.FindMapperPluginBySpec failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
 	}
-	affinityErr := checkNodeAffinity(og, volumeToMount, blockVolumePlugin)
+
+	affinityErr := checkNodeAffinity(og, volumeToMount)
 	if affinityErr != nil {
 		eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.NodeAffinity check failed", affinityErr)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
@@ -1077,7 +1089,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			blockVolumeMapper,
 			volumeToMount.OuterVolumeSpecName,
 			volumeToMount.VolumeGidValue,
-			volumeToMount.VolumeSpec)
+			originalSpec)
 		if markVolMountedErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MapVolume.MarkVolumeAsMounted failed", markVolMountedErr)
@@ -1107,13 +1119,32 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	volumeToUnmount MountedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
 
-	// Get block volume unmapper plugin
-	var blockVolumeUnmapper volume.BlockVolumeUnmapper
-	blockVolumePlugin, err :=
-		og.volumePluginMgr.FindMapperPluginByName(volumeToUnmount.PluginName)
-	if err != nil {
-		return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed", err)
+	var blockVolumePlugin volume.BlockVolumePlugin
+	var err error
+	// Translate to CSI spec if migration enabled
+	// And get block volume unmapper plugin
+	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
+		csiSpec, err := translateSpec(volumeToUnmount.VolumeSpec)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.TranslateSpec failed", err)
+		}
+
+		volumeToUnmount.VolumeSpec = csiSpec
+
+		blockVolumePlugin, err =
+			og.volumePluginMgr.FindMapperPluginByName(csi.CSIPluginName)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed", err)
+		}
+	} else {
+		blockVolumePlugin, err =
+			og.volumePluginMgr.FindMapperPluginByName(volumeToUnmount.PluginName)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed", err)
+		}
 	}
+
+	var blockVolumeUnmapper volume.BlockVolumeUnmapper
 	if blockVolumePlugin == nil {
 		return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
 	}
@@ -1184,11 +1215,29 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
 
-	blockVolumePlugin, err :=
-		og.volumePluginMgr.FindMapperPluginByName(deviceToDetach.PluginName)
-	if err != nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed", err)
+	var blockVolumePlugin volume.BlockVolumePlugin
+	var err error
+	// Translate to CSI spec if migration enabled
+	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec) {
+		csiSpec, err := translateSpec(deviceToDetach.VolumeSpec)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.TranslateSpec failed", err)
+		}
+
+		deviceToDetach.VolumeSpec = csiSpec
+		blockVolumePlugin, err =
+			og.volumePluginMgr.FindMapperPluginByName(csi.CSIPluginName)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed", err)
+		}
+	} else {
+		blockVolumePlugin, err =
+			og.volumePluginMgr.FindMapperPluginByName(deviceToDetach.PluginName)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed", err)
+		}
 	}
+
 	if blockVolumePlugin == nil {
 		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
 	}
@@ -1581,7 +1630,7 @@ func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount
 
 // checkNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
 // This ensures that we don't mount a volume that doesn't belong to this node
-func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount, plugin volume.VolumePlugin) error {
+func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
 		return nil
 	}
