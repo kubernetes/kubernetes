@@ -19,7 +19,7 @@ package cinder
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -64,7 +64,7 @@ type fakePDManager struct {
 }
 
 func getFakeDeviceName(host volume.VolumeHost, pdName string) string {
-	return path.Join(host.GetPluginDir(cinderVolumePluginName), "device", pdName)
+	return filepath.Join(host.GetPluginDir(cinderVolumePluginName), "device", pdName)
 }
 
 // Real Cinder AttachDisk attaches a cinder volume. If it is not yet mounted,
@@ -160,7 +160,7 @@ func TestPlugin(t *testing.T) {
 	if mounter == nil {
 		t.Errorf("Got a nil Mounter")
 	}
-	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~cinder/vol1")
+	volPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~cinder/vol1")
 	path := mounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)

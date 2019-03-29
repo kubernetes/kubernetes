@@ -18,7 +18,6 @@ package gcepd
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -272,8 +271,8 @@ func parseScsiSerial(output string) (string, error) {
 // Returns list of all /dev/disk/by-id/* paths for given PD.
 func getDiskByIDPaths(pdName string, partition string) []string {
 	devicePaths := []string{
-		path.Join(diskByIDPath, diskGooglePrefix+pdName),
-		path.Join(diskByIDPath, diskScsiGooglePrefix+pdName),
+		filepath.Join(diskByIDPath, diskGooglePrefix+pdName),
+		filepath.Join(diskByIDPath, diskScsiGooglePrefix+pdName),
 	}
 
 	if partition != "" {

@@ -19,7 +19,7 @@ package quobyte
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	gostrings "strings"
 
 	"github.com/pborman/uuid"
@@ -286,7 +286,7 @@ func (quobyteVolume *quobyte) GetPath() string {
 	// Quobyte has only one mount in the PluginDir where all Volumes are mounted
 	// The Quobyte client does a fixed-user mapping
 	pluginDir := quobyteVolume.plugin.host.GetPluginDir(utilstrings.EscapeQualifiedName(quobytePluginName))
-	return path.Join(pluginDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
+	return filepath.Join(pluginDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
 }
 
 type quobyteUnmounter struct {

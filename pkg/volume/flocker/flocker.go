@@ -19,7 +19,7 @@ package flocker
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	flockerapi "github.com/clusterhq/flocker-go"
@@ -81,7 +81,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 func makeGlobalFlockerPath(datasetUUID string) string {
-	return path.Join(defaultMountPath, datasetUUID)
+	return filepath.Join(defaultMountPath, datasetUUID)
 }
 
 func (p *flockerPlugin) Init(host volume.VolumeHost) error {

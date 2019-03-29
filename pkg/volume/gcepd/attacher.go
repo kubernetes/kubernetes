@@ -104,7 +104,7 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName ty
 		}
 	}
 
-	return path.Join(diskByIDPath, diskGooglePrefix+pdName), nil
+	return filepath.Join(diskByIDPath, diskGooglePrefix+pdName), nil
 }
 
 func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {

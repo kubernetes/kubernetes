@@ -19,7 +19,7 @@ package photon_pd
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -285,7 +285,7 @@ func (c *photonPersistentDiskUnmounter) TearDownAt(dir string) error {
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(photonPersistentDiskPluginName), util.MountsInGlobalPDPath, devName)
+	return filepath.Join(host.GetPluginDir(photonPersistentDiskPluginName), util.MountsInGlobalPDPath, devName)
 }
 
 func (ppd *photonPersistentDisk) GetPath() string {
