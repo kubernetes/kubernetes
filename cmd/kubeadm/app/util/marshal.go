@@ -19,7 +19,9 @@ package util
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"io"
+	"strings"
 
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
@@ -50,6 +52,25 @@ func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs s
 
 	encoder := codecs.EncoderForVersion(info.Serializer, gv)
 	return runtime.Encode(encoder, obj)
+}
+
+// MarshalTo marshals data to the specified output format (JSON or YAML)
+func MarshalTo(data interface{}, outputFormat string) (string, error) {
+	of := strings.ToLower(outputFormat)
+	if of != "text" && of != "json" && of != "yaml" {
+		return "", errors.Errorf("invalid output format: %s", outputFormat)
+	}
+	bytes, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if outputFormat == "yaml" {
+		bytes, err = yaml.JSONToYAML(bytes)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to convert JSON output to YAML")
+		}
+	}
+	return string(bytes), nil
 }
 
 // UnmarshalFromYaml unmarshals yaml into an object.

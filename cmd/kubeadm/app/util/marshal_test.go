@@ -18,6 +18,7 @@ package util
 
 import (
 	"bytes"
+	"encoding/json"
 	"reflect"
 	"sort"
 	"testing"
@@ -27,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"sigs.k8s.io/yaml"
+
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -152,6 +155,76 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 	}
 	if !reflect.DeepEqual(*cfg, *cfg2) {
 		t.Errorf("expected %v, got %v", *cfg, *cfg2)
+	}
+}
+
+func TestMarshalTo(t *testing.T) {
+	type testData struct {
+		Name string
+		List []string
+	}
+
+	tstData := testData{
+		Name: "test",
+		List: []string{"item 1", "item 2", "item 3"},
+	}
+
+	var tests = []struct {
+		name         string
+		data         interface{}
+		outputFormat string
+		expectedErr  bool
+	}{
+		{
+			name:         "to JSON",
+			data:         &tstData,
+			outputFormat: "json",
+		},
+		{
+			name:         "to YAML",
+			data:         &tstData,
+			outputFormat: "yaml",
+		},
+		{
+			name:         "invalid data",
+			data:         make(chan int),
+			outputFormat: "json",
+			expectedErr:  true,
+		},
+		{
+			name:         "invalid format",
+			data:         &tstData,
+			outputFormat: "invalid",
+			expectedErr:  true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+			marshaled, err := MarshalTo(rt.data, rt.outputFormat)
+			if err != nil {
+				if !rt.expectedErr {
+					t2.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+
+			// marshal result back to the struct for comparison
+			var unmarshaled testData
+			if rt.outputFormat == "json" {
+				err = json.Unmarshal([]byte(marshaled), &unmarshaled)
+			} else if rt.outputFormat == "yaml" {
+				err = yaml.Unmarshal([]byte(marshaled), &unmarshaled)
+			}
+			if err != nil {
+				t2.Errorf("unexpected unmarshall error: %v", err)
+				return
+			}
+
+			if !reflect.DeepEqual(&unmarshaled, rt.data) {
+				t2.Errorf("unexpected result: %+v, expected: %+v", &unmarshaled, rt.data)
+			}
+		})
 	}
 }
 

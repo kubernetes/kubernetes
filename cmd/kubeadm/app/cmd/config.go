@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
@@ -461,7 +462,7 @@ func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmap
 func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
 	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
-	var cfgPath, featureGatesString string
+	var cfgPath, featureGatesString, outputFormat string
 	var err error
 
 	// This just sets the Kubernetes version for unit testing so kubeadm won't try to
@@ -478,10 +479,11 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 			kubeadmutil.CheckErr(err)
 			imagesList, err := NewImagesList(cfgPath, externalcfg)
 			kubeadmutil.CheckErr(err)
-			kubeadmutil.CheckErr(imagesList.Run(out))
+			kubeadmutil.CheckErr(imagesList.Run(out, outputFormat))
 		},
 	}
 	AddImagesCommonConfigFlags(cmd.PersistentFlags(), externalcfg, &cfgPath, &featureGatesString)
+	cmd.Flags().StringVar(&outputFormat, "output", "text", "Output format; available options are 'text', 'yaml' and 'json'")
 	return cmd
 }
 
@@ -502,13 +504,30 @@ type ImagesList struct {
 	cfg *kubeadmapi.InitConfiguration
 }
 
+// ConfigImagesList represents information for JSON and YAML output produced by 'kubeadm config images list'
+type ConfigImagesList struct {
+	Images []string
+}
+
 // Run runs the images command and writes the result to the io.Writer passed in
-func (i *ImagesList) Run(out io.Writer) error {
-	imgs := images.GetControlPlaneImages(&i.cfg.ClusterConfiguration)
-	for _, img := range imgs {
-		fmt.Fprintln(out, img)
+func (i *ImagesList) Run(out io.Writer, outputFormat string) error {
+	of := strings.ToLower(outputFormat)
+	if of != "text" && of != "json" && of != "yaml" {
+		return errors.Errorf("invalid output format: %s", outputFormat)
 	}
 
+	imgs := images.GetControlPlaneImages(&i.cfg.ClusterConfiguration)
+	if of == "text" {
+		for _, img := range imgs {
+			fmt.Fprintln(out, img)
+		}
+	} else if of == "yaml" || of == "json" {
+		output, err := kubeadmutil.MarshalTo(ConfigImagesList{Images: imgs}, of)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(out, output)
+	}
 	return nil
 }
 
