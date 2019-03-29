@@ -30,15 +30,17 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-func EtcdUpgrade(target_storage, target_version string) error {
+// EtcdUpgrade upgrades etcd on GCE.
+func EtcdUpgrade(targetStorage, targetVersion string) error {
 	switch TestContext.Provider {
 	case "gce":
-		return etcdUpgradeGCE(target_storage, target_version)
+		return etcdUpgradeGCE(targetStorage, targetVersion)
 	default:
 		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", TestContext.Provider)
 	}
 }
 
+// MasterUpgrade upgrades master node on GCE/GKE.
 func MasterUpgrade(v string) error {
 	switch TestContext.Provider {
 	case "gce":
@@ -52,17 +54,18 @@ func MasterUpgrade(v string) error {
 	}
 }
 
-func etcdUpgradeGCE(target_storage, target_version string) error {
+func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 	env := append(
 		os.Environ(),
-		"TEST_ETCD_VERSION="+target_version,
-		"STORAGE_BACKEND="+target_storage,
+		"TEST_ETCD_VERSION="+targetVersion,
+		"STORAGE_BACKEND="+targetStorage,
 		"TEST_ETCD_IMAGE=3.3.10-0")
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
 }
 
+// MasterUpgradeGCEWithKubeProxyDaemonSet upgrades master node on GCE with enabling/disabling the daemon set of kube-proxy.
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
 func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
 	return masterUpgradeGCE(v, enableKubeProxyDaemonSet)
@@ -164,6 +167,7 @@ func masterUpgradeKubernetesAnywhere(v string) error {
 	return nil
 }
 
+// NodeUpgrade upgrades nodes on GCE/GKE.
 func NodeUpgrade(f *Framework, v string, img string) error {
 	// Perform the upgrade.
 	var err error
@@ -181,6 +185,7 @@ func NodeUpgrade(f *Framework, v string, img string) error {
 	return waitForNodesReadyAfterUpgrade(f)
 }
 
+// NodeUpgradeGCEWithKubeProxyDaemonSet upgrades nodes on GCE with enabling/disabling the daemon set of kube-proxy.
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
 func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, img string, enableKubeProxyDaemonSet bool) error {
 	// Perform the upgrade.
@@ -365,6 +370,7 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 	wg.Wait()
 }
 
+// DeleteNodeOnCloudProvider deletes the specified node.
 func DeleteNodeOnCloudProvider(node *v1.Node) error {
 	return TestContext.CloudConfig.Provider.DeleteNode(node)
 }
