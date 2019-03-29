@@ -43,12 +43,12 @@ type TestCase struct {
 // Destination-GroupVersions contained in `disallowMarshalGroupVersions` are excluded from the generated TestCases.
 func GetRoundtripTestCases(scheme *runtime.Scheme, disallowMarshalGroupVersions sets.String) []TestCase {
 	cases := []TestCase{}
-	versionsForKind := map[schema.GroupKind][]string{}
+	gkToVersions := map[schema.GroupKind][]string{}
 	for gvk := range scheme.AllKnownTypes() {
-		versionsForKind[gvk.GroupKind()] = append(versionsForKind[gvk.GroupKind()], gvk.Version)
+		gkToVersions[gvk.GroupKind()] = append(gkToVersions[gvk.GroupKind()], gvk.Version)
 	}
 
-	for gk, versions := range versionsForKind {
+	for gk, versions := range gkToVersions {
 		for _, vin := range versions {
 			if vin == runtime.APIVersionInternal {
 				continue // Don't try to deserialize the internal version
