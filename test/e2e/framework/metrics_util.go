@@ -417,7 +417,7 @@ func (a *APIResponsiveness) PrintHumanReadable() string {
 }
 
 func (a *APIResponsiveness) PrintJSON() string {
-	return PrettyPrintJSON(ApiCallToPerfData(a))
+	return PrettyPrintJSON(APICallToPerfData(a))
 }
 
 func (a *APIResponsiveness) Len() int { return len(a.APICalls) }

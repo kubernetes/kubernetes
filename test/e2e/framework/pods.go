@@ -34,8 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const DefaultPodDeletionTimeout = 3 * time.Minute
@@ -45,7 +45,7 @@ const DefaultPodDeletionTimeout = 3 * time.Minute
 // node e2e test.
 var ImageWhiteList sets.String
 
-// Convenience method for getting a pod client interface in the framework's namespace,
+// PodClient is a convenience method for getting a pod client interface in the framework's namespace,
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
 // node e2e pod scheduling.
 func (f *Framework) PodClient() *PodClient {
@@ -55,7 +55,7 @@ func (f *Framework) PodClient() *PodClient {
 	}
 }
 
-// Convenience method for getting a pod client interface in an alternative namespace,
+// PodClientNS is a convenience method for getting a pod client interface in an alternative namespace,
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
 // node e2e pod scheduling.
 func (f *Framework) PodClientNS(namespace string) *PodClient {
@@ -65,6 +65,7 @@ func (f *Framework) PodClientNS(namespace string) *PodClient {
 	}
 }
 
+// PodClient is a struct for pod client.
 type PodClient struct {
 	f *Framework
 	v1core.PodInterface
@@ -96,15 +97,15 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 func (c *PodClient) CreateEventually(pod *v1.Pod, opts ...interface{}) *v1.Pod {
 	c.mungeSpec(pod)
 	var ret *v1.Pod
-	Eventually(func() error {
+	gomega.Eventually(func() error {
 		p, err := c.PodInterface.Create(pod)
 		ret = p
 		return err
-	}, opts...).ShouldNot(HaveOccurred(), "Failed to create %q pod", pod.GetName())
+	}, opts...).ShouldNot(gomega.HaveOccurred(), "Failed to create %q pod", pod.GetName())
 	return ret
 }
 
-// CreateSync creates a new pod according to the framework specifications in the given namespace, and waits for it to start.
+// CreateSyncInNamespace creates a new pod according to the framework specifications in the given namespace, and waits for it to start.
 func (c *PodClient) CreateSyncInNamespace(pod *v1.Pod, namespace string) *v1.Pod {
 	p := c.Create(pod)
 	ExpectNoError(WaitForPodNameRunningInNamespace(c.f.ClientSet, p.Name, namespace))
@@ -127,7 +128,7 @@ func (c *PodClient) CreateBatch(pods []*v1.Pod) []*v1.Pod {
 		wg.Add(1)
 		go func(i int, pod *v1.Pod) {
 			defer wg.Done()
-			defer GinkgoRecover()
+			defer ginkgo.GinkgoRecover()
 			ps[i] = c.CreateSync(pod)
 		}(i, pod)
 	}
@@ -171,8 +172,8 @@ func (c *PodClient) DeleteSyncInNamespace(name string, namespace string, options
 	if err != nil && !errors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)
 	}
-	Expect(WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),
-		2*time.Second, timeout)).To(Succeed(), "wait for pod %q to disappear", name)
+	gomega.Expect(WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),
+		2*time.Second, timeout)).To(gomega.Succeed(), "wait for pod %q to disappear", name)
 }
 
 // mungeSpec apply test-suite specific transformations to the pod spec.
@@ -181,7 +182,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 		return
 	}
 
-	Expect(pod.Spec.NodeName).To(Or(BeZero(), Equal(TestContext.NodeName)), "Test misconfigured")
+	gomega.Expect(pod.Spec.NodeName).To(gomega.Or(gomega.BeZero(), gomega.Equal(TestContext.NodeName)), "Test misconfigured")
 	pod.Spec.NodeName = TestContext.NodeName
 	// Node e2e does not support the default DNSClusterFirst policy. Set
 	// the policy to DNSDefault, which is configured per node.
@@ -204,18 +205,18 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 		}
 		// If the image policy is not PullAlways, the image must be in the white list and
 		// pre-pulled.
-		Expect(ImageWhiteList.Has(c.Image)).To(BeTrue(), "Image %q is not in the white list, consider adding it to CommonImageWhiteList in test/e2e/common/util.go or NodeImageWhiteList in test/e2e_node/image_list.go", c.Image)
+		gomega.Expect(ImageWhiteList.Has(c.Image)).To(gomega.BeTrue(), "Image %q is not in the white list, consider adding it to CommonImageWhiteList in test/e2e/common/util.go or NodeImageWhiteList in test/e2e_node/image_list.go", c.Image)
 		// Do not pull images during the tests because the images in white list should have
 		// been prepulled.
 		c.ImagePullPolicy = v1.PullNever
 	}
 }
 
-// TODO(random-liu): Move pod wait function into this file
 // WaitForSuccess waits for pod to succeed.
+// TODO(random-liu): Move pod wait function into this file
 func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	f := c.f
-	Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+	gomega.Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:
@@ -226,13 +227,13 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 				return false, nil
 			}
 		},
-	)).To(Succeed(), "wait for pod %q to success", name)
+	)).To(gomega.Succeed(), "wait for pod %q to success", name)
 }
 
 // WaitForFailure waits for pod to fail.
 func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
 	f := c.f
-	Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+	gomega.Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:
@@ -243,10 +244,10 @@ func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
 				return false, nil
 			}
 		},
-	)).To(Succeed(), "wait for pod %q to fail", name)
+	)).To(gomega.Succeed(), "wait for pod %q to fail", name)
 }
 
-// WaitForSuccess waits for pod to succeed or an error event for that pod.
+// WaitForErrorEventOrSuccess waits for pod to succeed or an error event for that pod.
 func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
 	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
@@ -287,6 +288,7 @@ func (c *PodClient) MatchContainerOutput(name string, containerName string, expe
 	return nil
 }
 
+// PodIsReady returns true if the specified pod is ready. Otherwise false.
 func (c *PodClient) PodIsReady(name string) bool {
 	pod, err := c.Get(name, metav1.GetOptions{})
 	ExpectNoError(err)

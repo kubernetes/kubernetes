@@ -407,7 +407,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	f.AddNamespacesToDelete(ns)
 
 	if err == nil && !f.SkipPrivilegedPSPBinding {
-		CreatePrivilegedPSPBinding(f, ns.Name)
+		createPrivilegedPSPBinding(f, ns.Name)
 	}
 
 	return ns, err
