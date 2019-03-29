@@ -19,9 +19,10 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"testing"
+
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
-	"testing"
 )
 
 func TestNewCmdVersion(t *testing.T) {
@@ -35,7 +36,6 @@ func TestNewCmdVersion(t *testing.T) {
 func TestRunVersion(t *testing.T) {
 	var buf bytes.Buffer
 	iface := make(map[string]interface{})
-	flagNameOutput := "output"
 	cmd := NewCmdVersion(&buf)
 
 	testCases := []struct {
@@ -70,14 +70,19 @@ func TestRunVersion(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			var flagValue string
 			var err error
 			if len(tc.flag) > 0 {
-				if err = cmd.Flags().Set(flagNameOutput, tc.flag); err != nil {
+				if err = cmd.Flags().Set("output", tc.flag); err != nil {
 					goto error
 				}
 			}
 			buf.Reset()
-			if err = RunVersion(&buf, cmd); err != nil {
+			flagValue, err = cmd.Flags().GetString("output")
+			if err != nil {
+				goto error
+			}
+			if err = RunVersion(&buf, cmd, flagValue); err != nil {
 				goto error
 			}
 			if buf.String() == "" {
