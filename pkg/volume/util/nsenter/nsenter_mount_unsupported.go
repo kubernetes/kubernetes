@@ -78,7 +78,7 @@ func (*Mounter) PathIsDevice(pathname string) (bool, error) {
 
 // GetDeviceNameFromMount finds the device name from its global mount point using the
 // given mountpath and plugin location. It is a noop of unsupported platforms
-func (*Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+func (*Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
 	return "", nil
 }
 

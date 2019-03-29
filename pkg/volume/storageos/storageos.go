@@ -441,7 +441,7 @@ func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func makeGlobalPDName(host volume.VolumeHost, pvName, volNamespace, volName string) string {
-	return path.Join(host.GetPluginDir(utilstrings.EscapeQualifiedName(storageosPluginName)), mount.MountsInGlobalPDPath, pvName+"."+volNamespace+"."+volName)
+	return path.Join(host.GetPluginDir(utilstrings.EscapeQualifiedName(storageosPluginName)), util.MountsInGlobalPDPath, pvName+"."+volNamespace+"."+volName)
 }
 
 // Given the pod id and PV name, finds the volume's namespace and name from the

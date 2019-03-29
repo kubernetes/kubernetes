@@ -58,6 +58,10 @@ const (
 	// that decides if pod volumes are unmounted when pod is terminated
 	KeepTerminatedPodVolumesAnnotation string = "volumes.kubernetes.io/keep-terminated-pod-volumes"
 
+	// MountsInGlobalPDPath is name of the directory appended to a volume plugin
+	// name to create the place for volume mounts in the global PD path.
+	MountsInGlobalPDPath = "mounts"
+
 	// VolumeGidAnnotationKey is the of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
 	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
@@ -529,4 +533,11 @@ func MapBlockVolume(
 	}
 
 	return nil
+}
+
+// GetPluginMountDir returns the global mount directory name appended
+// to the given plugin name's plugin directory
+func GetPluginMountDir(host volume.VolumeHost, name string) string {
+	mntDir := filepath.Join(host.GetPluginDir(name), MountsInGlobalPDPath)
+	return mntDir
 }

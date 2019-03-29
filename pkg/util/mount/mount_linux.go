@@ -304,19 +304,19 @@ func ExclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 }
 
 //GetDeviceNameFromMount: given a mount point, find the device name from its global mount point
-func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginDir)
+func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
+	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
 }
 
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
-	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginDir)
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
 }
 
 // GetDeviceNameFromMountLinux find the device name from /proc/mounts in which
-// the mount path reference should match the given plugin directory. In case no mount path reference
+// the mount path reference should match the given plugin mount directory. In case no mount path reference
 // matches, returns the volume name taken from its given mountPath
 // This implementation is shared with NsEnterMounter
-func GetDeviceNameFromMountLinux(mounter Interface, mountPath, pluginDir string) (string, error) {
+func GetDeviceNameFromMountLinux(mounter Interface, mountPath, pluginMountDir string) (string, error) {
 	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
@@ -326,10 +326,9 @@ func GetDeviceNameFromMountLinux(mounter Interface, mountPath, pluginDir string)
 		klog.V(4).Infof("Directory %s is not mounted", mountPath)
 		return "", fmt.Errorf("directory %s is not mounted", mountPath)
 	}
-	basemountPath := path.Join(pluginDir, MountsInGlobalPDPath)
 	for _, ref := range refs {
-		if strings.HasPrefix(ref, basemountPath) {
-			volumeID, err := filepath.Rel(basemountPath, ref)
+		if strings.HasPrefix(ref, pluginMountDir) {
+			volumeID, err := filepath.Rel(pluginMountDir, ref)
 			if err != nil {
 				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
 				return "", err

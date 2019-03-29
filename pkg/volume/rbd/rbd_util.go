@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 	utilpath "k8s.io/utils/path"
 )
 
@@ -255,7 +256,7 @@ func makePDNameInternal(host volume.VolumeHost, pool string, image string) strin
 		return deprecatedDir
 	}
 	// Return the canonical format path.
-	return path.Join(host.GetPluginDir(rbdPluginName), mount.MountsInGlobalPDPath, pool+"-image-"+image)
+	return path.Join(host.GetPluginDir(rbdPluginName), volutil.MountsInGlobalPDPath, pool+"-image-"+image)
 }
 
 // Make a directory like /var/lib/kubelet/plugins/kubernetes.io/rbd/volumeDevices/pool-image-image.
