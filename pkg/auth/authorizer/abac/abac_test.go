@@ -815,7 +815,7 @@ func TestSubjectMatches(t *testing.T) {
 	}
 }
 
-func newWithContents(t *testing.T, contents string) (policyList, error) {
+func newWithContents(t *testing.T, contents string) (PolicyList, error) {
 	f, err := ioutil.TempFile("", "abac_test")
 	if err != nil {
 		t.Fatalf("unexpected error creating policyfile: %v", err)
