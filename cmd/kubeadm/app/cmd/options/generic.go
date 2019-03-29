@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 	cliflag "k8s.io/component-base/cli/flag"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
@@ -71,4 +72,9 @@ func AddFeatureGatesStringFlag(fs *pflag.FlagSet, featureGatesString *string) {
 		fs.StringVar(featureGatesString, FeatureGatesString, *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 			"No feature gates are available in this release.")
 	}
+}
+
+// AddOutputFlag adds the --output/-o flag to the given flagset
+func AddOutputFlag(fs *pflag.FlagSet, outputFormat *string) {
+	fs.StringVarP(outputFormat, "output", "o", "text", "Output format; available options are 'text', 'short', 'yaml' and 'json'")
 }
