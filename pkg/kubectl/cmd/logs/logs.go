@@ -94,14 +94,15 @@ type LogsOptions struct {
 	ConsumeRequestFn func(rest.ResponseWrapper, io.Writer) error
 
 	// PodLogOptions
-	SinceTime    string
-	SinceSeconds time.Duration
-	Follow       bool
-	Previous     bool
-	Timestamps   bool
-	LimitBytes   int64
-	Tail         int64
-	Container    string
+	SinceTime       string
+	SinceSeconds    time.Duration
+	Follow          bool
+	Previous        bool
+	Timestamps      bool
+	IgnoreLogErrors bool
+	LimitBytes      int64
+	Tail            int64
+	Container       string
 
 	// whether or not a container name was given via --container
 	ContainerNameSpecified bool
@@ -153,6 +154,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().Int64Var(&o.LimitBytes, "limit-bytes", o.LimitBytes, "Maximum bytes of logs to return. Defaults to no limit.")
 	cmd.Flags().BoolVarP(&o.Previous, "previous", "p", o.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists.")
 	cmd.Flags().Int64Var(&o.Tail, "tail", o.Tail, "Lines of recent log file to display. Defaults to -1 with no selector, showing all log lines otherwise 10, if a selector is provided.")
+	cmd.Flags().BoolVar(&o.IgnoreLogErrors, "ignore-errors", o.IgnoreLogErrors, "If watching / following pod logs, allow for any errors that occur to be non-fatal")
 	cmd.Flags().StringVar(&o.SinceTime, "since-time", o.SinceTime, i18n.T("Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."))
 	cmd.Flags().DurationVar(&o.SinceSeconds, "since", o.SinceSeconds, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.")
 	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Print the logs of this container")
@@ -323,10 +325,14 @@ func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) err
 	for _, request := range requests {
 		go func(request rest.ResponseWrapper) {
 			if err := o.ConsumeRequestFn(request, writer); err != nil {
-				writer.CloseWithError(err)
+				if !o.IgnoreLogErrors {
+					writer.CloseWithError(err)
 
-				// It's important to return here to propagate the error via the pipe
-				return
+					// It's important to return here to propagate the error via the pipe
+					return
+				}
+
+				fmt.Fprintf(writer, "error: %v\n", err)
 			}
 
 			wg.Done()
