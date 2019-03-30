@@ -821,7 +821,7 @@ func newNetexecPodSpec(podName string, httpPort, udpPort int32, hostNetwork bool
 			Containers: []v1.Container{
 				{
 					Name:  "netexec",
-					Image: NetexecImageName,
+					Image: netexecImageName,
 					Command: []string{
 						"/netexec",
 						fmt.Sprintf("--http-port=%d", httpPort),
