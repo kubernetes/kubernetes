@@ -140,7 +140,7 @@ message CustomResourceDefinition {
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 message CustomResourceDefinitionCondition {
-  // Type is the type of the condition.
+  // Type is the type of the condition. Types include Established, NamesAccepted and Terminating.
   optional string type = 1;
 
   // Status is the status of the condition.
