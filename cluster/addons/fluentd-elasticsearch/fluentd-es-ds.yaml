@@ -77,7 +77,7 @@ spec:
       serviceAccountName: fluentd-es
       containers:
       - name: fluentd-es
-        image: k8s.gcr.io/fluentd-elasticsearch:v2.5.0
+        image: gcr.io/fluentd-elasticsearch/fluentd:v2.5.0
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
