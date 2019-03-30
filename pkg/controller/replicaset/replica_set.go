@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -101,30 +102,44 @@ type ReplicaSetController struct {
 	// Added as a member to the struct to allow injection for testing.
 	podListerSynced cache.InformerSynced
 
+	nodeLister       corelisters.NodeLister
+	nodeListerSynced cache.InformerSynced
+
+	// taints stores taints info of nodes, it works for solving
+	// unlimit pod creation when a replicaset specifies its rs.Spec.Template.Spec.NodeName
+	// and that node was tainted.
+	taints map[string]*taintFreezeList
+
+	taintsMutex sync.Mutex
+
+	recorder record.EventRecorder
+
 	// Controllers that need to be synced
 	queue workqueue.RateLimitingInterface
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
+func NewReplicaSetController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	return NewBaseController(rsInformer, podInformer, kubeClient, burstReplicas,
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"})
+	return NewBaseController(rsInformer, podInformer, nodeInformer, kubeClient, burstReplicas,
 		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
 		"replicaset",
+		recorder,
 		controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
+			Recorder:   recorder,
 		},
 	)
 }
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
-func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
-	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface) *ReplicaSetController {
+func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface, burstReplicas int,
+	gvk schema.GroupVersionKind, metricOwnerName, queueName string, recorder record.EventRecorder, podControl controller.PodControlInterface) *ReplicaSetController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage(metricOwnerName, kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
@@ -136,6 +151,8 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 		burstReplicas:    burstReplicas,
 		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), queueName),
+		taints:           map[string]*taintFreezeList{},
+		recorder:         recorder,
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -157,8 +174,17 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 		UpdateFunc: rsc.updatePod,
 		DeleteFunc: rsc.deletePod,
 	})
+
 	rsc.podLister = podInformer.Lister()
 	rsc.podListerSynced = podInformer.Informer().HasSynced
+
+	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    rsc.addNode,
+		UpdateFunc: rsc.updateNode,
+		DeleteFunc: rsc.deletNode,
+	})
+	rsc.nodeLister = nodeInformer.Lister()
+	rsc.nodeListerSynced = nodeInformer.Informer().HasSynced
 
 	rsc.syncHandler = rsc.syncReplicaSet
 
@@ -407,6 +433,50 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 	rsc.enqueueReplicaSet(rs)
 }
 
+func (rsc *ReplicaSetController) updateNode(_, cur interface{}) {
+	rsc.taintsMutex.Lock()
+	defer rsc.taintsMutex.Unlock()
+	node := cur.(*v1.Node)
+	tf, exist := rsc.taints[node.Name]
+	if !exist {
+		klog.Warningf("unexpected error: %s does not exist in taints group", node.Name)
+		return
+	}
+
+	if !compareTaints(node.Spec.Taints, tf.taints) {
+		frs := tf.freezedRS
+		rsc.taints[node.Name] = &taintFreezeList{
+			taints:    node.Spec.Taints,
+			freezedRS: sets.String{},
+		}
+		for f := range frs {
+			rsc.queue.Add(f)
+		}
+	}
+}
+
+func (rsc *ReplicaSetController) addNode(obj interface{}) {
+	rsc.taintsMutex.Lock()
+	defer rsc.taintsMutex.Unlock()
+	node := obj.(*v1.Node)
+	rsc.taints[node.Name] = &taintFreezeList{
+		taints:    node.Spec.Taints,
+		freezedRS: sets.String{},
+	}
+}
+
+func (rsc *ReplicaSetController) deletNode(obj interface{}) {
+	rsc.taintsMutex.Lock()
+	defer rsc.taintsMutex.Unlock()
+	node := obj.(*v1.Node)
+	if len(rsc.taints[node.Name].freezedRS) != 0 {
+		for rs := range rsc.taints[node.Name].freezedRS {
+			rsc.queue.Add(rs)
+		}
+	}
+	delete(rsc.taints, node.Name)
+}
+
 // obj could be an *apps.ReplicaSet, or a DeletionFinalStateUnknown marker item.
 func (rsc *ReplicaSetController) enqueueReplicaSet(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
@@ -468,6 +538,26 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
 		}
+
+		nodeName := rs.Spec.Template.Spec.NodeName
+		if nodeName != "" {
+			rsc.taintsMutex.Lock()
+			t, exist := rsc.taints[nodeName]
+			if exist && !checkNodeStatus(t.taints, &rs.Spec.Template.Spec) {
+				key, err := cache.MetaNamespaceKeyFunc(rs)
+				if err != nil {
+					return err
+				}
+				// log the freeze rs
+				rsc.taints[nodeName].freezedRS.Insert(key)
+				klog.V(4).Infof("not create pods for replicaset %s/%s: node %s was tainted", rs.Namespace, rs.Name, nodeName)
+				rsc.recorder.Eventf(rs, v1.EventTypeWarning, "Freeze", "Node %s was tainted, stop sync", nodeName)
+				rsc.taintsMutex.Unlock()
+				return nil
+			}
+			rsc.taintsMutex.Unlock()
+		}
+
 		// TODO: Track UIDs of creates just like deletes. The problem currently
 		// is we'd need to wait on the result of a create to record the pod's
 		// UID, which would require locking *across* the create, which will turn

@@ -269,6 +269,7 @@ func startEndpointController(ctx ControllerContext) (http.Handler, bool, error) 
 func startReplicationController(ctx ControllerContext) (http.Handler, bool, error) {
 	go replicationcontroller.NewReplicationManager(
 		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),
 		replicationcontroller.BurstReplicas,

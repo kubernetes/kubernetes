@@ -21,6 +21,7 @@ package replicaset
 import (
 	"fmt"
 	"reflect"
+	"sort"
 
 	"k8s.io/klog"
 
@@ -28,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
@@ -173,4 +175,60 @@ func filterOutCondition(conditions []apps.ReplicaSetCondition, condType apps.Rep
 		newConditions = append(newConditions, c)
 	}
 	return newConditions
+}
+
+// This function checks if pod tolerates node's taints.
+// if so, return true, else return false.
+func checkNodeStatus(nodeTaints []v1.Taint, podSpec *v1.PodSpec) bool {
+	if len(nodeTaints) == 0 || podSpec == nil {
+		return true
+	}
+
+	for _, taint := range nodeTaints {
+		if taint.Effect == v1.TaintEffectNoExecute {
+			tolerated := false
+			for _, tol := range podSpec.Tolerations {
+				if tol.ToleratesTaint(&taint) {
+					tolerated = true
+				}
+			}
+			if !tolerated {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// This function comapre two v1.Taint array.
+// If they contains same taints, return true, else return false.
+func compareTaints(taints1, taints2 []v1.Taint) bool {
+	if len(taints1) != len(taints2) {
+		return false
+	}
+	tp1 := []string{}
+	tp2 := []string{}
+	for _, t1 := range taints1 {
+		tp1 = append(tp1, t1.ToString())
+	}
+	for _, t2 := range taints2 {
+		tp2 = append(tp2, t2.ToString())
+	}
+
+	sort.Strings(tp1)
+	sort.Strings(tp2)
+	for i := 0; i < len(tp1); i++ {
+		if tp1[i] != tp2[i] {
+			// different taints found
+			return false
+		}
+	}
+
+	return true
+}
+
+type taintFreezeList struct {
+	taints    []v1.Taint
+	freezedRS sets.String
 }
