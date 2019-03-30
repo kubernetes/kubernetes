@@ -108,14 +108,15 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			},
 			ClaimSize:    repdMinSize,
 			ExpectedSize: repdMinSize,
-			PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-				var err error
-				err = checkGCEPD(volume, "pd-standard")
+			PvCheck: func(claim *v1.PersistentVolumeClaim) {
+				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+				Expect(volume).NotTo(BeNil())
+
+				err := checkGCEPD(volume, "pd-standard")
 				Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
 				err = verifyZonesInPV(volume, sets.NewString(cloudZones...), true /* match */)
 				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
 
-				testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 			},
 		},
 		{
@@ -128,16 +129,16 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			},
 			ClaimSize:    repdMinSize,
 			ExpectedSize: repdMinSize,
-			PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-				var err error
-				err = checkGCEPD(volume, "pd-standard")
+			PvCheck: func(claim *v1.PersistentVolumeClaim) {
+				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+				Expect(volume).NotTo(BeNil())
+
+				err := checkGCEPD(volume, "pd-standard")
 				Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
 				zones, err := framework.GetClusterZones(c)
 				Expect(err).NotTo(HaveOccurred(), "GetClusterZones")
 				err = verifyZonesInPV(volume, zones, false /* match */)
 				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
-
-				testsuites.PVWriteReadSingleNodeCheck(c, claim, volume, framework.NodeSelection{})
 			},
 		},
 	}
