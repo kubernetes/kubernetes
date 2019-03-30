@@ -217,10 +217,9 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 		&cfg.Networking.DNSDomain, options.NetworkingDNSDomain, cfg.Networking.DNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal".`,
 	)
-	flagSet.StringVar(
-		&cfg.KubernetesVersion, options.KubernetesVersion, cfg.KubernetesVersion,
-		`Choose a specific Kubernetes version for the control plane.`,
-	)
+
+	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
+
 	flagSet.StringVar(
 		&cfg.CertificatesDir, options.CertificatesDir, cfg.CertificatesDir,
 		`The path where to save and store the certificates.`,

@@ -514,10 +514,7 @@ func (i *ImagesList) Run(out io.Writer) error {
 
 // AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
 func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, cfgPath *string, featureGatesString *string) {
-	flagSet.StringVar(
-		&cfg.ClusterConfiguration.KubernetesVersion, "kubernetes-version", cfg.ClusterConfiguration.KubernetesVersion,
-		`Choose a specific Kubernetes version for the control plane.`,
-	)
+	options.AddKubernetesVersionFlag(flagSet, &cfg.ClusterConfiguration.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 	flagSet.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file.")
 }
