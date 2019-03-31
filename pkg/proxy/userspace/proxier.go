@@ -461,6 +461,16 @@ func (proxier *Proxier) addServiceOnPortInternal(service proxy.ServicePortName, 
 	return si, nil
 }
 
+func (proxier *Proxier) cleanupPortalAndProxy(serviceName proxy.ServicePortName, info *ServiceInfo) error {
+	if err := proxier.closePortal(serviceName, info); err != nil {
+		return fmt.Errorf("Failed to close portal for %q: %v", serviceName, err)
+	}
+	if err := proxier.stopProxy(serviceName, info); err != nil {
+		return fmt.Errorf("Failed to stop service %q: %v", serviceName, err)
+	}
+	return nil
+}
+
 func (proxier *Proxier) mergeService(service *v1.Service) sets.String {
 	if service == nil {
 		return nil
@@ -483,11 +493,8 @@ func (proxier *Proxier) mergeService(service *v1.Service) sets.String {
 		}
 		if exists {
 			klog.V(4).Infof("Something changed for service %q: stopping it", serviceName)
-			if err := proxier.closePortal(serviceName, info); err != nil {
-				klog.Errorf("Failed to close portal for %q: %v", serviceName, err)
-			}
-			if err := proxier.stopProxy(serviceName, info); err != nil {
-				klog.Errorf("Failed to stop service %q: %v", serviceName, err)
+			if err := proxier.cleanupPortalAndProxy(serviceName, info); err != nil {
+				klog.Error(err)
 			}
 		}
 		proxyPort, err := proxier.proxyPorts.AllocateNext()
@@ -554,11 +561,8 @@ func (proxier *Proxier) unmergeService(service *v1.Service, existingPorts sets.S
 			staleUDPServices.Insert(proxier.serviceMap[serviceName].portal.ip.String())
 		}
 
-		if err := proxier.closePortal(serviceName, info); err != nil {
-			klog.Errorf("Failed to close portal for %q: %v", serviceName, err)
-		}
-		if err := proxier.stopProxy(serviceName, info); err != nil {
-			klog.Errorf("Failed to stop service %q: %v", serviceName, err)
+		if err := proxier.cleanupPortalAndProxy(serviceName, info); err != nil {
+			klog.Error(err)
 		}
 		proxier.loadBalancer.DeleteService(serviceName)
 	}
