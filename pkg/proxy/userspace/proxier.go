@@ -435,7 +435,7 @@ func (proxier *Proxier) mergeService(service *v1.Service) sets.String {
 		return nil
 	}
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	if !helper.IsServiceIPSet(service) {
+	if utilproxy.ShouldSkipService(svcName, service) {
 		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
 		return nil
 	}
@@ -500,7 +500,7 @@ func (proxier *Proxier) unmergeService(service *v1.Service, existingPorts sets.S
 		return
 	}
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-	if !helper.IsServiceIPSet(service) {
+	if utilproxy.ShouldSkipService(svcName, service) {
 		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
 		return
 	}
