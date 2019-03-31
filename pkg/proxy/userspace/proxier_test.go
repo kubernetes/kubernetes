@@ -243,6 +243,7 @@ func TestTCPProxy(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
@@ -270,6 +271,7 @@ func TestUDPProxy(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
@@ -297,6 +299,7 @@ func TestUDPProxyTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
@@ -336,6 +339,7 @@ func TestMultiPortProxy(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfoP, err := p.addServiceOnPort(serviceP, "TCP", 0, time.Second)
 	if err != nil {
@@ -365,6 +369,7 @@ func TestMultiPortOnServiceAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	p.OnServiceAdd(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceP.Name, Namespace: serviceP.Namespace},
@@ -428,6 +433,7 @@ func TestTCPProxyStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
@@ -472,6 +478,7 @@ func TestUDPProxyStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
@@ -510,6 +517,7 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
@@ -554,6 +562,7 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
@@ -599,6 +608,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
@@ -661,6 +671,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
@@ -722,6 +733,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
@@ -770,6 +782,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "UDP", 0, time.Second)
 	if err != nil {
@@ -815,6 +828,7 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {
@@ -868,6 +882,7 @@ func TestProxyUpdatePortal(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForNumProxyLoops(t, p, 0)
+	defer p.shutdown()
 
 	svcInfo, err := p.addServiceOnPort(service, "TCP", 0, time.Second)
 	if err != nil {

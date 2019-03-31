@@ -109,6 +109,8 @@ type Proxier struct {
 	proxyPorts      PortAllocator
 	makeProxySocket ProxySocketFunc
 	exec            utilexec.Interface
+
+	stopChan chan struct{}
 }
 
 // assert Proxier is a ProxyProvider
@@ -216,6 +218,7 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		proxyPorts:      proxyPorts,
 		makeProxySocket: makeProxySocket,
 		exec:            exec,
+		stopChan:        make(chan struct{}),
 	}, nil
 }
 
@@ -287,6 +290,20 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 	return encounteredError
 }
 
+// shutdown closes all service port proxies and returns from the proxy's
+// sync loop. Used from testcases.
+func (proxier *Proxier) shutdown() {
+	defer proxier.cleanupStaleStickySessions()
+
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+
+	for serviceName, info := range proxier.serviceMap {
+		proxier.stopProxyInternal(serviceName, info)
+	}
+	close(proxier.stopChan)
+}
+
 // Sync is called to immediately synchronize the proxier state to iptables
 func (proxier *Proxier) Sync() {
 	if err := iptablesInit(proxier.iptables); err != nil {
@@ -301,9 +318,13 @@ func (proxier *Proxier) SyncLoop() {
 	t := time.NewTicker(proxier.syncPeriod)
 	defer t.Stop()
 	for {
-		<-t.C
-		klog.V(6).Infof("Periodic sync")
-		proxier.Sync()
+		select {
+		case <-t.C:
+			klog.V(6).Infof("Periodic sync")
+			proxier.Sync()
+		case <-proxier.stopChan:
+			return
+		}
 	}
 }
 
