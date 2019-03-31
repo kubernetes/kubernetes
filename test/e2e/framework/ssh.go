@@ -111,6 +111,7 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 	return sshHosts, nil
 }
 
+// SSHResult holds the execution result of SSH command
 type SSHResult struct {
 	User   string
 	Host   string
@@ -230,6 +231,7 @@ func RunSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer)
 	return bout.String(), berr.String(), code, err
 }
 
+// LogSSHResult records SSHResult log
 func LogSSHResult(result SSHResult) {
 	remote := fmt.Sprintf("%s@%s", result.User, result.Host)
 	Logf("ssh %s: command:   %s", remote, result.Cmd)
@@ -238,6 +240,7 @@ func LogSSHResult(result SSHResult) {
 	Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
+// IssueSSHCommandWithResult tries to execute a SSH command and returns the execution result
 func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult, error) {
 	Logf("Getting external IP address for %s", node.Name)
 	host := ""
@@ -274,6 +277,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 	return &result, nil
 }
 
+// IssueSSHCommand tries to execute a SSH command
 func IssueSSHCommand(cmd, provider string, node *v1.Node) error {
 	_, err := IssueSSHCommandWithResult(cmd, provider, node)
 	if err != nil {
