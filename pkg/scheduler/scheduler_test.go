@@ -19,6 +19,9 @@ package scheduler
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
 	"reflect"
 	"testing"
 	"time"
@@ -43,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
@@ -933,5 +937,94 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 
 			close(stop)
 		})
+	}
+}
+
+func TestInitPolicyFromFile(t *testing.T) {
+	dir, err := ioutil.TempDir(os.TempDir(), "policy")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	for i, test := range []struct {
+		policy               string
+		expectedPredicates   sets.String
+		expectedPrioritizers sets.String
+	}{
+		// Test json format policy file
+		{
+			policy: `{
+				"kind" : "Policy",
+				"apiVersion" : "v1",
+				"predicates" : [
+					{"name" : "PredicateOne"},
+					{"name" : "PredicateTwo"}
+				],
+				"priorities" : [
+					{"name" : "PriorityOne", "weight" : 1},
+					{"name" : "PriorityTwo", "weight" : 5}
+				]
+			}`,
+			expectedPredicates: sets.NewString(
+				"PredicateOne",
+				"PredicateTwo",
+			),
+			expectedPrioritizers: sets.NewString(
+				"PriorityOne",
+				"PriorityTwo",
+			),
+		},
+		// Test yaml format policy file
+		{
+			policy: `apiVersion: v1
+kind: Policy
+predicates:
+- name: PredicateOne
+- name: PredicateTwo
+priorities:
+- name: PriorityOne
+  weight: 1
+- name: PriorityTwo
+  weight: 5
+`,
+			expectedPredicates: sets.NewString(
+				"PredicateOne",
+				"PredicateTwo",
+			),
+			expectedPrioritizers: sets.NewString(
+				"PriorityOne",
+				"PriorityTwo",
+			),
+		},
+	} {
+		file := fmt.Sprintf("scheduler-policy-config-file-%d", i)
+		fullPath := path.Join(dir, file)
+
+		if err := ioutil.WriteFile(fullPath, []byte(test.policy), 0644); err != nil {
+			t.Fatalf("Failed writing a policy config file: %v", err)
+		}
+
+		policy := &schedulerapi.Policy{}
+
+		if err := initPolicyFromFile(fullPath, policy); err != nil {
+			t.Fatalf("Failed writing a policy config file: %v", err)
+		}
+
+		// Verify that the policy is initialized correctly.
+		schedPredicates := sets.NewString()
+		for _, p := range policy.Predicates {
+			schedPredicates.Insert(p.Name)
+		}
+		schedPrioritizers := sets.NewString()
+		for _, p := range policy.Priorities {
+			schedPrioritizers.Insert(p.Name)
+		}
+		if !schedPredicates.Equal(test.expectedPredicates) {
+			t.Errorf("Expected predicates %v, got %v", test.expectedPredicates, schedPredicates)
+		}
+		if !schedPrioritizers.Equal(test.expectedPrioritizers) {
+			t.Errorf("Expected priority functions %v, got %v", test.expectedPrioritizers, schedPrioritizers)
+		}
 	}
 }
