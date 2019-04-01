@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -155,6 +156,9 @@ type EndpointController struct {
 	// triggerTimeTracker is an util used to compute and export the EndpointsLastChangeTriggerTime
 	// annotation.
 	triggerTimeTracker *TriggerTimeTracker
+
+	// serviceSelectorCache is a thread safe map for [*v1.Service]->labels.Selector
+	serviceSelectorCache *sync.Map
 }
 
 // Run will not return until stopCh is closed. workers determines how many
@@ -184,18 +188,36 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 
 func (e *EndpointController) getPodServiceMemberships(pod *v1.Pod) (sets.String, error) {
 	set := sets.String{}
-	services, err := e.serviceLister.GetPodServices(pod)
+	allServices, err := e.serviceLister.Services(pod.Namespace).List(labels.Everything())
 	if err != nil {
 		// don't log this error because this function makes pointless
 		// errors when no services match.
 		return set, nil
 	}
-	for i := range services {
-		key, err := controller.KeyFunc(services[i])
-		if err != nil {
-			return nil, err
+
+	var selector labels.Selector
+	for _, service := range allServices {
+		cachedSelector, ok := e.serviceSelectorCache.Load(service)
+		if ok {
+			// retrieve selector from cache
+			selector = cachedSelector.(labels.Selector)
+		} else {
+			// only create a selector if we don't have it cached already
+			if service.Spec.Selector == nil {
+				// services with nil selectors match nothing, not everything.
+				continue
+			}
+			selector = labels.Set(service.Spec.Selector).AsSelectorPreValidated()
+			e.serviceSelectorCache.Store(service, selector)
 		}
-		set.Insert(key)
+
+		if selector.Matches(labels.Set(pod.Labels)) {
+			key, err := controller.KeyFunc(service)
+			if err != nil {
+				return nil, err
+			}
+			set.Insert(key)
+		}
 	}
 	return set, nil
 }
@@ -407,6 +429,10 @@ func (e *EndpointController) syncService(key string) error {
 	}
 	service, err := e.serviceLister.Services(namespace).Get(name)
 	if err != nil {
+		// Since service has been deleted, delete the corresponding service from
+		// service->selector cache
+		e.serviceSelectorCache.Delete(service)
+
 		// Delete the corresponding endpoint, as the service has been deleted.
 		// TODO: Please note that this will delete an endpoint when a
 		// service is deleted. However, if we're down at the time when
