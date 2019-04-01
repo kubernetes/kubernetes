@@ -1123,31 +1123,32 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedP
 		// to rely less on such assumptions in the code when checking does not impose
 		// significant overhead.
 		// Also, we currently assume all failures returned by extender as resolvable.
-		for _, failedPredicate := range failedPredicates {
-			switch failedPredicate {
-			case
-				predicates.ErrNodeSelectorNotMatch,
-				predicates.ErrPodAffinityRulesNotMatch,
-				predicates.ErrPodNotMatchHostName,
-				predicates.ErrTaintsTolerationsNotMatch,
-				predicates.ErrNodeLabelPresenceViolated,
-				// Node conditions won't change when scheduler simulates removal of preemption victims.
-				// So, it is pointless to try nodes that have not been able to host the pod due to node
-				// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
-				predicates.ErrNodeNotReady,
-				predicates.ErrNodeNetworkUnavailable,
-				predicates.ErrNodeUnderDiskPressure,
-				predicates.ErrNodeUnderPIDPressure,
-				predicates.ErrNodeUnderMemoryPressure,
-				predicates.ErrNodeUnschedulable,
-				predicates.ErrNodeUnknownCondition,
-				predicates.ErrVolumeZoneConflict,
-				predicates.ErrVolumeNodeConflict,
-				predicates.ErrVolumeBindConflict:
-				unresolvableReasonExist = true
-				break
+		Loop:
+			for _, failedPredicate := range failedPredicates {
+				switch failedPredicate {
+				case
+					predicates.ErrNodeSelectorNotMatch,
+					predicates.ErrPodAffinityRulesNotMatch,
+					predicates.ErrPodNotMatchHostName,
+					predicates.ErrTaintsTolerationsNotMatch,
+					predicates.ErrNodeLabelPresenceViolated,
+					// Node conditions won't change when scheduler simulates removal of preemption victims.
+					// So, it is pointless to try nodes that have not been able to host the pod due to node
+					// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
+					predicates.ErrNodeNotReady,
+					predicates.ErrNodeNetworkUnavailable,
+					predicates.ErrNodeUnderDiskPressure,
+					predicates.ErrNodeUnderPIDPressure,
+					predicates.ErrNodeUnderMemoryPressure,
+					predicates.ErrNodeUnschedulable,
+					predicates.ErrNodeUnknownCondition,
+					predicates.ErrVolumeZoneConflict,
+					predicates.ErrVolumeNodeConflict,
+					predicates.ErrVolumeBindConflict:
+					unresolvableReasonExist = true
+					break Loop
+				}
 			}
-		}
 		if !unresolvableReasonExist {
 			klog.V(3).Infof("Node %v is a potential node for preemption.", node.Name)
 			potentialNodes = append(potentialNodes, node)
