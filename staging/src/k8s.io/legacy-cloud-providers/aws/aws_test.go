@@ -1835,6 +1835,47 @@ func TestCreateDisk(t *testing.T) {
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 
+func TestRegionIsValid(t *testing.T) {
+	fake := newMockedFakeAWSServices("fakeCluster")
+	fake.selfInstance.Placement = &ec2.Placement{
+		AvailabilityZone: aws.String("pl-fake-999a"),
+	}
+
+	// This is the legacy list that was removed, using this to ensure we avoid
+	// region regressions if something goes wrong in the SDK
+	regions := []string{
+		"ap-northeast-1",
+		"ap-northeast-2",
+		"ap-northeast-3",
+		"ap-south-1",
+		"ap-southeast-1",
+		"ap-southeast-2",
+		"ca-central-1",
+		"eu-central-1",
+		"eu-west-1",
+		"eu-west-2",
+		"eu-west-3",
+		"sa-east-1",
+		"us-east-1",
+		"us-east-2",
+		"us-west-1",
+		"us-west-2",
+		"cn-north-1",
+		"cn-northwest-1",
+		"us-gov-west-1",
+		"ap-northeast-3",
+
+		// Ensures that we always trust what the metadata service returns
+		"pl-fake-999",
+	}
+
+	for _, region := range regions {
+		assert.True(t, isRegionValid(region, fake.metadata), "expected region '%s' to be valid but it was not", region)
+	}
+
+	assert.False(t, isRegionValid("pl-fake-991a", fake.metadata), "expected region 'pl-fake-991' to be invalid but it was not")
+}
+
 func TestGetCandidateZonesForDynamicVolume(t *testing.T) {
 	tests := []struct {
 		name          string
