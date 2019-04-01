@@ -128,13 +128,12 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 
 func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptableFailureRatio float32) (output []time.Duration, err error) {
 	cfg := testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Image:          imageutils.GetPauseImageName(),
-		Name:           "svc-latency-rc",
-		Namespace:      f.Namespace.Name,
-		Replicas:       1,
-		PollInterval:   time.Second,
+		Client:       f.ClientSet,
+		Image:        imageutils.GetPauseImageName(),
+		Name:         "svc-latency-rc",
+		Namespace:    f.Namespace.Name,
+		Replicas:     1,
+		PollInterval: time.Second,
 	}
 	if err := framework.RunRC(cfg); err != nil {
 		return nil, err

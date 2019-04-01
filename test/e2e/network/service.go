@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -80,12 +79,10 @@ var _ = SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var cs clientset.Interface
-	var internalClientset internalclientset.Interface
 	serviceLBNames := []string{}
 
 	BeforeEach(func() {
 		cs = f.ClientSet
-		internalClientset = f.InternalClientset
 	})
 
 	AfterEach(func() {
@@ -322,10 +319,10 @@ var _ = SIGDescribe("Services", func() {
 		numPods, servicePort := 3, defaultServeHostnameServicePort
 
 		By("creating service1 in namespace " + ns)
-		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service1"), ns, numPods)
+		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service1"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc1IP, ns)
 		By("creating service2 in namespace " + ns)
-		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service2"), ns, numPods)
+		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service2"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc2IP, ns)
 
 		hosts, err := framework.NodeSSHHosts(cs)
@@ -352,7 +349,7 @@ var _ = SIGDescribe("Services", func() {
 
 		// Start another service and verify both are up.
 		By("creating service3 in namespace " + ns)
-		podNames3, svc3IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service3"), ns, numPods)
+		podNames3, svc3IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service3"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc3IP, ns)
 
 		if svc2IP == svc3IP {
@@ -379,13 +376,13 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, svc1))
 		}()
-		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService(svc1), ns, numPods)
+		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, getServeHostnameService(svc1), ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc1IP, ns)
 
 		defer func() {
 			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, svc2))
 		}()
-		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService(svc2), ns, numPods)
+		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, getServeHostnameService(svc2), ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc2IP, ns)
 
 		if svc1IP == svc2IP {
@@ -432,7 +429,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, "service1"))
 		}()
-		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service1"), ns, numPods)
+		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service1"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc1IP, ns)
 
 		hosts, err := framework.NodeSSHHosts(cs)
@@ -459,7 +456,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, "service2"))
 		}()
-		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, internalClientset, getServeHostnameService("service2"), ns, numPods)
+		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service2"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc2IP, ns)
 
 		if svc1IP == svc2IP {
@@ -1743,12 +1740,12 @@ var _ = SIGDescribe("Services", func() {
 		By("creating service-disabled in namespace " + ns)
 		svcDisabled := getServeHostnameService("service-disabled")
 		svcDisabled.ObjectMeta.Labels = serviceProxyNameLabels
-		_, svcDisabledIP, err := framework.StartServeHostnameService(cs, internalClientset, svcDisabled, ns, numPods)
+		_, svcDisabledIP, err := framework.StartServeHostnameService(cs, svcDisabled, ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svcDisabledIP, ns)
 
 		By("creating service in namespace " + ns)
 		svcToggled := getServeHostnameService("service")
-		podToggledNames, svcToggledIP, err := framework.StartServeHostnameService(cs, internalClientset, svcToggled, ns, numPods)
+		podToggledNames, svcToggledIP, err := framework.StartServeHostnameService(cs, svcToggled, ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svcToggledIP, ns)
 
 		jig := framework.NewServiceTestJig(cs, svcToggled.ObjectMeta.Name)
@@ -2211,7 +2208,7 @@ func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interf
 	By("creating service in namespace " + ns)
 	serviceType := svc.Spec.Type
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
-	_, _, err := framework.StartServeHostnameService(cs, f.InternalClientset, svc, ns, numPods)
+	_, _, err := framework.StartServeHostnameService(cs, svc, ns, numPods)
 	Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service in the namespace: %s", ns)
 	defer func() {
 		framework.StopServeHostnameService(cs, ns, serviceName)
@@ -2262,7 +2259,7 @@ func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface
 
 	By("creating service in namespace " + ns)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
-	_, _, err := framework.StartServeHostnameService(cs, f.InternalClientset, svc, ns, numPods)
+	_, _, err := framework.StartServeHostnameService(cs, svc, ns, numPods)
 	Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service in the namespace: %s", ns)
 	jig := framework.NewServiceTestJig(cs, serviceName)
 	By("waiting for loadbalancer for service " + ns + "/" + serviceName)

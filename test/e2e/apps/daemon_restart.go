@@ -199,13 +199,12 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// All the restart tests need an rc and a watch on pods of the rc.
 		// Additionally some of them might scale the rc during the test.
 		config = testutils.RCConfig{
-			Client:         f.ClientSet,
-			InternalClient: f.InternalClientset,
-			Name:           rcName,
-			Namespace:      ns,
-			Image:          imageutils.GetPauseImageName(),
-			Replicas:       numPods,
-			CreatedPods:    &[]*v1.Pod{},
+			Client:      f.ClientSet,
+			Name:        rcName,
+			Namespace:   ns,
+			Image:       imageutils.GetPauseImageName(),
+			Replicas:    numPods,
+			CreatedPods: &[]*v1.Pod{},
 		}
 		Expect(framework.RunRC(config)).NotTo(HaveOccurred())
 		replacePods(*config.CreatedPods, existingPods)

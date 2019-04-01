@@ -30,7 +30,6 @@ go_library(
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/util/labels:go_default_library",
