@@ -143,6 +143,48 @@ After modifying, run `glide up -v` again to re-populate your /vendor directory.
 Optionally, Glide users can also use [`glide-vc`](https://github.com/sgotti/glide-vc)
 after running `glide up -v` to remove unused files from /vendor.
 
+### Go modules
+
+Dependency management tools are built into go 1.11+ in the form of [go modules](https://github.com/golang/go/wiki/Modules).
+
+If you are using go 1.11 or 1.12 and are working with a project located within `$GOPATH`,
+you must opt into using go modules:
+
+```sh
+export GO111MODULE=on
+```
+
+Ensure your project has a `go.mod` file defined at the root of your project.
+If you do not already have one, `go mod init` will create one for you:
+
+```sh
+go mod init
+```
+
+Indicate the matching versions of `k8s.io/client-go`, `k8s.io/api`, and `k8s.io/apimachinery` your project requires:
+
+```sh
+go get k8s.io/client-go@v10.0.0              # replace v10.0.0 with the required version (or use kubernetes-1.x.y tags if desired)
+go get k8s.io/api@kubernetes-1.13.4          # replace kubernetes-1.13.4 with the required version
+go get k8s.io/apimachinery@kubernetes-1.13.4 # replace kubernetes-1.13.4 with the required version
+```
+
+or you can edit your `go.mod` file directly to specify required versions:
+
+```
+require (
+	k8s.io/api kubernetes-1.13.4
+	k8s.io/apimachinery kubernetes-1.13.4
+	k8s.io/client-go v10.0.0
+)
+```
+
+You can now import and use the `k8s.io/client-go` APIs in your project.
+The next time you `go build`, `go test`, or `go run` your project,
+`k8s.io/client-go` and its dependencies will be downloaded (if needed),
+and detailed dependency version info will be added to your `go.mod` file.
+You can also run `go mod tidy` to do this directly.
+
 ### Dep (Not supported yet!)
 
 [dep](https://github.com/golang/dep) is an up-and-coming dependency management
