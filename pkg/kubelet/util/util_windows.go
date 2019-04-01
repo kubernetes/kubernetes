@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/go-winio"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -40,6 +41,33 @@ func CreateListener(endpoint string) (net.Listener, error) {
 		return nil, err
 	}
 
+	// Use exponential backoff wait until pod-resources directory is created by kubelet.Run().
+	// 4 tries with ~5.6s max wait time
+	endpointReadinessBackoff := wait.Backoff{
+		Steps:    4,
+		Duration: 250 * time.Millisecond,
+		Factor:   4.0,
+		Jitter:   0.1,
+	}
+
+	var listener net.Listener
+	waitErr := wait.ExponentialBackoff(endpointReadinessBackoff, func() (bool, error) {
+		listener, err = getListener(protocol, addr)
+		switch {
+		case err == nil:
+			return true, nil
+		default:
+			return false, nil
+		}
+	})
+	if waitErr != nil {
+		return nil, err
+	}
+
+	return listener, nil
+}
+
+func getListener(protocol, addr string) (net.Listener, error) {
 	switch protocol {
 	case tcpProtocol:
 		return net.Listen(tcpProtocol, addr)

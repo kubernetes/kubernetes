@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 )
 
@@ -50,7 +51,30 @@ func CreateListener(endpoint string) (net.Listener, error) {
 		return nil, fmt.Errorf("failed to unlink socket file %q: %v", addr, err)
 	}
 
-	return net.Listen(protocol, addr)
+	// Use exponential backoff wait until pod-resources directory is created by kubelet.Run().
+	// 4 tries with ~5.6s max wait time
+	endpointReadinessBackoff := wait.Backoff{
+		Steps:    4,
+		Duration: 250 * time.Millisecond,
+		Factor:   4.0,
+		Jitter:   0.1,
+	}
+
+	var listener net.Listener
+	waitErr := wait.ExponentialBackoff(endpointReadinessBackoff, func() (bool, error) {
+		listener, err = net.Listen(protocol, addr)
+		switch {
+		case err == nil:
+			return true, nil
+		default:
+			return false, nil
+		}
+	})
+	if waitErr != nil {
+		return nil, err
+	}
+
+	return listener, nil
 }
 
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {

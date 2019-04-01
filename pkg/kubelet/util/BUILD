@@ -47,18 +47,22 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//vendor/github.com/Microsoft/go-winio:go_default_library",
         ],
         "//conditions:default": [],
