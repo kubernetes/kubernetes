@@ -17,18 +17,19 @@ limitations under the License.
 package bootstrap
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	"k8s.io/klog"
 
-	"fmt"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	informers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -90,7 +91,15 @@ type Signer struct {
 }
 
 // NewSigner returns a new *Signer.
-func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
+func NewSigner(cl clientset.Interface, options SignerOptions) (*Signer, error) {
+	secrets := informers.NewSharedInformerFactoryWithOptions(cl, options.SecretResync, informers.WithNamespace(options.TokenSecretNamespace)).Core().V1().Secrets()
+	configMaps := informers.NewSharedInformerFactoryWithOptions(cl, options.ConfigMapResync,
+		informers.WithNamespace(options.ConfigMapNamespace),
+		informers.WithTweakListOptions(func(listOptions *v1meta.ListOptions) {
+			listOptions.FieldSelector = fmt.Sprintf("metadata.name=%s", options.ConfigMapName)
+		}),
+	).Core().V1().ConfigMaps()
+
 	e := &Signer{
 		client:             cl,
 		configMapKey:       options.ConfigMapNamespace + "/" + options.ConfigMapName,
@@ -114,7 +123,7 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.ConfigMap:
-					return t.Name == options.ConfigMapName && t.Namespace == options.ConfigMapNamespace
+					return t.Name == options.ConfigMapName
 				default:
 					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
 					return false
@@ -133,7 +142,7 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Secret:
-					return t.Type == bootstrapapi.SecretTypeBootstrapToken && t.Namespace == e.secretNamespace
+					return t.Type == bootstrapapi.SecretTypeBootstrapToken
 				default:
 					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
 					return false
