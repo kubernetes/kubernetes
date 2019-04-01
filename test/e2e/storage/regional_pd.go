@@ -168,7 +168,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	}
 	class := newStorageClass(testSpec, ns, "" /* suffix */)
 	claimTemplate := newClaim(testSpec, ns, "" /* suffix */)
-	claimTemplate.Spec.StorageClassName = &testSpec.Class.Name
+	claimTemplate.Spec.StorageClassName = &class.Name
 	statefulSet, service, regionalPDLabels := newStatefulSet(claimTemplate, ns)
 
 	By("creating a StorageClass " + class.Name)
