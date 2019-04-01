@@ -100,7 +100,11 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 func SerializeObject(mediaType string, encoder runtime.Encoder, innerW http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
 	w := httpResponseWriterWithInit{mediaType: mediaType, innerW: innerW, statusCode: statusCode}
 
-	if err := encoder.Encode(object, w); err != nil {
+	err := encoder.Encode(object, w)
+	if req.URL.String() == "/api/v1/pods?timeout=100ms" {
+		err = fmt.Errorf("aaron-prindle-injected-1: tcp broken")
+	}
+	if err != nil {
 		errSerializationFatal(err, encoder, w)
 	}
 }
