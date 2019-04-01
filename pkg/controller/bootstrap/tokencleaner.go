@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -57,8 +57,6 @@ func DefaultTokenCleanerOptions() TokenCleanerOptions {
 
 // TokenCleaner is a controller that deletes expired tokens
 type TokenCleaner struct {
-	tokenSecretNamespace string
-
 	client clientset.Interface
 
 	// secretLister is able to list/get secrets and is populated by the shared informer passed to NewTokenCleaner.
@@ -71,13 +69,15 @@ type TokenCleaner struct {
 }
 
 // NewTokenCleaner returns a new *NewTokenCleaner.
-func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
+func NewTokenCleaner(cl clientset.Interface, options TokenCleanerOptions) (*TokenCleaner, error) {
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(cl, options.SecretResync, informers.WithNamespace(options.TokenSecretNamespace))
+	secrets := informerFactory.Core().V1().Secrets()
+
 	e := &TokenCleaner{
-		client:               cl,
-		secretLister:         secrets.Lister(),
-		secretSynced:         secrets.Informer().HasSynced,
-		tokenSecretNamespace: options.TokenSecretNamespace,
-		queue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "token_cleaner"),
+		client:       cl,
+		secretLister: secrets.Lister(),
+		secretSynced: secrets.Informer().HasSynced,
+		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "token_cleaner"),
 	}
 
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
@@ -91,7 +91,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Secret:
-					return t.Type == bootstrapapi.SecretTypeBootstrapToken && t.Namespace == e.tokenSecretNamespace
+					return t.Type == bootstrapapi.SecretTypeBootstrapToken
 				default:
 					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
 					return false

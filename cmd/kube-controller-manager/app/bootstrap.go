@@ -18,7 +18,6 @@ package app
 
 import (
 	"fmt"
-
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/controller/bootstrap"
@@ -39,10 +38,11 @@ func startBootstrapSignerController(ctx ControllerContext) (http.Handler, bool, 
 }
 
 func startTokenCleanerController(ctx ControllerContext) (http.Handler, bool, error) {
+	tokenCleanerOpts := bootstrap.DefaultTokenCleanerOptions()
+	tokenCleanerOpts.SecretResync = ctx.ResyncPeriod()
 	tcc, err := bootstrap.NewTokenCleaner(
 		ctx.ClientBuilder.ClientOrDie("token-cleaner"),
-		ctx.InformerFactory.Core().V1().Secrets(),
-		bootstrap.DefaultTokenCleanerOptions(),
+		tokenCleanerOpts,
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating TokenCleaner controller: %v", err)

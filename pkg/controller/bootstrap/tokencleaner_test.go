@@ -39,7 +39,7 @@ func newTokenCleaner() (*TokenCleaner, *fake.Clientset, coreinformers.SecretInfo
 	cl := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(cl, options.SecretResync)
 	secrets := informerFactory.Core().V1().Secrets()
-	tcc, err := NewTokenCleaner(cl, secrets, options)
+	tcc, err := NewTokenCleaner(cl, options)
 	if err != nil {
 		return nil, nil, nil, err
 	}
