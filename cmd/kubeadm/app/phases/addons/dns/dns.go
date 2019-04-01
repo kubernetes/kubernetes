@@ -45,6 +45,7 @@ const (
 	kubeDNSStubDomain          = "stubDomains"
 	kubeDNSUpstreamNameservers = "upstreamNameservers"
 	kubeDNSFederation          = "federations"
+	unableToDecodeCoreDNS      = "unable to decode CoreDNS"
 )
 
 // DeployedDNSAddon returns the type of DNS addon currently deployed
@@ -221,7 +222,7 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, client clientset.Interface) error {
 	coreDNSConfigMap := &v1.ConfigMap{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configBytes, coreDNSConfigMap); err != nil {
-		return errors.Wrap(err, "unable to decode CoreDNS configmap")
+		return errors.Wrapf(err, "%s ConfigMap", unableToDecodeCoreDNS)
 	}
 
 	// Create the ConfigMap for CoreDNS or retain it in case it already exists
@@ -231,7 +232,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	coreDNSClusterRoles := &rbac.ClusterRole{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), []byte(CoreDNSClusterRole), coreDNSClusterRoles); err != nil {
-		return errors.Wrap(err, "unable to decode CoreDNS clusterroles")
+		return errors.Wrapf(err, "%s ClusterRole", unableToDecodeCoreDNS)
 	}
 
 	// Create the Clusterroles for CoreDNS or update it in case it already exists
@@ -241,7 +242,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	coreDNSClusterRolesBinding := &rbac.ClusterRoleBinding{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), []byte(CoreDNSClusterRoleBinding), coreDNSClusterRolesBinding); err != nil {
-		return errors.Wrap(err, "unable to decode CoreDNS clusterrolebindings")
+		return errors.Wrapf(err, "%s ClusterRoleBinding", unableToDecodeCoreDNS)
 	}
 
 	// Create the Clusterrolebindings for CoreDNS or update it in case it already exists
@@ -251,7 +252,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	coreDNSServiceAccount := &v1.ServiceAccount{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), []byte(CoreDNSServiceAccount), coreDNSServiceAccount); err != nil {
-		return errors.Wrap(err, "unable to decode CoreDNS serviceaccount")
+		return errors.Wrapf(err, "%s ServiceAccount", unableToDecodeCoreDNS)
 	}
 
 	// Create the ConfigMap for CoreDNS or update it in case it already exists
@@ -261,7 +262,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	coreDNSDeployment := &apps.Deployment{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), deploymentBytes, coreDNSDeployment); err != nil {
-		return errors.Wrap(err, "unable to decode CoreDNS deployment")
+		return errors.Wrapf(err, "%s Deployment", unableToDecodeCoreDNS)
 	}
 
 	// Create the Deployment for CoreDNS or update it in case it already exists
