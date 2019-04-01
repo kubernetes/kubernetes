@@ -38,7 +38,6 @@
 ./hack/lib/swagger.sh
 ./hack/lib/test.sh
 ./hack/lib/version.sh
-./hack/local-up-cluster.sh
 ./hack/make-rules/clean.sh
 ./hack/make-rules/helpers/cache_go_dirs.sh
 ./hack/make-rules/make-help.sh
