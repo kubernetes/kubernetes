@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -120,96 +119,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				By(t.ExitLog)
 				jig.WaitForIngress(true)
 			}
-		})
-
-		It("should update ingress while sync failures occur on other ingresses", func() {
-			By("Creating ingresses that would fail on sync.")
-			ingFailTLSBackend := &extensions.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ing-fail-on-tls-backend",
-				},
-				Spec: extensions.IngressSpec{
-					TLS: []extensions.IngressTLS{
-						{SecretName: "tls-secret-notexist"},
-					},
-					Backend: &extensions.IngressBackend{
-						ServiceName: "echoheaders-notexist",
-						ServicePort: intstr.IntOrString{
-							Type:   intstr.Int,
-							IntVal: 80,
-						},
-					},
-				},
-			}
-			_, err := jig.Client.ExtensionsV1beta1().Ingresses(ns).Create(ingFailTLSBackend)
-			defer func() {
-				if err := jig.Client.ExtensionsV1beta1().Ingresses(ns).Delete(ingFailTLSBackend.Name, nil); err != nil {
-					framework.Logf("Failed to delete ingress %s: %v", ingFailTLSBackend.Name, err)
-				}
-			}()
-			Expect(err).NotTo(HaveOccurred())
-
-			ingFailRules := &extensions.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ing-fail-on-rules",
-				},
-				Spec: extensions.IngressSpec{
-					Rules: []extensions.IngressRule{
-						{
-							Host: "foo.bar.com",
-							IngressRuleValue: extensions.IngressRuleValue{
-								HTTP: &extensions.HTTPIngressRuleValue{
-									Paths: []extensions.HTTPIngressPath{
-										{
-											Path: "/foo",
-											Backend: extensions.IngressBackend{
-												ServiceName: "echoheaders-notexist",
-												ServicePort: intstr.IntOrString{
-													Type:   intstr.Int,
-													IntVal: 80,
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			}
-			_, err = jig.Client.ExtensionsV1beta1().Ingresses(ns).Create(ingFailRules)
-			defer func() {
-				if err := jig.Client.ExtensionsV1beta1().Ingresses(ns).Delete(ingFailRules.Name, nil); err != nil {
-					framework.Logf("Failed to delete ingress %s: %v", ingFailRules.Name, err)
-				}
-			}()
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Creating a basic HTTP ingress and wait for it to come up")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "http"), ns, nil, nil)
-			jig.WaitForIngress(true)
-
-			By("Updating the path on ingress and wait for it to take effect")
-			jig.Update(func(ing *extensions.Ingress) {
-				updatedRule := extensions.IngressRule{
-					Host: "ingress.test.com",
-					IngressRuleValue: extensions.IngressRuleValue{
-						HTTP: &extensions.HTTPIngressRuleValue{
-							Paths: []extensions.HTTPIngressPath{
-								{
-									Path: "/test",
-									// Copy backend from the first rule.
-									Backend: ing.Spec.Rules[0].HTTP.Paths[0].Backend,
-								},
-							},
-						},
-					},
-				}
-				// Replace the first rule.
-				ing.Spec.Rules[0] = updatedRule
-			})
-			// Wait for change to take effect on the updated ingress.
-			jig.WaitForIngress(false)
 		})
 
 		It("should not reconcile manually modified health check for ingress", func() {
