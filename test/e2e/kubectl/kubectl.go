@@ -570,6 +570,21 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(c.BatchV1().Jobs(ns).Delete("run-test-3", nil)).To(gomega.BeNil())
 		})
 
+		ginkgo.It("should contain last line of the log", func() {
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			podName := "run-log-test"
+
+			ginkgo.By("executing a command with run")
+			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+busyboxImage, "--restart=OnFailure", nsFlag, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
+
+			if !framework.CheckPodsRunningReady(c, ns, []string{podName}, framework.PodStartTimeout) {
+				framework.Failf("Pod for run-log-test was not ready")
+			}
+
+			logOutput := framework.RunKubectlOrDie(nsFlag, "logs", "-f", "run-log-test")
+			gomega.Expect(logOutput).To(gomega.ContainSubstring("EOF"))
+		})
+
 		ginkgo.It("should support port-forward", func() {
 			ginkgo.By("forwarding the container port to a local port")
 			cmd := runPortForward(ns, simplePodName, simplePodPort)
