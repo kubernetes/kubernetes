@@ -81,6 +81,14 @@ type ListMeta struct {
 	// identical to the value in the first response, unless you have received this token from an error
 	// message.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,3,opt,name=continue"`
+
+	// RemainingItemCount is the number of subsequent items in the list which are not included in this
+	// list response. If the list request contained label or field selectors, then the number of
+	// remaining items is unknown and this field will be unset. If the list is complete (either
+	// because it is unpaginated or because this is the last page), then there are no more remaining
+	// items and this field will also be unset.  Servers older than v1.15 do not set this field.
+	// +optional
+	RemainingItemCount int64 `json:"remainingItemCount,omitempty" protobuf:"bytes,4,opt,name=remainingItemCount"`
 }
 
 // These are internal finalizer values for Kubernetes-like APIs, must be qualified name unless defined here

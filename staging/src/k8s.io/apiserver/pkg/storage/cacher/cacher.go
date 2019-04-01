@@ -604,7 +604,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		}
 	}
 	if c.versioner != nil {
-		if err := c.versioner.UpdateList(listObj, readResourceVersion, ""); err != nil {
+		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", 0); err != nil {
 			return err
 		}
 	}
@@ -679,7 +679,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	}
 	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))
 	if c.versioner != nil {
-		if err := c.versioner.UpdateList(listObj, readResourceVersion, ""); err != nil {
+		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", 0); err != nil {
 			return err
 		}
 	}

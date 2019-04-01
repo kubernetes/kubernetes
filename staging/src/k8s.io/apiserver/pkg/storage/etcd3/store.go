@@ -413,7 +413,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 		}
 	}
 	// update version with cluster level revision
-	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "")
+	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "", 0)
 }
 
 func (s *store) Count(key string) (int64, error) {
@@ -576,9 +576,10 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	// loop until we have filled the requested limit from etcd or there are no more results
 	var lastKey []byte
 	var hasMore bool
+	var getResp *clientv3.GetResponse
 	for {
 		startTime := time.Now()
-		getResp, err := s.client.KV.Get(ctx, key, options...)
+		getResp, err = s.client.KV.Get(ctx, key, options...)
 		metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
@@ -639,11 +640,17 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		if err != nil {
 			return err
 		}
-		return s.versioner.UpdateList(listObj, uint64(returnedRV), next)
+		remainingItemCount := getResp.Count - pred.Limit
+		// getResp.Count counts in objects that do not match the pred.
+		// Instead of returning inaccurate count, return 0.
+		if !pred.Empty() {
+			remainingItemCount = 0
+		}
+		return s.versioner.UpdateList(listObj, uint64(returnedRV), next, remainingItemCount)
 	}
 
 	// no continuation
-	return s.versioner.UpdateList(listObj, uint64(returnedRV), "")
+	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", 0)
 }
 
 // growSlice takes a slice value and grows its capacity up
