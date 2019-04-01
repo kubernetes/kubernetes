@@ -157,3 +157,66 @@ func TestTimeout(t *testing.T) {
 		t.Fatalf("expected to see a handler panic, but didn't")
 	}
 }
+
+type ResponseHeaderRecorder struct {
+	http.ResponseWriter
+	rr             *httptest.ResponseRecorder
+	headersWritten []int
+}
+
+func NewResponseHeaderRecorder() *ResponseHeaderRecorder {
+	return &ResponseHeaderRecorder{
+		rr:             httptest.NewRecorder(),
+		headersWritten: []int{},
+	}
+}
+
+func (w *ResponseHeaderRecorder) Write(p []byte) (n int, err error) {
+	w.headersWritten = append(w.headersWritten, 200)
+	return w.rr.Write(p)
+}
+
+func (w *ResponseHeaderRecorder) WriteHeader(code int) {
+	w.headersWritten = append(w.headersWritten, code)
+	w.rr.WriteHeader(code)
+}
+
+func Write200Then500Handler() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("simulating one valid write")) // sets header to 200
+		// simulating a 500 after a valid write
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+}
+
+// TestTimeoutWrite200Then500Logged tests that the timeout handler works properly assuming
+// there is logging middleware. The expectations here is that in the case that the timeout
+// handler sees a 500, a tw.w.writeHeader(500) call is attempted despite a previous header
+// being written to 'w'. This is required so that 500s are properly logged.  Without meeting
+// this condition, 500s would not be logged as 200s (#75983)
+func TestTimeoutWrite200Then500Logged(t *testing.T) {
+	gotPanic := make(chan interface{}, 1)
+	timeout := make(chan time.Time, 1)
+	timeoutErr := apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
+	record := &recorder{}
+
+	handler := Write200Then500Handler()
+	fullHandler := withPanicRecovery(
+		WithTimeout(handler, func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
+			return req, timeout, record.Record, timeoutErr
+		}), func(w http.ResponseWriter, req *http.Request, err interface{}) {
+			gotPanic <- err
+			http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
+		})
+
+	rhr := NewResponseHeaderRecorder()
+	req, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fullHandler.ServeHTTP(rhr, req)
+	lastAttemptedHeader := rhr.headersWritten[len(rhr.headersWritten)-1]
+	if lastAttemptedHeader != http.StatusInternalServerError {
+		t.Errorf("lastAttemptedHeader was %d; expected %d", lastAttemptedHeader, http.StatusInternalServerError)
+	}
+}

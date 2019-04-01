@@ -201,7 +201,9 @@ func (tw *baseTimeoutWriter) WriteHeader(code int) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
 
-	if tw.timedOut || tw.wroteHeader || tw.hijacked {
+	// http.StatusInternalServerError(500) passes through here, regardless of
+	// tw.wroteHeader or tw.hijacked as 500 errors must be propogated for logging (#75983)
+	if (tw.timedOut || tw.wroteHeader || tw.hijacked) && code != http.StatusInternalServerError {
 		return
 	}
 
