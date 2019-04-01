@@ -49,6 +49,7 @@ const (
 	statefulSetReadyTimeout = 3 * time.Minute
 	taintKeyPrefix          = "zoneTaint_"
 	repdMinSize             = "200Gi"
+	pvcName                 = "regional-pd-vol"
 )
 
 var _ = utils.SIGDescribe("Regional PD", func() {
@@ -168,6 +169,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	}
 	class := newStorageClass(testSpec, ns, "" /* suffix */)
 	claimTemplate := newClaim(testSpec, ns, "" /* suffix */)
+	claimTemplate.Name = pvcName
 	claimTemplate.Spec.StorageClassName = &class.Name
 	statefulSet, service, regionalPDLabels := newStatefulSet(claimTemplate, ns)
 
@@ -520,7 +522,7 @@ func newPodTemplate(labels map[string]string) *v1.PodTemplateSpec {
 						Name:          "web",
 					}},
 					VolumeMounts: []v1.VolumeMount{{
-						Name:      "regional-pd-vol",
+						Name:      pvcName,
 						MountPath: "/mnt/data/regional-pd",
 					}},
 				},
