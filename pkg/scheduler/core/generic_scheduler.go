@@ -916,8 +916,8 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 		klog.Errorf("earliestStartTime is nil for node %s. Should not reach here.", minNodes2[0])
 		return minNodes2[0]
 	}
-	lenNodes1 = 0
-	for i := 0; i < lenNodes2; i++ {
+	nodeToReturn := minNodes2[0]
+	for i := 1; i < lenNodes2; i++ {
 		node := minNodes2[i]
 		// Get earliest start time of all pods on the current node.
 		earliestStartTimeOnNode := util.GetEarliestPodStartTime(nodesToVictims[node])
@@ -927,22 +927,11 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 		}
 		if earliestStartTimeOnNode.After(latestStartTime.Time) {
 			latestStartTime = earliestStartTimeOnNode
-			lenNodes1 = 0
-		}
-		if earliestStartTimeOnNode.Equal(latestStartTime) {
-			minNodes1[lenNodes1] = node
-			lenNodes1++
+			nodeToReturn = node
 		}
 	}
 
-	// At this point, even if there are more than one node with the same score,
-	// return the first one.
-	if lenNodes1 > 0 {
-		return minNodes1[0]
-	}
-
-	klog.Errorf("Error in logic of node scoring for preemption. We should never reach here!")
-	return nil
+	return nodeToReturn
 }
 
 // selectNodesForPreemption finds all the nodes with possible victims for
