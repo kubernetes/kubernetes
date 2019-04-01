@@ -1111,10 +1111,31 @@ func selectVictimsOnNode(
 	return victims, numViolatingVictim, true
 }
 
+type PredicateFailureReasonSet map[predicates.PredicateFailureReason]struct{}
+
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
 func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedPredicateMap) []*v1.Node {
 	potentialNodes := []*v1.Node{}
+	reasonSet := PredicateFailureReasonSet{}
+	reasonSet[predicates.ErrNodeSelectorNotMatch] = struct{}{}
+	reasonSet[predicates.ErrPodAffinityRulesNotMatch] = struct{}{}
+	reasonSet[predicates.ErrPodNotMatchHostName] = struct{}{}
+	reasonSet[predicates.ErrTaintsTolerationsNotMatch] = struct{}{}
+	reasonSet[predicates.ErrNodeLabelPresenceViolated] = struct{}{}
+	// Node conditions won't change when scheduler simulates removal of preemption victims.
+	// So, it is pointless to try nodes that have not been able to host the pod due to node
+	// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
+	reasonSet[predicates.ErrNodeNotReady] = struct{}{}
+	reasonSet[predicates.ErrNodeNetworkUnavailable] = struct{}{}
+	reasonSet[predicates.ErrNodeUnderDiskPressure] = struct{}{}
+	reasonSet[predicates.ErrNodeUnderPIDPressure] = struct{}{}
+	reasonSet[predicates.ErrNodeUnderMemoryPressure] = struct{}{}
+	reasonSet[predicates.ErrNodeUnschedulable] = struct{}{}
+	reasonSet[predicates.ErrNodeUnknownCondition] = struct{}{}
+	reasonSet[predicates.ErrVolumeZoneConflict] = struct{}{}
+	reasonSet[predicates.ErrVolumeNodeConflict] = struct{}{}
+	reasonSet[predicates.ErrVolumeBindConflict] = struct{}{}
 	for _, node := range nodes {
 		unresolvableReasonExist := false
 		failedPredicates, _ := failedPredicatesMap[node.Name]
@@ -1124,26 +1145,8 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedP
 		// significant overhead.
 		// Also, we currently assume all failures returned by extender as resolvable.
 		for _, failedPredicate := range failedPredicates {
-			switch failedPredicate {
-			case
-				predicates.ErrNodeSelectorNotMatch,
-				predicates.ErrPodAffinityRulesNotMatch,
-				predicates.ErrPodNotMatchHostName,
-				predicates.ErrTaintsTolerationsNotMatch,
-				predicates.ErrNodeLabelPresenceViolated,
-				// Node conditions won't change when scheduler simulates removal of preemption victims.
-				// So, it is pointless to try nodes that have not been able to host the pod due to node
-				// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
-				predicates.ErrNodeNotReady,
-				predicates.ErrNodeNetworkUnavailable,
-				predicates.ErrNodeUnderDiskPressure,
-				predicates.ErrNodeUnderPIDPressure,
-				predicates.ErrNodeUnderMemoryPressure,
-				predicates.ErrNodeUnschedulable,
-				predicates.ErrNodeUnknownCondition,
-				predicates.ErrVolumeZoneConflict,
-				predicates.ErrVolumeNodeConflict,
-				predicates.ErrVolumeBindConflict:
+			_, contained := reasonSet[failedPredicate]
+			if (contained) {
 				unresolvableReasonExist = true
 				break
 			}
