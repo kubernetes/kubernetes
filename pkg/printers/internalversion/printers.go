@@ -856,7 +856,7 @@ func printJob(obj *batch.Job, options printers.PrintOptions) ([]metav1beta1.Tabl
 	switch {
 	case obj.Status.StartTime == nil:
 	case obj.Status.CompletionTime == nil:
-		jobDuration = duration.HumanDuration(time.Now().Sub(obj.Status.StartTime.Time))
+		jobDuration = duration.HumanDuration(time.Since(obj.Status.StartTime.Time))
 	default:
 		jobDuration = duration.HumanDuration(obj.Status.CompletionTime.Sub(obj.Status.StartTime.Time))
 	}

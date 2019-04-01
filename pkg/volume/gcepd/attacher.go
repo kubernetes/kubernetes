@@ -353,3 +353,7 @@ func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string)
 func (plugin *gcePersistentDiskPlugin) CanAttach(spec *volume.Spec) bool {
 	return true
 }
+
+func (plugin *gcePersistentDiskPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}

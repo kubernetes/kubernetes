@@ -63,7 +63,7 @@ var (
 type IngressScaleFramework struct {
 	Clientset     clientset.Interface
 	Jig           *ingress.TestJig
-	GCEController *gce.GCEIngressController
+	GCEController *gce.IngressController
 	CloudConfig   framework.CloudConfig
 	Logger        ingress.TestLogger
 
@@ -112,7 +112,7 @@ func (f *IngressScaleFramework) PrepareScaleTest() error {
 	f.Jig = ingress.NewIngressTestJig(f.Clientset)
 	f.Jig.Logger = f.Logger
 	f.Jig.PollInterval = scaleTestPollInterval
-	f.GCEController = &gce.GCEIngressController{
+	f.GCEController = &gce.IngressController{
 		Client: f.Clientset,
 		Cloud:  f.CloudConfig,
 	}
@@ -154,7 +154,7 @@ func (f *IngressScaleFramework) CleanupScaleTest() []error {
 	}
 
 	f.Logger.Infof("Cleaning up cloud resources...")
-	if err := f.GCEController.CleanupGCEIngressControllerWithTimeout(ingressesCleanupTimeout); err != nil {
+	if err := f.GCEController.CleanupIngressControllerWithTimeout(ingressesCleanupTimeout); err != nil {
 		errs = append(errs, err)
 	}
 

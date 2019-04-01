@@ -108,6 +108,7 @@ func lookupClusterImageSources() (string, string, error) {
 	return masterImg, nodeImg, nil
 }
 
+// LogClusterImageSources writes out cluster image sources.
 func LogClusterImageSources() {
 	masterImg, nodeImg, err := lookupClusterImageSources()
 	if err != nil {
@@ -129,6 +130,7 @@ func LogClusterImageSources() {
 	}
 }
 
+// CreateManagedInstanceGroup creates a Compute Engine managed instance group.
 func CreateManagedInstanceGroup(size int64, zone, template string) error {
 	// TODO(verult): make this hit the compute API directly instead of
 	// shelling out to gcloud.
@@ -145,6 +147,7 @@ func CreateManagedInstanceGroup(size int64, zone, template string) error {
 	return nil
 }
 
+// GetManagedInstanceGroupTemplateName returns the list of Google Compute Engine managed instance groups.
 func GetManagedInstanceGroupTemplateName(zone string) (string, error) {
 	// TODO(verult): make this hit the compute API directly instead of
 	// shelling out to gcloud. Use InstanceGroupManager to get Instance Template name.
@@ -167,6 +170,7 @@ func GetManagedInstanceGroupTemplateName(zone string) (string, error) {
 	return templateName, nil
 }
 
+// DeleteManagedInstanceGroup deletes Google Compute Engine managed instance group.
 func DeleteManagedInstanceGroup(zone string) error {
 	// TODO(verult): make this hit the compute API directly instead of
 	// shelling out to gcloud.

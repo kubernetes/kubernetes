@@ -17,7 +17,11 @@ limitations under the License.
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
+	"math/rand"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -482,4 +486,44 @@ func CheckReadWriteToPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path str
 		// Check that writing to directory as block volume fails
 		VerifyExecInPodFail(pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
 	}
+}
+
+func genBinDataFromSeed(len int, seed int64) []byte {
+	binData := make([]byte, len)
+	rand.Seed(seed)
+
+	len, err := rand.Read(binData)
+	if err != nil {
+		fmt.Printf("Error: %v", err)
+	}
+
+	return binData
+}
+
+func CheckReadFromPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string, len int, seed int64) {
+	var pathForVolMode string
+	if volMode == v1.PersistentVolumeBlock {
+		pathForVolMode = path
+	} else {
+		pathForVolMode = filepath.Join(path, "file1.txt")
+	}
+
+	sum := sha256.Sum256(genBinDataFromSeed(len, seed))
+
+	VerifyExecInPodSucceed(pod, fmt.Sprintf("dd if=%s bs=%d count=1 | sha256sum", pathForVolMode, len))
+	VerifyExecInPodSucceed(pod, fmt.Sprintf("dd if=%s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, len, sum))
+}
+
+func CheckWriteToPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string, len int, seed int64) {
+	var pathForVolMode string
+	if volMode == v1.PersistentVolumeBlock {
+		pathForVolMode = path
+	} else {
+		pathForVolMode = filepath.Join(path, "file1.txt")
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(genBinDataFromSeed(len, seed))
+
+	VerifyExecInPodSucceed(pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
+	VerifyExecInPodSucceed(pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s bs=%d count=1", encoded, pathForVolMode, len))
 }

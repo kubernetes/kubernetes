@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -131,7 +131,7 @@ type ScheduleResult struct {
 }
 
 type genericScheduler struct {
-	cache                    schedulerinternalcache.Cache
+	cache                    internalcache.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
 	predicates               map[string]predicates.FitPredicate
 	priorityMetaProducer     priorities.PriorityMetadataProducer
@@ -141,7 +141,7 @@ type genericScheduler struct {
 	extenders                []algorithm.SchedulerExtender
 	lastNodeIndex            uint64
 	alwaysCheckAllPredicates bool
-	nodeInfoSnapshot         schedulerinternalcache.NodeInfoSnapshot
+	nodeInfoSnapshot         internalcache.NodeInfoSnapshot
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                algorithm.PDBLister
@@ -916,8 +916,8 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 		klog.Errorf("earliestStartTime is nil for node %s. Should not reach here.", minNodes2[0])
 		return minNodes2[0]
 	}
-	lenNodes1 = 0
-	for i := 0; i < lenNodes2; i++ {
+	nodeToReturn := minNodes2[0]
+	for i := 1; i < lenNodes2; i++ {
 		node := minNodes2[i]
 		// Get earliest start time of all pods on the current node.
 		earliestStartTimeOnNode := util.GetEarliestPodStartTime(nodesToVictims[node])
@@ -927,22 +927,11 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 		}
 		if earliestStartTimeOnNode.After(latestStartTime.Time) {
 			latestStartTime = earliestStartTimeOnNode
-			lenNodes1 = 0
-		}
-		if earliestStartTimeOnNode.Equal(latestStartTime) {
-			minNodes1[lenNodes1] = node
-			lenNodes1++
+			nodeToReturn = node
 		}
 	}
 
-	// At this point, even if there are more than one node with the same score,
-	// return the first one.
-	if lenNodes1 > 0 {
-		return minNodes1[0]
-	}
-
-	klog.Errorf("Error in logic of node scoring for preemption. We should never reach here!")
-	return nil
+	return nodeToReturn
 }
 
 // selectNodesForPreemption finds all the nodes with possible victims for
@@ -1046,7 +1035,7 @@ func selectVictimsOnNode(
 	if nodeInfo == nil {
 		return nil, 0, false
 	}
-	potentialVictims := util.SortableList{CompFunc: util.HigherPriorityPod}
+	potentialVictims := util.SortableList{CompFunc: util.MoreImportantPod}
 	nodeInfoCopy := nodeInfo.Clone()
 
 	removePod := func(rp *v1.Pod) {
@@ -1070,7 +1059,6 @@ func selectVictimsOnNode(
 			removePod(p)
 		}
 	}
-	potentialVictims.Sort()
 	// If the new pod does not fit after removing all the lower priority pods,
 	// we are almost done and this node is not suitable for preemption. The only
 	// condition that we could check is if the "pod" is failing to schedule due to
@@ -1085,6 +1073,7 @@ func selectVictimsOnNode(
 	}
 	var victims []*v1.Pod
 	numViolatingVictim := 0
+	potentialVictims.Sort()
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
 	// from the highest priority victims.
@@ -1205,7 +1194,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
-	cache schedulerinternalcache.Cache,
+	cache internalcache.Cache,
 	podQueue internalqueue.SchedulingQueue,
 	predicates map[string]predicates.FitPredicate,
 	predicateMetaProducer predicates.PredicateMetadataProducer,
@@ -1229,7 +1218,7 @@ func NewGenericScheduler(
 		priorityMetaProducer:     priorityMetaProducer,
 		pluginSet:                pluginSet,
 		extenders:                extenders,
-		nodeInfoSnapshot:         schedulerinternalcache.NewNodeInfoSnapshot(),
+		nodeInfoSnapshot:         internalcache.NewNodeInfoSnapshot(),
 		volumeBinder:             volumeBinder,
 		pvcLister:                pvcLister,
 		pdbLister:                pdbLister,

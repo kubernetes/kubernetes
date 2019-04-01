@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::log::status "Ensuring prereqs"
@@ -88,11 +88,12 @@ kube::log::status "Running godep save - this might take a while"
 # This uses $(pwd) rather than ${KUBE_ROOT} because KUBE_ROOT will be
 # realpath'ed, and godep barfs ("... is not using a known version control
 # system") on our staging dirs.
-GOPATH="${GOPATH}:$(pwd)/staging" ${KUBE_GODEP:?} save -i $(IFS=,; echo "${IGNORED_PACKAGES[*]}") "${REQUIRED_BINS[@]}"
+GOPATH="${GOPATH}:$(pwd)/staging" "${KUBE_GODEP:?}" save -i "$(IFS=,; echo "${IGNORED_PACKAGES[*]}")" "${REQUIRED_BINS[@]}"
 
 # create a symlink in vendor directory pointing to the staging client. This
 # let other packages use the staging client as if it were vendored.
-for repo in $(ls staging/src/k8s.io); do
+for repo in staging/src/k8s.io/*; do
+  repo="${repo#staging/src/k8s.io/}"
   if [ ! -e "vendor/k8s.io/${repo}" ]; then
     ln -s "../../staging/src/k8s.io/${repo}" "vendor/k8s.io/${repo}"
   fi

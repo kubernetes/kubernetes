@@ -47,7 +47,6 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -75,9 +74,8 @@ type Framework struct {
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
 
-	InternalClientset *internalclientset.Clientset
-	AggregatorClient  *aggregatorclient.Clientset
-	DynamicClient     dynamic.Interface
+	AggregatorClient *aggregatorclient.Clientset
+	DynamicClient    dynamic.Interface
 
 	ScalesGetter scaleclient.ScalesGetter
 
@@ -179,8 +177,6 @@ func (f *Framework) BeforeEach() {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
 		f.ClientSet, err = clientset.NewForConfig(config)
-		ExpectNoError(err)
-		f.InternalClientset, err = internalclientset.NewForConfig(config)
 		ExpectNoError(err)
 		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
 		ExpectNoError(err)
@@ -407,7 +403,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	f.AddNamespacesToDelete(ns)
 
 	if err == nil && !f.SkipPrivilegedPSPBinding {
-		CreatePrivilegedPSPBinding(f, ns.Name)
+		createPrivilegedPSPBinding(f, ns.Name)
 	}
 
 	return ns, err

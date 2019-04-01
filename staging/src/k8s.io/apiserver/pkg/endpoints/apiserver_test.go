@@ -1616,6 +1616,41 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func BenchmarkGet(b *testing.B) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: genericapitesting.Simple{
+			Other: "foo",
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	u := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resp, err := http.Get(u)
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			b.Fatalf("unexpected response: %#v", resp)
+		}
+		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+			b.Fatalf("unable to read body")
+		}
+	}
+	b.StopTimer()
+}
+
 func TestGetCompression(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{

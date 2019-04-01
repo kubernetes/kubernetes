@@ -1064,7 +1064,7 @@ func TestNodeOperators(t *testing.T) {
 		// Case 1: the node was added into cache successfully.
 		got, found := cache.nodes[node.Name]
 		if !found {
-			t.Errorf("Failed to find node %v in schedulerinternalcache.", node.Name)
+			t.Errorf("Failed to find node %v in internalcache.", node.Name)
 		}
 		if cache.nodeTree.NumNodes() != 1 || cache.nodeTree.Next() != node.Name {
 			t.Errorf("cache.nodeTree is not updated correctly after adding node: %v", node.Name)

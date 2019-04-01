@@ -107,69 +107,71 @@ func TestMarkControlPlane(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		hostname, err := node.GetHostname("")
-		if err != nil {
-			t.Fatalf("MarkControlPlane(%s): unexpected error: %v", tc.name, err)
-		}
-		controlPlaneNode := &v1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: hostname,
-				Labels: map[string]string{
-					v1.LabelHostname: hostname,
+		t.Run(tc.name, func(t *testing.T) {
+			hostname, err := node.GetHostname("")
+			if err != nil {
+				t.Fatalf("MarkControlPlane(%s): unexpected error: %v", tc.name, err)
+			}
+			controlPlaneNode := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: hostname,
+					Labels: map[string]string{
+						v1.LabelHostname: hostname,
+					},
 				},
-			},
-		}
-
-		if tc.existingLabel != "" {
-			controlPlaneNode.ObjectMeta.Labels[tc.existingLabel] = ""
-		}
-
-		if tc.existingTaints != nil {
-			controlPlaneNode.Spec.Taints = tc.existingTaints
-		}
-
-		jsonNode, err := json.Marshal(controlPlaneNode)
-		if err != nil {
-			t.Fatalf("MarkControlPlane(%s): unexpected encoding error: %v", tc.name, err)
-		}
-
-		var patchRequest string
-		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-
-			if req.URL.Path != "/api/v1/nodes/"+hostname {
-				t.Errorf("MarkControlPlane(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
-				http.Error(w, "", http.StatusNotFound)
-				return
 			}
 
-			switch req.Method {
-			case "GET":
-			case "PATCH":
-				patchRequest = toString(req.Body)
-			default:
-				t.Errorf("MarkControlPlane(%s): request for unexpected HTTP verb: %v", tc.name, req.Method)
-				http.Error(w, "", http.StatusNotFound)
-				return
+			if tc.existingLabel != "" {
+				controlPlaneNode.ObjectMeta.Labels[tc.existingLabel] = ""
 			}
 
-			w.WriteHeader(http.StatusOK)
-			w.Write(jsonNode)
-		}))
-		defer s.Close()
+			if tc.existingTaints != nil {
+				controlPlaneNode.Spec.Taints = tc.existingTaints
+			}
 
-		cs, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
-		if err != nil {
-			t.Fatalf("MarkControlPlane(%s): unexpected error building clientset: %v", tc.name, err)
-		}
+			jsonNode, err := json.Marshal(controlPlaneNode)
+			if err != nil {
+				t.Fatalf("MarkControlPlane(%s): unexpected encoding error: %v", tc.name, err)
+			}
 
-		if err := MarkControlPlane(cs, hostname, tc.newTaints); err != nil {
-			t.Errorf("MarkControlPlane(%s) returned unexpected error: %v", tc.name, err)
-		}
+			var patchRequest string
+			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
 
-		if tc.expectedPatch != patchRequest {
-			t.Errorf("MarkControlPlane(%s) wanted patch %v, got %v", tc.name, tc.expectedPatch, patchRequest)
-		}
+				if req.URL.Path != "/api/v1/nodes/"+hostname {
+					t.Errorf("MarkControlPlane(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
+					http.Error(w, "", http.StatusNotFound)
+					return
+				}
+
+				switch req.Method {
+				case "GET":
+				case "PATCH":
+					patchRequest = toString(req.Body)
+				default:
+					t.Errorf("MarkControlPlane(%s): request for unexpected HTTP verb: %v", tc.name, req.Method)
+					http.Error(w, "", http.StatusNotFound)
+					return
+				}
+
+				w.WriteHeader(http.StatusOK)
+				w.Write(jsonNode)
+			}))
+			defer s.Close()
+
+			cs, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
+			if err != nil {
+				t.Fatalf("MarkControlPlane(%s): unexpected error building clientset: %v", tc.name, err)
+			}
+
+			if err := MarkControlPlane(cs, hostname, tc.newTaints); err != nil {
+				t.Errorf("MarkControlPlane(%s) returned unexpected error: %v", tc.name, err)
+			}
+
+			if tc.expectedPatch != patchRequest {
+				t.Errorf("MarkControlPlane(%s) wanted patch %v, got %v", tc.name, tc.expectedPatch, patchRequest)
+			}
+		})
 	}
 }
 

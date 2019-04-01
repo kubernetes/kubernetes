@@ -153,12 +153,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			scTest.AllowVolumeExpansion = true
 		}
 
-		nodeSelection := testsuites.NodeSelection{
+		nodeSelection := framework.NodeSelection{
 			// The mock driver only works when everything runs on a single node.
 			Name: nodeName,
 		}
 		if len(m.nodeLabel) > 0 {
-			nodeSelection = testsuites.NodeSelection{
+			nodeSelection = framework.NodeSelection{
 				Selector: m.nodeLabel,
 			}
 		}
@@ -177,11 +177,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 	createPodWithPVC := func(pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
 		nodeName := m.config.ClientNodeName
-		nodeSelection := testsuites.NodeSelection{
+		nodeSelection := framework.NodeSelection{
 			Name: nodeName,
 		}
 		if len(m.nodeLabel) > 0 {
-			nodeSelection = testsuites.NodeSelection{
+			nodeSelection = framework.NodeSelection{
 				Selector: m.nodeLabel,
 			}
 		}
@@ -597,7 +597,7 @@ func checkNodeForLimits(nodeName string, attachKey v1.ResourceName, cs clientset
 	return int(attachLimit), waitErr
 }
 
-func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node testsuites.NodeSelection, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node framework.NodeSelection, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	class := newStorageClass(t, ns, "")
 	var err error
 	_, err = cs.StorageV1().StorageClasses().Get(class.Name, metav1.GetOptions{})
@@ -659,7 +659,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node t
 	return class, claim, pod
 }
 
-func startPausePodWithClaim(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node testsuites.NodeSelection, ns string) (*v1.Pod, error) {
+func startPausePodWithClaim(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node framework.NodeSelection, ns string) (*v1.Pod, error) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-volume-tester-",

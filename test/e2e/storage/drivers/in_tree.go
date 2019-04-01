@@ -95,6 +95,7 @@ func InitNFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -232,6 +233,7 @@ func InitGlusterFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -586,6 +588,7 @@ func InitCephFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -1183,8 +1186,9 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTest
 	}
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
+	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
 func (h *gcePdDriver) GetClaimSize() string {

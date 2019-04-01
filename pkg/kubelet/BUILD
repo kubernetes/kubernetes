@@ -44,8 +44,6 @@ go_library(
         "//pkg/fieldpath:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
-        "//pkg/kubelet/apis/cri:go_default_library",
-        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/apis/pluginregistration/v1:go_default_library",
         "//pkg/kubelet/apis/podresources:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
@@ -140,6 +138,8 @@ go_library(
         "//staging/src/k8s.io/client-go/util/certificate:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
+        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",
@@ -250,7 +250,7 @@ go_test(
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
+            "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         ],
         "//conditions:default": [],
     }),

@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 )
 
 // Time is a wrapper around time.Time which supports correct
@@ -147,8 +147,12 @@ func (t Time) MarshalJSON() ([]byte, error) {
 		// Encode unset/nil objects as JSON's "null".
 		return []byte("null"), nil
 	}
-
-	return json.Marshal(t.UTC().Format(time.RFC3339))
+	buf := make([]byte, 0, len(time.RFC3339)+2)
+	buf = append(buf, '"')
+	// time cannot contain non escapable JSON characters
+	buf = t.UTC().AppendFormat(buf, time.RFC3339)
+	buf = append(buf, '"')
+	return buf, nil
 }
 
 // OpenAPISchemaType is used by the kube-openapi generator when constructing

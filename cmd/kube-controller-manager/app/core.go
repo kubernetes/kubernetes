@@ -23,12 +23,11 @@ package app
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 	"time"
 
 	"k8s.io/klog"
-
-	"net/http"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -295,7 +294,7 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration),
-		InformerFactory:           ctx.InformerFactory,
+		InformerFactory:           ctx.GenericInformerFactory,
 		ReplenishmentResyncPeriod: ctx.ResyncPeriod,
 		DiscoveryFunc:             discoveryFunc,
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,

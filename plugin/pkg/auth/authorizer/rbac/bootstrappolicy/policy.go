@@ -413,6 +413,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 				// Needed for all shared informers
 				rbacv1helpers.NewRule("list", "watch").Groups("*").Resources("*").RuleOrDie(),
+				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
 			},
 		},
 		{

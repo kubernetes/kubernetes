@@ -49,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -341,9 +340,8 @@ var _ = SIGDescribe("Load capacity", func() {
 	}
 })
 
-func createClients(numberOfClients int) ([]clientset.Interface, []internalclientset.Interface, []scaleclient.ScalesGetter, error) {
+func createClients(numberOfClients int) ([]clientset.Interface, []scaleclient.ScalesGetter, error) {
 	clients := make([]clientset.Interface, numberOfClients)
-	internalClients := make([]internalclientset.Interface, numberOfClients)
 	scalesClients := make([]scaleclient.ScalesGetter, numberOfClients)
 
 	for i := 0; i < numberOfClients; i++ {
@@ -361,11 +359,11 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 		// each client here.
 		transportConfig, err := config.TransportConfig()
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		tlsConfig, err := transport.TLSConfigFor(transportConfig)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		config.Transport = utilnet.SetTransportDefaults(&http.Transport{
 			Proxy:               http.ProxyFromEnvironment,
@@ -387,14 +385,9 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 
 		c, err := clientset.NewForConfig(config)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		clients[i] = c
-		internalClient, err := internalclientset.NewForConfig(config)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		internalClients[i] = internalClient
 
 		// create scale client, if GroupVersion or NegotiatedSerializer are not set
 		// assign default values - these fields are mandatory (required by RESTClientFor).
@@ -406,11 +399,11 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 		}
 		restClient, err := restclient.RESTClientFor(config)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
 		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
@@ -418,7 +411,7 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		scalesClients[i] = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 	}
-	return clients, internalClients, scalesClients, nil
+	return clients, scalesClients, nil
 }
 
 func computePodCounts(total int) (int, int, int) {
@@ -478,12 +471,11 @@ func generateConfigs(
 	// Create a number of clients to better simulate real usecase
 	// where not everyone is using exactly the same client.
 	rcsPerClient := 20
-	clients, internalClients, scalesClients, err := createClients((len(configs) + rcsPerClient - 1) / rcsPerClient)
+	clients, scalesClients, err := createClients((len(configs) + rcsPerClient - 1) / rcsPerClient)
 	framework.ExpectNoError(err)
 
 	for i := 0; i < len(configs); i++ {
 		configs[i].SetClient(clients[i%len(clients)])
-		configs[i].SetInternalClient(internalClients[i%len(internalClients)])
 		configs[i].SetScalesClient(scalesClients[i%len(clients)])
 	}
 	for i := 0; i < len(secretConfigs); i++ {
@@ -542,7 +534,6 @@ func GenerateConfigsForGroup(
 
 		baseConfig := &testutils.RCConfig{
 			Client:         nil, // this will be overwritten later
-			InternalClient: nil, // this will be overwritten later
 			Name:           groupName + "-" + strconv.Itoa(i),
 			Namespace:      namespace,
 			Timeout:        UnreadyNodeToleration,

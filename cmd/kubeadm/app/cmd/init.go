@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/template"
 
 	"github.com/lithammer/dedent"
@@ -218,10 +217,9 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 		&cfg.Networking.DNSDomain, options.NetworkingDNSDomain, cfg.Networking.DNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal".`,
 	)
-	flagSet.StringVar(
-		&cfg.KubernetesVersion, options.KubernetesVersion, cfg.KubernetesVersion,
-		`Choose a specific Kubernetes version for the control plane.`,
-	)
+
+	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
+
 	flagSet.StringVar(
 		&cfg.CertificatesDir, options.CertificatesDir, cfg.CertificatesDir,
 		`The path where to save and store the certificates.`,
@@ -235,8 +233,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 		`Specify the node name.`,
 	)
 	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
-	flagSet.StringVar(featureGatesString, options.FeatureGatesString, *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
-		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
+	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset

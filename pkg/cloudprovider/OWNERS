@@ -48,3 +48,4 @@ reviewers:
 - andrewsykim
 labels:
 - sig/cloud-provider
+- area/cloudprovider

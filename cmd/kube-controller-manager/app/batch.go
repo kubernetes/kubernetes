@@ -46,7 +46,7 @@ func startCronJobController(ctx ControllerContext) (http.Handler, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}] {
 		return nil, false, nil
 	}
-	cjc, err := cronjob.NewCronJobController(
+	cjc, err := cronjob.NewController(
 		ctx.ClientBuilder.ClientOrDie("cronjob-controller"),
 	)
 	if err != nil {

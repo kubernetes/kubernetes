@@ -461,7 +461,7 @@ func TestApplyRemoveContainerPort(t *testing.T) {
 	defer closeFn()
 
 	obj := []byte(`{
-		"apiVersion": "extensions/v1beta1",
+		"apiVersion": "apps/v1",
 		"kind": "Deployment",
 		"metadata": {
 			"name": "deployment",
@@ -495,7 +495,7 @@ func TestApplyRemoveContainerPort(t *testing.T) {
 	}`)
 
 	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
-		AbsPath("/apis/extensions/v1beta1").
+		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").

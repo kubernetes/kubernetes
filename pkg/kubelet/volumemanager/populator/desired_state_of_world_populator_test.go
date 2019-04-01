@@ -152,6 +152,119 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 
 }
 
+func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
+	// create dswp
+	mode := v1.PersistentVolumeFilesystem
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dswp-test-volume-name",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			VolumeMode: &mode,
+		},
+	}
+	pvc := &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeName: "dswp-test-volume-name",
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase: v1.ClaimBound,
+		},
+	}
+	dswp, fakePodManager, fakesDSW := createDswpWithVolume(t, pv, pvc)
+
+	// create pod
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "dswp-test-volume-name",
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+
+	fakePodManager.AddPod(pod)
+
+	podName := util.GetUniquePodName(pod)
+
+	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
+
+	dswp.findAndAddNewPods()
+
+	if !dswp.pods.processedPods[podName] {
+		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
+	}
+
+	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
+
+	volumeExists := fakesDSW.VolumeExists(expectedVolumeName)
+	if !volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := fakesDSW.PodExistsInVolume(
+		podName, expectedVolumeName); !podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
+			podExistsInVolume)
+	}
+
+	verifyVolumeExistsInVolumesToMount(
+		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
+
+	//let the pod be terminated
+	podGet, exist := fakePodManager.GetPodByName(pod.Namespace, pod.Name)
+	if !exist {
+		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
+	}
+	podGet.Status.Phase = v1.PodFailed
+
+	dswp.findAndRemoveDeletedPods()
+	// Although Pod status is terminated, pod still exists in pod manager and actual state does not has this pod and volume information
+	// desired state populator will fail to delete this pod and volume first
+	volumeExists = fakesDSW.VolumeExists(expectedVolumeName)
+	if !volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := fakesDSW.PodExistsInVolume(
+		podName, expectedVolumeName); !podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
+			podExistsInVolume)
+	}
+
+	// reconcile with actual state so that volume is added into the actual state
+	// desired state populator now can successfully delete the pod and volume
+	fakeASW := dswp.actualStateOfWorld
+	reconcileASW(fakeASW, fakesDSW, t)
+	dswp.findAndRemoveDeletedPods()
+	volumeExists = fakesDSW.VolumeExists(expectedVolumeName)
+	if volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := fakesDSW.PodExistsInVolume(
+		podName, expectedVolumeName); podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
+			podExistsInVolume)
+	}
+}
+
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t *testing.T) {
 	// Enable BlockVolume feature gate
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()

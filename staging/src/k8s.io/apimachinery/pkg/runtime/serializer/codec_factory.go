@@ -17,6 +17,9 @@ limitations under the License.
 package serializer
 
 import (
+	"mime"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -120,6 +123,15 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 				Serializer:       d.Serializer,
 				PrettySerializer: d.PrettySerializer,
 			}
+
+			mediaType, _, err := mime.ParseMediaType(info.MediaType)
+			if err != nil {
+				panic(err)
+			}
+			parts := strings.SplitN(mediaType, "/", 2)
+			info.MediaTypeType = parts[0]
+			info.MediaTypeSubType = parts[1]
+
 			if d.StreamSerializer != nil {
 				info.StreamSerializer = &runtime.StreamSerializerInfo{
 					Serializer:    d.StreamSerializer,

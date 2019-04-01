@@ -340,6 +340,150 @@ func TestNameInFieldSelector(t *testing.T) {
 	}
 }
 
+func TestAPICRDProtobuf(t *testing.T) {
+	tearDown, config, _, err := fixtures.StartDefaultServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	s, _, closeFn := setup(t)
+	defer closeFn()
+
+	apiExtensionClient, err := apiextensionsclient.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fooCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foos.cr.bar.com",
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "cr.bar.com",
+			Version: "v1",
+			Scope:   apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural: "foos",
+				Kind:   "Foo",
+			},
+		},
+	}
+	fooCRD, err = fixtures.CreateNewCustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Version, Resource: "foos"}
+	crclient := dynamicClient.Resource(crdGVR).Namespace("default")
+
+	testcases := []struct {
+		name     string
+		accept   string
+		object   func(*testing.T) (metav1.Object, string, string)
+		wantErr  func(*testing.T, error)
+		wantBody func(*testing.T, io.Reader)
+	}{
+		{
+			name:   "server returns 406 when asking for protobuf for CRDs",
+			accept: "application/vnd.kubernetes.protobuf",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantErr: func(t *testing.T, err error) {
+				if !apierrors.IsNotAcceptable(err) {
+					t.Fatal(err)
+				}
+				// TODO: this should be a more specific error
+				if err.Error() != "only the following media types are accepted: application/json, application/yaml" {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name:   "server returns JSON when asking for protobuf and json for CRDs",
+			accept: "application/vnd.kubernetes.protobuf,application/json",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				obj := &unstructured.Unstructured{}
+				if err := json.NewDecoder(w).Decode(obj); err != nil {
+					t.Fatal(err)
+				}
+				v, ok, err := unstructured.NestedInt64(obj.UnstructuredContent(), "spec", "field")
+				if !ok || err != nil {
+					data, _ := json.MarshalIndent(obj.UnstructuredContent(), "", "  ")
+					t.Fatalf("err=%v ok=%t json=%s", err, ok, string(data))
+				}
+				if v != 1 {
+					t.Fatalf("unexpected body: %#v", obj.UnstructuredContent())
+				}
+			},
+		},
+	}
+
+	for i := range testcases {
+		tc := testcases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			obj, group, resource := tc.object(t)
+
+			cfg := dynamic.ConfigFor(config)
+			if len(group) == 0 {
+				cfg = dynamic.ConfigFor(&restclient.Config{Host: s.URL})
+				cfg.APIPath = "/api"
+			} else {
+				cfg.APIPath = "/apis"
+			}
+			cfg.GroupVersion = &schema.GroupVersion{Group: group, Version: "v1"}
+			client, err := restclient.RESTClientFor(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rv, _ := strconv.Atoi(obj.GetResourceVersion())
+			if rv < 1 {
+				rv = 1
+			}
+
+			w, err := client.Get().
+				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).Name(obj.GetName()).
+				SetHeader("Accept", tc.accept).
+				Stream()
+			if (tc.wantErr != nil) != (err != nil) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantErr != nil {
+				tc.wantErr(t, err)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer w.Close()
+			tc.wantBody(t, w)
+		})
+	}
+}
+
 func TestTransformOnWatch(t *testing.T) {
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {

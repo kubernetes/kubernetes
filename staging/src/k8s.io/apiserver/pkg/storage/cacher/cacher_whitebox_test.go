@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"sync"
@@ -63,7 +64,8 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	}
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
-	w = newCacheWatcher(0, 0, initEvents, filter, forget, testVersioner{})
+	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Duration(math.MaxInt64))
+	go w.process(context.Background(), initEvents, 0)
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
 		lock.RLock()
@@ -181,7 +183,9 @@ TestCase:
 		for j := range testCase.events {
 			testCase.events[j].ResourceVersion = uint64(j) + 1
 		}
-		w := newCacheWatcher(0, 0, testCase.events, filter, forget, testVersioner{})
+
+		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Duration(math.MaxInt64))
+		go w.process(context.Background(), testCase.events, 0)
 		ch := w.ResultChan()
 		for j, event := range testCase.expected {
 			e := <-ch
@@ -250,10 +254,10 @@ func newTestCacher(s storage.Interface, cap int) (*Cacher, storage.Versioner) {
 		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      testVersioner{},
-		Type:           &example.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		GetAttrsFunc:   func(obj runtime.Object) (labels.Set, fields.Set, error) { return nil, nil, nil },
+		NewFunc:        func() runtime.Object { return &example.Pod{} },
 		NewListFunc:    func() runtime.Object { return &example.PodList{} },
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 	}

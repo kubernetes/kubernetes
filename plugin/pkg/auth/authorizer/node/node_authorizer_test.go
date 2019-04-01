@@ -828,7 +828,7 @@ func BenchmarkAuthorization(b *testing.B) {
 								},
 							},
 						})
-						diff := time.Now().Sub(start)
+						diff := time.Since(start)
 						atomic.AddInt64(&writes, 1)
 						switch {
 						case diff < time.Millisecond:

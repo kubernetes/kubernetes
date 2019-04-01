@@ -250,6 +250,25 @@ func (b *Backoff) Step() time.Duration {
 	return duration
 }
 
+// contextForChannel derives a child context from a parent channel.
+//
+// The derived context's Done channel is closed when the returned cancel function
+// is called or when the parent channel is closed, whichever happens first.
+//
+// Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
+func contextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		select {
+		case <-parentCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
+}
+
 // ExponentialBackoff repeats a condition check with exponential backoff.
 //
 // It checks the condition up to Steps times, increasing the wait by multiplying
@@ -353,7 +372,9 @@ func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) erro
 // PollUntil always waits interval before the first run of 'condition'.
 // 'condition' will always be invoked at least once.
 func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
-	return WaitFor(poller(interval, 0), condition, stopCh)
+	ctx, cancel := contextForChannel(stopCh)
+	defer cancel()
+	return WaitFor(poller(interval, 0), condition, ctx.Done())
 }
 
 // PollImmediateUntil tries a condition func until it returns true, an error or stopCh is closed.
@@ -422,7 +443,9 @@ func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 // timeout has elapsed and then closes the channel.
 //
 // Over very short intervals you may receive no ticks before the channel is
-// closed. A timeout of 0 is interpreted as an infinity.
+// closed. A timeout of 0 is interpreted as an infinity, and in such a case
+// it would be the caller's responsibility to close the done channel.
+// Failure to do so would result in a leaked goroutine.
 //
 // Output ticks are not buffered. If the channel is not ready to receive an
 // item, the tick is skipped.

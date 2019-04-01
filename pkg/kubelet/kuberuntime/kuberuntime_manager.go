@@ -34,10 +34,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -854,7 +854,7 @@ func (m *kubeGenericRuntimeManager) cleanupErrorTimeouts() {
 	m.errorMapLock.Lock()
 	defer m.errorMapLock.Unlock()
 	for name, timeout := range m.errorPrinted {
-		if time.Now().Sub(timeout) >= identicalErrorDelay {
+		if time.Since(timeout) >= identicalErrorDelay {
 			delete(m.errorPrinted, name)
 			delete(m.lastError, name)
 		}
@@ -913,7 +913,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	defer m.errorMapLock.Unlock()
 	if err != nil {
 		lastMsg, ok := m.lastError[podFullName]
-		if !ok || err.Error() != lastMsg || time.Now().Sub(m.errorPrinted[podFullName]) >= identicalErrorDelay {
+		if !ok || err.Error() != lastMsg || time.Since(m.errorPrinted[podFullName]) >= identicalErrorDelay {
 			klog.Errorf("getPodContainerStatuses for pod %q failed: %v", podFullName, err)
 			m.errorPrinted[podFullName] = time.Now()
 			m.lastError[podFullName] = err.Error()

@@ -26,10 +26,12 @@ import (
 
 var _ Validator = &CgroupsValidator{}
 
+// CgroupsValidator validates cgroup configuration.
 type CgroupsValidator struct {
 	Reporter Reporter
 }
 
+// Name is part of the system.Validator interface.
 func (c *CgroupsValidator) Name() string {
 	return "cgroups"
 }
@@ -38,6 +40,7 @@ const (
 	cgroupsConfigPrefix = "CGROUPS_"
 )
 
+// Validate is part of the system.Validator interface.
 func (c *CgroupsValidator) Validate(spec SysSpec) (error, error) {
 	subsystems, err := c.getCgroupSubsystems()
 	if err != nil {

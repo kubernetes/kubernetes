@@ -872,10 +872,21 @@ func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
 	return warnings, errorList
 }
 
+// IPVSProxierCheck tests if IPVS proxier can be used.
+type IPVSProxierCheck struct {
+	exec utilsexec.Interface
+}
+
+// Name returns label for IPVSProxierCheck
+func (r IPVSProxierCheck) Name() string {
+	return "IPVSProxierCheck"
+}
+
 // RunInitNodeChecks executes all individual, applicable to control-plane node checks.
 // The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
+// The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
 // If the flag is set to true we should skip checks already executed by RunJoinNodeChecks and RunOptionalJoinNodeChecks.
-func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String, isSecondaryControlPlane bool) error {
+func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String, isSecondaryControlPlane bool, downloadCerts bool) error {
 	if !isSecondaryControlPlane {
 		// First, check if we're root separately from the other preflight checks and fail fast
 		if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
@@ -903,11 +914,9 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 	if !isSecondaryControlPlane {
 		checks = addCommonChecks(execer, cfg.KubernetesVersion, &cfg.NodeRegistration, checks)
 
-		// Check IVPS required kernel module once we use IVPS kube-proxy mode
+		// Check if IVPS kube-proxy mode is supported
 		if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
-			checks = append(checks,
-				ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
-			)
+			checks = append(checks, IPVSProxierCheck{exec: execer})
 		}
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
@@ -919,10 +928,16 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 				)
 			}
 		}
+
+		// if using an external etcd
+		if cfg.Etcd.External != nil {
+			// Check external etcd version before creating the cluster
+			checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
+		}
 	}
 
 	if cfg.Etcd.Local != nil {
-		// Only do etcd related checks when no external endpoints were specified
+		// Only do etcd related checks when required to install a local etcd
 		checks = append(checks,
 			PortOpenCheck{port: kubeadmconstants.EtcdListenClientPort},
 			PortOpenCheck{port: kubeadmconstants.EtcdListenPeerPort},
@@ -930,8 +945,8 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		)
 	}
 
-	if cfg.Etcd.External != nil {
-		// Only check etcd version when external endpoints are specified
+	if cfg.Etcd.External != nil && !(isSecondaryControlPlane && downloadCerts) {
+		// Only check etcd certificates when using an external etcd and not joining with automatic download of certs
 		if cfg.Etcd.External.CAFile != "" {
 			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.CAFile, Label: "ExternalEtcdClientCertificates"})
 		}
@@ -941,7 +956,6 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		if cfg.Etcd.External.KeyFile != "" {
 			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.External.KeyFile, Label: "ExternalEtcdClientCertificates"})
 		}
-		checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
@@ -994,11 +1008,9 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.ClusterConfiguration, ignorePreflightErrors sets.String) error {
 	checks := []Checker{}
 
-	// Check ipvs required kernel module if we use ipvs kube-proxy mode
+	// Check if IVPS kube-proxy mode is supported
 	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
-		checks = append(checks,
-			ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
-		)
+		checks = append(checks, IPVSProxierCheck{exec: execer})
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
@@ -1068,7 +1080,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	}
 
 	checks := []Checker{
-		ImagePullCheck{runtime: containerRuntime, imageList: images.GetAllImages(&cfg.ClusterConfiguration)},
+		ImagePullCheck{runtime: containerRuntime, imageList: images.GetControlPlaneImages(&cfg.ClusterConfiguration)},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }

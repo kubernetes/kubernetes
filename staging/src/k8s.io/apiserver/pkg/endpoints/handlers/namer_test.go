@@ -17,9 +17,13 @@ limitations under the License.
 package handlers
 
 import (
+	"math/rand"
+	"net/url"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	fuzz "github.com/google/gofuzz"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -113,4 +117,63 @@ func TestGenerateLink(t *testing.T) {
 			}
 		}
 	}
+}
+
+func Test_fastURLPathEncode_fuzz(t *testing.T) {
+	specialCases := []string{"/", "//", ".", "*", "/abc%"}
+	for _, test := range specialCases {
+		got := fastURLPathEncode(test)
+		u := url.URL{Path: test}
+		expected := u.EscapedPath()
+		if got != expected {
+			t.Errorf("%q did not match %q", got, expected)
+		}
+	}
+	f := fuzz.New().Funcs(
+		func(s *string, c fuzz.Continue) {
+			*s = randString(c.Rand)
+		},
+	)
+	for i := 0; i < 2000; i++ {
+		var test string
+		f.Fuzz(&test)
+
+		got := fastURLPathEncode(test)
+		u := url.URL{Path: test}
+		expected := u.EscapedPath()
+		if got != expected {
+			t.Errorf("%q did not match %q", got, expected)
+		}
+	}
+}
+
+// Unicode range fuzzer from github.com/google/gofuzz/fuzz.go
+
+type charRange struct {
+	first, last rune
+}
+
+var unicodeRanges = []charRange{
+	{0x00, 0x255},
+	{' ', '~'},           // ASCII characters
+	{'\u00a0', '\u02af'}, // Multi-byte encoded characters
+	{'\u4e00', '\u9fff'}, // Common CJK (even longer encodings)
+}
+
+// randString makes a random string up to 20 characters long. The returned string
+// may include a variety of (valid) UTF-8 encodings.
+func randString(r *rand.Rand) string {
+	n := r.Intn(20)
+	runes := make([]rune, n)
+	for i := range runes {
+		runes[i] = unicodeRanges[r.Intn(len(unicodeRanges))].choose(r)
+	}
+	return string(runes)
+}
+
+// choose returns a random unicode character from the given range, using the
+// given randomness source.
+func (r *charRange) choose(rand *rand.Rand) rune {
+	count := int64(r.last - r.first)
+	return r.first + rune(rand.Int63n(count))
 }

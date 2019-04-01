@@ -29,8 +29,8 @@ import (
 	"k8s.io/klog"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -344,7 +344,7 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		authConfig := dockertypes.AuthConfig(credentialprovider.LazyProvide(currentCreds))
+		authConfig := dockertypes.AuthConfig(credentialprovider.LazyProvide(currentCreds, repoToPull))
 		err := client.PullImage(image, authConfig, dockertypes.ImagePullOptions{})
 		// If there was no error, return success
 		if err == nil {

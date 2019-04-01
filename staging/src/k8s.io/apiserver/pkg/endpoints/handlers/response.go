@@ -31,12 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // transformObject takes the object as returned by storage and ensures it is in
 // the client's desired form, as well as ensuring any API level fields like self-link
 // are properly set.
-func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope RequestScope, req *http.Request) (runtime.Object, error) {
+func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
@@ -104,7 +105,7 @@ func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.Media
 
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
-func transformResponseObject(ctx context.Context, scope RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
+func transformResponseObject(ctx context.Context, scope *RequestScope, trace *utiltrace.Trace, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
 	options, err := optionsForTransform(mediaType, req)
 	if err != nil {
 		scope.err(err, w, req)
@@ -115,8 +116,8 @@ func transformResponseObject(ctx context.Context, scope RequestScope, req *http.
 		scope.err(err, w, req)
 		return
 	}
-	kind, serializer, _ := targetEncodingForTransform(&scope, mediaType, req)
-	responsewriters.WriteObjectNegotiated(serializer, &scope, kind.GroupVersion(), w, req, statusCode, obj)
+	kind, serializer, _ := targetEncodingForTransform(scope, mediaType, req)
+	responsewriters.WriteObjectNegotiated(serializer, scope, kind.GroupVersion(), w, req, statusCode, obj)
 }
 
 // errNotAcceptable indicates Accept negotiation has failed
@@ -141,7 +142,7 @@ func (e errNotAcceptable) Status() metav1.Status {
 	}
 }
 
-func asV1Beta1Table(ctx context.Context, result runtime.Object, opts *metav1beta1.TableOptions, scope RequestScope) (runtime.Object, error) {
+func asV1Beta1Table(ctx context.Context, result runtime.Object, opts *metav1beta1.TableOptions, scope *RequestScope) (runtime.Object, error) {
 	table, err := scope.TableConvertor.ConvertToTable(ctx, result, opts)
 	if err != nil {
 		return nil, err
