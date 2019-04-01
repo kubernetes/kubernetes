@@ -159,6 +159,10 @@ type policiesinfo struct {
 
 // OutboundNatPolicySetting sets outbound Network Address Translation on an Endpoint.
 type outboundnatpolicysetting struct {
+	VIP string
+}
+
+type outboundnatpolicysetting2 struct {
 	VirtualIP string
 }
 
@@ -951,7 +955,7 @@ func serviceToServiceMap(service *v1.Service, hns HostNetworkService) proxyServi
 
 func addDSRPolicyToEndpoint(hns HostNetworkService, endpoint *endpointsInfo) (*policiesinfo, error) {
 	policysetting := outboundnatpolicysetting{
-		VirtualIP: endpoint.ip,
+		VIP: endpoint.ip,
 	}
 	rawJSON, err := json.Marshal(policysetting)
 	if err != nil {
@@ -1078,9 +1082,9 @@ func (proxier *Proxier) syncProxyRules() {
 					var addDSRPolicy = false
 					for _, po := range newHnsEndpoint.policies {
 						if po.Type == "OutBoundNAT" {
-							var outputSettings outboundnatpolicysetting
+							var outputSettings outboundnatpolicysetting2
 							if err := json.Unmarshal([]byte(po.Settings), &outputSettings); err != nil {
-								klog.Errorf("Error Unmarshaling Endpoint Policy err: %v ", err)
+								klog.Errorf("Error Unmarshaling Endpoint Policy err: %v settings: %v", err, po.Settings)
 								continue
 							}
 							if outputSettings.VirtualIP == newHnsEndpoint.ip {

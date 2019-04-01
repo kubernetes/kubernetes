@@ -67,6 +67,9 @@ func (hns hnsV2) getEndpointByID(id string) (*endpointsInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	klog.V(3).Infof("endpoint policy:%s", hnsendpoint.Policies)
+
 	pol := policiesToPoliciesinfo(hnsendpoint.Policies)
 	return &endpointsInfo{ //TODO: fill out PA
 		ip:         hnsendpoint.IpConfigurations[0].IpAddress,
@@ -91,6 +94,7 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 			equal = endpoint.IpConfigurations[0].IpAddress == ip
 		}
 		if equal && strings.EqualFold(endpoint.HostComputeNetwork, hnsnetwork.Id) {
+			klog.V(3).Infof("endpoint:%s", endpoint.Policies)
 			pol := policiesToPoliciesinfo(endpoint.Policies)
 			return &endpointsInfo{
 				ip:         endpoint.IpConfigurations[0].IpAddress,
@@ -113,6 +117,7 @@ func policiesToPoliciesinfo(hcnendpointpolicies []hcn.EndpointPolicy) []*policie
 			Type:     string(po.Type),
 			Settings: po.Settings,
 		})
+		klog.V(3).Infof("endpoint policy we placed:%s", string(po.Settings))
 	}
 	return endpointPolicies
 }
@@ -164,6 +169,7 @@ func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 			return nil, fmt.Errorf("Local endpoint creation failed: %v", err)
 		}
 	}
+	klog.V(3).Infof("endpoint policies:%s", createdEndpoint.Policies)
 	pol := policiesToPoliciesinfo(createdEndpoint.Policies)
 	return &endpointsInfo{
 		ip:              createdEndpoint.IpConfigurations[0].IpAddress,
