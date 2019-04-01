@@ -13,7 +13,7 @@
 //   import "google.golang.org/api/tpu/v1"
 //   ...
 //   tpuService, err := tpu.New(oauthHttpClient)
-package tpu
+package tpu // import "google.golang.org/api/tpu/v1"
 
 import (
 	"bytes"

@@ -25,4 +25,4 @@
 // alone. Future additions will be focused on supporting the gonum matrix
 // package (https://godoc.org/github.com/gonum/matrix/mat64), though pull requests
 // with implementations and tests for LAPACK function are encouraged.
-package gonum
+package gonum // import "gonum.org/v1/gonum/lapack/gonum"

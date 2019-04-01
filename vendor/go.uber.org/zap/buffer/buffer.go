@@ -21,7 +21,7 @@
 // Package buffer provides a thin wrapper around a byte slice. Unlike the
 // standard library's bytes.Buffer, it supports a portion of the strconv
 // package's zero-allocation formatters.
-package buffer
+package buffer // import "go.uber.org/zap/buffer"
 
 import "strconv"
 
