@@ -38,6 +38,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
+// DefaultPodDeletionTimeout is the default timeout for deleting pod
 const DefaultPodDeletionTimeout = 3 * time.Minute
 
 // ImageWhiteList is the images used in the current test suite. It should be initialized in test suite and

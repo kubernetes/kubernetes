@@ -57,6 +57,7 @@ func traceRouteToMaster() {
 	}
 }
 
+// CheckMasterVersion validates the master version
 func CheckMasterVersion(c clientset.Interface, want string) error {
 	Logf("Checking master version")
 	var err error
@@ -84,6 +85,7 @@ func CheckMasterVersion(c clientset.Interface, want string) error {
 	return nil
 }
 
+// CheckNodesVersions validates the nodes versions
 func CheckNodesVersions(cs clientset.Interface, want string) error {
 	l := GetReadySchedulableNodesOrDie(cs)
 	for _, n := range l.Items {
