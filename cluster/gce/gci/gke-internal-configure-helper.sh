@@ -104,34 +104,9 @@ function generate_vertical_pod_autoscaler_admission_controller_certs {
     base64_decode_or_die "CA_CERT" ${certs_dir}/caCert.pem
     base64_decode_or_die "VPA_AC_KEY" ${certs_dir}/serverKey.pem
     base64_decode_or_die "VPA_AC_CERT" ${certs_dir}/serverCert.pem
-  elif [[ "${MULTIMASTER:-}" == "true" ]]; then
-    echo "==At least one of CA_CERT, VPA_AC_KEY, VPA_AC_CERT is missing for multi master cluster=="
-    exit 1
   else
-    # TODO(b/119761988): Stop falling back when it's safe.
-    echo "At least one of CA_CERT, VPA_AC_KEY, VPA_AC_CERT is missing, falling back to generating certificates"
-    cat > ${certs_dir}/server.conf << EOF
-[req]
-req_extensions = v3_req
-distinguished_name = req_distinguished_name
-[req_distinguished_name]
-[ v3_req ]
-basicConstraints = CA:FALSE
-keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-extendedKeyUsage = clientAuth, serverAuth
-subjectAltName=DNS:localhost
-subjectAltName=DNS:vpa.admissionwebhook.localhost
-EOF
-
-    # Create a certificate authority
-    openssl genrsa -out ${certs_dir}/caKey.pem 2048
-    openssl req -x509 -new -nodes -key ${certs_dir}/caKey.pem -days 100000 -out ${certs_dir}/caCert.pem -subj "/CN=gke_vpa_webhook_ca"
-
-    # Create a server certiticate
-    openssl genrsa -out ${certs_dir}/serverKey.pem 2048
-    # Note the CN is the DNS name of the service of the webhook.
-    openssl req -new -key ${certs_dir}/serverKey.pem -out ${certs_dir}/server.csr -subj "/CN=vpa.admissionwebhook.localhost" -config ${certs_dir}/server.conf
-    openssl x509 -req -in ${certs_dir}/server.csr -CA ${certs_dir}/caCert.pem -CAkey ${certs_dir}/caKey.pem -CAcreateserial -out ${certs_dir}/serverCert.pem -days 100000 -extensions v3_req -extfile ${certs_dir}/server.conf
+    echo "==At least one of CA_CERT, VPA_AC_KEY, VPA_AC_CERT is missing=="
+    exit 1
   fi
 }
 
