@@ -30,7 +30,7 @@ import (
 
 func TestGetEtcdCertVolumes(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
-	k8sCertifcatesDir := "/etc/kubernetes/pki"
+	k8sCertificatesDir := "/etc/kubernetes/pki"
 	var tests = []struct {
 		name, ca, cert, key string
 		vol                 []v1.Volume
@@ -62,9 +62,9 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 		},
 		{
 			name:     "Should ignore files in Kubernetes PKI directory (and subdirs)",
-			ca:       k8sCertifcatesDir + "/ca/my-etcd-ca.crt",
-			cert:     k8sCertifcatesDir + "/my-etcd.crt",
-			key:      k8sCertifcatesDir + "/my-etcd.key",
+			ca:       k8sCertificatesDir + "/ca/my-etcd-ca.crt",
+			cert:     k8sCertificatesDir + "/my-etcd.crt",
+			key:      k8sCertificatesDir + "/my-etcd.key",
 			vol:      []v1.Volume{},
 			volMount: []v1.VolumeMount{},
 		},
@@ -238,7 +238,7 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 				CAFile:   rt.ca,
 				CertFile: rt.cert,
 				KeyFile:  rt.key,
-			}, k8sCertifcatesDir)
+			}, k8sCertificatesDir)
 			if !reflect.DeepEqual(actualVol, rt.vol) {
 				t.Errorf(
 					"failed getEtcdCertVolumes:\n\texpected: %v\n\t  actual: %v",
