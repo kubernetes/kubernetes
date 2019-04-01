@@ -102,6 +102,7 @@ go_test(
         "runtime_conformance_test.go",
         "security_context_test.go",
         "summary_test.go",
+        "system_node_critical_test.go",
         "volume_manager_test.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
@@ -130,6 +131,7 @@ go_test(
         "//pkg/kubelet/cm/cpuset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/eviction:go_default_library",
+        "//pkg/kubelet/eviction/api:go_default_library",
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/kubeletconfig:go_default_library",
         "//pkg/kubelet/kubeletconfig/status:go_default_library",
