@@ -48,6 +48,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/github.com/mholt/caddy/caddyfile:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
