@@ -248,9 +248,9 @@ func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClai
 
 	if !metav1.HasAnnotation(claim.ObjectMeta, annBindCompleted) {
 		return ctrl.syncUnboundClaim(claim)
-	} else {
-		return ctrl.syncBoundClaim(claim)
 	}
+	return ctrl.syncBoundClaim(claim)
+
 }
 
 // checkVolumeSatisfyClaim checks if the volume requested by the claim satisfies the requirements of the claim
@@ -1467,7 +1467,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 		return pluginName, err
 	}
 
-	var selectedNode *v1.Node = nil
+	var selectedNode *v1.Node
 	if nodeName, ok := claim.Annotations[annSelectedNode]; ok {
 		selectedNode, err = ctrl.NodeLister.Get(nodeName)
 		if err != nil {
