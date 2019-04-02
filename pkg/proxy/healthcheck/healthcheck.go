@@ -175,7 +175,17 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 			// Serve() will exit when the listener is closed.
 			klog.V(3).Infof("Starting goroutine for healthcheck %q on port %d", nsn.String(), svc.port)
 			if err := svc.server.Serve(svc.listener); err != nil {
-				klog.V(3).Infof("Healthcheck %q closed: %v", nsn.String(), err)
+				serveMsg := fmt.Sprintf("node %s failed to serve healthcheck %q on port %d: %v", hcs.hostname, nsn.String(), port, err)
+
+				hcs.recorder.Eventf(
+					&v1.ObjectReference{
+						Kind:      "Service",
+						Namespace: nsn.Namespace,
+						Name:      nsn.Name,
+						UID:       types.UID(nsn.String()),
+					}, api.EventTypeWarning, "FailedToServeServiceHealthcheck", msg)
+
+				klog.V(3).Infof(serveMsg)
 				return
 			}
 			klog.V(3).Infof("Healthcheck %q closed", nsn.String())
