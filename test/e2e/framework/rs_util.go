@@ -19,7 +19,7 @@ package framework
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -33,6 +33,7 @@ import (
 
 type updateRsFunc func(d *apps.ReplicaSet)
 
+// UpdateReplicaSetWithRetries updates replicaset template with retries.
 func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateReplicaSetFunc) (*apps.ReplicaSet, error) {
 	return testutils.UpdateReplicaSetWithRetries(c, namespace, name, applyUpdate, Logf, Poll, pollShortTimeout)
 }
@@ -119,13 +120,15 @@ func WaitForReplicaSetTargetAvailableReplicas(c clientset.Interface, replicaSet 
 	return err
 }
 
+// RunReplicaSet launches (and verifies correctness) of a replicaset.
 func RunReplicaSet(config testutils.ReplicaSetConfig) error {
-	By(fmt.Sprintf("creating replicaset %s in namespace %s", config.Name, config.Namespace))
+	ginkgo.By(fmt.Sprintf("creating replicaset %s in namespace %s", config.Name, config.Namespace))
 	config.NodeDumpFunc = DumpNodeDebugInfo
 	config.ContainerDumpFunc = LogFailedContainers
 	return testutils.RunReplicaSet(config)
 }
 
+// NewReplicaSet returns a new ReplicaSet.
 func NewReplicaSet(name, namespace string, replicas int32, podLabels map[string]string, imageName, image string) *apps.ReplicaSet {
 	return &apps.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{
