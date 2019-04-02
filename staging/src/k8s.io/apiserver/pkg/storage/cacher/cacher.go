@@ -19,7 +19,6 @@ package cacher
 import (
 	"context"
 	"fmt"
-	"math"
 	"net/http"
 	"reflect"
 	"sync"
@@ -365,16 +364,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		chanSize = 1000
 	}
 
-	// Determine watch timeout
-	timeout := time.Duration(math.MaxInt64)
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout = deadline.Sub(time.Now())
-	}
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
-	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, timeout)
+	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
@@ -407,7 +401,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		c.watcherIdx++
 	}()
 
-	go watcher.process(ctx, initEvents, watchRV)
+	go watcher.process(initEvents, watchRV)
 	return watcher, nil
 }
 
@@ -894,34 +888,9 @@ type cacheWatcher struct {
 	stopped   bool
 	forget    func()
 	versioner storage.Versioner
-	timer     *time.Timer
 }
 
-var timerPool sync.Pool
-
-func newTimer(d time.Duration) *time.Timer {
-	t, ok := timerPool.Get().(*time.Timer)
-	if ok {
-		t.Reset(d)
-	} else {
-		t = time.NewTimer(d)
-	}
-	return t
-}
-
-func freeTimer(timer *time.Timer) {
-	if !timer.Stop() {
-		// Consume triggered (but not yet received) timer event
-		// so that future reuse does not get a spurious timeout.
-		select {
-		case <-timer.C:
-		default:
-		}
-	}
-	timerPool.Put(timer)
-}
-
-func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), versioner storage.Versioner, timeout time.Duration) *cacheWatcher {
+func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), versioner storage.Versioner) *cacheWatcher {
 	return &cacheWatcher{
 		input:     make(chan *watchCacheEvent, chanSize),
 		result:    make(chan watch.Event, chanSize),
@@ -930,7 +899,6 @@ func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), ve
 		stopped:   false,
 		forget:    forget,
 		versioner: versioner,
-		timer:     newTimer(timeout),
 	}
 }
 
@@ -951,7 +919,6 @@ func (c *cacheWatcher) stop() {
 		c.stopped = true
 		close(c.done)
 		close(c.input)
-		freeTimer(c.timer)
 	}
 }
 
@@ -1040,7 +1007,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	}
 }
 
-func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEvent, resourceVersion uint64) {
+func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion uint64) {
 	defer utilruntime.HandleCrash()
 
 	// Check how long we are processing initEvents.
@@ -1076,20 +1043,10 @@ func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEven
 
 	defer close(c.result)
 	defer c.Stop()
-	for {
-		select {
-		case event, ok := <-c.input:
-			if !ok {
-				return
-			}
-			// only send events newer than resourceVersion
-			if event.ResourceVersion > resourceVersion {
-				c.sendWatchCacheEvent(event)
-			}
-		case <-ctx.Done():
-			return
-		case <-c.timer.C:
-			return
+	for event := range c.input {
+		// only send events newer than resourceVersion
+		if event.ResourceVersion > resourceVersion {
+			c.sendWatchCacheEvent(event)
 		}
 	}
 }
