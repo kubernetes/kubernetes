@@ -33,7 +33,7 @@ run_kubectl_apply_tests() {
   # Post-Condition: pod "test-pod" is created
   kube::test::get_object_assert 'pods test-pod' "{{${labels_field:?}.name}}" 'test-pod-label'
   # Post-Condition: pod "test-pod" has configuration annotation
-  kubectl get pods test-pod -o yaml "${kube_flags[@]:?}" | grep -q kubectl.kubernetes.io/last-applied-configuration
+  grep -q kubectl.kubernetes.io/last-applied-configuration <<< kubectl get pods test-pod -o yaml "${kube_flags[@]:?}"
   # Clean up
   kubectl delete pods test-pod "${kube_flags[@]:?}"
 
@@ -46,18 +46,18 @@ run_kubectl_apply_tests() {
   # Post-Condition: deployment "test-deployment-retainkeys" created
   kube::test::get_object_assert deployments "{{range.items}}{{${id_field:?}}}{{end}}" 'test-deployment-retainkeys'
   # Post-Condition: deployment "test-deployment-retainkeys" has defaulted fields
-  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}" | grep -q RollingUpdate
-  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}" | grep -q maxSurge
-  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}" | grep -q maxUnavailable
-  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}" | grep -q emptyDir
+  grep -q RollingUpdate <<< kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}"
+  grep -q maxSurge <<< kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}"
+  grep -q maxUnavailable <<< kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}"
+  grep -q emptyDir <<< kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}"
   # Command: apply a deployment "test-deployment-retainkeys" should clear
   # defaulted fields and successfully update the deployment
   [[ "$(kubectl apply -f hack/testdata/retainKeys/deployment/deployment-after.yaml "${kube_flags[@]:?}")" ]]
   # Post-Condition: deployment "test-deployment-retainkeys" has updated fields
-  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}" | grep -q Recreate
-  ! kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}" | grep -q RollingUpdate
-  kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}" | grep -q hostPath
-  ! kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}" | grep -q emptyDir
+  grep -q Recreate <<< kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}"
+  ! grep -q RollingUpdate <<< kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}"
+  grep -q hostPath <<< kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}"
+  ! grep -q emptyDir <<< kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}"
   # Clean up
   kubectl delete deployments test-deployment-retainkeys "${kube_flags[@]:?}"
 
