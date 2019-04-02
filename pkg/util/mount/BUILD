@@ -37,7 +37,6 @@ go_library(
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/utils/io:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
