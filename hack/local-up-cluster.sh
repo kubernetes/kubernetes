@@ -638,7 +638,7 @@ function start_controller_manager {
       --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
       --cluster-signing-key-file="${CLUSTER_SIGNING_KEY_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
-      "${node_cidr_args[@]}" \
+      ${node_cidr_args[@]+"${node_cidr_args[@]}"} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
       "${cloud_config_arg[@]}" \
@@ -770,13 +770,13 @@ function start_kubelet {
       "--eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD}"
       "--pod-manifest-path=${POD_MANIFEST_PATH}"
       "--fail-swap-on=${FAIL_SWAP_ON}"
-      "${auth_args[@]}"
-      "${dns_args[@]}"
-      "${cni_conf_dir_args[@]}"
-      "${cni_bin_dir_args[@]}"
-      "${net_plugin_args[@]}"
-      "${container_runtime_endpoint_args[@]}"
-      "${image_service_endpoint_args[@]}"
+      ${auth_args[@]+"${auth_args[@]}"}
+      ${dns_args[@]+"${dns_args[@]}"}
+      ${cni_conf_dir_args[@]+"${cni_conf_dir_args[@]}"}
+      ${cni_bin_dir_args[@]+"${cni_bin_dir_args[@]}"}
+      ${net_plugin_args[@]+"${net_plugin_args[@]}"}
+      ${container_runtime_endpoint_args[@]+"${container_runtime_endpoint_args[@]}"}
+      ${image_service_endpoint_args[@]+"${image_service_endpoint_args[@]}"}
       "--port=${KUBELET_PORT}"
       ${KUBELET_FLAGS}
     )
