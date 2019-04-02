@@ -185,16 +185,38 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 					existingNamespace.Status.Phase = api.NamespaceTerminating
 				}
 
-				// Remove orphan finalizer if options.OrphanDependents = false.
-				if options.OrphanDependents != nil && *options.OrphanDependents == false {
-					// remove Orphan finalizer.
-					newFinalizers := []string{}
-					for i := range existingNamespace.ObjectMeta.Finalizers {
-						finalizer := existingNamespace.ObjectMeta.Finalizers[i]
-						if string(finalizer) != metav1.FinalizerOrphanDependents {
-							newFinalizers = append(newFinalizers, finalizer)
-						}
+				// remove orphan and foregroundDeletion first, add them back if needed
+				newFinalizers := []string{}
+				var orphanFinalizerRemoved, deleteFinalizerRemoved bool
+				for _, f := range existingNamespace.Finalizers {
+					if f == metav1.FinalizerOrphanDependents {
+						orphanFinalizerRemoved = true
+						continue
 					}
+					if f == metav1.FinalizerDeleteDependents {
+						deleteFinalizerRemoved = true
+						continue
+					}
+					newFinalizers = append(newFinalizers, f)
+				}
+
+				var orphanFinalizerAdded, deleteFinalizerAdded bool
+				// add orphan finalizer if we need to orphan this namespace.
+				if (options.OrphanDependents != nil && *options.OrphanDependents) ||
+					(options.PropagationPolicy != nil && *options.PropagationPolicy == metav1.DeletePropagationOrphan) ||
+					(options.OrphanDependents == nil && options.PropagationPolicy == nil && orphanFinalizerRemoved) {
+					newFinalizers = append(newFinalizers, metav1.FinalizerOrphanDependents)
+					orphanFinalizerAdded = true
+				}
+
+				// add foregroundDeletion if the options says foreground deletion.
+				if (options.PropagationPolicy != nil && *options.PropagationPolicy == metav1.DeletePropagationForeground) ||
+					((options.OrphanDependents == nil || *options.OrphanDependents == false) && options.PropagationPolicy == nil && deleteFinalizerRemoved) {
+					newFinalizers = append(newFinalizers, metav1.FinalizerDeleteDependents)
+					deleteFinalizerAdded = true
+				}
+
+				if (orphanFinalizerRemoved != orphanFinalizerAdded) || (deleteFinalizerRemoved != deleteFinalizerAdded) {
 					existingNamespace.ObjectMeta.Finalizers = newFinalizers
 				}
 				return existingNamespace, nil
