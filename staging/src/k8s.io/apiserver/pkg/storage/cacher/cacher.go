@@ -54,11 +54,37 @@ var (
 		},
 		[]string{"resource"},
 	)
+
 	emptyFunc = func() {}
+
+	// Track this counter to tell the watcher efficiency of events pushing. We need a
+	// larger buffer if it is often full.
+	eventBufferUsage = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "apiserver_watch_cache_event_buffer_usage",
+			Help: "Buffer usage distribution of watchcache broken by resource type and buffer size",
+			// The observed values are between 0 to 1, tracking via linear buckets.
+			Buckets: prometheus.LinearBuckets(0, 0.2, 6),
+		},
+		[]string{"resource", "size"},
+	)
+
+	// Track this counter to tell the efficiency of event dispatching, as the updates
+	// of backend store will be blocked if the incoming buffer is full. We need a
+	// larger buffer if it is often full.
+	incomingBufferUsage = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "apiserver_watch_cache_incoming_buffer_usage",
+			Help: "Incoming buffer usage of watchcache broken by resource type",
+		},
+		[]string{"resource"},
+	)
 )
 
 func init() {
 	prometheus.MustRegister(initCounter)
+	prometheus.MustRegister(eventBufferUsage)
+	prometheus.MustRegister(incomingBufferUsage)
 }
 
 // Config contains the configuration for a given Cache.
@@ -374,7 +400,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
-	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, timeout)
+	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, timeout, c.objectType)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
@@ -666,7 +692,17 @@ func (c *Cacher) processEvent(event *watchCacheEvent) {
 	c.incoming <- *event
 }
 
+func channelUsage(capacity, length int) float64 {
+	// FIXME Unbuffered channel is always full.
+	if capacity == 0 {
+		return 1
+	}
+	return float64(length) / float64(capacity)
+}
+
 func (c *Cacher) dispatchEvents() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case event, ok := <-c.incoming:
@@ -674,6 +710,8 @@ func (c *Cacher) dispatchEvents() {
 				return
 			}
 			c.dispatchEvent(&event)
+		case <-ticker.C:
+			incomingBufferUsage.WithLabelValues(c.objectType.String()).Set(channelUsage(cap(c.incoming), len(c.incoming)))
 		case <-c.stopCh:
 			return
 		}
@@ -921,16 +959,17 @@ func freeTimer(timer *time.Timer) {
 	timerPool.Put(timer)
 }
 
-func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), versioner storage.Versioner, timeout time.Duration) *cacheWatcher {
+func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), versioner storage.Versioner, timeout time.Duration, objectType reflect.Type) *cacheWatcher {
 	return &cacheWatcher{
-		input:     make(chan *watchCacheEvent, chanSize),
-		result:    make(chan watch.Event, chanSize),
-		done:      make(chan struct{}),
-		filter:    filter,
-		stopped:   false,
-		forget:    forget,
-		versioner: versioner,
-		timer:     newTimer(timeout),
+		input:      make(chan *watchCacheEvent, chanSize),
+		result:     make(chan watch.Event, chanSize),
+		done:       make(chan struct{}),
+		filter:     filter,
+		stopped:    false,
+		forget:     forget,
+		versioner:  versioner,
+		timeout:    timeout,
+		objectType: objectType,
 	}
 }
 
@@ -1061,21 +1100,21 @@ func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEven
 	for _, event := range initEvents {
 		c.sendWatchCacheEvent(event)
 	}
+	objType := c.objectType.String()
 	if len(initEvents) > 0 {
-		objType := reflect.TypeOf(initEvents[0].Object).String()
 		initCounter.WithLabelValues(objType).Add(float64(len(initEvents)))
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
-		objType := "<null>"
-		if len(initEvents) > 0 {
-			objType = reflect.TypeOf(initEvents[0].Object).String()
-		}
 		klog.V(2).Infof("processing %d initEvents of %s took %v", len(initEvents), objType, processingTime)
 	}
 
 	defer close(c.result)
 	defer c.Stop()
+
+	// Observe the buffer size periodically.
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case event, ok := <-c.input:
@@ -1090,6 +1129,8 @@ func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEven
 			return
 		case <-c.timer.C:
 			return
+		case <-ticker.C:
+			eventBufferUsage.WithLabelValues(objType, fmt.Sprintf("%v", cap(c.input))).Observe(channelUsage(cap(c.input), len(c.input)))
 		}
 	}
 }
