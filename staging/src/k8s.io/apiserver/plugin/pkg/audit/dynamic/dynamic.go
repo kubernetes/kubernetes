@@ -336,7 +336,7 @@ func (b *backend) createAndStartDelegate(sink *auditregv1alpha1.AuditSink) (*del
 func (b *backend) String() string {
 	var delegateStrings []string
 	for _, delegate := range b.GetDelegates() {
-		delegateStrings = append(delegateStrings, fmt.Sprintf("%s", delegate.(string)))
+		delegateStrings = append(delegateStrings, fmt.Sprintf("%v", delegate))
 	}
 	return fmt.Sprintf("%s[%s]", PluginName, strings.Join(delegateStrings, ","))
 }
