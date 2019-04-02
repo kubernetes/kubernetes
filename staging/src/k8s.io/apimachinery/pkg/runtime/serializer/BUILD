@@ -32,7 +32,6 @@ go_library(
     srcs = [
         "codec_factory.go",
         "negotiated_codec.go",
-        "protobuf_extension.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/runtime/serializer",
     importpath = "k8s.io/apimachinery/pkg/runtime/serializer",
