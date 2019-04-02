@@ -63,7 +63,7 @@ For more about specifying packages, see 'go help packages'.
 }
 
 var (
-	saveR, saveT bool
+	saveR, saveT   bool
 	ignorePackages string
 )
 
