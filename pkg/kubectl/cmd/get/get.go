@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
@@ -42,8 +41,8 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	utilprinters "k8s.io/kubernetes/pkg/kubectl/util/printers"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
@@ -393,7 +392,7 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 
 	return &RuntimeSorter{
 		field:   parsedField,
-		decoder: legacyscheme.Codecs.UniversalDecoder(),
+		decoder: scheme.Codecs.UniversalDecoder(),
 		objects: objects,
 	}
 }
@@ -564,13 +563,15 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			continue
 		}
 
-		internalObj, err := legacyscheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
+		// Changes unstructured to external versioned object.
+		gv := info.Mapping.GroupVersionKind.GroupVersion()
+		externalObj, err := scheme.Scheme.ConvertToVersion(info.Object, gv)
 		if err != nil {
 			// if there's an error, try to print what you have (mirrors old behavior).
-			klog.V(1).Info(err)
+			klog.V(1).Infof("Unable to convert %T to %v: %v", info.Object, gv, err)
 			printer.PrintObj(info.Object, w)
 		} else {
-			printer.PrintObj(internalObj, w)
+			printer.PrintObj(externalObj, w)
 		}
 	}
 	w.Flush()
@@ -666,9 +667,14 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		}
 		for _, objToPrint := range objsToPrint {
 			if o.IsHumanReadablePrinter {
-				// printing always takes the internal version, but the watch event uses externals
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				objToPrint = attemptToConvertToInternal(objToPrint, legacyscheme.Scheme, internalGV)
+				// Convert unstructured object to external versioned object.
+				gv := info.Mapping.GroupVersionKind.GroupVersion()
+				externalObj, err := scheme.Scheme.ConvertToVersion(objToPrint, gv)
+				if err != nil {
+					klog.V(1).Infof("Unable to convert %T to %v: %v", objToPrint, gv, err)
+				} else {
+					objToPrint = externalObj
+				}
 			}
 			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
@@ -695,12 +701,17 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 				return false, nil
 			}
 
-			// printing always takes the internal version, but the watch event uses externals
 			// TODO fix printing to use server-side or be version agnostic
 			objToPrint := e.Object
 			if o.IsHumanReadablePrinter {
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				objToPrint = attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV)
+				// Convert unstructured object to external versioned object.
+				gv := info.Mapping.GroupVersionKind.GroupVersion()
+				externalObj, err := scheme.Scheme.ConvertToVersion(objToPrint, gv)
+				if err != nil {
+					klog.V(1).Infof("Unable to convert %T to %v: %v", objToPrint, gv, err)
+				} else {
+					objToPrint = externalObj
+				}
 			}
 			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return false, err
@@ -711,16 +722,6 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		return err
 	})
 	return nil
-}
-
-// attemptToConvertToInternal tries to convert to an internal type, but returns the original if it can't
-func attemptToConvertToInternal(obj runtime.Object, converter runtime.ObjectConvertor, targetVersion schema.GroupVersion) runtime.Object {
-	internalObject, err := converter.ConvertToVersion(obj, targetVersion)
-	if err != nil {
-		klog.V(1).Infof("Unable to convert %T to %v: %v", obj, targetVersion, err)
-		return obj
-	}
-	return internalObject
 }
 
 func (o *GetOptions) decodeIntoTable(obj runtime.Object) (runtime.Object, error) {

@@ -143,14 +143,28 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetSchemaObject(t *testing.T) {
+	replicas := int32(7)
+	readyReplicas := int32(4)
+	rc := corev1.ReplicationController{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: corev1.ReplicationControllerSpec{
+			Replicas: &replicas,
+		},
+		Status: corev1.ReplicationControllerStatus{
+			Replicas:      replicas,
+			ReadyReplicas: readyReplicas,
+		},
+	}
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion)
-	t.Logf("%v", string(runtime.EncodeOrDie(codec, &corev1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})))
+	t.Logf("%v", string(runtime.EncodeOrDie(codec, &rc)))
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc)},
 	}
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 

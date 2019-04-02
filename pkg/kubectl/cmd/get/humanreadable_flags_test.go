@@ -22,14 +22,14 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
-	testObject := &api.Pod{ObjectMeta: metav1.ObjectMeta{
+	testObject := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
 		Name: "foo",
 		Labels: map[string]string{
 			"l1": "value",

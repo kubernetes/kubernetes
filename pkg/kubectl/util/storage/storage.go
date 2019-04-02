@@ -17,9 +17,10 @@ limitations under the License.
 package storage
 
 import (
+	"strings"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
 )
 
 // TODO(yue9944882): Remove this helper package once it's copied to k/api
@@ -30,6 +31,18 @@ const IsDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-c
 
 // BetaIsDefaultStorageClassAnnotation is the beta version of BetaIsDefaultStorageClassAnnotation.
 const BetaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
+
+// IsDefaultAnnotation returns a boolean if the annotation is set
+func IsDefaultAnnotation(obj metav1.ObjectMeta) bool {
+	if obj.Annotations[IsDefaultStorageClassAnnotation] == "true" {
+		return true
+	}
+	if obj.Annotations[BetaIsDefaultStorageClassAnnotation] == "true" {
+		return true
+	}
+
+	return false
+}
 
 // IsDefaultAnnotationText returns a pretty Yes/No String if
 // the annotation is set
