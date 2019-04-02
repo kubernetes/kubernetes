@@ -22,7 +22,10 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"sort"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"k8s.io/api/core/v1"
@@ -214,4 +217,62 @@ func BenchmarkDecodeIntoProtobuf(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+type DurationSlice []time.Duration
+
+func (s DurationSlice) Len() int           { return len(s) }
+func (s DurationSlice) Less(i, j int) bool { return s[i] < s[j] }
+func (s DurationSlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+func BenchmarkLatency(b *testing.B) {
+	items := benchmarkItems(b)
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := (&items[i]).Marshal()
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+		validate := &v1.Pod{}
+		if err := proto.Unmarshal(data, validate); err != nil {
+			b.Fatalf("Failed to unmarshal %d: %v\n%#v", i, err, items[i])
+		}
+	}
+
+	workers := 2000
+	attempts := 10000
+
+	lock := sync.Mutex{}
+	latencies := make([]time.Duration, 0, workers*attempts)
+
+	wg := sync.WaitGroup{}
+	block := make(chan struct{})
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			<-block
+			defer wg.Done()
+			timeLatencies := make([]time.Duration, attempts)
+			for i := 0; i < attempts; i++ {
+				startTime := time.Now()
+				obj := v1.Pod{}
+				if err := proto.Unmarshal(encoded[i%width], &obj); err != nil {
+					b.Fatal(err)
+				}
+				timeLatencies[i] = time.Since(startTime)
+			}
+			lock.Lock()
+			defer lock.Unlock()
+			latencies = append(latencies, timeLatencies...)
+		}()
+	}
+	close(block)
+	wg.Wait()
+
+	sort.Sort(DurationSlice(latencies))
+	perc99 := len(latencies)* 99 / 100
+	b.Errorf("99th perc: %#v", latencies[perc99])
 }
