@@ -190,7 +190,7 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 		expectTwo string
 	}{
 		{
-			name: "valid call 1",
+			name: "valid call with multiple IPs",
 			configMap: &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "kube-dns",
@@ -243,7 +243,7 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 			expectOne: "",
 		},
 		{
-			name: "valid call 2",
+			name: "valid call",
 			configMap: &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "kube-dns",
@@ -285,6 +285,64 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
     }`,
 		},
 		{
+			name: "If Hostname present: Omit Hostname",
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-dns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"stubDomains":         `{"bar.com" : ["1.2.3.4:5300","service.consul"], "my.cluster.local" : ["2.3.4.5"], "foo.com" : ["service.consul"]}`,
+					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
+				},
+			},
+
+			expectOne: `
+    bar.com:53 {
+       errors
+       cache 30
+       loop
+       forward . 1.2.3.4:5300
+    }
+    
+    my.cluster.local:53 {
+       errors
+       cache 30
+       loop
+       forward . 2.3.4.5
+    }`,
+			expectTwo: `
+    my.cluster.local:53 {
+       errors
+       cache 30
+       loop
+       forward . 2.3.4.5
+    }
+    
+    bar.com:53 {
+       errors
+       cache 30
+       loop
+       forward . 1.2.3.4:5300
+    }`,
+		},
+		{
+			name: "All hostname: return empty",
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-dns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"stubDomains":         `{"foo.com" : ["service.consul"], "my.cluster.local" : ["ns.foo.com"]}`,
+					"upstreamNameservers": `["8.8.8.8", "8.8.4.4"]`,
+				},
+			},
+
+			expectOne: "",
+			expectTwo: "",
+		},
+		{
 			name: "missing stubDomains",
 			configMap: &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
@@ -305,7 +363,7 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !strings.Contains(out, testCase.expectOne) && !strings.Contains(out, testCase.expectTwo) {
+			if !strings.EqualFold(out, testCase.expectOne) && !strings.EqualFold(out, testCase.expectTwo) {
 				t.Errorf("expected to find %q or %q in output: %q", testCase.expectOne, testCase.expectTwo, out)
 			}
 		})
@@ -358,14 +416,56 @@ func TestTranslateUpstreamKubeDNSToCoreDNS(t *testing.T) {
 
 			expect: "8.8.8.8 8.8.4.4",
 		},
+		{
+			name: "Hostname present: expect NameServer to omit the hostname",
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kubedns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"upstreamNameservers": `["service.consul", "ns.foo.com", "8.8.4.4", "ns.moo.com", "ns.bar.com"]`,
+				},
+			},
+
+			expect: "8.8.4.4",
+		},
+		{
+			name: "All hostnames: return empty",
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kube-dns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"upstreamNameservers": `["service.consul", "ns.foo.com"]`,
+				},
+			},
+
+			expect: "",
+		},
+		{
+			name: "IPv6: expect list of Name Server IP addresses",
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kubedns",
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"upstreamNameservers": `["[2003::1]:53", "8.8.4.4"]`,
+				},
+			},
+
+			expect: "[2003::1]:53 8.8.4.4",
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			out, err := translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(kubeDNSUpstreamNameservers, testCase.configMap)
+			out, err := translateUpstreamNameServerOfKubeDNSToUpstreamForwardCoreDNS(kubeDNSUpstreamNameservers, testCase.configMap)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !strings.Contains(out, testCase.expect) {
+			if !strings.EqualFold(out, testCase.expect) {
 				t.Errorf("expected to find %q in output: %q", testCase.expect, out)
 			}
 		})
@@ -414,6 +514,7 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 			},
 
 			expectOne: "",
+			expectTwo: "",
 		},
 		{
 			name: "missing federations data",
@@ -429,6 +530,7 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 			},
 
 			expectOne: "",
+			expectTwo: "",
 		},
 	}
 	for _, testCase := range testCases {
@@ -437,7 +539,7 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !strings.Contains(out, testCase.expectOne) && !strings.Contains(out, testCase.expectTwo) {
+			if !strings.EqualFold(out, testCase.expectOne) && !strings.EqualFold(out, testCase.expectTwo) {
 				t.Errorf("expected to find %q or %q in output: %q", testCase.expectOne, testCase.expectTwo, out)
 			}
 		})
