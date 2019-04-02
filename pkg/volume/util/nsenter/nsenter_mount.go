@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package nsenter
 
 import (
 	"fmt"
@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/utils/nsenter"
 	utilpath "k8s.io/utils/path"
 )
@@ -54,12 +55,12 @@ func NewNsenterMounter(rootDir string, ne *nsenter.Nsenter) *NsenterMounter {
 }
 
 // NsenterMounter implements mount.Interface
-var _ = Interface(&NsenterMounter{})
+var _ = mount.Interface(&NsenterMounter{})
 
 // Mount runs mount(8) in the host's root mount namespace.  Aside from this
 // aspect, Mount has the same semantics as the mounter returned by mount.New()
 func (n *NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
-	bind, bindOpts, bindRemountOpts := isBind(options)
+	bind, bindOpts, bindRemountOpts := mount.IsBind(options)
 
 	if bind {
 		err := n.doNsenterMount(source, target, fstype, bindOpts)
@@ -88,7 +89,7 @@ func (n *NsenterMounter) doNsenterMount(source, target, fstype string, options [
 // requested mount.
 func (n *NsenterMounter) makeNsenterArgs(source, target, fstype string, options []string) (string, []string) {
 	mountCmd := n.ne.AbsHostPath("mount")
-	mountArgs := makeMountArgs(source, target, fstype, options)
+	mountArgs := mount.MakeMountArgs(source, target, fstype, options)
 
 	if systemdRunPath, hasSystemd := n.ne.SupportsSystemd(); hasSystemd {
 		// Complete command line:
@@ -106,7 +107,7 @@ func (n *NsenterMounter) makeNsenterArgs(source, target, fstype string, options 
 		//   Kubelet container can be restarted and the fuse daemon survives.
 		// * When the daemon dies (e.g. during unmount) systemd removes the
 		//   scope automatically.
-		mountCmd, mountArgs = addSystemdScope(systemdRunPath, target, mountCmd, mountArgs)
+		mountCmd, mountArgs = mount.AddSystemdScope(systemdRunPath, target, mountCmd, mountArgs)
 	} else {
 		// Fall back to simple mount when the host has no systemd.
 		// Complete command line:
@@ -138,15 +139,11 @@ func (n *NsenterMounter) Unmount(target string) error {
 }
 
 // List returns a list of all mounted filesystems in the host's mount namespace.
-func (*NsenterMounter) List() ([]MountPoint, error) {
-	return listProcMounts(hostProcMountsPath)
+func (*NsenterMounter) List() ([]mount.MountPoint, error) {
+	return mount.ListProcMounts(hostProcMountsPath)
 }
 
-func (m *NsenterMounter) IsNotMountPoint(dir string) (bool, error) {
-	return isNotMountPoint(m, dir)
-}
-
-func (*NsenterMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+func (*NsenterMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
 	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
 	return (mp.Path == dir) || (mp.Path == deletedDir)
 }
@@ -217,28 +214,28 @@ func parseFindMnt(out string) (string, error) {
 // Returns an error if errno is any error other than EBUSY.
 // Returns with error if pathname is not a device.
 func (n *NsenterMounter) DeviceOpened(pathname string) (bool, error) {
-	return exclusiveOpenFailsOnDevice(pathname)
+	return mount.ExclusiveOpenFailsOnDevice(pathname)
 }
 
 // PathIsDevice uses FileInfo returned from os.Stat to check if path refers
 // to a device.
 func (n *NsenterMounter) PathIsDevice(pathname string) (bool, error) {
 	pathType, err := n.GetFileType(pathname)
-	isDevice := pathType == FileTypeCharDev || pathType == FileTypeBlockDev
+	isDevice := pathType == mount.FileTypeCharDev || pathType == mount.FileTypeBlockDev
 	return isDevice, err
 }
 
 //GetDeviceNameFromMount given a mount point, find the volume id from checking /proc/mounts
 func (n *NsenterMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return getDeviceNameFromMount(n, mountPath, pluginDir)
+	return mount.GetDeviceNameFromMountLinux(n, mountPath, pluginDir)
 }
 
 func (n *NsenterMounter) MakeRShared(path string) error {
-	return doMakeRShared(path, hostProcMountinfoPath)
+	return mount.DoMakeRShared(path, hostProcMountinfoPath)
 }
 
-func (mounter *NsenterMounter) GetFileType(pathname string) (FileType, error) {
-	var pathType FileType
+func (mounter *NsenterMounter) GetFileType(pathname string) (mount.FileType, error) {
+	var pathType mount.FileType
 	outputBytes, err := mounter.ne.Exec("stat", []string{"-L", "--printf=%F", pathname}).CombinedOutput()
 	if err != nil {
 		if strings.Contains(string(outputBytes), "No such file") {
@@ -251,15 +248,15 @@ func (mounter *NsenterMounter) GetFileType(pathname string) (FileType, error) {
 
 	switch string(outputBytes) {
 	case "socket":
-		return FileTypeSocket, nil
+		return mount.FileTypeSocket, nil
 	case "character special file":
-		return FileTypeCharDev, nil
+		return mount.FileTypeCharDev, nil
 	case "block special file":
-		return FileTypeBlockDev, nil
+		return mount.FileTypeBlockDev, nil
 	case "directory":
-		return FileTypeDirectory, nil
+		return mount.FileTypeDirectory, nil
 	case "regular file":
-		return FileTypeFile, nil
+		return mount.FileTypeFile, nil
 	}
 
 	return pathType, fmt.Errorf("only recognise file, directory, socket, block device and character device")
@@ -297,8 +294,8 @@ func (mounter *NsenterMounter) EvalHostSymlinks(pathname string) (string, error)
 }
 
 func (mounter *NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
-	pathExists, pathErr := PathExists(pathname)
-	if !pathExists || IsCorruptedMnt(pathErr) {
+	pathExists, pathErr := mount.PathExists(pathname)
+	if !pathExists || mount.IsCorruptedMnt(pathErr) {
 		return []string{}, nil
 	} else if pathErr != nil {
 		return nil, fmt.Errorf("Error checking path %s: %v", pathname, pathErr)
@@ -307,7 +304,7 @@ func (mounter *NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return searchMountPoints(hostpath, hostProcMountinfoPath)
+	return mount.SearchMountPoints(hostpath, hostProcMountinfoPath)
 }
 
 func (mounter *NsenterMounter) GetFSGroup(pathname string) (int64, error) {
@@ -316,11 +313,11 @@ func (mounter *NsenterMounter) GetFSGroup(pathname string) (int64, error) {
 		return -1, err
 	}
 	kubeletpath := mounter.ne.KubeletPath(hostPath)
-	return getFSGroup(kubeletpath)
+	return mount.GetFSGroupLinux(kubeletpath)
 }
 
 func (mounter *NsenterMounter) GetSELinuxSupport(pathname string) (bool, error) {
-	return getSELinuxSupport(pathname, hostProcMountsPath)
+	return mount.GetSELinux(pathname, hostProcMountsPath)
 }
 
 func (mounter *NsenterMounter) GetMode(pathname string) (os.FileMode, error) {
@@ -329,5 +326,5 @@ func (mounter *NsenterMounter) GetMode(pathname string) (os.FileMode, error) {
 		return 0, err
 	}
 	kubeletpath := mounter.ne.KubeletPath(hostPath)
-	return getMode(kubeletpath)
+	return mount.GetModeLinux(kubeletpath)
 }

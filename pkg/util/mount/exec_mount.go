@@ -44,7 +44,7 @@ var _ Interface = &execMounter{}
 
 // Mount runs mount(8) using given exec interface.
 func (m *execMounter) Mount(source string, target string, fstype string, options []string) error {
-	bind, bindOpts, bindRemountOpts := isBind(options)
+	bind, bindOpts, bindRemountOpts := IsBind(options)
 
 	if bind {
 		err := m.doExecMount(source, target, fstype, bindOpts)
@@ -60,7 +60,7 @@ func (m *execMounter) Mount(source string, target string, fstype string, options
 // doExecMount calls exec(mount <what> <where>) using given exec interface.
 func (m *execMounter) doExecMount(source, target, fstype string, options []string) error {
 	klog.V(5).Infof("Exec Mounting %s %s %s %v", source, target, fstype, options)
-	mountArgs := makeMountArgs(source, target, fstype, options)
+	mountArgs := MakeMountArgs(source, target, fstype, options)
 	output, err := m.exec.Run("mount", mountArgs...)
 	klog.V(5).Infof("Exec mounted %v: %v: %s", mountArgs, err, string(output))
 	if err != nil {
@@ -114,10 +114,6 @@ func (m *execMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (strin
 
 func (m *execMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 	return m.wrappedMounter.IsMountPointMatch(mp, dir)
-}
-
-func (m *execMounter) IsNotMountPoint(dir string) (bool, error) {
-	return m.wrappedMounter.IsNotMountPoint(dir)
 }
 
 func (m *execMounter) MakeRShared(path string) error {

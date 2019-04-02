@@ -16,13 +16,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package nsenter
 
 import (
 	"errors"
 	"os"
 
 	"k8s.io/utils/nsenter"
+
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type NsenterMounter struct{}
@@ -31,7 +33,7 @@ func NewNsenterMounter(rootDir string, ne *nsenter.Nsenter) *NsenterMounter {
 	return &NsenterMounter{}
 }
 
-var _ = Interface(&NsenterMounter{})
+var _ = mount.Interface(&NsenterMounter{})
 
 func (*NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
 	return nil
@@ -41,15 +43,11 @@ func (*NsenterMounter) Unmount(target string) error {
 	return nil
 }
 
-func (*NsenterMounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, nil
+func (*NsenterMounter) List() ([]mount.MountPoint, error) {
+	return []mount.MountPoint{}, nil
 }
 
-func (m *NsenterMounter) IsNotMountPoint(dir string) (bool, error) {
-	return isNotMountPoint(m, dir)
-}
-
-func (*NsenterMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+func (*NsenterMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
 	return (mp.Path == dir)
 }
 
@@ -73,8 +71,8 @@ func (*NsenterMounter) MakeRShared(path string) error {
 	return nil
 }
 
-func (*NsenterMounter) GetFileType(_ string) (FileType, error) {
-	return FileType("fake"), errors.New("not implemented")
+func (*NsenterMounter) GetFileType(_ string) (mount.FileType, error) {
+	return mount.FileType("fake"), errors.New("not implemented")
 }
 
 func (*NsenterMounter) MakeDir(pathname string) error {
