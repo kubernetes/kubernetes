@@ -102,7 +102,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 
 		// Test 3: create a standard-tierd LB with a user-requested IP.
 		By("reserving a static IP for the load balancer")
-		requestedAddrName := fmt.Sprintf("e2e-ext-lb-net-tier-%s", framework.RunId)
+		requestedAddrName := fmt.Sprintf("e2e-ext-lb-net-tier-%s", framework.RunID)
 		gceCloud, err := gce.GetGCECloud()
 		Expect(err).NotTo(HaveOccurred())
 		requestedIP, err := reserveAlphaRegionalAddress(gceCloud, requestedAddrName, cloud.NetworkTierStandard)

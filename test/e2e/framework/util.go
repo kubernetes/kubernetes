@@ -44,8 +44,8 @@ import (
 	"golang.org/x/net/websocket"
 	"k8s.io/klog"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
 	apps "k8s.io/api/apps/v1"
@@ -99,23 +99,25 @@ import (
 )
 
 const (
-	// How long to wait for the pod to be listable
+	// PodListTimeout is how long to wait for the pod to be listable.
 	PodListTimeout = time.Minute
-	// Initial pod start can be delayed O(minutes) by slow docker pulls
+	// PodStartTimeout is how long to wait for the pod to be started.
+	// Initial pod start can be delayed O(minutes) by slow docker pulls.
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	PodStartTimeout = 5 * time.Minute
 
-	// Same as `PodStartTimeout` to wait for the pod to be started, but shorter.
-	// Use it case by case when we are sure pod start will not be delayed
+	// PodStartShortTimeout is same as `PodStartTimeout` to wait for the pod to be started, but shorter.
+	// Use it case by case when we are sure pod start will not be delayed.
 	// minutes by slow docker pulls or something else.
 	PodStartShortTimeout = 2 * time.Minute
 
-	// How long to wait for a pod to be deleted
+	// PodDeleteTimeout is how long to wait for a pod to be deleted.
 	PodDeleteTimeout = 5 * time.Minute
 
 	// PodEventTimeout is how much we wait for a pod event to occur.
 	PodEventTimeout = 2 * time.Minute
 
+	// NamespaceCleanupTimeout is how long to wait for the namespace to be deleted.
 	// If there are any orphaned namespaces to clean up, this test is running
 	// on a long lived cluster. A long wait here is preferably to spurious test
 	// failures caused by leaked resources from a previous test run.
@@ -124,73 +126,76 @@ const (
 	// Some pods can take much longer to get ready due to volume attach/detach latency.
 	slowPodStartTimeout = 15 * time.Minute
 
-	// How long to wait for a service endpoint to be resolvable.
+	// ServiceStartTimeout is how long to wait for a service endpoint to be resolvable.
 	ServiceStartTimeout = 3 * time.Minute
 
-	// How often to Poll pods, nodes and claims.
+	// Poll is how often to Poll pods, nodes and claims.
 	Poll = 2 * time.Second
 
 	PollShortTimeout = 1 * time.Minute
 	PollLongTimeout  = 5 * time.Minute
 
+	// ServiceAccountProvisionTimeout is how long to wait for a service account to be provisioned.
 	// service accounts are provisioned after namespace creation
 	// a service account is required to support pod creation in a namespace as part of admission control
 	ServiceAccountProvisionTimeout = 2 * time.Minute
 
-	// How long to try single API calls (like 'get' or 'list'). Used to prevent
+	// SingleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
 	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
 	SingleCallTimeout = 5 * time.Minute
 
-	// How long nodes have to be "ready" when a test begins. They should already
+	// NodeReadyInitialTimeout is how long nodes have to be "ready" when a test begins. They should already
 	// be "ready" before the test starts, so this is small.
 	NodeReadyInitialTimeout = 20 * time.Second
 
-	// How long pods have to be "ready" when a test begins.
+	// PodReadyBeforeTimeout is how long pods have to be "ready" when a test begins.
 	PodReadyBeforeTimeout = 5 * time.Minute
 
 	// How long pods have to become scheduled onto nodes
 	podScheduledBeforeTimeout = PodListTimeout + (20 * time.Second)
 
-	podRespondingTimeout     = 15 * time.Minute
+	podRespondingTimeout = 15 * time.Minute
+	// ServiceRespondingTimeout is how long to wait for a service to be responding.
 	ServiceRespondingTimeout = 2 * time.Minute
-	EndpointRegisterTimeout  = time.Minute
+	// EndpointRegisterTimeout is how long to wait for an endpoint to be registered.
+	EndpointRegisterTimeout = time.Minute
 
-	// How long claims have to become dynamically provisioned
+	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
 	ClaimProvisionTimeout = 5 * time.Minute
 
-	// Same as `ClaimProvisionTimeout` to wait for claim to be dynamically provisioned, but shorter.
+	// ClaimProvisionShortTimeout is same as `ClaimProvisionTimeout` to wait for claim to be dynamically provisioned, but shorter.
 	// Use it case by case when we are sure this timeout is enough.
 	ClaimProvisionShortTimeout = 1 * time.Minute
 
-	// How long claims have to become bound
+	// ClaimBindingTimeout is how long claims have to become bound.
 	ClaimBindingTimeout = 3 * time.Minute
 
-	// How long claims have to become deleted
+	// ClaimDeletingTimeout is How long claims have to become deleted.
 	ClaimDeletingTimeout = 3 * time.Minute
 
-	// How long PVs have to beome reclaimed
+	// PVReclaimingTimeout is how long PVs have to beome reclaimed.
 	PVReclaimingTimeout = 3 * time.Minute
 
-	// How long PVs have to become bound
+	// PVBindingTimeout is how long PVs have to become bound.
 	PVBindingTimeout = 3 * time.Minute
 
-	// How long PVs have to become deleted
+	// PVDeletingTimeout is how long PVs have to become deleted.
 	PVDeletingTimeout = 3 * time.Minute
 
-	// How long a node is allowed to become "Ready" after it is recreated before
+	// RecreateNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is recreated before
 	// the test is considered failed.
 	RecreateNodeReadyAgainTimeout = 10 * time.Minute
 
-	// How long a node is allowed to become "Ready" after it is restarted before
+	// RestartNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
 	RestartNodeReadyAgainTimeout = 5 * time.Minute
 
-	// How long a pod is allowed to become "running" and "ready" after a node
+	// RestartPodReadyAgainTimeout is how long a pod is allowed to become "running" and "ready" after a node
 	// restart before test is considered failed.
 	RestartPodReadyAgainTimeout = 5 * time.Minute
 
-	// How long for snapshot to create snapshotContent
+	// SnapshotCreateTimeout is how long for snapshot to create snapshotContent.
 	SnapshotCreateTimeout = 5 * time.Minute
 
 	// Number of objects that gc can delete in a second.
@@ -208,6 +213,7 @@ const (
 )
 
 var (
+	// BusyBoxImage is the image URI of BusyBox.
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
 	// For parsing Kubectl version for version-skewed testing.
@@ -220,23 +226,27 @@ var (
 		regexp.MustCompile(".*node-problem-detector.*"),
 	}
 
-	// Serve hostname image name
+	// ServeHostnameImage is a serve hostname image name.
 	ServeHostnameImage = imageutils.GetE2EImage(imageutils.ServeHostname)
 )
 
+// GetServicesProxyRequest returns a request for a service proxy.
 func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
 	return request.Resource("services").SubResource("proxy"), nil
 }
 
-// unique identifier of the e2e run
-var RunId = uuid.NewUUID()
+// RunID is a unique identifier of the e2e run.
+// Beware that this ID is not the same for all tests in the e2e run, because each Ginkgo node creates it separately.
+var RunID = uuid.NewUUID()
 
+// CreateTestingNSFn is a func that is responsible for creating namespace used for executing e2e tests.
 type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
 
+// GetMasterHost returns a hostname of a master.
 func GetMasterHost() string {
-	masterUrl, err := url.Parse(TestContext.Host)
+	masterURL, err := url.Parse(TestContext.Host)
 	ExpectNoError(err)
-	return masterUrl.Hostname()
+	return masterURL.Hostname()
 }
 
 func nowStamp() string {
@@ -244,13 +254,15 @@ func nowStamp() string {
 }
 
 func log(level string, format string, args ...interface{}) {
-	fmt.Fprintf(GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
+	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
+// Logf logs the info.
 func Logf(format string, args ...interface{}) {
 	log("INFO", format, args...)
 }
 
+// Failf logs the fail info.
 func Failf(format string, args ...interface{}) {
 	FailfWithOffset(1, format, args...)
 }
@@ -269,52 +281,61 @@ func skipInternalf(caller int, format string, args ...interface{}) {
 	ginkgowrapper.Skip(msg, caller+1)
 }
 
+// Skipf skips with information about why the test is being skipped.
 func Skipf(format string, args ...interface{}) {
 	skipInternalf(1, format, args...)
 }
 
+// SkipUnlessNodeCountIsAtLeast skips if the number of nodes is less than the minNodeCount.
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
 	if TestContext.CloudConfig.NumNodes < minNodeCount {
 		skipInternalf(1, "Requires at least %d nodes (not %d)", minNodeCount, TestContext.CloudConfig.NumNodes)
 	}
 }
 
+// SkipUnlessNodeCountIsAtMost skips if the number of nodes is greater than the maxNodeCount.
 func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
 	if TestContext.CloudConfig.NumNodes > maxNodeCount {
 		skipInternalf(1, "Requires at most %d nodes (not %d)", maxNodeCount, TestContext.CloudConfig.NumNodes)
 	}
 }
 
+// SkipUnlessAtLeast skips if the value is less than the minValue.
 func SkipUnlessAtLeast(value int, minValue int, message string) {
 	if value < minValue {
 		skipInternalf(1, message)
 	}
 }
 
+// SkipIfProviderIs skips if the provider is included in the unsupportedProviders.
 func SkipIfProviderIs(unsupportedProviders ...string) {
 	if ProviderIs(unsupportedProviders...) {
 		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
 	}
 }
 
+// SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
 func SkipUnlessLocalEphemeralStorageEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 		skipInternalf(1, "Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
 	}
 }
 
+// SkipUnlessSSHKeyPresent skips if no SSH key is found.
 func SkipUnlessSSHKeyPresent() {
 	if _, err := GetSigner(TestContext.Provider); err != nil {
 		skipInternalf(1, "No SSH Key for provider %s: '%v'", TestContext.Provider, err)
 	}
 }
 
+// SkipUnlessProviderIs skips if the provider is not included in the supportedProviders.
 func SkipUnlessProviderIs(supportedProviders ...string) {
 	if !ProviderIs(supportedProviders...) {
 		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider)
 	}
 }
 
+// SkipUnlessMultizone skips if the cluster does not have multizone.
 func SkipUnlessMultizone(c clientset.Interface) {
 	zones, err := GetClusterZones(c)
 	if err != nil {
@@ -325,6 +346,7 @@ func SkipUnlessMultizone(c clientset.Interface) {
 	}
 }
 
+// SkipIfMultizone skips if the cluster has multizone.
 func SkipIfMultizone(c clientset.Interface) {
 	zones, err := GetClusterZones(c)
 	if err != nil {
@@ -335,30 +357,35 @@ func SkipIfMultizone(c clientset.Interface) {
 	}
 }
 
+// SkipUnlessPrometheusMonitoringIsEnabled skips if the prometheus monitoring is not enabled.
 func SkipUnlessPrometheusMonitoringIsEnabled(supportedMonitoring ...string) {
 	if !TestContext.EnablePrometheusMonitoring {
 		skipInternalf(1, "Skipped because prometheus monitoring is not enabled")
 	}
 }
 
+// SkipUnlessMasterOSDistroIs skips if the master OS distro is not included in the supportedMasterOsDistros.
 func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
 	if !MasterOSDistroIs(supportedMasterOsDistros...) {
 		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, TestContext.MasterOSDistro)
 	}
 }
 
+// SkipUnlessNodeOSDistroIs skips if the node OS distro is not included in the supportedNodeOsDistros.
 func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	if !NodeOSDistroIs(supportedNodeOsDistros...) {
 		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, TestContext.NodeOSDistro)
 	}
 }
 
+// SkipUnlessTaintBasedEvictionsEnabled skips if the TaintBasedEvictions is not enabled.
 func SkipUnlessTaintBasedEvictionsEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions) {
 		skipInternalf(1, "Only supported when %v feature is enabled", features.TaintBasedEvictions)
 	}
 }
 
+// SkipIfContainerRuntimeIs skips if the container runtime is included in the runtimes.
 func SkipIfContainerRuntimeIs(runtimes ...string) {
 	for _, runtime := range runtimes {
 		if runtime == TestContext.ContainerRuntime {
@@ -367,6 +394,7 @@ func SkipIfContainerRuntimeIs(runtimes ...string) {
 	}
 }
 
+// RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
 func RunIfContainerRuntimeIs(runtimes ...string) {
 	for _, runtime := range runtimes {
 		if runtime == TestContext.ContainerRuntime {
@@ -376,6 +404,7 @@ func RunIfContainerRuntimeIs(runtimes ...string) {
 	skipInternalf(1, "Skipped because container runtime %q is not in %s", TestContext.ContainerRuntime, runtimes)
 }
 
+// RunIfSystemSpecNameIs runs if the system spec name is included in the names.
 func RunIfSystemSpecNameIs(names ...string) {
 	for _, name := range names {
 		if name == TestContext.SystemSpecName {
@@ -385,6 +414,7 @@ func RunIfSystemSpecNameIs(names ...string) {
 	skipInternalf(1, "Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
 }
 
+// ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
 		if strings.ToLower(provider) == strings.ToLower(TestContext.Provider) {
@@ -394,6 +424,7 @@ func ProviderIs(providers ...string) bool {
 	return false
 }
 
+// MasterOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
 func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 	for _, distro := range supportedMasterOsDistros {
 		if strings.ToLower(distro) == strings.ToLower(TestContext.MasterOSDistro) {
@@ -403,6 +434,7 @@ func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
 	return false
 }
 
+// NodeOSDistroIs returns true if the node OS distro is included in the supportedNodeOsDistros. Otherwise false.
 func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 	for _, distro := range supportedNodeOsDistros {
 		if strings.ToLower(distro) == strings.ToLower(TestContext.NodeOSDistro) {
@@ -412,6 +444,7 @@ func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 	return false
 }
 
+// ProxyMode returns a proxyMode of a kube-proxy.
 func ProxyMode(f *Framework) (string, error) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -441,6 +474,7 @@ func ProxyMode(f *Framework) (string, error) {
 	return stdout, nil
 }
 
+// SkipUnlessServerVersionGTE skips if the server version is less than v.
 func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) {
 	gte, err := ServerVersionGTE(v, c)
 	if err != nil {
@@ -451,6 +485,7 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 	}
 }
 
+// SkipIfMissingResource skips if the gvr resource is missing.
 func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
 	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
 	_, err := resourceClient.List(metav1.ListOptions{})
@@ -689,6 +724,7 @@ func kubectlLogPod(c clientset.Interface, pod v1.Pod, containerNameSubstr string
 	}
 }
 
+// LogFailedContainers runs `kubectl logs` on a failed containers.
 func LogFailedContainers(c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{})) {
 	podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
 	if err != nil {
@@ -707,7 +743,7 @@ func LogFailedContainers(c clientset.Interface, ns string, logFunc func(ftm stri
 // Filter is by simple strings.Contains; first skip filter, then delete filter.
 // Returns the list of deleted namespaces or an error.
 func DeleteNamespaces(c clientset.Interface, deleteFilter, skipFilter []string) ([]string, error) {
-	By("Deleting namespaces")
+	ginkgo.By("Deleting namespaces")
 	nsList, err := c.CoreV1().Namespaces().List(metav1.ListOptions{})
 	ExpectNoError(err, "Failed to get namespace list")
 	var deleted []string
@@ -737,8 +773,8 @@ OUTER:
 		deleted = append(deleted, item.Name)
 		go func(nsName string) {
 			defer wg.Done()
-			defer GinkgoRecover()
-			Expect(c.CoreV1().Namespaces().Delete(nsName, nil)).To(Succeed())
+			defer ginkgo.GinkgoRecover()
+			gomega.Expect(c.CoreV1().Namespaces().Delete(nsName, nil)).To(gomega.Succeed())
 			Logf("namespace : %v api call to delete is complete ", nsName)
 		}(item.Name)
 	}
@@ -746,8 +782,9 @@ OUTER:
 	return deleted, nil
 }
 
+// WaitForNamespacesDeleted waits for the namespaces to be deleted.
 func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeout time.Duration) error {
-	By("Waiting for namespaces to vanish")
+	ginkgo.By("Waiting for namespaces to vanish")
 	nsMap := map[string]bool{}
 	for _, ns := range namespaces {
 		nsMap[ns] = true
@@ -779,6 +816,7 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	return err
 }
 
+// WaitForPodCondition waits a pods to be matched to the given condition.
 func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
 	Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
@@ -850,9 +888,8 @@ func WaitForPersistentVolumePhase(phase v1.PersistentVolumePhase, c clientset.In
 			if pv.Status.Phase == phase {
 				Logf("PersistentVolume %s found and phase=%s (%v)", pvName, phase, time.Since(start))
 				return nil
-			} else {
-				Logf("PersistentVolume %s found but phase is %s instead of %s.", pvName, pv.Status.Phase, phase)
 			}
+			Logf("PersistentVolume %s found but phase is %s instead of %s.", pvName, pv.Status.Phase, phase)
 		}
 	}
 	return fmt.Errorf("PersistentVolume %s not in phase %s within %v", pvName, phase, timeout)
@@ -870,9 +907,8 @@ func WaitForStatefulSetReplicasReady(statefulSetName, ns string, c clientset.Int
 			if sts.Status.ReadyReplicas == *sts.Spec.Replicas {
 				Logf("All %d replicas of StatefulSet %s are ready. (%v)", sts.Status.ReadyReplicas, statefulSetName, time.Since(start))
 				return nil
-			} else {
-				Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
 			}
+			Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
 		}
 	}
 	return fmt.Errorf("StatefulSet %s still has unready pods within %v", statefulSetName, timeout)
@@ -890,9 +926,8 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 			if apierrs.IsNotFound(err) {
 				Logf("PersistentVolume %s was removed", pvName)
 				return nil
-			} else {
-				Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 			}
+			Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 		}
 	}
 	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
@@ -903,11 +938,11 @@ func WaitForPersistentVolumeClaimPhase(phase v1.PersistentVolumeClaimPhase, c cl
 	return WaitForPersistentVolumeClaimsPhase(phase, c, ns, []string{pvcName}, Poll, timeout, true)
 }
 
-// WaitForPersistentVolumeClaimPhase waits for any (if matchAny is true) or all (if matchAny is false) PersistentVolumeClaims
+// WaitForPersistentVolumeClaimsPhase waits for any (if matchAny is true) or all (if matchAny is false) PersistentVolumeClaims
 // to be in a specific phase or until timeout occurs, whichever comes first.
 func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcNames []string, Poll, timeout time.Duration, matchAny bool) error {
 	if len(pvcNames) == 0 {
-		return fmt.Errorf("Incorrect parameter: Need at least one PVC to track. Found 0.")
+		return fmt.Errorf("Incorrect parameter: Need at least one PVC to track. Found 0")
 	}
 	Logf("Waiting up to %v for PersistentVolumeClaims %v to have phase %s", timeout, pvcNames, phase)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
@@ -961,7 +996,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels["e2e-run"] = string(RunId)
+	labels["e2e-run"] = string(RunID)
 
 	// We don't use ObjectMeta.GenerateName feature, as in case of API call
 	// failure we don't know whether the namespace was created and what is its
@@ -1251,6 +1286,7 @@ func hasRemainingContent(c clientset.Interface, dynamicClient dynamic.Interface,
 	return contentRemaining, nil
 }
 
+// ContainerInitInvariant checks for an init containers are initialized and invariant on both older and newer.
 func ContainerInitInvariant(older, newer runtime.Object) error {
 	oldPod := older.(*v1.Pod)
 	newPod := newer.(*v1.Pod)
@@ -1333,8 +1369,10 @@ func initContainersInvariants(pod *v1.Pod) error {
 	return nil
 }
 
+// InvariantFunc is a func that checks for invariant.
 type InvariantFunc func(older, newer runtime.Object) error
 
+// CheckInvariants checks for invariant of the each events.
 func CheckInvariants(events []watch.Event, fns ...InvariantFunc) error {
 	errs := sets.NewString()
 	for i := range events {
@@ -1528,7 +1566,7 @@ func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, 
 		}
 		switch pod.Status.Phase {
 		case v1.PodSucceeded:
-			By("Saw pod success")
+			ginkgo.By("Saw pod success")
 			return true, nil
 		case v1.PodFailed:
 			return true, fmt.Errorf("pod %q failed with status: %+v", podName, pod.Status)
@@ -1836,7 +1874,7 @@ func KubectlVersion() (*utilversion.Version, error) {
 }
 
 func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods *v1.PodList) error {
-	By("trying to dial each unique pod")
+	ginkgo.By("trying to dial each unique pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	return wait.PollImmediate(Poll, podRespondingTimeout, PodProxyResponseChecker(c, ns, label, name, wantName, pods).CheckAllResponses)
 }
@@ -1877,7 +1915,7 @@ func PodsCreatedByLabel(c clientset.Interface, ns, name string, replicas int32, 
 func podsRunning(c clientset.Interface, pods *v1.PodList) []error {
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	By("ensuring each pod is running")
+	ginkgo.By("ensuring each pod is running")
 	e := []error{}
 	error_chan := make(chan error)
 
@@ -1924,7 +1962,7 @@ func podRunningMaybeResponding(c clientset.Interface, ns, name string, wantName 
 }
 
 func ServiceResponding(c clientset.Interface, ns, name string) error {
-	By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
+	ginkgo.By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
 
 	return wait.PollImmediate(Poll, ServiceRespondingTimeout, func() (done bool, err error) {
 		proxyRequest, errProxy := GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
@@ -2022,7 +2060,7 @@ func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	if err != nil {
 		Logf("Unexpected error occurred: %v", err)
 	}
-	ExpectWithOffset(1+offset, err).NotTo(HaveOccurred(), explain...)
+	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
 func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
@@ -2034,12 +2072,12 @@ func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 		}
 		Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
 	}
-	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
+	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
 func Cleanup(filePath, ns string, selectors ...string) {
-	By("using delete to clean up resources")
+	ginkgo.By("using delete to clean up resources")
 	var nsArg string
 	if ns != "" {
 		nsArg = fmt.Sprintf("--namespace=%s", ns)
@@ -2278,7 +2316,7 @@ func (f *Framework) testContainerOutputMatcher(scenarioName string,
 	containerIndex int,
 	expectedOutput []string,
 	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
-	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
+	ginkgo.By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 	if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
 		Failf("Invalid container index: %d", containerIndex)
 	}
@@ -2300,7 +2338,7 @@ func (f *Framework) MatchContainerOutput(
 
 	createdPod := podClient.Create(pod)
 	defer func() {
-		By("delete the pod")
+		ginkgo.By("delete the pod")
 		podClient.DeleteSync(createdPod.Name, &metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
 	}()
 
@@ -2354,11 +2392,11 @@ func (f *Framework) MatchContainerOutput(
 type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error)
 
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
-	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
+	ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
 	events, err := eventsLister(metav1.ListOptions{}, namespace)
 	ExpectNoError(err, "failed to list events in namespace %q", namespace)
 
-	By(fmt.Sprintf("Found %d events.", len(events.Items)))
+	ginkgo.By(fmt.Sprintf("Found %d events.", len(events.Items)))
 	// Sort events by their first timestamp
 	sortedEvents := events.Items
 	if len(sortedEvents) > 1 {
@@ -2690,10 +2728,10 @@ func AddOrUpdateLabelOnNodeAndReturnOldValue(c clientset.Interface, nodeName str
 }
 
 func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string, labelValue string) {
-	By("verifying the node has the label " + labelKey + " " + labelValue)
+	ginkgo.By("verifying the node has the label " + labelKey + " " + labelValue)
 	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
-	Expect(node.Labels[labelKey]).To(Equal(labelValue))
+	gomega.Expect(node.Labels[labelKey]).To(gomega.Equal(labelValue))
 }
 
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
@@ -2708,15 +2746,15 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Tai
 // RemoveLabelOffNode is for cleaning up labels temporarily added to node,
 // won't fail if target label doesn't exist or has been removed.
 func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string) {
-	By("removing the label " + labelKey + " off the node " + nodeName)
+	ginkgo.By("removing the label " + labelKey + " off the node " + nodeName)
 	ExpectNoError(testutils.RemoveLabelOffNode(c, nodeName, []string{labelKey}))
 
-	By("verifying the node doesn't have the label " + labelKey)
+	ginkgo.By("verifying the node doesn't have the label " + labelKey)
 	ExpectNoError(testutils.VerifyLabelsRemoved(c, nodeName, []string{labelKey}))
 }
 
 func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Taint) {
-	By("verifying the node doesn't have the taint " + taint.ToString())
+	ginkgo.By("verifying the node doesn't have the taint " + taint.ToString())
 	nodeUpdated, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
 	if taintutils.TaintExists(nodeUpdated.Spec.Taints, taint) {
@@ -2725,7 +2763,7 @@ func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Tai
 }
 
 func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) {
-	By("verifying the node has the taint " + taint.ToString())
+	ginkgo.By("verifying the node has the taint " + taint.ToString())
 	if has, err := NodeHasTaint(c, nodeName, taint); !has {
 		ExpectNoError(err)
 		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
@@ -2814,7 +2852,7 @@ func ScaleResource(
 	kind schema.GroupKind,
 	gr schema.GroupResource,
 ) error {
-	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
+	ginkgo.By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
 	if err := testutils.ScaleResourceWithRetries(scalesGetter, ns, name, size, gr); err != nil {
 		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
 	}
@@ -3012,7 +3050,7 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 
 // DeleteResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
 func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns, name string) error {
-	By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", kind, name, ns))
+	ginkgo.By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", kind, name, ns))
 
 	rtObject, err := getRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
@@ -3351,7 +3389,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 }
 
 func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
-	By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
+	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
@@ -3375,7 +3413,7 @@ func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 }
 
 func DeletePodOrFail(c clientset.Interface, ns, name string) {
-	By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
+	ginkgo.By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
 	err := c.CoreV1().Pods(ns).Delete(name, nil)
 	ExpectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
 }
@@ -4496,13 +4534,13 @@ func GetPodsScheduled(masterNodes sets.String, pods *v1.PodList) (scheduledPods,
 		if !masterNodes.Has(pod.Spec.NodeName) {
 			if pod.Spec.NodeName != "" {
 				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				Expect(scheduledCondition != nil).To(Equal(true))
-				Expect(scheduledCondition.Status).To(Equal(v1.ConditionTrue))
+				gomega.Expect(scheduledCondition != nil).To(gomega.Equal(true))
+				gomega.Expect(scheduledCondition.Status).To(gomega.Equal(v1.ConditionTrue))
 				scheduledPods = append(scheduledPods, pod)
 			} else {
 				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				Expect(scheduledCondition != nil).To(Equal(true))
-				Expect(scheduledCondition.Status).To(Equal(v1.ConditionFalse))
+				gomega.Expect(scheduledCondition != nil).To(gomega.Equal(true))
+				gomega.Expect(scheduledCondition.Status).To(gomega.Equal(v1.ConditionFalse))
 				if scheduledCondition.Reason == "Unschedulable" {
 
 					notScheduledPods = append(notScheduledPods, pod)
