@@ -121,7 +121,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 			By("Initializing first PD with PVPVC binding")
 			pvSource1, diskName1 = framework.CreateGCEVolume()
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			pvConfig1 = framework.PersistentVolumeConfig{
 				NamePrefix: "gce-",
 				Labels:     volLabel,
@@ -129,12 +129,12 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 				Prebind:    nil,
 			}
 			pv1, pvc1, err = framework.CreatePVPVC(c, pvConfig1, pvcConfig, ns, false)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv1, pvc1))
 
 			By("Initializing second PD with PVPVC binding")
 			pvSource2, diskName2 = framework.CreateGCEVolume()
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			pvConfig2 = framework.PersistentVolumeConfig{
 				NamePrefix: "gce-",
 				Labels:     volLabel,
@@ -142,12 +142,12 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 				Prebind:    nil,
 			}
 			pv2, pvc2, err = framework.CreatePVPVC(c, pvConfig2, pvcConfig, ns, false)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv2, pvc2))
 
 			By("Attaching both PVC's to a single pod")
 			clientPod, err = framework.CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2}, true, "")
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 
 		AfterEach(func() {
@@ -176,20 +176,20 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func() {
 			By("Deleting PVC for volume 2")
 			err = framework.DeletePersistentVolumeClaim(c, pvc2.Name, ns)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			pvc2 = nil
 
 			By("Restarting the kube-controller-manager")
 			err = framework.RestartControllerManager()
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			err = framework.WaitForControllerManagerUp()
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			framework.Logf("kube-controller-manager restarted")
 
 			By("Observing the kube-controller-manager healthy for at least 2 minutes")
 			// Continue checking for 2 minutes to make sure kube-controller-manager is healthy
 			err = framework.CheckForControllerManagerHealthy(2 * time.Minute)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 
 	})
@@ -252,27 +252,27 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 			framework.DeletePersistentVolume(c, pv.Name)
 		}
 	}()
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	pod := framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
 	framework.Logf("Creating NFS client pod.")
 	pod, err = c.CoreV1().Pods(ns).Create(pod)
 	framework.Logf("NFS client Pod %q created on Node %q", pod.Name, nodeName)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer func() {
 		if err != nil {
 			framework.DeletePodWithWait(f, c, pod)
 		}
 	}()
 	err = framework.WaitForPodRunningInNamespace(c, pod)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Pod %q timed out waiting for phase: Running", pod.Name))
+	framework.ExpectNoError(err, fmt.Sprintf("Pod %q timed out waiting for phase: Running", pod.Name))
 	// Return created api objects
 	pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return pod, pv, pvc
 }
 

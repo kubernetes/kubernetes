@@ -113,9 +113,9 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 				Expect(volume).NotTo(BeNil())
 
 				err := checkGCEPD(volume, "pd-standard")
-				Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
+				framework.ExpectNoError(err, "checkGCEPD")
 				err = verifyZonesInPV(volume, sets.NewString(cloudZones...), true /* match */)
-				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
+				framework.ExpectNoError(err, "verifyZonesInPV")
 
 			},
 		},
@@ -134,11 +134,11 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 				Expect(volume).NotTo(BeNil())
 
 				err := checkGCEPD(volume, "pd-standard")
-				Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
+				framework.ExpectNoError(err, "checkGCEPD")
 				zones, err := framework.GetClusterZones(c)
-				Expect(err).NotTo(HaveOccurred(), "GetClusterZones")
+				framework.ExpectNoError(err, "GetClusterZones")
 				err = verifyZonesInPV(volume, zones, false /* match */)
-				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
+				framework.ExpectNoError(err, "verifyZonesInPV")
 			},
 		},
 	}
@@ -173,7 +173,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 
 	By("creating a StorageClass " + class.Name)
 	_, err := c.StorageV1().StorageClasses().Create(class)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer func() {
 		framework.Logf("deleting storage class %s", class.Name)
 		framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(class.Name, nil),
@@ -182,9 +182,9 @@ func testZonalFailover(c clientset.Interface, ns string) {
 
 	By("creating a StatefulSet")
 	_, err = c.CoreV1().Services(ns).Create(service)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	_, err = c.AppsV1().StatefulSets(ns).Create(statefulSet)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	defer func() {
 		framework.Logf("deleting statefulset%q/%q", statefulSet.Namespace, statefulSet.Name)
@@ -209,7 +209,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 		pod := getPod(c, ns, regionalPDLabels)
 		Expect(podutil.IsPodReadyConditionTrue(pod.Status)).To(BeTrue(),
 			"The statefulset pod has the following conditions: %s", pod.Status.Conditions)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 
 	pvc := getPVC(c, ns, regionalPDLabels)
@@ -254,14 +254,14 @@ func testZonalFailover(c clientset.Interface, ns string) {
 		newPodZone := node.Labels[v1.LabelZoneFailureDomain]
 		return newPodZone == otherZone, nil
 	})
-	Expect(err).NotTo(HaveOccurred(), "Error waiting for pod to be scheduled in a different zone (%q): %v", otherZone, err)
+	framework.ExpectNoError(err, "Error waiting for pod to be scheduled in a different zone (%q): %v", otherZone, err)
 
 	err = framework.WaitForStatefulSetReplicasReady(statefulSet.Name, ns, c, 3*time.Second, framework.RestartPodReadyAgainTimeout)
 	if err != nil {
 		pod := getPod(c, ns, regionalPDLabels)
 		Expect(podutil.IsPodReadyConditionTrue(pod.Status)).To(BeTrue(),
 			"The statefulset pod has the following conditions: %s", pod.Status.Conditions)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 
 	By("verifying the same PVC is used by the new pod")
@@ -270,7 +270,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 
 	By("verifying the container output has 2 lines, indicating the pod has been created twice using the same regional PD.")
 	logs, err := framework.GetPodLogs(c, ns, pod.Name, "")
-	Expect(err).NotTo(HaveOccurred(),
+	framework.ExpectNoError(err,
 		"Error getting logs from pod %s in namespace %s", pod.Name, ns)
 	lineCount := len(strings.Split(strings.TrimSpace(logs), "\n"))
 	expectedLineCount := 2
@@ -283,7 +283,7 @@ func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string)
 	reversePatches := make(map[string][]byte)
 	for _, node := range nodes {
 		oldData, err := json.Marshal(node)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		node.Spec.Taints = append(node.Spec.Taints, v1.Taint{
 			Key:    taintKeyPrefix + ns,
@@ -292,13 +292,13 @@ func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string)
 		})
 
 		newData, err := json.Marshal(node)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		reversePatchBytes, err := strategicpatch.CreateTwoWayMergePatch(newData, oldData, v1.Node{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		reversePatches[node.Name] = reversePatchBytes
 
 		_, err = c.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes)
@@ -421,7 +421,7 @@ func getPVC(c clientset.Interface, ns string, pvcLabels map[string]string) *v1.P
 	selector := labels.Set(pvcLabels).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	Expect(len(pvcList.Items)).To(Equal(1), "There should be exactly 1 PVC matched.")
 
 	return &pvcList.Items[0]
@@ -431,7 +431,7 @@ func getPod(c clientset.Interface, ns string, podLabels map[string]string) *v1.P
 	selector := labels.Set(podLabels).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	podList, err := c.CoreV1().Pods(ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	Expect(len(podList.Items)).To(Equal(1), "There should be exactly 1 pod matched.")
 
 	return &podList.Items[0]
