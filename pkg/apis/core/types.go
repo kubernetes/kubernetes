@@ -4172,6 +4172,7 @@ type EventSeries struct {
 	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime
 	// State of this Series: Ongoing or Finished
+	// Deprecated. Planned removal for 1.18
 	State EventSeriesState
 }
 

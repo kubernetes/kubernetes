@@ -4701,6 +4701,7 @@ type EventSeries struct {
 	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime,omitempty" protobuf:"bytes,2,name=lastObservedTime"`
 	// State of this Series: Ongoing or Finished
+	// Deprecated. Planned removal for 1.18
 	State EventSeriesState `json:"state,omitempty" protobuf:"bytes,3,name=state"`
 }
 
