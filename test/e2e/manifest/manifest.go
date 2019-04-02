@@ -26,9 +26,9 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -107,7 +107,7 @@ func IngressFromManifest(fileName string) (*extensions.Ingress, error) {
 // IngressToManifest generates a yaml file in the given path with the given ingress.
 // Assumes that a directory exists at the given path.
 func IngressToManifest(ing *extensions.Ingress, path string) error {
-	serialized, err := util.MarshalToYaml(ing, extensions.SchemeGroupVersion)
+	serialized, err := marshalToYaml(ing, extensions.SchemeGroupVersion)
 	if err != nil {
 		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
 	}
@@ -177,4 +177,16 @@ func RoleFromManifest(fileName, ns string) (*rbac.Role, error) {
 	}
 	role.Namespace = ns
 	return &role, nil
+}
+
+// marshalToYaml marshals an object into YAML for a given GroupVersion.
+// The object must be known in SupportedMediaTypes() for the Codecs under "client-go/kubernetes/scheme".
+func marshalToYaml(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
+	mediaType := "application/yaml"
+	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return []byte{}, fmt.Errorf("unsupported media type %q", mediaType)
+	}
+	encoder := scheme.Codecs.EncoderForVersion(info.Serializer, gv)
+	return runtime.Encode(encoder, obj)
 }
