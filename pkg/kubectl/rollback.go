@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
+	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
@@ -449,7 +450,7 @@ func findHistory(toRevision int64, allHistory []*appsv1.ControllerRevision) *app
 	var toHistory *appsv1.ControllerRevision
 	if toRevision == 0 {
 		// If toRevision == 0, find the latest revision (2nd max)
-		sort.Sort(historiesByRevision(allHistory))
+		sort.Sort(daemonutil.HistoriesByRevision(allHistory))
 		toHistory = allHistory[len(allHistory)-2]
 	} else {
 		for _, h := range allHistory {
@@ -474,13 +475,4 @@ func printPodTemplate(specTemplate *corev1.PodTemplateSpec) (string, error) {
 
 func revisionNotFoundErr(r int64) error {
 	return fmt.Errorf("unable to find specified revision %v in history", r)
-}
-
-// TODO: copied from daemon controller, should extract to a library
-type historiesByRevision []*appsv1.ControllerRevision
-
-func (h historiesByRevision) Len() int      { return len(h) }
-func (h historiesByRevision) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-func (h historiesByRevision) Less(i, j int) bool {
-	return h[i].Revision < h[j].Revision
 }

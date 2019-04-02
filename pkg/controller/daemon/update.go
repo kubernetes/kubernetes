@@ -169,7 +169,7 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 	}
 
 	// Clean up old history from smallest to highest revision (from oldest to newest)
-	sort.Sort(historiesByRevision(old))
+	sort.Sort(util.HistoriesByRevision(old))
 	for _, history := range old {
 		if toKill <= 0 {
 			break
@@ -428,12 +428,4 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *apps.DaemonSet, nodeL
 	}
 	klog.V(4).Infof(" DaemonSet %s/%s, maxUnavailable: %d, numUnavailable: %d", ds.Namespace, ds.Name, maxUnavailable, numUnavailable)
 	return maxUnavailable, numUnavailable, nil
-}
-
-type historiesByRevision []*apps.ControllerRevision
-
-func (h historiesByRevision) Len() int      { return len(h) }
-func (h historiesByRevision) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-func (h historiesByRevision) Less(i, j int) bool {
-	return h[i].Revision < h[j].Revision
 }

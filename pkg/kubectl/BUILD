@@ -58,6 +58,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl",
     deps = [
+        "//pkg/controller/daemon/util:go_default_library",
         "//pkg/kubectl/apps:go_default_library",
         "//pkg/kubectl/describe/versioned:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",

@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["daemonset_util.go"],
+    srcs = [
+        "daemonset_util.go",
+        "histories_by_revision.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/controller/daemon/util",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
@@ -36,11 +39,15 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["daemonset_util_test.go"],
+    srcs = [
+        "daemonset_util_test.go",
+        "histories_by_revision_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/scheduler/api:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
