@@ -225,6 +225,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Roles", Type: "string", Description: "The roles of the node"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Version", Type: "string", Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["kubeletVersion"]},
+		{Name: "System-UUID", Type: "string", Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["systemUUID"]},
 		{Name: "Internal-IP", Type: "string", Priority: 1, Description: apiv1.NodeStatus{}.SwaggerDoc()["addresses"]},
 		{Name: "External-IP", Type: "string", Priority: 1, Description: apiv1.NodeStatus{}.SwaggerDoc()["addresses"]},
 		{Name: "OS-Image", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["osImage"]},
