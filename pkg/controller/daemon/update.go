@@ -160,21 +160,13 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 		}
 	}
 
-	// Find all live history with the above hashes
-	liveHistory := make(map[string]bool)
-	for _, history := range old {
-		if hash := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; liveHashes[hash] {
-			liveHistory[history.Name] = true
-		}
-	}
-
 	// Clean up old history from smallest to highest revision (from oldest to newest)
 	sort.Sort(historiesByRevision(old))
 	for _, history := range old {
 		if toKill <= 0 {
 			break
 		}
-		if liveHistory[history.Name] {
+		if hash := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; liveHashes[hash] {
 			continue
 		}
 		// Clean up
