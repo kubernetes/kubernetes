@@ -28,3 +28,5 @@ They are listed here for convenience.***
 - [Datadog Cluster Agent](https://github.com/DataDog/datadog-agent/blob/c4f38af1897bac294d8fed6285098b14aafa6178/docs/cluster-agent/CUSTOM_METRICS_SERVER.md).
   Implementation of the external metrics provider, using Datadog as a backend for the metrics.
   Coming soon: Implementation of the custom metrics provider to support in-cluster metrics collected by the Datadog Agents.
+
+- [Kube Metrics Adapter](https://github.com/zalando-incubator/kube-metrics-adapter). A general purpose metrics adapter for Kubernetes that can collect and serve custom and external metrics for Horizontal Pod Autoscaling.
