@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -263,15 +264,30 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 	}
 
 	// gets the etcd version of the local/stacked etcd member running on the current machine
+	// the version is read from che cluster; this should take into account that there are still
+	// around old etcd manifest with etcd listening on local host only
+	// N.B. taking care of old etcd manifests is necessary only in v1.14; starting from v1.15 all the etcd manifest should have 2 endpoints
 	currentEtcdVersions, err := oldEtcdClient.GetClusterVersions()
 	if err != nil {
 		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
 	}
-	currentEtcdVersionStr, ok := currentEtcdVersions[etcdutil.GetClientURL(&cfg.LocalAPIEndpoint)]
-	if !ok {
-		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
-	}
 
+	var ok bool
+	var currentEtcdVersionStr string
+	if etcdutil.IsEtcdListeningOnLocalHostOnly() {
+		// in case of etcd listening on local host only, there could be only etcd member in the cluster, and so
+		// also in the currentEtcdVersions map; we are using a for to take the value of the first element
+		for _, v := range currentEtcdVersions {
+			currentEtcdVersionStr = v
+			break
+		}
+	} else {
+		// otherwise take the etcd version of the etcd member hosted on the current machine
+		currentEtcdVersionStr, ok = currentEtcdVersions[etcdutil.GetClientURL(&cfg.LocalAPIEndpoint)]
+		if !ok {
+			return true, errors.Wrap(err, "failed to retrieve the current etcd version")
+		}
+	}
 	currentEtcdVersion, err := version.ParseSemantic(currentEtcdVersionStr)
 	if err != nil {
 		return true, errors.Wrapf(err, "failed to parse the current etcd version(%s)", currentEtcdVersionStr)
@@ -500,6 +516,21 @@ func renewCerts(cfg *kubeadmapi.InitConfiguration, component string) error {
 					&certsphase.KubeadmCertEtcdPeer,
 					&certsphase.KubeadmCertEtcdHealthcheck,
 				} {
+					if cert.BaseName == constants.EtcdServerCertAndKeyBaseName {
+						// When renewing the etcd server certificate it is necessary to mutate it from listening on
+						// localhost only to listening on localhost and API server advertise address (if not already the case)
+						// N.B. this code is necessary only in v1.14; starting from v1.15 all the etcd manifest should have 2 endpoints
+						advertiseAddress := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress)
+						if advertiseAddress == nil {
+							return errors.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %q: is not a valid textual representation of an IP address", cfg.LocalAPIEndpoint.AdvertiseAddress)
+						}
+
+						if err := renewal.RenewAndMutateExistingEtcdServerCert(cfg.CertificatesDir, cert.BaseName, advertiseAddress, renewer); err != nil {
+							return errors.Wrapf(err, "failed to renew %s certificate and key", certsphase.KubeadmCertEtcdServer.Name)
+						}
+
+						continue
+					}
 					if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
 						return errors.Wrapf(err, "failed to renew %s certificate and key", cert.Name)
 					}
