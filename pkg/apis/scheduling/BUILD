@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "annotations.go",
         "doc.go",
         "helpers.go",
         "register.go",

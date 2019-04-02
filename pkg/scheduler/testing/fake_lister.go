@@ -22,6 +22,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -221,4 +222,13 @@ type FakePDBLister []*policy.PodDisruptionBudget
 // List returns a list of PodDisruptionBudgets.
 func (f FakePDBLister) List(labels.Selector) ([]*policy.PodDisruptionBudget, error) {
 	return f, nil
+}
+
+// FakePriorityClassLister implements PriorityClassLister on a slice of Priority for test purposes.
+type FakePriorityClassLister schedulingv1.PriorityClass
+
+// Get returns a PriorityClass by name.
+func (f FakePriorityClassLister) Get(name string) (*schedulingv1.PriorityClass, error) {
+	pc := schedulingv1.PriorityClass(f)
+	return &pc, nil
 }

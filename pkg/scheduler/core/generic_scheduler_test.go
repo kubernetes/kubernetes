@@ -416,9 +416,9 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:               map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "matches": matchesPredicate, "false": falsePredicate},
 			prioritizers:             []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			alwaysCheckAllPredicates: true,
-			nodes:                    []string{"1"},
-			pod:                      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			name:                     "test alwaysCheckAllPredicates is true",
+			nodes: []string{"1"},
+			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			name:  "test alwaysCheckAllPredicates is true",
 			wErr: &FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 1,
@@ -462,6 +462,7 @@ func TestGenericScheduler(t *testing.T) {
 				nil,
 				pvcLister,
 				schedulertesting.FakePDBLister{},
+				schedulertesting.FakePriorityClassLister{},
 				test.alwaysCheckAllPredicates,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
@@ -493,7 +494,7 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 		prioritizers,
 		priorities.EmptyPriorityMetadataProducer,
 		emptyFramework,
-		nil, nil, nil, nil, false, false,
+		nil, nil, nil, nil, nil, false, false,
 		schedulerapi.DefaultPercentageOfNodesToScore)
 	cache.UpdateNodeInfoSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
@@ -1499,6 +1500,7 @@ func TestPreempt(t *testing.T) {
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},
 				schedulertesting.FakePDBLister{},
+				schedulertesting.FakePriorityClassLister{},
 				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
@@ -1559,7 +1561,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 10,
 		},
 		{
-			name:                     "set percentageOfNodesToScore and nodes number not more than 50",
+			name: "set percentageOfNodesToScore and nodes number not more than 50",
 			percentageOfNodesToScore: 40,
 			numAllNodes:              10,
 			wantNumNodes:             10,
@@ -1570,7 +1572,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 420,
 		},
 		{
-			name:                     "set percentageOfNodesToScore and nodes number more than 50",
+			name: "set percentageOfNodesToScore and nodes number more than 50",
 			percentageOfNodesToScore: 40,
 			numAllNodes:              1000,
 			wantNumNodes:             400,
@@ -1581,12 +1583,13 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 300,
 		},
 		{
-			name:                     "set percentageOfNodesToScore and nodes number more than 50*125",
+			name: "set percentageOfNodesToScore and nodes number more than 50*125",
 			percentageOfNodesToScore: 40,
 			numAllNodes:              6000,
 			wantNumNodes:             2400,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := &genericScheduler{

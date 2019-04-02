@@ -35,11 +35,13 @@ import (
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
+	schedulinglister "k8s.io/client-go/listers/scheduling/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -185,6 +187,8 @@ type configFactory struct {
 	storageClassLister storagelisters.StorageClassLister
 	// framework has a set of plugins and the context used for running them.
 	framework framework.Framework
+	// a means to list all PriorityClass
+	priorityClassLister schedulinglister.PriorityClassLister
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
@@ -233,6 +237,7 @@ type ConfigFactoryArgs struct {
 	ServiceInformer                coreinformers.ServiceInformer
 	PdbInformer                    policyinformers.PodDisruptionBudgetInformer
 	StorageClassInformer           storageinformers.StorageClassInformer
+	PriorityClassInformer          schedulinginformers.PriorityClassInformer
 	HardPodAffinitySymmetricWeight int32
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
@@ -276,6 +281,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		pdbLister:                      args.PdbInformer.Lister(),
 		storageClassLister:             storageClassLister,
 		framework:                      framework,
+		priorityClassLister:            args.PriorityClassInformer.Lister(),
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  args.SchedulerName,
@@ -463,6 +469,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.volumeBinder,
 		c.pVCLister,
 		c.pdbLister,
+		c.priorityClassLister,
 		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
@@ -564,6 +571,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: c.storageClassLister},
 		VolumeBinder:                   c.volumeBinder,
 		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
+		PriorityLister:                 c.priorityClassLister,
 	}, nil
 }
 

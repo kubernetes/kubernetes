@@ -36,6 +36,8 @@ const (
 	SystemClusterCritical = SystemPriorityClassPrefix + "cluster-critical"
 	// SystemNodeCritical is the system priority class name that represents node-critical.
 	SystemNodeCritical = SystemPriorityClassPrefix + "node-critical"
+	// The default value for preempting attribute.
+	DefaultPreempting = true
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -64,6 +66,11 @@ type PriorityClass struct {
 	// when this priority class should be used.
 	// +optional
 	Description string
+
+	// Preempting specifies whether a pod with this PriorityClass could start a preemption process.
+	// If this field is missing, the PriorityClass is considered a preempting class by default.
+	// +optional
+	Preempting *bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

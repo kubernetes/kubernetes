@@ -49,6 +49,11 @@ type PriorityClass struct {
 	// when this priority class should be used.
 	// +optional
 	Description string `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`
+
+	// Preempting specifies whether a pod with this PriorityClass could trigger a preemption process.
+	// If this field is unset, the PriorityClass is considered a Preempting class by default.
+	// +optional
+	Preempting *bool `json:"preempting,omitempty" protobuf:"bytes,5,opt,name=preempting"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

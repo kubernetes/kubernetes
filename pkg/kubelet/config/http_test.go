@@ -130,6 +130,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
+	preempting := v1.DefaultPreempting
 	var testCases = []struct {
 		desc     string
 		pods     runtime.Object
@@ -175,6 +176,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						TerminationGracePeriodSeconds: &grace,
 						SchedulerName:                 api.DefaultSchedulerName,
 						EnableServiceLinks:            &enableServiceLinks,
+						Preempting:                    &preempting,
 
 						Containers: []v1.Container{{
 							Name:                     "1",
@@ -247,6 +249,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SecurityContext:               &v1.PodSecurityContext{},
 						SchedulerName:                 api.DefaultSchedulerName,
 						EnableServiceLinks:            &enableServiceLinks,
+						Preempting:                    &preempting,
 
 						Containers: []v1.Container{{
 							Name:                     "1",
@@ -276,6 +279,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						SecurityContext:               &v1.PodSecurityContext{},
 						SchedulerName:                 api.DefaultSchedulerName,
 						EnableServiceLinks:            &enableServiceLinks,
+						Preempting:                    &preempting,
 
 						Containers: []v1.Container{{
 							Name:                     "2",

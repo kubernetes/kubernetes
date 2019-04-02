@@ -3181,6 +3181,11 @@ message PodSpec {
   // +optional
   optional int32 priority = 25;
 
+  // Preempting specifies whether a pod with this PriorityClass could start a preemption process.
+  // If this field is missing, the PriorityClass is considered a Preempting class by default.
+  // +optional
+  optional bool preempting = 31;
+
   // Specifies the DNS parameters of a pod.
   // Parameters specified here will be merged to the generated DNS
   // configuration based on DNSPolicy.

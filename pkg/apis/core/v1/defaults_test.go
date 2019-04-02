@@ -1390,3 +1390,11 @@ func TestSetDefaultEnableServiceLinks(t *testing.T) {
 		t.Errorf("Expected enableServiceLinks value: %+v\ngot: %+v\n", v1.DefaultEnableServiceLinks, *output.Spec.EnableServiceLinks)
 	}
 }
+
+func TestSetDefaultPreempting(t *testing.T) {
+	pod := &v1.Pod{}
+	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+	if output.Spec.Preempting == nil || *output.Spec.Preempting != v1.DefaultPreempting {
+		t.Errorf("Expected enableServiceLinks value: %+v\ngot: %+v\n", v1.DefaultPreempting, *output.Spec.Preempting)
+	}
+}

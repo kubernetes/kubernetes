@@ -152,6 +152,7 @@ func generateDeployment(image string) apps.Deployment {
 	podLabels := map[string]string{"name": image}
 	terminationSec := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
+	preempting := v1.DefaultPreempting
 	return apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        image,
@@ -178,6 +179,7 @@ func generateDeployment(image string) apps.Deployment {
 					RestartPolicy:                 v1.RestartPolicyAlways,
 					SecurityContext:               &v1.PodSecurityContext{},
 					EnableServiceLinks:            &enableServiceLinks,
+					Preempting:                    &preempting,
 				},
 			},
 		},

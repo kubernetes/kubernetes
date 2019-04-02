@@ -17,10 +17,20 @@ limitations under the License.
 package fuzzer
 
 import (
+	"github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
 // Funcs returns the fuzzer functions for the scheduling api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
-	return []interface{}{}
+	return []interface{}{
+		func(s *scheduling.PriorityClass, c fuzz.Continue) {
+			c.FuzzNoCustom(s)
+			if s.Preempting == nil {
+				preempting := scheduling.DefaultPreempting
+				s.Preempting = &preempting
+			}
+		},
+	}
 }

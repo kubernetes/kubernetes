@@ -162,6 +162,11 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		enableServiceLinks := v1.DefaultEnableServiceLinks
 		obj.Spec.EnableServiceLinks = &enableServiceLinks
 	}
+	if obj.Spec.Preempting == nil {
+		// Set Preempting as true by default.
+		Preempting := v1.DefaultPreempting
+		obj.Spec.Preempting = &Preempting
+	}
 }
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// New fields added here will break upgrade tests:

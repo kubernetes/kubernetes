@@ -491,6 +491,7 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
+		informerFactory.Scheduling().V1().PriorityClasses(),
 		hardPodAffinitySymmetricWeight,
 		disablePodPreemption,
 		schedulerapi.DefaultPercentageOfNodesToScore,

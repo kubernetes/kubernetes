@@ -179,6 +179,7 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 
 	if operation == admission.Create {
 		var priority int32
+		var preempting *bool
 		// TODO: @ravig - This is for backwards compatibility to ensure that critical pods with annotations just work fine.
 		// Remove when no longer needed.
 		if len(pod.Spec.PriorityClassName) == 0 &&
@@ -189,7 +190,7 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 		if len(pod.Spec.PriorityClassName) == 0 {
 			var err error
 			var pcName string
-			pcName, priority, err = p.getDefaultPriority()
+			pcName, priority, preempting, err = p.getDefaultPriority()
 			if err != nil {
 				return fmt.Errorf("failed to get default priority class: %v", err)
 			}
@@ -211,12 +212,14 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 			}
 
 			priority = pc.Value
+			preempting = pc.Preempting
 		}
 		// if the pod contained a priority that differs from the one computed from the priority class, error
 		if pod.Spec.Priority != nil && *pod.Spec.Priority != priority {
 			return admission.NewForbidden(a, fmt.Errorf("the integer value of priority (%d) must not be provided in pod spec; priority admission controller computed %d from the given PriorityClass name", *pod.Spec.Priority, priority))
 		}
 		pod.Spec.Priority = &priority
+		pod.Spec.Preempting = preempting
 	}
 	return nil
 }
@@ -262,14 +265,15 @@ func (p *priorityPlugin) getDefaultPriorityClass() (*schedulingv1.PriorityClass,
 	return defaultPC, nil
 }
 
-func (p *priorityPlugin) getDefaultPriority() (string, int32, error) {
+func (p *priorityPlugin) getDefaultPriority() (string, int32, *bool, error) {
 	dpc, err := p.getDefaultPriorityClass()
 	if err != nil {
-		return "", 0, err
+		return "", 0, nil, err
 	}
 	if dpc != nil {
-		return dpc.Name, dpc.Value, nil
+		return dpc.Name, dpc.Value, dpc.Preempting, nil
 	}
+	preempting := true
 
-	return "", int32(scheduling.DefaultPriorityWhenNoDefaultClassExists), nil
+	return "", int32(scheduling.DefaultPriorityWhenNoDefaultClassExists), &preempting, nil
 }

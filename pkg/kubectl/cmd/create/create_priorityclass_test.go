@@ -56,6 +56,7 @@ func TestCreatePriorityClass(t *testing.T) {
 	cmd.Flags().Set("value", "1000")
 	cmd.Flags().Set("global-default", "true")
 	cmd.Flags().Set("description", "my priority")
+	cmd.Flags().Set("preempting", "true")
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", outputFormat)
 

@@ -254,6 +254,7 @@ priorities: []
 			informerFactory.Core().V1().Services(),
 			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 			informerFactory.Storage().V1().StorageClasses(),
+			informerFactory.Scheduling().V1().PriorityClasses(),
 			eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 			kubeschedulerconfig.SchedulerAlgorithmSource{
 				Policy: &kubeschedulerconfig.SchedulerPolicySource{
@@ -325,6 +326,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
+		informerFactory.Scheduling().V1().PriorityClasses(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 		kubeschedulerconfig.SchedulerAlgorithmSource{
 			Policy: &kubeschedulerconfig.SchedulerPolicySource{

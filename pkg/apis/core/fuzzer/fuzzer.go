@@ -89,6 +89,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				enableServiceLinks := corev1.DefaultEnableServiceLinks
 				s.EnableServiceLinks = &enableServiceLinks
 			}
+			if s.Preempting == nil {
+				preempting := corev1.DefaultPreempting
+				s.Preempting = &preempting
+			}
 		},
 		func(j *core.PodPhase, c fuzz.Continue) {
 			statuses := []core.PodPhase{core.PodPending, core.PodRunning, core.PodFailed, core.PodUnknown}
