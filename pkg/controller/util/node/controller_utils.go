@@ -17,19 +17,22 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/pager"
 	"k8s.io/client-go/tools/record"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -122,31 +125,38 @@ func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	nodeName := node.Name
 	klog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
 	opts := metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName).String()}
-	pods, err := kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(opts)
-	if err != nil {
-		return err
-	}
-
+	podPager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
+		return kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(opts)
+	}))
 	errMsg := []string{}
-	for _, pod := range pods.Items {
+	err := podPager.EachListItem(context.Background(), opts, func(obj runtime.Object) error {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			return fmt.Errorf("unexpected type in pod list: %T", obj)
+		}
 		// Defensive check, also needed for tests.
 		if pod.Spec.NodeName != nodeName {
-			continue
+			return nil
 		}
 
 		for i, cond := range pod.Status.Conditions {
 			if cond.Type == v1.PodReady {
 				pod.Status.Conditions[i].Status = v1.ConditionFalse
 				klog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
-				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(&pod)
+				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
 				if err != nil {
-					klog.Warningf("Failed to update status for pod %q: %v", format.Pod(&pod), err)
+					klog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
 					errMsg = append(errMsg, fmt.Sprintf("%v", err))
 				}
 				break
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
+
 	if len(errMsg) == 0 {
 		return nil
 	}
