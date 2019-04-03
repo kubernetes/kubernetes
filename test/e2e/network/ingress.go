@@ -27,7 +27,6 @@ import (
 	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -119,74 +118,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				By(t.ExitLog)
 				jig.WaitForIngress(true)
 			}
-		})
-
-		It("should not reconcile manually modified health check for ingress", func() {
-			By("Creating a basic HTTP ingress and wait for it to come up.")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "http"), ns, nil, nil)
-			jig.WaitForIngress(true)
-
-			// Get cluster UID.
-			clusterID, err := gce.GetClusterID(f.ClientSet)
-			Expect(err).NotTo(HaveOccurred())
-			// Get the related nodeports.
-			nodePorts := jig.GetIngressNodePorts(false)
-			Expect(len(nodePorts)).ToNot(Equal(0))
-
-			// Filter health check using cluster UID as the suffix.
-			By("Retrieving relevant health check resources from GCE.")
-			gceCloud, err := gce.GetGCECloud()
-			Expect(err).NotTo(HaveOccurred())
-			hcs, err := gceCloud.ListHealthChecks()
-			Expect(err).NotTo(HaveOccurred())
-			var hcToChange *compute.HealthCheck
-			for _, hc := range hcs {
-				if strings.HasSuffix(hc.Name, clusterID) {
-					Expect(hc.HttpHealthCheck).NotTo(BeNil())
-					if fmt.Sprintf("%d", hc.HttpHealthCheck.Port) == nodePorts[0] {
-						hcToChange = hc
-						break
-					}
-				}
-			}
-			Expect(hcToChange).NotTo(BeNil())
-
-			By(fmt.Sprintf("Modifying health check %v without involving ingress.", hcToChange.Name))
-			// Change timeout from 60s to 25s.
-			hcToChange.TimeoutSec = 25
-			// Change path from /healthz to /.
-			hcToChange.HttpHealthCheck.RequestPath = "/"
-			err = gceCloud.UpdateHealthCheck(hcToChange)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Add one more path to ingress to trigger resource syncing.
-			By("Adding a new path to ingress and wait for it to take effect.")
-			jig.Update(func(ing *extensions.Ingress) {
-				ing.Spec.Rules = append(ing.Spec.Rules, extensions.IngressRule{
-					Host: "ingress.test.com",
-					IngressRuleValue: extensions.IngressRuleValue{
-						HTTP: &extensions.HTTPIngressRuleValue{
-							Paths: []extensions.HTTPIngressPath{
-								{
-									Path: "/test",
-									// Copy backend from the first rule.
-									Backend: ing.Spec.Rules[0].HTTP.Paths[0].Backend,
-								},
-							},
-						},
-					},
-				})
-			})
-			// Wait for change to take effect before checking the health check resource.
-			jig.WaitForIngress(false)
-
-			// Validate the modified fields on health check are intact.
-			By("Checking if the modified health check is unchanged.")
-			hcAfterSync, err := gceCloud.GetHealthCheck(hcToChange.Name)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(hcAfterSync.HttpHealthCheck).ToNot(Equal(nil))
-			Expect(hcAfterSync.TimeoutSec).To(Equal(hcToChange.TimeoutSec))
-			Expect(hcAfterSync.HttpHealthCheck.RequestPath).To(Equal(hcToChange.HttpHealthCheck.RequestPath))
 		})
 
 		It("should create ingress with pre-shared certificate", func() {
