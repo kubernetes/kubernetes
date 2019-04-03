@@ -16,6 +16,7 @@ Repositories currently staged here:
 - [`k8s.io/cluster-bootstrap`](https://github.com/kubernetes/cluster-bootstrap)
 - [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator)
 - [`k8s.io/component-base`](https://github.com/kubernetes/component-base)
+- [`k8s.io/cri-api`](https://github.com/kubernetes/cri-api)
 - [`k8s.io/csi-api`](https://github.com/kubernetes/csi-api)
 - [`k8s.io/csi-translation-lib`](https://github.com/kubernetes/csi-translation-lib)
 - [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
