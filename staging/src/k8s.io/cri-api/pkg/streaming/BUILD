@@ -13,7 +13,8 @@ go_library(
         "request_cache.go",
         "server.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/server/streaming",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cri-api/pkg/streaming",
+    importpath = "k8s.io/cri-api/pkg/streaming",
     deps = [
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",

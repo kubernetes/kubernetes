@@ -44,7 +44,7 @@ type Server interface {
 	http.Handler
 
 	// Get the serving URL for the requests.
-	// Requests must not be nil. Responses may be nil iff an error is returned.
+	// Requests must not be nil. Responses may be nil if an error is returned.
 	GetExec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error)
 	GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error)
 	GetPortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
