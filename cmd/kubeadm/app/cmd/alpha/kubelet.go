@@ -158,7 +158,7 @@ func newCmdKubeletConfigEnableDynamic() *cobra.Command {
 	}
 
 	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
-	cmd.Flags().StringVar(&nodeName, "node-name", nodeName, "Name of the node that should enable the dynamic kubelet configuration")
+	cmd.Flags().StringVar(&nodeName, options.NodeName, nodeName, "Name of the node that should enable the dynamic kubelet configuration")
 	cmd.Flags().StringVar(&kubeletVersionStr, "kubelet-version", kubeletVersionStr, "The desired version for the kubelet")
 	return cmd
 }
