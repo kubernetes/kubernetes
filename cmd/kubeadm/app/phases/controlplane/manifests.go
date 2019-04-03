@@ -117,10 +117,10 @@ func CreateStaticPodFiles(manifestDir string, cfg *kubeadmapi.ClusterConfigurati
 
 	// creates required static pod specs
 	for _, componentName := range componentNames {
-		// retrives the StaticPodSpec for given component
+		// retrieves the StaticPodSpec for given component
 		spec, exists := specs[componentName]
 		if !exists {
-			return errors.Errorf("couldn't retrive StaticPodSpec for %q", componentName)
+			return errors.Errorf("couldn't retrieve StaticPodSpec for %q", componentName)
 		}
 
 		// writes the StaticPodSpec to disk
