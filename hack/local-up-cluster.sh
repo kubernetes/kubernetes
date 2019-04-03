@@ -751,7 +751,7 @@ function start_kubelet {
 
     # shellcheck disable=SC2206
     all_kubelet_flags=(
-      "${priv_arg}"
+      ${priv_arg}
       "--v=${LOG_LEVEL}"
       "--vmodule=${LOG_SPEC}"
       "--chaos-chance=${CHAOS_CHANCE}"
