@@ -56,6 +56,12 @@ var (
 	emptyFunc = func() {}
 )
 
+const (
+	// storageWatchListPageSize is the cacher's request chunk size of
+	// initial and resync watch lists to storage.
+	storageWatchListPageSize = int64(10000)
+)
+
 func init() {
 	prometheus.MustRegister(initCounter)
 }
@@ -231,7 +237,7 @@ type Cacher struct {
 // given configuration.
 func NewCacherFromConfig(config Config) *Cacher {
 	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc, config.Versioner)
-	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
+	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
 	obj := config.NewFunc()
@@ -242,12 +248,16 @@ func NewCacherFromConfig(config Config) *Cacher {
 	}
 
 	stopCh := make(chan struct{})
+	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
+	// Configure reflector's pager to for an appropriate pagination chunk size for fetching data from
+	// storage. The pager falls back to full list if paginated list calls fail due to an "Expired" error.
+	reflector.WatchListPageSize = storageWatchListPageSize
 	cacher := &Cacher{
 		ready:       newReady(),
 		storage:     config.Storage,
 		objectType:  reflect.TypeOf(obj),
 		watchCache:  watchCache,
-		reflector:   cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0),
+		reflector:   reflector,
 		versioner:   config.Versioner,
 		triggerFunc: config.TriggerPublisherFunc,
 		watcherIdx:  0,
@@ -849,7 +859,8 @@ type cacherListerWatcher struct {
 	newListFunc    func() runtime.Object
 }
 
-func newCacherListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object) cache.ListerWatcher {
+// NewCacherListerWatcher returns a storage.Interface backed ListerWatcher.
+func NewCacherListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object) cache.ListerWatcher {
 	return &cacherListerWatcher{
 		storage:        storage,
 		resourcePrefix: resourcePrefix,
@@ -860,7 +871,14 @@ func newCacherListerWatcher(storage storage.Interface, resourcePrefix string, ne
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object, error) {
 	list := lw.newListFunc()
-	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, "", storage.Everything, list); err != nil {
+	pred := storage.SelectionPredicate{
+		Label:    labels.Everything(),
+		Field:    fields.Everything(),
+		Limit:    options.Limit,
+		Continue: options.Continue,
+	}
+
+	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, "", pred, list); err != nil {
 		return nil, err
 	}
 	return list, nil
