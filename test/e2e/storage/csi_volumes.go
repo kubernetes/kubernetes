@@ -134,7 +134,7 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 
 	// Use different zones for pod and PV
 	zones, err := framework.GetClusterZones(cs)
-	Expect(err).ToNot(HaveOccurred())
+	framework.ExpectNoError(err)
 	Expect(zones.Len()).To(BeNumerically(">=", 2))
 	zonesList := zones.UnsortedList()
 	podZoneIndex := rand.Intn(zones.Len())

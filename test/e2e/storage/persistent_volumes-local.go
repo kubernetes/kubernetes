@@ -212,7 +212,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				BeforeEach(func() {
 					By("Creating pod1")
 					pod1, pod1Err = createLocalPod(config, testVol, nil)
-					Expect(pod1Err).NotTo(HaveOccurred())
+					framework.ExpectNoError(pod1Err)
 					verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 					writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
@@ -287,7 +287,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup1, fsGroup1)
 					By("Deleting first pod")
 					err := framework.DeletePodWithWait(f, config.client, pod1)
-					Expect(err).NotTo(HaveOccurred(), "while deleting first pod")
+					framework.ExpectNoError(err, "while deleting first pod")
 					By("Create second pod and check fsGroup is the new one")
 					pod2 := createPodWithFsGroupTest(config, testVol, fsGroup2, fsGroup2)
 					By("Deleting second pod")
@@ -328,7 +328,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 			pod := makeLocalPodWithNodeName(config, testVol, config.nodes[1].Name)
 			pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 			Expect(err).To(HaveOccurred())
@@ -554,7 +554,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 					pod := framework.MakeSecPod(config.ns, pvcs, false, "sleep 1", false, false, selinuxLabel, nil)
 					pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
-					Expect(err).NotTo(HaveOccurred())
+					framework.ExpectNoError(err)
 					pods[pod.Name] = pod
 					numCreated++
 				}
@@ -600,7 +600,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 				return numFinished == totalPods, nil
 			})
-			Expect(err).ToNot(HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 	})
 
@@ -647,7 +647,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			for i := 0; i < count; i++ {
 				pod := framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{pvc}, false, "", false, false, selinuxLabel, nil)
 				pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				pods[pod.Name] = pod
 			}
 			By("Wait for all pods are running")
@@ -665,7 +665,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				}
 				return runningPods == count, nil
 			})
-			Expect(err).ToNot(HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 	})
 })
@@ -697,10 +697,10 @@ func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeTyp
 
 	pod := makeLocalPodFunc(config, testVol, nodeName)
 	pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	err = framework.WaitForPodNameUnschedulableInNamespace(config.client, pod.Name, pod.Namespace)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 }
 
 // The tests below are run against multiple mount point types
@@ -709,7 +709,7 @@ func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeTyp
 func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 	By("Creating pod1 to write to the PV")
 	pod1, pod1Err := createLocalPod(config, testVol, nil)
-	Expect(pod1Err).NotTo(HaveOccurred())
+	framework.ExpectNoError(pod1Err)
 	verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 	writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
@@ -722,7 +722,7 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 
 	By("Creating pod2 to read from the PV")
 	pod2, pod2Err := createLocalPod(config, testVol, nil)
-	Expect(pod2Err).NotTo(HaveOccurred())
+	framework.ExpectNoError(pod2Err)
 	verifyLocalPod(config, testVol, pod2, config.node0.Name)
 
 	// testFileContent was written after creating pod1
@@ -746,7 +746,7 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolume) {
 	By("Creating pod1")
 	pod1, pod1Err := createLocalPod(config, testVol, nil)
-	Expect(pod1Err).NotTo(HaveOccurred())
+	framework.ExpectNoError(pod1Err)
 	verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 	writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
@@ -762,7 +762,7 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 
 	By("Creating pod2")
 	pod2, pod2Err := createLocalPod(config, testVol, nil)
-	Expect(pod2Err).NotTo(HaveOccurred())
+	framework.ExpectNoError(pod2Err)
 	verifyLocalPod(config, testVol, pod2, config.node0.Name)
 
 	By("Reading in pod2")
@@ -777,7 +777,7 @@ func createPodWithFsGroupTest(config *localTestConfig, testVol *localTestVolume,
 	pod, err := createLocalPod(config, testVol, &fsGroup)
 	framework.ExpectNoError(err)
 	_, err = framework.LookForStringInPodExec(config.ns, pod.Name, []string{"stat", "-c", "%g", volumeDir}, strconv.FormatInt(expectedFsGroup, 10), time.Second*3)
-	Expect(err).NotTo(HaveOccurred(), "failed to get expected fsGroup %d on directory %s in pod %s", fsGroup, volumeDir, pod.Name)
+	framework.ExpectNoError(err, "failed to get expected fsGroup %d on directory %s in pod %s", fsGroup, volumeDir, pod.Name)
 	return pod
 }
 
@@ -791,7 +791,7 @@ func setupStorageClass(config *localTestConfig, mode *storagev1.VolumeBindingMod
 	}
 
 	_, err := config.client.StorageV1().StorageClasses().Create(sc)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 }
 
 func cleanupStorageClass(config *localTestConfig) {
@@ -844,7 +844,7 @@ func verifyLocalVolume(config *localTestConfig, volume *localTestVolume) {
 
 func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Pod, expectedNodeName string) {
 	podNodeName, err := podNodeName(config, pod)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.Logf("pod %q created on Node %q", pod.Name, podNodeName)
 	Expect(podNodeName).To(Equal(expectedNodeName))
 }
@@ -1031,7 +1031,7 @@ func testReadFileContent(testFileDir string, testFile string, testFileContent st
 func podRWCmdExec(pod *v1.Pod, cmd string) string {
 	out, err := utils.PodExec(pod, cmd)
 	framework.Logf("podRWCmdExec out: %q err: %v", out, err)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return out
 }
 
@@ -1148,7 +1148,7 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 	}
 
 	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(spec)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	config.ssTester.WaitForRunningAndReady(ssReplicas, ss)
 	return ss
@@ -1177,7 +1177,7 @@ func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti b
 			if pvcSource != nil {
 				err := framework.WaitForPersistentVolumeClaimPhase(
 					v1.ClaimBound, config.client, config.ns, pvcSource.ClaimName, framework.Poll, time.Second)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 			}
 		}
 	}
@@ -1188,9 +1188,9 @@ func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti b
 func SkipUnlessLocalSSDExists(config *localTestConfig, ssdInterface, filesystemType string, node *v1.Node) {
 	ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
 	res, err := config.hostExec.IssueCommandWithResult(ssdCmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	num, err := strconv.Atoi(strings.TrimSpace(res))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	if num < 1 {
 		framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
 	}
