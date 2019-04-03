@@ -30,7 +30,6 @@ import (
 	"k8s.io/klog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -278,7 +277,7 @@ func verifyKeyData(data []byte) bool {
 }
 
 func waitForServer(cfg restclient.Config, deadline time.Duration) error {
-	cfg.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	cfg.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	cfg.Timeout = 1 * time.Second
 	cli, err := restclient.UnversionedRESTClientFor(&cfg)
 	if err != nil {

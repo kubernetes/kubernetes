@@ -33,7 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
@@ -48,7 +47,7 @@ func TestSetEnvLocal(t *testing.T) {
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -85,7 +84,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -448,7 +447,7 @@ func TestSetEnvRemote(t *testing.T) {
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         input.groupVersion,
-				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == input.path && m == http.MethodGet:
@@ -583,7 +582,7 @@ func TestSetEnvFromResource(t *testing.T) {
 			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
-				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == "/namespaces/test/configmaps/testconfigmap" && m == http.MethodGet:

@@ -63,7 +63,7 @@ func NewForVersionForConfig(c *rest.Config, mapper meta.RESTMapper, version sche
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	configShallowCopy.GroupVersion = &version
-	configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	configShallowCopy.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {
