@@ -104,6 +104,7 @@ func TestReadConfig(t *testing.T) {
  auth-url = http://auth.url
  user-id = user
  tenant-name = demo
+ tenant-domain-name = Default
  region = RegionOne
  [LoadBalancer]
  create-monitor = yes
@@ -135,6 +136,10 @@ func TestReadConfig(t *testing.T) {
 	// config file wins over environment variable
 	if cfg.Global.TenantName != "demo" {
 		t.Errorf("incorrect tenant name: %s", cfg.Global.TenantName)
+	}
+
+	if cfg.Global.TenantDomainName != "Default" {
+		t.Errorf("incorrect tenant domain name: %s", cfg.Global.TenantDomainName)
 	}
 
 	if cfg.Global.Region != "RegionOne" {
@@ -671,6 +676,8 @@ func TestToAuth3Options(t *testing.T) {
 	cfg.Global.DomainName = "local"
 	cfg.Global.AuthURL = "http://auth.url"
 	cfg.Global.UserID = "user"
+	cfg.Global.TenantName = "demo"
+	cfg.Global.TenantDomainName = "Default"
 
 	ao := cfg.toAuth3Options()
 
@@ -694,6 +701,83 @@ func TestToAuth3Options(t *testing.T) {
 	}
 	if ao.DomainName != cfg.Global.DomainName {
 		t.Errorf("DomainName %s != %s", ao.DomainName, cfg.Global.DomainName)
+	}
+	if ao.Scope.ProjectName != cfg.Global.TenantName {
+		t.Errorf("TenantName %s != %s", ao.Scope.ProjectName, cfg.Global.TenantName)
+	}
+	if ao.Scope.DomainName != cfg.Global.TenantDomainName {
+		t.Errorf("TenantDomainName %s != %s", ao.Scope.DomainName, cfg.Global.TenantDomainName)
+	}
+}
+func TestToAuth3OptionsScope(t *testing.T) {
+	// Use Domain Name/ID if Tenant Domain Name/ID is not set
+	cfg := Config{}
+	cfg.Global.Username = "user"
+	cfg.Global.Password = "pass"
+	cfg.Global.DomainID = "2a73b8f597c04551a0fdc8e95544be8a"
+	cfg.Global.DomainName = "local"
+	cfg.Global.AuthURL = "http://auth.url"
+	cfg.Global.UserID = "user"
+	cfg.Global.TenantName = "demo"
+
+	ao := cfg.toAuth3Options()
+
+	if ao.Scope.ProjectName != cfg.Global.TenantName {
+		t.Errorf("TenantName %s != %s", ao.Scope.ProjectName, cfg.Global.TenantName)
+	}
+	if ao.Scope.DomainName != cfg.Global.DomainName {
+		t.Errorf("DomainName %s != %s", ao.Scope.DomainName, cfg.Global.DomainName)
+	}
+	if ao.Scope.DomainID != cfg.Global.DomainID {
+		t.Errorf("DomainID %s != %s", ao.Scope.DomainName, cfg.Global.DomainID)
+	}
+
+	// Use Tenant Domain Name/ID if set
+	cfg = Config{}
+	cfg.Global.Username = "user"
+	cfg.Global.Password = "pass"
+	cfg.Global.DomainID = "2a73b8f597c04551a0fdc8e95544be8a"
+	cfg.Global.DomainName = "local"
+	cfg.Global.AuthURL = "http://auth.url"
+	cfg.Global.UserID = "user"
+	cfg.Global.TenantName = "demo"
+	cfg.Global.TenantDomainName = "Default"
+	cfg.Global.TenantDomainID = "default"
+
+	ao = cfg.toAuth3Options()
+
+	if ao.Scope.ProjectName != cfg.Global.TenantName {
+		t.Errorf("TenantName %s != %s", ao.Scope.ProjectName, cfg.Global.TenantName)
+	}
+	if ao.Scope.DomainName != cfg.Global.TenantDomainName {
+		t.Errorf("TenantDomainName %s != %s", ao.Scope.DomainName, cfg.Global.TenantDomainName)
+	}
+	if ao.Scope.DomainID != cfg.Global.TenantDomainID {
+		t.Errorf("TenantDomainID %s != %s", ao.Scope.DomainName, cfg.Global.TenantDomainID)
+	}
+
+	// Do not use neither Domain Name nor ID, if Tenant ID was provided
+	cfg = Config{}
+	cfg.Global.Username = "user"
+	cfg.Global.Password = "pass"
+	cfg.Global.DomainID = "2a73b8f597c04551a0fdc8e95544be8a"
+	cfg.Global.DomainName = "local"
+	cfg.Global.AuthURL = "http://auth.url"
+	cfg.Global.UserID = "user"
+	cfg.Global.TenantID = "7808db451cfc43eaa9acda7d67da8cf1"
+	cfg.Global.TenantDomainName = "Default"
+	cfg.Global.TenantDomainID = "default"
+
+	ao = cfg.toAuth3Options()
+
+	if ao.Scope.ProjectName != "" {
+		t.Errorf("TenantName in the scope  is not empty")
+	}
+	if ao.Scope.DomainName != "" {
+		t.Errorf("DomainName in the scope is not empty")
+	}
+	if ao.Scope.DomainID != "" {
+		t.Errorf("DomainID in the scope is not empty")
 	}
 }
 

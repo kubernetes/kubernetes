@@ -148,19 +148,21 @@ type OpenStack struct {
 // Config is used to read and store information from the cloud configuration file
 type Config struct {
 	Global struct {
-		AuthURL         string `gcfg:"auth-url"`
-		Username        string
-		UserID          string `gcfg:"user-id"`
-		Password        string
-		TenantID        string `gcfg:"tenant-id"`
-		TenantName      string `gcfg:"tenant-name"`
-		TrustID         string `gcfg:"trust-id"`
-		DomainID        string `gcfg:"domain-id"`
-		DomainName      string `gcfg:"domain-name"`
-		Region          string
-		CAFile          string `gcfg:"ca-file"`
-		SecretName      string `gcfg:"secret-name"`
-		SecretNamespace string `gcfg:"secret-namespace"`
+		AuthURL          string `gcfg:"auth-url"`
+		Username         string
+		UserID           string `gcfg:"user-id"`
+		Password         string
+		TenantID         string `gcfg:"tenant-id"`
+		TenantName       string `gcfg:"tenant-name"`
+		TrustID          string `gcfg:"trust-id"`
+		DomainID         string `gcfg:"domain-id"`
+		DomainName       string `gcfg:"domain-name"`
+		TenantDomainID   string `gcfg:"tenant-domain-id"`
+		TenantDomainName string `gcfg:"tenant-domain-name"`
+		Region           string
+		CAFile           string `gcfg:"ca-file"`
+		SecretName       string `gcfg:"secret-name"`
+		SecretNamespace  string `gcfg:"secret-namespace"`
 	}
 	LoadBalancer LoadBalancerOpts
 	BlockStorage BlockStorageOpts
@@ -197,6 +199,30 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 }
 
 func (cfg Config) toAuth3Options() tokens3.AuthOptions {
+	// Setting up a scope
+	scope := tokens3.Scope{}
+
+	// Gophercloud requires that either ProjectID or ProjectName is specified,
+	// but not both.
+	if cfg.Global.TenantID != "" {
+		scope.ProjectID = cfg.Global.TenantID
+	} else {
+		scope.ProjectName = cfg.Global.TenantName
+
+		// If Tenant Domain Name/ID was provided, then use it for the scope, otherwise
+		// fall back to Domain Name/ID
+		if cfg.Global.TenantDomainID != "" {
+			scope.DomainID = cfg.Global.TenantDomainID
+		} else {
+			scope.DomainID = cfg.Global.DomainID
+		}
+		if cfg.Global.TenantDomainName != "" {
+			scope.DomainName = cfg.Global.TenantDomainName
+		} else {
+			scope.DomainName = cfg.Global.DomainName
+		}
+	}
+
 	return tokens3.AuthOptions{
 		IdentityEndpoint: cfg.Global.AuthURL,
 		Username:         cfg.Global.Username,
@@ -204,6 +230,7 @@ func (cfg Config) toAuth3Options() tokens3.AuthOptions {
 		Password:         cfg.Global.Password,
 		DomainID:         cfg.Global.DomainID,
 		DomainName:       cfg.Global.DomainName,
+		Scope:            scope,
 		AllowReauth:      true,
 	}
 }
@@ -235,6 +262,9 @@ func configFromEnv() (cfg Config, ok bool) {
 	if cfg.Global.DomainName == "" {
 		cfg.Global.DomainName = os.Getenv("OS_USER_DOMAIN_NAME")
 	}
+
+	cfg.Global.TenantDomainID = os.Getenv("OS_PROJECT_DOMAIN_ID")
+	cfg.Global.TenantDomainName = os.Getenv("OS_PROJECT_DOMAIN_NAME")
 
 	cfg.Global.SecretName = os.Getenv("SECRET_NAME")
 	cfg.Global.SecretNamespace = os.Getenv("SECRET_NAMESPACE")
@@ -411,6 +441,9 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 			AuthOptionsBuilder: &opts,
 		}
 		err = openstack.AuthenticateV3(provider, authOptsExt, gophercloud.EndpointOpts{})
+	} else if cfg.Global.TenantDomainID != "" || cfg.Global.TenantDomainName != "" {
+		opts := cfg.toAuth3Options()
+		err = openstack.AuthenticateV3(provider, &opts, gophercloud.EndpointOpts{})
 	} else {
 		err = openstack.Authenticate(provider, cfg.toAuthOptions())
 	}

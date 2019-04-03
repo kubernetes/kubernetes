@@ -304,19 +304,21 @@ func getOpenstackCloudProvider() (*openstack.OpenStack, error) {
 func getOpenstackConfig() openstack.Config {
 	cfg := openstack.Config{
 		Global: struct {
-			AuthURL         string `gcfg:"auth-url"`
-			Username        string
-			UserID          string `gcfg:"user-id"`
-			Password        string
-			TenantID        string `gcfg:"tenant-id"`
-			TenantName      string `gcfg:"tenant-name"`
-			TrustID         string `gcfg:"trust-id"`
-			DomainID        string `gcfg:"domain-id"`
-			DomainName      string `gcfg:"domain-name"`
-			Region          string
-			CAFile          string `gcfg:"ca-file"`
-			SecretName      string `gcfg:"secret-name"`
-			SecretNamespace string `gcfg:"secret-namespace"`
+			AuthURL          string `gcfg:"auth-url"`
+			Username         string
+			UserID           string `gcfg:"user-id"`
+			Password         string
+			TenantID         string `gcfg:"tenant-id"`
+			TenantName       string `gcfg:"tenant-name"`
+			TrustID          string `gcfg:"trust-id"`
+			DomainID         string `gcfg:"domain-id"`
+			DomainName       string `gcfg:"domain-name"`
+			TenantDomainID   string `gcfg:"tenant-domain-id"`
+			TenantDomainName string `gcfg:"tenant-domain-name"`
+			Region           string
+			CAFile           string `gcfg:"ca-file"`
+			SecretName       string `gcfg:"secret-name"`
+			SecretNamespace  string `gcfg:"secret-namespace"`
 		}{
 			Username:   "user",
 			Password:   "pass",
