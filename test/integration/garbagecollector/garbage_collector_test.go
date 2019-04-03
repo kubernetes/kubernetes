@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -194,6 +195,7 @@ type testContext struct {
 	clientSet          clientset.Interface
 	apiExtensionClient apiextensionsclientset.Interface
 	dynamicClient      dynamic.Interface
+	metadataClient     metadata.Interface
 	startGC            func(workers int)
 	// syncPeriod is how often the GC started with startGC will be resynced.
 	syncPeriod time.Duration
@@ -224,6 +226,10 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	restMapper.Reset()
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	config := *result.ClientConfig
+	metadataClient, err := metadata.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("failed to create metadataClient: %v", err)
+	}
 	dynamicClient, err := dynamic.NewForConfig(&config)
 	if err != nil {
 		t.Fatalf("failed to create dynamicClient: %v", err)
@@ -232,7 +238,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
-		dynamicClient,
+		metadataClient,
 		restMapper,
 		deletableResources,
 		garbagecollector.DefaultIgnoredResources(),
@@ -270,6 +276,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		clientSet:          clientSet,
 		apiExtensionClient: apiExtensionClient,
 		dynamicClient:      dynamicClient,
+		metadataClient:     metadataClient,
 		startGC:            startGC,
 		syncPeriod:         syncPeriod,
 	}

@@ -30,7 +30,7 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,10 +40,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -59,7 +59,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}
 	tweakableRM := meta.NewDefaultRESTMapper(nil)
 	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
-	dynamicClient, err := dynamic.NewForConfig(config)
+	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	// construction will not fail.
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(dynamicClient, rm, twoResources, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(metadataClient, rm, twoResources, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 		fakeResponse, ok := f.response[request.Method+request.URL.Path]
 		if !ok {
 			fakeResponse.statusCode = 200
-			fakeResponse.content = []byte("{\"kind\": \"List\"}")
+			fakeResponse.content = []byte(`{"apiVersion": "v1", "kind": "List"}`)
 		}
 		response.Header().Set("Content-Type", "application/json")
 		response.WriteHeader(fakeResponse.statusCode)
@@ -189,7 +189,7 @@ type garbageCollector struct {
 }
 
 func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
-	dynamicClient, err := dynamic.NewForConfig(config)
+	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +199,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(dynamicClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, podResource, ignoredResources, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, podResource, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,6 +217,7 @@ func getPod(podName string, ownerReferences []metav1.OwnerReference) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            podName,
 			Namespace:       "ns1",
+			UID:             "456",
 			OwnerReferences: ownerReferences,
 		},
 	}
@@ -435,12 +436,12 @@ func TestGCListWatcher(t *testing.T) {
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
 	podResource := schema.GroupVersionResource{Version: "v1", Resource: "pods"}
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	metadataClient, err := metadata.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	lw := listWatcher(dynamicClient, podResource)
+	lw := listWatcher(metadataClient, podResource)
 	lw.DisableChunking = true
 	if _, err := lw.Watch(metav1.ListOptions{ResourceVersion: "1"}); err != nil {
 		t.Fatal(err)
@@ -837,7 +838,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	}
 
 	rm := &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	metadataClient, err := metadata.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -848,7 +849,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(dynamicClient, rm, podResource, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(metadataClient, rm, podResource, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}

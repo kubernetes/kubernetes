@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
@@ -91,7 +91,7 @@ type GraphBuilder struct {
 	// it is protected by monitorLock.
 	running bool
 
-	dynamicClient dynamic.Interface
+	metadataClient metadata.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
@@ -126,7 +126,7 @@ func (m *monitor) Run() {
 
 type monitors map[schema.GroupVersionResource]*monitor
 
-func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource) *cache.ListWatch {
+func listWatcher(client metadata.Interface, resource schema.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
@@ -187,7 +187,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 	// TODO: consider store in one storage.
 	klog.V(5).Infof("create storage for resource %s", resource)
 	store, monitor := cache.NewInformer(
-		listWatcher(gb.dynamicClient, resource),
+		listWatcher(gb.metadataClient, resource),
 		nil,
 		ResourceResyncTime,
 		// don't need to clone because it's not from shared cache
