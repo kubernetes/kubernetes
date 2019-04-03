@@ -85,7 +85,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 	options.AddKubeConfigFlag(tokenCmd.PersistentFlags(), &kubeConfigFile)
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
-		"dry-run", dryRun, "Whether to enable dry-run mode or not")
+		options.DryRun, dryRun, "Whether to enable dry-run mode or not")
 
 	cfg := &kubeadmapiv1beta1.InitConfiguration{}
 

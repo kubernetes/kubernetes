@@ -80,7 +80,7 @@ var (
 func GetItemsPtr(list runtime.Object) (interface{}, error) {
 	obj, err := getItemsPtr(list)
 	if err != nil {
-		return nil, fmt.Errorf("%T is not a list: %v", err)
+		return nil, fmt.Errorf("%T is not a list: %v", list, err)
 	}
 	return obj, nil
 }

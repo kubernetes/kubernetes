@@ -516,5 +516,6 @@ func (i *ImagesList) Run(out io.Writer) error {
 func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, cfgPath *string, featureGatesString *string) {
 	options.AddKubernetesVersionFlag(flagSet, &cfg.ClusterConfiguration.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
+	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)
 	flagSet.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file.")
 }

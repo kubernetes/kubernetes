@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,31 +34,35 @@ import (
 )
 
 const (
-	PDRetryTimeout    = 5 * time.Minute
-	PDRetryPollTime   = 5 * time.Second
+	pdRetryTimeout  = 5 * time.Minute
+	pdRetryPollTime = 5 * time.Second
+
+	// VolumeSelectorKey is the key for volume selector.
 	VolumeSelectorKey = "e2e-pv-pool"
 )
 
 var (
-	// Common selinux labels
+	// SELinuxLabel is common selinux labels.
 	SELinuxLabel = &v1.SELinuxOptions{
 		Level: "s0:c0,c1"}
 )
 
-// Map of all PVs used in the multi pv-pvc tests. The key is the PV's name, which is
+type pvval struct{}
+
+// PVMap is a map of all PVs used in the multi pv-pvc tests. The key is the PV's name, which is
 // guaranteed to be unique. The value is {} (empty struct) since we're only interested
 // in the PV's name and if it is present. We must always Get the pv object before
 // referencing any of its values, eg its ClaimRef.
-type pvval struct{}
 type PVMap map[string]pvval
 
-// Map of all PVCs used in the multi pv-pvc tests. The key is "namespace/pvc.Name". The
+type pvcval struct{}
+
+// PVCMap is a map of all PVCs used in the multi pv-pvc tests. The key is "namespace/pvc.Name". The
 // value is {} (empty struct) since we're only interested in the PVC's name and if it is
 // present. We must always Get the pvc object before referencing any of its values, eg.
 // its VolumeName.
 // Note: It's unsafe to add keys to a map in a loop. Their insertion in the map is
 //   unpredictable and can result in the same key being iterated over again.
-type pvcval struct{}
 type PVCMap map[types.NamespacedName]pvcval
 
 // PersistentVolumeConfig is consumed by MakePersistentVolume() to generate a PV object
@@ -84,7 +88,6 @@ type PersistentVolumeConfig struct {
 // PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to generate a PVC object.
 // AccessModes defaults to all modes (RWO, RWX, ROX) if left empty
 // (+optional) Annotations defines the PVC's annotations
-
 type PersistentVolumeClaimConfig struct {
 	AccessModes      []v1.PersistentVolumeAccessMode
 	Annotations      map[string]string
@@ -101,7 +104,7 @@ type NodeSelection struct {
 	Affinity *v1.Affinity
 }
 
-// Clean up a pv and pvc in a single pv/pvc test case.
+// PVPVCCleanup cleans up a pv and pvc in a single pv/pvc test case.
 // Note: delete errors are appended to []error so that we can attempt to delete both the pvc and pv.
 func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) []error {
 	var errs []error
@@ -125,7 +128,7 @@ func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc
 	return errs
 }
 
-// Clean up pvs and pvcs in multi-pv-pvc test cases. Entries found in the pv and claim maps are
+// PVPVCMapCleanup Cleans up pvs and pvcs in multi-pv-pvc test cases. Entries found in the pv and claim maps are
 // deleted as long as the Delete api call succeeds.
 // Note: delete errors are appended to []error so that as many pvcs and pvs as possible are deleted.
 func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMap) []error {
@@ -151,7 +154,7 @@ func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMa
 	return errs
 }
 
-// Delete the PV.
+// DeletePersistentVolume deletes the PV.
 func DeletePersistentVolume(c clientset.Interface, pvName string) error {
 	if c != nil && len(pvName) > 0 {
 		Logf("Deleting PersistentVolume %q", pvName)
@@ -163,7 +166,7 @@ func DeletePersistentVolume(c clientset.Interface, pvName string) error {
 	return nil
 }
 
-// Delete the Claim
+// DeletePersistentVolumeClaim deletes the Claim.
 func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns string) error {
 	if c != nil && len(pvcName) > 0 {
 		Logf("Deleting PersistentVolumeClaim %q", pvcName)
@@ -175,7 +178,7 @@ func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 	return nil
 }
 
-// Delete the PVC and wait for the PV to enter its expected phase. Validate that the PV
+// DeletePVCandValidatePV deletes the PVC and waits for the PV to enter its expected phase. Validate that the PV
 // has been reclaimed (assumption here about reclaimPolicy). Caller tells this func which
 // phase value to expect for the pv bound to the to-be-deleted claim.
 func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) error {
@@ -216,7 +219,7 @@ func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 	return nil
 }
 
-// Wraps deletePVCandValidatePV() by calling the function in a loop over the PV map. Only bound PVs
+// DeletePVCandValidatePVGroup wraps deletePVCandValidatePV() by calling the function in a loop over the PV map. Only bound PVs
 // are deleted. Validates that the claim was deleted and the PV is in the expected Phase (Released,
 // Available, Bound).
 // Note: if there are more claims than pvs then some of the remaining claims may bind to just made
@@ -269,12 +272,12 @@ func createPV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVol
 	return pv, nil
 }
 
-// create the PV resource. Fails test on error.
+// CreatePV creates the PV resource. Fails test on error.
 func CreatePV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	return createPV(c, pv)
 }
 
-// create the PVC resource. Fails test on error.
+// CreatePVC creates the PVC resource. Fails test on error.
 func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
 	if err != nil {
@@ -283,7 +286,7 @@ func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) 
 	return pvc, nil
 }
 
-// Create a PVC followed by the PV based on the passed in nfs-server ip and
+// CreatePVCPV creates a PVC followed by the PV based on the passed in nfs-server ip and
 // namespace. If the "preBind" bool is true then pre-bind the PV to the PVC
 // via the PV's ClaimRef. Return the pv and pvc to reflect the created objects.
 // Note: in the pre-bind case the real PVC name, which is generated, is not
@@ -300,7 +303,7 @@ func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 	// make the pv spec
 	pv := MakePersistentVolume(pvConfig)
 
-	By(fmt.Sprintf("Creating a PVC followed by a%s PV", preBindMsg))
+	ginkgo.By(fmt.Sprintf("Creating a PVC followed by a%s PV", preBindMsg))
 	pvc, err := CreatePVC(c, ns, pvc)
 	if err != nil {
 		return nil, nil, err
@@ -317,7 +320,7 @@ func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 	return pv, pvc, nil
 }
 
-// Create a PV followed by the PVC based on the passed in nfs-server ip and
+// CreatePVPVC creates a PV followed by the PVC based on the passed in nfs-server ip and
 // namespace. If the "preBind" bool is true then pre-bind the PVC to the PV
 // via the PVC's VolumeName. Return the pv and pvc to reflect the created
 // objects.
@@ -351,7 +354,7 @@ func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 	return pv, pvc, nil
 }
 
-// Create the desired number of PVs and PVCs and return them in separate maps. If the
+// CreatePVsPVCs creates the desired number of PVs and PVCs and returns them in separate maps. If the
 // number of PVs != the number of PVCs then the min of those two counts is the number of
 // PVs expected to bind. If a Create error occurs, the returned maps may contain pv and pvc
 // entries for the resources that were successfully created. In other words, when the caller
@@ -399,7 +402,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 	return pvMap, pvcMap, nil
 }
 
-// Wait for the pv and pvc to bind to each other.
+// WaitOnPVandPVC waits for the pv and pvc to bind to each other.
 func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) error {
 	// Wait for newly created PVC to bind to the PV
 	Logf("Waiting for PV %v to bind to PVC %v", pv.Name, pvc.Name)
@@ -442,7 +445,7 @@ func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, p
 	return nil
 }
 
-// Search for bound PVs and PVCs by examining pvols for non-nil claimRefs.
+// WaitAndVerifyBinds searches for bound PVs and PVCs by examining pvols for non-nil claimRefs.
 // NOTE: Each iteration waits for a maximum of 3 minutes per PV and, if the PV is bound,
 //   up to 3 minutes for the PVC. When the number of PVs != number of PVCs, this can lead
 //   to situations where the maximum wait times are reached several times in succession,
@@ -495,7 +498,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 
 // Test the pod's exit code to be zero.
 func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
-	By("Pod should terminate with exitcode 0 (success)")
+	ginkgo.By("Pod should terminate with exitcode 0 (success)")
 	if err := WaitForPodSuccessInNamespace(c, pod.Name, ns); err != nil {
 		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
 	}
@@ -503,7 +506,7 @@ func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
 	return nil
 }
 
-// Deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod
+// DeletePodWithWait deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod
 // not existing.
 func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) error {
 	if pod == nil {
@@ -512,7 +515,7 @@ func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) error {
 	return DeletePodWithWaitByName(f, c, pod.GetName(), pod.GetNamespace())
 }
 
-// Deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod
+// DeletePodWithWaitByName deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod
 // not existing.
 func DeletePodWithWaitByName(f *Framework, c clientset.Interface, podName, podNamespace string) error {
 	Logf("Deleting pod %q in namespace %q", podName, podNamespace)
@@ -531,7 +534,7 @@ func DeletePodWithWaitByName(f *Framework, c clientset.Interface, podName, podNa
 	return nil
 }
 
-// Create the test pod, wait for (hopefully) success, and then delete the pod.
+// CreateWaitAndDeletePod creates the test pod, wait for (hopefully) success, and then delete the pod.
 // Note: need named return value so that the err assignment in the defer sets the returned error.
 //       Has been shown to be necessary using Go 1.7.
 func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (err error) {
@@ -560,7 +563,7 @@ func makePvcKey(ns, name string) types.NamespacedName {
 	return types.NamespacedName{Namespace: ns, Name: name}
 }
 
-// Returns a PV definition based on the nfs server IP. If the PVC is not nil
+// MakePersistentVolume returns a PV definition based on the nfs server IP. If the PVC is not nil
 // then the PV is defined with a ClaimRef which includes the PVC's namespace.
 // If the PVC is nil then the PV is not defined with a ClaimRef.  If no reclaimPolicy
 // is assigned, assumes "Retain". Specs are expected to match the test's PVC.
@@ -607,7 +610,7 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 	}
 }
 
-// Returns a PVC definition based on the namespace.
+// MakePersistentVolumeClaim returns a PVC definition based on the namespace.
 // Note: if this PVC is intended to be pre-bound to a PV, whose name is not
 //   known until the PV is instantiated, then the func CreatePVPVC will add
 //   pvc.Spec.VolumeName to this claim.
@@ -641,7 +644,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 
 func createPDWithRetry(zone string) (string, error) {
 	var err error
-	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
+	for start := time.Now(); time.Since(start) < pdRetryTimeout; time.Sleep(pdRetryPollTime) {
 		newDiskName, err := createPD(zone)
 		if err != nil {
 			Logf("Couldn't create a new PD, sleeping 5 seconds: %v", err)
@@ -653,20 +656,23 @@ func createPDWithRetry(zone string) (string, error) {
 	return "", err
 }
 
+// CreatePDWithRetry creates PD with retry.
 func CreatePDWithRetry() (string, error) {
 	return createPDWithRetry("")
 }
 
+// CreatePDWithRetryAndZone creates PD on zone with retry.
 func CreatePDWithRetryAndZone(zone string) (string, error) {
 	return createPDWithRetry(zone)
 }
 
+// DeletePDWithRetry deletes PD with retry.
 func DeletePDWithRetry(diskName string) error {
 	var err error
-	for start := time.Now(); time.Since(start) < PDRetryTimeout; time.Sleep(PDRetryPollTime) {
+	for start := time.Now(); time.Since(start) < pdRetryTimeout; time.Sleep(pdRetryPollTime) {
 		err = deletePD(diskName)
 		if err != nil {
-			Logf("Couldn't delete PD %q, sleeping %v: %v", diskName, PDRetryPollTime, err)
+			Logf("Couldn't delete PD %q, sleeping %v: %v", diskName, pdRetryPollTime, err)
 			continue
 		}
 		Logf("Successfully deleted PD %q.", diskName)
@@ -686,13 +692,13 @@ func deletePD(pdName string) error {
 	return TestContext.CloudConfig.Provider.DeletePD(pdName)
 }
 
-// Returns a pod definition based on the namespace. The pod references the PVC's
+// MakeWritePod returns a pod definition based on the namespace. The pod references the PVC's
 // name.
 func MakeWritePod(ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
 	return MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
 }
 
-// Returns a pod definition based on the namespace. The pod references the PVC's
+// MakePod returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
 func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *v1.Pod {
 	if len(command) == 0 {
@@ -737,8 +743,8 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 	return podSpec
 }
 
-// Returns a pod definition based on the namespace using nginx image
-func MakeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim) *v1.Pod {
+// makeNginxPod returns a pod definition based on the namespace using nginx image
+func makeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim) *v1.Pod {
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -778,7 +784,7 @@ func MakeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 	return podSpec
 }
 
-// Returns a pod definition based on the namespace. The pod references the PVC's
+// MakeSecPod returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod.
 // SELinux testing requires to pass HostIPC and HostPID as booleansi arguments.
 func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64) *v1.Pod {
@@ -860,8 +866,9 @@ func CreatePod(client clientset.Interface, namespace string, nodeSelector map[st
 	return pod, nil
 }
 
+// CreateNginxPod creates an enginx pod.
 func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim) (*v1.Pod, error) {
-	pod := MakeNginxPod(namespace, nodeSelector, pvclaims)
+	pod := makeNginxPod(namespace, nodeSelector, pvclaims)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
@@ -879,12 +886,12 @@ func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector m
 	return pod, nil
 }
 
-// create security pod with given claims
+// CreateSecPod creates security pod with given claims
 func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*v1.Pod, error) {
 	return CreateSecPodWithNodeSelection(client, namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup, NodeSelection{}, timeout)
 }
 
-// create security pod with given claims
+// CreateSecPodWithNodeSelection creates security pod with given claims
 func CreateSecPodWithNodeSelection(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, node NodeSelection, timeout time.Duration) (*v1.Pod, error) {
 	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
 	// Setting node
@@ -948,7 +955,7 @@ func SetAntiAffinity(nodeSelection *NodeSelection, nodeName string) {
 	SetNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpNotIn, nodeName)
 }
 
-// Define and create a pod with a mounted PV.  Pod runs infinite loop until killed.
+// CreateClientPod defines and creates a pod with a mounted PV.  Pod runs infinite loop until killed.
 func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
 	return CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 }
@@ -973,7 +980,7 @@ func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSe
 	return pod, nil
 }
 
-// wait until all pvcs phase set to bound
+// WaitForPVClaimBoundPhase waits until all pvcs phase set to bound
 func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim, timeout time.Duration) ([]*v1.PersistentVolume, error) {
 	persistentvolumes := make([]*v1.PersistentVolume, len(pvclaims))
 
@@ -996,6 +1003,7 @@ func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.Persist
 	return persistentvolumes, nil
 }
 
+// CreatePVSource creates a PV source.
 func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
 	diskName, err := CreatePDWithRetryAndZone(zone)
 	if err != nil {
@@ -1004,10 +1012,12 @@ func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
 	return TestContext.CloudConfig.Provider.CreatePVSource(zone, diskName)
 }
 
+// DeletePVSource deletes a PV source.
 func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
 	return TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
 }
 
+// GetBoundPV returns a PV details.
 func GetBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	// Get new copy of the claim
 	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})

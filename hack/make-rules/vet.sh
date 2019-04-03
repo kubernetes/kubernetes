@@ -46,8 +46,8 @@ for arg; do
 done
 
 if [[ ${#targets[@]} -eq 0 ]]; then
-  # Do not run on third_party directories or generated client code.
-  targets=$(go list -e ./... | egrep -v "/(third_party|vendor|staging|clientset_generated)/")
+  # Do not run on third_party directories or generated client code or build tools.
+  targets=$(go list -e ./... | egrep -v "/(build|third_party|vendor|staging|clientset_generated)/")
 fi
 
 go vet "${goflags[@]:+${goflags[@]}}" ${targets[@]}

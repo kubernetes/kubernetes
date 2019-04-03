@@ -22,7 +22,6 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -164,7 +163,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// that the pod can write to the nfs volume.
 			It("should create a non-pre-bound PV and PVC: test write access ", func() {
 				pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -173,7 +172,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// correctly, and that the pod can write to the nfs volume.
 			It("create a PVC and non-pre-bound PV: test write access", func() {
 				pv, pvc, err = framework.CreatePVCPV(c, pvConfig, pvcConfig, ns, false)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -182,7 +181,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// correctly, and that the pod can write to the nfs volume.
 			It("create a PVC and a pre-bound PV: test write access", func() {
 				pv, pvc, err = framework.CreatePVCPV(c, pvConfig, pvcConfig, ns, true)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
 
@@ -191,7 +190,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// correctly, and that the pod can write to the nfs volume.
 			It("create a PV and a pre-bound PVC: test write access", func() {
 				pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				completeTest(f, c, ns, pv, pvc)
 			})
 		})
@@ -229,7 +228,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			It("should create 2 PVs and 4 PVCs: test write access", func() {
 				numPVs, numPVCs := 2, 4
 				pvols, claims, err = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.WaitAndVerifyBinds(c, ns, pvols, claims, true))
 				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
 			})
@@ -239,7 +238,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			It("should create 3 PVs and 3 PVCs: test write access", func() {
 				numPVs, numPVCs := 3, 3
 				pvols, claims, err = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.WaitAndVerifyBinds(c, ns, pvols, claims, true))
 				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
 			})
@@ -249,7 +248,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			It("should create 4 PVs and 2 PVCs: test write access [Slow]", func() {
 				numPVs, numPVCs := 4, 2
 				pvols, claims, err = framework.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.WaitAndVerifyBinds(c, ns, pvols, claims, true))
 				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
 			})
@@ -262,7 +261,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			BeforeEach(func() {
 				pvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimRecycle
 				pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
-				Expect(err).NotTo(HaveOccurred(), "BeforeEach: Failed to create PV/PVC")
+				framework.ExpectNoError(err, "BeforeEach: Failed to create PV/PVC")
 				framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc), "BeforeEach: WaitOnPVandPVC failed")
 			})
 
@@ -280,7 +279,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				By("Writing to the volume.")
 				pod := framework.MakeWritePod(ns, pvc)
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 
 				By("Deleting the claim")
@@ -290,7 +289,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				By("Re-mounting the volume.")
 				pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns)
 				pvc, err = framework.CreatePVC(c, ns, pvc)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, 60*time.Second), "Failed to reach 'Bound' for PVC ", pvc.Name)
 
 				// If a file is detected in /mnt, fail the pod and do not restart it.
@@ -298,7 +297,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
 				pod = framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 				framework.Logf("Pod exited without failure; the volume has been recycled.")

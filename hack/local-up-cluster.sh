@@ -227,6 +227,7 @@ LOG_SPEC=${LOG_SPEC:-""}
 LOG_DIR=${LOG_DIR:-"/tmp"}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
+RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
@@ -638,7 +639,7 @@ function start_controller_manager {
       --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
       --cluster-signing-key-file="${CLUSTER_SIGNING_KEY_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
-      "${node_cidr_args[@]}" \
+      ${node_cidr_args[@]+"${node_cidr_args[@]}"} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
       "${cloud_config_arg[@]}" \
@@ -750,7 +751,7 @@ function start_kubelet {
 
     # shellcheck disable=SC2206
     all_kubelet_flags=(
-      "${priv_arg}"
+      ${priv_arg}
       "--v=${LOG_LEVEL}"
       "--vmodule=${LOG_SPEC}"
       "--chaos-chance=${CHAOS_CHANCE}"
@@ -770,13 +771,14 @@ function start_kubelet {
       "--eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD}"
       "--pod-manifest-path=${POD_MANIFEST_PATH}"
       "--fail-swap-on=${FAIL_SWAP_ON}"
-      "${auth_args[@]}"
-      "${dns_args[@]}"
-      "${cni_conf_dir_args[@]}"
-      "${cni_bin_dir_args[@]}"
-      "${net_plugin_args[@]}"
-      "${container_runtime_endpoint_args[@]}"
-      "${image_service_endpoint_args[@]}"
+      ${auth_args[@]+"${auth_args[@]}"}
+      ${dns_args[@]+"${dns_args[@]}"}
+      ${cni_conf_dir_args[@]+"${cni_conf_dir_args[@]}"}
+      ${cni_bin_dir_args[@]+"${cni_bin_dir_args[@]}"}
+      ${net_plugin_args[@]+"${net_plugin_args[@]}"}
+      ${container_runtime_endpoint_args[@]+"${container_runtime_endpoint_args[@]}"}
+      ${image_service_endpoint_args[@]+"${image_service_endpoint_args[@]}"}
+      "--runtime-request-timeout=${RUNTIME_REQUEST_TIMEOUT}"
       "--port=${KUBELET_PORT}"
       ${KUBELET_FLAGS}
     )
@@ -898,18 +900,6 @@ function create_storage_class {
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f "${CLASS_FILE}"
     else
         echo "No storage class available for ${CLOUD_PROVIDER}."
-    fi
-}
-
-create_csi_crd() {
-    echo "create_csi_crd $1"
-    YAML_FILE=${KUBE_ROOT}/cluster/addons/storage-crds/$1.yaml
-
-    if [ -e "${YAML_FILE}" ]; then
-        echo "Create $1 crd"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f "${YAML_FILE}"
-    else
-        echo "No $1 available."
     fi
 }
 
@@ -1058,14 +1048,6 @@ fi
 
 if [[ "${DEFAULT_STORAGE_CLASS}" = "true" ]]; then
   create_storage_class
-fi
-
-if [[ "${FEATURE_GATES:-}" == "AllAlpha=true" || "${FEATURE_GATES:-}" =~ "CSIDriverRegistry=true" ]]; then
-  create_csi_crd "csidriver"
-fi
-
-if [[ "${FEATURE_GATES:-}" == "AllAlpha=true" || "${FEATURE_GATES:-}" =~ "CSINodeInfo=true" ]]; then
-  create_csi_crd "csinodeinfo"
 fi
 
 print_success

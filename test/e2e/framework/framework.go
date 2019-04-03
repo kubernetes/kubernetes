@@ -42,12 +42,11 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -75,9 +74,8 @@ type Framework struct {
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
 
-	InternalClientset *internalclientset.Clientset
-	AggregatorClient  *aggregatorclient.Clientset
-	DynamicClient     dynamic.Interface
+	AggregatorClient *aggregatorclient.Clientset
+	DynamicClient    dynamic.Interface
 
 	ScalesGetter scaleclient.ScalesGetter
 
@@ -180,8 +178,6 @@ func (f *Framework) BeforeEach() {
 		}
 		f.ClientSet, err = clientset.NewForConfig(config)
 		ExpectNoError(err)
-		f.InternalClientset, err = internalclientset.NewForConfig(config)
-		ExpectNoError(err)
 		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
 		ExpectNoError(err)
 		f.DynamicClient, err = dynamic.NewForConfig(config)
@@ -197,7 +193,7 @@ func (f *Framework) BeforeEach() {
 			config.GroupVersion = &schema.GroupVersion{}
 		}
 		if config.NegotiatedSerializer == nil {
-			config.NegotiatedSerializer = legacyscheme.Codecs
+			config.NegotiatedSerializer = scheme.Codecs
 		}
 		restClient, err := rest.RESTClientFor(config)
 		ExpectNoError(err)

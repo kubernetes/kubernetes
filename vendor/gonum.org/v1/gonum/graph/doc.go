@@ -3,4 +3,4 @@
 // license that can be found in the LICENSE file.
 
 // Package graph defines graph interfaces.
-package graph
+package graph // import "gonum.org/v1/gonum/graph"

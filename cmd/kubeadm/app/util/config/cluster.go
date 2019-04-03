@@ -105,7 +105,7 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 		return errors.Wrap(err, "failed to get node name from kubelet config")
 	}
 
-	// gets the corresponding node and retrives attributes stored there.
+	// gets the corresponding node and retrieves attributes stored there.
 	node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to get corresponding node")

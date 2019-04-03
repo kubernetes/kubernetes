@@ -129,7 +129,7 @@ func (n NullProvider) GetGroupNodes(group string) ([]string, error) {
 	return nil, fmt.Errorf("provider does not support InstanceGroups")
 }
 
-// DeleteNode is a base implementation which returns group size.
+// GroupSize returns the size of an instance group
 func (n NullProvider) GroupSize(group string) (int, error) {
 	return -1, fmt.Errorf("provider does not support InstanceGroups")
 }

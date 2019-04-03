@@ -43,6 +43,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/kube-aggregator/hack:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/apiserver:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset:all-srcs",

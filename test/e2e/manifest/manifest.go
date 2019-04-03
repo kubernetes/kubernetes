@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -44,7 +44,7 @@ func PodFromManifest(filename string) (*v1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &pod); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &pod); err != nil {
 		return nil, err
 	}
 	return &pod, nil
@@ -62,7 +62,7 @@ func RcFromManifest(fileName string) (*v1.ReplicationController, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &controller); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &controller); err != nil {
 		return nil, err
 	}
 	return &controller, nil
@@ -80,7 +80,7 @@ func SvcFromManifest(fileName string) (*v1.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &svc); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &svc); err != nil {
 		return nil, err
 	}
 	return &svc, nil
@@ -98,7 +98,7 @@ func IngressFromManifest(fileName string) (*extensions.Ingress, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &ing); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &ing); err != nil {
 		return nil, err
 	}
 	return &ing, nil
@@ -130,7 +130,7 @@ func StatefulSetFromManifest(fileName, ns string) (*apps.StatefulSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &ss); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &ss); err != nil {
 		return nil, err
 	}
 	ss.Namespace = ns
@@ -154,7 +154,7 @@ func DaemonSetFromManifest(fileName, ns string) (*apps.DaemonSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &ds)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &ds)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func RoleFromManifest(fileName, ns string) (*rbac.Role, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &role)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &role)
 	if err != nil {
 		return nil, err
 	}

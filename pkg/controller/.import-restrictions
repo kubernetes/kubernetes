@@ -262,13 +262,8 @@
       ]
     },
     {
-      "SelectorRegexp": "k8s[.]io/(metrics/|utils/|csi-api/|heapster/|kube-controller-manager/)",
+      "SelectorRegexp": "k8s[.]io/(metrics/|utils/|heapster/|kube-controller-manager/)",
       "AllowedPrefixes": [
-        "k8s.io/csi-api/pkg/apis/csi/v1alpha1",
-        "k8s.io/csi-api/pkg/client/clientset/versioned",
-        "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1",
-        "k8s.io/csi-api/pkg/client/informers/externalversions",
-        "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1",
         "k8s.io/heapster/metrics/api/v1/types",
         "k8s.io/kube-controller-manager/config/v1alpha1",
         "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2",

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
@@ -29,16 +30,20 @@ import (
 
 // CSIMaxVolumeLimitChecker defines predicate needed for counting CSI volumes
 type CSIMaxVolumeLimitChecker struct {
-	pvInfo  PersistentVolumeInfo
-	pvcInfo PersistentVolumeClaimInfo
+	pvInfo               PersistentVolumeInfo
+	pvcInfo              PersistentVolumeClaimInfo
+	scInfo               StorageClassInfo
+	randomVolumeIDPrefix string
 }
 
 // NewCSIMaxVolumeLimitPredicate returns a predicate for counting CSI volumes
 func NewCSIMaxVolumeLimitPredicate(
-	pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) FitPredicate {
+	pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, scInfo StorageClassInfo) FitPredicate {
 	c := &CSIMaxVolumeLimitChecker{
-		pvInfo:  pvInfo,
-		pvcInfo: pvcInfo,
+		pvInfo:               pvInfo,
+		pvcInfo:              pvcInfo,
+		scInfo:               scInfo,
+		randomVolumeIDPrefix: rand.String(32),
 	}
 	return c.attachableLimitPredicate
 }
@@ -129,28 +134,70 @@ func (c *CSIMaxVolumeLimitChecker) filterAttachableVolumes(
 			continue
 		}
 
-		pvName := pvc.Spec.VolumeName
-		// TODO - the actual handling of unbound PVCs will be fixed by late binding design.
-		if pvName == "" {
-			klog.V(4).Infof("Persistent volume had no name for claim %s/%s", namespace, pvcName)
+		driverName, volumeHandle := c.getCSIDriver(pvc)
+		// if we can't find driver name or volume handle - we don't count this volume.
+		if driverName == "" || volumeHandle == "" {
 			continue
 		}
-		pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
-
-		if err != nil {
-			klog.V(4).Infof("Unable to look up PV info for PVC %s/%s and PV %s", namespace, pvcName, pvName)
-			continue
-		}
-
-		csiSource := pv.Spec.PersistentVolumeSource.CSI
-		if csiSource == nil {
-			klog.V(4).Infof("Not considering non-CSI volume %s/%s", namespace, pvcName)
-			continue
-		}
-		driverName := csiSource.Driver
 		volumeLimitKey := volumeutil.GetCSIAttachLimitKey(driverName)
-		result[csiSource.VolumeHandle] = volumeLimitKey
+		result[volumeHandle] = volumeLimitKey
 
 	}
 	return nil
+}
+
+func (c *CSIMaxVolumeLimitChecker) getCSIDriver(pvc *v1.PersistentVolumeClaim) (string, string) {
+	pvName := pvc.Spec.VolumeName
+	namespace := pvc.Namespace
+	pvcName := pvc.Name
+
+	placeHolderCSIDriver := ""
+	placeHolderHandle := ""
+	if pvName == "" {
+		klog.V(5).Infof("Persistent volume had no name for claim %s/%s", namespace, pvcName)
+		return c.getDriverNameFromSC(pvc)
+	}
+	pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
+
+	if err != nil {
+		klog.V(4).Infof("Unable to look up PV info for PVC %s/%s and PV %s", namespace, pvcName, pvName)
+		// If we can't fetch PV associated with PVC, may be it got deleted
+		// or PVC was prebound to a PVC that hasn't been created yet.
+		// fallback to using StorageClass for volume counting
+		return c.getDriverNameFromSC(pvc)
+	}
+
+	csiSource := pv.Spec.PersistentVolumeSource.CSI
+	if csiSource == nil {
+		klog.V(5).Infof("Not considering non-CSI volume %s/%s", namespace, pvcName)
+		return placeHolderCSIDriver, placeHolderHandle
+	}
+	return csiSource.Driver, csiSource.VolumeHandle
+}
+
+func (c *CSIMaxVolumeLimitChecker) getDriverNameFromSC(pvc *v1.PersistentVolumeClaim) (string, string) {
+	namespace := pvc.Namespace
+	pvcName := pvc.Name
+	scName := pvc.Spec.StorageClassName
+
+	placeHolderCSIDriver := ""
+	placeHolderHandle := ""
+	if scName == nil {
+		// if StorageClass is not set or found, then PVC must be using immediate binding mode
+		// and hence it must be bound before scheduling. So it is safe to not count it.
+		klog.V(5).Infof("pvc %s/%s has no storageClass", namespace, pvcName)
+		return placeHolderCSIDriver, placeHolderHandle
+	}
+
+	storageClass, err := c.scInfo.GetStorageClassInfo(*scName)
+	if err != nil {
+		klog.V(5).Infof("no storage %s found for pvc %s/%s", *scName, namespace, pvcName)
+		return placeHolderCSIDriver, placeHolderHandle
+	}
+
+	// We use random prefix to avoid conflict with volume-ids. If PVC is bound in the middle
+	// predicate and there is another pod(on same node) that uses same volume then we will overcount
+	// the volume and consider both volumes as different.
+	volumeHandle := fmt.Sprintf("%s-%s/%s", c.randomVolumeIDPrefix, namespace, pvcName)
+	return storageClass.Provisioner, volumeHandle
 }

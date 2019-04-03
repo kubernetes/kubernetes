@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/kubectl/version"
 )
 
 const (

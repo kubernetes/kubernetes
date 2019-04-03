@@ -18,7 +18,7 @@
 // Go 1.8 export data files, so they will work before and after the
 // Go update. (See discussion at https://golang.org/issue/15651.)
 //
-package gcexportdata
+package gcexportdata // import "golang.org/x/tools/go/gcexportdata"
 
 import (
 	"bufio"

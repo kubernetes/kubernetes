@@ -117,16 +117,26 @@ else
   fi
 fi
 
+# common arguments we'll pass to shellcheck
+SHELLCHECK_OPTIONS=(
+  # allow following sourced files that are not specified in the command,
+  # we need this because we specify one file at at time in order to trivially
+  # detect which files are failing
+  "--external-sources"
+  # include our disabled lints
+  "--exclude=${SHELLCHECK_DISABLED}"
+)
+
 # lint each script, tracking failures
 errors=()
 not_failing=()
 for f in "${all_shell_scripts[@]}"; do
   set +o errexit
   if ${HAVE_SHELLCHECK}; then
-    failedLint=$(shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
+    failedLint=$(shellcheck "${SHELLCHECK_OPTIONS[@]}" "${f}")
   else
     failedLint=$(docker exec -t ${SHELLCHECK_CONTAINER} \
-                 shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
+                 shellcheck "${SHELLCHECK_OPTIONS[@]}" "${f}")
   fi
   set -o errexit
   kube::util::array_contains "${f}" "${failing_files[@]}" && in_failing=$? || in_failing=$?
