@@ -283,6 +283,10 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 		return printPodTemplate(&appliedDS.Spec.Template)
 	}
 
+	if ds.Spec.Paused {
+		return "", fmt.Errorf("you cannot rollback a paused daemonset; resume it first with 'kubectl rollout resume daemonset/%s' and try again", ds.Name)
+	}
+
 	// Skip if the revision already matches current DaemonSet
 	done, err := daemonSetMatch(ds, toHistory)
 	if err != nil {
@@ -369,6 +373,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 		}
 		return printPodTemplate(&appliedSS.Spec.Template)
 	}
+
 
 	// Skip if the revision already matches current StatefulSet
 	done, err := statefulsetMatch(sts, toHistory)

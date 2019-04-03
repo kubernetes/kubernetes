@@ -986,6 +986,10 @@ func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, hash string) error {
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
 // returns slice with erros if any
 func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
+	if ds.Spec.Paused {
+		klog.V(4).Infof("daemonset %s updation is paused.", ds.Name)
+		return nil
+	}
 	// We need to set expectations before creating/deleting pods to avoid race conditions.
 	dsKey, err := controller.KeyFunc(ds)
 	if err != nil {

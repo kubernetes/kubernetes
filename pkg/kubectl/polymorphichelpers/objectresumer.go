@@ -58,6 +58,20 @@ func defaultObjectResumer(obj runtime.Object) ([]byte, error) {
 		obj.Spec.Paused = false
 		return runtime.Encode(scheme.Codecs.LegacyCodec(appsv1beta1.SchemeGroupVersion), obj)
 
+	case *extensionsv1beta1.DaemonSet:
+		if !obj.Spec.Paused {
+			return nil, errors.New("is not paused")
+		}
+		obj.Spec.Paused = false
+		return runtime.Encode(scheme.Codecs.LegacyCodec(extensionsv1beta1.SchemeGroupVersion), obj)
+
+	case *appsv1.DaemonSet:
+		if !obj.Spec.Paused {
+			return nil, errors.New("is not paused")
+		}
+		obj.Spec.Paused = false
+		return runtime.Encode(scheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion), obj)
+
 	default:
 		return nil, fmt.Errorf("resuming is not supported")
 	}

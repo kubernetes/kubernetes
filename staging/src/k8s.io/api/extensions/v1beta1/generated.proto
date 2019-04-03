@@ -154,6 +154,11 @@ message DaemonSetSpec {
   // Defaults to 10.
   // +optional
   optional int32 revisionHistoryLimit = 6;
+
+  // Indicates that the DaemonSet is paused and will not be processed by the
+  // DaemonSet controller.
+  // +optional
+  optional bool paused = 7;
 }
 
 // DaemonSetStatus represents the current status of a daemon set.

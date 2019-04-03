@@ -923,6 +923,7 @@ func autoConvert_v1beta1_DaemonSetSpec_To_apps_DaemonSetSpec(in *v1beta1.DaemonS
 	out.MinReadySeconds = in.MinReadySeconds
 	out.TemplateGeneration = in.TemplateGeneration
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.Paused = in.Paused
 	return nil
 }
 
@@ -942,6 +943,7 @@ func autoConvert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *apps.DaemonSetS
 	out.MinReadySeconds = in.MinReadySeconds
 	out.TemplateGeneration = in.TemplateGeneration
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.Paused = in.Paused
 	return nil
 }
 

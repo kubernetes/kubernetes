@@ -576,6 +576,11 @@ type DaemonSetSpec struct {
 	// Defaults to 10.
 	// +optional
 	RevisionHistoryLimit *int32
+
+	// Indicates that the daemonset is paused and will not be processed by the
+	// daemonset controller.
+	// +optional
+	Paused bool
 }
 
 // DaemonSetStatus represents the current status of a daemon set.

@@ -403,6 +403,11 @@ type DaemonSetSpec struct {
 	// Defaults to 10.
 	// +optional
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty" protobuf:"varint,6,opt,name=revisionHistoryLimit"`
+
+	// Indicates that the DaemonSet is paused and will not be processed by the
+	// DaemonSet controller.
+	// +optional
+	Paused bool `json:"paused,omitempty" protobuf:"varint,8,opt,name=paused"`
 }
 
 // DaemonSetStatus represents the current status of a daemon set.

@@ -615,6 +615,7 @@ func autoConvert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *v1.DaemonSetSpec, ou
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.Paused = in.Paused
 	return nil
 }
 
@@ -629,6 +630,7 @@ func autoConvert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, 
 	out.MinReadySeconds = in.MinReadySeconds
 	// WARNING: in.TemplateGeneration requires manual conversion: does not exist in peer-type
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.Paused = in.Paused
 	return nil
 }
 

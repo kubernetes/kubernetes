@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
-// Currently only supports Deployments.
+// Currently only supports Deployments and DaemonSets.
 func defaultObjectPauser(obj runtime.Object) ([]byte, error) {
 	switch obj := obj.(type) {
 	case *extensionsv1beta1.Deployment:
@@ -58,6 +58,20 @@ func defaultObjectPauser(obj runtime.Object) ([]byte, error) {
 		}
 		obj.Spec.Paused = true
 		return runtime.Encode(scheme.Codecs.LegacyCodec(appsv1beta1.SchemeGroupVersion), obj)
+
+	case *extensionsv1beta1.DaemonSet:
+		if obj.Spec.Paused {
+			return nil, errors.New("is already paused")
+		}
+		obj.Spec.Paused = true
+		return runtime.Encode(scheme.Codecs.LegacyCodec(extensionsv1beta1.SchemeGroupVersion), obj)
+
+	case *appsv1.DaemonSet:
+		if obj.Spec.Paused {
+			return nil, errors.New("is already paused")
+		}
+		obj.Spec.Paused = true
+		return runtime.Encode(scheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion), obj)
 
 	default:
 		return nil, fmt.Errorf("pausing is not supported")

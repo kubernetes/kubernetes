@@ -258,6 +258,7 @@ func Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(in *apps.DaemonSetSpec, out 
 		return err
 	}
 	out.MinReadySeconds = int32(in.MinReadySeconds)
+	out.Paused = in.Paused
 	if in.RevisionHistoryLimit != nil {
 		out.RevisionHistoryLimit = new(int32)
 		*out.RevisionHistoryLimit = *in.RevisionHistoryLimit
@@ -313,6 +314,7 @@ func Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(in *appsv1.DaemonSetSpec, ou
 		out.RevisionHistoryLimit = nil
 	}
 	out.MinReadySeconds = in.MinReadySeconds
+	out.Paused = in.Paused
 	return nil
 }
 

@@ -97,6 +97,7 @@ var map_DaemonSetSpec = map[string]string{
 	"minReadySeconds":      "The minimum number of seconds for which a newly created DaemonSet pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready).",
 	"templateGeneration":   "DEPRECATED. A sequence number representing a specific generation of the template. Populated by the system. It can be set only during the creation.",
 	"revisionHistoryLimit": "The number of old history to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
+	"paused":               "Indicates that the DaemonSet is paused and will not be processed by the DaemonSet controller.",
 }
 
 func (DaemonSetSpec) SwaggerDoc() map[string]string {
