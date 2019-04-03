@@ -40,12 +40,12 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -395,7 +395,7 @@ func createClients(numberOfClients int) ([]clientset.Interface, []scaleclient.Sc
 			config.GroupVersion = &schema.GroupVersion{}
 		}
 		if config.NegotiatedSerializer == nil {
-			config.NegotiatedSerializer = legacyscheme.Codecs
+			config.NegotiatedSerializer = scheme.Codecs
 		}
 		restClient, err := restclient.RESTClientFor(config)
 		if err != nil {

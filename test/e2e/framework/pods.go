@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
@@ -252,7 +252,7 @@ func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
 func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
 	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
-		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(legacyscheme.Scheme, pod)
+		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %s", err)
 		}

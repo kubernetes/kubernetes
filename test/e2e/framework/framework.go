@@ -42,11 +42,11 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -193,7 +193,7 @@ func (f *Framework) BeforeEach() {
 			config.GroupVersion = &schema.GroupVersion{}
 		}
 		if config.NegotiatedSerializer == nil {
-			config.NegotiatedSerializer = legacyscheme.Codecs
+			config.NegotiatedSerializer = scheme.Codecs
 		}
 		restClient, err := rest.RESTClientFor(config)
 		ExpectNoError(err)
