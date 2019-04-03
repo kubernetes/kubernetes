@@ -111,7 +111,7 @@ define VERIFY_HELP_INFO
 # Runs all the presubmission verifications.
 #
 # Args:
-#   BRANCH: Branch to be passed to verify-godeps.sh script.
+#   BRANCH: Branch to be passed to verify-vendor.sh script.
 #   WHAT: List of checks to run
 #
 # Example:

@@ -1,7 +1,7 @@
 /*Package filters provides tools for encoding a mapping of keys to a set of
 multiple values.
 */
-package filters
+package filters // import "github.com/docker/docker/api/types/filters"
 
 import (
 	"encoding/json"

@@ -13,7 +13,7 @@
 //   import "google.golang.org/api/compute/v1"
 //   ...
 //   computeService, err := compute.New(oauthHttpClient)
-package compute
+package compute // import "google.golang.org/api/compute/v1"
 
 import (
 	"bytes"

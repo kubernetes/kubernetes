@@ -41,9 +41,9 @@ rules:
     - repository: api
       branch: master
   smoke-test: |
-    godep restore
+    # assumes GO111MODULE=on
     go build ./...
-    go test $(go list ./... | grep -v /vendor/)
+    go test ./...
 - destination: component-base
   library: true
   branches:
@@ -87,6 +87,8 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: code-generator
+      branch: master
 - destination: sample-apiserver
   branches:
   - source:
@@ -109,12 +111,7 @@ rules:
     required-packages:
     - k8s.io/code-generator
   smoke-test: |
-    # vendor/ should have all dependencies as a non-library
-    go build .
-    # re-create vendor/ and try again
-    godep restore
-    rm -rf vendor/ Godeps/
-    godep save ./...
+    # assumes GO111MODULE=on
     go build .
 - destination: sample-controller
   branches:
@@ -136,13 +133,7 @@ rules:
     required-packages:
     - k8s.io/code-generator
   smoke-test: |
-    # vendor/ should have all dependencies as a non-library
-    go build .
-
-    # re-create vendor/ and try again
-    godep restore
-    rm -rf vendor/ Godeps/
-    godep save ./...
+    # assumes GO111MODULE=on
     go build .
 - destination: apiextensions-apiserver
   branches:
@@ -178,6 +169,8 @@ rules:
     - repository: api
       branch: master
     - repository: client-go
+      branch: master
+    - repository: code-generator
       branch: master
 - destination: cli-runtime
   library: true
@@ -306,6 +299,8 @@ rules:
     - repository: apimachinery
       branch: master
     - repository: client-go
+      branch: master
+    - repository: code-generator
       branch: master
 - destination: csi-translation-lib
   library: true

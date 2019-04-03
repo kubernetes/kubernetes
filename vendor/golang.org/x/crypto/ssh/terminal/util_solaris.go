@@ -4,7 +4,7 @@
 
 // +build solaris
 
-package terminal
+package terminal // import "golang.org/x/crypto/ssh/terminal"
 
 import (
 	"golang.org/x/sys/unix"

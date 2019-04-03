@@ -20,6 +20,8 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
+export GO111MODULE=auto
+
 staging_repos=($(ls "${KUBE_ROOT}/staging/src/k8s.io/"))
 staging_repos_pattern=$(IFS="|"; echo "${staging_repos[*]}")
 

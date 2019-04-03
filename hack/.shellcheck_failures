@@ -53,12 +53,11 @@
 ./hack/update-generated-kms-dockerized.sh
 ./hack/update-generated-protobuf-dockerized.sh
 ./hack/update-generated-runtime-dockerized.sh
-./hack/update-godep-licenses.sh
 ./hack/update-gofmt.sh
 ./hack/update-openapi-spec.sh
-./hack/update-staging-godeps-dockerized.sh
-./hack/update-staging-godeps.sh
 ./hack/update-translations.sh
+./hack/update-vendor-licenses.sh
+./hack/update-vendor.sh
 ./hack/update-workspace-mirror.sh
 ./hack/verify-api-groups.sh
 ./hack/verify-boilerplate.sh
