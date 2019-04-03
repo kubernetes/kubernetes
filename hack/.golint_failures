@@ -214,7 +214,6 @@ pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration
 pkg/master/tunneler
-pkg/printers
 pkg/printers/internalversion
 pkg/printers/storage
 pkg/proxy

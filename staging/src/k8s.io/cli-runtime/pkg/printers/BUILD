@@ -5,11 +5,13 @@ go_library(
     srcs = [
         "discard.go",
         "doc.go",
+        "humanreadable.go",
         "interface.go",
         "json.go",
         "jsonpath.go",
         "name.go",
         "sourcechecker.go",
+        "tabwriter.go",
         "template.go",
         "typesetter.go",
     ],
@@ -18,11 +20,16 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/client-go/util/jsonpath:go_default_library",
+        "//vendor/github.com/liggitt/tabwriter:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
@@ -30,12 +37,15 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "humanreadable_test.go",
         "sourcechecker_test.go",
         "template_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
 )

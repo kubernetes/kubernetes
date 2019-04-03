@@ -42,7 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	genericprinters "k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -55,7 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 var testData = TestStruct{
@@ -259,11 +258,11 @@ func yamlUnmarshal(data []byte, v interface{}) error {
 }
 
 func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}), yamlUnmarshal)
+	testPrinter(t, printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.YAMLPrinter{}), yamlUnmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}), json.Unmarshal)
+	testPrinter(t, printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.JSONPrinter{}), json.Unmarshal)
 }
 
 func TestFormatResourceName(t *testing.T) {
@@ -339,7 +338,7 @@ func TestUnknownTypePrinting(t *testing.T) {
 
 func TestTemplatePanic(t *testing.T) {
 	tmpl := `{{and ((index .currentState.info "foo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
-	printer, err := genericprinters.NewGoTemplatePrinter([]byte(tmpl))
+	printer, err := printers.NewGoTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
@@ -504,7 +503,7 @@ func TestTemplateStrings(t *testing.T) {
 	}
 	// The point of this test is to verify that the below template works.
 	tmpl := `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
-	printer, err := genericprinters.NewGoTemplatePrinter([]byte(tmpl))
+	printer, err := printers.NewGoTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
@@ -536,25 +535,25 @@ func TestPrinters(t *testing.T) {
 		jsonpathPrinter  printers.ResourcePrinter
 	)
 
-	templatePrinter, err = genericprinters.NewGoTemplatePrinter([]byte("{{.name}}"))
+	templatePrinter, err = printers.NewGoTemplatePrinter([]byte("{{.name}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	templatePrinter2, err = genericprinters.NewGoTemplatePrinter([]byte("{{len .items}}"))
+	templatePrinter2, err = printers.NewGoTemplatePrinter([]byte("{{len .items}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	jsonpathPrinter, err = genericprinters.NewJSONPathPrinter("{.metadata.name}")
+	jsonpathPrinter, err = printers.NewJSONPathPrinter("{.metadata.name}")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	genericPrinters := map[string]printers.ResourcePrinter{
 		// TODO(juanvallejo): move "generic printer" tests to pkg/kubectl/genericclioptions/printers
-		"json":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}),
-		"yaml":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}),
+		"json":      printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.JSONPrinter{}),
+		"yaml":      printers.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&printers.YAMLPrinter{}),
 		"template":  templatePrinter,
 		"template2": templatePrinter2,
 		"jsonpath":  jsonpathPrinter,
