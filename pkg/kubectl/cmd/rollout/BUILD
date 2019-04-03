@@ -10,6 +10,7 @@ go_library(
         "rollout.go",
         "rollout_history.go",
         "rollout_pause.go",
+        "rollout_restart.go",
         "rollout_resume.go",
         "rollout_status.go",
         "rollout_undo.go",

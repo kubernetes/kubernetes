@@ -11,6 +11,7 @@ go_library(
         "logsforobject.go",
         "mapbasedselectorforobject.go",
         "objectpauser.go",
+        "objectrestarter.go",
         "objectresumer.go",
         "portsforobject.go",
         "protocolsforobject.go",

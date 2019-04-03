@@ -106,3 +106,10 @@ type RollbackerFunc func(restClientGetter genericclioptions.RESTClientGetter, ma
 
 // RollbackerFn gives a way to easily override the function for unit testing if needed
 var RollbackerFn RollbackerFunc = rollbacker
+
+// ObjectRestarterFunc is a function type that updates an annotation in a deployment to restart it..
+type ObjectRestarterFunc func(runtime.Object) ([]byte, error)
+
+// ObjectRestarterFn gives a way to easily override the function for unit testing if needed.
+// Returns the patched object in bytes and any error that occurred during the encoding.
+var ObjectRestarterFn ObjectRestarterFunc = defaultObjectRestarter
