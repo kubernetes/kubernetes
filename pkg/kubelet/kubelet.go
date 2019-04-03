@@ -475,7 +475,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			clusterDNS = append(clusterDNS, ip)
 		}
 	}
-	httpClient := &http.Client{}
+	httpClient := &http.Client{
+		Timeout: 3 * time.Second,
+	}
 	parsedNodeIP := net.ParseIP(nodeIP)
 	protocol := utilipt.ProtocolIpv4
 	if parsedNodeIP != nil && parsedNodeIP.To4() == nil {
