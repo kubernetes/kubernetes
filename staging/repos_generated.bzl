@@ -27,7 +27,6 @@ staging_repos = [
     "k8s.io/code-generator",
     "k8s.io/component-base",
     "k8s.io/cri-api",
-    "k8s.io/csi-api",
     "k8s.io/csi-translation-lib",
     "k8s.io/kube-aggregator",
     "k8s.io/kube-controller-manager",

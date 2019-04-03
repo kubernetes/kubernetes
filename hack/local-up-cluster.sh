@@ -903,18 +903,6 @@ function create_storage_class {
     fi
 }
 
-create_csi_crd() {
-    echo "create_csi_crd $1"
-    YAML_FILE=${KUBE_ROOT}/cluster/addons/storage-crds/$1.yaml
-
-    if [ -e "${YAML_FILE}" ]; then
-        echo "Create $1 crd"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f "${YAML_FILE}"
-    else
-        echo "No $1 available."
-    fi
-}
-
 function print_success {
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   if [[ "${ENABLE_DAEMON}" = false ]]; then
@@ -1060,14 +1048,6 @@ fi
 
 if [[ "${DEFAULT_STORAGE_CLASS}" = "true" ]]; then
   create_storage_class
-fi
-
-if [[ "${FEATURE_GATES:-}" == "AllAlpha=true" || "${FEATURE_GATES:-}" =~ "CSIDriverRegistry=true" ]]; then
-  create_csi_crd "csidriver"
-fi
-
-if [[ "${FEATURE_GATES:-}" == "AllAlpha=true" || "${FEATURE_GATES:-}" =~ "CSINodeInfo=true" ]]; then
-  create_csi_crd "csinodeinfo"
 fi
 
 print_success

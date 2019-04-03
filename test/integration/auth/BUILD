@@ -18,9 +18,6 @@ go_test(
         "rbac_test.go",
         "svcaccttoken_test.go",
     ],
-    data = [
-        "//staging/src/k8s.io/csi-api/pkg/crd:csi-manifests",
-    ],
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
