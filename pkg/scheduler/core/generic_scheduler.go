@@ -445,7 +445,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
 		filtered = make([]*v1.Node, numNodesToFind)
-		errs := errors.MessageCountMap{}
+		errCh := make(chan error, int(allNodes))
 		var (
 			predicateResultLock sync.Mutex
 			filteredLen         int32
@@ -467,9 +467,8 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 				g.alwaysCheckAllPredicates,
 			)
 			if err != nil {
-				predicateResultLock.Lock()
-				errs[err.Error()]++
-				predicateResultLock.Unlock()
+				cancel()
+				errCh <- err
 				return
 			}
 			if fits {
@@ -489,11 +488,18 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 
 		// Stops searching for more nodes once the configured number of feasible nodes
 		// are found.
-		workqueue.ParallelizeUntil(ctx, 16, int(allNodes), checkNode)
+		stop := make(chan struct{})
+		go func() {
+			workqueue.ParallelizeUntil(ctx, 16, int(allNodes), checkNode)
+			stop <- struct{}{}
+		}()
 
 		filtered = filtered[:filteredLen]
-		if len(errs) > 0 {
-			return []*v1.Node{}, FailedPredicateMap{}, errors.CreateAggregateFromMessageCountMap(errs)
+		select {
+		case err := <-errCh:
+			return []*v1.Node{}, FailedPredicateMap{}, err
+
+		case <-stop:
 		}
 	}
 
