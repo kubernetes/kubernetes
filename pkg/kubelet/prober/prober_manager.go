@@ -32,12 +32,29 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
-// ProberResults stores the results of a probe as prometheus metrics.
-var ProberResults = prometheus.NewGaugeVec(
+// ProberResults stores the cumulative number of a probe by result as prometheus metrics.
+var ProberResults = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Subsystem: "prober",
+		Name:      "probe_total",
+		Help:      "Cumulative number of a liveness or readiness probe for a container by result.",
+	},
+	[]string{"probe_type",
+		"result",
+		"container",
+		"pod",
+		"namespace",
+		"pod_uid"},
+)
+
+// DeprecatedProberResults stores the results of a probe as prometheus metrics.
+// This metrics is deprecated, will be removed in a future release.
+// Please convert to the metrics of counter type above.
+var DeprecatedProberResults = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Subsystem: "prober",
 		Name:      "probe_result",
-		Help:      "The result of a liveness or readiness probe for a container.",
+		Help:      "(Deprecated) The result of a liveness or readiness probe for a container.",
 	},
 	[]string{"probe_type",
 		"container_name",
@@ -130,6 +147,10 @@ type probeType int
 const (
 	liveness probeType = iota
 	readiness
+
+	probeResultSuccessful string = "successful"
+	probeResultFailed     string = "failed"
+	probeResultUnknown    string = "unknown"
 )
 
 // For debugging.
