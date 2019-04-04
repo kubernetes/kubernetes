@@ -1215,7 +1215,7 @@ func (proxier *Proxier) syncProxyRules() {
 	klog.V(5).Infof("Restoring iptables rules: %s", proxier.iptablesData.Bytes())
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		klog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, proxier.iptablesData.Bytes())
+		klog.Errorf("Failed to execute iptables-restore: %v\nfailed payload:\n%s", err, proxier.iptablesData.String())
 		// Revert new local ports.
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
