@@ -351,6 +351,44 @@ foo    0/0              0          <unknown>   <none>
 	}
 }
 
+func TestGetEmptyTable(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	emptyTable := ioutil.NopCloser(bytes.NewBufferString(`{
+"kind":"Table",
+"apiVersion":"meta.k8s.io/v1beta1",
+"metadata":{
+	"selfLink":"/api/v1/namespaces/default/pods",
+	"resourceVersion":"346"
+},
+"columnDefinitions":[
+	{"name":"Name","type":"string","format":"name","description":"the name","priority":0}
+],
+"rows":[]
+}`))
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTable},
+	}
+
+	streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"pods"})
+
+	expected := ``
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+	expectedErr := `No resources found.
+`
+	if e, a := expectedErr, errbuf.String(); e != a {
+		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
+	}
+}
+
 func TestGetObjectIgnoreNotFound(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
 
