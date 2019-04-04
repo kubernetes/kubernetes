@@ -1892,8 +1892,11 @@ function make-gcloud-network-argument() {
   if [[ "${enable_ip_alias}" == 'true' ]]; then
     ret="--network-interface"
     ret="${ret} network=${networkURL}"
-    # If address is omitted, instance will not receive an external IP.
-    ret="${ret},address=${address:-}"
+    if [[ "${address:-}" == "no-address" ]]; then
+      ret="${ret},no-address"
+    else
+      ret="${ret},address=${address:-}"
+    fi
     ret="${ret},subnet=${subnetURL}"
     ret="${ret},aliases=pods-default:${alias_size}"
     ret="${ret} --no-can-ip-forward"
@@ -1905,7 +1908,7 @@ function make-gcloud-network-argument() {
     fi
 
     ret="${ret} --can-ip-forward"
-    if [[ -n ${address:-} ]]; then
+    if [[ -n ${address:-} ]] && [[ "$address" != "no-address" ]]; then
       ret="${ret} --address ${address}"
     fi
   fi
@@ -2010,13 +2013,17 @@ function create-node-template() {
     fi
   fi
 
+  local address=""
+  if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+    address="no-address"
+  fi
 
   local network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" \
     "${REGION}" \
     "${NETWORK}" \
     "${SUBNETWORK:-}" \
-    "" \
+    "${address}" \
     "${ENABLE_IP_ALIASES:-}" \
     "${IP_ALIAS_SIZE:-}")
 
@@ -2113,6 +2120,7 @@ function kube-up() {
     create-network
     create-subnetworks
     detect-subnetworks
+    create-cloud-nat-router
     write-cluster-location
     write-cluster-name
     create-autoscaler-config
@@ -2302,6 +2310,26 @@ function detect-subnetworks() {
   echo "${color_red}Could not find subnetwork with region ${REGION}, network ${NETWORK}, and project ${NETWORK_PROJECT}"
 }
 
+# Sets up Cloud NAT for the network.
+# Assumed vars:
+#   NETWORK_PROJECT
+#   REGION
+#   NETWORK
+function create-cloud-nat-router() {
+  if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+    gcloud compute routers create "$NETWORK-nat-router" \
+      --project $NETWORK_PROJECT \
+      --region $REGION \
+      --network $NETWORK
+    gcloud compute routers nats create "$NETWORK-nat-config" \
+      --project $NETWORK_PROJECT \
+      --router-region $REGION \
+      --router "$NETWORK-nat-router" \
+      --nat-all-subnet-ip-ranges \
+      --auto-allocate-nat-external-ips
+  fi
+}
+
 function delete-all-firewall-rules() {
   if fws=$(gcloud compute firewall-rules list --project "${NETWORK_PROJECT}" --filter="network=${NETWORK}" --format="value(name)"); then
     echo "Deleting firewall rules remaining in network ${NETWORK}: ${fws}"
@@ -2329,6 +2357,15 @@ function delete-network() {
       echo "Failed to delete network '${NETWORK}'. Listing firewall-rules:"
       gcloud compute firewall-rules --project "${NETWORK_PROJECT}" list --filter="network=${NETWORK}"
       return 1
+    fi
+  fi
+}
+
+function delete-cloud-nat-router() {
+  if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+    if [[ -n $(gcloud compute routers describe --project "${NETWORK_PROJECT}" --region "${REGION}" "${NETWORK}-nat-router" --format='value(name)' 2>/dev/null || true) ]]; then
+      echo "Deleting Cloud NAT router..."
+      gcloud compute routers delete --project "${NETWORK_PROJECT}" --region "${REGION}" --quiet "${NETWORK}-nat-router"
     fi
   fi
 }
@@ -3209,6 +3246,7 @@ function kube-down() {
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
 
     if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
+      delete-cloud-nat-router
       # Delete all remaining firewall rules in the network.
       delete-all-firewall-rules || true
       delete-subnetworks || true
@@ -3402,6 +3440,13 @@ function check-resources() {
   if gcloud compute addresses describe --project "${PROJECT}" "${MASTER_NAME}-ip" --region "${REGION}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Master's reserved IP"
     return 1
+  fi
+
+  if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+    if gcloud compute routers describe --project "${NETWORK_PROJECT}" --region "${REGION}" "${NETWORK}-nat-router" &>/dev/null; then
+      KUBE_RESOURCE_FOUND="Cloud NAT router"
+      return 1
+    fi
   fi
 
   # No resources found.
