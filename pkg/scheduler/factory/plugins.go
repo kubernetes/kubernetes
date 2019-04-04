@@ -77,7 +77,7 @@ type PriorityConfigFactory struct {
 }
 
 var (
-	schedulerFactoryMutex sync.Mutex
+	schedulerFactoryMutex sync.RWMutex
 
 	// maps that hold registered algorithm types
 	fitPredicateMap        = make(map[string]FitPredicateFactory)
@@ -139,7 +139,6 @@ func RemovePredicateKeyFromAlgorithmProviderMap(key string) {
 	for _, provider := range algorithmProviderMap {
 		provider.FitPredicateKeys.Delete(key)
 	}
-	return
 }
 
 // InsertPredicateKeyToAlgoProvider insert a fit predicate key to algorithmProvider.
@@ -376,8 +375,8 @@ func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *s
 
 // IsPriorityFunctionRegistered is useful for testing providers.
 func IsPriorityFunctionRegistered(name string) bool {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 	_, ok := priorityFunctionMap[name]
 	return ok
 }
@@ -397,8 +396,8 @@ func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys sets.Str
 
 // GetAlgorithmProvider should not be used to modify providers. It is publicly visible for testing.
 func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	provider, ok := algorithmProviderMap[name]
 	if !ok {
