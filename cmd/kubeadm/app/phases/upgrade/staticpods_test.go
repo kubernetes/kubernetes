@@ -36,6 +36,7 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -45,9 +46,10 @@ import (
 )
 
 const (
-	waitForHashes        = "wait-for-hashes"
-	waitForHashChange    = "wait-for-hash-change"
-	waitForPodsWithLabel = "wait-for-pods-with-label"
+	waitForHashes         = "wait-for-hashes"
+	waitForHashChange     = "wait-for-hash-change"
+	waitForPodsWithLabel  = "wait-for-pods-with-label"
+	clusterStatusEndpoint = "https://192.168.2.2:2379"
 
 	testConfiguration = `
 apiVersion: kubeadm.k8s.io/v1beta1
@@ -225,24 +227,48 @@ func (spm *fakeStaticPodPathManager) CleanupDirs() error {
 	return os.RemoveAll(spm.BackupEtcdDir())
 }
 
-type fakeTLSEtcdClient struct{ TLS bool }
+func (spm *fakeStaticPodPathManager) CleanupKubernetesDir() error {
+	return os.RemoveAll(spm.KubernetesDir())
+}
+
+type fakeTLSEtcdClient struct {
+	TLS              bool
+	version          string
+	versionErr       bool
+	clusterStatusErr bool
+	availableErr     bool
+}
 
 func (c fakeTLSEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
 
 func (c fakeTLSEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
+	if c.availableErr {
+		return false, errors.New("WaitForClusterAvailable failed")
+	}
 	return true, nil
 }
 
 func (c fakeTLSEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
+	if c.clusterStatusErr {
+		return nil, errors.New("GetClusterStatus failed")
+	}
 	return map[string]*clientv3.StatusResponse{
-		"https://1.2.3.4:2379": {
+		clusterStatusEndpoint: {
 			Version: "3.1.12",
 		}}, nil
 }
 
 func (c fakeTLSEtcdClient) GetClusterVersions() (map[string]string, error) {
+	if c.versionErr {
+		return nil, errors.New("Unsupported or unknown Kubernetes version")
+	}
+	if c.version != "" {
+		return map[string]string{
+			clusterStatusEndpoint: c.version,
+		}, nil
+	}
 	return map[string]string{
-		"https://1.2.3.4:2379": "3.1.12",
+		clusterStatusEndpoint: "3.1.12",
 	}, nil
 }
 
@@ -264,11 +290,17 @@ func (c fakeTLSEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
-type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
+type fakePodManifestEtcdClient struct {
+	ManifestDir, CertificatesDir string
+	AvailableErr                 bool
+}
 
 func (c fakePodManifestEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
 
 func (c fakePodManifestEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
+	if c.AvailableErr {
+		return false, errors.New("WaitForClusterAvailable failed")
+	}
 	return true, nil
 }
 
@@ -285,13 +317,13 @@ func (c fakePodManifestEtcdClient) GetClusterStatus() (map[string]*clientv3.Stat
 	}
 
 	return map[string]*clientv3.StatusResponse{
-		"https://1.2.3.4:2379": {Version: "3.1.12"},
+		clusterStatusEndpoint: {Version: "3.1.12"},
 	}, nil
 }
 
 func (c fakePodManifestEtcdClient) GetClusterVersions() (map[string]string, error) {
 	return map[string]string{
-		"https://1.2.3.4:2379": "3.1.12",
+		clusterStatusEndpoint: "3.1.12",
 	}, nil
 }
 
@@ -570,6 +602,73 @@ func getTempDir(t *testing.T, name string) (string, func()) {
 	}
 }
 
+func getPathMgrAndCfg(t *testing.T) (StaticPodPathManager, *kubeadmapi.InitConfiguration) {
+	pathMgr, err := NewFakeStaticPodPathManager(os.Rename)
+	if err != nil {
+		t.Fatalf("couldn't run NewFakeStaticPodPathManager: %v", err)
+	}
+
+	// constants.KubernetesDir = pathMgr.(*fakeStaticPodPathManager).KubernetesDir()
+
+	tempCertsDir, err := ioutil.TempDir("", "kubeadm-certs")
+	if err != nil {
+		t.Fatalf("couldn't create temporary certificates directory: %v", err)
+	}
+
+	tmpEtcdDataDir, err := ioutil.TempDir("", "kubeadm-etcd-data")
+	if err != nil {
+		t.Fatalf("couldn't create temporary etcd data directory: %v", err)
+	}
+
+	oldcfg, err := getConfig(constants.MinimumControlPlaneVersion.String(), tempCertsDir, tmpEtcdDataDir)
+	if err != nil {
+		t.Fatalf("couldn't create config: %v", err)
+	}
+
+	tree, err := certsphase.GetCertsWithoutEtcd().AsMap().CertTree()
+	if err != nil {
+		t.Fatalf("couldn't get cert tree: %v", err)
+	}
+
+	if err := tree.CreateTree(oldcfg); err != nil {
+		t.Fatalf("couldn't get create cert tree: %v", err)
+	}
+
+	t.Logf("Wrote certs to %s\n", oldcfg.CertificatesDir)
+
+	// Initialize the directory with v1.13 manifests; should then be upgraded to v1.14 using the method
+	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
+	if err != nil {
+		t.Fatalf("couldn't run CreateInitStaticPodManifestFiles: %v", err)
+	}
+	err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), oldcfg.NodeRegistration.Name, &oldcfg.ClusterConfiguration, &oldcfg.LocalAPIEndpoint)
+	if err != nil {
+		t.Fatalf("couldn't run CreateLocalEtcdStaticPodManifestFile: %v", err)
+	}
+
+	newcfg, err := getConfig(constants.CurrentKubernetesVersion.String(), tempCertsDir, tmpEtcdDataDir)
+	if err != nil {
+		t.Fatalf("couldn't create config: %v", err)
+	}
+
+	// create the kubeadm etcd certs
+	caCert, caKey, err := certsphase.KubeadmCertEtcdCA.CreateAsCA(newcfg)
+	if err != nil {
+		t.Fatalf("couldn't create new CA certificate: %v", err)
+	}
+	for _, cert := range []*certsphase.KubeadmCert{
+		&certsphase.KubeadmCertEtcdServer,
+		&certsphase.KubeadmCertEtcdPeer,
+		&certsphase.KubeadmCertEtcdHealthcheck,
+		&certsphase.KubeadmCertEtcdAPIClient,
+	} {
+		if err := cert.CreateFromCA(newcfg, caCert, caKey); err != nil {
+			t.Fatalf("couldn't create certificate %s: %v", cert.Name, err)
+		}
+	}
+	return pathMgr, newcfg
+}
+
 func TestCleanupDirs(t *testing.T) {
 	tests := []struct {
 		name                   string
@@ -744,5 +843,334 @@ func TestRenewCerts(t *testing.T) {
 			}
 		})
 
+	}
+}
+
+func TestCompareEtcdVersion(t *testing.T) {
+	var tests = []struct {
+		description   string
+		cfg           *kubeadmapi.InitConfiguration
+		oldEtcdClient etcdutil.ClusterInterrogator
+		expectedFatal bool
+		expectedError bool
+	}{
+		{
+			description: "cfg.KubernetesVersion error",
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "1.99.0",
+				},
+			},
+			expectedFatal: true,
+			expectedError: true,
+		},
+		{
+			description: "oldEtcdClient.GetClusterVersions error",
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "1.14.0",
+				},
+			},
+			oldEtcdClient: fakeTLSEtcdClient{
+				versionErr: true,
+			},
+			expectedFatal: true,
+			expectedError: true,
+		},
+		{
+			description: "cfg.LocalAPIEndpoint error",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "192.168.2.1"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "1.14.0",
+				},
+			},
+			oldEtcdClient: fakeTLSEtcdClient{},
+			expectedFatal: true,
+			expectedError: true,
+		},
+		{
+			description: "parse etcdVersion error",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "192.168.2.2"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "1.14.0",
+				},
+			},
+			oldEtcdClient: fakeTLSEtcdClient{
+				version: "3:1:22",
+			},
+			expectedFatal: true,
+			expectedError: true,
+		},
+		{
+			description: "desiredEtcdVersion lessThan currentEtcdVersion error",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "192.168.2.2"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "1.13.1",
+				},
+			},
+			oldEtcdClient: fakeTLSEtcdClient{
+				version: "3.3.10",
+			},
+			expectedFatal: false,
+			expectedError: true,
+		},
+		{
+			description: "desiredEtcdVersion is the same as currentEtcdVersion",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "192.168.2.2"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "1.14.0",
+				},
+			},
+			oldEtcdClient: fakeTLSEtcdClient{
+				version: "3.3.10",
+			},
+			expectedFatal: false,
+			expectedError: false,
+		},
+		{
+			description: "etcdVersion compare success",
+			cfg: &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "192.168.2.2"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "1.14.0",
+				},
+			},
+			oldEtcdClient: fakeTLSEtcdClient{
+				version: "3.2.24",
+			},
+			expectedFatal: true,
+			expectedError: false,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.description, func(t *testing.T) {
+			actualFatal, actualError := compareEtcdVersion(rt.cfg, rt.oldEtcdClient)
+			if actualFatal != rt.expectedFatal {
+				t.Errorf("%s unexpected failure: %v", rt.description, actualFatal)
+				return
+			}
+			if (actualError != nil) && !rt.expectedError {
+				t.Errorf("%s unexpected failure: %v", rt.description, actualError)
+				return
+			} else if (actualError == nil) && rt.expectedError {
+				t.Errorf("%s passed when expected to fail", rt.description)
+				return
+			}
+		})
+	}
+}
+
+func TestRollbackEtcdOnFailedUpgrade(t *testing.T) {
+	tests := []struct {
+		description      string
+		oldEtcdClient    etcdutil.ClusterInterrogator
+		recoverManifests map[string]string
+		expectedErr      bool
+	}{
+		{
+			description:   "roll back etcd success with no recoverManifests",
+			oldEtcdClient: fakeTLSEtcdClient{},
+			expectedErr:   false,
+		},
+		{
+			description: "roll back etcd fail with no recoverManifests",
+			oldEtcdClient: fakeTLSEtcdClient{
+				availableErr: true,
+			},
+			expectedErr: true,
+		},
+		{
+			description:      "roll back etcd success with recoverManifests",
+			oldEtcdClient:    fakeTLSEtcdClient{},
+			recoverManifests: map[string]string{},
+			expectedErr:      false,
+		},
+		{
+			description: "roll back etcd fail with recoverManifests",
+			oldEtcdClient: fakeTLSEtcdClient{
+				availableErr: true,
+			},
+			recoverManifests: map[string]string{},
+			expectedErr:      true,
+		},
+	}
+
+	for _, rt := range tests {
+		pathMgr, newcfg := getPathMgrAndCfg(t)
+		defer pathMgr.(*fakeStaticPodPathManager).CleanupKubernetesDir()
+		defer os.RemoveAll(newcfg.CertificatesDir)
+		defer os.RemoveAll(newcfg.Etcd.Local.DataDir)
+
+		backupEtcdDir := pathMgr.BackupEtcdDir()
+		runningEtcdDir := newcfg.Etcd.Local.DataDir
+		if err := util.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
+			t.Fatalf("failed to back up etcd data: %v", err)
+		}
+
+		var errForRecoverManifests error
+		if rt.recoverManifests != nil {
+			backupManifestPath := pathMgr.BackupManifestPath(constants.Etcd)
+			rt.recoverManifests[constants.Etcd] = backupManifestPath
+			errForRecoverManifests = errors.New("WaitForClusterAvailable failed")
+		}
+
+		actualErr := rollbackEtcdOnFailedUpgrade(
+			pathMgr,
+			newcfg,
+			rt.recoverManifests,
+			rt.oldEtcdClient,
+			backupEtcdDir,
+			errForRecoverManifests,
+		)
+		if (actualErr != nil) != rt.expectedErr {
+			t.Errorf(
+				"failed rollbackEtcdOnFailedUpgrade\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+				rt.description,
+				rt.expectedErr,
+				(actualErr != nil),
+				actualErr,
+			)
+		}
+	}
+}
+
+func TestPerformEtcdStaticPodUpgrade(t *testing.T) {
+	tests := []struct {
+		description      string
+		waitErrsToReturn map[string]error
+		oldEtcdClient    etcdutil.ClusterInterrogator
+		newEtcdClient    etcdutil.ClusterInterrogator
+		expectedFatal    bool
+		expectedErr      bool
+	}{
+		{
+			description: "error-free case should succeed",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        nil,
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: nil,
+			},
+			oldEtcdClient: fakeTLSEtcdClient{},
+			expectedFatal: false,
+			expectedErr:   false,
+		},
+		{
+			description: "etcd cluster is not healthy should abort",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        nil,
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: nil,
+			},
+			oldEtcdClient: fakeTLSEtcdClient{
+				clusterStatusErr: true,
+			},
+			expectedFatal: true,
+			expectedErr:   true,
+		},
+		{
+			description: "compare the currentEtcdVersion and desiredEtcdVersion failed should abort",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        nil,
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: nil,
+			},
+			oldEtcdClient: fakeTLSEtcdClient{
+				version: "3:3:10",
+			},
+			expectedFatal: true,
+			expectedErr:   true,
+		},
+		{
+			description: "any wait error should abort",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        errors.New("boo! failed"),
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: nil,
+			},
+			oldEtcdClient: fakeTLSEtcdClient{},
+			expectedFatal: true,
+			expectedErr:   true,
+		},
+		{
+			description: "upgrade failed should result in a rollback and an abort",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        nil,
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: errors.New("boo! failed"),
+			},
+			oldEtcdClient: fakeTLSEtcdClient{},
+			expectedFatal: true,
+			expectedErr:   true,
+		},
+		{
+			description: "wait oldEtcdClient available failed should result in a rollback and an abort",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        nil,
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: errors.New("boo! failed"),
+			},
+			oldEtcdClient: fakeTLSEtcdClient{
+				availableErr: true,
+			},
+			expectedFatal: true,
+			expectedErr:   true,
+		},
+		{
+			description: "wait newEtcdClient available failed should result in a rollback and an abort",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        nil,
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: nil,
+			},
+			oldEtcdClient: fakeTLSEtcdClient{},
+			newEtcdClient: fakePodManifestEtcdClient{AvailableErr: true},
+			expectedFatal: true,
+			expectedErr:   true,
+		},
+	}
+
+	for _, rt := range tests {
+		waiter := NewFakeStaticPodWaiter(rt.waitErrsToReturn)
+		pathMgr, newcfg := getPathMgrAndCfg(t)
+		defer pathMgr.(*fakeStaticPodPathManager).CleanupKubernetesDir()
+		defer os.RemoveAll(newcfg.CertificatesDir)
+		defer os.RemoveAll(newcfg.Etcd.Local.DataDir)
+
+		recoverManifests := map[string]string{}
+		if rt.newEtcdClient == nil {
+			rt.newEtcdClient = fakePodManifestEtcdClient{
+				ManifestDir:     pathMgr.RealManifestDir(),
+				CertificatesDir: newcfg.CertificatesDir,
+			}
+		} else {
+			rt.newEtcdClient = fakePodManifestEtcdClient{
+				ManifestDir:     pathMgr.RealManifestDir(),
+				CertificatesDir: newcfg.CertificatesDir,
+				AvailableErr:    true,
+			}
+		}
+		actualFatal, actualErr := performEtcdStaticPodUpgrade(
+			nil,
+			waiter,
+			pathMgr,
+			newcfg,
+			recoverManifests,
+			rt.oldEtcdClient,
+			rt.newEtcdClient,
+		)
+		if (actualFatal != rt.expectedFatal) || ((actualErr != nil) != rt.expectedErr) {
+			t.Errorf(
+				"failed performEtcdStaticPodUpgrade\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+				rt.description,
+				rt.expectedErr,
+				(actualErr != nil),
+				actualErr,
+			)
+		}
 	}
 }

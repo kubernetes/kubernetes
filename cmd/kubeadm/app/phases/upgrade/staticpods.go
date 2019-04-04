@@ -40,6 +40,10 @@ import (
 const (
 	// UpgradeManifestTimeout is timeout of upgrading the static pod manifest
 	UpgradeManifestTimeout = 5 * time.Minute
+	// etcdConnectRetries is the number of retries for connections
+	etcdConnectRetries = 10
+	// etcdConnectRetryInterval is the interval time of retries for connections
+	etcdConnectRetryInterval = 15 * time.Second
 )
 
 // StaticPodPathManager is responsible for tracking the directories used in the static pod upgrade transition
@@ -256,34 +260,10 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 		return true, errors.Wrap(err, "failed to back up etcd data")
 	}
 
-	// Need to check currently used version and version from constants, if differs then upgrade
-	desiredEtcdVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
-	if err != nil {
-		return true, errors.Wrap(err, "failed to retrieve an etcd version for the target Kubernetes version")
-	}
-
-	// gets the etcd version of the local/stacked etcd member running on the current machine
-	currentEtcdVersions, err := oldEtcdClient.GetClusterVersions()
-	if err != nil {
-		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
-	}
-	currentEtcdVersionStr, ok := currentEtcdVersions[etcdutil.GetClientURL(&cfg.LocalAPIEndpoint)]
-	if !ok {
-		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
-	}
-
-	currentEtcdVersion, err := version.ParseSemantic(currentEtcdVersionStr)
-	if err != nil {
-		return true, errors.Wrapf(err, "failed to parse the current etcd version(%s)", currentEtcdVersionStr)
-	}
-
-	// Comparing current etcd version with desired to catch the same version or downgrade condition and fail on them.
-	if desiredEtcdVersion.LessThan(currentEtcdVersion) {
-		return false, errors.Errorf("the desired etcd version for this Kubernetes version %q is %q, but the current etcd version is %q. Won't downgrade etcd, instead just continue", cfg.KubernetesVersion, desiredEtcdVersion.String(), currentEtcdVersion.String())
-	}
-	// For the case when desired etcd version is the same as current etcd version
-	if strings.Compare(desiredEtcdVersion.String(), currentEtcdVersion.String()) == 0 {
-		return false, nil
+	//compare the currentEtcdVersion and desiredEtcdVersion
+	compare, err := compareEtcdVersion(cfg, oldEtcdClient)
+	if !compare || err != nil {
+		return compare, err
 	}
 
 	beforeEtcdPodHash, err := waiter.WaitForStaticPodSingleHash(cfg.NodeRegistration.Name, constants.Etcd)
@@ -297,37 +277,19 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 		return true, errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
-	retries := 10
-	retryInterval := 15 * time.Second
-
 	// Perform etcd upgrade using common to all control plane components function
 	if err := upgradeComponent(constants.Etcd, waiter, pathMgr, cfg, beforeEtcdPodHash, recoverManifests); err != nil {
 		fmt.Printf("[upgrade/etcd] Failed to upgrade etcd: %v\n", err)
 		// Since upgrade component failed, the old etcd manifest has either been restored or was never touched
 		// Now we need to check the health of etcd cluster if it is up with old manifest
 		fmt.Println("[upgrade/etcd] Waiting for previous etcd to become available")
-		if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
-			fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
-
-			// At this point we know that etcd cluster is dead and it is safe to copy backup datastore and to rollback old etcd manifest
-			fmt.Println("[upgrade/etcd] Rolling back etcd data")
-			if err := rollbackEtcdData(cfg, pathMgr); err != nil {
-				// Even copying back datastore failed, no options for recovery left, bailing out
-				return true, errors.Errorf("fatal error rolling back local etcd cluster datadir: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+		if _, err := oldEtcdClient.WaitForClusterAvailable(etcdConnectRetries, etcdConnectRetryInterval); err != nil {
+			fmt.Printf("[upgrade/etcd] Failed to healthcheck etcd: %v\n", err)
+			if err := rollbackEtcdOnFailedUpgrade(pathMgr, cfg, nil, oldEtcdClient, backupEtcdDir, nil); err != nil {
+				return true, err
 			}
-			fmt.Println("[upgrade/etcd] Etcd data rollback successful")
-
-			// Now that we've rolled back the data, let's check if the cluster comes up
-			fmt.Println("[upgrade/etcd] Waiting for previous etcd to become available")
-			if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
-				fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
-				// Nothing else left to try to recover etcd cluster
-				return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s)", backupEtcdDir)
-			}
-
 			// We've recovered to the previous etcd from this case
 		}
-		fmt.Println("[upgrade/etcd] Etcd was rolled back and is now available")
 
 		// Since etcd cluster came back up with the old manifest
 		return true, errors.Wrap(err, "fatal error when trying to upgrade the etcd cluster, rolled the state back to pre-upgrade state")
@@ -344,36 +306,81 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 
 	// Checking health state of etcd after the upgrade
 	fmt.Println("[upgrade/etcd] Waiting for etcd to become available")
-	if _, err = newEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
+	if _, err = newEtcdClient.WaitForClusterAvailable(etcdConnectRetries, etcdConnectRetryInterval); err != nil {
 		fmt.Printf("[upgrade/etcd] Failed to healthcheck etcd: %v\n", err)
-		// Despite the fact that upgradeComponent was successful, there is something wrong with the etcd cluster
-		// First step is to restore back up of datastore
-		fmt.Println("[upgrade/etcd] Rolling back etcd data")
-		if err := rollbackEtcdData(cfg, pathMgr); err != nil {
-			// Even copying back datastore failed, no options for recovery left, bailing out
-			return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster datadir, the backup of etcd database is stored here:(%s)", backupEtcdDir)
+		if err := rollbackEtcdOnFailedUpgrade(pathMgr, cfg, recoverManifests, oldEtcdClient, backupEtcdDir, err); err != nil {
+			return true, err
 		}
-		fmt.Println("[upgrade/etcd] Etcd data rollback successful")
-
-		// Old datastore has been copied, rolling back old manifests
-		fmt.Println("[upgrade/etcd] Rolling back etcd manifest")
-		rollbackOldManifests(recoverManifests, err, pathMgr, true)
-		// rollbackOldManifests() always returns an error -- ignore it and continue
-
-		// Assuming rollback of the old etcd manifest was successful, check the status of etcd cluster again
-		fmt.Println("[upgrade/etcd] Waiting for previous etcd to become available")
-		if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
-			fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
-			// Nothing else left to try to recover etcd cluster
-			return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s)", backupEtcdDir)
-		}
-		fmt.Println("[upgrade/etcd] Etcd was rolled back and is now available")
 
 		// We've successfully rolled back etcd, and now return an error describing that the upgrade failed
 		return true, errors.Wrap(err, "fatal error upgrading local etcd cluster, rolled the state back to pre-upgrade state")
 	}
 
 	return false, nil
+}
+
+// compareEtcdVersion is used to compare the currentEtcdVersion and desiredEtcdVersion
+func compareEtcdVersion(cfg *kubeadmapi.InitConfiguration, oldEtcdClient etcdutil.ClusterInterrogator) (bool, error) {
+	// Need to check currently used version and version from constants, if differs then upgrade
+	desiredEtcdVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
+	if err != nil {
+		return true, errors.Wrap(err, "failed to retrieve an etcd version for the target Kubernetes version")
+	}
+
+	// gets the etcd version of the local/stacked etcd member running on the current machine
+	currentEtcdVersions, err := oldEtcdClient.GetClusterVersions()
+	if err != nil {
+		return true, errors.Wrap(err, "failed to retrieve the current etcd version from oldEtcdClient")
+	}
+	currentEtcdVersionStr, ok := currentEtcdVersions[etcdutil.GetClientURL(&cfg.LocalAPIEndpoint)]
+	if !ok {
+		return true, errors.Wrap(errors.Errorf("unknown LocalAPIEndpoint: %v", cfg.LocalAPIEndpoint), "failed to retrieve the current etcd version from cfg.LocalAPIEndpoint")
+	}
+
+	currentEtcdVersion, err := version.ParseSemantic(currentEtcdVersionStr)
+	if err != nil {
+		return true, errors.Wrapf(err, "failed to parse the current etcd version(%s)", currentEtcdVersionStr)
+	}
+
+	// Comparing current etcd version with desired to catch the same version or downgrade condition and fail on them.
+	if desiredEtcdVersion.LessThan(currentEtcdVersion) {
+		return false, errors.Errorf("the desired etcd version for this Kubernetes version %q is %q, but the current etcd version is %q. Won't downgrade etcd, instead just continue", cfg.KubernetesVersion, desiredEtcdVersion.String(), currentEtcdVersion.String())
+	}
+	// For the case when desired etcd version is the same as current etcd version
+	if strings.Compare(desiredEtcdVersion.String(), currentEtcdVersion.String()) == 0 {
+		return false, nil
+	}
+	return true, nil
+}
+
+// rollbackEtcdOnFailedUpgrade is used to rolled back oldEtcd
+func rollbackEtcdOnFailedUpgrade(pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, recoverManifests map[string]string, oldEtcdClient etcdutil.ClusterInterrogator, backupEtcdDir string, err error) error {
+	// Despite the fact that upgradeComponent was successful, there is something wrong with the etcd cluster
+	// First step is to restore back up of datastore
+	fmt.Println("[upgrade/etcd] Rolling back etcd data")
+	if err := rollbackEtcdData(cfg, pathMgr); err != nil {
+		// Even copying back datastore failed, no options for recovery left, bailing out
+		return errors.Wrapf(err, "fatal error rolling back local etcd cluster datadir, the backup of etcd database is stored here:(%s)", backupEtcdDir)
+	}
+	fmt.Println("[upgrade/etcd] Etcd data rollback successful")
+
+	if recoverManifests != nil {
+		// Old datastore has been copied, rolling back old manifests
+		fmt.Println("[upgrade/etcd] Rolling back etcd manifest")
+		rollbackOldManifests(recoverManifests, err, pathMgr, true)
+		// rollbackOldManifests() always returns an error -- ignore it and continue
+	}
+
+	// Assuming rollback of the old etcd manifest was successful, check the status of etcd cluster again
+	fmt.Println("[upgrade/etcd] Waiting for previous etcd to become available")
+	if _, err := oldEtcdClient.WaitForClusterAvailable(etcdConnectRetries, etcdConnectRetryInterval); err != nil {
+		fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
+		// Nothing else left to try to recover etcd cluster
+		return errors.Wrapf(err, "fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s)", backupEtcdDir)
+	}
+	fmt.Println("[upgrade/etcd] Etcd was rolled back and is now available")
+
+	return nil
 }
 
 // StaticPodControlPlane upgrades a static pod-hosted control plane
