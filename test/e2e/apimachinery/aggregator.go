@@ -216,6 +216,9 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 		{
 			Name:  "etcd",
 			Image: etcdImage,
+			Command: []string{
+				"/usr/local/bin/etcd",
+			},
 		},
 	}
 	d := &apps.Deployment{
