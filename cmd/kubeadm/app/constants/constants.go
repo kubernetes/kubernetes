@@ -175,8 +175,6 @@ const (
 	DiscoveryRetryInterval = 5 * time.Second
 	// PatchNodeTimeout specifies how long kubeadm should wait for applying the label and taint on the control-plane before timing out
 	PatchNodeTimeout = 2 * time.Minute
-	// UpdateNodeTimeout specifies how long kubeadm should wait for updating node with the initial remote configuration of kubelet before timing out
-	UpdateNodeTimeout = 2 * time.Minute
 	// TLSBootstrapTimeout specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
 	TLSBootstrapTimeout = 2 * time.Minute
 
@@ -314,19 +312,10 @@ const (
 	// KubeDNSDnsMasqNannyImageName specifies the name of the image for the dnsmasq container in the kube-dns add-on
 	KubeDNSDnsMasqNannyImageName = "k8s-dns-dnsmasq-nanny"
 
-	// CRICtlPackage defines the go package that installs crictl
-	CRICtlPackage = "github.com/kubernetes-incubator/cri-tools/cmd/crictl"
-
-	// KubeAuditPolicyVolumeName is the name of the volume that will contain the audit policy
-	KubeAuditPolicyVolumeName = "audit"
 	// AuditPolicyDir is the directory that will contain the audit policy
 	AuditPolicyDir = "audit"
 	// AuditPolicyFile is the name of the audit policy file itself
 	AuditPolicyFile = "audit.yaml"
-	// AuditPolicyLogFile is the name of the file audit logs get written to
-	AuditPolicyLogFile = "audit.log"
-	// KubeAuditPolicyLogVolumeName is the name of the volume that will contain the audit logs
-	KubeAuditPolicyLogVolumeName = "audit-log"
 	// StaticPodAuditPolicyLogDir is the name of the directory in the static pod that will have the audit logs
 	StaticPodAuditPolicyLogDir = "/var/log/kubernetes/audit"
 
