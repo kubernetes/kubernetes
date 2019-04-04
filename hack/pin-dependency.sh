@@ -56,10 +56,10 @@ fi
 
 # Add the require directive
 echo "Running: go get ${dep}@${sha}"
-go get "${dep}@${sha}"
+go get -d "${dep}@${sha}"
 
 # Find the resolved version
-rev=$(go mod edit -json | jq -r '.Require[] | select(.Path == "github.com/docker/docker") | .Version')
+rev=$(go mod edit -json | jq -r ".Require[] | select(.Path == \"${dep}\") | .Version")
 echo "Resolved to ${dep}@${rev}"
 
 # Add the replace directive
