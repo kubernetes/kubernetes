@@ -208,7 +208,7 @@ func UpdateEndpointsMap(endpointsMap EndpointsMap, changes *EndpointChangeTracke
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to endpointsMap.
 	result.HCEndpointsLocalIPSize = make(map[types.NamespacedName]int)
-	localIPs := GetLocalEndpointIPs(endpointsMap)
+	localIPs := endpointsMap.getLocalEndpointIPs()
 	for nsn, ips := range localIPs {
 		result.HCEndpointsLocalIPSize[nsn] = len(ips)
 	}
@@ -316,9 +316,9 @@ func (em EndpointsMap) unmerge(other EndpointsMap) {
 }
 
 // GetLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
-func GetLocalEndpointIPs(endpointsMap EndpointsMap) map[types.NamespacedName]sets.String {
+func (em EndpointsMap) getLocalEndpointIPs() map[types.NamespacedName]sets.String {
 	localIPs := make(map[types.NamespacedName]sets.String)
-	for svcPortName, epList := range endpointsMap {
+	for svcPortName, epList := range em {
 		for _, ep := range epList {
 			if ep.GetIsLocal() {
 				nsn := svcPortName.NamespacedName

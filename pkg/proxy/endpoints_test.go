@@ -112,7 +112,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 
 	for tci, tc := range testCases {
 		// outputs
-		localIPs := GetLocalEndpointIPs(tc.endpointsMap)
+		localIPs := tc.endpointsMap.getLocalEndpointIPs()
 
 		if !reflect.DeepEqual(localIPs, tc.expected) {
 			t.Errorf("[%d] expected %#v, got %#v", tci, tc.expected, localIPs)
