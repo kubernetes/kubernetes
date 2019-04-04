@@ -290,8 +290,8 @@ func (em EndpointsMap) apply(changes *EndpointChangeTracker, staleEndpoints *[]S
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
-		em.Unmerge(change.previous)
-		em.Merge(change.current)
+		em.unmerge(change.previous)
+		em.merge(change.current)
 		detectStaleConnections(change.previous, change.current, staleEndpoints, staleServiceNames)
 	}
 	changes.items = make(map[types.NamespacedName]*endpointsChange)
@@ -302,14 +302,14 @@ func (em EndpointsMap) apply(changes *EndpointChangeTracker, staleEndpoints *[]S
 }
 
 // Merge ensures that the current EndpointsMap contains all <service, endpoints> pairs from the EndpointsMap passed in.
-func (em EndpointsMap) Merge(other EndpointsMap) {
+func (em EndpointsMap) merge(other EndpointsMap) {
 	for svcPortName := range other {
 		em[svcPortName] = other[svcPortName]
 	}
 }
 
 // Unmerge removes the <service, endpoints> pairs from the current EndpointsMap which are contained in the EndpointsMap passed in.
-func (em EndpointsMap) Unmerge(other EndpointsMap) {
+func (em EndpointsMap) unmerge(other EndpointsMap) {
 	for svcPortName := range other {
 		delete(em, svcPortName)
 	}
