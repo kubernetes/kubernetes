@@ -185,32 +185,17 @@ var _ = SIGDescribe("Pods Extended", func() {
 		framework.ConformanceIt("should be submitted and removed ", func() {
 			By("creating the pod")
 			name := "pod-qos-class-" + string(uuid.NewUUID())
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
-					Labels: map[string]string{
-						"name": name,
-					},
+			resorces := v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "nginx",
-							Image: imageutils.GetE2EImage(imageutils.Nginx),
-							Resources: v1.ResourceRequirements{
-								Limits: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("100m"),
-									v1.ResourceMemory: resource.MustParse("100Mi"),
-								},
-								Requests: v1.ResourceList{
-									v1.ResourceCPU:    resource.MustParse("100m"),
-									v1.ResourceMemory: resource.MustParse("100Mi"),
-								},
-							},
-						},
-					},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			}
+			pod := getResourcePod(name, resorces)
 
 			By("submitting the pod to kubernetes")
 			podClient.Create(pod)
@@ -220,5 +205,40 @@ var _ = SIGDescribe("Pods Extended", func() {
 			Expect(err).NotTo(HaveOccurred(), "failed to query for pod")
 			Expect(pod.Status.QOSClass == v1.PodQOSGuaranteed)
 		})
+
+		It("should be set on Pods with matching resource QOS", func() {
+			By("creating the pod")
+			name := "pod-qos-class-" + string(uuid.NewUUID())
+			resorces := v1.ResourceRequirements{}
+			pod := getResourcePod(name, resorces)
+
+			By("submitting the pod to kubernetes")
+			podClient.Create(pod)
+
+			By("verifying QOS class is set on the pod")
+			pod, err := podClient.Get(name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred(), "failed to query for pod")
+			Expect(pod.Status.QOSClass == v1.PodQOSBestEffort)
+		})
 	})
 })
+
+func getResourcePod(name string, resorces v1.ResourceRequirements) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": name,
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:      "nginx",
+					Image:     imageutils.GetE2EImage(imageutils.Nginx),
+					Resources: resorces,
+				},
+			},
+		},
+	}
+}
