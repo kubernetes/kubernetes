@@ -27,7 +27,7 @@ import (
 	"k8s.io/klog"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -211,10 +211,12 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 		volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 		if err != nil || volumePlugin == nil {
-			err = fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
-				"waiting for an external controller to process this PVC")
-			eventType := v1.EventTypeNormal
-			if err != nil {
+			var eventType string
+			if err == nil {
+				eventType = v1.EventTypeNormal
+				err = fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
+					"waiting for an external controller to process this PVC")
+			} else {
 				eventType = v1.EventTypeWarning
 			}
 			expc.recorder.Event(newPVC, eventType, events.ExternalExpanding,
