@@ -12,7 +12,6 @@ go_library(
     importpath = "k8s.io/apiextensions-apiserver/pkg/controller/openapi",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/validation:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion:go_default_library",

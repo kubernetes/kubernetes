@@ -18,14 +18,12 @@ package openapi
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 	"sync"
 
 	restful "github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
-	v1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,10 +67,6 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string) (
 			return nil, err
 		}
 	}
-	// TODO(roycaihw): remove the WebService templating below. The following logic
-	// comes from function registerResourceHandlers() in k8s.io/apiserver.
-	// Alternatives are either (ideally) refactoring registerResourceHandlers() to
-	// reuse the code, or faking an APIInstaller for CR to feed to registerResourceHandlers().
 	b := newBuilder(crd, version, schema)
 
 	// Sample response types for building web service
@@ -87,42 +81,82 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string) (
 		kind:    b.listKind,
 	}
 	status := &metav1.Status{}
-	patch := &metav1.Patch{}
-	scale := &v1.Scale{}
+	// patch := &metav1.Patch{}
+	// scale := &v1.Scale{}
 
-	routes := make([]*restful.RouteBuilder, 0)
+	actions := []*endpoints.Action{}
+	params := []*restful.Parameter{}
+
 	root := fmt.Sprintf("/apis/%s/%s/%s", b.group, b.version, b.plural)
 	if b.namespaced {
-		routes = append(routes, b.buildRoute(root, "", "GET", "list", sampleList).
-			Operation("list"+b.kind+"ForAllNamespaces"))
+		actions = append(actions, endpoints.NewAction("LIST", root, params, true))
 		root = fmt.Sprintf("/apis/%s/%s/namespaces/{namespace}/%s", b.group, b.version, b.plural)
 	}
-	routes = append(routes, b.buildRoute(root, "", "GET", "list", sampleList))
-	routes = append(routes, b.buildRoute(root, "", "POST", "create", sample).Reads(sample))
-	routes = append(routes, b.buildRoute(root, "", "DELETE", "deletecollection", status))
+	actions = append(actions, endpoints.NewAction("LIST", root, params, false))
+	actions = append(actions, endpoints.NewAction("POST", root, params, false))
+	actions = append(actions, endpoints.NewAction("DELETECOLLECTION", root, params, false))
 
-	routes = append(routes, b.buildRoute(root, "/{name}", "GET", "read", sample))
-	routes = append(routes, b.buildRoute(root, "/{name}", "PUT", "replace", sample).Reads(sample))
-	routes = append(routes, b.buildRoute(root, "/{name}", "DELETE", "delete", status))
-	routes = append(routes, b.buildRoute(root, "/{name}", "PATCH", "patch", sample).Reads(patch))
+	actions = append(actions, endpoints.NewAction("GET", root, params, false))
+	actions = append(actions, endpoints.NewAction("PUT", root, params, false))
+	actions = append(actions, endpoints.NewAction("DELETE", root, params, false))
+	actions = append(actions, endpoints.NewAction("PATCH", root, params, false))
 
 	subresources, err := apiextensions.GetSubresourcesForVersion(crd, version)
 	if err != nil {
 		return nil, err
 	}
 	if subresources != nil && subresources.Status != nil {
-		routes = append(routes, b.buildRoute(root, "/{name}/status", "GET", "read", sample))
-		routes = append(routes, b.buildRoute(root, "/{name}/status", "PUT", "replace", sample).Reads(sample))
-		routes = append(routes, b.buildRoute(root, "/{name}/status", "PATCH", "patch", sample).Reads(patch))
+		// TODO(roycaihw): distinguish subresources
+		root := root + "/{name}/status"
+		actions = append(actions, endpoints.NewAction("GET", root, params, false))
+		actions = append(actions, endpoints.NewAction("PUT", root, params, false))
+		actions = append(actions, endpoints.NewAction("PATCH", root, params, false))
 	}
 	if subresources != nil && subresources.Scale != nil {
-		routes = append(routes, b.buildRoute(root, "/{name}/scale", "GET", "read", scale))
-		routes = append(routes, b.buildRoute(root, "/{name}/scale", "PUT", "replace", scale).Reads(scale))
-		routes = append(routes, b.buildRoute(root, "/{name}/scale", "PATCH", "patch", scale).Reads(patch))
+		// TODO(roycaihw): distinguish subresources
+		root := root + "/{name}/scale"
+		actions = append(actions, endpoints.NewAction("GET", root, params, false))
+		actions = append(actions, endpoints.NewAction("PUT", root, params, false))
+		actions = append(actions, endpoints.NewAction("PATCH", root, params, false))
 	}
 
-	for _, route := range routes {
-		b.ws.Route(route)
+	// complete actions
+	for _, action := range actions {
+		action = action.AssignProducedMIMETypes([]string{"application/json", "application/yaml"}, nil, nil)
+
+		action = action.AssignConsumedMIMETypes()
+
+		action = action.AssignWriteSample(sample, sampleList, status, nil)
+
+		action = action.AssignReadSample(sample, &metav1.DeleteOptions{})
+
+		// TODO(roycaihw): generalize parameters without creater
+		// action, err = action.AssignParameters(a.group.Creater, a.group.Typer, optionsExternalVersion, a.group.GroupVersion, storage)
+		// if err != nil {
+		// 	return nil, err
+		// }
+	}
+
+	ws := &restful.WebService{}
+	var routes []*restful.RouteBuilder
+	for _, action := range actions {
+		doc, err := endpoints.DocumentationAction(action, b.kind, "", false, true, true)
+		if err != nil {
+			return nil, err
+		}
+		routes, err = endpoints.RegisterActionsToWebService(action, ws, b.namespaced, true, b.kind, "", endpoints.ToRESTMethod[action.Verb], doc, endpoints.ToOperationPrefix[action.Verb])
+		if err != nil {
+			return nil, err
+		}
+		for _, route := range routes {
+			route.Metadata(endpoints.ROUTE_META_GVK, metav1.GroupVersionKind{
+				Group:   b.group,
+				Version: b.version,
+				Kind:    b.kind,
+			})
+			route.Metadata(endpoints.ROUTE_META_ACTION, strings.ToLower(action.Verb))
+			b.ws.Route(route)
+		}
 	}
 
 	openAPISpec, err := openapibuilder.BuildOpenAPISpec([]*restful.WebService{b.ws}, b.getOpenAPIConfig())
@@ -164,126 +198,6 @@ type builder struct {
 	plural   string
 
 	namespaced bool
-}
-
-// subresource is a handy method to get subresource name. Valid inputs are:
-//     input                     output
-//     ""                        ""
-//     "/"                       ""
-//     "/{name}"                 ""
-//     "/{name}/scale"           "scale"
-//     "/{name}/scale/foo"       invalid input
-func subresource(path string) string {
-	parts := strings.Split(path, "/")
-	if len(parts) <= 2 {
-		return ""
-	}
-	if len(parts) == 3 {
-		return parts[2]
-	}
-	// panic to alert on programming error
-	panic("failed to parse subresource; invalid path")
-}
-
-func (b *builder) descriptionFor(path, verb string) string {
-	var article string
-	switch verb {
-	case "list":
-		article = " objects of kind "
-	case "read", "replace":
-		article = " the specified "
-	case "patch":
-		article = " the specified "
-	case "create", "delete":
-		article = endpoints.GetArticleForNoun(b.kind, " ")
-	default:
-		article = ""
-	}
-
-	var description string
-	sub := subresource(path)
-	if len(sub) > 0 {
-		sub = " " + sub + " of"
-	}
-	switch verb {
-	case "patch":
-		description = "partially update" + sub + article + b.kind
-	case "deletecollection":
-		// to match the text for built-in APIs
-		if len(sub) > 0 {
-			sub = sub + " a"
-		}
-		description = "delete collection of" + sub + " " + b.kind
-	default:
-		description = verb + sub + article + b.kind
-	}
-
-	return description
-}
-
-// buildRoute returns a RouteBuilder for WebService to consume and builds path in swagger
-//     action can be one of: GET, PUT, PATCH, POST, DELETE;
-//     verb can be one of: list, read, replace, patch, create, delete, deletecollection;
-//     sample is the sample Go type for response type.
-func (b *builder) buildRoute(root, path, action, verb string, sample interface{}) *restful.RouteBuilder {
-	var namespaced string
-	if b.namespaced {
-		namespaced = "Namespaced"
-	}
-	route := b.ws.Method(action).
-		Path(root+path).
-		To(func(req *restful.Request, res *restful.Response) {}).
-		Doc(b.descriptionFor(path, verb)).
-		Param(b.ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
-		Operation(verb+namespaced+b.kind+strings.Title(subresource(path))).
-		Metadata(endpoints.ROUTE_META_GVK, metav1.GroupVersionKind{
-			Group:   b.group,
-			Version: b.version,
-			Kind:    b.kind,
-		}).
-		Metadata(endpoints.ROUTE_META_ACTION, strings.ToLower(action)).
-		Produces("application/json", "application/yaml").
-		Returns(http.StatusOK, "OK", sample).
-		Writes(sample)
-
-	// Build consume media types
-	if action == "PATCH" {
-		route.Consumes("application/json-patch+json",
-			"application/merge-patch+json",
-			"application/strategic-merge-patch+json")
-	} else {
-		route.Consumes("*/*")
-	}
-
-	// Build option parameters
-	switch verb {
-	case "get":
-		// TODO: CRD support for export is still under consideration
-		endpoints.AddObjectParams(b.ws, route, &metav1.GetOptions{})
-	case "list", "deletecollection":
-		endpoints.AddObjectParams(b.ws, route, &metav1.ListOptions{})
-	case "replace", "patch":
-		// TODO: PatchOption added in feature branch but not in master yet
-		endpoints.AddObjectParams(b.ws, route, &metav1.UpdateOptions{})
-	case "create":
-		endpoints.AddObjectParams(b.ws, route, &metav1.CreateOptions{})
-	case "delete":
-		endpoints.AddObjectParams(b.ws, route, &metav1.DeleteOptions{})
-		route.Reads(&metav1.DeleteOptions{}).ParameterNamed("body").Required(false)
-	}
-
-	// Build responses
-	switch verb {
-	case "create":
-		route.Returns(http.StatusAccepted, "Accepted", sample)
-		route.Returns(http.StatusCreated, "Created", sample)
-	case "delete":
-		route.Returns(http.StatusAccepted, "Accepted", sample)
-	case "replace":
-		route.Returns(http.StatusCreated, "Created", sample)
-	}
-
-	return route
 }
 
 // buildKubeNative builds input schema with Kubernetes' native object meta, type meta and

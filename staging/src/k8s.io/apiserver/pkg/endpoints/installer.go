@@ -57,7 +57,7 @@ type APIInstaller struct {
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", "PROXY", etc).
-type action struct {
+type Action struct {
 	Verb          string               // Verb identifying the action ("GET", "POST", "WATCH", "PROXY", etc).
 	Path          string               // The path of the action
 	Params        []*restful.Parameter // List of parameters associated with the action.
@@ -75,8 +75,8 @@ type action struct {
 	producedMIMETypes []string
 }
 
-func newAction(verb, path string, params []*restful.Parameter, allNamespaces bool) *action {
-	a := &action{
+func NewAction(verb, path string, params []*restful.Parameter, allNamespaces bool) *Action {
+	a := &Action{
 		Verb:          verb,
 		Path:          path,
 		Params:        params,
@@ -152,8 +152,8 @@ var toDiscoveryKubeVerb = map[string]string{
 	"WATCHLIST":        "watch",
 }
 
-// toRESTMethod maps an action.Verb to the RESTful method
-var toRESTMethod = map[string]string{
+// ToRESTMethod maps an action.Verb to the RESTful method
+var ToRESTMethod = map[string]string{
 	"DELETE":           "DELETE",
 	"DELETECOLLECTION": "DELETE",
 	"GET":              "GET",
@@ -165,7 +165,7 @@ var toRESTMethod = map[string]string{
 	"WATCHLIST":        "GET",
 }
 
-var toOperationPrefix = map[string]string{
+var ToOperationPrefix = map[string]string{
 	"GET":              "read",
 	"LIST":             "list",
 	"PUT":              "replace",
@@ -377,7 +377,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
 
 	params := []*restful.Parameter{}
-	actions := []*action{}
+	actions := []*Action{}
 
 	var resourceKind string
 	kindProvider, ok := storage.(rest.KindProvider)
@@ -444,41 +444,41 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// E.g. LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 		if !isSubresource {
-			actions = appendIf(actions, newAction("LIST", resource, params, true), isLister)
+			actions = appendIf(actions, NewAction("LIST", resource, params, true), isLister)
 			// DEPRECATED in 1.11
-			actions = appendIf(actions, newAction("WATCHLIST", "watch/"+resource, params, true), allowWatchList)
+			actions = appendIf(actions, NewAction("WATCHLIST", "watch/"+resource, params, true), allowWatchList)
 		}
 	}
 
 	// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 	// Add actions at the resource path: /api/apiVersion/resource
-	actions = appendIf(actions, newAction("LIST", resourcePath, resourceParams, false), isLister)
-	actions = appendIf(actions, newAction("POST", resourcePath, resourceParams, false), isCreater || isNamedCreater)
-	actions = appendIf(actions, newAction("DELETECOLLECTION", resourcePath, resourceParams, false), isCollectionDeleter)
+	actions = appendIf(actions, NewAction("LIST", resourcePath, resourceParams, false), isLister)
+	actions = appendIf(actions, NewAction("POST", resourcePath, resourceParams, false), isCreater || isNamedCreater)
+	actions = appendIf(actions, NewAction("DELETECOLLECTION", resourcePath, resourceParams, false), isCollectionDeleter)
 
 	// DEPRECATED in 1.11
-	actions = appendIf(actions, newAction("WATCHLIST", "watch/"+resourcePath, resourceParams, false), allowWatchList)
+	actions = appendIf(actions, NewAction("WATCHLIST", "watch/"+resourcePath, resourceParams, false), allowWatchList)
 
 	// Add actions at the item path: /api/apiVersion/resource/{name}
-	actions = appendIf(actions, newAction("GET", itemPath, nameParams, false), isGetter || isGetterWithOptions)
+	actions = appendIf(actions, NewAction("GET", itemPath, nameParams, false), isGetter || isGetterWithOptions)
 	var getSubpath bool
 	if isGetterWithOptions {
 		_, getSubpath, _ = getterWithOptions.NewGetOptions()
 	}
 	if getSubpath {
-		actions = appendIf(actions, newAction("GET", itemPath+"/{path:*}", proxyParams, false), isGetter || isGetterWithOptions)
+		actions = appendIf(actions, NewAction("GET", itemPath+"/{path:*}", proxyParams, false), isGetter || isGetterWithOptions)
 	}
-	actions = appendIf(actions, newAction("PUT", itemPath, nameParams, false), isUpdater)
-	actions = appendIf(actions, newAction("PATCH", itemPath, nameParams, false), isPatcher)
-	actions = appendIf(actions, newAction("DELETE", itemPath, nameParams, false), isGracefulDeleter)
+	actions = appendIf(actions, NewAction("PUT", itemPath, nameParams, false), isUpdater)
+	actions = appendIf(actions, NewAction("PATCH", itemPath, nameParams, false), isPatcher)
+	actions = appendIf(actions, NewAction("DELETE", itemPath, nameParams, false), isGracefulDeleter)
 	// DEPRECATED in 1.11
-	actions = appendIf(actions, newAction("WATCH", "watch/"+itemPath, nameParams, false), isWatcher)
-	actions = appendIf(actions, newAction("CONNECT", itemPath, nameParams, false), isConnecter)
+	actions = appendIf(actions, NewAction("WATCH", "watch/"+itemPath, nameParams, false), isWatcher)
+	actions = appendIf(actions, NewAction("CONNECT", itemPath, nameParams, false), isConnecter)
 	var connectSubpath bool
 	if isConnecter {
 		_, connectSubpath, _ = connecter.NewConnectOptions()
 	}
-	actions = appendIf(actions, newAction("CONNECT", itemPath+"/{path:*}", proxyParams, false), isConnecter && connectSubpath)
+	actions = appendIf(actions, NewAction("CONNECT", itemPath+"/{path:*}", proxyParams, false), isConnecter && connectSubpath)
 
 	for _, s := range a.group.Serializer.SupportedMediaTypes() {
 		if len(s.MediaTypeSubType) == 0 || len(s.MediaTypeType) == 0 {
@@ -556,19 +556,19 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// complete actions
 	for _, action := range actions {
 		producedMIMETypes := storageMeta.ProducesMIMETypes(action.Verb)
-		action = action.assignProducedMIMETypes(producedMIMETypes, mediaTypes, allMediaTypes)
+		action = action.AssignProducedMIMETypes(producedMIMETypes, mediaTypes, allMediaTypes)
 
-		action = action.assignConsumedMIMETypes()
+		action = action.AssignConsumedMIMETypes()
 
 		writeSample := storageMeta.ProducesObject(action.Verb)
 		if writeSample == nil {
 			writeSample = defaultVersionedObject
 		}
-		action = action.assignWriteSample(writeSample, versionedList, versionedStatus, versionedWatchEvent)
+		action = action.AssignWriteSample(writeSample, versionedList, versionedStatus, versionedWatchEvent)
 
-		action = action.assignReadSample(defaultVersionedObject, versionedDeleterObject)
+		action = action.AssignReadSample(defaultVersionedObject, versionedDeleterObject)
 
-		action, err = action.assignParameters(a.group.Creater, a.group.Typer, optionsExternalVersion, a.group.GroupVersion, storage)
+		action, err = action.AssignParameters(a.group.Creater, a.group.Typer, optionsExternalVersion, a.group.GroupVersion, storage)
 		if err != nil {
 			return nil, err
 		}
@@ -613,7 +613,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				if isSubresource {
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
-				r, err := registerActionsToWebService(action, ws, namespaceScoped, isGracefulDeleter, kind, subresource, method, doc, "connect"+strings.Title(strings.ToLower(method)))
+				r, err := RegisterActionsToWebService(action, ws, namespaceScoped, isGracefulDeleter, kind, subresource, method, doc, "connect"+strings.Title(strings.ToLower(method)))
 				if err != nil {
 					return nil, err
 				}
@@ -627,11 +627,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				}
 			}
 		} else {
-			doc, err := documentationAction(action, kind, subresource, isSubresource, isLister, isWatcher)
+			doc, err := DocumentationAction(action, kind, subresource, isSubresource, isLister, isWatcher)
 			if err != nil {
 				return nil, err
 			}
-			routes, err = registerActionsToWebService(action, ws, namespaceScoped, isGracefulDeleter, kind, subresource, toRESTMethod[action.Verb], doc, toOperationPrefix[action.Verb])
+			routes, err = RegisterActionsToWebService(action, ws, namespaceScoped, isGracefulDeleter, kind, subresource, ToRESTMethod[action.Verb], doc, ToOperationPrefix[action.Verb])
 		}
 		if err != nil {
 			return nil, err
@@ -651,7 +651,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	return a.constructAPIResource(storage, kubeVerbs, namespaceScoped, path, resourceKind)
 }
 
-func (a *action) assignParameters(creater runtime.ObjectCreater, typer runtime.ObjectTyper, externalVersion, internalVersion schema.GroupVersion, storage rest.Storage) (*action, error) {
+func (a *Action) AssignParameters(creater runtime.ObjectCreater, typer runtime.ObjectTyper, externalVersion, internalVersion schema.GroupVersion, storage rest.Storage) (*Action, error) {
 	switch a.Verb {
 	case "GET":
 		getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
@@ -739,7 +739,7 @@ func (a *action) assignParameters(creater runtime.ObjectCreater, typer runtime.O
 	return a, nil
 }
 
-func (a *action) addOptions(creater runtime.ObjectCreater, groupVersion schema.GroupVersion, options string) error {
+func (a *Action) addOptions(creater runtime.ObjectCreater, groupVersion schema.GroupVersion, options string) error {
 	versionedOptions, err := creater.New(groupVersion.WithKind(options))
 	if err != nil {
 		return err
@@ -848,7 +848,7 @@ func (a *APIInstaller) constructRequestScope(fqKindToRegister schema.GroupVersio
 	return reqScope, nil
 }
 
-func (a *action) assignConsumedMIMETypes() *action {
+func (a *Action) AssignConsumedMIMETypes() *Action {
 	switch a.Verb {
 	case "PATCH": // Partially update a resource
 		a.consumedMIMETypes = supportedPatchTypes()
@@ -858,7 +858,7 @@ func (a *action) assignConsumedMIMETypes() *action {
 	return a
 }
 
-func (a *action) assignProducedMIMETypes(producedMIMETypes, mediaTypes, allMediaTypes []string) *action {
+func (a *Action) AssignProducedMIMETypes(producedMIMETypes, mediaTypes, allMediaTypes []string) *Action {
 	switch a.Verb {
 	case "LIST":
 		producedMIMETypes = append(producedMIMETypes, allMediaTypes...)
@@ -873,7 +873,7 @@ func (a *action) assignProducedMIMETypes(producedMIMETypes, mediaTypes, allMedia
 	return a
 }
 
-func (a *action) assignWriteSample(writeSample, versionedList, versionedStatus, versionedWatchEvent interface{}) *action {
+func (a *Action) AssignWriteSample(writeSample, versionedList, versionedStatus, versionedWatchEvent interface{}) *Action {
 	switch a.Verb {
 	case "LIST":
 		writeSample = versionedList
@@ -887,7 +887,7 @@ func (a *action) assignWriteSample(writeSample, versionedList, versionedStatus, 
 	return a
 }
 
-func (a *action) assignReadSample(defaultVersionedObject, versionedDeleterObject interface{}) *action {
+func (a *Action) AssignReadSample(defaultVersionedObject, versionedDeleterObject interface{}) *Action {
 	switch a.Verb {
 	case "PUT", "POST":
 		a.readSample = defaultVersionedObject
@@ -899,7 +899,7 @@ func (a *action) assignReadSample(defaultVersionedObject, versionedDeleterObject
 	return a
 }
 
-func documentationAction(action *action, kind, subresource string, isSubresource, isLister, isWatcher bool) (string, error) {
+func DocumentationAction(action *Action, kind, subresource string, isSubresource, isLister, isWatcher bool) (string, error) {
 	var doc string
 	switch action.Verb {
 	case "GET": // Get a resource.
@@ -970,7 +970,7 @@ func documentationAction(action *action, kind, subresource string, isSubresource
 	return doc, nil
 }
 
-func registerActionsToWebService(action *action, ws *restful.WebService, isNamespaced, isGracefulDeleter bool, kind, subresource, method, doc, operation string) ([]*restful.RouteBuilder, error) {
+func RegisterActionsToWebService(action *Action, ws *restful.WebService, isNamespaced, isGracefulDeleter bool, kind, subresource, method, doc, operation string) ([]*restful.RouteBuilder, error) {
 	var namespaced string
 	var operationSuffix string
 	if isNamespaced {
@@ -1025,7 +1025,7 @@ func indirectArbitraryPointer(ptrToObject interface{}) interface{} {
 	return reflect.Indirect(reflect.ValueOf(ptrToObject)).Interface()
 }
 
-func appendIf(actions []*action, a *action, shouldAppend bool) []*action {
+func appendIf(actions []*Action, a *Action, shouldAppend bool) []*Action {
 	if shouldAppend {
 		actions = append(actions, a)
 	}
@@ -1036,55 +1036,6 @@ func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 	for _, param := range params {
 		route.Param(param)
 	}
-}
-
-// AddObjectParams converts a runtime.Object into a set of go-restful Param() definitions on the route.
-// The object must be a pointer to a struct; only fields at the top level of the struct that are not
-// themselves interfaces or structs are used; only fields with a json tag that is non empty (the standard
-// Go JSON behavior for omitting a field) become query parameters. The name of the query parameter is
-// the JSON field name. If a description struct tag is set on the field, that description is used on the
-// query parameter. In essence, it converts a standard JSON top level object into a query param schema.
-func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj interface{}) error {
-	sv, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return err
-	}
-	st := sv.Type()
-	switch st.Kind() {
-	case reflect.Struct:
-		for i := 0; i < st.NumField(); i++ {
-			name := st.Field(i).Name
-			sf, ok := st.FieldByName(name)
-			if !ok {
-				continue
-			}
-			switch sf.Type.Kind() {
-			case reflect.Interface, reflect.Struct:
-			case reflect.Ptr:
-				// TODO: This is a hack to let metav1.Time through. This needs to be fixed in a more generic way eventually. bug #36191
-				if (sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct) && strings.TrimPrefix(sf.Type.String(), "*") != "metav1.Time" {
-					continue
-				}
-				fallthrough
-			default:
-				jsonTag := sf.Tag.Get("json")
-				if len(jsonTag) == 0 {
-					continue
-				}
-				jsonName := strings.SplitN(jsonTag, ",", 2)[0]
-				if len(jsonName) == 0 {
-					continue
-				}
-
-				var desc string
-				if docable, ok := obj.(documentable); ok {
-					desc = docable.SwaggerDoc()[jsonName]
-				}
-				route.Param(ws.QueryParameter(jsonName, desc).DataType(typeToJSON(sf.Type.String())))
-			}
-		}
-	}
-	return nil
 }
 
 // addObjectParams converts a runtime.Object into a set of go-restful Param() definitions on the route.
