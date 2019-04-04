@@ -105,7 +105,7 @@ func TestListWatchesCanList(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		defer server.Close()
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
+		lw := NewListWatchFromClient(client.CoreV1().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		lw.DisableChunking = true
 		// This test merely tests that the correct request is made.
 		lw.List(metav1.ListOptions{})
@@ -172,7 +172,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		defer server.Close()
 		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-		lw := NewListWatchFromClient(client.Core().RESTClient(), item.resource, item.namespace, item.fieldSelector)
+		lw := NewListWatchFromClient(client.CoreV1().RESTClient(), item.resource, item.namespace, item.fieldSelector)
 		// This test merely tests that the correct request is made.
 		lw.Watch(metav1.ListOptions{ResourceVersion: item.rv})
 		handler.ValidateRequest(t, item.location, "GET", nil)
