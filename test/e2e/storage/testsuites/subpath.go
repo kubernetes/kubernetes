@@ -439,7 +439,7 @@ func TestBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 
 	By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
-	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
+	framework.ExpectNoError(err, "while deleting pod")
 }
 
 func generateSuffixForPodName(s string) string {
@@ -699,7 +699,7 @@ func testReadFile(f *framework.Framework, file string, pod *v1.Pod, containerInd
 
 	By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
-	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
+	framework.ExpectNoError(err, "while deleting pod")
 }
 
 func testPodFailSubpath(f *framework.Framework, pod *v1.Pod, allowContainerTerminationError bool) {
@@ -716,7 +716,7 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 	}()
 	By("Checking for subpath error in container status")
 	err = waitForPodSubpathError(f, pod, allowContainerTerminationError)
-	Expect(err).NotTo(HaveOccurred(), "while waiting for subpath failure")
+	framework.ExpectNoError(err, "while waiting for subpath failure")
 }
 
 func findSubpathContainerName(pod *v1.Pod) string {

@@ -236,7 +236,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		// TODO: make class creation optional and remove the IsAlreadyExists exception
 		Expect(err == nil || apierrs.IsAlreadyExists(err)).To(Equal(true))
 		class, err = client.StorageV1().StorageClasses().Get(class.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
 			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(class.Name, nil))
@@ -245,7 +245,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 
 	By("creating a claim")
 	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer func() {
 		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 		// typically this claim has already been deleted
@@ -283,11 +283,11 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 // checkProvisioning verifies that the claim is bound and has the correct properities
 func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storagev1.StorageClass) *v1.PersistentVolume {
 	err := framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	By("checking the claim")
 	pv, err := framework.GetBoundPV(client, claim)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Check sizes
 	expectedCapacity := resource.MustParse(t.ExpectedSize)
@@ -353,14 +353,14 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 	}()
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
 	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred(), "get pod")
+	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
 	StopPod(client, pod)
 	pod = nil // Don't stop twice.
 
 	// Get a new copy of the PV
 	volume, err := framework.GetBoundPV(client, claim)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("checking the created volume has the correct mount options, is readable and retains data on the same node %q", actualNodeName))
 	command = "grep 'hello world' /mnt/test/data"
@@ -406,7 +406,7 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 	pod = StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-writer-node1", command, node)
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
 	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred(), "get pod")
+	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
 	StopPod(client, pod)
 	pod = nil // Don't stop twice.
@@ -422,7 +422,7 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 	pod = StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-reader-node2", command, secondNode)
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
 	runningPod, err = client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred(), "get pod")
+	framework.ExpectNoError(err, "get pod")
 	Expect(runningPod.Spec.NodeName).NotTo(Equal(actualNodeName), "second pod should have run on a different node")
 	StopPod(client, pod)
 	pod = nil
@@ -443,7 +443,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 
 	By("creating a storage class " + t.Class.Name)
 	class, err := t.Client.StorageV1().StorageClasses().Create(t.Class)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer deleteStorageClass(t.Client, class.Name)
 
 	By("creating claims")
@@ -453,7 +453,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 		c, err := t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
 		claimNames = append(claimNames, c.Name)
 		createdClaims = append(createdClaims, c)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 	defer func() {
 		var errors map[string]error
@@ -484,7 +484,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	} else {
 		pod, err = framework.CreatePod(t.Client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
 	}
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer func() {
 		framework.DeletePodOrFail(t.Client, pod.Namespace, pod.Name)
 		framework.WaitForPodToDisappear(t.Client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
@@ -497,20 +497,20 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 
 	// collect node details
 	node, err := t.Client.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	By("re-checking the claims to see they binded")
 	var pvs []*v1.PersistentVolume
 	for _, claim := range createdClaims {
 		// Get new copy of the claim
 		claim, err = t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		// make sure claim did bind
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, t.Client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		pv, err := t.Client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		pvs = append(pvs, pv)
 	}
 	Expect(len(pvs)).To(Equal(len(createdClaims)))
@@ -594,7 +594,7 @@ func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeCl
 	for _, claim := range pvcs {
 		// Get new copy of the claim
 		claim, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
 	}
 }
@@ -611,19 +611,19 @@ func prepareDataSourceForProvisioning(
 	if class != nil {
 		By("[Initialize dataSource]creating a StorageClass " + class.Name)
 		_, err = client.StorageV1().StorageClasses().Create(class)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 
 	By("[Initialize dataSource]creating a initClaim")
 	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Create(initClaim)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, updatedClaim.Namespace, updatedClaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	By("[Initialize dataSource]checking the initClaim")
 	// Get new copy of the initClaim
 	_, err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Get(updatedClaim.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// write namespace to the /mnt/test (= the volume).
 	By("[Initialize dataSource]write data to volume")
@@ -636,15 +636,15 @@ func prepareDataSourceForProvisioning(
 	By("[Initialize dataSource]creating a snapshot")
 	snapshot := getSnapshot(updatedClaim.Name, updatedClaim.Namespace, snapshotClass.GetName())
 	snapshot, err = dynamicClient.Resource(snapshotGVR).Namespace(updatedClaim.Namespace).Create(snapshot, metav1.CreateOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	WaitForSnapshotReady(dynamicClient, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	By("[Initialize dataSource]checking the snapshot")
 	// Get new copy of the snapshot
 	snapshot, err = dynamicClient.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Get(snapshot.GetName(), metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	group := "snapshot.storage.k8s.io"
 	dataSourceRef := &v1.TypedLocalObjectReference{
 		APIGroup: &group,

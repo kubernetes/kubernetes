@@ -61,7 +61,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		}
 		By("creating vmdk")
 		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		volumePaths = append(volumePaths, volumePath)
 	})
 
@@ -180,7 +180,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 	It("should create and delete pod with multiple volumes from same datastore", func() {
 		By("creating another vmdk")
 		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		volumePaths = append(volumePaths, volumePath)
 
 		By(fmt.Sprintf("Creating pod on the node: %v with volume: %v and volume: %v", node1Name, volumePaths[0], volumePaths[1]))
@@ -228,7 +228,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		volumeOptions.Datastore = GetAndExpectStringEnvVar(SecondSharedDatastore)
 		volumePath, err := vsp.CreateVolume(volumeOptions, nodeInfo.DataCenterRef)
 
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		volumePaths = append(volumePaths, volumePath)
 
 		By(fmt.Sprintf("Creating pod on the node: %v with volume :%v  and volume: %v", node1Name, volumePaths[0], volumePaths[1]))
@@ -295,7 +295,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		// Create another VMDK Volume
 		By("creating another vmdk")
 		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		volumePaths = append(volumePaths, volumePath)
 		testvolumePathsPodB = append(testvolumePathsPodA, volumePath)
 
@@ -358,14 +358,14 @@ func createPodWithVolumeAndNodeSelector(client clientset.Interface, namespace st
 	podspec := getVSpherePodSpecWithVolumePaths(volumePaths, nodeKeyValueLabel, nil)
 
 	pod, err = client.CoreV1().Pods(namespace).Create(podspec)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	By("Waiting for pod to be ready")
 	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
 
 	By(fmt.Sprintf("Verify volume is attached to the node:%v", nodeName))
 	for _, volumePath := range volumePaths {
 		isAttached, err := diskIsAttached(volumePath, nodeName)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		Expect(isAttached).To(BeTrue(), "disk:"+volumePath+" is not attached with the node")
 	}
 	return pod

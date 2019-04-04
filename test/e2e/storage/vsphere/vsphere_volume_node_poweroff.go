@@ -77,36 +77,36 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		By("Creating a Storage Class")
 		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil)
 		storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 		By("Creating PVC using the Storage Class")
 		pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "1Gi", storageclass)
 		pvclaim, err := framework.CreatePVC(client, namespace, pvclaimSpec)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create PVC with err: %v", err))
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to create PVC with err: %v", err))
 		defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 		By("Waiting for PVC to be in bound phase")
 		pvclaims := []*v1.PersistentVolumeClaim{pvclaim}
 		pvs, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to wait until PVC phase set to bound: %v", err))
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to wait until PVC phase set to bound: %v", err))
 		volumePath := pvs[0].Spec.VsphereVolume.VolumePath
 
 		By("Creating a Deployment")
 		deployment, err := framework.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create Deployment with err: %v", err))
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
 		defer client.AppsV1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
 
 		By("Get pod from the deployement")
 		podList, err := framework.GetPodsForDeployment(client, deployment)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get pod from the deployement with err: %v", err))
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod from the deployement with err: %v", err))
 		Expect(podList.Items).NotTo(BeEmpty())
 		pod := podList.Items[0]
 		node1 := pod.Spec.NodeName
 
 		By(fmt.Sprintf("Verify disk is attached to the node: %v", node1))
 		isAttached, err := diskIsAttached(volumePath, node1)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		Expect(isAttached).To(BeTrue(), "Disk is not attached to the node")
 
 		By(fmt.Sprintf("Power off the node: %v", node1))
@@ -116,28 +116,28 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		_, err = vm.PowerOff(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		defer vm.PowerOn(ctx)
 
 		err = vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOff)
-		Expect(err).NotTo(HaveOccurred(), "Unable to power off the node")
+		framework.ExpectNoError(err, "Unable to power off the node")
 
 		// Waiting for the pod to be failed over to a different node
 		node2, err := waitForPodToFailover(client, deployment, node1)
-		Expect(err).NotTo(HaveOccurred(), "Pod did not fail over to a different node")
+		framework.ExpectNoError(err, "Pod did not fail over to a different node")
 
 		By(fmt.Sprintf("Waiting for disk to be attached to the new node: %v", node2))
 		err = waitForVSphereDiskToAttach(volumePath, node2)
-		Expect(err).NotTo(HaveOccurred(), "Disk is not attached to the node")
+		framework.ExpectNoError(err, "Disk is not attached to the node")
 
 		By(fmt.Sprintf("Waiting for disk to be detached from the previous node: %v", node1))
 		err = waitForVSphereDiskToDetach(volumePath, node1)
-		Expect(err).NotTo(HaveOccurred(), "Disk is not detached from the node")
+		framework.ExpectNoError(err, "Disk is not detached from the node")
 
 		By(fmt.Sprintf("Power on the previous node: %v", node1))
 		vm.PowerOn(ctx)
 		err = vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOn)
-		Expect(err).NotTo(HaveOccurred(), "Unable to power on the node")
+		framework.ExpectNoError(err, "Unable to power on the node")
 	})
 })
 

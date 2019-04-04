@@ -72,7 +72,7 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		Expect(err).To(HaveOccurred())
 		errorMsg := `Failed to provision volume with StorageClass \"` + DatastoreSCName + `\": The specified datastore ` + InvalidDatastore + ` is not a shared datastore across node VMs`
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 })
@@ -80,12 +80,12 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 func invokeInvalidDatastoreTestNeg(client clientset.Interface, namespace string, scParameters map[string]string) error {
 	By("Creating Storage Class With Invalid Datastore")
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(DatastoreSCName, scParameters, nil))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
+	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	By("Expect claim to fail provisioning volume")

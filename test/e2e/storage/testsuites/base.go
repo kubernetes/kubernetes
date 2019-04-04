@@ -23,7 +23,6 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -201,7 +200,7 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			By("creating a StorageClass " + r.sc.Name)
 			var err error
 			r.sc, err = cs.StorageV1().StorageClasses().Create(r.sc)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			if r.sc != nil {
 				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPVFromDynamicProvisionSC(
@@ -289,10 +288,10 @@ func createVolumeSourceWithPVCPV(
 
 	framework.Logf("Creating PVC and PV")
 	pv, pvc, err := framework.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
-	Expect(err).NotTo(HaveOccurred(), "PVC, PV creation failed")
+	framework.ExpectNoError(err, "PVC, PV creation failed")
 
 	err = framework.WaitOnPVandPVC(f.ClientSet, f.Namespace.Name, pv, pvc)
-	Expect(err).NotTo(HaveOccurred(), "PVC, PV failed to bind")
+	framework.ExpectNoError(err, "PVC, PV failed to bind")
 
 	volSource := &v1.VolumeSource{
 		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
@@ -323,20 +322,20 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 
 	var err error
 	pvc, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	if !isDelayedBinding(sc) {
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 
 	pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	var pv *v1.PersistentVolume
 	if !isDelayedBinding(sc) {
 		pv, err = cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 
 	volSource := &v1.VolumeSource{
@@ -380,7 +379,7 @@ func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
 func deleteStorageClass(cs clientset.Interface, className string) {
 	err := cs.StorageV1().StorageClasses().Delete(className, nil)
 	if err != nil && !apierrs.IsNotFound(err) {
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 }
 
