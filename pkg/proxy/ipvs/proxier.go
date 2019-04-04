@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -480,7 +481,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 		return nil, err
 	}
 	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
-	b, err := ioutil.ReadFile(builtinModsFilePath)
+	b, err := ioutil.ReadFile(filepath.Clean(builtinModsFilePath))
 	if err != nil {
 		klog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", builtinModsFilePath, err)
 	}
