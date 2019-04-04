@@ -388,12 +388,12 @@ func (ssc *StatefulSetController) processNextWorkItem() bool {
 	if quit {
 		return false
 	}
-	defer ssc.queue.Done(key)
 	if err := ssc.sync(key.(string)); err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing StatefulSet %v, requeuing: %v", key.(string), err))
 		ssc.queue.AddRateLimited(key)
 	} else {
 		ssc.queue.Forget(key)
+		ssc.queue.Done(key)
 	}
 	return true
 }
