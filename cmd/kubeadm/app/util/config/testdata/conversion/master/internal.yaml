@@ -59,6 +59,7 @@ ComponentConfigs:
       ExcludeCIDRs: null
       MinSyncPeriod: 0s
       Scheduler: ""
+      StrictARP: false
       SyncPeriod: 30s
     MetricsBindAddress: 127.0.0.1:10249
     Mode: iptables

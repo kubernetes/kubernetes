@@ -196,6 +196,7 @@ func newProxyServer(
 			config.IPVS.SyncPeriod.Duration,
 			config.IPVS.MinSyncPeriod.Duration,
 			config.IPVS.ExcludeCIDRs,
+			config.IPVS.StrictARP,
 			config.IPTables.MasqueradeAll,
 			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
