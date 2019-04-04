@@ -3027,7 +3027,7 @@ function kube-down() {
     # change during a cluster upgrade.)
     local templates=$(get-template "${PROJECT}")
 
-    local all_instance_groups=(${INSTANCE_GROUPS[@]} ${WINDOWS_INSTANCE_GROUPS[@]})
+    local all_instance_groups=(${INSTANCE_GROUPS[@]:-} ${WINDOWS_INSTANCE_GROUPS[@]:-})
     for group in ${all_instance_groups[@]:-}; do
       if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
         gcloud compute instance-groups managed delete \
