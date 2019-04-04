@@ -293,7 +293,7 @@ func writeKeyFilesIfNotExist(pkiDir string, baseName string, key *rsa.PrivateKey
 	return nil
 }
 
-// writeCertificateAuthorithyFilesIfNotExist write a new CSR to the given path.
+// writeCSRFilesIfNotExist writes a new CSR to the given path.
 // If there already is a CSR file at the given path; kubeadm tries to load it and check if it's a valid certificate.
 // otherwise this function returns an error.
 func writeCSRFilesIfNotExist(csrDir string, baseName string, csr *x509.CertificateRequest, key *rsa.PrivateKey) error {
