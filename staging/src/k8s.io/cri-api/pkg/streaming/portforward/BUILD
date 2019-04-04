@@ -14,7 +14,8 @@ go_library(
         "portforward.go",
         "websocket.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/server/portforward",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cri-api/pkg/streaming/portforward",
+    importpath = "k8s.io/cri-api/pkg/streaming/portforward",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

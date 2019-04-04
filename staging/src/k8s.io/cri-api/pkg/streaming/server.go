@@ -35,8 +35,8 @@ import (
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
-	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
+	"k8s.io/cri-api/pkg/streaming/portforward"
+	remotecommandserver "k8s.io/cri-api/pkg/streaming/remotecommand"
 )
 
 // Server is the library interface to serve the stream requests.
