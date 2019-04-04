@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/remote/fake"
 )
 
@@ -45,7 +46,7 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 }
 
 func createRemoteRuntimeService(endpoint string, t *testing.T) internalapi.RuntimeService {
-	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout)
+	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, kubeletconfig.DefaultKubeletPodSandboxImageName)
 	require.NoError(t, err)
 
 	return runtimeService

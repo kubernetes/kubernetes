@@ -22,6 +22,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
+        "//pkg/kubelet/config:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",

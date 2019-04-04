@@ -25,17 +25,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-const (
-	// When these values are updated, also update test/e2e/framework/util.go
-	defaultPodSandboxImageName    = "k8s.gcr.io/pause"
-	defaultPodSandboxImageVersion = "3.1"
-)
-
-var (
-	defaultPodSandboxImage = defaultPodSandboxImageName +
-		":" + defaultPodSandboxImageVersion
-)
-
 // NewContainerRuntimeOptions will create a new ContainerRuntimeOptions with
 // default values.
 func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
@@ -49,7 +38,7 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 		RedirectContainerStreaming: false,
 		DockerEndpoint:             dockerEndpoint,
 		DockershimRootDirectory:    "/var/lib/dockershim",
-		PodSandboxImage:            defaultPodSandboxImage,
+		PodSandboxImage:            config.DefaultKubeletPodSandboxImageName,
 		ImagePullProgressDeadline:  metav1.Duration{Duration: 1 * time.Minute},
 		ExperimentalDockershim:     false,
 

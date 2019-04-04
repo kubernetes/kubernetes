@@ -31,6 +31,7 @@ go_library(
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/cm/devicemanager:go_default_library",
+        "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/remote:go_default_library",

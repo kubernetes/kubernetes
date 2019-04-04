@@ -368,6 +368,8 @@ message RunPodSandboxRequest {
     // behavior before this feature was added.
     // See https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
     string runtime_handler = 2;
+    // The image whose network/ipc namespaces containers in each pod will use.
+    ImageSpec image = 3;
 }
 
 message RunPodSandboxResponse {

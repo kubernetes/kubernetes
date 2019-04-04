@@ -32,6 +32,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -39,8 +40,6 @@ import (
 )
 
 const (
-	defaultSandboxImage = "k8s.gcr.io/pause:3.1"
-
 	// Various default sandbox resources requests/limits.
 	defaultSandboxCPUshares int64 = 2
 
@@ -82,7 +81,7 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	config := r.GetConfig()
 
 	// Step 1: Pull the image for the sandbox.
-	image := defaultSandboxImage
+	image := kubeletconfig.DefaultKubeletPodSandboxImageName
 	podSandboxImage := ds.podSandboxImage
 	if len(podSandboxImage) != 0 {
 		image = podSandboxImage

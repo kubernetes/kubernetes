@@ -26,4 +26,5 @@ const (
 	DefaultKubeletContainersDirName          = "containers"
 	DefaultKubeletPluginContainersDirName    = "plugin-containers"
 	DefaultKubeletPodResourcesDirName        = "pod-resources"
+	DefaultKubeletPodSandboxImageName        = "k8s.gcr.io/pause:3.1"
 )

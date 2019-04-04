@@ -38,6 +38,7 @@ go_library(
         "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/checkpointmanager/checksum:go_default_library",
         "//pkg/kubelet/checkpointmanager/errors:go_default_library",
+        "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/cm:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
@@ -100,6 +101,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/checkpointmanager:go_default_library",
+        "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",

@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -184,7 +185,7 @@ func TestSandboxStatusAfterRestart(t *testing.T) {
 	fClock.SetTime(time.Now())
 	expected.CreatedAt = fClock.Now().UnixNano()
 
-	createConfig, err := ds.makeSandboxDockerConfig(config, defaultSandboxImage)
+	createConfig, err := ds.makeSandboxDockerConfig(config, kubeletconfig.DefaultKubeletPodSandboxImageName)
 	assert.NoError(t, err)
 
 	createResp, err := ds.client.CreateContainer(*createConfig)

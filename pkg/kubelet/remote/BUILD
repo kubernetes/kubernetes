@@ -46,6 +46,7 @@ go_test(
     srcs = ["remote_runtime_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/remote/fake:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/testing:go_default_library",

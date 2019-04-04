@@ -43,6 +43,7 @@ import (
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubeletdefaults "k8s.io/kubernetes/pkg/kubelet/config"
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
@@ -394,7 +395,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout)
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, kubeletdefaults.DefaultKubeletPodSandboxImageName)
 	if err != nil {
 		return nil, nil, err
 	}

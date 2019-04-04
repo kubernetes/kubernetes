@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/config"
 
 	"k8s.io/client-go/tools/cache"
 
@@ -61,7 +62,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 				Containers: []v1.Container{
 					{
 						Name:  "pause",
-						Image: "k8s.gcr.io/pause:3.1",
+						Image: kubeletconfig.DefaultKubeletPodSandboxImageName,
 					},
 				},
 			},
@@ -80,7 +81,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 					Containers: []v1.Container{
 						{
 							Name:  "pause",
-							Image: "k8s.gcr.io/pause:3.1",
+							Image: kubeletconfig.DefaultKubeletPodSandboxImageName,
 						},
 					},
 					Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute}},
@@ -99,7 +100,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 					Containers: []v1.Container{
 						{
 							Name:  "pause",
-							Image: "k8s.gcr.io/pause:3.1",
+							Image: kubeletconfig.DefaultKubeletPodSandboxImageName,
 						},
 					},
 					// default - tolerate forever

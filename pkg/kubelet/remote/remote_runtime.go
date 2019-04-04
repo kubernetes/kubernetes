@@ -42,6 +42,8 @@ type RemoteRuntimeService struct {
 	// Time last per-container error message was printed
 	errorPrinted map[string]time.Time
 	errorMapLock sync.Mutex
+	// The image used for the pod sandbox
+	podSandboxImage string
 }
 
 const (
@@ -50,7 +52,7 @@ const (
 )
 
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
-func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (internalapi.RuntimeService, error) {
+func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, podSandboxImage string) (internalapi.RuntimeService, error) {
 	klog.V(3).Infof("Connecting to runtime service %s", endpoint)
 	addr, dailer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
@@ -66,10 +68,11 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (
 	}
 
 	return &RemoteRuntimeService{
-		timeout:       connectionTimeout,
-		runtimeClient: runtimeapi.NewRuntimeServiceClient(conn),
-		lastError:     make(map[string]string),
-		errorPrinted:  make(map[string]time.Time),
+		timeout:         connectionTimeout,
+		runtimeClient:   runtimeapi.NewRuntimeServiceClient(conn),
+		lastError:       make(map[string]string),
+		errorPrinted:    make(map[string]time.Time),
+		podSandboxImage: podSandboxImage,
 	}, nil
 }
 
@@ -104,6 +107,7 @@ func (r *RemoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig
 	resp, err := r.runtimeClient.RunPodSandbox(ctx, &runtimeapi.RunPodSandboxRequest{
 		Config:         config,
 		RuntimeHandler: runtimeHandler,
+		Image:          &runtimeapi.ImageSpec{Image: r.podSandboxImage},
 	})
 	if err != nil {
 		klog.Errorf("RunPodSandbox from runtime service failed: %v", err)
