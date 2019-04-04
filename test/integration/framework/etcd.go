@@ -36,7 +36,7 @@ var etcdURL = ""
 
 const installEtcd = `
 Cannot find etcd, cannot run integration tests
-Please see https://git.k8s.io/community/contributors/devel/sig-testing/testing.md#install-etcd-dependency for instructions.
+Please see https://git.k8s.io/community/contributors/devel/sig-testing/integration-tests.md#install-etcd-dependency for instructions.
 
 You can use 'hack/install-etcd.sh' to install a copy in third_party/.
 

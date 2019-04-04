@@ -42,7 +42,7 @@ func WaitForAuthorizationUpdate(c v1beta1authorization.SubjectAccessReviewsGette
 	return WaitForNamedAuthorizationUpdate(c, user, namespace, verb, "", resource, allowed)
 }
 
-// WaitForAuthorizationUpdate checks if the given user can perform the named verb and action on the named resource.
+// WaitForNamedAuthorizationUpdate checks if the given user can perform the named verb and action on the named resource.
 // If policyCachePollTimeout is reached without the expected condition matching, an error is returned
 func WaitForNamedAuthorizationUpdate(c v1beta1authorization.SubjectAccessReviewsGetter, user, namespace, verb, resourceName string, resource schema.GroupResource, allowed bool) error {
 	review := &authorizationv1beta1.SubjectAccessReview{
@@ -133,6 +133,7 @@ var (
 	isRBACEnabled     bool
 )
 
+// IsRBACEnabled returns true if RBAC is enabled. Otherwise false.
 func IsRBACEnabled(f *Framework) bool {
 	isRBACEnabledOnce.Do(func() {
 		crs, err := f.ClientSet.RbacV1().ClusterRoles().List(metav1.ListOptions{})

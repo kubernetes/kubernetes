@@ -30,8 +30,6 @@ import (
 )
 
 const (
-	controlPlaneV1alpha3YAML          = "testdata/conversion/controlplane/v1alpha3.yaml"
-	controlPlaneV1alpha3YAMLNonLinux  = "testdata/conversion/controlplane/v1alpha3_non_linux.yaml"
 	controlPlaneV1beta1YAML           = "testdata/conversion/controlplane/v1beta1.yaml"
 	controlPlaneV1beta1YAMLNonLinux   = "testdata/conversion/controlplane/v1beta1_non_linux.yaml"
 	controlPlaneInternalYAML          = "testdata/conversion/controlplane/internal.yaml"
@@ -86,26 +84,6 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 				cfgFiles["Kubelet_componentconfig"],
 			}, []byte(constants.YAMLDocumentSeparator)),
 		},
-		{
-			name:         "v1alpha3.partial1",
-			fileContents: cfgFiles["InitConfiguration_v1alpha3"],
-			expectErr:    true,
-		},
-		{
-			name:         "v1alpha3.partial2",
-			fileContents: cfgFiles["ClusterConfiguration_v1alpha3"],
-			expectErr:    true,
-		},
-		{
-			name: "v1alpha3.full",
-			fileContents: bytes.Join([][]byte{
-				cfgFiles["InitConfiguration_v1alpha3"],
-				cfgFiles["ClusterConfiguration_v1alpha3"],
-				cfgFiles["Kube-proxy_componentconfig"],
-				cfgFiles["Kubelet_componentconfig"],
-			}, []byte(constants.YAMLDocumentSeparator)),
-			expectErr: true,
-		},
 	}
 
 	for _, rt := range tests {
@@ -138,12 +116,10 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 
 /*
 func TestInitConfigurationMarshallingFromFile(t *testing.T) {
-	controlPlaneV1alpha3YAMLAbstracted := controlPlaneV1alpha3YAML
 	controlPlaneV1beta1YAMLAbstracted := controlPlaneV1beta1YAML
 	controlPlaneInternalYAMLAbstracted := controlPlaneInternalYAML
 	controlPlaneDefaultedYAMLAbstracted := controlPlaneDefaultedYAML
 	if runtime.GOOS != "linux" {
-		controlPlaneV1alpha3YAMLAbstracted = controlPlaneV1alpha3YAMLNonLinux
 		controlPlaneV1beta1YAMLAbstracted = controlPlaneV1beta1YAMLNonLinux
 		controlPlaneInternalYAMLAbstracted = controlPlaneInternalYAMLNonLinux
 		controlPlaneDefaultedYAMLAbstracted = controlPlaneDefaultedYAMLNonLinux
@@ -156,11 +132,6 @@ func TestInitConfigurationMarshallingFromFile(t *testing.T) {
 	}{
 		// These tests are reading one file, loading it using LoadInitConfigurationFromFile that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha3 -> internal
-			name:        "v1alpha3IsDeprecated",
-			in:          controlPlaneV1alpha3YAMLAbstracted,
-			expectedErr: true,
-		},
 		//{ // v1beta1 -> internal NB. test commented after changes required for upgrading to go v1.12
 		//	name:         "v1beta1ToInternal",
 		//	in:           controlPlaneV1beta1YAMLAbstracted,

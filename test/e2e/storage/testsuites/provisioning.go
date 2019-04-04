@@ -18,14 +18,14 @@ package testsuites
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,7 +51,7 @@ type StorageClassTest struct {
 	DelayBinding         bool
 	ClaimSize            string
 	ExpectedSize         string
-	PvCheck              func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume)
+	PvCheck              func(claim *v1.PersistentVolumeClaim)
 	VolumeMode           *v1.PersistentVolumeMode
 	AllowVolumeExpansion bool
 }
@@ -147,6 +147,9 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		init()
 		defer cleanup()
 
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
+			PVWriteReadSingleNodeCheck(l.cs, claim, framework.NodeSelection{Name: l.config.ClientNodeName})
+		}
 		l.testCase.TestDynamicProvisioning()
 	})
 
@@ -159,6 +162,9 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		defer cleanup()
 
 		l.testCase.Class.MountOptions = dInfo.SupportedMountOption.Union(dInfo.RequiredMountOption).List()
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
+			PVWriteReadSingleNodeCheck(l.cs, claim, framework.NodeSelection{Name: l.config.ClientNodeName})
+		}
 		l.testCase.TestDynamicProvisioning()
 	})
 
@@ -179,23 +185,9 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		if len(nodes.Items) <= 1 {
 			framework.Skipf("need more than one node - skipping")
 		}
-		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-			PVMultiNodeCheck(l.cs, claim, volume, NodeSelection{Name: l.config.ClientNodeName})
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
+			PVMultiNodeCheck(l.cs, claim, framework.NodeSelection{Name: l.config.ClientNodeName})
 		}
-		l.testCase.TestDynamicProvisioning()
-	})
-
-	It("should create and delete block persistent volumes", func() {
-		if !dInfo.Capabilities[CapBlock] {
-			framework.Skipf("Driver %q does not support BlockVolume - skipping", dInfo.Name)
-		}
-
-		init()
-		defer cleanup()
-
-		block := v1.PersistentVolumeBlock
-		l.testCase.VolumeMode = &block
-		l.pvc.Spec.VolumeMode = &block
 		l.testCase.TestDynamicProvisioning()
 	})
 
@@ -214,62 +206,14 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 		dc := l.config.Framework.DynamicClient
 		vsc := sDriver.GetSnapshotClass(l.config)
-		dataSource, cleanupFunc := prepareDataSourceForProvisioning(NodeSelection{Name: l.config.ClientNodeName}, l.cs, dc, l.pvc, l.sc, vsc)
+		dataSource, cleanupFunc := prepareDataSourceForProvisioning(framework.NodeSelection{Name: l.config.ClientNodeName}, l.cs, dc, l.pvc, l.sc, vsc)
 		defer cleanupFunc()
 
 		l.pvc.Spec.DataSource = dataSource
-		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			By("checking whether the created volume has the pre-populated data")
 			command := fmt.Sprintf("grep '%s' /mnt/test/initialData", claim.Namespace)
-			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, NodeSelection{Name: l.config.ClientNodeName})
-		}
-		l.testCase.TestDynamicProvisioning()
-	})
-
-	It("should allow concurrent writes on the same node", func() {
-		if !dInfo.Capabilities[CapMultiPODs] {
-			framework.Skipf("Driver %q does not support multiple concurrent pods - skipping", dInfo.Name)
-		}
-
-		init()
-		defer cleanup()
-
-		l.testCase.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
-			// We start two pods concurrently on the same node,
-			// using the same PVC. Both wait for other to create a
-			// file before returning. The pods are forced onto the
-			// same node via pod affinity.
-			wg := sync.WaitGroup{}
-			wg.Add(2)
-			firstPodName := "pvc-tester-first"
-			secondPodName := "pvc-tester-second"
-			run := func(podName, command string) {
-				defer GinkgoRecover()
-				defer wg.Done()
-				node := NodeSelection{
-					Name: l.config.ClientNodeName,
-				}
-				if podName == secondPodName {
-					node.Affinity = &v1.Affinity{
-						PodAffinity: &v1.PodAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-								{LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										// Set by RunInPodWithVolume.
-										"app": firstPodName,
-									},
-								},
-									TopologyKey: "kubernetes.io/hostname",
-								},
-							},
-						},
-					}
-				}
-				RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, podName, command, node)
-			}
-			go run(firstPodName, "touch /mnt/test/first && while ! [ -f /mnt/test/second ]; do sleep 1; done")
-			go run(secondPodName, "touch /mnt/test/second && while ! [ -f /mnt/test/first ]; do sleep 1; done")
-			wg.Wait()
+			RunInPodWithVolume(l.cs, claim.Namespace, claim.Name, "pvc-snapshot-tester", command, framework.NodeSelection{Name: l.config.ClientNodeName})
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
@@ -310,16 +254,39 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 		}
 	}()
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+
+	// Run the checker
+	if t.PvCheck != nil {
+		t.PvCheck(claim)
+	}
+
+	pv := t.checkProvisioning(client, claim, class)
+
+	By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
+	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
+
+	// Wait for the PV to get deleted if reclaim policy is Delete. (If it's
+	// Retain, there's no use waiting because the PV won't be auto-deleted and
+	// it's expected for the caller to do it.) Technically, the first few delete
+	// attempts may fail, as the volume is still attached to a node because
+	// kubelet is slowly cleaning up the previous pod, however it should succeed
+	// in a couple of minutes. Wait 20 minutes to recover from random cloud
+	// hiccups.
+	if pv != nil && pv.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
+		By(fmt.Sprintf("deleting the claim's PV %q", pv.Name))
+		framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
+	}
+
+	return pv
+}
+
+// checkProvisioning verifies that the claim is bound and has the correct properities
+func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storagev1.StorageClass) *v1.PersistentVolume {
+	err := framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("checking the claim")
-	// Get new copy of the claim
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	// Get the bound PV
-	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+	pv, err := framework.GetBoundPV(client, claim)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check sizes
@@ -333,8 +300,20 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 
 	// Check PV properties
 	By("checking the PV")
-	expectedAccessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
-	Expect(pv.Spec.AccessModes).To(Equal(expectedAccessModes))
+
+	// Every access mode in PV should be in PVC
+	Expect(pv.Spec.AccessModes).NotTo(BeZero())
+	for _, pvMode := range pv.Spec.AccessModes {
+		found := false
+		for _, pvcMode := range claim.Spec.AccessModes {
+			if pvMode == pvcMode {
+				found = true
+				break
+			}
+		}
+		Expect(found).To(BeTrue())
+	}
+
 	Expect(pv.Spec.ClaimRef.Name).To(Equal(claim.ObjectMeta.Name))
 	Expect(pv.Spec.ClaimRef.Namespace).To(Equal(claim.ObjectMeta.Namespace))
 	if class == nil {
@@ -343,35 +322,15 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(*class.ReclaimPolicy))
 		Expect(pv.Spec.MountOptions).To(Equal(class.MountOptions))
 	}
-	if t.VolumeMode != nil {
+	if claim.Spec.VolumeMode != nil {
 		Expect(pv.Spec.VolumeMode).NotTo(BeNil())
-		Expect(*pv.Spec.VolumeMode).To(Equal(*t.VolumeMode))
+		Expect(*pv.Spec.VolumeMode).To(Equal(*claim.Spec.VolumeMode))
 	}
-
-	// Run the checker
-	if t.PvCheck != nil {
-		t.PvCheck(claim, pv)
-	}
-
-	By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
-	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
-
-	// Wait for the PV to get deleted if reclaim policy is Delete. (If it's
-	// Retain, there's no use waiting because the PV won't be auto-deleted and
-	// it's expected for the caller to do it.) Technically, the first few delete
-	// attempts may fail, as the volume is still attached to a node because
-	// kubelet is slowly cleaning up the previous pod, however it should succeed
-	// in a couple of minutes. Wait 20 minutes to recover from random cloud
-	// hiccups.
-	if pv.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
-		By(fmt.Sprintf("deleting the claim's PV %q", pv.Name))
-		framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
-	}
-
 	return pv
 }
 
-// PVWriteReadSingleNodeCheck checks that a PV retains data on a single node.
+// PVWriteReadSingleNodeCheck checks that a PV retains data on a single node
+// and returns the PV.
 //
 // It starts two pods:
 // - The first pod writes 'hello word' to the /mnt/test (= the volume) on one node.
@@ -384,16 +343,9 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 // persistent across pods.
 //
 // This is a common test that can be called from a StorageClassTest.PvCheck.
-func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume, node NodeSelection) {
-	By(fmt.Sprintf("checking the created volume is writable and has the PV's mount options on node %+v", node))
+func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, node framework.NodeSelection) *v1.PersistentVolume {
+	By(fmt.Sprintf("checking the created volume is writable on node %+v", node))
 	command := "echo 'hello world' > /mnt/test/data"
-	// We give the first pod the secondary responsibility of checking the volume has
-	// been mounted with the PV's mount options, if the PV was provisioned with any
-	for _, option := range volume.Spec.MountOptions {
-		// Get entry, get mount options at 6th word, replace brackets with commas
-		command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
-	}
-	command += " || (mount | grep 'on /mnt/test'; false)"
 	pod := StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-writer", command, node)
 	defer func() {
 		// pod might be nil now.
@@ -406,9 +358,24 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 	StopPod(client, pod)
 	pod = nil // Don't stop twice.
 
-	By(fmt.Sprintf("checking the created volume is readable and retains data on the same node %q", actualNodeName))
+	// Get a new copy of the PV
+	volume, err := framework.GetBoundPV(client, claim)
+	Expect(err).NotTo(HaveOccurred())
+
+	By(fmt.Sprintf("checking the created volume has the correct mount options, is readable and retains data on the same node %q", actualNodeName))
 	command = "grep 'hello world' /mnt/test/data"
-	RunInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, NodeSelection{Name: actualNodeName})
+
+	// We give the second pod the additional responsibility of checking the volume has
+	// been mounted with the PV's mount options, if the PV was provisioned with any
+	for _, option := range volume.Spec.MountOptions {
+		// Get entry, get mount options at 6th word, replace brackets with commas
+		command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
+	}
+	command += " || (mount | grep 'on /mnt/test'; false)"
+
+	RunInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, framework.NodeSelection{Name: actualNodeName})
+
+	return volume
 }
 
 // PVMultiNodeCheck checks that a PV retains data when moved between nodes.
@@ -425,7 +392,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 // persistent across pods and across nodes.
 //
 // This is a common test that can be called from a StorageClassTest.PvCheck.
-func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume, node NodeSelection) {
+func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, node framework.NodeSelection) {
 	Expect(node.Name).To(Equal(""), "this test only works when not locked onto a single node")
 
 	var pod *v1.Pod
@@ -434,7 +401,7 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 		StopPod(client, pod)
 	}()
 
-	By(fmt.Sprintf("checking the created volume is writable and has the PV's mount options on node %+v", node))
+	By(fmt.Sprintf("checking the created volume is writable on node %+v", node))
 	command := "echo 'hello world' > /mnt/test/data"
 	pod = StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-writer-node1", command, node)
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
@@ -446,30 +413,7 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 
 	// Add node-anti-affinity.
 	secondNode := node
-	if secondNode.Affinity == nil {
-		secondNode.Affinity = &v1.Affinity{}
-	}
-	if secondNode.Affinity.NodeAffinity == nil {
-		secondNode.Affinity.NodeAffinity = &v1.NodeAffinity{}
-	}
-	if secondNode.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-		secondNode.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{}
-	}
-	secondNode.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(secondNode.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-		v1.NodeSelectorTerm{
-			// https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity warns
-			// that "the value of kubernetes.io/hostname may be the same as the Node name in some environments and a different value in other environments".
-			// So this might be cleaner:
-			// MatchFields: []v1.NodeSelectorRequirement{
-			// 	{Key: "name", Operator: v1.NodeSelectorOpNotIn, Values: []string{actualNodeName}},
-			// },
-			// However, "name", "Name", "ObjectMeta.Name" all got rejected with "not a valid field selector key".
-
-			MatchExpressions: []v1.NodeSelectorRequirement{
-				{Key: "kubernetes.io/hostname", Operator: v1.NodeSelectorOpNotIn, Values: []string{actualNodeName}},
-			},
-		})
-
+	framework.SetAntiAffinity(&secondNode, actualNodeName)
 	By(fmt.Sprintf("checking the created volume is readable and retains data on another node %+v", secondNode))
 	command = "grep 'hello world' /mnt/test/data"
 	if framework.NodeOSDistroIs("windows") {
@@ -573,17 +517,9 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	return pvs, node
 }
 
-// NodeSelection specifies where to run a pod, using a combination of fixed node name,
-// node selector and/or affinity.
-type NodeSelection struct {
-	Name     string
-	Selector map[string]string
-	Affinity *v1.Affinity
-}
-
 // RunInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
 // It starts, checks, collects output and stops it.
-func RunInPodWithVolume(c clientset.Interface, ns, claimName, podName, command string, node NodeSelection) {
+func RunInPodWithVolume(c clientset.Interface, ns, claimName, podName, command string, node framework.NodeSelection) {
 	pod := StartInPodWithVolume(c, ns, claimName, podName, command, node)
 	defer StopPod(c, pod)
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
@@ -591,7 +527,7 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, podName, command s
 
 // StartInPodWithVolume starts a command in a pod with given claim mounted to /mnt directory
 // The caller is responsible for checking the pod and deleting it.
-func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command string, node NodeSelection) *v1.Pod {
+func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command string, node framework.NodeSelection) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -664,7 +600,7 @@ func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeCl
 }
 
 func prepareDataSourceForProvisioning(
-	node NodeSelection,
+	node framework.NodeSelection,
 	client clientset.Interface,
 	dynamicClient dynamic.Interface,
 	initClaim *v1.PersistentVolumeClaim,

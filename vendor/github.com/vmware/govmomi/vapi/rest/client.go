@@ -43,6 +43,16 @@ func NewClient(c *vim25.Client) *Client {
 	return &Client{sc}
 }
 
+type Signer interface {
+	SignRequest(*http.Request) error
+}
+
+type signerContext struct{}
+
+func (c *Client) WithSigner(ctx context.Context, s Signer) context.Context {
+	return context.WithValue(ctx, signerContext{}, s)
+}
+
 // Do sends the http.Request, decoding resBody if provided.
 func (c *Client) Do(ctx context.Context, req *http.Request, resBody interface{}) error {
 	switch req.Method {
@@ -51,6 +61,12 @@ func (c *Client) Do(ctx context.Context, req *http.Request, resBody interface{})
 	}
 
 	req.Header.Set("Accept", "application/json")
+
+	if s, ok := ctx.Value(signerContext{}).(Signer); ok {
+		if err := s.SignRequest(req); err != nil {
+			return err
+		}
+	}
 
 	return c.Client.Do(ctx, req, func(res *http.Response) error {
 		switch res.StatusCode {
@@ -96,6 +112,10 @@ func (c *Client) Login(ctx context.Context, user *url.Userinfo) error {
 	}
 
 	return c.Do(ctx, req, nil)
+}
+
+func (c *Client) LoginByToken(ctx context.Context) error {
+	return c.Login(ctx, nil)
 }
 
 // Logout deletes the current session.

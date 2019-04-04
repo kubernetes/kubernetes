@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -55,14 +54,12 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		ns               string
 		jig              *ingress.TestJig
 		conformanceTests []ingress.ConformanceTests
-		cloudConfig      framework.CloudConfig
 	)
 	f := framework.NewDefaultFramework("ingress")
 
 	BeforeEach(func() {
 		jig = ingress.NewIngressTestJig(f.ClientSet)
 		ns = f.Namespace.Name
-		cloudConfig = framework.TestContext.CloudConfig
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
@@ -83,13 +80,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	// Slow by design ~10m for each "It" block dominated by loadbalancer setup time
 	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
 	Describe("GCE [Slow] [Feature:Ingress]", func() {
-		var gceController *gce.GCEIngressController
+		var gceController *gce.IngressController
 
 		// Platform specific setup
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			By("Initializing gce controller")
-			gceController = &gce.GCEIngressController{
+			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
@@ -111,7 +108,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
-			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
+			Expect(gceController.CleanupIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
@@ -122,126 +119,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				By(t.ExitLog)
 				jig.WaitForIngress(true)
 			}
-		})
-
-		It("should create ingress with given static-ip", func() {
-			// ip released when the rest of lb resources are deleted in CleanupGCEIngressController
-			ip := gceController.CreateStaticIP(ns)
-			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
-			executeStaticIPHttpsOnlyTest(f, jig, ns, ip)
-
-			By("should have correct firewall rule for ingress")
-			fw := gceController.GetFirewallRule()
-			nodeTags := []string{cloudConfig.NodeTag}
-			if framework.TestContext.Provider != "gce" {
-				// nodeTags would be different in GKE.
-				nodeTags = gce.GetNodeTags(jig.Client, cloudConfig)
-			}
-			expFw := jig.ConstructFirewallForIngress(gceController.GetFirewallRuleName(), nodeTags)
-			// Passed the last argument as `true` to verify the backend ports is a subset
-			// of the allowed ports in firewall rule, given there may be other existing
-			// ingress resources and backends we are not aware of.
-			Expect(gce.VerifyFirewallRule(fw, expFw, gceController.Cloud.Network, true)).NotTo(HaveOccurred())
-
-			// TODO: uncomment the restart test once we have a way to synchronize
-			// and know that the controller has resumed watching. If we delete
-			// the ingress before the controller is ready we will leak.
-			// By("restarting glbc")
-			// restarter := NewRestartConfig(
-			//	 framework.GetMasterHost(), "glbc", glbcHealthzPort, restartPollInterval, restartTimeout)
-			// restarter.restart()
-			// By("should continue serving on provided static-ip for 30 seconds")
-			// framework.ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", ip), "", 30, 1*time.Second, httpClient))
-		})
-
-		It("should update ingress while sync failures occur on other ingresses", func() {
-			By("Creating ingresses that would fail on sync.")
-			ingFailTLSBackend := &extensions.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ing-fail-on-tls-backend",
-				},
-				Spec: extensions.IngressSpec{
-					TLS: []extensions.IngressTLS{
-						{SecretName: "tls-secret-notexist"},
-					},
-					Backend: &extensions.IngressBackend{
-						ServiceName: "echoheaders-notexist",
-						ServicePort: intstr.IntOrString{
-							Type:   intstr.Int,
-							IntVal: 80,
-						},
-					},
-				},
-			}
-			_, err := jig.Client.ExtensionsV1beta1().Ingresses(ns).Create(ingFailTLSBackend)
-			defer func() {
-				if err := jig.Client.ExtensionsV1beta1().Ingresses(ns).Delete(ingFailTLSBackend.Name, nil); err != nil {
-					framework.Logf("Failed to delete ingress %s: %v", ingFailTLSBackend.Name, err)
-				}
-			}()
-			Expect(err).NotTo(HaveOccurred())
-
-			ingFailRules := &extensions.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ing-fail-on-rules",
-				},
-				Spec: extensions.IngressSpec{
-					Rules: []extensions.IngressRule{
-						{
-							Host: "foo.bar.com",
-							IngressRuleValue: extensions.IngressRuleValue{
-								HTTP: &extensions.HTTPIngressRuleValue{
-									Paths: []extensions.HTTPIngressPath{
-										{
-											Path: "/foo",
-											Backend: extensions.IngressBackend{
-												ServiceName: "echoheaders-notexist",
-												ServicePort: intstr.IntOrString{
-													Type:   intstr.Int,
-													IntVal: 80,
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			}
-			_, err = jig.Client.ExtensionsV1beta1().Ingresses(ns).Create(ingFailRules)
-			defer func() {
-				if err := jig.Client.ExtensionsV1beta1().Ingresses(ns).Delete(ingFailRules.Name, nil); err != nil {
-					framework.Logf("Failed to delete ingress %s: %v", ingFailRules.Name, err)
-				}
-			}()
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Creating a basic HTTP ingress and wait for it to come up")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "http"), ns, nil, nil)
-			jig.WaitForIngress(true)
-
-			By("Updating the path on ingress and wait for it to take effect")
-			jig.Update(func(ing *extensions.Ingress) {
-				updatedRule := extensions.IngressRule{
-					Host: "ingress.test.com",
-					IngressRuleValue: extensions.IngressRuleValue{
-						HTTP: &extensions.HTTPIngressRuleValue{
-							Paths: []extensions.HTTPIngressPath{
-								{
-									Path: "/test",
-									// Copy backend from the first rule.
-									Backend: ing.Spec.Rules[0].HTTP.Paths[0].Backend,
-								},
-							},
-						},
-					},
-				}
-				// Replace the first rule.
-				ing.Spec.Rules[0] = updatedRule
-			})
-			// Wait for change to take effect on the updated ingress.
-			jig.WaitForIngress(false)
 		})
 
 		It("should not reconcile manually modified health check for ingress", func() {
@@ -314,10 +191,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		It("should create ingress with pre-shared certificate", func() {
 			executePresharedCertTest(f, jig, "")
-		})
-
-		It("should create ingress with backend HTTPS", func() {
-			executeBacksideBacksideHTTPSTest(f, jig, "")
 		})
 
 		It("should support multiple TLS certs", func() {
@@ -401,17 +274,17 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 			// Verify that the controller does not create any other resource except instance group.
 			// TODO(59778): Check GCE resources specific to this ingress instead of listing all resources.
-			if len(gceController.ListUrlMaps()) != 0 {
-				framework.Failf("unexpected url maps, expected none, got: %v", gceController.ListUrlMaps())
+			if len(gceController.ListURLMaps()) != 0 {
+				framework.Failf("unexpected url maps, expected none, got: %v", gceController.ListURLMaps())
 			}
 			if len(gceController.ListGlobalForwardingRules()) != 0 {
 				framework.Failf("unexpected forwarding rules, expected none, got: %v", gceController.ListGlobalForwardingRules())
 			}
-			if len(gceController.ListTargetHttpProxies()) != 0 {
-				framework.Failf("unexpected target http proxies, expected none, got: %v", gceController.ListTargetHttpProxies())
+			if len(gceController.ListTargetHTTPProxies()) != 0 {
+				framework.Failf("unexpected target http proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
 			}
-			if len(gceController.ListTargetHttpsProxies()) != 0 {
-				framework.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHttpProxies())
+			if len(gceController.ListTargetHTTPSProxies()) != 0 {
+				framework.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
 			}
 			if len(gceController.ListSslCertificates()) != 0 {
 				framework.Failf("unexpected ssl certificates, expected none, got: %v", gceController.ListSslCertificates())
@@ -426,52 +299,18 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 			// TODO(nikhiljindal): Check the instance group annotation value and verify with a multizone cluster.
 		})
-
-		It("should be able to switch between HTTPS and HTTP2 modes", func() {
-			httpsScheme := "request_scheme=https"
-
-			By("Create a basic HTTP2 ingress")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "http2"), ns, map[string]string{}, map[string]string{})
-			jig.WaitForIngress(true)
-
-			address, err := jig.WaitForIngressAddress(jig.Client, jig.Ingress.Namespace, jig.Ingress.Name, framework.LoadBalancerPollTimeout)
-
-			By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTP2", address))
-			detectHttpVersionAndSchemeTest(f, jig, address, "request_version=2", httpsScheme)
-
-			By("Switch backend service to use HTTPS")
-			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			for _, svc := range svcList.Items {
-				svc.Annotations[ingress.ServiceApplicationProtocolKey] = `{"http2":"HTTPS"}`
-				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
-				Expect(err).NotTo(HaveOccurred())
-			}
-			detectHttpVersionAndSchemeTest(f, jig, address, "request_version=1.1", httpsScheme)
-
-			By("Switch backend service to use HTTP2")
-			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			for _, svc := range svcList.Items {
-				svc.Annotations[ingress.ServiceApplicationProtocolKey] = `{"http2":"HTTP2"}`
-				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
-				Expect(err).NotTo(HaveOccurred())
-			}
-			detectHttpVersionAndSchemeTest(f, jig, address, "request_version=2", httpsScheme)
-		})
-
 		// TODO: Implement a multizone e2e that verifies traffic reaches each
 		// zone based on pod labels.
 	})
 
 	Describe("GCE [Slow] [Feature:NEG]", func() {
-		var gceController *gce.GCEIngressController
+		var gceController *gce.IngressController
 
 		// Platform specific setup
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			By("Initializing gce controller")
-			gceController = &gce.GCEIngressController{
+			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
@@ -493,7 +332,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.TryDeleteIngress()
 
 			By("Cleaning up cloud resources")
-			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
+			Expect(gceController.CleanupIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
@@ -506,9 +345,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				t.Execute()
 				By(t.ExitLog)
 				jig.WaitForIngress(true)
-				usingNeg, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(usingNeg).To(BeTrue())
+				Expect(gceController.WaitForNegBackendService(jig.GetServicePorts(false))).NotTo(HaveOccurred())
 			}
 		})
 
@@ -517,9 +354,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			By("Create a basic HTTP ingress using NEG")
 			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
-			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(usingNEG).To(BeTrue())
+			Expect(gceController.WaitForNegBackendService(jig.GetServicePorts(false))).NotTo(HaveOccurred())
 
 			By("Switch backend service to use IG")
 			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
@@ -530,7 +365,11 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 			err = wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
-				return gceController.BackendServiceUsingIG(jig.GetServicePorts(false))
+				if err := gceController.BackendServiceUsingIG(jig.GetServicePorts(false)); err != nil {
+					framework.Logf("Failed to verify IG backend service: %v", err)
+					return false, nil
+				}
+				return true, nil
 			})
 			Expect(err).NotTo(HaveOccurred(), "Expect backend service to target IG, but failed to observe")
 			jig.WaitForIngress(true)
@@ -544,21 +383,22 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 			err = wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
-				return gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
+				if err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false)); err != nil {
+					framework.Logf("Failed to verify NEG backend service: %v", err)
+					return false, nil
+				}
+				return true, nil
 			})
 			Expect(err).NotTo(HaveOccurred(), "Expect backend service to target NEG, but failed to observe")
 			jig.WaitForIngress(true)
 		})
 
 		It("should be able to create a ClusterIP service", func() {
-			var err error
 			By("Create a basic HTTP ingress using NEG")
 			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg-clusterip"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			svcPorts := jig.GetServicePorts(false)
-			usingNEG, err := gceController.BackendServiceUsingNEG(svcPorts)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(usingNEG).To(BeTrue(), "Expect backend service to be using NEG. But not.")
+			Expect(gceController.WaitForNegBackendService(svcPorts)).NotTo(HaveOccurred())
 
 			// ClusterIP ServicePorts have no NodePort
 			for _, sp := range svcPorts {
@@ -591,9 +431,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			jig.WaitForIngressToStable()
-			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(usingNEG).To(BeTrue())
+			Expect(gceController.WaitForNegBackendService(jig.GetServicePorts(false))).NotTo(HaveOccurred())
 			// initial replicas number is 1
 			scaleAndValidateNEG(1)
 
@@ -617,9 +455,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			jig.WaitForIngressToStable()
-			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(usingNEG).To(BeTrue())
+			Expect(gceController.WaitForNegBackendService(jig.GetServicePorts(false))).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("Scale backend replicas to %d", replicas))
 			scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(name, metav1.GetOptions{})
@@ -731,9 +567,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			By("Create a basic HTTP ingress using NEG")
 			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg-exposed"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
-			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(usingNEG).To(BeTrue())
+			Expect(gceController.WaitForNegBackendService(jig.GetServicePorts(false))).NotTo(HaveOccurred())
 			// initial replicas number is 1
 			scaleAndValidateExposedNEG(1)
 
@@ -807,7 +641,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	})
 
 	Describe("GCE [Slow] [Feature:kubemci]", func() {
-		var gceController *gce.GCEIngressController
+		var gceController *gce.IngressController
 		var ipName, ipAddress string
 
 		// Platform specific setup
@@ -816,7 +650,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.Class = ingress.MulticlusterIngressClassValue
 			jig.PollInterval = 5 * time.Second
 			By("Initializing gce controller")
-			gceController = &gce.GCEIngressController{
+			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
 				Cloud:  framework.TestContext.CloudConfig,
@@ -827,7 +661,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// TODO(https://github.com/GoogleCloudPlatform/k8s-multicluster-ingress/issues/19):
 			// Kubemci should reserve a static ip if user has not specified one.
 			ipName = "kubemci-" + string(uuid.NewUUID())
-			// ip released when the rest of lb resources are deleted in CleanupGCEIngressController
+			// ip released when the rest of lb resources are deleted in CleanupIngressController
 			ipAddress = gceController.CreateStaticIP(ipName)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ipName, ipAddress))
 		})
@@ -845,7 +679,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 
 			By("Cleaning up cloud resources")
-			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
+			Expect(gceController.CleanupIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
@@ -1117,7 +951,7 @@ func detectHttpVersionAndSchemeTest(f *framework.Framework, jig *ingress.TestJig
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get %s or %s, response body: %s", version, scheme, resp))
 }
 
-func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceController *gce.GCEIngressController, ns, name string, negs int) {
+func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceController *gce.IngressController, ns, name string, negs int) {
 	if err := wait.Poll(5*time.Second, negUpdateTimeout, func() (bool, error) {
 		svc, err := f.ClientSet.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
@@ -1126,7 +960,12 @@ func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceContro
 
 		// if we expect no NEGs, then we should be using IGs
 		if negs == 0 {
-			return gceController.BackendServiceUsingIG(jig.GetServicePorts(false))
+			err := gceController.BackendServiceUsingIG(jig.GetServicePorts(false))
+			if err != nil {
+				framework.Logf("Failed to validate IG backend service: %v", err)
+				return false, nil
+			}
+			return true, nil
 		}
 
 		var status ingress.NegStatus
@@ -1159,7 +998,12 @@ func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceContro
 			}
 		}
 
-		return gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
+		err = gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
+		if err != nil {
+			framework.Logf("Failed to validate NEG backend service: %v", err)
+			return false, nil
+		}
+		return true, nil
 	}); err != nil {
 		Expect(err).NotTo(HaveOccurred())
 	}

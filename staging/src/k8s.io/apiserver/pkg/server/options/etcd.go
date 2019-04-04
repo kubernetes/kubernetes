@@ -229,6 +229,7 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		if !ok {
 			cacheSize = f.Options.DefaultWatchCacheSize
 		}
+		// depending on cache size this might return an undecorated storage
 		ret.Decorator = genericregistry.StorageWithCacher(cacheSize)
 	}
 	return ret, nil
@@ -262,6 +263,7 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		if !ok {
 			cacheSize = f.Options.DefaultWatchCacheSize
 		}
+		// depending on cache size this might return an undecorated storage
 		ret.Decorator = genericregistry.StorageWithCacher(cacheSize)
 	}
 
@@ -285,7 +287,6 @@ func ParseWatchCacheSizes(cacheSizes []string) (map[schema.GroupResource]int, er
 		if size < 0 {
 			return nil, fmt.Errorf("watch cache size cannot be negative: %s", c)
 		}
-
 		watchCacheSizes[schema.ParseGroupResource(tokens[0])] = size
 	}
 	return watchCacheSizes, nil

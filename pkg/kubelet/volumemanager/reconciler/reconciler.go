@@ -75,8 +75,6 @@ type Reconciler interface {
 //   this node, and therefore the volume manager should not
 // loopSleepDuration - the amount of time the reconciler loop sleeps between
 //   successive executions
-//   syncDuration - the amount of time the syncStates sleeps between
-//   successive executions
 // waitForAttachTimeout - the amount of time the Mount function will wait for
 //   the volume to be attached
 // nodeName - the Name for this node, used by Attach and Detach methods
@@ -94,7 +92,6 @@ func NewReconciler(
 	kubeClient clientset.Interface,
 	controllerAttachDetachEnabled bool,
 	loopSleepDuration time.Duration,
-	syncDuration time.Duration,
 	waitForAttachTimeout time.Duration,
 	nodeName types.NodeName,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
@@ -108,7 +105,6 @@ func NewReconciler(
 		kubeClient:                    kubeClient,
 		controllerAttachDetachEnabled: controllerAttachDetachEnabled,
 		loopSleepDuration:             loopSleepDuration,
-		syncDuration:                  syncDuration,
 		waitForAttachTimeout:          waitForAttachTimeout,
 		nodeName:                      nodeName,
 		desiredStateOfWorld:           desiredStateOfWorld,

@@ -45,7 +45,6 @@ import (
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 	"k8s.io/klog"
 )
@@ -99,10 +98,8 @@ type RunObjectConfig interface {
 	GetNamespace() string
 	GetKind() schema.GroupKind
 	GetClient() clientset.Interface
-	GetInternalClient() internalclientset.Interface
 	GetScalesGetter() scaleclient.ScalesGetter
 	SetClient(clientset.Interface)
-	SetInternalClient(internalclientset.Interface)
 	SetScalesClient(scaleclient.ScalesGetter)
 	GetReplicas() int
 	GetLabelValue(string) (string, bool)
@@ -112,7 +109,6 @@ type RunObjectConfig interface {
 type RCConfig struct {
 	Affinity          *v1.Affinity
 	Client            clientset.Interface
-	InternalClient    internalclientset.Interface
 	ScalesGetter      scaleclient.ScalesGetter
 	Image             string
 	Command           []string
@@ -527,20 +523,12 @@ func (config *RCConfig) GetClient() clientset.Interface {
 	return config.Client
 }
 
-func (config *RCConfig) GetInternalClient() internalclientset.Interface {
-	return config.InternalClient
-}
-
 func (config *RCConfig) GetScalesGetter() scaleclient.ScalesGetter {
 	return config.ScalesGetter
 }
 
 func (config *RCConfig) SetClient(c clientset.Interface) {
 	config.Client = c
-}
-
-func (config *RCConfig) SetInternalClient(c internalclientset.Interface) {
-	config.InternalClient = c
 }
 
 func (config *RCConfig) SetScalesClient(getter scaleclient.ScalesGetter) {
@@ -827,7 +815,7 @@ func (config *RCConfig) start() error {
 	if oldRunning != config.Replicas {
 		// List only pods from a given replication controller.
 		options := metav1.ListOptions{LabelSelector: label.String()}
-		if pods, err := config.Client.CoreV1().Pods(metav1.NamespaceAll).List(options); err == nil {
+		if pods, err := config.Client.CoreV1().Pods(config.Namespace).List(options); err == nil {
 			for _, pod := range pods.Items {
 				config.RCConfigLog("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
 			}

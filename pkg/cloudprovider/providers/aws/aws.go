@@ -2327,19 +2327,17 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	}
 	volumeName := KubernetesVolumeID("aws://" + aws.StringValue(response.AvailabilityZone) + "/" + string(awsID))
 
-	// AWS has a bad habbit of reporting success when creating a volume with
-	// encryption keys that either don't exists or have wrong permissions.
-	// Such volume lives for couple of seconds and then it's silently deleted
-	// by AWS. There is no other check to ensure that given KMS key is correct,
-	// because Kubernetes may have limited permissions to the key.
-	if len(volumeOptions.KmsKeyID) > 0 {
-		err := c.waitUntilVolumeAvailable(volumeName)
-		if err != nil {
-			if isAWSErrorVolumeNotFound(err) {
-				err = fmt.Errorf("failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key")
-			}
-			return "", err
+	err = c.waitUntilVolumeAvailable(volumeName)
+	if err != nil {
+		// AWS has a bad habbit of reporting success when creating a volume with
+		// encryption keys that either don't exists or have wrong permissions.
+		// Such volume lives for couple of seconds and then it's silently deleted
+		// by AWS. There is no other check to ensure that given KMS key is correct,
+		// because Kubernetes may have limited permissions to the key.
+		if isAWSErrorVolumeNotFound(err) {
+			err = fmt.Errorf("failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key")
 		}
+		return "", err
 	}
 
 	return volumeName, nil
@@ -4212,18 +4210,39 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 		// Note that this is annoying: the load balancer disappears from the API immediately, but it is still
 		// deleting in the background.  We get a DependencyViolation until the load balancer has deleted itself
 
+		var loadBalancerSGs = aws.StringValueSlice(lb.SecurityGroups)
+
+		describeRequest := &ec2.DescribeSecurityGroupsInput{}
+		filters := []*ec2.Filter{
+			newEc2Filter("group-id", loadBalancerSGs...),
+		}
+		describeRequest.Filters = c.tagging.addFilters(filters)
+		response, err := c.ec2.DescribeSecurityGroups(describeRequest)
+		if err != nil {
+			return fmt.Errorf("error querying security groups for ELB: %q", err)
+		}
+
 		// Collect the security groups to delete
 		securityGroupIDs := map[string]struct{}{}
-		for _, securityGroupID := range lb.SecurityGroups {
-			if *securityGroupID == c.cfg.Global.ElbSecurityGroup {
-				//We don't want to delete a security group that was defined in the Cloud Configurationn.
+
+		for _, sg := range response {
+			sgID := aws.StringValue(sg.GroupId)
+
+			if sgID == c.cfg.Global.ElbSecurityGroup {
+				//We don't want to delete a security group that was defined in the Cloud Configuration.
 				continue
 			}
-			if aws.StringValue(securityGroupID) == "" {
-				klog.Warning("Ignoring empty security group in ", service.Name)
+			if sgID == "" {
+				klog.Warningf("Ignoring empty security group in %s", service.Name)
 				continue
 			}
-			securityGroupIDs[*securityGroupID] = struct{}{}
+
+			if !c.tagging.hasClusterTag(sg.Tags) {
+				klog.Warningf("Ignoring security group with no cluster tag in %s", service.Name)
+				continue
+			}
+
+			securityGroupIDs[sgID] = struct{}{}
 		}
 
 		// Loop through and try to delete them

@@ -33,6 +33,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	firewallTestTCPTimeout = time.Duration(1 * time.Second)
+	// Set ports outside of 30000-32767, 80 and 8080 to avoid being whitelisted by the e2e cluster
+	firewallTestHTTPPort = int32(29999)
+	firewallTestUDPPort  = int32(29998)
+)
+
 var _ = SIGDescribe("Firewall rule", func() {
 	var firewall_test_name = "firewall-test"
 	f := framework.NewDefaultFramework(firewall_test_name)
@@ -74,7 +81,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		By("Creating a LoadBalancer type service with ExternalTrafficPolicy=Global")
 		svc := jig.CreateLoadBalancerService(ns, serviceName, framework.LoadBalancerCreateTimeoutDefault, func(svc *v1.Service) {
-			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: gce.FirewallTestHttpPort}}
+			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: firewallTestHTTPPort}}
 			svc.Spec.LoadBalancerSourceRanges = firewallTestSourceRanges
 		})
 		defer func() {
@@ -121,7 +128,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		By(fmt.Sprintf("Creating netexec pods on at most %v nodes", framework.MaxNodesForEndpointsTests))
 		for i, nodeName := range nodesNames {
 			podName := fmt.Sprintf("netexec%v", i)
-			jig.LaunchNetexecPodOnNode(f, nodeName, podName, gce.FirewallTestHttpPort, gce.FirewallTestUdpPort, true)
+			jig.LaunchNetexecPodOnNode(f, nodeName, podName, firewallTestHTTPPort, firewallTestUDPPort, true)
 			defer func() {
 				framework.Logf("Cleaning up the netexec pod: %v", podName)
 				Expect(cs.CoreV1().Pods(ns).Delete(podName, nil)).NotTo(HaveOccurred())
@@ -130,7 +137,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		// Send requests from outside of the cluster because internal traffic is whitelisted
 		By("Accessing the external service ip from outside, all non-master nodes should be reached")
-		Expect(framework.TestHitNodesFromOutside(svcExternalIP, gce.FirewallTestHttpPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
+		Expect(framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
 
 		// Check if there are overlapping tags on the firewall that extend beyond just the vms in our cluster
 		// by removing the tag on one vm and make sure it doesn't get any traffic. This is an imperfect
@@ -150,11 +157,11 @@ var _ = SIGDescribe("Firewall rule", func() {
 			nodesSet.Insert(nodesNames[0])
 			gce.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
 			// Make sure traffic is recovered before exit
-			Expect(framework.TestHitNodesFromOutside(svcExternalIP, gce.FirewallTestHttpPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
+			Expect(framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
 		}()
 
 		By("Accessing serivce through the external ip and examine got no response from the node without tags")
-		Expect(framework.TestHitNodesFromOutsideWithCount(svcExternalIP, gce.FirewallTestHttpPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet, 15)).NotTo(HaveOccurred())
+		Expect(framework.TestHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet, 15)).NotTo(HaveOccurred())
 	})
 
 	It("should have correct firewall rules for e2e cluster", func() {
@@ -178,12 +185,12 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		masterAddresses := framework.GetAllMasterAddresses(cs)
 		for _, masterAddress := range masterAddresses {
-			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, gce.FirewallTestTcpTimeout)
-			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureSchedulerPort, gce.FirewallTestTcpTimeout)
+			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
+			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureSchedulerPort, firewallTestTCPTimeout)
 		}
-		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, gce.FirewallTestTcpTimeout)
-		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletReadOnlyPort, gce.FirewallTestTcpTimeout)
-		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.ProxyStatusPort, gce.FirewallTestTcpTimeout)
+		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, firewallTestTCPTimeout)
+		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletReadOnlyPort, firewallTestTCPTimeout)
+		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.ProxyStatusPort, firewallTestTCPTimeout)
 	})
 })
 

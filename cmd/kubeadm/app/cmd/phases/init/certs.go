@@ -190,7 +190,7 @@ func runCertsSa(c workflow.RunData) error {
 
 	// if external CA mode, skip service account key generation
 	if data.ExternalCA() {
-		fmt.Printf("[certs] External CA mode: Using existing sa keys\n")
+		fmt.Printf("[certs] Using existing sa keys\n")
 		return nil
 	}
 
@@ -220,7 +220,7 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
 				return nil
 			}
-			fmt.Printf("[certs] Using existing %s keyless certificate authority", ca.BaseName)
+			fmt.Printf("[certs] Using existing %s keyless certificate authority\n", ca.BaseName)
 			return nil
 		}
 

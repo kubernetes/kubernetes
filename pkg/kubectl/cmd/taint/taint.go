@@ -64,7 +64,7 @@ var (
 		* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
 		* The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
 		* Optionally, the key can begin with a DNS subdomain prefix and a single '/', like example.com/my-app
-		* The value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.
+		* The value is optional. If given, it must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.
 		* The effect must be NoSchedule, PreferNoSchedule or NoExecute.
 		* Currently taint can only apply to node.`))
 
@@ -80,7 +80,10 @@ var (
 		kubectl taint nodes foo dedicated-
 
 		# Add a taint with key 'dedicated' on nodes having label mylabel=X
-		kubectl taint node -l myLabel=X  dedicated=foo:PreferNoSchedule`))
+		kubectl taint node -l myLabel=X  dedicated=foo:PreferNoSchedule
+
+		# Add to node 'foo' a taint with key 'bar' and no value
+		kubectl taint nodes foo bar:NoSchedule`))
 )
 
 func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

@@ -147,7 +147,7 @@ func newEnvFromSecret(namespace, name string) *v1.Secret {
 }
 
 func createEmptyKeySecretForTest(f *framework.Framework) (*v1.Secret, error) {
-	secretName := "secret-emptyKey-test-" + string(uuid.NewUUID())
+	secretName := "secret-emptykey-test-" + string(uuid.NewUUID())
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace.Name,

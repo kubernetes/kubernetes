@@ -25,8 +25,8 @@ import (
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/jsonmessage"
 
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -125,6 +125,11 @@ func (ds *dockerService) RemoveImage(_ context.Context, r *runtimeapi.RemoveImag
 	// it is safe to continue removing it since there is another check below.
 	if err != nil && !libdocker.IsImageNotFoundError(err) {
 		return nil, err
+	}
+
+	if imageInspect == nil {
+		// image is nil, assuming it doesn't exist.
+		return &runtimeapi.RemoveImageResponse{}, nil
 	}
 
 	// An image can have different numbers of RepoTags and RepoDigests.

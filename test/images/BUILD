@@ -30,6 +30,7 @@ filegroup(
         "//test/images/pets/peer-finder:all-srcs",
         "//test/images/port-forward-tester:all-srcs",
         "//test/images/porter:all-srcs",
+        "//test/images/regression-issue-74839:all-srcs",
         "//test/images/resource-consumer:all-srcs",
         "//test/images/sample-apiserver:all-srcs",
         "//test/images/sample-device-plugin:all-srcs",

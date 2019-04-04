@@ -43,7 +43,7 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
-func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
+func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Create " + req.URL.Path)
@@ -73,7 +73,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
-		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -130,7 +130,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		userInfo, _ := request.UserFrom(ctx)
 		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, dryrun.IsDryRun(options.DryRun), userInfo)
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
-			err = mutatingAdmission.Admit(admissionAttributes, &scope)
+			err = mutatingAdmission.Admit(admissionAttributes, scope)
 			if err != nil {
 				scope.err(err, w, req)
 				return
@@ -157,7 +157,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 				ctx,
 				name,
 				obj,
-				rest.AdmissionToValidateObjectFunc(admit, admissionAttributes, &scope),
+				rest.AdmissionToValidateObjectFunc(admit, admissionAttributes, scope),
 				options,
 			)
 		})
@@ -173,18 +173,17 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 			status.Code = int32(code)
 		}
 
-		scope.Trace = trace
-		transformResponseObject(ctx, scope, req, w, code, outputMediaType, result)
+		transformResponseObject(ctx, scope, trace, req, w, code, outputMediaType, result)
 	}
 }
 
 // CreateNamedResource returns a function that will handle a resource creation with name.
-func CreateNamedResource(r rest.NamedCreater, scope RequestScope, admission admission.Interface) http.HandlerFunc {
+func CreateNamedResource(r rest.NamedCreater, scope *RequestScope, admission admission.Interface) http.HandlerFunc {
 	return createHandler(r, scope, admission, true)
 }
 
 // CreateResource returns a function that will handle a resource creation.
-func CreateResource(r rest.Creater, scope RequestScope, admission admission.Interface) http.HandlerFunc {
+func CreateResource(r rest.Creater, scope *RequestScope, admission admission.Interface) http.HandlerFunc {
 	return createHandler(&namedCreaterAdapter{r}, scope, admission, false)
 }
 

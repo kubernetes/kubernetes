@@ -260,6 +260,10 @@ func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) bool {
 	return true
 }
 
+func (plugin *flexVolumeAttachablePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
 // ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.
 func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	flexVolume := &api.Volume{

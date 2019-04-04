@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/client-go/kubernetes/scheme"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -464,7 +464,7 @@ func waitForEventWithReason(c clientset.Interface, ns, cronJobName string, reaso
 		if err != nil {
 			return false, err
 		}
-		events, err := c.CoreV1().Events(ns).Search(legacyscheme.Scheme, sj)
+		events, err := c.CoreV1().Events(ns).Search(scheme.Scheme, sj)
 		if err != nil {
 			return false, err
 		}

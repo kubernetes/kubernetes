@@ -40,7 +40,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -59,7 +59,7 @@ type Scheduler struct {
 }
 
 // Cache returns the cache in scheduler for test to check the data in scheduler.
-func (sched *Scheduler) Cache() schedulerinternalcache.Cache {
+func (sched *Scheduler) Cache() internalcache.Cache {
 	return sched.config.SchedulerCache
 }
 
@@ -285,7 +285,7 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (core.ScheduleResult, error) {
 }
 
 // preempt tries to create room for a pod that has failed to schedule, by preempting lower priority pods if possible.
-// If it succeeds, it adds the name of the node where preemption has happened to the pod annotations.
+// If it succeeds, it adds the name of the node where preemption has happened to the pod spec.
 // It returns the node name and an error if any.
 func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, error) {
 	preemptor, err := sched.config.PodPreemptor.GetUpdatedPod(preemptor)
@@ -310,7 +310,7 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 		// Make a call to update nominated node name of the pod on the API server.
 		err = sched.config.PodPreemptor.SetNominatedNodeName(preemptor, nodeName)
 		if err != nil {
-			klog.Errorf("Error in preemption process. Cannot update pod %v/%v annotations: %v", preemptor.Namespace, preemptor.Name, err)
+			klog.Errorf("Error in preemption process. Cannot set 'NominatedPod' on pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
 			sched.config.SchedulingQueue.DeleteNominatedPodIfExists(preemptor)
 			return "", err
 		}
@@ -327,11 +327,12 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 	// Clearing nominated pods should happen outside of "if node != nil". Node could
 	// be nil when a pod with nominated node name is eligible to preempt again,
 	// but preemption logic does not find any node for it. In that case Preempt()
-	// function of generic_scheduler.go returns the pod itself for removal of the annotation.
+	// function of generic_scheduler.go returns the pod itself for removal of
+	// the 'NominatedPod' field.
 	for _, p := range nominatedPodsToClear {
 		rErr := sched.config.PodPreemptor.RemoveNominatedNodeName(p)
 		if rErr != nil {
-			klog.Errorf("Cannot remove nominated node annotation of pod: %v", rErr)
+			klog.Errorf("Cannot remove 'NominatedPod' field of pod: %v", rErr)
 			// We do not return as this error is not critical.
 		}
 	}
@@ -541,7 +542,9 @@ func (sched *Scheduler) scheduleOne() {
 				metrics.PodScheduleErrors.Inc()
 			}
 			if !approved {
-				sched.Cache().ForgetPod(assumedPod)
+				if forgetErr := sched.Cache().ForgetPod(assumedPod); forgetErr != nil {
+					klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
+				}
 				var reason string
 				if err == nil {
 					msg := fmt.Sprintf("prebind plugin %v rejected pod %v.", pl.Name(), assumedPod.Name)

@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -46,12 +45,6 @@ func TestVerifyUnmarshalStrict(t *testing.T) {
 			fileName:      "invalid_duplicate_field_clustercfg.yaml",
 			kind:          constants.InitConfigurationKind,
 			groupVersion:  kubeadmapiv1beta1.SchemeGroupVersion,
-			expectedError: true,
-		},
-		{
-			fileName:      "invalid_duplicate_field_initcfg.yaml",
-			kind:          constants.InitConfigurationKind,
-			groupVersion:  kubeadmapiv1alpha3.SchemeGroupVersion,
 			expectedError: true,
 		},
 		{

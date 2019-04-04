@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/mount"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"

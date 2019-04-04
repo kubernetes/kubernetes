@@ -43,9 +43,9 @@ const queryDnsPythonTemplate string = `
 import socket
 try:
 	socket.gethostbyname('%s')
-	print 'ok'
+	print('ok')
 except:
-	print 'err'`
+	print('err')`
 
 var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 	f := framework.NewDefaultFramework("cluster-dns")

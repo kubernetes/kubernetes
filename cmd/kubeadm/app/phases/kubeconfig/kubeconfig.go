@@ -106,10 +106,10 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 	}
 
 	for _, kubeConfigFileName := range kubeConfigFileNames {
-		// retrives the KubeConfigSpec for given kubeConfigFileName
+		// retrieves the KubeConfigSpec for given kubeConfigFileName
 		spec, exists := specs[kubeConfigFileName]
 		if !exists {
-			return errors.Errorf("couldn't retrive KubeConfigSpec for %s", kubeConfigFileName)
+			return errors.Errorf("couldn't retrieve KubeConfigSpec for %s", kubeConfigFileName)
 		}
 
 		// builds the KubeConfig object
@@ -362,24 +362,24 @@ func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfigu
 		kubeadmconstants.SchedulerKubeConfigFileName,
 	}
 
-	specs, err := getKubeConfigSpecs(cfg)
+	// Creates a kubeconfig file with the target CA and server URL
+	// to be used as a input for validating user provided kubeconfig files
+	caCert, err := pkiutil.TryLoadCertFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	if err != nil {
+		return errors.Wrapf(err, "the CA file couldn't be loaded")
+	}
+
+	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return err
 	}
 
+	validationConfig := kubeconfigutil.CreateBasic(controlPlaneEndpoint, "dummy", "dummy", pkiutil.EncodeCertPEM(caCert))
+
+	// validate user provided kubeconfig files
 	for _, kubeConfigFileName := range kubeConfigFileNames {
-		spec, exists := specs[kubeConfigFileName]
-		if !exists {
-			return errors.Errorf("couldn't retrive KubeConfigSpec for %s", kubeConfigFileName)
-		}
-
-		kubeconfig, err := buildKubeConfigFromSpec(spec, cfg.ClusterName)
-		if err != nil {
-			return err
-		}
-
-		if err = validateKubeConfig(outDir, kubeConfigFileName, kubeconfig); err != nil {
-			return err
+		if err = validateKubeConfig(outDir, kubeConfigFileName, validationConfig); err != nil {
+			return errors.Wrapf(err, "the %s file does not exists or it is not valid", kubeConfigFileName)
 		}
 	}
 	return nil

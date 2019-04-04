@@ -247,19 +247,6 @@ type PriorityQueue struct {
 // Making sure that PriorityQueue implements SchedulingQueue.
 var _ = SchedulingQueue(&PriorityQueue{})
 
-// podTimeStamp returns pod's last schedule time or its creation time if the
-// scheduler has never tried scheduling it.
-func podTimestamp(pod *v1.Pod) *metav1.Time {
-	_, condition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-	if condition == nil {
-		return &pod.CreationTimestamp
-	}
-	if condition.LastProbeTime.IsZero() {
-		return &condition.LastTransitionTime
-	}
-	return &condition.LastProbeTime
-}
-
 // podInfo is minimum cell in the scheduling queue.
 type podInfo struct {
 	pod *v1.Pod
@@ -297,7 +284,7 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock) *Priority
 		stop:             stop,
 		podBackoff:       util.CreatePodBackoffWithClock(1*time.Second, 10*time.Second, clock),
 		activeQ:          util.NewHeap(podInfoKeyFunc, activeQComp),
-		unschedulableQ:   newUnschedulablePodsMap(clock),
+		unschedulableQ:   newUnschedulablePodsMap(),
 		nominatedPods:    newNominatedPodMap(),
 		moveRequestCycle: -1,
 	}
@@ -818,7 +805,7 @@ func (u *UnschedulablePodsMap) clear() {
 }
 
 // newUnschedulablePodsMap initializes a new object of UnschedulablePodsMap.
-func newUnschedulablePodsMap(clock util.Clock) *UnschedulablePodsMap {
+func newUnschedulablePodsMap() *UnschedulablePodsMap {
 	return &UnschedulablePodsMap{
 		podInfoMap: make(map[string]*podInfo),
 		keyFunc:    util.GetPodFullName,

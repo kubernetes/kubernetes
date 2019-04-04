@@ -42,8 +42,8 @@ func (c *Manager) AttachTag(ctx context.Context, tagID string, ref mo.Reference)
 	if err != nil {
 		return err
 	}
-	spec := internal.NewAssociation(id, ref)
-	url := internal.URL(c, internal.AssociationPath).WithAction("attach")
+	spec := internal.NewAssociation(ref)
+	url := internal.URL(c, internal.AssociationPath).WithID(id).WithAction("attach")
 	return c.Do(ctx, url.Request(http.MethodPost, spec), nil)
 }
 
@@ -54,14 +54,14 @@ func (c *Manager) DetachTag(ctx context.Context, tagID string, ref mo.Reference)
 	if err != nil {
 		return err
 	}
-	spec := internal.NewAssociation(id, ref)
-	url := internal.URL(c, internal.AssociationPath).WithAction("detach")
+	spec := internal.NewAssociation(ref)
+	url := internal.URL(c, internal.AssociationPath).WithID(id).WithAction("detach")
 	return c.Do(ctx, url.Request(http.MethodPost, spec), nil)
 }
 
 // ListAttachedTags fetches the array of tag IDs attached to the given object.
 func (c *Manager) ListAttachedTags(ctx context.Context, ref mo.Reference) ([]string, error) {
-	spec := internal.NewAssociation("", ref)
+	spec := internal.NewAssociation(ref)
 	url := internal.URL(c, internal.AssociationPath).WithAction("list-attached-tags")
 	var res []string
 	return res, c.Do(ctx, url.Request(http.MethodPost, spec), &res)
@@ -91,12 +91,9 @@ func (c *Manager) ListAttachedObjects(ctx context.Context, tagID string) ([]mo.R
 	if err != nil {
 		return nil, err
 	}
-	spec := internal.Association{
-		TagID: id,
-	}
-	url := internal.URL(c, internal.AssociationPath).WithAction("list-attached-objects")
+	url := internal.URL(c, internal.AssociationPath).WithID(id).WithAction("list-attached-objects")
 	var res []internal.AssociatedObject
-	if err := c.Do(ctx, url.Request(http.MethodPost, spec), &res); err != nil {
+	if err := c.Do(ctx, url.Request(http.MethodPost, nil), &res); err != nil {
 		return nil, err
 	}
 

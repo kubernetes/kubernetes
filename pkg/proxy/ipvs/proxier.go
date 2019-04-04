@@ -127,8 +127,8 @@ var ipsetInfo = []struct {
 	{kubeNodePortLocalSetTCP, utilipset.BitmapPort, kubeNodePortLocalSetTCPComment},
 	{kubeNodePortSetUDP, utilipset.BitmapPort, kubeNodePortSetUDPComment},
 	{kubeNodePortLocalSetUDP, utilipset.BitmapPort, kubeNodePortLocalSetUDPComment},
-	{kubeNodePortSetSCTP, utilipset.BitmapPort, kubeNodePortSetSCTPComment},
-	{kubeNodePortLocalSetSCTP, utilipset.BitmapPort, kubeNodePortLocalSetSCTPComment},
+	{kubeNodePortSetSCTP, utilipset.HashIPPort, kubeNodePortSetSCTPComment},
+	{kubeNodePortLocalSetSCTP, utilipset.HashIPPort, kubeNodePortLocalSetSCTPComment},
 }
 
 // ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
@@ -153,8 +153,8 @@ var ipsetWithIptablesChain = []struct {
 	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "tcp"},
 	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", "udp"},
 	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "udp"},
-	{kubeNodePortSetSCTP, string(kubeServicesChain), string(KubeNodePortChain), "dst", "sctp"},
-	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst", "sctp"},
+	{kubeNodePortSetSCTP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst,dst", "sctp"},
+	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst,dst", "sctp"},
 }
 
 // In IPVS proxy mode, the following flags need to be set
@@ -194,7 +194,9 @@ type Proxier struct {
 	syncPeriod    time.Duration
 	minSyncPeriod time.Duration
 	// Values are CIDR's to exclude when cleaning up IPVS rules.
-	excludeCIDRs   []string
+	excludeCIDRs []string
+	// Set to true to set sysctls arp_ignore and arp_announce
+	strictARP      bool
 	iptables       utiliptables.Interface
 	ipvs           utilipvs.Interface
 	ipset          utilipset.Interface
@@ -285,6 +287,7 @@ func NewProxier(ipt utiliptables.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	excludeCIDRs []string,
+	strictARP bool,
 	masqueradeAll bool,
 	masqueradeBit int,
 	clusterCIDR string,
@@ -344,17 +347,19 @@ func NewProxier(ipt utiliptables.Interface,
 		}
 	}
 
-	// Set the arp_ignore sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlArpIgnore); val != 1 {
-		if err := sysctl.SetSysctl(sysctlArpIgnore, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpIgnore, err)
+	if strictARP {
+		// Set the arp_ignore sysctl we need for
+		if val, _ := sysctl.GetSysctl(sysctlArpIgnore); val != 1 {
+			if err := sysctl.SetSysctl(sysctlArpIgnore, 1); err != nil {
+				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpIgnore, err)
+			}
 		}
-	}
 
-	// Set the arp_announce sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlArpAnnounce); val != 2 {
-		if err := sysctl.SetSysctl(sysctlArpAnnounce, 2); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpAnnounce, err)
+		// Set the arp_announce sysctl we need for
+		if val, _ := sysctl.GetSysctl(sysctlArpAnnounce); val != 2 {
+			if err := sysctl.SetSysctl(sysctlArpAnnounce, 2); err != nil {
+				return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlArpAnnounce, err)
+			}
 		}
 	}
 
@@ -741,6 +746,9 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.GetProtocol() == v1.ProtocolUDP {
 			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIPString())
 			staleServices.Insert(svcInfo.ClusterIPString())
+			for _, extIP := range svcInfo.ExternalIPStrings() {
+				staleServices.Insert(extIP)
+			}
 		}
 	}
 
@@ -1088,20 +1096,32 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// Nodeports need SNAT, unless they're local.
 			// ipset call
-			entry = &utilipset.Entry{
-				// No need to provide ip info
-				Port:     svcInfo.NodePort,
-				Protocol: protocol,
-				SetType:  utilipset.BitmapPort,
-			}
 			var nodePortSet *IPSet
 			switch protocol {
 			case "tcp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetTCP]
+				entry = &utilipset.Entry{
+					// No need to provide ip info
+					Port:     svcInfo.NodePort,
+					Protocol: protocol,
+					SetType:  utilipset.BitmapPort,
+				}
 			case "udp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetUDP]
+				entry = &utilipset.Entry{
+					// No need to provide ip info
+					Port:     svcInfo.NodePort,
+					Protocol: protocol,
+					SetType:  utilipset.BitmapPort,
+				}
 			case "sctp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetSCTP]
+				entry = &utilipset.Entry{
+					IP:       proxier.nodeIP.String(),
+					Port:     svcInfo.NodePort,
+					Protocol: protocol,
+					SetType:  utilipset.HashIPPort,
+				}
 			default:
 				// It should never hit
 				klog.Errorf("Unsupported protocol type: %s", protocol)

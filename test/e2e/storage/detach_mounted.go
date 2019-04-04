@@ -32,7 +32,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var (
@@ -80,31 +79,31 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 		clientPod := getFlexVolumePod(volumeSource, node.Name)
 		By("Creating pod that uses slow format volume")
 		pod, err := cs.CoreV1().Pods(ns.Name).Create(clientPod)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		uniqueVolumeName := getUniqueVolumeName(pod, driverInstallAs)
 
 		By("waiting for volumes to be attached to node")
 		err = waitForVolumesAttached(cs, node.Name, uniqueVolumeName)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for volume to attach to %s node", node.Name)
+		framework.ExpectNoError(err, "while waiting for volume to attach to %s node", node.Name)
 
 		By("waiting for volume-in-use on the node after pod creation")
 		err = waitForVolumesInUse(cs, node.Name, uniqueVolumeName)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for volume in use")
+		framework.ExpectNoError(err, "while waiting for volume in use")
 
 		By("waiting for kubelet to start mounting the volume")
 		time.Sleep(20 * time.Second)
 
 		By("Deleting the flexvolume pod")
 		err = framework.DeletePodWithWait(f, cs, pod)
-		Expect(err).NotTo(HaveOccurred(), "in deleting the pod")
+		framework.ExpectNoError(err, "in deleting the pod")
 
 		// Wait a bit for node to sync the volume status
 		time.Sleep(30 * time.Second)
 
 		By("waiting for volume-in-use on the node after pod deletion")
 		err = waitForVolumesInUse(cs, node.Name, uniqueVolumeName)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for volume in use")
+		framework.ExpectNoError(err, "while waiting for volume in use")
 
 		// Wait for 110s because mount device operation has a sleep of 120 seconds
 		// we previously already waited for 30s.
@@ -112,7 +111,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 
 		By("waiting for volume to disappear from node in-use")
 		err = waitForVolumesNotInUse(cs, node.Name, uniqueVolumeName)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for volume to be removed from in-use")
+		framework.ExpectNoError(err, "while waiting for volume to be removed from in-use")
 
 		By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
 		uninstallFlex(cs, &node, "k8s", driverInstallAs)

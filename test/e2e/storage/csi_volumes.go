@@ -47,6 +47,7 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitSubPathTestSuite,
 	testsuites.InitProvisioningTestSuite,
 	testsuites.InitSnapshottableTestSuite,
+	testsuites.InitMultiVolumeTestSuite,
 }
 
 // This executes testSuites for csi volumes.
@@ -133,7 +134,7 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 
 	// Use different zones for pod and PV
 	zones, err := framework.GetClusterZones(cs)
-	Expect(err).ToNot(HaveOccurred())
+	framework.ExpectNoError(err)
 	Expect(zones.Len()).To(BeNumerically(">=", 2))
 	zonesList := zones.UnsortedList()
 	podZoneIndex := rand.Intn(zones.Len())
@@ -152,10 +153,10 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 	if delayBinding {
 		test.TestBindingWaitForFirstConsumer(nodeSelector, true /* expect unschedulable */)
 	} else {
-		test.PvCheck = func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+		test.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			// Ensure that a pod cannot be scheduled in an unsuitable zone.
 			pod := testsuites.StartInPodWithVolume(cs, namespace, claim.Name, "pvc-tester-unschedulable", "sleep 100000",
-				testsuites.NodeSelection{Selector: nodeSelector})
+				framework.NodeSelection{Selector: nodeSelector})
 			defer testsuites.StopPod(cs, pod)
 			framework.ExpectNoError(framework.WaitForPodNameUnschedulableInNamespace(cs, pod.Name, pod.Namespace), "pod should be unschedulable")
 		}

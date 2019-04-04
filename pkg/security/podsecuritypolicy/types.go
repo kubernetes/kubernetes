@@ -32,16 +32,12 @@ import (
 // Provider provides the implementation to generate a new security
 // context based on constraints or validate an existing security context against constraints.
 type Provider interface {
-	// DefaultPodSecurityContext sets the default values of the required but not filled fields.
-	// It modifies the SecurityContext and annotations of the provided pod.
-	DefaultPodSecurityContext(pod *api.Pod) error
-	// DefaultContainerSecurityContext sets the default values of the required but not filled fields.
-	// It modifies the SecurityContext of the container and annotations of the pod.
-	DefaultContainerSecurityContext(pod *api.Pod, container *api.Container) error
-	// Ensure a pod is in compliance with the given constraints.
+	// MutatePod sets the default values of the required but not filled fields of the pod and all
+	// containers in the pod.
+	MutatePod(pod *api.Pod) error
+	// ValidatePod ensures a pod and all its containers are in compliance with the given constraints.
+	// ValidatePod MUST NOT mutate the pod.
 	ValidatePod(pod *api.Pod) field.ErrorList
-	// Ensure a container's SecurityContext is in compliance with the given constraints.
-	ValidateContainer(pod *api.Pod, container *api.Container, containerPath *field.Path) field.ErrorList
 	// Get the name of the PSP that this provider was initialized with.
 	GetPSPName() string
 }

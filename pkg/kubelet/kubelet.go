@@ -32,7 +32,6 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -51,11 +50,11 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -822,7 +821,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock)
+	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.podManager.GetMirrorPodByPod, klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock)
 
 	klet.evictionManager = evictionManager
 	klet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
@@ -990,9 +989,6 @@ type Kubelet struct {
 
 	// Cached MachineInfo returned by cadvisor.
 	machineInfo *cadvisorapi.MachineInfo
-
-	//Cached RootFsInfo returned by cadvisor
-	rootfsInfo *cadvisorapiv2.FsInfo
 
 	// Handles certificate rotations.
 	serverCertificateManager certificate.Manager

@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -34,7 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -234,7 +235,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
 func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component, contentType string, httpCode, respSize int, elapsed time.Duration) {
 	reportedVerb := cleanVerb(verb, req)
-	dryRun := cleanDryRun(req.URL.Query()["dryRun"])
+	dryRun := cleanDryRun(req.URL)
 	client := cleanUserAgent(utilnet.GetHTTPClient(req))
 	elapsedMicroseconds := float64(elapsed / time.Microsecond)
 	elapsedSeconds := elapsed.Seconds()
@@ -331,12 +332,19 @@ func cleanVerb(verb string, request *http.Request) string {
 	return reportedVerb
 }
 
-func cleanDryRun(dryRun []string) string {
+func cleanDryRun(u *url.URL) string {
+	// avoid allocating when we don't see dryRun in the query
+	if !strings.Contains(u.RawQuery, "dryRun") {
+		return ""
+	}
+	dryRun := u.Query()["dryRun"]
 	if errs := validation.ValidateDryRun(nil, dryRun); len(errs) > 0 {
 		return "invalid"
 	}
 	// Since dryRun could be valid with any arbitrarily long length
 	// we have to dedup and sort the elements before joining them together
+	// TODO: this is a fairly large allocation for what it does, consider
+	//   a sort and dedup in a single pass
 	return strings.Join(utilsets.NewString(dryRun...).List(), ",")
 }
 
@@ -346,7 +354,10 @@ func cleanUserAgent(ua string) string {
 		return "Browser"
 	}
 	// If an old "kubectl.exe" has passed us its full path, we discard the path portion.
-	ua = kubectlExeRegexp.ReplaceAllString(ua, "$1")
+	if kubectlExeRegexp.MatchString(ua) {
+		// avoid an allocation
+		ua = kubectlExeRegexp.ReplaceAllString(ua, "$1")
+	}
 	return ua
 }
 

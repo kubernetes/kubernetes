@@ -21,7 +21,7 @@ DEB_ARCH=$(dpkg --print-architecture)
 # /etc/apt/sources.list which is "deb http://deb.debian.org/debian jessie-updates main"
 
 case ${DEB_ARCH} in
-    arm64|ppc64el)
+    s390x|arm64|ppc64el)
         sed -i '/debian-security/d' /etc/apt/sources.list
         ;;
 esac

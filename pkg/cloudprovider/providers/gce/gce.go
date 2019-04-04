@@ -64,18 +64,8 @@ const (
 	gceAffinityTypeNone = "NONE"
 	// AffinityTypeClientIP - affinity based on Client IP.
 	gceAffinityTypeClientIP = "CLIENT_IP"
-	// AffinityTypeClientIPProto - affinity based on Client IP and port.
-	gceAffinityTypeClientIPProto = "CLIENT_IP_PROTO"
 
-	operationPollInterval = time.Second
-	// Creating Route in very large clusters, may take more than half an hour.
-	operationPollTimeoutDuration = time.Hour
-
-	// Each page can have 500 results, but we cap how many pages
-	// are iterated through to prevent infinite loops if the API
-	// were to continuously return a nextPageToken.
-	maxPages = 25
-
+	operationPollInterval        = time.Second
 	maxTargetPoolCreateInstances = 200
 
 	// HTTP Load Balancer parameters

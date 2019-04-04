@@ -488,6 +488,10 @@ func (plugin *FakeVolumePlugin) CanAttach(spec *Spec) bool {
 	return true
 }
 
+func (plugin *FakeVolumePlugin) CanDeviceMount(spec *Spec) (bool, error) {
+	return true, nil
+}
+
 func (plugin *FakeVolumePlugin) Recycle(pvName string, spec *Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	return nil
 }
@@ -608,6 +612,10 @@ var _ VolumePlugin = &FakeBasicVolumePlugin{}
 // FakeDeviceMountableVolumePlugin implements an device mountable plugin based on FakeBasicVolumePlugin.
 type FakeDeviceMountableVolumePlugin struct {
 	FakeBasicVolumePlugin
+}
+
+func (f *FakeDeviceMountableVolumePlugin) CanDeviceMount(spec *Spec) (bool, error) {
+	return true, nil
 }
 
 func (f *FakeDeviceMountableVolumePlugin) NewDeviceMounter() (DeviceMounter, error) {

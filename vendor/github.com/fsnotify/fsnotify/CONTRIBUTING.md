@@ -17,7 +17,7 @@ Please indicate that you have signed the CLA in your pull request.
 ### How fsnotify is Developed
 
 * Development is done on feature branches.
-* Tests are run on BSD, Linux, OS X and Windows.
+* Tests are run on BSD, Linux, macOS and Windows.
 * Pull requests are reviewed and [applied to master][am] using [hub][].
   * Maintainers may modify or squash commits rather than asking contributors to.
 * To issue a new release, the maintainers will:
@@ -40,11 +40,11 @@ Contribute upstream:
 3. Push to the branch (`git push fork my-new-feature`)
 4. Create a new Pull Request on GitHub
 
-This workflow is [thoroughly explained by Katrina Owen](https://blog.splice.com/contributing-open-source-git-repositories-go/).
+This workflow is [thoroughly explained by Katrina Owen](https://splice.com/blog/contributing-open-source-git-repositories-go/).
 
 ### Testing
 
-fsnotify uses build tags to compile different code on Linux, BSD, OS X, and Windows.
+fsnotify uses build tags to compile different code on Linux, BSD, macOS, and Windows.
 
 Before doing a pull request, please do your best to test your changes on multiple platforms, and list which platforms you were able/unable to test on.
 
@@ -58,7 +58,7 @@ To aid in cross-platform testing there is a Vagrantfile for Linux and BSD.
 
 Notice: fsnotify file system events won't trigger in shared folders. The tests get around this limitation by using the /tmp directory.
 
-Right now there is no equivalent solution for Windows and OS X, but there are Windows VMs [freely available from Microsoft](http://www.modern.ie/en-us/virtualization-tools#downloads).
+Right now there is no equivalent solution for Windows and macOS, but there are Windows VMs [freely available from Microsoft](http://www.modern.ie/en-us/virtualization-tools#downloads).
 
 ### Maintainers
 

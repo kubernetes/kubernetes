@@ -19,7 +19,7 @@ The `update-codegen` script will automatically generate the following files &
 directories:
 
 * `pkg/apis/samplecontroller/v1alpha1/zz_generated.deepcopy.go`
-* `pkg/client/`
+* `pkg/generated/`
 
 Changes should not be made to these files manually, and when creating your own
 controller based off of this implementation you should not copy these files and

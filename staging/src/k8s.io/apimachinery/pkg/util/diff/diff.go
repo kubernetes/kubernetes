@@ -78,7 +78,20 @@ func ObjectGoPrintDiff(a, b interface{}) string {
 	)
 }
 
+// ObjectReflectDiff returns a multi-line formatted diff between two objects
+// of equal type. If an object with private fields is passed you will
+// only see string comparison for those fields. Otherwise this presents the
+// most human friendly diff of two structs of equal type in this package.
 func ObjectReflectDiff(a, b interface{}) string {
+	if a == nil && b == nil {
+		return "<no diffs>"
+	}
+	if a == nil {
+		return fmt.Sprintf("a is nil and b is not-nil")
+	}
+	if b == nil {
+		return fmt.Sprintf("a is not-nil and b is nil")
+	}
 	vA, vB := reflect.ValueOf(a), reflect.ValueOf(b)
 	if vA.Type() != vB.Type() {
 		return fmt.Sprintf("type A %T and type B %T do not match", a, b)

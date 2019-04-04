@@ -210,7 +210,7 @@ func TestFindRule(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		findResult := findRule(test.existingRule, test.curRule)
+		findResult := findRule(test.existingRule, test.curRule, true)
 		assert.Equal(t, test.expected, findResult, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
 	}
 }

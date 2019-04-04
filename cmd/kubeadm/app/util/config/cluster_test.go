@@ -58,27 +58,6 @@ apiEndpoints:
 apiVersion: kubeadm.k8s.io/v1beta1
 kind: ClusterStatus
 `),
-	"InitConfiguration_v1alpha3": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha3
-kind: InitConfiguration
-`),
-	"ClusterConfiguration_v1alpha3": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha3
-kind: ClusterConfiguration
-kubernetesVersion: ` + k8sVersionString + `
-`),
-	"ClusterStatus_v1alpha3": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha3
-kind: ClusterStatus
-apiEndpoints: 
-  ` + nodeName + `: 
-    advertiseAddress: 1.2.3.4
-    bindPort: 1234
-`),
-	"ClusterStatus_v1alpha3_Without_APIEndpoints": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha3
-kind: ClusterStatus
-`),
 	"Kube-proxy_componentconfig": []byte(`
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
@@ -356,33 +335,6 @@ func TestGetAPIEndpoint(t *testing.T) {
 			},
 			expectedError: true,
 		},
-		{
-			name: "valid v1alpha3",
-			configMap: fakeConfigMap{
-				name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
-				data: map[string]string{
-					kubeadmconstants.ClusterStatusConfigMapKey: string(cfgFiles["ClusterStatus_v1alpha3"]),
-				},
-			},
-		},
-		{
-			name: "invalid v1alpha3 - No ClusterStatus in kubeadm-config ConfigMap",
-			configMap: fakeConfigMap{
-				name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
-				data: map[string]string{},
-			},
-			expectedError: true,
-		},
-		{
-			name: "invalid v1alpha3 - ClusterStatus without APIEndopoints",
-			configMap: fakeConfigMap{
-				name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
-				data: map[string]string{
-					kubeadmconstants.ClusterStatusConfigMapKey: string(cfgFiles["ClusterStatus_v1alpha3_Without_APIEndpoints"]),
-				},
-			},
-			expectedError: true,
-		},
 	}
 
 	for _, rt := range tests {
@@ -579,66 +531,6 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			},
 			newControlPlane: true,
 		},
-		{
-			name: "valid v1alpha3 - new control plane == false", // InitConfiguration composed with data from different places, with also node specific information from ClusterStatus and node
-			configMaps: []fakeConfigMap{
-				{
-					name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
-					data: map[string]string{
-						kubeadmconstants.ClusterConfigurationConfigMapKey: string(cfgFiles["ClusterConfiguration_v1alpha3"]),
-						kubeadmconstants.ClusterStatusConfigMapKey:        string(cfgFiles["ClusterStatus_v1alpha3"]),
-					},
-				},
-				{
-					name: kubeadmconstants.KubeProxyConfigMap, // Kube-proxy component config from corresponding ConfigMap.
-					data: map[string]string{
-						kubeadmconstants.KubeProxyConfigMapKey: string(cfgFiles["Kube-proxy_componentconfig"]),
-					},
-				},
-				{
-					name: kubeadmconstants.GetKubeletConfigMapName(k8sVersion), // Kubelet component config from corresponding ConfigMap.
-					data: map[string]string{
-						kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(cfgFiles["Kubelet_componentconfig"]),
-					},
-				},
-			},
-			fileContents: kubeletConfFiles["configWithEmbeddedCert"],
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: nodeName,
-					Annotations: map[string]string{
-						kubeadmconstants.AnnotationKubeadmCRISocket: "myCRIsocket",
-					},
-				},
-				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
-				},
-			},
-		},
-		{
-			name: "valid v1alpha3 - new control plane == true", // InitConfiguration composed with data from different places, without node specific information
-			configMaps: []fakeConfigMap{
-				{
-					name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
-					data: map[string]string{
-						kubeadmconstants.ClusterConfigurationConfigMapKey: string(cfgFiles["ClusterConfiguration_v1alpha3"]),
-					},
-				},
-				{
-					name: kubeadmconstants.KubeProxyConfigMap, // Kube-proxy component config from corresponding ConfigMap.
-					data: map[string]string{
-						kubeadmconstants.KubeProxyConfigMapKey: string(cfgFiles["Kube-proxy_componentconfig"]),
-					},
-				},
-				{
-					name: kubeadmconstants.GetKubeletConfigMapName(k8sVersion), // Kubelet component config from corresponding ConfigMap.
-					data: map[string]string{
-						kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(cfgFiles["Kubelet_componentconfig"]),
-					},
-				},
-			},
-			newControlPlane: true,
-		},
 	}
 
 	for _, rt := range tests {
@@ -717,18 +609,6 @@ func TestGetGetClusterStatus(t *testing.T) {
 					name: kubeadmconstants.KubeadmConfigConfigMap,
 					data: map[string]string{
 						kubeadmconstants.ClusterStatusConfigMapKey: string(cfgFiles["ClusterStatus_v1beta1"]),
-					},
-				},
-			},
-			expectedEndpoints: 1,
-		},
-		{
-			name: "valid v1alpha3",
-			configMaps: []fakeConfigMap{
-				{
-					name: kubeadmconstants.KubeadmConfigConfigMap,
-					data: map[string]string{
-						kubeadmconstants.ClusterStatusConfigMapKey: string(cfgFiles["ClusterStatus_v1alpha3"]),
 					},
 				},
 			},

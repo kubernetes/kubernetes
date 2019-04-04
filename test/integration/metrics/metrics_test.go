@@ -61,6 +61,9 @@ func scrapeMetrics(s *httptest.Server) ([]*prometheuspb.MetricFamily, error) {
 	// Each line in the response body should contain all the data for a single metric.
 	var metrics []*prometheuspb.MetricFamily
 	scanner := bufio.NewScanner(resp.Body)
+	// Increase buffer size, since default one is too small for reading
+	// the /metrics contents.
+	scanner.Buffer(make([]byte, 10), 131072)
 	for scanner.Scan() {
 		var metric prometheuspb.MetricFamily
 		if err := proto.UnmarshalText(scanner.Text(), &metric); err != nil {
@@ -122,5 +125,6 @@ func TestApiserverMetrics(t *testing.T) {
 	checkForExpectedMetrics(t, metrics, []string{
 		"apiserver_request_total",
 		"apiserver_request_duration_seconds",
+		"etcd_request_duration_seconds",
 	})
 }

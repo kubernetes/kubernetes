@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/crd"
 	uexec "k8s.io/utils/exec"
 
 	"github.com/onsi/ginkgo"
@@ -569,6 +570,21 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(c.BatchV1().Jobs(ns).Delete("run-test-3", nil)).To(gomega.BeNil())
 		})
 
+		ginkgo.It("should contain last line of the log", func() {
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			podName := "run-log-test"
+
+			ginkgo.By("executing a command with run")
+			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+busyboxImage, "--restart=OnFailure", nsFlag, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
+
+			if !framework.CheckPodsRunningReady(c, ns, []string{podName}, framework.PodStartTimeout) {
+				framework.Failf("Pod for run-log-test was not ready")
+			}
+
+			logOutput := framework.RunKubectlOrDie(nsFlag, "logs", "-f", "run-log-test")
+			gomega.Expect(logOutput).To(gomega.ContainSubstring("EOF"))
+		})
+
 		ginkgo.It("should support port-forward", func() {
 			ginkgo.By("forwarding the container port to a local port")
 			cmd := runPortForward(ns, simplePodName, simplePodPort)
@@ -823,7 +839,7 @@ metadata:
 	framework.KubeDescribe("Kubectl client-side validation", func() {
 		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func() {
 			ginkgo.By("create CRD with no validation schema")
-			crd, err := framework.CreateTestCRD(f)
+			crd, err := crd.CreateTestCRD(f)
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
@@ -832,7 +848,7 @@ metadata:
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
-			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.ApiGroup, crd.Versions[0].Name, "test-cr")
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
 			randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
 			if err := createApplyCustomResource(randomCR, f.Namespace.Name, "test-cr", crd); err != nil {
 				framework.Failf("%v", err)
@@ -841,7 +857,7 @@ metadata:
 
 		ginkgo.It("should create/apply a valid CR for CRD with validation schema", func() {
 			ginkgo.By("prepare CRD with validation schema")
-			crd, err := framework.CreateTestCRD(f)
+			crd, err := crd.CreateTestCRD(f)
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
@@ -853,7 +869,7 @@ metadata:
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
-			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.ApiGroup, crd.Versions[0].Name, "test-cr")
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
 			validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
 			if err := createApplyCustomResource(validCR, f.Namespace.Name, "test-cr", crd); err != nil {
 				framework.Failf("%v", err)
@@ -862,7 +878,7 @@ metadata:
 
 		ginkgo.It("should create/apply a valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
 			ginkgo.By("prepare CRD with partially-specified validation schema")
-			crd, err := framework.CreateTestCRD(f)
+			crd, err := crd.CreateTestCRD(f)
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
@@ -874,7 +890,7 @@ metadata:
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
-			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.ApiGroup, crd.Versions[0].Name, "test-cr")
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
 			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
 			if err := createApplyCustomResource(validArbitraryCR, f.Namespace.Name, "test-cr", crd); err != nil {
 				framework.Failf("%v", err)
@@ -2226,7 +2242,7 @@ func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
 
 // createApplyCustomResource asserts that given CustomResource be created and applied
 // without being rejected by client-side validation
-func createApplyCustomResource(resource, namespace, name string, crd *framework.TestCrd) error {
+func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCrd) error {
 	ns := fmt.Sprintf("--namespace=%v", namespace)
 	ginkgo.By("successfully create CR")
 	if _, err := framework.RunKubectlInput(resource, ns, "create", "-f", "-"); err != nil {

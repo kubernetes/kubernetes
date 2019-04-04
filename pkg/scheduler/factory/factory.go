@@ -51,7 +51,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/api/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/plugins"
@@ -81,7 +81,7 @@ type PodConditionUpdater interface {
 type Config struct {
 	// It is expected that changes made via SchedulerCache will be observed
 	// by NodeLister and Algorithm.
-	SchedulerCache schedulerinternalcache.Cache
+	SchedulerCache internalcache.Cache
 
 	NodeLister algorithm.NodeLister
 	Algorithm  core.ScheduleAlgorithm
@@ -90,7 +90,8 @@ type Config struct {
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
 	PodConditionUpdater PodConditionUpdater
-	// PodPreemptor is used to evict pods and update pod annotations.
+	// PodPreemptor is used to evict pods and update 'NominatedNode' field of
+	// the preemptor pod.
 	PodPreemptor PodPreemptor
 	// PlugingSet has a set of plugins and data used to run them.
 	PluginSet pluginsv1alpha1.PluginSet
@@ -125,8 +126,8 @@ type Config struct {
 	SchedulingQueue internalqueue.SchedulingQueue
 }
 
-// PodPreemptor has methods needed to delete a pod and to update
-// annotations of the preemptor pod.
+// PodPreemptor has methods needed to delete a pod and to update 'NominatedPod'
+// field of the preemptor pod.
 type PodPreemptor interface {
 	GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error)
 	DeletePod(pod *v1.Pod) error
@@ -191,7 +192,7 @@ type configFactory struct {
 
 	scheduledPodsHasSynced cache.InformerSynced
 
-	schedulerCache schedulerinternalcache.Cache
+	schedulerCache internalcache.Cache
 
 	// SchedulerName of a scheduler is used to select which pods will be
 	// processed by this scheduler, based on pods's "spec.schedulerName".
@@ -247,7 +248,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	if stopEverything == nil {
 		stopEverything = wait.NeverStop
 	}
-	schedulerCache := schedulerinternalcache.New(30*time.Second, stopEverything)
+	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
 	var storageClassLister storagelisters.StorageClassLister
@@ -638,7 +639,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue, schedulerCache schedulerinternalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
+func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			klog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)

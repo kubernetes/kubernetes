@@ -44,6 +44,7 @@ type KernelValidator struct {
 	Reporter      Reporter
 }
 
+// Name is part of the system.Validator interface.
 func (k *KernelValidator) Name() string {
 	return "kernel"
 }
@@ -58,10 +59,11 @@ const (
 
 	// validKConfigRegex is the regex matching kernel configuration line.
 	validKConfigRegex = "^CONFIG_[A-Z0-9_]+=[myn]"
-	// kConfigPrefix is the prefix of kernel configuration.
-	kConfigPrefix = "CONFIG_"
+	// kernelConfigPrefix is the prefix of kernel configuration.
+	kernelConfigPrefix = "CONFIG_"
 )
 
+// Validate is part of the system.Validator interface.
 func (k *KernelValidator) Validate(spec SysSpec) (error, error) {
 	helper := KernelValidatorHelperImpl{}
 	release, err := helper.GetKernelReleaseVersion()
@@ -135,7 +137,7 @@ func (k *KernelValidator) validateCachedKernelConfig(allConfig map[string]kConfi
 		var opt kConfigOption
 		var ok bool
 		for _, name = range append([]string{config.Name}, config.Aliases...) {
-			name = kConfigPrefix + name
+			name = kernelConfigPrefix + name
 			if opt, ok = allConfig[name]; ok {
 				break
 			}

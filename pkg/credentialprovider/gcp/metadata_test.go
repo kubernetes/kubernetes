@@ -91,7 +91,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 		t.Errorf("Provider is unexpectedly disabled")
 	}
 
-	keyring.Add(provider.Provide())
+	keyring.Add(provider.Provide(""))
 
 	creds, ok := keyring.Lookup(registryUrl)
 	if !ok {
@@ -169,7 +169,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 		t.Errorf("Provider is unexpectedly disabled")
 	}
 
-	keyring.Add(provider.Provide())
+	keyring.Add(provider.Provide(""))
 
 	creds, ok := keyring.Lookup(registryUrl)
 	if !ok {
@@ -253,7 +253,7 @@ func TestContainerRegistryBasics(t *testing.T) {
 		t.Errorf("Provider is unexpectedly disabled")
 	}
 
-	keyring.Add(provider.Provide())
+	keyring.Add(provider.Provide(""))
 
 	creds, ok := keyring.Lookup(registryUrl)
 	if !ok {

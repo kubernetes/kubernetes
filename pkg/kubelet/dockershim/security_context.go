@@ -24,7 +24,7 @@ import (
 	"github.com/blang/semver"
 	dockercontainer "github.com/docker/docker/api/types/container"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
 

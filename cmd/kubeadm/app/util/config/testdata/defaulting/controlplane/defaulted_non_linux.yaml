@@ -101,7 +101,7 @@ cgroupsPerQOS: true
 clusterDNS:
 - 10.192.0.10
 clusterDomain: cluster.global
-configMapAndSecretChangeDetectionStrategy: Cache
+configMapAndSecretChangeDetectionStrategy: Watch
 containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
 contentType: application/vnd.kubernetes.protobuf

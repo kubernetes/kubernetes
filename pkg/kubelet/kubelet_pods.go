@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -48,7 +49,6 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
@@ -89,19 +89,7 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 
 // GetActivePods returns non-terminal pods
 func (kl *Kubelet) GetActivePods() []*v1.Pod {
-	allPods, mirrorPods := kl.podManager.GetPodsAndMirrorPods()
-	mirrorPodSet := make(map[string]*v1.Pod)
-	for _, p := range mirrorPods {
-		mirrorPodSet[kubecontainer.GetPodFullName(p)] = p
-	}
-	for i := range allPods {
-		podFullName := kubecontainer.GetPodFullName(allPods[i])
-		// replace static pod with mirror pod as some info (e.g. spec.Priority)
-		// is needed to make further decisions (e.g. eviction)
-		if mirrorPod, ok := mirrorPodSet[podFullName]; ok {
-			allPods[i] = mirrorPod
-		}
-	}
+	allPods := kl.podManager.GetPods()
 	activePods := kl.filterOutTerminatedPods(allPods)
 	return activePods
 }

@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -39,7 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	informers "k8s.io/client-go/informers"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -166,6 +166,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.config.IPVS.SyncPeriod.Duration, "ipvs-sync-period", o.config.IPVS.SyncPeriod.Duration, "The maximum interval of how often ipvs rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
 	fs.DurationVar(&o.config.IPVS.MinSyncPeriod.Duration, "ipvs-min-sync-period", o.config.IPVS.MinSyncPeriod.Duration, "The minimum interval of how often the ipvs rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
 	fs.StringSliceVar(&o.config.IPVS.ExcludeCIDRs, "ipvs-exclude-cidrs", o.config.IPVS.ExcludeCIDRs, "A comma-separated list of CIDR's which the ipvs proxier should not touch when cleaning up IPVS rules.")
+	fs.BoolVar(&o.config.IPVS.StrictARP, "ipvs-strict-arp", o.config.IPVS.StrictARP, "Enable strict ARP by setting arp_ignore to 1 and arp_announce to 2")
 	fs.DurationVar(&o.config.ConfigSyncPeriod.Duration, "config-sync-period", o.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
 	fs.BoolVar(&o.config.IPTables.MasqueradeAll, "masquerade-all", o.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT all traffic sent via Service cluster IPs (this not commonly needed)")
 	fs.StringVar(&o.config.ClusterCIDR, "cluster-cidr", o.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
@@ -351,6 +352,7 @@ func (o *Options) writeConfigFile() error {
 	if err != nil {
 		return err
 	}
+	// TODO handle error
 	defer configFile.Close()
 
 	if err := encoder.Encode(o.config, configFile); err != nil {
@@ -413,11 +415,11 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 	if err != nil {
 		return nil, err
 	}
-	config, ok := configObj.(*kubeproxyconfig.KubeProxyConfiguration)
+	proxyConfig, ok := configObj.(*kubeproxyconfig.KubeProxyConfiguration)
 	if !ok {
 		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
 	}
-	return config, nil
+	return proxyConfig, nil
 }
 
 func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
@@ -477,6 +479,7 @@ with the apiserver API to configure the proxy.`,
 
 	opts.AddFlags(cmd.Flags())
 
+	// TODO handle error
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
 	return cmd
@@ -533,7 +536,6 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 	kubeConfig.AcceptContentTypes = config.AcceptContentTypes
 	kubeConfig.ContentType = config.ContentType
 	kubeConfig.QPS = config.QPS
-	//TODO make config struct use int instead of int32?
 	kubeConfig.Burst = int(config.Burst)
 
 	client, err := clientset.NewForConfig(kubeConfig)
@@ -559,7 +561,7 @@ func (s *ProxyServer) Run() error {
 		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
 		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface, s.CleanupIPVS) || encounteredError
 		if encounteredError {
-			return errors.New("encountered an error while tearing down rules.")
+			return errors.New("encountered an error while tearing down rules")
 		}
 		return nil
 	}
@@ -593,18 +595,18 @@ func (s *ProxyServer) Run() error {
 
 	// Start up a metrics server if requested
 	if len(s.MetricsBindAddress) > 0 {
-		mux := mux.NewPathRecorderMux("kube-proxy")
-		healthz.InstallHandler(mux)
-		mux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
+		proxyMux := mux.NewPathRecorderMux("kube-proxy")
+		healthz.InstallHandler(proxyMux)
+		proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
-		mux.Handle("/metrics", prometheus.Handler())
+		proxyMux.Handle("/metrics", prometheus.Handler())
 		if s.EnableProfiling {
-			routes.Profiling{}.Install(mux)
+			routes.Profiling{}.Install(proxyMux)
 		}
-		configz.InstallHandler(mux)
+		configz.InstallHandler(proxyMux)
 		go wait.Until(func() {
-			err := http.ListenAndServe(s.MetricsBindAddress, mux)
+			err := http.ListenAndServe(s.MetricsBindAddress, proxyMux)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("starting metrics server failed: %v", err))
 			}

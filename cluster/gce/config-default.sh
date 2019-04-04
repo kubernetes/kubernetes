@@ -352,6 +352,7 @@ fi
 if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} GCE_GLBC_IMAGE"
 fi
+CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection

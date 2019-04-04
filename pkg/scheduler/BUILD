@@ -96,7 +96,6 @@ filegroup(
         "//pkg/scheduler/api:all-srcs",
         "//pkg/scheduler/apis/config:all-srcs",
         "//pkg/scheduler/core:all-srcs",
-        "//pkg/scheduler/equivalence:all-srcs",
         "//pkg/scheduler/factory:all-srcs",
         "//pkg/scheduler/internal/cache:all-srcs",
         "//pkg/scheduler/internal/queue:all-srcs",

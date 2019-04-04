@@ -73,6 +73,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/serviceaccount/config:all-srcs",
+    ],
     tags = ["automanaged"],
 )

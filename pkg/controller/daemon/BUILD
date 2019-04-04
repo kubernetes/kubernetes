@@ -76,6 +76,7 @@ go_test(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
@@ -104,6 +105,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/daemon/config:all-srcs",
         "//pkg/controller/daemon/util:all-srcs",
     ],
     tags = ["automanaged"],

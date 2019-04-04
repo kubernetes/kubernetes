@@ -19,6 +19,9 @@ package scheduler
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
 	"reflect"
 	"testing"
 	"time"
@@ -43,10 +46,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -331,7 +335,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := schedulerinternalcache.New(100*time.Millisecond, stop)
+	scache := internalcache.New(100*time.Millisecond, stop)
 	pod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	scache.AddNode(&node)
@@ -390,7 +394,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := schedulerinternalcache.New(10*time.Minute, stop)
+	scache := internalcache.New(10*time.Minute, stop)
 	firstPod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	scache.AddNode(&node)
@@ -478,7 +482,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-			scache := schedulerinternalcache.New(test.CacheTTL, stop)
+			scache := internalcache.New(test.CacheTTL, stop)
 
 			node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 			scache.AddNode(&node)
@@ -519,7 +523,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 
 // queuedPodStore: pods queued before processing.
 // cache: scheduler cache that might contain assumed pods.
-func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcache.FIFO, scache schedulerinternalcache.Cache,
+func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcache.FIFO, scache internalcache.Cache,
 	informerFactory informers.SharedInformerFactory, stop chan struct{}, predicateMap map[string]predicates.FitPredicate, pod *v1.Pod, node *v1.Node) (*Scheduler, chan *v1.Binding, chan error) {
 
 	scheduler, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, predicateMap, nil)
@@ -554,7 +558,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := schedulerinternalcache.New(10*time.Minute, stop)
+	scache := internalcache.New(10*time.Minute, stop)
 
 	// Design the baseline for the pods, and we will make nodes that dont fit it later.
 	var cpu = int64(4)
@@ -631,7 +635,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
-func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerinternalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, recorder record.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, recorder record.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil),
@@ -683,7 +687,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 	return sched, bindingChan, errChan
 }
 
-func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulerinternalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
+func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil),
@@ -741,7 +745,7 @@ func setupTestSchedulerWithVolumeBinding(fakeVolumeBinder *volumebinder.VolumeBi
 	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{Name: "testVol",
 		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}}})
 	queuedPodStore.Add(pod)
-	scache := schedulerinternalcache.New(10*time.Minute, stop)
+	scache := internalcache.New(10*time.Minute, stop)
 	scache.AddNode(&testNode)
 	testPVC := v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "testPVC", Namespace: pod.Namespace, UID: types.UID("testPVC")}}
 	client := clientsetfake.NewSimpleClientset(&testNode, &testPVC)
@@ -933,5 +937,94 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 
 			close(stop)
 		})
+	}
+}
+
+func TestInitPolicyFromFile(t *testing.T) {
+	dir, err := ioutil.TempDir(os.TempDir(), "policy")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	for i, test := range []struct {
+		policy               string
+		expectedPredicates   sets.String
+		expectedPrioritizers sets.String
+	}{
+		// Test json format policy file
+		{
+			policy: `{
+				"kind" : "Policy",
+				"apiVersion" : "v1",
+				"predicates" : [
+					{"name" : "PredicateOne"},
+					{"name" : "PredicateTwo"}
+				],
+				"priorities" : [
+					{"name" : "PriorityOne", "weight" : 1},
+					{"name" : "PriorityTwo", "weight" : 5}
+				]
+			}`,
+			expectedPredicates: sets.NewString(
+				"PredicateOne",
+				"PredicateTwo",
+			),
+			expectedPrioritizers: sets.NewString(
+				"PriorityOne",
+				"PriorityTwo",
+			),
+		},
+		// Test yaml format policy file
+		{
+			policy: `apiVersion: v1
+kind: Policy
+predicates:
+- name: PredicateOne
+- name: PredicateTwo
+priorities:
+- name: PriorityOne
+  weight: 1
+- name: PriorityTwo
+  weight: 5
+`,
+			expectedPredicates: sets.NewString(
+				"PredicateOne",
+				"PredicateTwo",
+			),
+			expectedPrioritizers: sets.NewString(
+				"PriorityOne",
+				"PriorityTwo",
+			),
+		},
+	} {
+		file := fmt.Sprintf("scheduler-policy-config-file-%d", i)
+		fullPath := path.Join(dir, file)
+
+		if err := ioutil.WriteFile(fullPath, []byte(test.policy), 0644); err != nil {
+			t.Fatalf("Failed writing a policy config file: %v", err)
+		}
+
+		policy := &schedulerapi.Policy{}
+
+		if err := initPolicyFromFile(fullPath, policy); err != nil {
+			t.Fatalf("Failed writing a policy config file: %v", err)
+		}
+
+		// Verify that the policy is initialized correctly.
+		schedPredicates := sets.NewString()
+		for _, p := range policy.Predicates {
+			schedPredicates.Insert(p.Name)
+		}
+		schedPrioritizers := sets.NewString()
+		for _, p := range policy.Priorities {
+			schedPrioritizers.Insert(p.Name)
+		}
+		if !schedPredicates.Equal(test.expectedPredicates) {
+			t.Errorf("Expected predicates %v, got %v", test.expectedPredicates, schedPredicates)
+		}
+		if !schedPrioritizers.Equal(test.expectedPrioritizers) {
+			t.Errorf("Expected priority functions %v, got %v", test.expectedPrioritizers, schedPrioritizers)
+		}
 	}
 }

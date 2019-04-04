@@ -592,10 +592,15 @@ func (r *Request) WatchWithSpecificDecoders(wrapperDecoderFn func(io.ReadCloser)
 		if result := r.transformResponse(resp, req); result.err != nil {
 			return nil, result.err
 		}
-		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
+		return nil, fmt.Errorf("for request %s, got status: %v", url, resp.StatusCode)
 	}
 	wrapperDecoder := wrapperDecoderFn(resp.Body)
-	return watch.NewStreamWatcher(restclientwatch.NewDecoder(wrapperDecoder, embeddedDecoder)), nil
+	return watch.NewStreamWatcher(
+		restclientwatch.NewDecoder(wrapperDecoder, embeddedDecoder),
+		// use 500 to indicate that the cause of the error is unknown - other error codes
+		// are more specific to HTTP interactions, and set a reason
+		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
+	), nil
 }
 
 // updateURLMetrics is a convenience function for pushing metrics.
@@ -845,13 +850,13 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			// 3. Apiserver closes connection.
 			// 4. client-go should catch this and return an error.
 			klog.V(2).Infof("Stream error %#v when reading response body, may be caused by closed connection.", err)
-			streamErr := fmt.Errorf("Stream error %#v when reading response body, may be caused by closed connection. Please retry.", err)
+			streamErr := fmt.Errorf("Stream error when reading response body, may be caused by closed connection. Please retry. Original error: %v", err)
 			return Result{
 				err: streamErr,
 			}
 		default:
-			klog.Errorf("Unexpected error when reading response body: %#v", err)
-			unexpectedErr := fmt.Errorf("Unexpected error %#v when reading response body. Please retry.", err)
+			klog.Errorf("Unexpected error when reading response body: %v", err)
+			unexpectedErr := fmt.Errorf("Unexpected error when reading response body. Please retry. Original error: %v", err)
 			return Result{
 				err: unexpectedErr,
 			}

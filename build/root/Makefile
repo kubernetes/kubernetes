@@ -111,7 +111,7 @@ define VERIFY_HELP_INFO
 # Runs all the presubmission verifications.
 #
 # Args:
-#   BRANCH: Branch to be passed to verify-godeps.sh script.
+#   BRANCH: Branch to be passed to verify-vendor.sh script.
 #   WHAT: List of checks to run
 #
 # Example:
@@ -151,10 +151,10 @@ define UPDATE_HELP_INFO
 endef
 .PHONY: update
 ifeq ($(PRINT_HELP),y)
-update: generated_files
+update:
 	@echo "$$UPDATE_HELP_INFO"
 else
-update:
+update: generated_files
 	CALLED_FROM_MAIN_MAKEFILE=1 hack/make-rules/update.sh
 endif
 

@@ -135,6 +135,10 @@ func (ec *EstablishingController) sync(key string) error {
 
 	// Update server with new CRD condition.
 	_, err = ec.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+		// deleted or changed in the meantime, we'll get called again
+		return nil
+	}
 	if err != nil {
 		return err
 	}

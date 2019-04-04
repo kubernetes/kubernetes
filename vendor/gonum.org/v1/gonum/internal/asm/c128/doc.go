@@ -3,4 +3,4 @@
 // license that can be found in the LICENSE file.
 
 // Package c128 provides complex128 vector primitives.
-package c128
+package c128 // import "gonum.org/v1/gonum/internal/asm/c128"

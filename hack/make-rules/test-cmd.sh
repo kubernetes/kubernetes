@@ -21,11 +21,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/test.sh"
 source "${KUBE_ROOT}/test/cmd/legacy-script.sh"
 
+# Runs kube-apiserver
+#
+# Exports:
+#   APISERVER_PID
 function run_kube_apiserver() {
   kube::log::status "Building kube-apiserver"
   make -C "${KUBE_ROOT}" WHAT="cmd/kube-apiserver"
@@ -58,11 +62,15 @@ function run_kube_apiserver() {
     --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" \
     --token-auth-file=hack/testdata/auth-tokens.csv 1>&2 &
-  APISERVER_PID=$!
+  export APISERVER_PID=$!
 
   kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
 }
 
+# Runs run_kube_controller_manager
+# 
+# Exports:
+#   CTLRMGR_PID
 function run_kube_controller_manager() {
   kube::log::status "Building kube-controller-manager"
   make -C "${KUBE_ROOT}" WHAT="cmd/kube-controller-manager"
@@ -73,13 +81,16 @@ function run_kube_controller_manager() {
     --port="${CTLRMGR_PORT}" \
     --kube-api-content-type="${KUBE_TEST_API_TYPE-}" \
     --master="127.0.0.1:${API_PORT}" 1>&2 &
-  CTLRMGR_PID=$!
+  export CTLRMGR_PID=$!
 
   kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
 }
 
 # Creates a node object with name 127.0.0.1. This is required because we do not
 # run kubelet.
+# 
+# Exports:
+#   SUPPORTED_RESOURCES(Array of all resources supported by the apiserver).
 function create_node() {
   kubectl create -f - -s "http://127.0.0.1:${API_PORT}" << __EOF__
 {
@@ -117,7 +128,7 @@ setup
 run_kube_apiserver
 run_kube_controller_manager
 create_node
-SUPPORTED_RESOURCES=("*")
+export SUPPORTED_RESOURCES=("*")
 # WARNING: Do not wrap this call in a subshell to capture output, e.g. output=$(runTests)
 # Doing so will suppress errexit behavior inside runTests
 runTests

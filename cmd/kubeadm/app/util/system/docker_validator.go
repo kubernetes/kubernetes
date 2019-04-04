@@ -32,6 +32,7 @@ type DockerValidator struct {
 	Reporter Reporter
 }
 
+// Name is part of the system.Validator interface.
 func (d *DockerValidator) Name() string {
 	return "docker"
 }
@@ -41,6 +42,7 @@ const (
 	latestValidatedDockerVersion = "18.09"
 )
 
+// Validate is part of the system.Validator interface.
 // TODO(random-liu): Add more validating items.
 func (d *DockerValidator) Validate(spec SysSpec) (error, error) {
 	if spec.RuntimeSpec.DockerSpec == nil {

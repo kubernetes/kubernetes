@@ -15,7 +15,7 @@
 //   import "google.golang.org/api/monitoring/v3"
 //   ...
 //   monitoringService, err := monitoring.New(oauthHttpClient)
-package monitoring
+package monitoring // import "google.golang.org/api/monitoring/v3"
 
 import (
 	"bytes"
