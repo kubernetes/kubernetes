@@ -47,24 +47,6 @@ var ProberResults = prometheus.NewCounterVec(
 		"pod_uid"},
 )
 
-// DeprecatedProberResults stores the results of a probe as prometheus metrics.
-// This metrics is deprecated, will be removed in a future release.
-// Please convert to the metrics of counter type above.
-var DeprecatedProberResults = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Subsystem: "prober",
-		Name:      "probe_result",
-		Help:      "(Deprecated) The result of a liveness or readiness probe for a container.",
-	},
-	[]string{"probe_type",
-		"container_name",
-		"container",
-		"pod_name",
-		"pod",
-		"namespace",
-		"pod_uid"},
-)
-
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
 // probe (AddPod). The worker periodically probes its assigned container and caches the results. The
 // manager use the cached probe results to set the appropriate Ready state in the PodStatus when

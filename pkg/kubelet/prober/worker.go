@@ -68,8 +68,7 @@ type worker struct {
 	onHold bool
 
 	// proberResultsMetricLabels holds the labels attached to this worker
-	// for the ProberResults metric.
-	proberResultsMetricLabels           prometheus.Labels
+	// for the ProberResults metric by result.
 	proberResultsSuccessfulMetricLabels prometheus.Labels
 	proberResultsFailedMetricLabels     prometheus.Labels
 	proberResultsUnknownMetricLabels    prometheus.Labels
@@ -109,10 +108,6 @@ func newWorker(
 		"pod_uid":    string(w.pod.UID),
 	}
 
-	w.proberResultsMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
-	w.proberResultsMetricLabels["container_name"] = w.container.Name
-	w.proberResultsMetricLabels["pod_name"] = w.pod.Name
-
 	w.proberResultsSuccessfulMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
 	w.proberResultsSuccessfulMetricLabels["result"] = probeResultSuccessful
 
@@ -146,7 +141,6 @@ func (w *worker) run() {
 		ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)
 		ProberResults.Delete(w.proberResultsFailedMetricLabels)
 		ProberResults.Delete(w.proberResultsUnknownMetricLabels)
-		DeprecatedProberResults.Delete(w.proberResultsMetricLabels)
 	}()
 
 probeLoop:
@@ -260,7 +254,6 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
-	DeprecatedProberResults.With(w.proberResultsMetricLabels).Set(result.ToPrometheusType())
 
 	if w.probeType == liveness && result == results.Failure {
 		// The container fails a liveness check, it will need to be restarted.

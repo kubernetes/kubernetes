@@ -321,7 +321,6 @@ func (s *Server) InstallDefaultHandlers() {
 	// prober metrics are exposed under a different endpoint
 	p := prometheus.NewRegistry()
 	p.MustRegister(prober.ProberResults)
-	p.MustRegister(prober.DeprecatedProberResults)
 	s.restfulCont.Handle(proberMetricsPath,
 		promhttp.HandlerFor(p, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	)
