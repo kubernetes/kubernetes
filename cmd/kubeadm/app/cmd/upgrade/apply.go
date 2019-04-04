@@ -148,6 +148,13 @@ func runApply(flags *applyFlags, userVersion string) error {
 		return errors.Wrap(err, "[upgrade/version] FATAL")
 	}
 
+	// block if the local etcd manifest is listening on local host only and the user explicitly opted out from etcd upgrade.
+	// this is necessary because we want all the user to move to the new etcd manifest with v1.14.
+	// N.B. this code is necessary only in v1.14; starting from v1.15 all the etcd manifests should have 2 endpoints
+	if cfg.Etcd.External == nil && etcdutil.IsEtcdListeningOnLocalHostOnly() && !flags.etcdUpgrade {
+		return errors.New("kubeadm detected that the local etcd member is still listening only on localhost. Please upgrade etcd to avoid problems with new releases of kubeadm")
+	}
+
 	// If the current session is interactive, ask the user whether they really want to upgrade.
 	if flags.sessionIsInteractive() {
 		if err := InteractivelyConfirmUpgrade("Are you sure you want to proceed with the upgrade?"); err != nil {
