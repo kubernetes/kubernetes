@@ -348,16 +348,16 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				spec := makeStatefulSetWithPVCs(ns, writeCmd, mounts, claims, probe)
 				ss, err := c.AppsV1().StatefulSets(ns).Create(spec)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				ssTester.WaitForRunningAndReady(1, ss)
 
 				By("Deleting the StatefulSet but not the volumes")
 				// Scale down to 0 first so that the Delete is quick
 				ss, err = ssTester.Scale(ss, 0)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				ssTester.WaitForStatusReplicas(ss, 0)
 				err = c.AppsV1().StatefulSets(ns).Delete(ss.Name, &metav1.DeleteOptions{})
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				By("Creating a new Statefulset and validating the data")
 				validateCmd := "true"
@@ -368,7 +368,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				spec = makeStatefulSetWithPVCs(ns, validateCmd, mounts, claims, probe)
 				ss, err = c.AppsV1().StatefulSets(ns).Create(spec)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				ssTester.WaitForRunningAndReady(1, ss)
 			})
 		})
