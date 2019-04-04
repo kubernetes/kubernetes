@@ -161,6 +161,7 @@ func (o *CreateCronJobOptions) Validate() error {
 func (o *CreateCronJobOptions) Run() error {
 	var cronjob *batchv1beta1.CronJob
 	cronjob = o.createCronJob()
+	cronjob.Namespace = o.Namespace
 
 	if !o.DryRun {
 		var err error

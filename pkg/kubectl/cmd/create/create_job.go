@@ -190,6 +190,9 @@ func (o *CreateJobOptions) Run() error {
 
 		job = o.createJobFromCronJob(cronJob)
 	}
+
+	job.Namespace = o.Namespace
+
 	if !o.DryRun {
 		var err error
 		job, err = o.Client.Jobs(o.Namespace).Create(job)

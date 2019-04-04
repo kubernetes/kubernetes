@@ -334,6 +334,7 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 		return err
 	}
 	role.Rules = rules
+	role.Namespace = o.Namespace
 
 	// Create role.
 	if !o.DryRun {
