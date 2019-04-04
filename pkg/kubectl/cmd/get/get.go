@@ -204,11 +204,11 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		o.ExplicitNamespace = false
 	}
 
-	isSorting, err := cmd.Flags().GetString("sort-by")
+	sortBy, err := cmd.Flags().GetString("sort-by")
 	if err != nil {
 		return err
 	}
-	o.Sort = len(isSorting) > 0
+	o.Sort = len(sortBy) > 0
 
 	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
 
@@ -253,12 +253,20 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 			return nil, err
 		}
 
-		printer = maybeWrapSortingPrinter(printer, isSorting)
+		if o.Sort {
+			printer = &SortingPrinter{Delegate: printer, SortField: sortBy}
+		}
+		if o.ServerPrint {
+			printer = &TablePrinter{Delegate: printer}
+		}
 		return printer.PrintObj, nil
 	}
 
 	switch {
 	case o.Watch || o.WatchOnly:
+		if o.Sort {
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: --watch or --watch-only requested, --sort-by will be ignored\n")
+		}
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 			fmt.Fprintf(o.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.SuggestAPIResources(o.CmdParent))
@@ -271,6 +279,12 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 			return cmdutil.UsageErrorf(cmd, usageString)
 		}
 	}
+
+	// openapi printing is mutually exclusive with server side printing
+	if o.PrintWithOpenAPICols && o.ServerPrint {
+		fmt.Fprintf(o.IOStreams.ErrOut, "warning: --%s requested, --%s will be ignored\n", useOpenAPIPrintColumnFlagLabel, useServerPrintColumns)
+	}
+
 	return nil
 }
 
@@ -398,6 +412,27 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 	}
 }
 
+func (o *GetOptions) transformRequests(req *rest.Request) {
+	// We need full objects if printing with openapi columns
+	if o.PrintWithOpenAPICols {
+		return
+	}
+	if !o.ServerPrint || !o.IsHumanReadablePrinter {
+		return
+	}
+
+	group := metav1beta1.GroupName
+	version := metav1beta1.SchemeGroupVersion.Version
+
+	tableParam := fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", version, group)
+	req.SetHeader("Accept", tableParam)
+
+	// if sorting, ensure we receive the full object in order to introspect its fields via jsonpath
+	if o.Sort {
+		req.Param("includeObject", "Object")
+	}
+}
+
 // Run performs the get operation.
 // TODO: remove the need to pass these arguments, like other commands.
 func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
@@ -406,11 +441,6 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	}
 	if o.Watch || o.WatchOnly {
 		return o.watch(f, cmd, args)
-	}
-
-	// openapi printing is mutually exclusive with server side printing
-	if o.PrintWithOpenAPICols && o.ServerPrint {
-		fmt.Fprintf(o.IOStreams.ErrOut, "warning: --%s requested, --%s will be ignored\n", useOpenAPIPrintColumnFlagLabel, useServerPrintColumns)
 	}
 
 	chunkSize := o.ChunkSize
@@ -432,26 +462,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		ContinueOnError().
 		Latest().
 		Flatten().
-		TransformRequests(func(req *rest.Request) {
-			// We need full objects if printing with openapi columns
-			if o.PrintWithOpenAPICols {
-				return
-			}
-			if !o.ServerPrint || !o.IsHumanReadablePrinter {
-				return
-			}
-
-			group := metav1beta1.GroupName
-			version := metav1beta1.SchemeGroupVersion.Version
-
-			tableParam := fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", version, group)
-			req.SetHeader("Accept", tableParam)
-
-			// if sorting, ensure we receive the full object in order to introspect its fields via jsonpath
-			if o.Sort {
-				req.Param("includeObject", "Object")
-			}
-		}).
+		TransformRequests(o.transformRequests).
 		Do()
 
 	if o.IgnoreNotFound {
@@ -475,17 +486,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	objs := make([]runtime.Object, len(infos))
 	for ix := range infos {
+		// TODO: remove this and just pass the table objects to the printer opaquely once `info.Object.(*metav1beta1.Table)` checking is removed below
 		if o.ServerPrint {
-			table, err := o.decodeIntoTable(infos[ix].Object)
+			table, err := decodeIntoTable(infos[ix].Object)
 			if err == nil {
 				infos[ix].Object = table
-			} else {
-				// if we are unable to decode server response into a v1beta1.Table,
-				// fallback to client-side printing with whatever info the server returned.
-				klog.V(2).Infof("Unable to decode server response into a Table. Falling back to hardcoded types: %v", err)
 			}
 		}
-
 		objs[ix] = infos[ix].Object
 	}
 
@@ -723,35 +730,6 @@ func attemptToConvertToInternal(obj runtime.Object, converter runtime.ObjectConv
 	return internalObject
 }
 
-func (o *GetOptions) decodeIntoTable(obj runtime.Object) (runtime.Object, error) {
-	if obj.GetObjectKind().GroupVersionKind().Kind != "Table" {
-		return nil, fmt.Errorf("attempt to decode non-Table object into a v1beta1.Table")
-	}
-
-	unstr, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return nil, fmt.Errorf("attempt to decode non-Unstructured object")
-	}
-	table := &metav1beta1.Table{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, table); err != nil {
-		return nil, err
-	}
-
-	for i := range table.Rows {
-		row := &table.Rows[i]
-		if row.Object.Raw == nil || row.Object.Object != nil {
-			continue
-		}
-		converted, err := runtime.Decode(unstructured.UnstructuredJSONScheme, row.Object.Raw)
-		if err != nil {
-			return nil, err
-		}
-		row.Object.Object = converted
-	}
-
-	return table, nil
-}
-
 func (o *GetOptions) printGeneric(r *resource.Result) error {
 	// we flattened the data from the builder, so we have individual items, but now we'd like to either:
 	// 1. if there is more than one item, combine them all into a single list
@@ -861,16 +839,6 @@ func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping
 
 func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 	return cmdutil.GetFlagString(cmd, "output") != ""
-}
-
-func maybeWrapSortingPrinter(printer printers.ResourcePrinter, sortBy string) printers.ResourcePrinter {
-	if len(sortBy) != 0 {
-		return &SortingPrinter{
-			Delegate:  printer,
-			SortField: fmt.Sprintf("%s", sortBy),
-		}
-	}
-	return printer
 }
 
 func multipleGVKsRequested(infos []*resource.Info) bool {

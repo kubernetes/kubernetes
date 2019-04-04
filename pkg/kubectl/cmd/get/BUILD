@@ -23,6 +23,7 @@ go_library(
         "get_flags.go",
         "humanreadable_flags.go",
         "sorter.go",
+        "table_printer.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/get",
     visibility = ["//visibility:public"],
