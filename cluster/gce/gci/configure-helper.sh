@@ -25,6 +25,24 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+function convert-manifest-params {
+  # A helper function to convert the manifest args from a string to a list of
+  # flag arguments.
+  # Old format:
+  #   command=["/bin/sh", "-c", "exec KUBE_EXEC_BINARY --param1=val1 --param2-val2"].
+  # New format:
+  #   command=["KUBE_EXEC_BINARY"]  # No shell dependencies.
+  #   args=["--param1=val1", "--param2-val2"]
+  IFS=' ' read -ra FLAGS <<< "$1"
+  params=""
+  for flag in "${FLAGS[@]}"; do
+    params+="\n\"$flag\","
+  done
+  if [ ! -z $params ]; then
+    echo "${params::-1}"  #  drop trailing comma
+  fi
+}
+
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -1850,6 +1868,9 @@ function start-kube-apiserver {
   # params is passed by reference, so no "$"
   setup-etcd-encryption "${src_file}" params
 
+  params+=" --log-file=${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}"
+  params+=" --logtostderr=false"
+  params="$(convert-manifest-params "${params}")"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag="${KUBE_API_SERVER_DOCKER_TAG:-$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
@@ -2031,7 +2052,8 @@ function apply-encryption-config() {
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
   create-kubecontrollermanager-kubeconfig
-  prepare-log-file /var/log/kube-controller-manager.log
+  local LOG_PATH=/var/log/kube-controller-manager.log
+  prepare-log-file "${LOG_PATH}"
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --use-service-account-credentials"
@@ -2059,7 +2081,7 @@ function start-kube-controller-manager {
     params+=" --concurrent-service-syncs=${CONCURRENT_SERVICE_SYNCS}"
   fi
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
-    params+=" --allocate-node-cidrs=true"
+    params+=" --allocate-node-cidrs"
   elif [[ -n "${ALLOCATE_NODE_CIDRS:-}" ]]; then
     params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
   fi
@@ -2090,9 +2112,13 @@ function start-kube-controller-manager {
     params+=" --pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE"
   fi
   if [[ -n "${RUN_CONTROLLERS:-}" ]]; then
-    params+=" --controllers=${RUN_CONTROLLERS}"
+    # Trim the `RUN_CONTROLLERS` value. This field is quoted which is
+    # incompatible with the `convert-manifest-params` format.
+    params+=" --controllers=${RUN_CONTROLLERS//\'}"
   fi
-
+  params+=" --log-file=${LOG_PATH}"
+  params+=" --logtostderr=false"
+  params="$(convert-manifest-params "${params}")"
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
@@ -2127,7 +2153,8 @@ function start-kube-controller-manager {
 function start-kube-scheduler {
   echo "Start kubernetes scheduler"
   create-kubescheduler-kubeconfig
-  prepare-log-file /var/log/kube-scheduler.log
+  local LOG_PATH=/var/log/kube-scheduler.log
+  prepare-log-file "${LOG_PATH}"
 
   # Calculate variables and set them in the manifest.
   params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
@@ -2143,6 +2170,10 @@ function start-kube-scheduler {
     params+=" --use-legacy-policy-config"
     params+=" --policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config"
   fi
+
+  params+=" --log-file=${LOG_PATH}"
+  params+=" --logtostderr=false"
+  params="$(convert-manifest-params "${params}")"
   local -r kube_scheduler_docker_tag=$(cat "${KUBE_HOME}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values.
