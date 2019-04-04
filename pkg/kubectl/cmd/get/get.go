@@ -487,13 +487,6 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	objs := make([]runtime.Object, len(infos))
 	for ix := range infos {
-		// TODO: remove this and just pass the table objects to the printer opaquely once `info.Object.(*metav1beta1.Table)` checking is removed below
-		if o.ServerPrint {
-			table, err := decodeIntoTable(infos[ix].Object)
-			if err == nil {
-				infos[ix].Object = table
-			}
-		}
 		objs[ix] = infos[ix].Object
 	}
 
@@ -513,8 +506,11 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	var printer printers.ResourcePrinter
 	var lastMapping *meta.RESTMapping
-	nonEmptyObjCount := 0
-	w := utilprinters.GetNewTabWriter(o.Out)
+
+	// track if we write any output
+	trackingWriter := &trackingWriterWrapper{Delegate: o.Out}
+
+	w := utilprinters.GetNewTabWriter(trackingWriter)
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var info *resource.Info
@@ -525,16 +521,6 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			info = infos[ix]
 			mapping = info.Mapping
 		}
-
-		// if dealing with a table that has no rows, skip remaining steps
-		// and avoid printing an unnecessary newline
-		if table, isTable := info.Object.(*metav1beta1.Table); isTable {
-			if len(table.Rows) == 0 {
-				continue
-			}
-		}
-
-		nonEmptyObjCount++
 
 		printWithNamespace := o.AllNamespaces
 
@@ -582,10 +568,21 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 	}
 	w.Flush()
-	if nonEmptyObjCount == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
+	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
+		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
 		fmt.Fprintln(o.ErrOut, "No resources found.")
 	}
 	return utilerrors.NewAggregate(allErrs)
+}
+
+type trackingWriterWrapper struct {
+	Delegate io.Writer
+	Written  int
+}
+
+func (t *trackingWriterWrapper) Write(p []byte) (n int, err error) {
+	t.Written += len(p)
+	return t.Delegate.Write(p)
 }
 
 // raw makes a simple HTTP request to the provided path on the server using the default
