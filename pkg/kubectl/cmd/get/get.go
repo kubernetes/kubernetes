@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -622,6 +623,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		ResourceTypeOrNameArgs(true, args...).
 		SingleResourceType().
 		Latest().
+		TransformRequests(o.transformRequests).
 		Do()
 	if err := r.Err(); err != nil {
 		return err
@@ -662,6 +664,8 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 
 	writer := utilprinters.GetNewTabWriter(o.Out)
 
+	tableGK := metainternal.SchemeGroupVersion.WithKind("Table").GroupKind()
+
 	// print the current object
 	if !o.WatchOnly {
 		var objsToPrint []runtime.Object
@@ -672,8 +676,8 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 			objsToPrint = append(objsToPrint, obj)
 		}
 		for _, objToPrint := range objsToPrint {
-			if o.IsHumanReadablePrinter {
-				// printing always takes the internal version, but the watch event uses externals
+			if o.IsHumanReadablePrinter && objToPrint.GetObjectKind().GroupVersionKind().GroupKind() != tableGK {
+				// printing anything other than tables always takes the internal version, but the watch event uses externals
 				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
 				objToPrint = attemptToConvertToInternal(objToPrint, legacyscheme.Scheme, internalGV)
 			}
@@ -705,7 +709,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 			// printing always takes the internal version, but the watch event uses externals
 			// TODO fix printing to use server-side or be version agnostic
 			objToPrint := e.Object
-			if o.IsHumanReadablePrinter {
+			if o.IsHumanReadablePrinter && objToPrint.GetObjectKind().GroupVersionKind().GroupKind() != tableGK {
 				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
 				objToPrint = attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV)
 			}
