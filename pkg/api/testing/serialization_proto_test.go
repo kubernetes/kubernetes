@@ -276,3 +276,73 @@ func BenchmarkLatency(b *testing.B) {
 	perc99 := len(latencies)* 99 / 100
 	b.Errorf("99th perc: %#v", latencies[perc99])
 }
+
+type Xxx struct {
+	a string
+	b int
+	c float64
+	d float64
+	e string
+}
+
+func BenchmarkMemory(b *testing.B) {
+	workers := 5000
+	attempts := 1000
+	sliceSize := 1000
+
+	lock := sync.Mutex{}
+	latencies := make([]time.Duration, 0, workers*attempts)
+
+	wg := sync.WaitGroup{}
+	block := make(chan struct{})
+
+	blob := make([]byte, 1000000000)
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			objects := make([]*Xxx, 2*sliceSize)
+			for i := 0; i < sliceSize; i++ {
+				objects[i] = &Xxx{
+					a: "oifsldkf",
+					b: i,
+					c: 1.4938,
+					d: 493.3248,
+					e: "eworipwo",
+				}
+			}
+
+			defer wg.Done()
+			timeLatencies := make([]time.Duration, attempts)
+			for i := 0; i < attempts; i++ {
+				startTime := time.Now()
+				for i := sliceSize; i < 2*sliceSize; i++ {
+					objects[i] = &Xxx{
+						a: "orite",
+						b: i,
+						c: 1.4938,
+						d: 493.3248,
+						e: "eworipwo",
+					}
+				}
+				if objects[2*sliceSize-1].b != 2*sliceSize-1 {
+					b.Fatalf("incorrectData")
+				}
+				timeLatencies[i] = time.Since(startTime)
+			}
+			lock.Lock()
+			defer lock.Unlock()
+			latencies = append(latencies, timeLatencies...)
+		}()
+	}
+	close(block)
+	wg.Wait()
+
+	if blob[45983] != 0 {
+		b.Fatalf("bad data")
+	}
+
+	sort.Sort(DurationSlice(latencies))
+	perc99 := len(latencies)* 99 / 100
+	b.Errorf("99th perc: %#v", latencies[perc99])
+}
