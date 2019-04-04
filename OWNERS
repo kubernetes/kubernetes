@@ -31,3 +31,8 @@ filters:
   "BUILD(\\.bazel)?$":
     approvers:
       - ixdy
+
+  # Dependency updates touch go.mod and go.sum files in the root
+  "(go\\.mod|go\\.sum)$":
+    approvers:
+    - dep-approvers
