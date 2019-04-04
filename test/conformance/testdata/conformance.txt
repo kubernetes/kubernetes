@@ -147,6 +147,7 @@ test/e2e/common/projected_secret.go: "should be consumable from pods in volume w
 test/e2e/common/projected_secret.go: "should be consumable in multiple volumes in a pod"
 test/e2e/common/projected_secret.go: "optional updates should be reflected in volume"
 test/e2e/common/runtime.go: "should run with the expected status"
+test/e2e/common/runtime.go: "should report termination message  if TerminationMessagePath is set as non-root user and at a non-default path"
 test/e2e/common/secrets.go: "should be consumable from pods in env vars"
 test/e2e/common/secrets.go: "should be consumable via the environment"
 test/e2e/common/secrets_volume.go: "should be consumable from pods in volume"
