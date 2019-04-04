@@ -33,8 +33,6 @@
 ./hack/jenkins/upload-to-gcs.sh
 ./hack/jenkins/verify-dockerized.sh
 ./hack/lib/init.sh
-./hack/lib/logging.sh
-./hack/lib/protoc.sh
 ./hack/lib/swagger.sh
 ./hack/lib/test.sh
 ./hack/lib/version.sh
