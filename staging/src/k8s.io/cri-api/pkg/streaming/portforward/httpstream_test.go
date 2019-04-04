@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestHTTPStreamReceived(t *testing.T) {
@@ -136,7 +136,7 @@ func TestGetStreamPair(t *testing.T) {
 
 	// removed via complete
 	dataStream := newFakeHTTPStream()
-	dataStream.headers.Set(api.StreamType, api.StreamTypeData)
+	dataStream.headers.Set(apiv1.StreamType, apiv1.StreamTypeData)
 	complete, err := p.add(dataStream)
 	if err != nil {
 		t.Fatalf("unexpected error adding data stream to pair: %v", err)
@@ -146,7 +146,7 @@ func TestGetStreamPair(t *testing.T) {
 	}
 
 	errorStream := newFakeHTTPStream()
-	errorStream.headers.Set(api.StreamType, api.StreamTypeError)
+	errorStream.headers.Set(apiv1.StreamType, apiv1.StreamTypeError)
 	complete, err = p.add(errorStream)
 	if err != nil {
 		t.Fatalf("unexpected error adding error stream to pair: %v", err)
@@ -189,20 +189,20 @@ func TestRequestID(t *testing.T) {
 	h := &httpStreamHandler{}
 
 	s := newFakeHTTPStream()
-	s.headers.Set(api.StreamType, api.StreamTypeError)
+	s.headers.Set(apiv1.StreamType, apiv1.StreamTypeError)
 	s.id = 1
 	if e, a := "1", h.requestID(s); e != a {
 		t.Errorf("expected %q, got %q", e, a)
 	}
 
-	s.headers.Set(api.StreamType, api.StreamTypeData)
+	s.headers.Set(apiv1.StreamType, apiv1.StreamTypeData)
 	s.id = 3
 	if e, a := "1", h.requestID(s); e != a {
 		t.Errorf("expected %q, got %q", e, a)
 	}
 
 	s.id = 7
-	s.headers.Set(api.PortForwardRequestIDHeader, "2")
+	s.headers.Set(apiv1.PortForwardRequestIDHeader, "2")
 	if e, a := "2", h.requestID(s); e != a {
 		t.Errorf("expected %q, got %q", e, a)
 	}

@@ -28,11 +28,11 @@ import (
 
 	"k8s.io/klog"
 
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (
@@ -46,7 +46,7 @@ const (
 // V4Options contains details about which streams are required for port
 // forwarding.
 // All fields included in V4Options need to be expressed explicitly in the
-// CRI (k8s.io/cri-api/pkg/apis/{version}/api.proto) PortForwardRequest.
+// CRI (k8s.io/cri-api/pkg/apis/{version}/apiv1.proto) PortForwardRequest.
 type V4Options struct {
 	Ports []int32
 }
@@ -57,15 +57,15 @@ func NewV4Options(req *http.Request) (*V4Options, error) {
 		return &V4Options{}, nil
 	}
 
-	portStrings := req.URL.Query()[api.PortHeader]
+	portStrings := req.URL.Query()[apiv1.PortHeader]
 	if len(portStrings) == 0 {
-		return nil, fmt.Errorf("query parameter %q is required", api.PortHeader)
+		return nil, fmt.Errorf("query parameter %q is required", apiv1.PortHeader)
 	}
 
 	ports := make([]int32, 0, len(portStrings))
 	for _, portString := range portStrings {
 		if len(portString) == 0 {
-			return nil, fmt.Errorf("query parameter %q cannot be empty", api.PortHeader)
+			return nil, fmt.Errorf("query parameter %q cannot be empty", apiv1.PortHeader)
 		}
 		for _, p := range strings.Split(portString, ",") {
 			port, err := strconv.ParseUint(p, 10, 16)

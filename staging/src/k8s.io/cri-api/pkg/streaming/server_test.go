@@ -30,12 +30,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	apiv1 "k8s.io/api/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/transport/spdy"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletportforward "k8s.io/cri-api/pkg/streaming/portforward"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (
@@ -291,13 +291,13 @@ func TestServePortForward(t *testing.T) {
 	// Create the streams.
 	headers := http.Header{}
 	// Error stream is required, but unused in this test.
-	headers.Set(api.StreamType, api.StreamTypeError)
-	headers.Set(api.PortHeader, strconv.Itoa(testPort))
+	headers.Set(apiv1.StreamType, apiv1.StreamTypeError)
+	headers.Set(apiv1.PortHeader, strconv.Itoa(testPort))
 	_, err = streamConn.CreateStream(headers)
 	require.NoError(t, err)
 	// Setup the data stream.
-	headers.Set(api.StreamType, api.StreamTypeData)
-	headers.Set(api.PortHeader, strconv.Itoa(testPort))
+	headers.Set(apiv1.StreamType, apiv1.StreamTypeData)
+	headers.Set(apiv1.PortHeader, strconv.Itoa(testPort))
 	stream, err := streamConn.CreateStream(headers)
 	require.NoError(t, err)
 

@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"time"
 
+	apiv1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/wsstream"
 	"k8s.io/client-go/tools/remotecommand"
-	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"k8s.io/klog"
 )
@@ -48,10 +48,10 @@ type Options struct {
 
 // NewOptions creates a new Options from the Request.
 func NewOptions(req *http.Request) (*Options, error) {
-	tty := req.FormValue(api.ExecTTYParam) == "1"
-	stdin := req.FormValue(api.ExecStdinParam) == "1"
-	stdout := req.FormValue(api.ExecStdoutParam) == "1"
-	stderr := req.FormValue(api.ExecStderrParam) == "1"
+	tty := req.FormValue(apiv1.ExecTTYParam) == "1"
+	stdin := req.FormValue(apiv1.ExecStdinParam) == "1"
+	stdout := req.FormValue(apiv1.ExecStdoutParam) == "1"
+	stderr := req.FormValue(apiv1.ExecStderrParam) == "1"
 	if tty && stderr {
 		// TODO: make this an error before we reach this method
 		klog.V(4).Infof("Access to exec with tty and stderr is not supported, bypassing stderr")
@@ -214,21 +214,21 @@ WaitForStreams:
 	for {
 		select {
 		case stream := <-streams:
-			streamType := stream.Headers().Get(api.StreamType)
+			streamType := stream.Headers().Get(apiv1.StreamType)
 			switch streamType {
-			case api.StreamTypeError:
+			case apiv1.StreamTypeError:
 				ctx.writeStatus = v4WriteStatusFunc(stream) // write json errors
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStdin:
+			case apiv1.StreamTypeStdin:
 				ctx.stdinStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStdout:
+			case apiv1.StreamTypeStdout:
 				ctx.stdoutStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStderr:
+			case apiv1.StreamTypeStderr:
 				ctx.stderrStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeResize:
+			case apiv1.StreamTypeResize:
 				ctx.resizeStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			default:
@@ -265,21 +265,21 @@ WaitForStreams:
 	for {
 		select {
 		case stream := <-streams:
-			streamType := stream.Headers().Get(api.StreamType)
+			streamType := stream.Headers().Get(apiv1.StreamType)
 			switch streamType {
-			case api.StreamTypeError:
+			case apiv1.StreamTypeError:
 				ctx.writeStatus = v1WriteStatusFunc(stream)
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStdin:
+			case apiv1.StreamTypeStdin:
 				ctx.stdinStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStdout:
+			case apiv1.StreamTypeStdout:
 				ctx.stdoutStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStderr:
+			case apiv1.StreamTypeStderr:
 				ctx.stderrStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeResize:
+			case apiv1.StreamTypeResize:
 				ctx.resizeStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			default:
@@ -316,18 +316,18 @@ WaitForStreams:
 	for {
 		select {
 		case stream := <-streams:
-			streamType := stream.Headers().Get(api.StreamType)
+			streamType := stream.Headers().Get(apiv1.StreamType)
 			switch streamType {
-			case api.StreamTypeError:
+			case apiv1.StreamTypeError:
 				ctx.writeStatus = v1WriteStatusFunc(stream)
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStdin:
+			case apiv1.StreamTypeStdin:
 				ctx.stdinStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStdout:
+			case apiv1.StreamTypeStdout:
 				ctx.stdoutStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStderr:
+			case apiv1.StreamTypeStderr:
 				ctx.stderrStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			default:
@@ -364,9 +364,9 @@ WaitForStreams:
 	for {
 		select {
 		case stream := <-streams:
-			streamType := stream.Headers().Get(api.StreamType)
+			streamType := stream.Headers().Get(apiv1.StreamType)
 			switch streamType {
-			case api.StreamTypeError:
+			case apiv1.StreamTypeError:
 				ctx.writeStatus = v1WriteStatusFunc(stream)
 
 				// This defer statement shouldn't be here, but due to previous refactoring, it ended up in
@@ -375,13 +375,13 @@ WaitForStreams:
 				defer stream.Reset()
 
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStdin:
+			case apiv1.StreamTypeStdin:
 				ctx.stdinStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStdout:
+			case apiv1.StreamTypeStdout:
 				ctx.stdoutStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
-			case api.StreamTypeStderr:
+			case apiv1.StreamTypeStderr:
 				ctx.stderrStream = stream
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			default:

@@ -17,7 +17,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cri-api/pkg/streaming/portforward",
     importpath = "k8s.io/cri-api/pkg/streaming/portforward",
     deps = [
-        "//pkg/apis/core:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/httpstream/spdy:go_default_library",
@@ -36,7 +36,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
     ],
 )

@@ -214,3 +214,17 @@
   - k8s.io/klog
   - k8s.io/cloud-provider
   - k8s.io/csi-translation-lib
+
+- baseImportPath: "./vendor/k8s.io/cri-api/"
+  ignoredSubTrees:
+  - "./vendor/k8s.io/cri-api/pkg/apis"
+  - "./vendor/k8s.io/cri-api/pkg/apis/testing"
+  - "./vendor/k8s.io/cri-api/pkg/streaming"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/apiserver
+  - k8s.io/client-go
+  - k8s.io/klog
+  - k8s.io/utils
+  

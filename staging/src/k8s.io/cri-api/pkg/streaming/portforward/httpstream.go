@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"k8s.io/klog"
 )
@@ -74,9 +74,9 @@ func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 func httpStreamReceived(streams chan httpstream.Stream) func(httpstream.Stream, <-chan struct{}) error {
 	return func(stream httpstream.Stream, replySent <-chan struct{}) error {
 		// make sure it has a valid port header
-		portString := stream.Headers().Get(api.PortHeader)
+		portString := stream.Headers().Get(apiv1.PortHeader)
 		if len(portString) == 0 {
-			return fmt.Errorf("%q header is required", api.PortHeader)
+			return fmt.Errorf("%q header is required", apiv1.PortHeader)
 		}
 		port, err := strconv.ParseUint(portString, 10, 16)
 		if err != nil {
@@ -87,11 +87,11 @@ func httpStreamReceived(streams chan httpstream.Stream) func(httpstream.Stream, 
 		}
 
 		// make sure it has a valid stream type header
-		streamType := stream.Headers().Get(api.StreamType)
+		streamType := stream.Headers().Get(apiv1.StreamType)
 		if len(streamType) == 0 {
-			return fmt.Errorf("%q header is required", api.StreamType)
+			return fmt.Errorf("%q header is required", apiv1.StreamType)
 		}
-		if streamType != api.StreamTypeError && streamType != api.StreamTypeData {
+		if streamType != apiv1.StreamTypeError && streamType != apiv1.StreamTypeData {
 			return fmt.Errorf("invalid stream type %q", streamType)
 		}
 
@@ -168,9 +168,9 @@ func (h *httpStreamHandler) removeStreamPair(requestID string) {
 
 // requestID returns the request id for stream.
 func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
-	requestID := stream.Headers().Get(api.PortForwardRequestIDHeader)
+	requestID := stream.Headers().Get(apiv1.PortForwardRequestIDHeader)
 	if len(requestID) == 0 {
-		klog.V(5).Infof("(conn=%p) stream received without %s header", h.conn, api.PortForwardRequestIDHeader)
+		klog.V(5).Infof("(conn=%p) stream received without %s header", h.conn, apiv1.PortForwardRequestIDHeader)
 		// If we get here, it's because the connection came from an older client
 		// that isn't generating the request id header
 		// (https://github.com/kubernetes/kubernetes/blob/843134885e7e0b360eb5441e85b1410a8b1a7a0c/pkg/client/unversioned/portforward/portforward.go#L258-L287)
@@ -189,11 +189,11 @@ func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
 		// old clients that don't generate request ids.  If there are concurrent
 		// new connections, it's possible that 1 connection gets streams whose IDs
 		// are not consecutive (e.g. 5 and 9 instead of 5 and 7).
-		streamType := stream.Headers().Get(api.StreamType)
+		streamType := stream.Headers().Get(apiv1.StreamType)
 		switch streamType {
-		case api.StreamTypeError:
+		case apiv1.StreamTypeError:
 			requestID = strconv.Itoa(int(stream.Identifier()))
-		case api.StreamTypeData:
+		case apiv1.StreamTypeData:
 			requestID = strconv.Itoa(int(stream.Identifier()) - 2)
 		}
 
@@ -215,7 +215,7 @@ Loop:
 			break Loop
 		case stream := <-h.streamChan:
 			requestID := h.requestID(stream)
-			streamType := stream.Headers().Get(api.StreamType)
+			streamType := stream.Headers().Get(apiv1.StreamType)
 			klog.V(5).Infof("(conn=%p, request=%s) received new stream of type %s", h.conn, requestID, streamType)
 
 			p, created := h.getStreamPair(requestID)
@@ -239,7 +239,7 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	defer p.dataStream.Close()
 	defer p.errorStream.Close()
 
-	portString := p.dataStream.Headers().Get(api.PortHeader)
+	portString := p.dataStream.Headers().Get(apiv1.PortHeader)
 	port, _ := strconv.ParseInt(portString, 10, 32)
 
 	klog.V(5).Infof("(conn=%p, request=%s) invoking forwarder.PortForward for port %s", h.conn, p.requestID, portString)
@@ -279,13 +279,13 @@ func (p *httpStreamPair) add(stream httpstream.Stream) (bool, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	switch stream.Headers().Get(api.StreamType) {
-	case api.StreamTypeError:
+	switch stream.Headers().Get(apiv1.StreamType) {
+	case apiv1.StreamTypeError:
 		if p.errorStream != nil {
 			return false, errors.New("error stream already assigned")
 		}
 		p.errorStream = stream
-	case api.StreamTypeData:
+	case apiv1.StreamTypeData:
 		if p.dataStream != nil {
 			return false, errors.New("data stream already assigned")
 		}
