@@ -36,7 +36,7 @@ spec:
         - name: gce-pd-driver
           securityContext:
             privileged: true
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.3.1-gke.0
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.4.0-gke.0
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"
