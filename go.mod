@@ -155,7 +155,6 @@ require (
 	github.com/spf13/pflag v1.0.1
 	github.com/spf13/viper v0.0.0-20160820190039-7fb2782df3d8
 	github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
-	github.com/stretchr/objx v0.0.0-20150928122152-1a9d0bb9f541 // indirect
 	github.com/stretchr/testify v1.2.2
 	github.com/syndtr/gocapability v0.0.0-20160928074757-e7cb7fa329f4 // indirect
 	github.com/urfave/negroni v1.0.0 // indirect
@@ -165,7 +164,7 @@ require (
 	github.com/vmware/photon-controller-go-sdk v0.0.0-20170310013346-4a435daef6cc
 	github.com/xanzy/go-cloudstack v0.0.0-20160728180336-1e2cbf647e57
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
-	golang.org/x/crypto v0.0.0-20180808211826-de0752318171
+	golang.org/x/crypto v0.0.0-20180904163835-0709b304e793
 	golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 	golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181
@@ -343,6 +342,7 @@ replace (
 	github.com/kardianos/osext => github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.7.5
 	github.com/kisielk/sqlstruct => github.com/kisielk/sqlstruct v0.0.0-20150923205031-648daed35d49
+	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.1
 	github.com/kr/fs => github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169
 	github.com/kr/logfmt => github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515
 	github.com/kr/pretty => github.com/kr/pretty v0.0.0-20140812000539-f31442d60e51
@@ -404,7 +404,7 @@ replace (
 	github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.0.0-20150813023252-1b506fc7c24e
 	github.com/shurcooL/sanitized_anchor_name => github.com/shurcooL/sanitized_anchor_name v0.0.0-20151028001915-10ef21a441db
 	github.com/sigma/go-inotify => github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d
-	github.com/sirupsen/logrus => github.com/sirupsen/logrus v0.0.0-20170822132746-89742aefa4b2
+	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.2.0
 	github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
 	github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.3
@@ -448,12 +448,10 @@ replace (
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6
 	google.golang.org/grpc => google.golang.org/grpc v1.13.0
-	gopkg.in/airbrake/gobrake.v2 => gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 => gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405
 	gopkg.in/fsnotify.v1 => gopkg.in/fsnotify.v1 v1.4.7
 	gopkg.in/gcfg.v1 => gopkg.in/gcfg.v1 v1.2.0
-	gopkg.in/gemnasium/logrus-airbrake-hook.v2 => gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2
 	gopkg.in/inf.v0 => gopkg.in/inf.v0 v0.9.0
 	gopkg.in/natefinch/lumberjack.v2 => gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7
 	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.0.0-20180411045311-89060dee6a84

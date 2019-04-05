@@ -65,6 +65,7 @@ replace (
 	github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.0.0-20141017032234-72f9bd7c4e0c
 	github.com/json-iterator/go => github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be
 	github.com/julienschmidt/httprouter => github.com/julienschmidt/httprouter v1.2.0
+	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.1
 	github.com/kr/logfmt => github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515
 	github.com/mailru/easyjson => github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
 	github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.1
@@ -87,9 +88,10 @@ replace (
 	github.com/prometheus/client_model => github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335
 	github.com/prometheus/common => github.com/prometheus/common v0.2.0
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.0-20170519190837-65c1f6f8f0fc
-	github.com/sirupsen/logrus => github.com/sirupsen/logrus v0.0.0-20170822132746-89742aefa4b2
+	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.2.0
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.3
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
+	github.com/stretchr/objx => github.com/stretchr/objx v0.0.0-20150928122152-1a9d0bb9f541
 	github.com/stretchr/testify => github.com/stretchr/testify v0.0.0-20180319223459-c679ae2cc0cb
 	github.com/tinylib/msgp => github.com/tinylib/msgp v1.1.0
 	github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8
@@ -108,11 +110,9 @@ replace (
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6
 	google.golang.org/grpc => google.golang.org/grpc v1.13.0
-	gopkg.in/airbrake/gobrake.v2 => gopkg.in/airbrake/gobrake.v2 v2.0.9
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 => gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405
 	gopkg.in/fsnotify.v1 => gopkg.in/fsnotify.v1 v1.4.7
-	gopkg.in/gemnasium/logrus-airbrake-hook.v2 => gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2
 	gopkg.in/inf.v0 => gopkg.in/inf.v0 v0.9.0
 	gopkg.in/natefinch/lumberjack.v2 => gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7
 	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.0.0-20180411045311-89060dee6a84

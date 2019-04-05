@@ -625,6 +625,8 @@ github.com/kardianos/osext
 github.com/karrick/godirwalk
 # github.com/kisielk/sqlstruct v0.0.0-20150923205031-648daed35d49 => github.com/kisielk/sqlstruct v0.0.0-20150923205031-648daed35d49
 github.com/kisielk/sqlstruct
+# github.com/konsorten/go-windows-terminal-sequences v1.0.1 => github.com/konsorten/go-windows-terminal-sequences v1.0.1
+github.com/konsorten/go-windows-terminal-sequences
 # github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169 => github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169
 github.com/kr/fs
 # github.com/lib/pq v0.0.0-20180201184707-88edab080323 => github.com/lib/pq v0.0.0-20180201184707-88edab080323
@@ -815,7 +817,7 @@ github.com/seccomp/libseccomp-golang
 github.com/shurcooL/sanitized_anchor_name
 # github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d => github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d
 github.com/sigma/go-inotify
-# github.com/sirupsen/logrus v1.2.0 => github.com/sirupsen/logrus v0.0.0-20170822132746-89742aefa4b2
+# github.com/sirupsen/logrus v1.2.0 => github.com/sirupsen/logrus v1.2.0
 github.com/sirupsen/logrus
 # github.com/soheilhy/cmux v0.1.3 => github.com/soheilhy/cmux v0.1.3
 github.com/soheilhy/cmux
@@ -839,7 +841,7 @@ github.com/storageos/go-api
 github.com/storageos/go-api/netutil
 github.com/storageos/go-api/serror
 github.com/storageos/go-api/types
-# github.com/stretchr/objx v0.0.0-20150928122152-1a9d0bb9f541 => github.com/stretchr/objx v0.0.0-20150928122152-1a9d0bb9f541
+# github.com/stretchr/objx v0.1.1 => github.com/stretchr/objx v0.0.0-20150928122152-1a9d0bb9f541
 github.com/stretchr/objx
 # github.com/stretchr/testify v1.2.2 => github.com/stretchr/testify v0.0.0-20180319223459-c679ae2cc0cb
 github.com/stretchr/testify/assert
@@ -909,7 +911,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20180808211826-de0752318171 => golang.org/x/crypto v0.0.0-20180808211826-de0752318171
+# golang.org/x/crypto v0.0.0-20180904163835-0709b304e793 => golang.org/x/crypto v0.0.0-20180808211826-de0752318171
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/cryptobyte

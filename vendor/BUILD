@@ -294,6 +294,7 @@ filegroup(
         "//vendor/github.com/kardianos/osext:all-srcs",
         "//vendor/github.com/karrick/godirwalk:all-srcs",
         "//vendor/github.com/kisielk/sqlstruct:all-srcs",
+        "//vendor/github.com/konsorten/go-windows-terminal-sequences:all-srcs",
         "//vendor/github.com/kr/fs:all-srcs",
         "//vendor/github.com/lib/pq:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/api:all-srcs",

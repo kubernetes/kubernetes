@@ -24,6 +24,8 @@ func (entry *Entry) WriterLevel(level Level) *io.PipeWriter {
 	var printFunc func(args ...interface{})
 
 	switch level {
+	case TraceLevel:
+		printFunc = entry.Trace
 	case DebugLevel:
 		printFunc = entry.Debug
 	case InfoLevel:
