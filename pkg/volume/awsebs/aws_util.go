@@ -120,8 +120,10 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *
 	}
 
 	fstype := ""
-	if v, ok := c.options.Parameters[volume.VolumeParameterFSType]; ok {
-		fstype = v
+	for k, v := range c.options.Parameters {
+		if strings.ToLower(k) == volume.VolumeParameterFSType {
+			fstype = v
+		}
 	}
 
 	return name, volumeOptions.CapacityGB, labels, fstype, nil
