@@ -232,6 +232,14 @@ for repo in $(tsort "${TMP_DIR}/tidy_deps.txt"); do
   pushd "${KUBE_ROOT}/staging/src/${repo}" >/dev/null 2>&1
     echo "=== tidying ${repo}" >> "${LOG_FILE}"
     go mod tidy >>"${LOG_FILE}" 2>&1
+
+    # disallow transitive dependencies on k8s.io/kubernetes
+    loopback_deps="$(go list all 2>/dev/null | grep k8s.io/kubernetes/ || true)"
+    if [[ ! -z "${loopback_deps}" ]]; then
+      kube::log::error "Disallowed ${repo} -> k8s.io/kubernetes dependencies exist via the following imports:
+$(go mod why ${loopback_deps})"
+      exit 1
+    fi
   popd >/dev/null 2>&1
 done
 echo "=== tidying root" >> "${LOG_FILE}"
@@ -241,17 +249,13 @@ go mod tidy >>"${LOG_FILE}" 2>&1
 # Phase 6: add generated comments to go.mod files
 kube::log::status "go.mod: adding generated comments"
 add_generated_comments "
-// This is a generated file.
+// This is a generated file. Do not edit directly.
 // Run hack/pin-dependency.sh to change pinned dependency versions.
 // Run hack/update-vendor.sh to update go.mod files and the vendor directory.
 "
 for repo in $(ls staging/src/k8s.io | sort); do
   pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
-    add_generated_comments "
-// This is a generated file. Do not edit directly.
-// Run hack/pin-dependency.sh to change pinned dependency versions.
-// Run hack/update-vendor.sh to update go.mod files and the vendor directory.
-"
+    add_generated_comments "// This is a generated file. Do not edit directly."
   popd >/dev/null 2>&1
 done
 
