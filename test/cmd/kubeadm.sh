@@ -32,7 +32,7 @@ run_kubeadm_tests() {
   # kubernetes/kubeadm/issues/1430 is fixed
   make -C "${KUBE_ROOT}" test \
   WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd \
-  KUBE_TEST_ARGS="--kubeadm-path '${KUBEADM_PATH}'" \
+  KUBE_TEST_ARGS="--kubeadm-path '${KUBEADM_PATH}' --count ${ITERATION}" \
   KUBE_TIMEOUT="--timeout 600s"
   set +o nounset
   set +o errexit
