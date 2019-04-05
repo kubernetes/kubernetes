@@ -80,7 +80,7 @@ replace (
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/philhofer/fwd => github.com/philhofer/fwd v1.0.0
 	github.com/pkg/errors => github.com/pkg/errors v0.8.0
-	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v0.0.0-20181226105442-5d4384ee4fb2
+	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 	github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 	github.com/pquerna/ffjson => github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.2

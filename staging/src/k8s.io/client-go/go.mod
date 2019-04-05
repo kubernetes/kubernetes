@@ -62,7 +62,7 @@ replace (
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v0.0.0-20170318221715-67b9df7f55fe
 	github.com/onsi/gomega => github.com/onsi/gomega v0.0.0-20190113212917-5533ce8a0da3
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
-	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v0.0.0-20181226105442-5d4384ee4fb2
+	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
 	github.com/stretchr/testify => github.com/stretchr/testify v0.0.0-20180319223459-c679ae2cc0cb
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20180808211826-de0752318171

@@ -775,7 +775,7 @@ github.com/peterbourgon/diskv
 github.com/pkg/errors
 # github.com/pkg/sftp v0.0.0-20160930220758-4d0e916071f6 => github.com/pkg/sftp v0.0.0-20160930220758-4d0e916071f6
 github.com/pkg/sftp
-# github.com/pmezard/go-difflib v1.0.0 => github.com/pmezard/go-difflib v0.0.0-20181226105442-5d4384ee4fb2
+# github.com/pmezard/go-difflib v1.0.0 => github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
 # github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 github.com/pquerna/cachecontrol
