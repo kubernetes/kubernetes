@@ -168,16 +168,16 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				By("Creating pv and pvc")
 				l.pv, err = l.cs.CoreV1().PersistentVolumes().Create(l.pv)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				// Prebind pv
 				l.pvc.Spec.VolumeName = l.pv.Name
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
 
@@ -199,16 +199,16 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				By("Creating pv and pvc")
 				l.pv, err = l.cs.CoreV1().PersistentVolumes().Create(l.pv)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				// Prebind pv
 				l.pvc.Spec.VolumeName = l.pv.Name
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
 
@@ -219,7 +219,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				defer func() {
 					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				By("Checking if persistent volume exists as expected volume mode")
 				utils.CheckVolumeModeOfPath(pod, pattern.VolMode, "/mnt/volume1")
@@ -239,11 +239,11 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				By("Creating pv and pvc")
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, l.cs, l.pvc.Namespace, l.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 				Expect(err).To(HaveOccurred())
@@ -257,20 +257,20 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				By("Creating pv and pvc")
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, l.cs, l.pvc.Namespace, l.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(l.pvc.Name, metav1.GetOptions{})
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				l.pv, err = l.cs.CoreV1().PersistentVolumes().Get(l.pvc.Spec.VolumeName, metav1.GetOptions{})
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				By("Creating pod")
 				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
@@ -279,7 +279,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				defer func() {
 					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				By("Checking if persistent volume exists as expected volume mode")
 				utils.CheckVolumeModeOfPath(pod, pattern.VolMode, "/mnt/volume1")

@@ -29,7 +29,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -308,22 +307,69 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 	Describe("Default StorageClass", func() {
 		Context("pods that use multiple volumes", func() {
 
+			AfterEach(func() {
+				framework.DeleteAllStatefulSets(c, ns)
+			})
+
 			It("should be reschedulable [Slow]", func() {
 				// Only run on providers with default storageclass
 				framework.SkipUnlessProviderIs("openstack", "gce", "gke", "vsphere", "azure")
 
 				numVols := 4
+				ssTester := framework.NewStatefulSetTester(c)
 
-				By("Creating pvcs")
-				claims := []*v1.PersistentVolumeClaim{}
+				By("Creating a StatefulSet pod to initialize data")
+				writeCmd := "true"
 				for i := 0; i < numVols; i++ {
-					pvc := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{}, ns)
-					claims = append(claims, pvc)
+					writeCmd += fmt.Sprintf("&& touch %v", getVolumeFile(i))
+				}
+				writeCmd += "&& sleep 10000"
+
+				probe := &v1.Probe{
+					Handler: v1.Handler{
+						Exec: &v1.ExecAction{
+							// Check that the last file got created
+							Command: []string{"test", "-f", getVolumeFile(numVols - 1)},
+						},
+					},
+					InitialDelaySeconds: 1,
+					PeriodSeconds:       1,
 				}
 
-				By("Testing access to pvcs before and after pod recreation on differetn node")
-				testsuites.TestAccessMultipleVolumesAcrossPodRecreation(f, c, ns,
-					framework.NodeSelection{}, claims, false /* sameNode */)
+				mounts := []v1.VolumeMount{}
+				claims := []v1.PersistentVolumeClaim{}
+
+				for i := 0; i < numVols; i++ {
+					pvc := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{}, ns)
+					pvc.Name = getVolName(i)
+					mounts = append(mounts, v1.VolumeMount{Name: pvc.Name, MountPath: getMountPath(i)})
+					claims = append(claims, *pvc)
+				}
+
+				spec := makeStatefulSetWithPVCs(ns, writeCmd, mounts, claims, probe)
+				ss, err := c.AppsV1().StatefulSets(ns).Create(spec)
+				framework.ExpectNoError(err)
+				ssTester.WaitForRunningAndReady(1, ss)
+
+				By("Deleting the StatefulSet but not the volumes")
+				// Scale down to 0 first so that the Delete is quick
+				ss, err = ssTester.Scale(ss, 0)
+				framework.ExpectNoError(err)
+				ssTester.WaitForStatusReplicas(ss, 0)
+				err = c.AppsV1().StatefulSets(ns).Delete(ss.Name, &metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+
+				By("Creating a new Statefulset and validating the data")
+				validateCmd := "true"
+				for i := 0; i < numVols; i++ {
+					validateCmd += fmt.Sprintf("&& test -f %v", getVolumeFile(i))
+				}
+				validateCmd += "&& sleep 10000"
+
+				spec = makeStatefulSetWithPVCs(ns, validateCmd, mounts, claims, probe)
+				ss, err = c.AppsV1().StatefulSets(ns).Create(spec)
+				framework.ExpectNoError(err)
+				ssTester.WaitForRunningAndReady(1, ss)
 			})
 		})
 	})

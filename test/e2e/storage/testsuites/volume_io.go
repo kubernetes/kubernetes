@@ -30,7 +30,6 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -133,7 +132,7 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 			FSGroup: fsGroup,
 		}
 		err := testVolumeIO(f, cs, convertTestConfig(l.config), *l.resource.volSource, &podSec, testFile, fileSizes)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 }
 

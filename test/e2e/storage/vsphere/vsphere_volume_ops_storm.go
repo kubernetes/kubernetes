@@ -66,7 +66,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		Expect(GetReadySchedulableNodeInfos()).NotTo(BeEmpty())
 		if os.Getenv("VOLUME_OPS_SCALE") != "" {
 			volume_ops_scale, err = strconv.Atoi(os.Getenv("VOLUME_OPS_SCALE"))
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 		} else {
 			volume_ops_scale = DEFAULT_VOLUME_OPS_SCALE
 		}
@@ -79,7 +79,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		}
 		By("Deleting StorageClass")
 		err = client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 
 	It("should create pod with many volumes and verify no attach call fails", func() {
@@ -88,23 +88,23 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
 		storageclass, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("thinsc", scParameters, nil))
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Creating PVCs using the Storage Class")
 		count := 0
 		for count < volume_ops_scale {
 			pvclaims[count], err = framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			count++
 		}
 
 		By("Waiting for all claims to be in bound phase")
 		persistentvolumes, err = framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Creating pod to attach PVs to the node")
 		pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Verify all volumes are accessible and available in the pod")
 		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)

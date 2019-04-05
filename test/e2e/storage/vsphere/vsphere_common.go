@@ -17,9 +17,11 @@ limitations under the License.
 package vsphere
 
 import (
-	. "github.com/onsi/gomega"
 	"os"
 	"strconv"
+
+	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -72,6 +74,6 @@ func GetAndExpectStringEnvVar(varName string) string {
 func GetAndExpectIntEnvVar(varName string) int {
 	varValue := GetAndExpectStringEnvVar(varName)
 	varIntValue, err := strconv.Atoi(varValue)
-	Expect(err).NotTo(HaveOccurred(), "Error Parsing "+varName)
+	framework.ExpectNoError(err, "Error Parsing "+varName)
 	return varIntValue
 }
