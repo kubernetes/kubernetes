@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	finalizerrestriction "k8s.io/apiserver/pkg/admission/plugin/finalizerrestriction"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
@@ -81,8 +82,8 @@ func NewAdmissionOptions() *AdmissionOptions {
 		// admission plugins. The apiserver always runs the validating ones
 		// after all the mutating ones, so their relative order in this list
 		// doesn't matter.
-		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
-		DefaultOffPlugins:      sets.NewString(),
+		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingwebhook.PluginName, finalizerrestriction.PluginName, validatingwebhook.PluginName},
+		DefaultOffPlugins:      sets.NewString(finalizerrestriction.PluginName),
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options

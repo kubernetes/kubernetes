@@ -79,6 +79,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/admission/configuration:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/finalizerrestriction:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/errors:all-srcs",
