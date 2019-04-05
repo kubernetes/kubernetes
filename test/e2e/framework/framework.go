@@ -50,12 +50,13 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
 	maxKubectlExecRetries = 5
+	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
 	// TODO(mikedanese): reset this to 5 minutes once #47135 is resolved.
 	// ref https://github.com/kubernetes/kubernetes/issues/47135
 	DefaultNamespaceDeletionTimeout = 10 * time.Minute
@@ -114,19 +115,21 @@ type Framework struct {
 	clusterAutoscalerMetricsBeforeTest metrics.Collection
 }
 
+// TestDataSummary is an interface for managing test data.
 type TestDataSummary interface {
 	SummaryKind() string
 	PrintHumanReadable() string
 	PrintJSON() string
 }
 
+// FrameworkOptions is a struct for managing test framework options.
 type FrameworkOptions struct {
 	ClientQPS    float32
 	ClientBurst  int
 	GroupVersion *schema.GroupVersion
 }
 
-// NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
+// NewDefaultFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewDefaultFramework(baseName string) *Framework {
 	options := FrameworkOptions{
@@ -136,6 +139,7 @@ func NewDefaultFramework(baseName string) *Framework {
 	return NewFramework(baseName, options, nil)
 }
 
+// NewFramework creates a test framework.
 func NewFramework(baseName string, options FrameworkOptions, client clientset.Interface) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,
@@ -144,8 +148,8 @@ func NewFramework(baseName string, options FrameworkOptions, client clientset.In
 		ClientSet:                client,
 	}
 
-	BeforeEach(f.BeforeEach)
-	AfterEach(f.AfterEach)
+	ginkgo.BeforeEach(f.BeforeEach)
+	ginkgo.AfterEach(f.AfterEach)
 
 	return f
 }
@@ -156,9 +160,9 @@ func (f *Framework) BeforeEach() {
 	// https://github.com/onsi/ginkgo/issues/222
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 	if f.ClientSet == nil {
-		By("Creating a kubernetes client")
+		ginkgo.By("Creating a kubernetes client")
 		config, err := LoadConfig()
-		testDesc := CurrentGinkgoTestDescription()
+		testDesc := ginkgo.CurrentGinkgoTestDescription()
 		if len(testDesc.ComponentTexts) > 0 {
 			componentTexts := strings.Join(testDesc.ComponentTexts, " ")
 			config.UserAgent = fmt.Sprintf(
@@ -209,7 +213,7 @@ func (f *Framework) BeforeEach() {
 	}
 
 	if !f.SkipNamespaceCreation {
-		By(fmt.Sprintf("Building a namespace api object, basename %s", f.BaseName))
+		ginkgo.By(fmt.Sprintf("Building a namespace api object, basename %s", f.BaseName))
 		namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
 			"e2e-framework": f.BaseName,
 		})
@@ -218,7 +222,7 @@ func (f *Framework) BeforeEach() {
 		f.Namespace = namespace
 
 		if TestContext.VerifyServiceAccount {
-			By("Waiting for a default service account to be provisioned in namespace")
+			ginkgo.By("Waiting for a default service account to be provisioned in namespace")
 			err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
 			ExpectNoError(err)
 		} else {
@@ -297,9 +301,9 @@ func (f *Framework) AfterEach() {
 		// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
 		// if delete-namespace set to false, namespace will always be preserved.
 		// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
-		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !CurrentGinkgoTestDescription().Failed) {
+		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
 			for _, ns := range f.namespacesToDelete {
-				By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
+				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
 				timeout := DefaultNamespaceDeletionTimeout
 				if f.NamespaceDeletionTimeout != 0 {
 					timeout = f.NamespaceDeletionTimeout
@@ -336,7 +340,7 @@ func (f *Framework) AfterEach() {
 	}()
 
 	// Print events if the test failed.
-	if CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
+	if ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
 		// Pass both unversioned client and versioned clientset, till we have removed all uses of the unversioned client.
 		if !f.SkipNamespaceCreation {
 			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
@@ -344,21 +348,21 @@ func (f *Framework) AfterEach() {
 	}
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
-		By("Collecting resource usage data")
+		ginkgo.By("Collecting resource usage data")
 		summary, resourceViolationError := f.gatherer.StopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints)
 		defer ExpectNoError(resourceViolationError)
 		f.TestSummaries = append(f.TestSummaries, summary)
 	}
 
 	if TestContext.GatherLogsSizes {
-		By("Gathering log sizes data")
+		ginkgo.By("Gathering log sizes data")
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
 		f.TestSummaries = append(f.TestSummaries, f.logsSizeVerifier.GetSummary())
 	}
 
 	if TestContext.GatherMetricsAfterTest != "false" {
-		By("Gathering metrics")
+		ginkgo.By("Gathering metrics")
 		// Grab apiserver, scheduler, controller-manager metrics and (optionally) nodes' kubelet metrics.
 		grabMetricsFromKubelets := TestContext.GatherMetricsAfterTest != "master" && !ProviderIs("kubemark")
 		grabber, err := metrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, grabMetricsFromKubelets, true, true, true, TestContext.IncludeClusterAutoscalerMetrics)
@@ -392,6 +396,7 @@ func (f *Framework) AfterEach() {
 	}
 }
 
+// CreateNamespace creates a namespace for e2e testing.
 func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*v1.Namespace, error) {
 	createTestingNS := TestContext.CreateTestingNS
 	if createTestingNS == nil {
@@ -409,6 +414,8 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	return ns, err
 }
 
+// RecordFlakeIfError records flakeness info if error happens.
+// NOTE: This function is not used at any places yet, but we are in progress for https://github.com/kubernetes/kubernetes/issues/66239 which requires this. Please don't remove this.
 func (f *Framework) RecordFlakeIfError(err error, optionalDescription ...interface{}) {
 	f.flakeReport.RecordFlakeIfError(err, optionalDescription)
 }
@@ -461,20 +468,20 @@ func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
 // for all of the containers in the podSpec to move into the 'Success' status, and tests
 // the specified container log against the given expected output using a substring matcher.
 func (f *Framework) TestContainerOutput(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
-	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, ContainSubstring)
+	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.ContainSubstring)
 }
 
 // TestContainerOutputRegexp runs the given pod in the given namespace and waits
 // for all of the containers in the podSpec to move into the 'Success' status, and tests
 // the specified container log against the given expected output using a regexp matcher.
 func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
-	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, MatchRegexp)
+	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.MatchRegexp)
 }
 
-// Write a file using kubectl exec echo <contents> > <path> via specified container
-// Because of the primitive technique we're using here, we only allow ASCII alphanumeric characters
+// WriteFileViaContainer writes a file using kubectl exec echo <contents> > <path> via specified container
+// because of the primitive technique we're using here, we only allow ASCII alphanumeric characters
 func (f *Framework) WriteFileViaContainer(podName, containerName string, path string, contents string) error {
-	By("writing a file in the container")
+	ginkgo.By("writing a file in the container")
 	allowedCharacters := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	for _, c := range contents {
 		if !strings.ContainsRune(allowedCharacters, c) {
@@ -489,9 +496,9 @@ func (f *Framework) WriteFileViaContainer(podName, containerName string, path st
 	return err
 }
 
-// Read a file using kubectl exec cat <path>
+// ReadFileViaContainer reads a file using kubectl exec cat <path>.
 func (f *Framework) ReadFileViaContainer(podName, containerName string, path string) (string, error) {
-	By("reading a file in the container")
+	ginkgo.By("reading a file in the container")
 
 	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "cat", path)
 	if err != nil {
@@ -500,8 +507,9 @@ func (f *Framework) ReadFileViaContainer(podName, containerName string, path str
 	return string(stdout), err
 }
 
+// CheckFileSizeViaContainer returns the list of file size under the specified path.
 func (f *Framework) CheckFileSizeViaContainer(podName, containerName, path string) (string, error) {
-	By("checking a file size in the container")
+	ginkgo.By("checking a file size in the container")
 
 	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "ls", "-l", path)
 	if err != nil {
@@ -511,14 +519,14 @@ func (f *Framework) CheckFileSizeViaContainer(podName, containerName, path strin
 }
 
 // CreateServiceForSimpleAppWithPods is a convenience wrapper to create a service and its matching pods all at once.
-func (f *Framework) CreateServiceForSimpleAppWithPods(contPort int, svcPort int, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (error, *v1.Service) {
-	var err error = nil
+func (f *Framework) CreateServiceForSimpleAppWithPods(contPort int, svcPort int, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (*v1.Service, error) {
+	var err error
 	theService := f.CreateServiceForSimpleApp(contPort, svcPort, appName)
 	f.CreatePodsPerNodeForSimpleApp(appName, podSpec, count)
 	if block {
 		err = testutils.WaitForPodsWithLabelRunning(f.ClientSet, f.Namespace.Name, labels.SelectorFromSet(labels.Set(theService.Spec.Selector)))
 	}
-	return err, theService
+	return theService, err
 }
 
 // CreateServiceForSimpleApp returns a service that selects/exposes pods (send -1 ports if no exposure needed) with an app label.
@@ -535,13 +543,12 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 	portsFunc := func() []v1.ServicePort {
 		if contPort < 1 || svcPort < 1 {
 			return nil
-		} else {
-			return []v1.ServicePort{{
-				Protocol:   v1.ProtocolTCP,
-				Port:       int32(svcPort),
-				TargetPort: intstr.FromInt(contPort),
-			}}
 		}
+		return []v1.ServicePort{{
+			Protocol:   v1.ProtocolTCP,
+			Port:       int32(svcPort),
+			TargetPort: intstr.FromInt(contPort),
+		}}
 	}
 	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
 	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
@@ -560,7 +567,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 	return service
 }
 
-// CreatePodsPerNodeForSimpleApp Creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
+// CreatePodsPerNodeForSimpleApp creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
 func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n v1.Node) v1.PodSpec, maxCount int) map[string]string {
 	nodes := GetReadySchedulableNodesOrDie(f.ClientSet)
 	labels := map[string]string{
@@ -583,6 +590,7 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 	return labels
 }
 
+// KubeUser is a struct for managing kubernetes user info.
 type KubeUser struct {
 	Name string `yaml:"name"`
 	User struct {
@@ -592,6 +600,7 @@ type KubeUser struct {
 	} `yaml:"user"`
 }
 
+// KubeCluster is a struct for managing kubernetes cluster info.
 type KubeCluster struct {
 	Name    string `yaml:"name"`
 	Cluster struct {
@@ -600,6 +609,7 @@ type KubeCluster struct {
 	} `yaml:"cluster"`
 }
 
+// KubeConfig is a struct for managing kubernetes config.
 type KubeConfig struct {
 	Contexts []struct {
 		Name    string `yaml:"name"`
@@ -614,6 +624,7 @@ type KubeConfig struct {
 	Users []KubeUser `yaml:"users"`
 }
 
+// FindUser returns user info which is the specified user name.
 func (kc *KubeConfig) FindUser(name string) *KubeUser {
 	for _, user := range kc.Users {
 		if user.Name == name {
@@ -623,6 +634,7 @@ func (kc *KubeConfig) FindUser(name string) *KubeUser {
 	return nil
 }
 
+// FindCluster returns cluster info which is the specified cluster name.
 func (kc *KubeConfig) FindCluster(name string) *KubeCluster {
 	for _, cluster := range kc.Clusters {
 		if cluster.Name == name {
@@ -677,15 +689,15 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-// Wrapper function for ginkgo describe.  Adds namespacing.
+// KubeDescribe is wrapper function for ginkgo describe.  Adds namespacing.
 // TODO: Support type safe tagging as well https://github.com/kubernetes/kubernetes/pull/22401.
 func KubeDescribe(text string, body func()) bool {
-	return Describe("[k8s.io] "+text, body)
+	return ginkgo.Describe("[k8s.io] "+text, body)
 }
 
-// Wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
+// ConformanceIt is wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
 func ConformanceIt(text string, body interface{}, timeout ...float64) bool {
-	return It(text+" [Conformance]", body, timeout...)
+	return ginkgo.It(text+" [Conformance]", body, timeout...)
 }
 
 // PodStateVerification represents a verification of pod state.
@@ -709,12 +721,14 @@ type PodStateVerification struct {
 	PodName string
 }
 
+// ClusterVerification is a struct for a verification of cluster state.
 type ClusterVerification struct {
 	client    clientset.Interface
 	namespace *v1.Namespace // pointer rather than string, since ns isn't created until before each.
 	podState  PodStateVerification
 }
 
+// NewClusterVerification creates a new cluster verification.
 func (f *Framework) NewClusterVerification(namespace *v1.Namespace, filter PodStateVerification) *ClusterVerification {
 	return &ClusterVerification{
 		f.ClientSet,
@@ -730,15 +744,14 @@ func passesPodNameFilter(pod v1.Pod, name string) bool {
 func passesVerifyFilter(pod v1.Pod, verify func(p v1.Pod) (bool, error)) (bool, error) {
 	if verify == nil {
 		return true, nil
-	} else {
-		verified, err := verify(pod)
-		// If an error is returned, by definition, pod verification fails
-		if err != nil {
-			return false, err
-		} else {
-			return verified, nil
-		}
 	}
+
+	verified, err := verify(pod)
+	// If an error is returned, by definition, pod verification fails
+	if err != nil {
+		return false, err
+	}
+	return verified, nil
 }
 
 func passesPhasesFilter(pod v1.Pod, validPhases []v1.PodPhase) bool {
