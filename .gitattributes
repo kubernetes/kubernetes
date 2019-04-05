@@ -7,3 +7,5 @@ test/test_owners.csv merge=union
 **/generated.proto
 **/types_swagger_doc_generated.go linguist-generated=true
 api/openapi-spec/*.json linguist-generated=true
+staging/**/go.mod linguist-generated=true
+staging/**/go.sum linguist-generated=true
