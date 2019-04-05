@@ -269,7 +269,7 @@ replace (
 	github.com/docker/distribution => github.com/docker/distribution v0.0.0-20170726174610-edc3ab29cdff
 	github.com/docker/docker => github.com/docker/docker v0.0.0-20180612054059-a9fbbdc8dd87
 	github.com/docker/go-connections => github.com/docker/go-connections v0.3.0
-	github.com/docker/go-units => github.com/docker/go-units v0.0.0-20170127094116-9e638d38cf69
+	github.com/docker/go-units => github.com/docker/go-units v0.3.3
 	github.com/docker/libnetwork => github.com/docker/libnetwork v0.0.0-20180830151422-a9cd636e3789
 	github.com/docker/spdystream => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
 	github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e

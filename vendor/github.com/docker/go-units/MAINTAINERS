@@ -1,6 +1,6 @@
-# go-connections maintainers file
+# go-units maintainers file
 #
-# This file describes who runs the docker/go-connections project and how.
+# This file describes who runs the docker/go-units project and how.
 # This is a living document - if you see something out of date or missing, speak up!
 #
 # It is structured to be consumable by both humans and programs.
@@ -11,7 +11,10 @@
 [Org]
 	[Org."Core maintainers"]
 		people = [
-			"calavera",
+			"akihirosuda",
+			"dnephin",
+			"thajeztah",
+			"vdemeester",
 		]
 
 [people]
@@ -21,7 +24,23 @@
 # in the people section.
 
 	# ADD YOURSELF HERE IN ALPHABETICAL ORDER
-	[people.calavera]
-	Name = "David Calavera"
-	Email = "david.calavera@gmail.com"
-	GitHub = "calavera"
+
+	[people.akihirosuda]
+	Name = "Akihiro Suda"
+	Email = "suda.akihiro@lab.ntt.co.jp"
+	GitHub = "AkihiroSuda"
+
+	[people.dnephin]
+	Name = "Daniel Nephin"
+	Email = "dnephin@gmail.com"
+	GitHub = "dnephin"
+	
+	[people.thajeztah]
+	Name = "Sebastiaan van Stijn"
+	Email = "github@gone.nl"
+	GitHub = "thaJeztah"
+
+	[people.vdemeester]
+	Name = "Vincent Demeester"
+	Email = "vincent@sbr.pm"
+	GitHub = "vdemeester"
