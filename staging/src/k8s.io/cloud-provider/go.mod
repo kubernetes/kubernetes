@@ -278,7 +278,7 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/cri-api => ../cri-api
 	k8s.io/csi-translation-lib => ../csi-translation-lib
-	k8s.io/gengo => k8s.io/gengo v0.0.0-20181106084056-51747d6e00da
+	k8s.io/gengo => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/heapster => k8s.io/heapster v1.2.0-beta.1
 	k8s.io/klog => k8s.io/klog v0.0.0-20190306015804-8e90cee79f82
 	k8s.io/kube-aggregator => ../kube-aggregator

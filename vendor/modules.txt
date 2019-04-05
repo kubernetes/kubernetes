@@ -1633,7 +1633,7 @@ k8s.io/cri-api/pkg/apis/testing
 # k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib/plugins
-# k8s.io/gengo v0.0.0-20181106084056-51747d6e00da => k8s.io/gengo v0.0.0-20181106084056-51747d6e00da
+# k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 k8s.io/gengo/args
 k8s.io/gengo/examples/deepcopy-gen/generators
 k8s.io/gengo/examples/defaulter-gen/generators
