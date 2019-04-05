@@ -160,6 +160,12 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 	}
 }
 
+// WithoutConversion returns a NegotiatedSerializer that performs no conversion, even if the
+// caller requests it.
+func (f CodecFactory) WithoutConversion() runtime.NegotiatedSerializer {
+	return WithoutConversionCodecFactory{f}
+}
+
 // SupportedMediaTypes returns the RFC2046 media types that this factory has serializers for.
 func (f CodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
 	return f.accepts
@@ -227,23 +233,26 @@ func (f CodecFactory) EncoderForVersion(encoder runtime.Encoder, gv runtime.Grou
 	return f.CodecForVersions(encoder, nil, gv, nil)
 }
 
-// DirectCodecFactory provides methods for retrieving "DirectCodec"s, which do not do conversion.
-type DirectCodecFactory struct {
+// WithoutConversionCodecFactory is a CodecFactory that will explicitly ignore requests to perform conversion.
+// This wrapper is used while code migrates away from using conversion (such as external clients) and in the future
+// will be unnecessary when we change the signature of NegotiatedSerializer.
+type WithoutConversionCodecFactory struct {
 	CodecFactory
 }
 
-// EncoderForVersion returns an encoder that does not do conversion.
-func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, version runtime.GroupVersioner) runtime.Encoder {
-	return versioning.DirectEncoder{
+// EncoderForVersion returns an encoder that does not do conversion, but does set the group version kind of the object
+// when serialized.
+func (f WithoutConversionCodecFactory) EncoderForVersion(serializer runtime.Encoder, version runtime.GroupVersioner) runtime.Encoder {
+	return runtime.WithVersionEncoder{
 		Version:     version,
 		Encoder:     serializer,
 		ObjectTyper: f.CodecFactory.scheme,
 	}
 }
 
-// DecoderToVersion returns an decoder that does not do conversion. gv is ignored.
-func (f DirectCodecFactory) DecoderToVersion(serializer runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
-	return versioning.DirectDecoder{
+// DecoderToVersion returns an decoder that does not do conversion.
+func (f WithoutConversionCodecFactory) DecoderToVersion(serializer runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
+	return runtime.WithoutVersionDecoder{
 		Decoder: serializer,
 	}
 }

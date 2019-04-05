@@ -154,7 +154,7 @@ func TestTableGet(t *testing.T) {
 		crConfig := *config
 		crConfig.GroupVersion = &gv
 		crConfig.APIPath = "/apis"
-		crConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: codecs}
+		crConfig.NegotiatedSerializer = codecs.WithoutConversion()
 		crRestClient, err := rest.RESTClientFor(&crConfig)
 		if err != nil {
 			t.Fatal(err)
