@@ -294,6 +294,7 @@ func (em EndpointsMap) apply(changes *EndpointChangeTracker, staleEndpoints *[]S
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
+
 		em.unmerge(change.previous)
 		em.merge(change.current)
 		detectStaleConnections(change.previous, change.current, staleEndpoints, staleServiceNames)
