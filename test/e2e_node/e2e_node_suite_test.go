@@ -277,7 +277,7 @@ func getNode(c *clientset.Clientset) (*v1.Node, error) {
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil.")
 	}
-	Expect(len(nodes.Items) > 1).NotTo(BeTrue(), "should not be more than 1 nodes.")
+	Expect(len(nodes.Items) > 1).NotTo(BeTrue(), "the number of nodes is more than 1.")
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("empty node list: %+v", nodes)
 	}
