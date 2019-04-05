@@ -27,11 +27,8 @@
 ./hack/cherry_pick_pull.sh
 ./hack/ginkgo-e2e.sh
 ./hack/grab-profiles.sh
-./hack/jenkins/benchmark-dockerized.sh
-./hack/jenkins/build.sh
 ./hack/jenkins/test-dockerized.sh
 ./hack/jenkins/upload-to-gcs.sh
-./hack/jenkins/verify-dockerized.sh
 ./hack/lib/init.sh
 ./hack/lib/logging.sh
 ./hack/lib/protoc.sh
