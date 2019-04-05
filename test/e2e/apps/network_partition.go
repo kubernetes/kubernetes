@@ -36,6 +36,7 @@ import (
 	nodepkg "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -426,11 +427,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			completions := int32(4)
 			backoffLimit := int32(6) // default value
 
-			job := framework.NewTestJob("notTerminate", "network-partition", v1.RestartPolicyNever,
+			job := jobutil.NewTestJob("notTerminate", "network-partition", v1.RestartPolicyNever,
 				parallelism, completions, nil, backoffLimit)
-			job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
+			job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 			Expect(err).NotTo(HaveOccurred())
-			label := labels.SelectorFromSet(labels.Set(map[string]string{framework.JobSelectorKey: job.Name}))
+			label := labels.SelectorFromSet(labels.Set(map[string]string{jobutil.JobSelectorKey: job.Name}))
 
 			By(fmt.Sprintf("verifying that there are now %v running pods", parallelism))
 			_, err = framework.PodsCreatedByLabel(c, ns, job.Name, parallelism, label)
