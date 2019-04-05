@@ -267,7 +267,7 @@ func TestCleanupLeftovers(t *testing.T) {
 	fp.syncProxyRules()
 
 	// test cleanup left over
-	if CleanupLeftovers(ipvs, ipt, ipset) {
+	if CleanupLeftovers(ipvs, ipt, ipset, true) {
 		t.Errorf("Cleanup leftovers failed")
 	}
 }
