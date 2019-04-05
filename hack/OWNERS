@@ -16,6 +16,7 @@ reviewers:
   - spiffxp
   - xichengliudui
 approvers:
+  - bentheelder
   - cblecker
   - deads2k
   - eparis
