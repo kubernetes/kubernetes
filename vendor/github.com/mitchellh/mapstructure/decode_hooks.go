@@ -2,6 +2,8 @@ package mapstructure
 
 import (
 	"errors"
+	"fmt"
+	"net"
 	"reflect"
 	"strconv"
 	"strings"
@@ -38,12 +40,6 @@ func DecodeHookExec(
 	raw DecodeHookFunc,
 	from reflect.Type, to reflect.Type,
 	data interface{}) (interface{}, error) {
-	// Build our arguments that reflect expects
-	argVals := make([]reflect.Value, 3)
-	argVals[0] = reflect.ValueOf(from)
-	argVals[1] = reflect.ValueOf(to)
-	argVals[2] = reflect.ValueOf(data)
-
 	switch f := typedDecodeHook(raw).(type) {
 	case DecodeHookFuncType:
 		return f(from, to, data)
@@ -121,6 +117,74 @@ func StringToTimeDurationHookFunc() DecodeHookFunc {
 	}
 }
 
+// StringToIPHookFunc returns a DecodeHookFunc that converts
+// strings to net.IP
+func StringToIPHookFunc() DecodeHookFunc {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data interface{}) (interface{}, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+		if t != reflect.TypeOf(net.IP{}) {
+			return data, nil
+		}
+
+		// Convert it by parsing
+		ip := net.ParseIP(data.(string))
+		if ip == nil {
+			return net.IP{}, fmt.Errorf("failed parsing ip %v", data)
+		}
+
+		return ip, nil
+	}
+}
+
+// StringToIPNetHookFunc returns a DecodeHookFunc that converts
+// strings to net.IPNet
+func StringToIPNetHookFunc() DecodeHookFunc {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data interface{}) (interface{}, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+		if t != reflect.TypeOf(net.IPNet{}) {
+			return data, nil
+		}
+
+		// Convert it by parsing
+		_, net, err := net.ParseCIDR(data.(string))
+		return net, err
+	}
+}
+
+// StringToTimeHookFunc returns a DecodeHookFunc that converts
+// strings to time.Time.
+func StringToTimeHookFunc(layout string) DecodeHookFunc {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data interface{}) (interface{}, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+		if t != reflect.TypeOf(time.Time{}) {
+			return data, nil
+		}
+
+		// Convert it by parsing
+		return time.Parse(layout, data.(string))
+	}
+}
+
+// WeaklyTypedHook is a DecodeHookFunc which adds support for weak typing to
+// the decoder.
+//
+// Note that this is significantly different from the WeaklyTypedInput option
+// of the DecoderConfig.
 func WeaklyTypedHook(
 	f reflect.Kind,
 	t reflect.Kind,
@@ -132,9 +196,8 @@ func WeaklyTypedHook(
 		case reflect.Bool:
 			if dataVal.Bool() {
 				return "1", nil
-			} else {
-				return "0", nil
 			}
+			return "0", nil
 		case reflect.Float32:
 			return strconv.FormatFloat(dataVal.Float(), 'f', -1, 64), nil
 		case reflect.Int:
