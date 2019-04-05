@@ -27,6 +27,7 @@ require (
 	golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f // indirect
 	golang.org/x/sys v0.0.0-20181116152217-5ac8a444bdc5 // indirect
+	golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db // indirect
 	gopkg.in/inf.v0 v0.9.0
 	gopkg.in/yaml.v2 v2.2.1
 	k8s.io/klog v0.0.0-20190306015804-8e90cee79f82
@@ -60,7 +61,8 @@ replace (
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20171031081856-95c657629925
-	golang.org/x/text => golang.org/x/text v0.0.0-20170810154203-b19bf474d317
+	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
+	golang.org/x/tools => golang.org/x/tools v0.0.0-20190205050122-7f7074d5bcfd
 	gopkg.in/check.v1 => gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405
 	gopkg.in/fsnotify.v1 => gopkg.in/fsnotify.v1 v1.4.7
 	gopkg.in/inf.v0 => gopkg.in/inf.v0 v0.9.0

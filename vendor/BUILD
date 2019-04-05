@@ -409,6 +409,7 @@ filegroup(
         "//vendor/golang.org/x/sys/unix:all-srcs",
         "//vendor/golang.org/x/sys/windows:all-srcs",
         "//vendor/golang.org/x/text/encoding:all-srcs",
+        "//vendor/golang.org/x/text/internal/language:all-srcs",
         "//vendor/golang.org/x/text/internal/tag:all-srcs",
         "//vendor/golang.org/x/text/internal/utf8internal:all-srcs",
         "//vendor/golang.org/x/text/language:all-srcs",

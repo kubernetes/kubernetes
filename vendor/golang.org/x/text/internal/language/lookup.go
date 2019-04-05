@@ -17,11 +17,11 @@ import (
 // if it could not be found.
 func findIndex(idx tag.Index, key []byte, form string) (index int, err error) {
 	if !tag.FixCase(form, key) {
-		return 0, errSyntax
+		return 0, ErrSyntax
 	}
 	i := idx.Index(key)
 	if i == -1 {
-		return 0, mkErrInvalid(key)
+		return 0, NewValueError(key)
 	}
 	return i, nil
 }
@@ -32,38 +32,45 @@ func searchUint(imap []uint16, key uint16) int {
 	})
 }
 
-type langID uint16
+type Language uint16
 
 // getLangID returns the langID of s if s is a canonical subtag
 // or langUnknown if s is not a canonical subtag.
-func getLangID(s []byte) (langID, error) {
+func getLangID(s []byte) (Language, error) {
 	if len(s) == 2 {
 		return getLangISO2(s)
 	}
 	return getLangISO3(s)
 }
 
+// TODO language normalization as well as the AliasMaps could be moved to the
+// higher level package, but it is a bit tricky to separate the generation.
+
+func (id Language) Canonicalize() (Language, AliasType) {
+	return normLang(id)
+}
+
 // mapLang returns the mapped langID of id according to mapping m.
-func normLang(id langID) (langID, langAliasType) {
-	k := sort.Search(len(langAliasMap), func(i int) bool {
-		return langAliasMap[i].from >= uint16(id)
+func normLang(id Language) (Language, AliasType) {
+	k := sort.Search(len(AliasMap), func(i int) bool {
+		return AliasMap[i].From >= uint16(id)
 	})
-	if k < len(langAliasMap) && langAliasMap[k].from == uint16(id) {
-		return langID(langAliasMap[k].to), langAliasTypes[k]
+	if k < len(AliasMap) && AliasMap[k].From == uint16(id) {
+		return Language(AliasMap[k].To), AliasTypes[k]
 	}
-	return id, langAliasTypeUnknown
+	return id, AliasTypeUnknown
 }
 
 // getLangISO2 returns the langID for the given 2-letter ISO language code
 // or unknownLang if this does not exist.
-func getLangISO2(s []byte) (langID, error) {
+func getLangISO2(s []byte) (Language, error) {
 	if !tag.FixCase("zz", s) {
-		return 0, errSyntax
+		return 0, ErrSyntax
 	}
 	if i := lang.Index(s); i != -1 && lang.Elem(i)[3] != 0 {
-		return langID(i), nil
+		return Language(i), nil
 	}
-	return 0, mkErrInvalid(s)
+	return 0, NewValueError(s)
 }
 
 const base = 'z' - 'a' + 1
@@ -88,7 +95,7 @@ func intToStr(v uint, s []byte) {
 
 // getLangISO3 returns the langID for the given 3-letter ISO language code
 // or unknownLang if this does not exist.
-func getLangISO3(s []byte) (langID, error) {
+func getLangISO3(s []byte) (Language, error) {
 	if tag.FixCase("und", s) {
 		// first try to match canonical 3-letter entries
 		for i := lang.Index(s[:2]); i != -1; i = lang.Next(s[:2], i) {
@@ -96,7 +103,7 @@ func getLangISO3(s []byte) (langID, error) {
 				// We treat "und" as special and always translate it to "unspecified".
 				// Note that ZZ and Zzzz are private use and are not treated as
 				// unspecified by default.
-				id := langID(i)
+				id := Language(i)
 				if id == nonCanonicalUnd {
 					return 0, nil
 				}
@@ -104,26 +111,26 @@ func getLangISO3(s []byte) (langID, error) {
 			}
 		}
 		if i := altLangISO3.Index(s); i != -1 {
-			return langID(altLangIndex[altLangISO3.Elem(i)[3]]), nil
+			return Language(altLangIndex[altLangISO3.Elem(i)[3]]), nil
 		}
 		n := strToInt(s)
 		if langNoIndex[n/8]&(1<<(n%8)) != 0 {
-			return langID(n) + langNoIndexOffset, nil
+			return Language(n) + langNoIndexOffset, nil
 		}
 		// Check for non-canonical uses of ISO3.
 		for i := lang.Index(s[:1]); i != -1; i = lang.Next(s[:1], i) {
 			if e := lang.Elem(i); e[2] == s[1] && e[3] == s[2] {
-				return langID(i), nil
+				return Language(i), nil
 			}
 		}
-		return 0, mkErrInvalid(s)
+		return 0, NewValueError(s)
 	}
-	return 0, errSyntax
+	return 0, ErrSyntax
 }
 
-// stringToBuf writes the string to b and returns the number of bytes
+// StringToBuf writes the string to b and returns the number of bytes
 // written.  cap(b) must be >= 3.
-func (id langID) stringToBuf(b []byte) int {
+func (id Language) StringToBuf(b []byte) int {
 	if id >= langNoIndexOffset {
 		intToStr(uint(id)-langNoIndexOffset, b[:3])
 		return 3
@@ -140,7 +147,7 @@ func (id langID) stringToBuf(b []byte) int {
 // String returns the BCP 47 representation of the langID.
 // Use b as variable name, instead of id, to ensure the variable
 // used is consistent with that of Base in which this type is embedded.
-func (b langID) String() string {
+func (b Language) String() string {
 	if b == 0 {
 		return "und"
 	} else if b >= langNoIndexOffset {
@@ -157,7 +164,7 @@ func (b langID) String() string {
 }
 
 // ISO3 returns the ISO 639-3 language code.
-func (b langID) ISO3() string {
+func (b Language) ISO3() string {
 	if b == 0 || b >= langNoIndexOffset {
 		return b.String()
 	}
@@ -173,15 +180,24 @@ func (b langID) ISO3() string {
 }
 
 // IsPrivateUse reports whether this language code is reserved for private use.
-func (b langID) IsPrivateUse() bool {
+func (b Language) IsPrivateUse() bool {
 	return langPrivateStart <= b && b <= langPrivateEnd
 }
 
-type regionID uint16
+// SuppressScript returns the script marked as SuppressScript in the IANA
+// language tag repository, or 0 if there is no such script.
+func (b Language) SuppressScript() Script {
+	if b < langNoIndexOffset {
+		return Script(suppressScript[b])
+	}
+	return 0
+}
+
+type Region uint16
 
 // getRegionID returns the region id for s if s is a valid 2-letter region code
 // or unknownRegion.
-func getRegionID(s []byte) (regionID, error) {
+func getRegionID(s []byte) (Region, error) {
 	if len(s) == 3 {
 		if isAlpha(s[0]) {
 			return getRegionISO3(s)
@@ -195,34 +211,34 @@ func getRegionID(s []byte) (regionID, error) {
 
 // getRegionISO2 returns the regionID for the given 2-letter ISO country code
 // or unknownRegion if this does not exist.
-func getRegionISO2(s []byte) (regionID, error) {
+func getRegionISO2(s []byte) (Region, error) {
 	i, err := findIndex(regionISO, s, "ZZ")
 	if err != nil {
 		return 0, err
 	}
-	return regionID(i) + isoRegionOffset, nil
+	return Region(i) + isoRegionOffset, nil
 }
 
 // getRegionISO3 returns the regionID for the given 3-letter ISO country code
 // or unknownRegion if this does not exist.
-func getRegionISO3(s []byte) (regionID, error) {
+func getRegionISO3(s []byte) (Region, error) {
 	if tag.FixCase("ZZZ", s) {
 		for i := regionISO.Index(s[:1]); i != -1; i = regionISO.Next(s[:1], i) {
 			if e := regionISO.Elem(i); e[2] == s[1] && e[3] == s[2] {
-				return regionID(i) + isoRegionOffset, nil
+				return Region(i) + isoRegionOffset, nil
 			}
 		}
 		for i := 0; i < len(altRegionISO3); i += 3 {
 			if tag.Compare(altRegionISO3[i:i+3], s) == 0 {
-				return regionID(altRegionIDs[i/3]), nil
+				return Region(altRegionIDs[i/3]), nil
 			}
 		}
-		return 0, mkErrInvalid(s)
+		return 0, NewValueError(s)
 	}
-	return 0, errSyntax
+	return 0, ErrSyntax
 }
 
-func getRegionM49(n int) (regionID, error) {
+func getRegionM49(n int) (Region, error) {
 	if 0 < n && n <= 999 {
 		const (
 			searchBits = 7
@@ -236,7 +252,7 @@ func getRegionM49(n int) (regionID, error) {
 			return buf[i] >= val
 		})
 		if r := fromM49[int(m49Index[idx])+i]; r&^regionMask == val {
-			return regionID(r & regionMask), nil
+			return Region(r & regionMask), nil
 		}
 	}
 	var e ValueError
@@ -247,13 +263,13 @@ func getRegionM49(n int) (regionID, error) {
 // normRegion returns a region if r is deprecated or 0 otherwise.
 // TODO: consider supporting BYS (-> BLR), CSK (-> 200 or CZ), PHI (-> PHL) and AFI (-> DJ).
 // TODO: consider mapping split up regions to new most populous one (like CLDR).
-func normRegion(r regionID) regionID {
+func normRegion(r Region) Region {
 	m := regionOldMap
 	k := sort.Search(len(m), func(i int) bool {
-		return m[i].from >= uint16(r)
+		return m[i].From >= uint16(r)
 	})
-	if k < len(m) && m[k].from == uint16(r) {
-		return regionID(m[k].to)
+	if k < len(m) && m[k].From == uint16(r) {
+		return Region(m[k].To)
 	}
 	return 0
 }
@@ -264,13 +280,13 @@ const (
 	bcp47Region
 )
 
-func (r regionID) typ() byte {
+func (r Region) typ() byte {
 	return regionTypes[r]
 }
 
 // String returns the BCP 47 representation for the region.
 // It returns "ZZ" for an unspecified region.
-func (r regionID) String() string {
+func (r Region) String() string {
 	if r < isoRegionOffset {
 		if r == 0 {
 			return "ZZ"
@@ -284,7 +300,7 @@ func (r regionID) String() string {
 // ISO3 returns the 3-letter ISO code of r.
 // Note that not all regions have a 3-letter ISO code.
 // In such cases this method returns "ZZZ".
-func (r regionID) ISO3() string {
+func (r Region) ISO3() string {
 	if r < isoRegionOffset {
 		return "ZZZ"
 	}
@@ -301,29 +317,29 @@ func (r regionID) ISO3() string {
 
 // M49 returns the UN M.49 encoding of r, or 0 if this encoding
 // is not defined for r.
-func (r regionID) M49() int {
+func (r Region) M49() int {
 	return int(m49[r])
 }
 
 // IsPrivateUse reports whether r has the ISO 3166 User-assigned status. This
 // may include private-use tags that are assigned by CLDR and used in this
 // implementation. So IsPrivateUse and IsCountry can be simultaneously true.
-func (r regionID) IsPrivateUse() bool {
+func (r Region) IsPrivateUse() bool {
 	return r.typ()&iso3166UserAssigned != 0
 }
 
-type scriptID uint8
+type Script uint8
 
 // getScriptID returns the script id for string s. It assumes that s
 // is of the format [A-Z][a-z]{3}.
-func getScriptID(idx tag.Index, s []byte) (scriptID, error) {
+func getScriptID(idx tag.Index, s []byte) (Script, error) {
 	i, err := findIndex(idx, s, "Zzzz")
-	return scriptID(i), err
+	return Script(i), err
 }
 
 // String returns the script code in title case.
 // It returns "Zzzz" for an unspecified script.
-func (s scriptID) String() string {
+func (s Script) String() string {
 	if s == 0 {
 		return "Zzzz"
 	}
@@ -331,7 +347,7 @@ func (s scriptID) String() string {
 }
 
 // IsPrivateUse reports whether this script code is reserved for private use.
-func (s scriptID) IsPrivateUse() bool {
+func (s Script) IsPrivateUse() bool {
 	return _Qaaa <= s && s <= _Qabx
 }
 
@@ -389,7 +405,7 @@ func grandfathered(s [maxAltTaglen]byte) (t Tag, ok bool) {
 		if v < 0 {
 			return Make(altTags[altTagIndex[-v-1]:altTagIndex[-v]]), true
 		}
-		t.lang = langID(v)
+		t.LangID = Language(v)
 		return t, true
 	}
 	return t, false
