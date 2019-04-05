@@ -1037,10 +1037,10 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 				found := -1
 				for i, expected := range listeners {
-					if elbProtocolsAreEqual(actual.Protocol, expected.Protocol) {
+					if !elbProtocolsAreEqual(actual.Protocol, expected.Protocol) {
 						continue
 					}
-					if elbProtocolsAreEqual(actual.InstanceProtocol, expected.InstanceProtocol) {
+					if !elbProtocolsAreEqual(actual.InstanceProtocol, expected.InstanceProtocol) {
 						continue
 					}
 					if aws.Int64Value(actual.InstancePort) != aws.Int64Value(expected.InstancePort) {
@@ -1049,7 +1049,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 					if aws.Int64Value(actual.LoadBalancerPort) != aws.Int64Value(expected.LoadBalancerPort) {
 						continue
 					}
-					if awsArnEquals(actual.SSLCertificateId, expected.SSLCertificateId) {
+					if !awsArnEquals(actual.SSLCertificateId, expected.SSLCertificateId) {
 						continue
 					}
 					found = i
