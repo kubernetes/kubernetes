@@ -29,7 +29,7 @@ require (
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v11.1.0+incompatible
-	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.0.0
+	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.0
 	github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20160726150825-5bd2802263f2
 	github.com/davecgh/go-spew => github.com/davecgh/go-spew v0.0.0-20170626231645-782f4967f2dc
 	github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda
