@@ -369,7 +369,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Testname: Pods, ActiveDeadlineSeconds
 		Description: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful. The Pod is updated with ActiveDeadlineSeconds set on the Pod spec. Pod MUST terminate of the specified time elapses.
 	*/
-	framework.ConformanceIt("should allow activeDeadlineSeconds to be updated [NodeConformance]", func() {
+	framework.ConformanceIt("should allow activeDeadlineSeconds to be updated and pod must terminate with the status DeadlineExceeded [NodeConformance]", func() {
 		By("creating the pod")
 		name := "pod-update-activedeadlineseconds-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
