@@ -502,9 +502,49 @@ c      0/0              0          <unknown>
 	}
 }
 
+func TestGetSortedObjectsUnstructuredTable(t *testing.T) {
+	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(sortTestTableData()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	unstructuredBytes, err := encjson.MarshalIndent(unstructuredMap, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// t.Log(string(unstructuredBytes))
+	body := ioutil.NopCloser(bytes.NewReader(unstructuredBytes))
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body},
+	}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &corev1.SchemeGroupVersion}}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	// sorting with metedata.name
+	cmd.Flags().Set("sort-by", ".metadata.name")
+	cmd.Run(cmd, []string{"pods"})
+
+	expected := `NAME   CUSTOM
+a      custom-a
+b      custom-b
+c      custom-c
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
 func sortTestData() []runtime.Object {
 	return []runtime.Object{
 		&corev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 			ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
 			Spec: corev1.PodSpec{
 				RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -515,6 +555,7 @@ func sortTestData() []runtime.Object {
 			},
 		},
 		&corev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
 			Spec: corev1.PodSpec{
 				RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -525,6 +566,7 @@ func sortTestData() []runtime.Object {
 			},
 		},
 		&corev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 			ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
 			Spec: corev1.PodSpec{
 				RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -540,11 +582,17 @@ func sortTestData() []runtime.Object {
 func sortTestTableData() []runtime.Object {
 	return []runtime.Object{
 		&metav1beta1.Table{
-			TypeMeta: metav1.TypeMeta{Kind: "Table"},
+			TypeMeta: metav1.TypeMeta{APIVersion: "meta.k8s.io/v1beta1", Kind: "Table"},
+			ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+				{Name: "NAME", Type: "string", Format: "name"},
+				{Name: "CUSTOM", Type: "string", Format: ""},
+			},
 			Rows: []metav1beta1.TableRow{
 				{
+					Cells: []interface{}{"c", "custom-c"},
 					Object: runtime.RawExtension{
 						Object: &corev1.Pod{
+							TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 							ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
 							Spec: corev1.PodSpec{
 								RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -557,8 +605,10 @@ func sortTestTableData() []runtime.Object {
 					},
 				},
 				{
+					Cells: []interface{}{"b", "custom-b"},
 					Object: runtime.RawExtension{
 						Object: &corev1.Pod{
+							TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 							ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
 							Spec: corev1.PodSpec{
 								RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -571,8 +621,10 @@ func sortTestTableData() []runtime.Object {
 					},
 				},
 				{
+					Cells: []interface{}{"a", "custom-a"},
 					Object: runtime.RawExtension{
 						Object: &corev1.Pod{
+							TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 							ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
 							Spec: corev1.PodSpec{
 								RestartPolicy:                 corev1.RestartPolicyAlways,
