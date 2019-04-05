@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -160,7 +160,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 	switch pattern.VolType {
 	case testpatterns.PreprovisionedPV:
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
-			It("should fail to create pod by failing to mount volume", func() {
+			It("should fail to create pod by failing to mount volume [Slow]", func() {
 				init()
 				defer cleanup()
 
