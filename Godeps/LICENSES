@@ -4573,7 +4573,7 @@ ISC License
 
 Copyright (c) 2012-2016 Dave Collins <dave@davec.name>
 
-Permission to use, copy, modify, and distribute this software for any
+Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
 copyright notice and this permission notice appear in all copies.
 
@@ -4585,7 +4585,7 @@ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-= vendor/github.com/davecgh/go-spew/LICENSE 818c0a1d81cfcfdb7ecd58db268bab7e
+= vendor/github.com/davecgh/go-spew/LICENSE c06795ed54b2a35ebeeb543cd3a73e56
 ================================================================================
 
 

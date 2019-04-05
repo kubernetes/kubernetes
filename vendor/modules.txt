@@ -342,7 +342,7 @@ github.com/d2g/dhcp4
 github.com/d2g/dhcp4client
 # github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb => github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb
 github.com/daaku/go.zipexe
-# github.com/davecgh/go-spew v1.1.1 => github.com/davecgh/go-spew v0.0.0-20170626231645-782f4967f2dc
+# github.com/davecgh/go-spew v1.1.1 => github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 github.com/daviddengcn/go-colortext
