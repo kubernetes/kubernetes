@@ -353,7 +353,7 @@ replace (
 	github.com/lithammer/dedent => github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc => github.com/lpabon/godbc v0.1.1
 	github.com/magiconair/properties => github.com/magiconair/properties v0.0.0-20160816085511-61b492c03cf4
-	github.com/mailru/easyjson => github.com/mailru/easyjson v0.0.0-20170624190925-2f5df55504eb
+	github.com/mailru/easyjson => github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
 	github.com/marstr/guid => github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c
 	github.com/mattn/go-shellwords => github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de
 	github.com/mattn/go-sqlite3 => github.com/mattn/go-sqlite3 v1.6.0

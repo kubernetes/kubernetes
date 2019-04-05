@@ -644,7 +644,7 @@ github.com/liggitt/tabwriter
 github.com/lithammer/dedent
 # github.com/magiconair/properties v0.0.0-20160816085511-61b492c03cf4 => github.com/magiconair/properties v0.0.0-20160816085511-61b492c03cf4
 github.com/magiconair/properties
-# github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329 => github.com/mailru/easyjson v0.0.0-20170624190925-2f5df55504eb
+# github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329 => github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
