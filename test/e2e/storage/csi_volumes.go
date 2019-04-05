@@ -22,6 +22,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
@@ -69,6 +70,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			testCleanup func()
 		)
 		BeforeEach(func() {
+			driver.SkipUnsupportedTest(testpatterns.TestPattern{})
 			config, testCleanup = driver.PrepareTest(f)
 		})
 

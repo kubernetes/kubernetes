@@ -70,6 +70,7 @@ go_library(
         "//test/e2e/framework/providers/gce:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/storage/drivers:go_default_library",
+        "//test/e2e/storage/testpatterns:go_default_library",
         "//test/e2e/storage/testsuites:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
         "//test/utils/image:go_default_library",
