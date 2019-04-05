@@ -9,5 +9,5 @@
 TEXT ·getprocaddress(SB), 7, $0-32
 	JMP	syscall·getprocaddress(SB)
 
-TEXT ·loadlibrary(SB), 7, $0-8
+TEXT ·loadlibrary(SB), 7, $0-24
 	JMP	syscall·loadlibrary(SB)

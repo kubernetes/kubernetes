@@ -168,7 +168,7 @@ require (
 	golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 	golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181
-	golang.org/x/sys v0.0.0-20181116152217-5ac8a444bdc5
+	golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
 	golang.org/x/tools v0.0.0-20190328211700-ab21143f2384
 	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
@@ -438,7 +438,7 @@ replace (
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20171031081856-95c657629925
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 	golang.org/x/time => golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190205050122-7f7074d5bcfd
