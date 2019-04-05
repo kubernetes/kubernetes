@@ -128,7 +128,7 @@ github.com/bazelbuild/bazel-gazelle/internal/rule
 github.com/bazelbuild/bazel-gazelle/internal/version
 github.com/bazelbuild/bazel-gazelle/internal/walk
 github.com/bazelbuild/bazel-gazelle/internal/wspace
-# github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e => github.com/bazelbuild/buildtools v0.0.0-20171220125010-1a9c38e0df93
+# github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e => github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e
 github.com/bazelbuild/buildtools/api_proto
 github.com/bazelbuild/buildtools/build
 github.com/bazelbuild/buildtools/build_proto

@@ -44,8 +44,8 @@ github.com/aws/aws-sdk-go v1.16.26 h1:GWkl3rkRO/JGRTWoLLIqwf7AWC4/W/1hMOUZqmX0js
 github.com/aws/aws-sdk-go v1.16.26/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/bazelbuild/bazel-gazelle v0.0.0-20181012220611-c728ce9f663e h1:k7E/Rdb9kYVDDrdCX46/GLgHhbxBs4BQz7+FDRf8lcg=
 github.com/bazelbuild/bazel-gazelle v0.0.0-20181012220611-c728ce9f663e/go.mod h1:uHBSeeATKpVazAACZBDPL/Nk/UhQDDsJWDlqYJo8/Us=
-github.com/bazelbuild/buildtools v0.0.0-20171220125010-1a9c38e0df93 h1:HOcA9ovaT+3lN0RGVE8NpLHLU2poukBPujkIQOGI40U=
-github.com/bazelbuild/buildtools v0.0.0-20171220125010-1a9c38e0df93/go.mod h1:5JP0TXzWDHXv8qvxRC4InIazwdyDseBDbzESUMKk1yU=
+github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e h1:VuTBHPJNCQ88Okm9ld5SyLCvU50soWJYQYjQFdcDxew=
+github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e/go.mod h1:5JP0TXzWDHXv8qvxRC4InIazwdyDseBDbzESUMKk1yU=
 github.com/beorn7/perks v0.0.0-20160229213445-3ac7bf7a47d1 h1:OnJHjoVbY69GG4gclp0ngXfywigLhR6rrgUxmxQRWO4=
 github.com/beorn7/perks v0.0.0-20160229213445-3ac7bf7a47d1/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/blang/semver v3.5.0+incompatible h1:CGxCgetQ64DKk7rdZ++Vfnb1+ogGNnB17OJKJXD2Cfs=
