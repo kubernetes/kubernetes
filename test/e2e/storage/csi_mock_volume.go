@@ -349,7 +349,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	})
 
 	Context("CSI volume limit information using mock driver", func() {
-		It("should report attach limit when limit is bigger than 0", func() {
+		It("should report attach limit when limit is bigger than 0 [Slow]", func() {
 			// define volume limit to be 2 for this test
 
 			var err error

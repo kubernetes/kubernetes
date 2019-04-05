@@ -372,7 +372,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		testReadFile(f, l.filePathInSubpath, l.pod, 0)
 	})
 
-	It("should verify container cannot write to subpath readonly volumes", func() {
+	It("should verify container cannot write to subpath readonly volumes [Slow]", func() {
 		init()
 		defer cleanup()
 		if l.roVolSource == nil {

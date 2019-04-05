@@ -23,7 +23,7 @@ import (
 
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -62,7 +62,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 		suffix = ns.Name
 	})
 
-	It("should not work when mount is in progress", func() {
+	It("should not work when mount is in progress [Slow]", func() {
 		driver := "attachable-with-long-mount"
 		driverInstallAs := driver + "-" + suffix
 
