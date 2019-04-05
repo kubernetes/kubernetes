@@ -32,7 +32,6 @@ import (
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -334,19 +333,13 @@ func (o *Options) runLoop() error {
 }
 
 func (o *Options) writeConfigFile() error {
-	var encoder runtime.Encoder
-	mediaTypes := o.codecs.SupportedMediaTypes()
-	for _, info := range mediaTypes {
-		if info.MediaType == "application/yaml" {
-			encoder = info.Serializer
-			break
-		}
+	const mediaType = runtime.ContentTypeYAML
+	info, ok := runtime.SerializerInfoForMediaType(o.codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
-	if encoder == nil {
-		return errors.New("unable to locate yaml encoder")
-	}
-	encoder = json.NewYAMLSerializer(json.DefaultMetaFactory, o.scheme, o.scheme)
-	encoder = o.codecs.EncoderForVersion(encoder, v1alpha1.SchemeGroupVersion)
+
+	encoder := o.codecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion)
 
 	configFile, err := os.Create(o.WriteConfigTo)
 	if err != nil {
