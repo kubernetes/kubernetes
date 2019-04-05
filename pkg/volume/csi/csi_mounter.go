@@ -69,7 +69,7 @@ type csiMountMgr struct {
 	podUID         types.UID
 	options        volume.VolumeOptions
 	publishContext map[string]string
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 // volume.Volume methods
@@ -285,6 +285,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	klog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
+
 	return nil
 }
 
