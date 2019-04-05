@@ -43,11 +43,11 @@ import (
 )
 
 const (
-	// Poll interval for StatefulSet tests
+	// StatefulSetPoll is a poll interval for StatefulSet tests
 	StatefulSetPoll = 10 * time.Second
-	// Timeout interval for StatefulSet operations
+	// StatefulSetTimeout is a timeout interval for StatefulSet operations
 	StatefulSetTimeout = 10 * time.Minute
-	// Timeout for stateful pods to change state
+	// StatefulPodTimeout is a timeout for stateful pods to change state
 	StatefulPodTimeout = 5 * time.Minute
 )
 
@@ -468,16 +468,15 @@ func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *apps.StatefulSe
 				}
 			}
 			return false, nil
-		} else {
-			for i := int(*set.Spec.Replicas) - 1; i >= partition; i-- {
-				if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
-					Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
-						pods.Items[i].Namespace,
-						pods.Items[i].Name,
-						set.Status.UpdateRevision,
-						pods.Items[i].Labels[apps.StatefulSetRevisionLabel])
-					return false, nil
-				}
+		}
+		for i := int(*set.Spec.Replicas) - 1; i >= partition; i-- {
+			if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
+				Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
+					pods.Items[i].Namespace,
+					pods.Items[i].Name,
+					set.Status.UpdateRevision,
+					pods.Items[i].Labels[apps.StatefulSetRevisionLabel])
+				return false, nil
 			}
 		}
 		return true, nil
@@ -485,7 +484,7 @@ func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *apps.StatefulSe
 	return set, pods
 }
 
-// WaitForRunningAndReady waits for numStatefulPods in ss to be Running and not Ready.
+// WaitForRunningAndNotReady waits for numStatefulPods in ss to be Running and not Ready.
 func (s *StatefulSetTester) WaitForRunningAndNotReady(numStatefulPods int32, ss *apps.StatefulSet) {
 	s.WaitForRunning(numStatefulPods, 0, ss)
 }
@@ -502,15 +501,15 @@ var httpProbe = &v1.Probe{
 	FailureThreshold: 1,
 }
 
-// SetHttpProbe sets the pod template's ReadinessProbe for Nginx StatefulSet containers.
-// This probe can then be controlled with BreakHttpProbe() and RestoreHttpProbe().
+// SetHTTPProbe sets the pod template's ReadinessProbe for Nginx StatefulSet containers.
+// This probe can then be controlled with BreakHTTPProbe() and RestoreHTTPProbe().
 // Note that this cannot be used together with PauseNewPods().
-func (s *StatefulSetTester) SetHttpProbe(ss *apps.StatefulSet) {
+func (s *StatefulSetTester) SetHTTPProbe(ss *apps.StatefulSet) {
 	ss.Spec.Template.Spec.Containers[0].ReadinessProbe = httpProbe
 }
 
-// BreakHttpProbe breaks the readiness probe for Nginx StatefulSet containers in ss.
-func (s *StatefulSetTester) BreakHttpProbe(ss *apps.StatefulSet) error {
+// BreakHTTPProbe breaks the readiness probe for Nginx StatefulSet containers in ss.
+func (s *StatefulSetTester) BreakHTTPProbe(ss *apps.StatefulSet) error {
 	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
@@ -520,8 +519,8 @@ func (s *StatefulSetTester) BreakHttpProbe(ss *apps.StatefulSet) error {
 	return s.ExecInStatefulPods(ss, cmd)
 }
 
-// BreakPodHttpProbe breaks the readiness probe for Nginx StatefulSet containers in one pod.
-func (s *StatefulSetTester) BreakPodHttpProbe(ss *apps.StatefulSet, pod *v1.Pod) error {
+// BreakPodHTTPProbe breaks the readiness probe for Nginx StatefulSet containers in one pod.
+func (s *StatefulSetTester) BreakPodHTTPProbe(ss *apps.StatefulSet, pod *v1.Pod) error {
 	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
@@ -533,8 +532,8 @@ func (s *StatefulSetTester) BreakPodHttpProbe(ss *apps.StatefulSet, pod *v1.Pod)
 	return err
 }
 
-// RestoreHttpProbe restores the readiness probe for Nginx StatefulSet containers in ss.
-func (s *StatefulSetTester) RestoreHttpProbe(ss *apps.StatefulSet) error {
+// RestoreHTTPProbe restores the readiness probe for Nginx StatefulSet containers in ss.
+func (s *StatefulSetTester) RestoreHTTPProbe(ss *apps.StatefulSet) error {
 	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
@@ -544,8 +543,8 @@ func (s *StatefulSetTester) RestoreHttpProbe(ss *apps.StatefulSet) error {
 	return s.ExecInStatefulPods(ss, cmd)
 }
 
-// RestorePodHttpProbe restores the readiness probe for Nginx StatefulSet containers in pod.
-func (s *StatefulSetTester) RestorePodHttpProbe(ss *apps.StatefulSet, pod *v1.Pod) error {
+// RestorePodHTTPProbe restores the readiness probe for Nginx StatefulSet containers in pod.
+func (s *StatefulSetTester) RestorePodHTTPProbe(ss *apps.StatefulSet, pod *v1.Pod) error {
 	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
@@ -574,7 +573,7 @@ func hasPauseProbe(pod *v1.Pod) bool {
 // PauseNewPods adds an always-failing ReadinessProbe to the StatefulSet PodTemplate.
 // This causes all newly-created Pods to stay Unready until they are manually resumed
 // with ResumeNextPod().
-// Note that this cannot be used together with SetHttpProbe().
+// Note that this cannot be used together with SetHTTPProbe().
 func (s *StatefulSetTester) PauseNewPods(ss *apps.StatefulSet) {
 	ss.Spec.Template.Spec.Containers[0].ReadinessProbe = pauseProbe
 }
@@ -655,7 +654,7 @@ func (s *StatefulSetTester) WaitForStatusReplicas(ss *apps.StatefulSet, expected
 }
 
 // CheckServiceName asserts that the ServiceName for ss is equivalent to expectedServiceName.
-func (p *StatefulSetTester) CheckServiceName(ss *apps.StatefulSet, expectedServiceName string) error {
+func (s *StatefulSetTester) CheckServiceName(ss *apps.StatefulSet, expectedServiceName string) error {
 	Logf("Checking if statefulset spec.serviceName is %s", expectedServiceName)
 
 	if expectedServiceName != ss.Spec.ServiceName {
@@ -869,6 +868,7 @@ func (sp statefulPodsByOrdinal) Less(i, j int) bool {
 
 type updateStatefulSetFunc func(*apps.StatefulSet)
 
+// UpdateStatefulSetWithRetries updates statfulset template with retries.
 func UpdateStatefulSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *apps.StatefulSet, err error) {
 	statefulSets := c.AppsV1().StatefulSets(namespace)
 	var updateErr error
