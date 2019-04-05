@@ -1,6 +1,18 @@
 # changelog
 
-### unreleased
+### 0.20.0 (2018-02-06)
+
+* Add vslm package for managing First Class Disks
+
+* Add LoginByToken to session KeepAliveHandler
+
+### 0.19.0 (2018-09-30)
+
+* New vapi/rest and and vapi/tags packages
+
+* Allowing the use of STS for exchanging tokens
+
+* Add object.VirtualMachine.UUID method
 
 * SetRootCAs on the soap.Client returns an error for invalid certificates
 
