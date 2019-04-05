@@ -19,7 +19,7 @@ replace (
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/protobuf => github.com/golang/protobuf v1.1.0
 	github.com/google/gofuzz => github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
-	github.com/google/uuid => github.com/google/uuid v0.0.0-20171113160352-8c31c18f31ed
+	github.com/google/uuid => github.com/google/uuid v1.0.0
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/hashicorp/golang-lru => github.com/hashicorp/golang-lru v0.5.0
 	github.com/hpcloud/tail => github.com/hpcloud/tail v1.0.0

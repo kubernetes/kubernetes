@@ -529,7 +529,7 @@ github.com/google/certificate-transparency-go/x509
 github.com/google/certificate-transparency-go/x509/pkix
 # github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf => github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
 github.com/google/gofuzz
-# github.com/google/uuid v0.0.0-20171113160352-8c31c18f31ed => github.com/google/uuid v0.0.0-20171113160352-8c31c18f31ed
+# github.com/google/uuid v1.0.0 => github.com/google/uuid v1.0.0
 github.com/google/uuid
 # github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d => github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 github.com/googleapis/gnostic/OpenAPIv2
@@ -765,7 +765,7 @@ github.com/opencontainers/runtime-spec/specs-go
 # github.com/opencontainers/selinux v0.0.0-20170621221121-4a2974bf1ee9 => github.com/opencontainers/selinux v0.0.0-20170621221121-4a2974bf1ee9
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
-# github.com/pborman/uuid v1.2.0 => github.com/pborman/uuid v0.0.0-20150603214016-ca53cad383ca
+# github.com/pborman/uuid v1.2.0 => github.com/pborman/uuid v1.2.0
 github.com/pborman/uuid
 # github.com/pelletier/go-toml v1.2.0 => github.com/pelletier/go-toml v1.2.0
 github.com/pelletier/go-toml

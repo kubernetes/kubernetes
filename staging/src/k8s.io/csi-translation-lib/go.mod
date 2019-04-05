@@ -50,7 +50,7 @@ replace (
 	github.com/google/btree => github.com/google/btree v0.0.0-20160524151835-7d79101e329e
 	github.com/google/go-cmp => github.com/google/go-cmp v0.2.0
 	github.com/google/gofuzz => github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
-	github.com/google/uuid => github.com/google/uuid v0.0.0-20171113160352-8c31c18f31ed
+	github.com/google/uuid => github.com/google/uuid v1.0.0
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.0.0-20190126172459-c818fa66e4c8
 	github.com/gorilla/websocket => github.com/gorilla/websocket v0.0.0-20170926233335-4201258b820c
@@ -76,7 +76,7 @@ replace (
 	github.com/natefinch/lumberjack => github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v0.0.0-20170318221715-67b9df7f55fe
 	github.com/onsi/gomega => github.com/onsi/gomega v0.0.0-20190113212917-5533ce8a0da3
-	github.com/pborman/uuid => github.com/pborman/uuid v0.0.0-20150603214016-ca53cad383ca
+	github.com/pborman/uuid => github.com/pborman/uuid v1.2.0
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/philhofer/fwd => github.com/philhofer/fwd v1.0.0
 	github.com/pkg/errors => github.com/pkg/errors v0.8.0
