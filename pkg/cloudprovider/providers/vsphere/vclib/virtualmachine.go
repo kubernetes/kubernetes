@@ -229,9 +229,7 @@ func (vm *VirtualMachine) GetAllAccessibleDatastores(ctx context.Context) ([]*Da
 		return nil, err
 	}
 	var dsRefList []types.ManagedObjectReference
-	for _, dsRef := range hostSystemMo.Datastore {
-		dsRefList = append(dsRefList, dsRef)
-	}
+	dsRefList = append(dsRefList, hostSystemMo.Datastore...)
 
 	var dsMoList []mo.Datastore
 	pc := property.DefaultCollector(vm.Client())

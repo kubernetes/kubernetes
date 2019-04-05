@@ -82,6 +82,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/utils:go_default_library",
+        "//test/utils/crd:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

@@ -24,7 +24,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	schedulerapi "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,7 +47,7 @@ type priorityPair struct {
 
 var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	var cs clientset.Interface
-	var nodeList *v1.NodeList
+	var nodeList *corev1.NodeList
 	var ns string
 	f := framework.NewDefaultFramework("sched-preemption")
 
@@ -70,7 +70,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	BeforeEach(func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
-		nodeList = &v1.NodeList{}
+		nodeList = &corev1.NodeList{}
 		for _, pair := range priorityPairs {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value})
 			Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
@@ -87,10 +87,10 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	// enough resources is found, scheduler preempts a lower priority pod to schedule
 	// the high priority pod.
 	It("validates basic preemption works", func() {
-		var podRes v1.ResourceList
+		var podRes corev1.ResourceList
 		// Create one pod per node that uses a lot of the node's resources.
 		By("Create pods that use 60% of node resources.")
-		pods := make([]*v1.Pod, len(nodeList.Items))
+		pods := make([]*corev1.Pod, len(nodeList.Items))
 		for i, node := range nodeList.Items {
 			cpuAllocatable, found := node.Status.Allocatable["cpu"]
 			Expect(found).To(Equal(true))
@@ -98,9 +98,9 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			memAllocatable, found := node.Status.Allocatable["memory"]
 			Expect(found).To(Equal(true))
 			memory := memAllocatable.Value() * 60 / 100
-			podRes = v1.ResourceList{}
-			podRes[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
-			podRes[v1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
+			podRes = corev1.ResourceList{}
+			podRes[corev1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
+			podRes[corev1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
 
 			// make the first pod low priority and the rest medium priority.
 			priorityName := mediumPriorityClassName
@@ -110,7 +110,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			pods[i] = createPausePod(f, pausePodConfig{
 				Name:              fmt.Sprintf("pod%d-%v", i, priorityName),
 				PriorityClassName: priorityName,
-				Resources: &v1.ResourceRequirements{
+				Resources: &corev1.ResourceRequirements{
 					Requests: podRes,
 				},
 			})
@@ -126,7 +126,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		runPausePod(f, pausePodConfig{
 			Name:              "preemptor-pod",
 			PriorityClassName: highPriorityClassName,
-			Resources: &v1.ResourceRequirements{
+			Resources: &corev1.ResourceRequirements{
 				Requests: podRes,
 			},
 		})
@@ -147,10 +147,10 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	// enough resources is found, scheduler preempts a lower priority pod to schedule
 	// this critical pod.
 	It("validates lower priority pod preemption by critical pod", func() {
-		var podRes v1.ResourceList
+		var podRes corev1.ResourceList
 		// Create one pod per node that uses a lot of the node's resources.
 		By("Create pods that use 60% of node resources.")
-		pods := make([]*v1.Pod, len(nodeList.Items))
+		pods := make([]*corev1.Pod, len(nodeList.Items))
 		for i, node := range nodeList.Items {
 			cpuAllocatable, found := node.Status.Allocatable["cpu"]
 			Expect(found).To(Equal(true))
@@ -158,9 +158,9 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			memAllocatable, found := node.Status.Allocatable["memory"]
 			Expect(found).To(Equal(true))
 			memory := memAllocatable.Value() * 60 / 100
-			podRes = v1.ResourceList{}
-			podRes[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
-			podRes[v1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
+			podRes = corev1.ResourceList{}
+			podRes[corev1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
+			podRes[corev1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
 
 			// make the first pod low priority and the rest medium priority.
 			priorityName := mediumPriorityClassName
@@ -170,7 +170,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			pods[i] = createPausePod(f, pausePodConfig{
 				Name:              fmt.Sprintf("pod%d-%v", i, priorityName),
 				PriorityClassName: priorityName,
-				Resources: &v1.ResourceRequirements{
+				Resources: &corev1.ResourceRequirements{
 					Requests: podRes,
 				},
 			})
@@ -187,7 +187,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			Name:              "critical-pod",
 			Namespace:         metav1.NamespaceSystem,
 			PriorityClassName: scheduling.SystemClusterCritical,
-			Resources: &v1.ResourceRequirements{
+			Resources: &corev1.ResourceRequirements{
 				Requests: podRes,
 			},
 		})
@@ -215,14 +215,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	// It also verifies that existing low priority pods are not preempted as their
 	// preemption wouldn't help.
 	It("validates pod anti-affinity works in preemption", func() {
-		var podRes v1.ResourceList
+		var podRes corev1.ResourceList
 		// Create a few pods that uses a small amount of resources.
 		By("Create pods that use 10% of node resources.")
 		numPods := 4
 		if len(nodeList.Items) < numPods {
 			numPods = len(nodeList.Items)
 		}
-		pods := make([]*v1.Pod, numPods)
+		pods := make([]*corev1.Pod, numPods)
 		for i := 0; i < numPods; i++ {
 			node := nodeList.Items[i]
 			cpuAllocatable, found := node.Status.Allocatable["cpu"]
@@ -231,9 +231,9 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			memAllocatable, found := node.Status.Allocatable["memory"]
 			Expect(found).To(BeTrue())
 			memory := memAllocatable.Value() * 10 / 100
-			podRes = v1.ResourceList{}
-			podRes[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
-			podRes[v1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
+			podRes = corev1.ResourceList{}
+			podRes[corev1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
+			podRes[corev1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
 
 			// Apply node label to each node
 			framework.AddOrUpdateLabelOnNode(cs, node.Name, "node", node.Name)
@@ -247,12 +247,12 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			pods[i] = createPausePod(f, pausePodConfig{
 				Name:              fmt.Sprintf("pod%d-%v", i, priorityName),
 				PriorityClassName: priorityName,
-				Resources: &v1.ResourceRequirements{
+				Resources: &corev1.ResourceRequirements{
 					Requests: podRes,
 				},
-				Affinity: &v1.Affinity{
-					PodAntiAffinity: &v1.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				Affinity: &corev1.Affinity{
+					PodAntiAffinity: &corev1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
 							{
 								LabelSelector: &metav1.LabelSelector{
 									MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -267,14 +267,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 							},
 						},
 					},
-					NodeAffinity: &v1.NodeAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-							NodeSelectorTerms: []v1.NodeSelectorTerm{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
 								{
-									MatchExpressions: []v1.NodeSelectorRequirement{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
 										{
 											Key:      "node",
-											Operator: v1.NodeSelectorOpIn,
+											Operator: corev1.NodeSelectorOpIn,
 											Values:   []string{node.Name},
 										},
 									},
@@ -303,15 +303,15 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			Name:              "preemptor-pod",
 			PriorityClassName: highPriorityClassName,
 			Labels:            map[string]string{"service": "blah"},
-			Affinity: &v1.Affinity{
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{
+			Affinity: &corev1.Affinity{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
 							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
 									{
 										Key:      "node",
-										Operator: v1.NodeSelectorOpIn,
+										Operator: corev1.NodeSelectorOpIn,
 										Values:   []string{nodeList.Items[0].Name},
 									},
 								},
@@ -374,12 +374,12 @@ var _ = SIGDescribe("PodPriorityResolution [Serial]", func() {
 
 // construct a fakecpu so as to set it to status of Node object
 // otherwise if we update CPU/Memory/etc, those values will be corrected back by kubelet
-var fakecpu v1.ResourceName = "example.com/fakecpu"
+var fakecpu corev1.ResourceName = "example.com/fakecpu"
 
 var _ = SIGDescribe("PreemptionExecutionPath", func() {
 	var cs clientset.Interface
-	var node *v1.Node
-	var ns string
+	var node *corev1.Node
+	var ns, nodeHostNameLabel string
 	f := framework.NewDefaultFramework("sched-preemption-path")
 
 	priorityPairs := make([]priorityPair, 0)
@@ -427,6 +427,11 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		if err != nil {
 			framework.Failf("error getting node %q: %v", nodeName, err)
 		}
+		var ok bool
+		nodeHostNameLabel, ok = node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
+		if !ok {
+			framework.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
+		}
 
 		// update Node API object with a fake resource
 		nodeCopy := node.DeepCopy()
@@ -465,11 +470,11 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 					return f.ClientSet.CoreV1().Pods(ns).Watch(options)
 				},
 			},
-			&v1.Pod{},
+			&corev1.Pod{},
 			0,
 			cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
-					if pod, ok := obj.(*v1.Pod); ok {
+					if pod, ok := obj.(*corev1.Pod); ok {
 						podNamesSeen[pod.Name] = struct{}{}
 					}
 				},
@@ -487,10 +492,10 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 					Namespace:         ns,
 					Labels:            map[string]string{"name": "pod1"},
 					PriorityClassName: "p1",
-					NodeSelector:      map[string]string{"kubernetes.io/hostname": node.Name},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("40")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("40")},
+					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{fakecpu: resource.MustParse("40")},
+						Limits:   corev1.ResourceList{fakecpu: resource.MustParse("40")},
 					},
 				},
 			},
@@ -501,10 +506,10 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 					Namespace:         ns,
 					Labels:            map[string]string{"name": "pod2"},
 					PriorityClassName: "p2",
-					NodeSelector:      map[string]string{"kubernetes.io/hostname": node.Name},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("50")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("50")},
+					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{fakecpu: resource.MustParse("50")},
+						Limits:   corev1.ResourceList{fakecpu: resource.MustParse("50")},
 					},
 				},
 			},
@@ -515,10 +520,10 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 					Namespace:         ns,
 					Labels:            map[string]string{"name": "pod3"},
 					PriorityClassName: "p3",
-					NodeSelector:      map[string]string{"kubernetes.io/hostname": node.Name},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("95")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("95")},
+					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{fakecpu: resource.MustParse("95")},
+						Limits:   corev1.ResourceList{fakecpu: resource.MustParse("95")},
 					},
 				},
 			},
@@ -529,10 +534,10 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 					Namespace:         ns,
 					Labels:            map[string]string{"name": "pod4"},
 					PriorityClassName: "p4",
-					NodeSelector:      map[string]string{"kubernetes.io/hostname": node.Name},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("400")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("400")},
+					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{fakecpu: resource.MustParse("400")},
+						Limits:   corev1.ResourceList{fakecpu: resource.MustParse("400")},
 					},
 				},
 			},
@@ -594,7 +599,7 @@ func initPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSet 
 			Selector: &metav1.LabelSelector{
 				MatchLabels: pausePod.Labels,
 			},
-			Template: v1.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: pausePod.ObjectMeta.Labels},
 				Spec:       pausePod.Spec,
 			},

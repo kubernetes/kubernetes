@@ -43,7 +43,8 @@
 				"k8s.io/utils/integer",
 				"k8s.io/utils/path",
 				"k8s.io/utils/pointer",
-				"k8s.io/utils/net"
+				"k8s.io/utils/net",
+				"k8s.io/utils/trace"
 			]
 		},
 		{
@@ -57,6 +58,7 @@
 				"k8s.io/kubernetes/pkg/apis/rbac",
 				"k8s.io/kubernetes/pkg/apis/scheduling",
 				"k8s.io/kubernetes/pkg/api/v1/pod",
+				"k8s.io/kubernetes/pkg/api/v1/service",
 				"k8s.io/kubernetes/pkg/capabilities",
 				"k8s.io/kubernetes/pkg/controller",
 				"k8s.io/kubernetes/pkg/features",
@@ -67,20 +69,26 @@
 				"k8s.io/kubernetes/pkg/kubelet/types",
 				"k8s.io/kubernetes/pkg/master/ports",
 				"k8s.io/kubernetes/pkg/proxy/apis/config",
+				"k8s.io/kubernetes/pkg/proxy",
 				"k8s.io/kubernetes/pkg/registry/core/service/allocator",
 				"k8s.io/kubernetes/pkg/registry/core/service/ipallocator",
 				"k8s.io/kubernetes/pkg/security/apparmor",
 				"k8s.io/kubernetes/pkg/serviceaccount",
+				"k8s.io/kubernetes/pkg/util/async",
+				"k8s.io/kubernetes/pkg/util/conntrack",
+				"k8s.io/kubernetes/pkg/util/dbus",
 				"k8s.io/kubernetes/pkg/util/hash",
 				"k8s.io/kubernetes/pkg/util/initsystem",
+				"k8s.io/kubernetes/pkg/util/ipset",
+				"k8s.io/kubernetes/pkg/util/iptables",
 				"k8s.io/kubernetes/pkg/util/ipvs",
 				"k8s.io/kubernetes/pkg/util/metrics",
 				"k8s.io/kubernetes/pkg/util/node",
 				"k8s.io/kubernetes/pkg/util/normalizer",
 				"k8s.io/kubernetes/pkg/util/parsers",
 				"k8s.io/kubernetes/pkg/util/procfs",
+				"k8s.io/kubernetes/pkg/util/sysctl",
 				"k8s.io/kubernetes/pkg/util/taints",
-				"k8s.io/kubernetes/pkg/util/ipvs",
 				"k8s.io/kubernetes/pkg/version"
 			],
 			"ForbiddenPrefixes": [
@@ -120,6 +128,7 @@
 				"github.com/docker/go-connections/tlsconfig",
 				"github.com/docker/go-units",
 				"github.com/docker/libnetwork/ipvs",
+				"github.com/godbus/dbus",
 				"github.com/gogo/protobuf/proto",
 				"github.com/gogo/protobuf/sortkeys",
 				"github.com/golang/groupcache/lru",
@@ -156,7 +165,8 @@
 				"github.com/russross/blackfriday",
 				"github.com/shurcooL/sanitized_anchor_name",
 				"github.com/spf13/cobra",
-				"github.com/spf13/pflag"
+				"github.com/spf13/pflag",
+				"github.com/vishvananda/netlink"
 			]
 		},
 		{

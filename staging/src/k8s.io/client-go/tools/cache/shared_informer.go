@@ -555,7 +555,7 @@ func (p *processorListener) run() {
 				case deleteNotification:
 					p.handler.OnDelete(notification.oldObj)
 				default:
-					utilruntime.HandleError(fmt.Errorf("unrecognized notification: %#v", next))
+					utilruntime.HandleError(fmt.Errorf("unrecognized notification: %T", next))
 				}
 			}
 			// the only way to get here is if the p.nextCh is empty and closed

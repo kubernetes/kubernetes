@@ -19,7 +19,6 @@ package external_metrics
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
@@ -46,7 +45,7 @@ func NewForConfig(c *rest.Config) (ExternalMetricsClient, error) {
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
 	configShallowCopy.GroupVersion = &v1beta1.SchemeGroupVersion
-	configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	configShallowCopy.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	client, err := rest.RESTClientFor(&configShallowCopy)
 	if err != nil {

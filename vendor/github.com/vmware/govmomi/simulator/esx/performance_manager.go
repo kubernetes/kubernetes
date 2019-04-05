@@ -9883,3 +9883,5175 @@ var PerfCounter = []types.PerfCounterInfo{
 		AssociatedCounterId: nil,
 	},
 }
+
+// *********************************** VM Metrics ************************************
+var VmMetrics = []types.PerfMetricId{
+	{
+		CounterId: 11,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 1,
+		Instance:  "",
+	},
+	{
+		CounterId: 12,
+		Instance:  "",
+	},
+	{
+		CounterId: 9,
+		Instance:  "",
+	},
+	{
+		CounterId: 29,
+		Instance:  "",
+	},
+	{
+		CounterId: 30,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 24,
+		Instance:  "",
+	},
+	{
+		CounterId: 13,
+		Instance:  "",
+	},
+	{
+		CounterId: 10,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 14,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 27,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 25,
+		Instance:  "",
+	},
+	{
+		CounterId: 5,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 32,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 14,
+		Instance:  "",
+	},
+	{
+		CounterId: 12,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 10,
+		Instance:  "",
+	},
+	{
+		CounterId: 28,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 5,
+		Instance:  "",
+	},
+	{
+		CounterId: 27,
+		Instance:  "",
+	},
+	{
+		CounterId: 31,
+		Instance:  "",
+	},
+	{
+		CounterId: 32,
+		Instance:  "",
+	},
+	{
+		CounterId: 26,
+		Instance:  "",
+	},
+	{
+		CounterId: 13,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 28,
+		Instance:  "",
+	},
+	{
+		CounterId: 30,
+		Instance:  "",
+	},
+	{
+		CounterId: 11,
+		Instance:  "",
+	},
+	{
+		CounterId: 655379,
+		Instance:  "",
+	},
+
+	{
+		CounterId: 655362,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655363,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655360,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655364,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655361,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655365,
+		Instance:  "$physDisk",
+	},
+
+	{
+		CounterId: 131095,
+		Instance:  "",
+	},
+	{
+		CounterId: 65549,
+		Instance:  "",
+	},
+	{
+		CounterId: 65595,
+		Instance:  "",
+	},
+	{
+		CounterId: 65632,
+		Instance:  "",
+	},
+	{
+		CounterId: 65591,
+		Instance:  "",
+	},
+	{
+		CounterId: 65623,
+		Instance:  "",
+	},
+	{
+		CounterId: 65628,
+		Instance:  "",
+	},
+	{
+		CounterId: 65621,
+		Instance:  "",
+	},
+	{
+		CounterId: 65618,
+		Instance:  "",
+	},
+	{
+		CounterId: 65634,
+		Instance:  "",
+	},
+	{
+		CounterId: 65624,
+		Instance:  "",
+	},
+	{
+		CounterId: 65586,
+		Instance:  "",
+	},
+	{
+		CounterId: 65545,
+		Instance:  "",
+	},
+	{
+		CounterId: 65633,
+		Instance:  "",
+	},
+	{
+		CounterId: 65607,
+		Instance:  "",
+	},
+	{
+		CounterId: 65541,
+		Instance:  "",
+	},
+	{
+		CounterId: 65626,
+		Instance:  "",
+	},
+	{
+		CounterId: 65620,
+		Instance:  "",
+	},
+	{
+		CounterId: 65611,
+		Instance:  "",
+	},
+	{
+		CounterId: 65629,
+		Instance:  "",
+	},
+	{
+		CounterId: 65622,
+		Instance:  "",
+	},
+	{
+		CounterId: 65619,
+		Instance:  "",
+	},
+	{
+		CounterId: 65553,
+		Instance:  "",
+	},
+	{
+		CounterId: 65627,
+		Instance:  "",
+	},
+	{
+		CounterId: 65635,
+		Instance:  "",
+	},
+	{
+		CounterId: 65599,
+		Instance:  "",
+	},
+	{
+		CounterId: 65582,
+		Instance:  "",
+	},
+	{
+		CounterId: 65537,
+		Instance:  "",
+	},
+	{
+		CounterId: 65603,
+		Instance:  "",
+	},
+	{
+		CounterId: 196622,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196612,
+		Instance:  "",
+	},
+	{
+		CounterId: 196617,
+		Instance:  "",
+	},
+	{
+		CounterId: 196613,
+		Instance:  "",
+	},
+	{
+		CounterId: 196619,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196618,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196617,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196621,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196616,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196615,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196614,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196618,
+		Instance:  "",
+	},
+	{
+		CounterId: 196609,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196619,
+		Instance:  "",
+	},
+	{
+		CounterId: 196622,
+		Instance:  "",
+	},
+	{
+		CounterId: 196628,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196609,
+		Instance:  "",
+	},
+	{
+		CounterId: 196612,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196628,
+		Instance:  "",
+	},
+	{
+		CounterId: 196627,
+		Instance:  "",
+	},
+	{
+		CounterId: 196616,
+		Instance:  "",
+	},
+	{
+		CounterId: 196613,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196627,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196614,
+		Instance:  "",
+	},
+	{
+		CounterId: 196621,
+		Instance:  "",
+	},
+	{
+		CounterId: 196620,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 196620,
+		Instance:  "",
+	},
+	{
+		CounterId: 196623,
+		Instance:  "",
+	},
+	{
+		CounterId: 196615,
+		Instance:  "",
+	},
+	{
+		CounterId: 196623,
+		Instance:  "4000",
+	},
+	{
+		CounterId: 720898,
+		Instance:  "",
+	},
+	{
+		CounterId: 720896,
+		Instance:  "",
+	},
+	{
+		CounterId: 327684,
+		Instance:  "",
+	},
+	{
+		CounterId: 327687,
+		Instance:  "",
+	},
+	{
+		CounterId: 327693,
+		Instance:  "",
+	},
+	{
+		CounterId: 327680,
+		Instance:  "",
+	},
+	{
+		CounterId: 327685,
+		Instance:  "",
+	},
+	{
+		CounterId: 327694,
+		Instance:  "",
+	},
+	{
+		CounterId: 327686,
+		Instance:  "",
+	},
+	{
+		CounterId: 327692,
+		Instance:  "",
+	},
+	{
+		CounterId: 327688,
+		Instance:  "",
+	},
+	{
+		CounterId: 327695,
+		Instance:  "",
+	},
+	{
+		CounterId: 327689,
+		Instance:  "",
+	},
+	{
+		CounterId: 327681,
+		Instance:  "",
+	},
+	{
+		CounterId: 327696,
+		Instance:  "",
+	},
+	{
+		CounterId: 327683,
+		Instance:  "",
+	},
+	{
+		CounterId: 327691,
+		Instance:  "",
+	},
+	{
+		CounterId: 327690,
+		Instance:  "",
+	},
+	{
+		CounterId: 327682,
+		Instance:  "",
+	},
+	{
+		CounterId: 262144,
+		Instance:  "",
+	},
+	{
+		CounterId: 262145,
+		Instance:  "",
+	},
+	{
+		CounterId: 262170,
+		Instance:  "",
+	},
+	{
+		CounterId: 589827,
+		Instance:  "",
+	},
+	{
+		CounterId: 589826,
+		Instance:  "",
+	},
+}
+
+// **************************** Host metrics *********************************
+
+var HostMetrics = []types.PerfMetricId{
+	{
+		CounterId: 23,
+		Instance:  "",
+	},
+	{
+		CounterId: 14,
+		Instance:  "",
+	},
+	{
+		CounterId: 1,
+		Instance:  "",
+	},
+	{
+		CounterId: 11,
+		Instance:  "",
+	},
+	{
+		CounterId: 20,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 13,
+		Instance:  "",
+	},
+	{
+		CounterId: 5,
+		Instance:  "",
+	},
+	{
+		CounterId: 32,
+		Instance:  "",
+	},
+	{
+		CounterId: 26,
+		Instance:  "",
+	},
+	{
+		CounterId: 24,
+		Instance:  "",
+	},
+	{
+		CounterId: 16,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 27,
+		Instance:  "",
+	},
+	{
+		CounterId: 16,
+		Instance:  "",
+	},
+
+	{
+		CounterId: 10,
+		Instance:  "",
+	},
+	{
+		CounterId: 12,
+		Instance:  "",
+	},
+	{
+		CounterId: 1,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 12,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 13,
+		Instance:  "$cpu",
+	},
+	{
+		CounterId: 8,
+		Instance:  "",
+	},
+	{
+		CounterId: 655380,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655370,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655377,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655379,
+		Instance:  "",
+	},
+	{
+		CounterId: 655375,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655378,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655372,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655369,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655373,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655362,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655374,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655368,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655365,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655366,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655367,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655371,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655361,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655376,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655363,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655360,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 655381,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131073,
+		Instance:  "",
+	},
+	{
+		CounterId: 131090,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131079,
+		Instance:  "",
+	},
+	{
+		CounterId: 131086,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131098,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131081,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131082,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131090,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131081,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131086,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131088,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131098,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131078,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131079,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131099,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131087,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131089,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131078,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131096,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131091,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131080,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131078,
+		Instance:  "",
+	},
+	{
+		CounterId: 131076,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131092,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131080,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131095,
+		Instance:  "",
+	},
+	{
+		CounterId: 131097,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131093,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131092,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131084,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131099,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131079,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131085,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131083,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131076,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131096,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131094,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131088,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131089,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131077,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131077,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131093,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131087,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131085,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131091,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131097,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131082,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131094,
+		Instance:  "mpx.vmhba32:C0:T0:L0",
+	},
+	{
+		CounterId: 131084,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 131083,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 786433,
+		Instance:  "",
+	},
+	{
+		CounterId: 786434,
+		Instance:  "",
+	},
+	{
+		CounterId: 786432,
+		Instance:  "",
+	},
+	{
+		CounterId: 65573,
+		Instance:  "",
+	},
+	{
+		CounterId: 65618,
+		Instance:  "",
+	},
+	{
+		CounterId: 65632,
+		Instance:  "",
+	},
+	{
+		CounterId: 65623,
+		Instance:  "",
+	},
+	{
+		CounterId: 65582,
+		Instance:  "",
+	},
+	{
+		CounterId: 65611,
+		Instance:  "",
+	},
+	{
+		CounterId: 65541,
+		Instance:  "",
+	},
+	{
+		CounterId: 65586,
+		Instance:  "",
+	},
+	{
+		CounterId: 65621,
+		Instance:  "",
+	},
+	{
+		CounterId: 65561,
+		Instance:  "",
+	},
+	{
+		CounterId: 65569,
+		Instance:  "",
+	},
+	{
+		CounterId: 65580,
+		Instance:  "",
+	},
+	{
+		CounterId: 65553,
+		Instance:  "",
+	},
+	{
+		CounterId: 65646,
+		Instance:  "",
+	},
+	{
+		CounterId: 65603,
+		Instance:  "",
+	},
+	{
+		CounterId: 65647,
+		Instance:  "",
+	},
+	{
+		CounterId: 65628,
+		Instance:  "",
+	},
+	{
+		CounterId: 65557,
+		Instance:  "",
+	},
+	{
+		CounterId: 65635,
+		Instance:  "",
+	},
+	{
+		CounterId: 65589,
+		Instance:  "",
+	},
+	{
+		CounterId: 65643,
+		Instance:  "",
+	},
+	{
+		CounterId: 65545,
+		Instance:  "",
+	},
+	{
+		CounterId: 65537,
+		Instance:  "",
+	},
+	{
+		CounterId: 65622,
+		Instance:  "",
+	},
+	{
+		CounterId: 65639,
+		Instance:  "",
+	},
+	{
+		CounterId: 65599,
+		Instance:  "",
+	},
+	{
+		CounterId: 65633,
+		Instance:  "",
+	},
+	{
+		CounterId: 65650,
+		Instance:  "",
+	},
+	{
+		CounterId: 65649,
+		Instance:  "",
+	},
+	{
+		CounterId: 65615,
+		Instance:  "",
+	},
+	{
+		CounterId: 65577,
+		Instance:  "",
+	},
+	{
+		CounterId: 65648,
+		Instance:  "",
+	},
+	{
+		CounterId: 65619,
+		Instance:  "",
+	},
+	{
+		CounterId: 65630,
+		Instance:  "",
+	},
+	{
+		CounterId: 65651,
+		Instance:  "",
+	},
+	{
+		CounterId: 65620,
+		Instance:  "",
+	},
+	{
+		CounterId: 65625,
+		Instance:  "",
+	},
+	{
+		CounterId: 65549,
+		Instance:  "",
+	},
+	{
+		CounterId: 196616,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196612,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196621,
+		Instance:  "",
+	},
+	{
+		CounterId: 196618,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196609,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196622,
+		Instance:  "",
+	},
+	{
+		CounterId: 196623,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196626,
+		Instance:  "",
+	},
+	{
+		CounterId: 196614,
+		Instance:  "",
+	},
+	{
+		CounterId: 196616,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196615,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196621,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196622,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196614,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196620,
+		Instance:  "",
+	},
+	{
+		CounterId: 196622,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196617,
+		Instance:  "",
+	},
+	{
+		CounterId: 196616,
+		Instance:  "",
+	},
+	{
+		CounterId: 196613,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196614,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196625,
+		Instance:  "",
+	},
+	{
+		CounterId: 196609,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196624,
+		Instance:  "",
+	},
+	{
+		CounterId: 196619,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196625,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196617,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196619,
+		Instance:  "",
+	},
+	{
+		CounterId: 196618,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196626,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196612,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196613,
+		Instance:  "",
+	},
+	{
+		CounterId: 196621,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196615,
+		Instance:  "",
+	},
+	{
+		CounterId: 196620,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196612,
+		Instance:  "",
+	},
+	{
+		CounterId: 196624,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196617,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196625,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196618,
+		Instance:  "",
+	},
+	{
+		CounterId: 196623,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196623,
+		Instance:  "",
+	},
+	{
+		CounterId: 196609,
+		Instance:  "",
+	},
+	{
+		CounterId: 196613,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196620,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196619,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196624,
+		Instance:  "vmnic0",
+	},
+	{
+		CounterId: 196615,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 196626,
+		Instance:  "vmnic1",
+	},
+	{
+		CounterId: 720898,
+		Instance:  "",
+	},
+	{
+		CounterId: 720897,
+		Instance:  "",
+	},
+	{
+		CounterId: 720896,
+		Instance:  "",
+	},
+	{
+		CounterId: 327681,
+		Instance:  "",
+	},
+	{
+		CounterId: 327694,
+		Instance:  "",
+	},
+	{
+		CounterId: 327689,
+		Instance:  "",
+	},
+	{
+		CounterId: 327696,
+		Instance:  "",
+	},
+	{
+		CounterId: 327685,
+		Instance:  "",
+	},
+	{
+		CounterId: 327680,
+		Instance:  "",
+	},
+	{
+		CounterId: 327690,
+		Instance:  "",
+	},
+	{
+		CounterId: 327693,
+		Instance:  "",
+	},
+	{
+		CounterId: 327683,
+		Instance:  "",
+	},
+	{
+		CounterId: 327688,
+		Instance:  "",
+	},
+	{
+		CounterId: 327687,
+		Instance:  "",
+	},
+	{
+		CounterId: 327684,
+		Instance:  "",
+	},
+	{
+		CounterId: 327691,
+		Instance:  "",
+	},
+	{
+		CounterId: 327682,
+		Instance:  "",
+	},
+	{
+		CounterId: 327695,
+		Instance:  "",
+	},
+	{
+		CounterId: 327686,
+		Instance:  "",
+	},
+	{
+		CounterId: 327692,
+		Instance:  "",
+	},
+	{
+		CounterId: 458755,
+		Instance:  "vmhba64",
+	},
+	{
+		CounterId: 458755,
+		Instance:  "vmhba1",
+	},
+	{
+		CounterId: 458756,
+		Instance:  "vmhba1",
+	},
+	{
+		CounterId: 458757,
+		Instance:  "vmhba32",
+	},
+	{
+		CounterId: 458753,
+		Instance:  "vmhba1",
+	},
+	{
+		CounterId: 458754,
+		Instance:  "vmhba1",
+	},
+	{
+		CounterId: 458752,
+		Instance:  "vmhba0",
+	},
+	{
+		CounterId: 458755,
+		Instance:  "vmhba32",
+	},
+	{
+		CounterId: 458757,
+		Instance:  "vmhba64",
+	},
+	{
+		CounterId: 458753,
+		Instance:  "vmhba64",
+	},
+	{
+		CounterId: 458754,
+		Instance:  "vmhba64",
+	},
+	{
+		CounterId: 458752,
+		Instance:  "vmhba64",
+	},
+	{
+		CounterId: 458759,
+		Instance:  "",
+	},
+	{
+		CounterId: 458758,
+		Instance:  "vmhba1",
+	},
+	{
+		CounterId: 458753,
+		Instance:  "vmhba32",
+	},
+	{
+		CounterId: 458758,
+		Instance:  "vmhba0",
+	},
+	{
+		CounterId: 458756,
+		Instance:  "vmhba64",
+	},
+	{
+		CounterId: 458754,
+		Instance:  "vmhba32",
+	},
+	{
+		CounterId: 458753,
+		Instance:  "vmhba0",
+	},
+	{
+		CounterId: 458757,
+		Instance:  "vmhba0",
+	},
+	{
+		CounterId: 458754,
+		Instance:  "vmhba0",
+	},
+	{
+		CounterId: 458756,
+		Instance:  "vmhba0",
+	},
+	{
+		CounterId: 458752,
+		Instance:  "vmhba1",
+	},
+	{
+		CounterId: 458752,
+		Instance:  "vmhba32",
+	},
+	{
+		CounterId: 458756,
+		Instance:  "vmhba32",
+	},
+	{
+		CounterId: 458755,
+		Instance:  "vmhba0",
+	},
+	{
+		CounterId: 458758,
+		Instance:  "vmhba64",
+	},
+	{
+		CounterId: 458757,
+		Instance:  "vmhba1",
+	},
+	{
+		CounterId: 458758,
+		Instance:  "vmhba32",
+	},
+	{
+		CounterId: 524290,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 524288,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 524291,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 524292,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 524295,
+		Instance:  "",
+	},
+	{
+		CounterId: 524289,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 524293,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 524294,
+		Instance:  "$physDisk",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vmkeventd",
+	},
+	{
+		CounterId: 262168,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/iofilters/vmwarevmcrypt",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/snmpd",
+	},
+	{
+		CounterId: 262166,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/svmotion",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/drivers",
+	},
+	{
+		CounterId: 262163,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/dhclient",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vimuser/terminal/ssh",
+	},
+	{
+		CounterId: 262161,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/kernel/tmp",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/drivers",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/kernel/opt",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/logging",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/kernel",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/ls",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/nscd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/logging",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/kernel/var",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/sfcb",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/ntpd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/ft",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/kernel/tmp",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/kernel",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vmfstraced",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostdCgiServer",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/likewise",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/snmpd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/osfsd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/swapobjd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/kernel",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vpxa",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/logger",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/usbArbitrator",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/kernel/tmp",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/init",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/wsman",
+	},
+	{
+		CounterId: 262165,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/iofilters",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vmkiscsid",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/lbt",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/nscd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/kernel/root",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/dhclientrelease",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/kernel",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/kernel/root",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vsfwd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/kernel/root",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vsanperfsvc",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/aam",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/kernel/etc",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vimuser/terminal/ssh",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/kernel/etc",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/kernel/var",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/kernel",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/kernel/etc",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vmkeventd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/head",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/kernel/opt",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/kernel/var",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/kernel/opt",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/kernel/opt",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/kernel/var",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vmkbacktrace",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/pgrep",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostdCgiServer",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/drivers",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/kernel/var",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vsanperfsvc",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/plugins",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vimuser",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/sfcb_aux",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vimuser/terminal/shell",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/netcpa",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/kernel/tmp",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/memScrubber",
+	},
+	{
+		CounterId: 262162,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/kernel/iofilters",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/kernel/iofilters",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/kernel/iofilters",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/kernel/tmp",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vimuser",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/kernel/hostdstats",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/net-daemons",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/kernel/var",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/upittraced",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmci",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/kernel/hostdstats",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/iofilters",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/kernel/var",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/kernel",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/kernel/root",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/kernel/hostdstats",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/awk",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/iofilters/iofiltervpd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vsanperfsvc",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vimuser",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/plugins",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/kernel/hostdstats",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/kernel/tmp",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/slp",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/probe",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/helper",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/kernel/hostdstats",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/kernel/hostdstats",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/kernel/hostdstats",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vmkbacktrace",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/uwdaemons",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/helper",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/iofilters/spm",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vvoltraced",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/helper",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/tmp",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/boot",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vimuser/terminal/ssh",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/logging",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/kernel/iofilters",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vobd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/kernel/root",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vimuser",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/kernel/opt",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/upitd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/dcui",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/sensord",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hbrca",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/awk",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vimuser/terminal/shell",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/swapobjd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/drivers",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/helper",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vimuser/terminal/shell",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/pcscd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/kernel/root",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/iofilters/spm",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/svmotion",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/pcscd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/pcscd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/pcscd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/sensord",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/sfcb",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/snmpd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/lbt",
+	},
+	{
+		CounterId: 262161,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vvold",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostdCgiServer",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/pcscd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/usbArbitrator",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/pcscd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vmkeventd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/plugins",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/plugins",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/svmotion",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/kernel/var",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/plugins",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/usbArbitrator",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/logger",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/plugins",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/swapobjd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/plugins",
+	},
+	{
+		CounterId: 262158,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/rabbitmqproxy",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vsish",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vpxa",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/rabbitmqproxy",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/iofilters/vmwarevmcrypt",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/init",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/helper",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/awk",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/iofilters/spm",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/rabbitmqproxy",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/sfcb_aux",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/pgrep",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/rabbitmqproxy",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/drivers",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/dhclientrelease",
+	},
+	{
+		CounterId: 262158,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/slp",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/kernel/hostdstats",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/rabbitmqproxy",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vmkiscsid",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/rabbitmqproxy",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/smartd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/lbt",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/sensord",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/logger",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/init",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/kernel/opt",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/sensord",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/sensord",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/sfcb",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/sensord",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/sensord",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/sensord",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/smartd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/sensord",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/logger",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/memScrubber",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/sioc",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/sfcb",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/kernel/tmp",
+	},
+	{
+		CounterId: 262144,
+		Instance:  "",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/wsman",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/kernel/var",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/sfcb",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/sfcb",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostdCgiServer",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/nfcd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/kernel/iofilters",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmci",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/upitd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/sfcb_aux",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/kernel/etc",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/sfcb",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/sfcb",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/swapobjd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vvoltraced",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/sfcb",
+	},
+	{
+		CounterId: 262164,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vobd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/pgrep",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/sfcb_aux",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/sfcb_aux",
+	},
+	{
+		CounterId: 262163,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/sfcb_aux",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vimuser",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/kernel/hostdstats",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/sfcb_aux",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/head",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/init",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/sfcb_aux",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/kernel/opt",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/sioc",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/iofilters/vmwarevmcrypt",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostdCgiServer",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/sioc",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/kernel",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/sioc",
+	},
+	{
+		CounterId: 262160,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/sioc",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/lbt",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/aam",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/sioc",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/kernel/etc",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/sioc",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/memScrubber",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vmfstraced",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vmkdevmgr",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/sioc",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/init",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/user",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vmkbacktrace",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/slp",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/smartd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/slp",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/nscd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/osfsd",
+	},
+	{
+		CounterId: 262160,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/lbt",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/sensord",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/slp",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/slp",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/iofilters/iofiltervpd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/slp",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/sh",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/slp",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/slp",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/smartd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/smartd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/svmotion",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/smartd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/smartd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/smartd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/osfsd",
+	},
+	{
+		CounterId: 262167,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/head",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/snmpd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/snmpd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/snmpd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/snmpd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/logging",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/kernel/tmp",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/snmpd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/swapobjd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vmkiscsid",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/swapobjd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/swapobjd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/swapobjd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/lbt",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/upitd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmci",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/upitd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/snmpd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/upitd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vmkbacktrace",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vvoltraced",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/probe",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/drivers",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/upitd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/upitd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/upitd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/upitd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/pktcap-agent",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/upittraced",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/kernel/etc",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/likewise",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/upittraced",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vsanperfsvc",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/upittraced",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/pcscd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vsanmgmtdWatchdog",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vvold",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/upittraced",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/upittraced",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vsish",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/dhclientrelease",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/upittraced",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/upittraced",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/upittraced",
+	},
+	{
+		CounterId: 262165,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vsanmgmtdWatchdog",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/lacpd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/usbArbitrator",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/usbArbitrator",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/usbArbitrator",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/usbArbitrator",
+	},
+	{
+		CounterId: 262159,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/snmpd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmci",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/awk",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/usbArbitrator",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/uwdaemons",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vmkdevmgr",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/pktcap-agent",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/nfcd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/uwdaemons",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/uwdaemons",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/iofilters/spm",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vmkdevmgr",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/helper",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/uwdaemons",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/awk",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/uwdaemons",
+	},
+	{
+		CounterId: 262163,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/user",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/netcpa",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/uwdaemons",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/uwdaemons",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vmfstraced",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vmfstraced",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/iofilters",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/osfsd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/tmp",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vmfstraced",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vmfstraced",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vmfstraced",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vmkdevmgr",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/likewise",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vmkdevmgr",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vmkdevmgr",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vmkdevmgr",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vmkdevmgr",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vmkeventd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vmkeventd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vmkeventd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/likewise",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/memScrubber",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vmkeventd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/logger",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/likewise",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vmkeventd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vmkiscsid",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/iofilters/spm",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/kernel/etc",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/kernel/hostdstats",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostdCgiServer",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostdCgiServer",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/logging",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vmkiscsid",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/pcscd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vmkiscsid",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/netcpa",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vmkiscsid",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vmkiscsid",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vobd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vobd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/iofilters",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/kernel/iofilters",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/kernel/root",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vobd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/tmp",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vobd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vobd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vdpi",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vobd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/wsman",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vobd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/iofilters",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vobd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/memScrubber",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/usbArbitrator",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vpxa",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/helper",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vpxa",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vimuser",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vpxa",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vpxa",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vpxa",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vpxa",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/dcui",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/probe",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vpxa",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/logging",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/nfcd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vvold",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vvold",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vmkbacktrace",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/kernel/var",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vvold",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vmkeventd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vvold",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vvold",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/rabbitmqproxy",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/aam",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/netcpa",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/nfcd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/kernel/root",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vvold",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/helper",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/nfsgssd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/uwdaemons",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vvold",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vvold",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vsish",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/swapobjd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vvoltraced",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vvoltraced",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vmfstraced",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/lacpd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/kernel/tmp",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/tmp",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vimuser/terminal",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vvoltraced",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vvoltraced",
+	},
+	{
+		CounterId: 262168,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vvoltraced",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/wsman",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/dhclient",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/wsman",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/pgrep",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/slp",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/wsman",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/wsman",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/wsman",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vdpi",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/wsman",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/wsman",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vmkdevmgr",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vsanperfsvc",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/user",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/ntpd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vsanperfsvc",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vsanperfsvc",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vdpi",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vsanperfsvc",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/aam",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/kernel/opt",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vsanperfsvc",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vsanperfsvc",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vsanmgmtdWatchdog",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/user",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vsanmgmtdWatchdog",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/pktcap-agent",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/awk",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/plugins",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/lacpd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/pktcap-agent",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/pktcap-agent",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/pktcap-agent",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/pktcap-agent",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vdpi",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostdCgiServer",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vdpi",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vdpi",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vdpi",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vimuser/terminal",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vdpi",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/drivers",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/kernel/opt",
+	},
+	{
+		CounterId: 262162,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/drivers",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/head",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/ft",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/memScrubber",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/pgrep",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/ft",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/sioc",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/ft",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/ft",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/ft",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/iofilters/spm",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/ft",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vsfwd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hbrca",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vimuser/terminal/ssh",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vsfwd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostdCgiServer",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vsfwd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/logger",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vsfwd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/kernel",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/pcscd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/net-daemons",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/head",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/sh",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vsfwd",
+	},
+	{
+		CounterId: 262159,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/dcui",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vsish",
+	},
+	{
+		CounterId: 262164,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262167,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vimuser/terminal",
+	},
+	{
+		CounterId: 262167,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/rabbitmqproxy",
+	},
+	{
+		CounterId: 262169,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vsfwd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/dhclientrelease",
+	},
+	{
+		CounterId: 262166,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/osfsd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/svmotion",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/rabbitmqproxy",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/vsfwd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vsfwd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/svmotion",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/helper",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/svmotion",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/svmotion",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262165,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hbrca",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/logging",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vsfwd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262169,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/sh",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/plugins",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/boot",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vimuser/terminal/shell",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/vsanmgmtdWatchdog",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/kernel",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/lacpd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/vsanmgmtdWatchdog",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor",
+	},
+	{
+		CounterId: 262158,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262159,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262160,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262161,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/sfcb_aux",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/osfsd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vimuser",
+	},
+	{
+		CounterId: 262164,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vimuser/terminal/ssh",
+	},
+	{
+		CounterId: 262166,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262168,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262169,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vimuser",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/kernel/iofilters",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmci",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmci",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vimuser",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vmkeventd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmci",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/boot",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmci",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vimuser",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/dhclient",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vimuser/terminal",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/ntpd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vimuser/terminal",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmci",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vimuser/terminal",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmci",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/init",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/aam",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/smartd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/aam",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/kernel/root",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/ls",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vimuser/terminal",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/aam",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vsanmgmtdWatchdog",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/init",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/user",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/aam",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/ft",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/aam",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/boot",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/probe",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/boot",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/upitd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/boot",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vimuser/terminal",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vimuser/terminal",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vimuser/terminal",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/boot",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vmkiscsid",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vimuser/terminal/shell",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/logger",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/boot",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/boot",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/dcui",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/smartd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/dcui",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/svmotion",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vimuser/terminal/shell",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/pgrep",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/svmotion",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/dcui",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vsish",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vimuser/terminal/shell",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/dcui",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/dcui",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vmkbacktrace",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/dcui",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vimuser/terminal/shell",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hbrca",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vimuser/terminal/shell",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/dhclient",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/dhclient",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/osfsd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/dhclient",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vimuser/terminal/ssh",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/dhclient",
+	},
+	{
+		CounterId: 262162,
+		Instance:  "host/system/vmotion",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/dhclient",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/dhclient",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/pgrep",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/dhclientrelease",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vmkiscsid",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/dhclientrelease",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/dhclientrelease",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/iofilters/spm",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/dhclientrelease",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/dhclientrelease",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/sioc",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hbrca",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hbrca",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/pgrep",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hbrca",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/ntpd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hbrca",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/kernel/etc",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hbrca",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vmkdevmgr",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vimuser/terminal/ssh",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/dhclientrelease",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/pktcap-agent",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/init",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/helper",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/tmp",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/rabbitmqproxy",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/tmp",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/tmp",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/init",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/netcpa",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vsanmgmtdWatchdog",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vmfstraced",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/tmp",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/tmp",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/net-daemons",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/iofilters/spm",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/nfsgssd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/awk",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/drivers",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/iofilters",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/awk",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/ls",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/awk",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/iofilters",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/awk",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/nscd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/pktcap-agent",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/osfsd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vimuser/terminal/ssh",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/head",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/vsanmgmtdWatchdog",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/dhclient",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/head",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/iofilters/iofiltervpd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/head",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/iofilters",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/head",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/plugins",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/nfcd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/system/kernel/tmp",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/head",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/logger",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/vpxa",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/lacpd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/sfcb_aux",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/iofilters",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/iofilters",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/logger",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/iofilters/iofiltervpd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/logger",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/ls",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/ft",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/net-daemons",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/ls",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/iofilters/iofiltervpd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/ls",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/ls",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/usbArbitrator",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/ls",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/ls",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/iofilters/iofiltervpd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/ls",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vsanmgmtdWatchdog",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/pgrep",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/iofilters/iofiltervpd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/pgrep",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/iofilters/iofiltervpd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/probe",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/probe",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/probe",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/sh",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/probe",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/kernel/etc",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/probe",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/iofilters/iofiltervpd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/probe",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/sh",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/iofilters/iofiltervpd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/sh",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/iofilters/vmwarevmcrypt",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/pktcap-agent",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/netcpa",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/vvoltraced",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/system/kernel",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/sh",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/iofilters/vmwarevmcrypt",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/sh",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/sh",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vmkbacktrace",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vmkbacktrace",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/tmp",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vmkbacktrace",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vimuser/terminal/ssh",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/vmfstraced",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vmkbacktrace",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/nfsgssd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/vdpi",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vsish",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/vdpi",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vsish",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vimuser/terminal/ssh",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vsish",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vsish",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/hostdCgiServer",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/hbrca",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/init",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/lacpd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/lacpd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/nscd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/lacpd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/uwdaemons",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/lacpd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/drivers",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/lacpd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/lbt",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/system/kernel/opt",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/lbt",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/lbt",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/iofilters/vmwarevmcrypt",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/lbt",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/likewise",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/iofilters/vmwarevmcrypt",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/aam",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/vsish",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/likewise",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/likewise",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/likewise",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/iofilters/vmwarevmcrypt",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/memScrubber",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/system/kernel/iofilters",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/logging",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/logging",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/logging",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/system/kernel/iofilters",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/memScrubber",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/hostd-probe",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/memScrubber",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/osfsd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/memScrubber",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/likewise",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/iofilters/vmwarevmcrypt",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/iofilters/vmwarevmcrypt",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/net-daemons",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/iofilters/spm",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/ntpd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/net-daemons",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/system/kernel/root",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/net-daemons",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/net-daemons",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/net-daemons",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/net-daemons",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/iofilters/spm",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/netcpa",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vimuser/terminal/shell",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/netcpa",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/sfcb",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/system/ft",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/osfsd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/netcpa",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/netcpa",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/swapobjd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/nfcd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/hostd-probe/stats/sh",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/nfcd",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/vvoltraced",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/system/kernel/etc",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/nfcd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/user",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/nfcd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/vim/vmvisor/dcui",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/nfcd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/vim/vmvisor/nfsgssd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/nfsgssd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/user",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/nfsgssd",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/nfsgssd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/upittraced",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/nfsgssd",
+	},
+	{
+		CounterId: 262154,
+		Instance:  "host/user",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/nfsgssd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/user",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/nfsgssd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/nscd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/nscd",
+	},
+	{
+		CounterId: 262156,
+		Instance:  "host/vim/vmvisor/nscd",
+	},
+	{
+		CounterId: 262172,
+		Instance:  "host/system/kernel/iofilters",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/user",
+	},
+	{
+		CounterId: 262157,
+		Instance:  "host/vim/vmvisor/nscd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/nscd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/ntpd",
+	},
+	{
+		CounterId: 262151,
+		Instance:  "host/vim/vmvisor/ntpd",
+	},
+	{
+		CounterId: 262152,
+		Instance:  "host/vim/vmvisor/ntpd",
+	},
+	{
+		CounterId: 262153,
+		Instance:  "host/vim/vmvisor/ntpd",
+	},
+	{
+		CounterId: 262171,
+		Instance:  "host/vim/vmvisor/boot",
+	},
+	{
+		CounterId: 262155,
+		Instance:  "host/vim/vmvisor/ntpd",
+	},
+	{
+		CounterId: 262148,
+		Instance:  "host/vim/vmvisor/pcscd",
+	},
+	{
+		CounterId: 851968,
+		Instance:  "vfc",
+	},
+}
+
+// ********************************* Resource pool metrics **********************************
+var ResourcePoolMetrics = []types.PerfMetricId{
+	{
+		CounterId: 5,
+		Instance:  "",
+	},
+	{
+		CounterId: 65586,
+		Instance:  "",
+	},
+	{
+		CounterId: 65591,
+		Instance:  "",
+	},
+	{
+		CounterId: 65545,
+		Instance:  "",
+	},
+	{
+		CounterId: 65553,
+		Instance:  "",
+	},
+	{
+		CounterId: 65541,
+		Instance:  "",
+	},
+	{
+		CounterId: 65549,
+		Instance:  "",
+	},
+	{
+		CounterId: 65582,
+		Instance:  "",
+	},
+}

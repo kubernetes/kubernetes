@@ -29,6 +29,21 @@
 #    * ppc64le
 #    * s390x
 #
+#  Set KUBERNETES_CLIENT_OS to choose the client OS to download:
+#    * current OS [default]
+#    * linux
+#    * darwin
+#    * windows
+#
+#  Set KUBERNETES_CLIENT_ARCH to choose the client architecture to download:
+#    * current architecture [default]
+#    * amd64
+#    * arm
+#    * arm64
+#    * ppc64le
+#    * s390x
+#    * windows
+#
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
 #    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
@@ -59,48 +74,57 @@ function detect_kube_release() {
 }
 
 function detect_client_info() {
-  local kernel machine
-  kernel="$(uname -s)"
-  case "${kernel}" in
-    Darwin)
-      CLIENT_PLATFORM="darwin"
-      ;;
-    Linux)
-      CLIENT_PLATFORM="linux"
-      ;;
-    *)
-      echo "Unknown, unsupported platform: ${kernel}." >&2
-      echo "Supported platforms: Linux, Darwin." >&2
-      echo "Bailing out." >&2
-      exit 2
-  esac
+  if [ -n "${KUBERNETES_CLIENT_OS-}" ]; then
+    CLIENT_PLATFORM="${KUBERNETES_CLIENT_OS}"
+  else
+    local kernel
+    kernel="$(uname -s)"
+    case "${kernel}" in
+      Darwin)
+        CLIENT_PLATFORM="darwin"
+        ;;
+      Linux)
+        CLIENT_PLATFORM="linux"
+        ;;
+      *)
+        echo "Unknown, unsupported platform: ${kernel}." >&2
+        echo "Supported platforms: Linux, Darwin." >&2
+        echo "Bailing out." >&2
+        exit 2
+    esac
+  fi
 
-  # TODO: migrate the kube::util::host_platform function out of hack/lib and
-  # use it here.
-  machine="$(uname -m)"
-  case "${machine}" in
-    x86_64*|i?86_64*|amd64*)
-      CLIENT_ARCH="amd64"
-      ;;
-    aarch64*|arm64*)
-      CLIENT_ARCH="arm64"
-      ;;
-    arm*)
-      CLIENT_ARCH="arm"
-      ;;
-    i?86*)
-      CLIENT_ARCH="386"
-      ;;
-    s390x*)
-      CLIENT_ARCH="s390x"
-      ;;
-    *)
-      echo "Unknown, unsupported architecture (${machine})." >&2
-      echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
-      echo "Bailing out." >&2
-      exit 3
-      ;;
-  esac
+  if [ -n "${KUBERNETES_CLIENT_ARCH-}" ]; then
+    CLIENT_ARCH="${KUBERNETES_CLIENT_ARCH}"
+  else
+    # TODO: migrate the kube::util::host_platform function out of hack/lib and
+    # use it here.
+    local machine
+    machine="$(uname -m)"
+    case "${machine}" in
+      x86_64*|i?86_64*|amd64*)
+        CLIENT_ARCH="amd64"
+        ;;
+      aarch64*|arm64*)
+        CLIENT_ARCH="arm64"
+        ;;
+      arm*)
+        CLIENT_ARCH="arm"
+        ;;
+      i?86*)
+        CLIENT_ARCH="386"
+        ;;
+      s390x*)
+        CLIENT_ARCH="s390x"
+        ;;
+      *)
+        echo "Unknown, unsupported architecture (${machine})." >&2
+        echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
+        echo "Bailing out." >&2
+        exit 3
+        ;;
+    esac
+  fi
 }
 
 function md5sum_file() {
@@ -171,7 +195,11 @@ CLIENT_TAR="kubernetes-client-${CLIENT_PLATFORM}-${CLIENT_ARCH}.tar.gz"
 
 echo "Kubernetes release: ${KUBE_VERSION}"
 echo "Server: ${SERVER_PLATFORM}/${SERVER_ARCH}  (to override, set KUBERNETES_SERVER_ARCH)"
-echo "Client: ${CLIENT_PLATFORM}/${CLIENT_ARCH}  (autodetected)"
+printf "Client: %s/%s" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
+if [ -z "${KUBERNETES_CLIENT_OS-}" ] && [ -z "${KUBERNETES_CLIENT_ARCH-}" ]; then
+  printf "  (autodetected)"
+fi
+echo "  (to override, set KUBERNETES_CLIENT_OS and/or KUBERNETES_CLIENT_ARCH)"
 echo
 
 echo "Will download ${SERVER_TAR} from ${DOWNLOAD_URL_PREFIX}"

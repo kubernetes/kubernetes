@@ -17,13 +17,13 @@ load("//build:workspace_mirror.bzl", "mirror")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
-CNI_VERSION = "0.6.0"
+CNI_VERSION = "0.7.5"
 _CNI_TARBALL_ARCH_SHA256 = {
-    "amd64": "f04339a21b8edf76d415e7f17b620e63b8f37a76b2f706671587ab6464411f2d",
-    "arm": "ffb62021d2fc6e1266dc6ef7f2058125b6e6b44c016291a2b04a15ed9b4be70a",
-    "arm64": "016bbc989877e35e3cd49fafe11415fb2717e52c74fde6b1650411154cb91b81",
-    "ppc64le": "dd38dec69b167cfe40ecbba4b18cfe5b4296f2e49b90c00804b3988ef968e859",
-    "s390x": "7708289eee7e52ad055407c421033d8e593f5cf1a0b43a872f09eb4e1508aafc",
+    "amd64": "3ca15c0a18ee830520cf3a95408be826cbd255a1535a38e0be9608b25ad8bf64",
+    "arm": "0eb4a528b5b2e4ce23ebc96e41b2f5280d5a64d41eec8dd8b16c3d66aaa0f6b8",
+    "arm64": "7fec91af78e9548df306f0ec43bea527c8c10cc3a9682c33e971c8522a7fcded",
+    "ppc64le": "9164a26ed8dd398b2fe3b15d9d456271dfa59aa537528d10572ea9fa2cef7679",
+    "s390x": "415cdcf02c65c22f5b7e55b0ab61208a10f2b95a0c8310176c771d07a9f448cf",
 }
 
 CRI_TOOLS_VERSION = "1.12.0"

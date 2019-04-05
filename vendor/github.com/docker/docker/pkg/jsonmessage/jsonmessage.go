@@ -1,4 +1,4 @@
-package jsonmessage
+package jsonmessage // import "github.com/docker/docker/pkg/jsonmessage"
 
 import (
 	"encoding/json"

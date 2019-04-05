@@ -77,14 +77,14 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		pv = framework.MakePersistentVolume(pvConfig)
 		// create the PV
 		pv, err = client.CoreV1().PersistentVolumes().Create(pv)
-		Expect(err).NotTo(HaveOccurred(), "Error creating PV")
+		framework.ExpectNoError(err, "Error creating PV")
 
 		By("Waiting for PV to enter phase Available")
 		framework.ExpectNoError(framework.WaitForPersistentVolumePhase(v1.VolumeAvailable, client, pv.Name, 1*time.Second, 30*time.Second))
 
 		By("Checking that PV Protection finalizer is set")
 		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "While getting PV status")
+		framework.ExpectNoError(err, "While getting PV status")
 		Expect(slice.ContainsString(pv.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)).To(BeTrue(), "PV Protection finalizer(%v) is not set in %v", volumeutil.PVProtectionFinalizer, pv.ObjectMeta.Finalizers)
 	})
 
@@ -98,7 +98,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	It("Verify \"immediate\" deletion of a PV that is not bound to a PVC", func() {
 		By("Deleting the PV")
 		err = client.CoreV1().PersistentVolumes().Delete(pv.Name, metav1.NewDeleteOptions(0))
-		Expect(err).NotTo(HaveOccurred(), "Error deleting PV")
+		framework.ExpectNoError(err, "Error deleting PV")
 		framework.WaitForPersistentVolumeDeleted(client, pv.Name, framework.Poll, framework.PVDeletingTimeout)
 	})
 
@@ -106,24 +106,24 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		By("Creating a PVC")
 		pvc = framework.MakePersistentVolumeClaim(pvcConfig, nameSpace)
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
-		Expect(err).NotTo(HaveOccurred(), "Error creating PVC")
+		framework.ExpectNoError(err, "Error creating PVC")
 
 		By("Waiting for PVC to become Bound")
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, framework.ClaimBindingTimeout)
-		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
+		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 
 		By("Deleting the PV, however, the PV must not be removed from the system as it's bound to a PVC")
 		err = client.CoreV1().PersistentVolumes().Delete(pv.Name, metav1.NewDeleteOptions(0))
-		Expect(err).NotTo(HaveOccurred(), "Error deleting PV")
+		framework.ExpectNoError(err, "Error deleting PV")
 
 		By("Checking that the PV status is Terminating")
 		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "While checking PV status")
+		framework.ExpectNoError(err, "While checking PV status")
 		Expect(pv.ObjectMeta.DeletionTimestamp).NotTo(Equal(nil))
 
 		By("Deleting the PVC that is bound to the PV")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
-		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
+		framework.ExpectNoError(err, "Error deleting PVC")
 
 		By("Checking that the PV is automatically removed from the system because it's no longer bound to a PVC")
 		framework.WaitForPersistentVolumeDeleted(client, pv.Name, framework.Poll, framework.PVDeletingTimeout)

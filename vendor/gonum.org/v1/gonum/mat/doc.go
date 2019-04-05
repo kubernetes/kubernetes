@@ -166,4 +166,4 @@
 // mat will not attempt to detect element overlap if the input does not implement a
 // Raw method. Method behavior is undefined if there is undetected overlap.
 //
-package mat
+package mat // import "gonum.org/v1/gonum/mat"

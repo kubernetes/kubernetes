@@ -281,6 +281,10 @@ func (plugin *awsElasticBlockStorePlugin) CanAttach(spec *volume.Spec) bool {
 	return true
 }
 
+func (plugin *awsElasticBlockStorePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
 func setNodeDisk(
 	nodeDiskMap map[types.NodeName]map[*volume.Spec]bool,
 	volumeSpec *volume.Spec,

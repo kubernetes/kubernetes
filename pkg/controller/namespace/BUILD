@@ -42,6 +42,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/namespace/config:all-srcs",
         "//pkg/controller/namespace/deletion:all-srcs",
     ],
     tags = ["automanaged"],

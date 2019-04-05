@@ -20,9 +20,13 @@ import (
 	"sort"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/api"
+	"time"
 )
 
 // GetContainerPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
@@ -52,7 +56,7 @@ func GetPodFullName(pod *v1.Pod) string {
 	return pod.Name + "_" + pod.Namespace
 }
 
-// GetPodPriority return priority of the given pod.
+// GetPodPriority returns priority of the given pod.
 func GetPodPriority(pod *v1.Pod) int32 {
 	if pod.Spec.Priority != nil {
 		return *pod.Spec.Priority
@@ -61,6 +65,45 @@ func GetPodPriority(pod *v1.Pod) int32 {
 	// that there was no global default priority class and the priority class
 	// name of the pod was empty. So, we resolve to the static default priority.
 	return scheduling.DefaultPriorityWhenNoDefaultClassExists
+}
+
+// GetPodStartTime returns start time of the given pod.
+func GetPodStartTime(pod *v1.Pod) *metav1.Time {
+	if pod.Status.StartTime != nil {
+		return pod.Status.StartTime
+	}
+	// Should not reach here as the start time of a running time should not be nil
+	// Return current timestamp as the default value.
+	// This will not affect the calculation of earliest timestamp of all the pods on one node,
+	// because current timestamp is always after the StartTime of any pod in good state.
+	klog.Errorf("pod.Status.StartTime is nil for pod %s. Should not reach here.", pod.Name)
+	return &metav1.Time{Time: time.Now()}
+}
+
+// GetEarliestPodStartTime returns the earliest start time of all pods that
+// have the highest priority among all victims.
+func GetEarliestPodStartTime(victims *api.Victims) *metav1.Time {
+	if len(victims.Pods) == 0 {
+		// should not reach here.
+		klog.Errorf("victims.Pods is empty. Should not reach here.")
+		return nil
+	}
+
+	earliestPodStartTime := GetPodStartTime(victims.Pods[0])
+	highestPriority := GetPodPriority(victims.Pods[0])
+
+	for _, pod := range victims.Pods {
+		if GetPodPriority(pod) == highestPriority {
+			if GetPodStartTime(pod).Before(earliestPodStartTime) {
+				earliestPodStartTime = GetPodStartTime(pod)
+			}
+		} else if GetPodPriority(pod) > highestPriority {
+			highestPriority = GetPodPriority(pod)
+			earliestPodStartTime = GetPodStartTime(pod)
+		}
+	}
+
+	return earliestPodStartTime
 }
 
 // SortableList is a list that implements sort.Interface.
@@ -91,9 +134,15 @@ func (l *SortableList) Sort() {
 	sort.Sort(l)
 }
 
-// HigherPriorityPod return true when priority of the first pod is higher than
-// the second one. It takes arguments of the type "interface{}" to be used with
-// SortableList, but expects those arguments to be *v1.Pod.
-func HigherPriorityPod(pod1, pod2 interface{}) bool {
-	return GetPodPriority(pod1.(*v1.Pod)) > GetPodPriority(pod2.(*v1.Pod))
+// MoreImportantPod return true when priority of the first pod is higher than
+// the second one. If two pods' priorities are equal, compare their StartTime.
+// It takes arguments of the type "interface{}" to be used with SortableList,
+// but expects those arguments to be *v1.Pod.
+func MoreImportantPod(pod1, pod2 interface{}) bool {
+	p1 := GetPodPriority(pod1.(*v1.Pod))
+	p2 := GetPodPriority(pod2.(*v1.Pod))
+	if p1 != p2 {
+		return p1 > p2
+	}
+	return GetPodStartTime(pod1.(*v1.Pod)).Before(GetPodStartTime(pod2.(*v1.Pod)))
 }

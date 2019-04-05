@@ -63,7 +63,7 @@ const isNotIntegerErrorMsg string = `must be an integer`
 const isNotPositiveErrorMsg string = `must be greater than zero`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
-var fileModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
+var fileModeErrorMsg = "must be a number between 0 and 0777 (octal), both inclusive"
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = apimachineryvalidation.BannedOwners
@@ -1305,8 +1305,8 @@ func validateAzureDisk(azure *core.AzureDiskVolumeSource, fldPath *field.Path) f
 	var supportedCachingModes = sets.NewString(string(core.AzureDataDiskCachingNone), string(core.AzureDataDiskCachingReadOnly), string(core.AzureDataDiskCachingReadWrite))
 	var supportedDiskKinds = sets.NewString(string(core.AzureSharedBlobDisk), string(core.AzureDedicatedBlobDisk), string(core.AzureManagedDisk))
 
-	diskUriSupportedManaged := []string{"/subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}"}
-	diskUriSupportedblob := []string{"https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd"}
+	diskURISupportedManaged := []string{"/subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}"}
+	diskURISupportedblob := []string{"https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd"}
 
 	allErrs := field.ErrorList{}
 	if azure.DiskName == "" {
@@ -1327,11 +1327,11 @@ func validateAzureDisk(azure *core.AzureDiskVolumeSource, fldPath *field.Path) f
 
 	// validate that DiskUri is the correct format
 	if azure.Kind != nil && *azure.Kind == core.AzureManagedDisk && strings.Index(azure.DataDiskURI, "/subscriptions/") != 0 {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskUriSupportedManaged))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskURISupportedManaged))
 	}
 
 	if azure.Kind != nil && *azure.Kind != core.AzureManagedDisk && strings.Index(azure.DataDiskURI, "https://") != 0 {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskUriSupportedblob))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskURISupportedblob))
 	}
 
 	return allErrs
@@ -2704,6 +2704,10 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, "must not have more than 256 characters (including spaces) in the search list"))
 		}
 		for i, search := range dnsConfig.Searches {
+			// it is fine to have a trailing dot
+			if strings.HasSuffix(search, ".") {
+				search = search[0 : len(search)-1]
+			}
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
 		}
 		// Validate options.
@@ -4705,8 +4709,8 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
 	reqPath := fldPath.Child("requests")
-	limContainsCpuOrMemory := false
-	reqContainsCpuOrMemory := false
+	limContainsCPUOrMemory := false
+	reqContainsCPUOrMemory := false
 	limContainsHugePages := false
 	reqContainsHugePages := false
 	supportedQoSComputeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
@@ -4724,7 +4728,7 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		}
 
 		if supportedQoSComputeResources.Has(string(resourceName)) {
-			limContainsCpuOrMemory = true
+			limContainsCPUOrMemory = true
 		}
 	}
 	for resourceName, quantity := range requirements.Requests {
@@ -4750,11 +4754,11 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 			reqContainsHugePages = true
 		}
 		if supportedQoSComputeResources.Has(string(resourceName)) {
-			reqContainsCpuOrMemory = true
+			reqContainsCPUOrMemory = true
 		}
 
 	}
-	if !limContainsCpuOrMemory && !reqContainsCpuOrMemory && (reqContainsHugePages || limContainsHugePages) {
+	if !limContainsCPUOrMemory && !reqContainsCPUOrMemory && (reqContainsHugePages || limContainsHugePages) {
 		allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("HugePages require cpu or memory")))
 	}
 

@@ -173,7 +173,7 @@ func TestValidateCachedKernelConfig(t *testing.T) {
 			// Add kernel config prefix.
 			for k, v := range test.config {
 				delete(test.config, k)
-				test.config[kConfigPrefix+k] = v
+				test.config[kernelConfigPrefix+k] = v
 			}
 			err := v.validateCachedKernelConfig(test.config, testKernelSpec)
 			if !test.err {

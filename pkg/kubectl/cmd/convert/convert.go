@@ -263,9 +263,7 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 			gvks, _, err := scheme.Scheme.ObjectKinds(info.Object)
 			if err == nil {
 				for _, gvk := range gvks {
-					for _, version := range scheme.Scheme.PrioritizedVersionsForGroup(gvk.Group) {
-						targetVersions = append(targetVersions, version)
-					}
+					targetVersions = append(targetVersions, scheme.Scheme.PrioritizedVersionsForGroup(gvk.Group)...)
 				}
 			}
 		}

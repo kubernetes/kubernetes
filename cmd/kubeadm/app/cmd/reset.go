@@ -217,7 +217,9 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.I
 
 		If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
 		to reset your system's IPVS tables.
-
+		
+		The reset process does not clean your kubeconfig files and you must remove them manually.
+		Please, check the contents of the $HOME/.kube/config file.
 	`)
 	fmt.Print(msg)
 

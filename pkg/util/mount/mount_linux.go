@@ -30,7 +30,6 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 	utilio "k8s.io/utils/io"
@@ -90,8 +89,13 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
-	fsTypesNeedMounter := sets.NewString("nfs", "glusterfs", "ceph", "cifs")
-	if fsTypesNeedMounter.Has(fstype) {
+	fsTypesNeedMounter := map[string]struct{}{
+		"nfs":       {},
+		"glusterfs": {},
+		"ceph":      {},
+		"cifs":      {},
+	}
+	if _, ok := fsTypesNeedMounter[fstype]; ok {
 		mounterPath = mounter.mounterPath
 	}
 	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options)

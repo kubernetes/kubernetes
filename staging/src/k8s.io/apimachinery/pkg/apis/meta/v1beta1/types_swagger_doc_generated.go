@@ -37,8 +37,9 @@ func (PartialObjectMetadata) SwaggerDoc() map[string]string {
 }
 
 var map_PartialObjectMetadataList = map[string]string{
-	"":      "PartialObjectMetadataList contains a list of objects containing only their metadata",
-	"items": "items contains each of the included items.",
+	"":         "PartialObjectMetadataList contains a list of objects containing only their metadata",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+	"items":    "items contains each of the included items.",
 }
 
 func (PartialObjectMetadataList) SwaggerDoc() map[string]string {

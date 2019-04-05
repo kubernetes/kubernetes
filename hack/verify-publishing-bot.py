@@ -23,18 +23,23 @@ import json
 import yaml
 
 
-def get_godeps_dependencies(godeps):
+def get_gomod_dependencies(rootdir, components):
     all_dependencies = {}
-    for arg in godeps:
-        with open(arg) as f:
-            data = json.load(f)
-            dependencies = []
-            for dep in data["Deps"]:
-                if dep['Rev'].startswith('xxxx') and dep['ImportPath'].startswith("k8s.io"):
-                    package = "/".join(dep['ImportPath'].split('/')[0:2])
-                    if package not in dependencies:
-                        dependencies.append(package.split('/')[1])
-            all_dependencies[(data["ImportPath"].split('/')[1])] = dependencies
+    for component in components:
+        with open(os.path.join(rootdir, component, "go.mod")) as f:
+            print(component + " dependencies")
+            all_dependencies[component] = []
+            lines = list(set(f))
+            lines.sort()
+            for line in lines:
+                for dep in components:
+                    if dep == component:
+                        continue
+                    if ("k8s.io/" + dep + " v0.0.0") not in line:
+                        continue
+                    print("\t"+dep)
+                    if dep not in all_dependencies[component]:
+                        all_dependencies[component].append(dep)
     return all_dependencies
 
 
@@ -48,13 +53,14 @@ def main():
     rootdir = os.path.dirname(__file__) + "/../"
     rootdir = os.path.abspath(rootdir)
 
-    godeps = []
-    for root, dirnames, filenames in os.walk(rootdir + '/staging/'):
-        for filename in fnmatch.filter(filenames, 'Godeps.json'):
-            godeps.append(os.path.join(root, filename))
+    components = []
+    for component in os.listdir(rootdir + '/staging/src/k8s.io/'):
+        components.append(component)
+    components.sort()
 
-    godep_dependencies = get_godeps_dependencies(godeps)
-    rules_dependencies = get_rules_dependencies(rootdir + "/staging/publishing/rules.yaml")
+    rules_file = "/staging/publishing/rules.yaml"
+    gomod_dependencies = get_gomod_dependencies(rootdir + '/staging/src/k8s.io/', components)
+    rules_dependencies = get_rules_dependencies(rootdir + rules_file)
 
     processed_repos = []
     for rule in rules_dependencies["rules"]:
@@ -65,10 +71,10 @@ def main():
             raise Exception("cannot find master source branch for destination %s" % rule["destination"])
 
         print("processing : %s" % rule["destination"])
-        if rule["destination"] not in godep_dependencies:
-            raise Exception("missing Godeps.json for %s" % rule["destination"])
+        if rule["destination"] not in gomod_dependencies:
+            raise Exception("missing go.mod for %s" % rule["destination"])
         processed_repos.append(rule["destination"])
-        for dep in set(godep_dependencies[rule["destination"]]):
+        for dep in set(gomod_dependencies[rule["destination"]]):
             found = False
             if "dependencies" in branch:
                 for dep2 in branch["dependencies"]:
@@ -79,12 +85,12 @@ def main():
                         found = True
             else:
                 raise Exception(
-                    "destination %s does not have any dependencies (looking for %s)" % (rule["destination"], dep))
+                    "Please add %s as dependencies under destination %s in %s" % (gomod_dependencies[rule["destination"]], rule["destination"], rules_file))
             if not found:
-                raise Exception("destination %s does not have dependency %s" % (rule["destination"], dep))
+                raise Exception("Please add %s as a dependency under destination %s in %s" % (dep, rule["destination"], rules_file))
             else:
                 print("  found dependency %s" % dep)
-    items = set(godep_dependencies.keys()) - set(processed_repos)
+    items = set(gomod_dependencies.keys()) - set(processed_repos)
     if len(items) > 0:
         raise Exception("missing rules for %s" % ','.join(str(s) for s in items))
     print("Done.")

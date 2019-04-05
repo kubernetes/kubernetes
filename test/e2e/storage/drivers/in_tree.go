@@ -95,6 +95,7 @@ func InitNFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -232,6 +233,7 @@ func InitGlusterFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -586,6 +588,7 @@ func InitCephFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -1041,7 +1044,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 	output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
 	outputString := string(output[:])
 	framework.Logf("cinder output:\n%s", outputString)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Parse 'id'' from stdout. Expected format:
 	// |     attachments     |                  []                  |
@@ -1183,8 +1186,9 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTest
 	}
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
+	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
 func (h *gcePdDriver) GetClaimSize() string {
@@ -1216,7 +1220,7 @@ func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 	}
 	By("creating a test gce pd volume")
 	vname, err := framework.CreatePDWithRetry()
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return &gcePdVolume{
 		volumeName: vname,
 	}
@@ -1337,7 +1341,7 @@ func (v *vSphereDriver) CreateVolume(config *testsuites.PerTestConfig, volType t
 	vspheretest.Bootstrap(f)
 	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
 	volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return &vSphereVolume{
 		volumePath: volumePath,
 		nodeInfo:   nodeInfo,
@@ -1456,7 +1460,7 @@ func (a *azureDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 func (a *azureDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	By("creating a test azure disk volume")
 	volumeName, err := framework.CreatePDWithRetry()
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return &azureVolume{
 		volumeName: volumeName,
 	}
@@ -1569,7 +1573,7 @@ func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	By("creating a test aws volume")
 	var err error
 	a.volumeName, err = framework.CreatePDWithRetry()
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err))
 }
 
 DeleteVolume() {
@@ -1683,9 +1687,9 @@ func (l *localDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 		filesystemType := "fs"
 		ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
 		res, err := l.hostExec.IssueCommandWithResult(ssdCmd, l.node)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		num, err := strconv.Atoi(strings.TrimSpace(res))
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		if num < 1 {
 			framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
 		}

@@ -55,7 +55,8 @@ var (
 )
 
 // TODO: Get rid of [DisabledForLargeClusters] when feature request #53455 is ready.
-var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters]", func() {
+// Marked as flaky until a reliable method for collecting server-side audit logs is available. See http://issue.k8s.io/74745#issuecomment-474052439
+var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 	f := framework.NewDefaultFramework("audit")
 	var namespace string
 	BeforeEach(func() {

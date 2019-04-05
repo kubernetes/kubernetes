@@ -112,7 +112,8 @@ try {
   Set-EnvironmentVars
   Create-Directories
   Download-HelperScripts
-  InstallAndStart-LoggingAgent
+  # Disable Stackdrver logging until issue is fixed.
+  # InstallAndStart-LoggingAgent
 
   Create-DockerRegistryKey
   DownloadAndInstall-KubernetesBinaries

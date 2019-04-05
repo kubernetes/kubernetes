@@ -144,8 +144,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		}
 		proxier = proxierUserspace
 		serviceEventHandler = proxierUserspace
-		klog.V(0).Info("Tearing down pure-winkernel proxy rules.")
-		winkernel.CleanupLeftovers()
 	}
 
 	return &ProxyServer{

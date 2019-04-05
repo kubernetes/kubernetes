@@ -96,7 +96,7 @@ func TestWatchBasedManager(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed on %s: %v", name, err)
 				}
-				if d := time.Now().Sub(start); d > time.Second {
+				if d := time.Since(start); d > time.Second {
 					t.Logf("%s took %v", name, d)
 				}
 			}

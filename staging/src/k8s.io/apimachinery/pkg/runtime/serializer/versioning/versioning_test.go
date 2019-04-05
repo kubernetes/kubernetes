@@ -370,7 +370,7 @@ func TestDirectCodecEncode(t *testing.T) {
 		},
 	}
 
-	c := DirectEncoder{
+	c := runtime.WithVersionEncoder{
 		Version:     schema.GroupVersion{Group: "expected_group"},
 		Encoder:     &serializer,
 		ObjectTyper: &typer,

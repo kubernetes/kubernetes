@@ -267,7 +267,7 @@ const (
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 type CustomResourceDefinitionCondition struct {
-	// Type is the type of the condition.
+	// Type is the type of the condition. Types include Established, NamesAccepted and Terminating.
 	Type CustomResourceDefinitionConditionType
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.

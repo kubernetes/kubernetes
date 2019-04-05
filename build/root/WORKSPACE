@@ -10,13 +10,13 @@ http_archive(
 
 load("@bazel_skylib//lib:versions.bzl", "versions")
 
-versions.check(minimum_bazel_version = "0.18.0")
+versions.check(minimum_bazel_version = "0.23.0")
 
 http_archive(
     name = "io_k8s_repo_infra",
-    sha256 = "2cc74219eafebb0af1e0cf80b9c2b78aac9aa570de762bfb82b83e9164be9da2",
-    strip_prefix = "repo-infra-b461270ab6ccfb94ff2d78df96d26f669376d660",
-    urls = mirror("https://github.com/kubernetes/repo-infra/archive/b461270ab6ccfb94ff2d78df96d26f669376d660.tar.gz"),
+    sha256 = "4a8384320fba401cbf21fef177aa113ed8fe35952ace98e00b796cac87ae7868",
+    strip_prefix = "repo-infra-df02ded38f9506e5bbcbf21702034b4fef815f2f",
+    urls = mirror("https://github.com/kubernetes/repo-infra/archive/df02ded38f9506e5bbcbf21702034b4fef815f2f.tar.gz"),
 )
 
 http_archive(

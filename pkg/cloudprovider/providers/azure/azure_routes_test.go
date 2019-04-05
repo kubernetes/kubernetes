@@ -35,9 +35,9 @@ func TestDeleteRoute(t *testing.T) {
 	cloud := &Cloud{
 		RoutesClient: fakeRoutes,
 		Config: Config{
-			ResourceGroup:  "foo",
-			RouteTableName: "bar",
-			Location:       "location",
+			RouteTableResourceGroup: "foo",
+			RouteTableName:          "bar",
+			Location:                "location",
 		},
 		unmanagedNodes:     sets.NewString(),
 		nodeInformerSynced: func() bool { return true },
@@ -100,9 +100,9 @@ func TestCreateRoute(t *testing.T) {
 		RoutesClient:      fakeRoutes,
 		vmSet:             fakeVM,
 		Config: Config{
-			ResourceGroup:  "foo",
-			RouteTableName: "bar",
-			Location:       "location",
+			RouteTableResourceGroup: "foo",
+			RouteTableName:          "bar",
+			Location:                "location",
 		},
 		unmanagedNodes:     sets.NewString(),
 		nodeInformerSynced: func() bool { return true },
@@ -115,7 +115,7 @@ func TestCreateRoute(t *testing.T) {
 		Location: &cloud.Location,
 	}
 	fakeTable.FakeStore = map[string]map[string]network.RouteTable{}
-	fakeTable.FakeStore[cloud.ResourceGroup] = map[string]network.RouteTable{
+	fakeTable.FakeStore[cloud.RouteTableResourceGroup] = map[string]network.RouteTable{
 		cloud.RouteTableName: expectedTable,
 	}
 	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
@@ -179,9 +179,9 @@ func TestCreateRouteTableIfNotExists_Exists(t *testing.T) {
 	cloud := &Cloud{
 		RouteTablesClient: fake,
 		Config: Config{
-			ResourceGroup:  "foo",
-			RouteTableName: "bar",
-			Location:       "location",
+			RouteTableResourceGroup: "foo",
+			RouteTableName:          "bar",
+			Location:                "location",
 		},
 	}
 	cache, _ := cloud.newRouteTableCache()
@@ -192,7 +192,7 @@ func TestCreateRouteTableIfNotExists_Exists(t *testing.T) {
 		Location: &cloud.Location,
 	}
 	fake.FakeStore = map[string]map[string]network.RouteTable{}
-	fake.FakeStore[cloud.ResourceGroup] = map[string]network.RouteTable{
+	fake.FakeStore[cloud.RouteTableResourceGroup] = map[string]network.RouteTable{
 		cloud.RouteTableName: expectedTable,
 	}
 	err := cloud.createRouteTableIfNotExists("clusterName", &cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/16"})
@@ -210,9 +210,9 @@ func TestCreateRouteTableIfNotExists_NotExists(t *testing.T) {
 	cloud := &Cloud{
 		RouteTablesClient: fake,
 		Config: Config{
-			ResourceGroup:  "foo",
-			RouteTableName: "bar",
-			Location:       "location",
+			RouteTableResourceGroup: "foo",
+			RouteTableName:          "bar",
+			Location:                "location",
 		},
 	}
 	cache, _ := cloud.newRouteTableCache()
@@ -229,7 +229,7 @@ func TestCreateRouteTableIfNotExists_NotExists(t *testing.T) {
 		t.FailNow()
 	}
 
-	table := fake.FakeStore[cloud.ResourceGroup][cloud.RouteTableName]
+	table := fake.FakeStore[cloud.RouteTableResourceGroup][cloud.RouteTableName]
 	if *table.Location != *expectedTable.Location {
 		t.Errorf("mismatch: %s vs %s", *table.Location, *expectedTable.Location)
 	}
@@ -246,9 +246,9 @@ func TestCreateRouteTable(t *testing.T) {
 	cloud := &Cloud{
 		RouteTablesClient: fake,
 		Config: Config{
-			ResourceGroup:  "foo",
-			RouteTableName: "bar",
-			Location:       "location",
+			RouteTableResourceGroup: "foo",
+			RouteTableName:          "bar",
+			Location:                "location",
 		},
 	}
 	cache, _ := cloud.newRouteTableCache()

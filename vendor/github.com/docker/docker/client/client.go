@@ -39,7 +39,7 @@ For example, to list running containers (the equivalent of "docker ps"):
 	}
 
 */
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"

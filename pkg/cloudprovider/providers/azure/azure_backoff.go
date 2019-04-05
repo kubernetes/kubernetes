@@ -429,7 +429,7 @@ func (az *Cloud) CreateOrUpdateRouteTable(routeTable network.RouteTable) error {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.RouteTablesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, routeTable)
+		resp, err := az.RouteTablesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, routeTable)
 		return az.processHTTPResponse(nil, "", resp, err)
 	}
 
@@ -442,7 +442,7 @@ func (az *Cloud) createOrUpdateRouteTableWithRetry(routeTable network.RouteTable
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.RouteTablesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, routeTable)
+		resp, err := az.RouteTablesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, routeTable)
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})
 }
@@ -453,7 +453,7 @@ func (az *Cloud) CreateOrUpdateRoute(route network.Route) error {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.RoutesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, *route.Name, route)
+		resp, err := az.RoutesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, *route.Name, route)
 		klog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): end", *route.Name)
 		return az.processHTTPResponse(nil, "", resp, err)
 	}
@@ -467,7 +467,7 @@ func (az *Cloud) createOrUpdateRouteWithRetry(route network.Route) error {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.RoutesClient.CreateOrUpdate(ctx, az.ResourceGroup, az.RouteTableName, *route.Name, route)
+		resp, err := az.RoutesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, *route.Name, route)
 		klog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): end", *route.Name)
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})
@@ -479,7 +479,7 @@ func (az *Cloud) DeleteRouteWithName(routeName string) error {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.RoutesClient.Delete(ctx, az.ResourceGroup, az.RouteTableName, routeName)
+		resp, err := az.RoutesClient.Delete(ctx, az.RouteTableResourceGroup, az.RouteTableName, routeName)
 		klog.V(10).Infof("RoutesClient.Delete(%s,%s): end", az.RouteTableName, routeName)
 		return az.processHTTPResponse(nil, "", resp, err)
 	}
@@ -493,7 +493,7 @@ func (az *Cloud) deleteRouteWithRetry(routeName string) error {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.RoutesClient.Delete(ctx, az.ResourceGroup, az.RouteTableName, routeName)
+		resp, err := az.RoutesClient.Delete(ctx, az.RouteTableResourceGroup, az.RouteTableName, routeName)
 		klog.V(10).Infof("RoutesClient.Delete(%s,%s): end", az.RouteTableName, routeName)
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})

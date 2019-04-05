@@ -16,6 +16,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/versioning:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/yaml:go_default_library",
     ],
 )
 

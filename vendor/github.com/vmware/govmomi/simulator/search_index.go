@@ -163,3 +163,101 @@ func (s *SearchIndex) FindByUuid(req *types.FindByUuid) soap.HasFault {
 
 	return body
 }
+
+func (s *SearchIndex) FindByDnsName(req *types.FindByDnsName) soap.HasFault {
+	body := &methods.FindByDnsNameBody{Res: new(types.FindByDnsNameResponse)}
+
+	all := types.FindAllByDnsName(*req)
+
+	switch r := s.FindAllByDnsName(&all).(type) {
+	case *methods.FindAllByDnsNameBody:
+		if len(r.Res.Returnval) > 0 {
+			body.Res.Returnval = &r.Res.Returnval[0]
+		}
+	default:
+		// no need until FindAllByDnsName below returns a Fault
+	}
+
+	return body
+}
+
+func (s *SearchIndex) FindAllByDnsName(req *types.FindAllByDnsName) soap.HasFault {
+	body := &methods.FindAllByDnsNameBody{Res: new(types.FindAllByDnsNameResponse)}
+
+	if req.VmSearch {
+		// Find Virtual Machine using DNS name
+		for ref, obj := range Map.objects {
+			vm, ok := obj.(*VirtualMachine)
+			if !ok {
+				continue
+			}
+			if vm.Guest.HostName == req.DnsName {
+				body.Res.Returnval = append(body.Res.Returnval, ref)
+			}
+		}
+	} else {
+		// Find Host System using DNS name
+		for ref, obj := range Map.objects {
+			host, ok := obj.(*HostSystem)
+			if !ok {
+				continue
+			}
+			for _, net := range host.Config.Network.NetStackInstance {
+				if net.DnsConfig.GetHostDnsConfig().HostName == req.DnsName {
+					body.Res.Returnval = append(body.Res.Returnval, ref)
+				}
+			}
+		}
+	}
+
+	return body
+}
+
+func (s *SearchIndex) FindByIp(req *types.FindByIp) soap.HasFault {
+	body := &methods.FindByIpBody{Res: new(types.FindByIpResponse)}
+
+	all := types.FindAllByIp(*req)
+
+	switch r := s.FindAllByIp(&all).(type) {
+	case *methods.FindAllByIpBody:
+		if len(r.Res.Returnval) > 0 {
+			body.Res.Returnval = &r.Res.Returnval[0]
+		}
+	default:
+		// no need until FindAllByIp below returns a Fault
+	}
+
+	return body
+}
+
+func (s *SearchIndex) FindAllByIp(req *types.FindAllByIp) soap.HasFault {
+	body := &methods.FindAllByIpBody{Res: new(types.FindAllByIpResponse)}
+
+	if req.VmSearch {
+		// Find Virtual Machine using IP
+		for ref, obj := range Map.objects {
+			vm, ok := obj.(*VirtualMachine)
+			if !ok {
+				continue
+			}
+			if vm.Guest.IpAddress == req.Ip {
+				body.Res.Returnval = append(body.Res.Returnval, ref)
+			}
+		}
+	} else {
+		// Find Host System using IP
+		for ref, obj := range Map.objects {
+			host, ok := obj.(*HostSystem)
+			if !ok {
+				continue
+			}
+			for _, net := range host.Config.Network.Vnic {
+				if net.Spec.Ip.IpAddress == req.Ip {
+					body.Res.Returnval = append(body.Res.Returnval, ref)
+				}
+			}
+		}
+	}
+
+	return body
+}

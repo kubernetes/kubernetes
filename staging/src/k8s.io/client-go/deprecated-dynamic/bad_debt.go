@@ -59,15 +59,9 @@ func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
 // ContentConfig returns a rest.ContentConfig for dynamic types.
 // Deprecated only used by test code and its wrong
 func ContentConfig() rest.ContentConfig {
-	var jsonInfo runtime.SerializerInfo
 	// TODO: scheme.Codecs here should become "pkg/apis/server/scheme" which is the minimal core you need
 	// to talk to a kubernetes server
-	for _, info := range scheme.Codecs.SupportedMediaTypes() {
-		if info.MediaType == runtime.ContentTypeJSON {
-			jsonInfo = info
-			break
-		}
-	}
+	jsonInfo, _ := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 
 	jsonInfo.Serializer = dynamicCodec{}
 	jsonInfo.PrettySerializer = nil

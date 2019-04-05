@@ -64,6 +64,7 @@ func TestParseConfig(t *testing.T) {
 		"primaryScaleSetName": "primaryScaleSetName",
 		"resourceGroup": "resourceGroup",
 		"routeTableName": "routeTableName",
+		"routeTableResourceGroup": "routeTableResourceGroup",
 		"securityGroupName": "securityGroupName",
 		"subnetName": "subnetName",
 		"subscriptionId": "subscriptionId",
@@ -101,6 +102,7 @@ func TestParseConfig(t *testing.T) {
 		PrimaryScaleSetName:               "primaryScaleSetName",
 		ResourceGroup:                     "resourcegroup",
 		RouteTableName:                    "routeTableName",
+		RouteTableResourceGroup:           "routeTableResourceGroup",
 		SecurityGroupName:                 "securityGroupName",
 		SubnetName:                        "subnetName",
 		UseInstanceMetadata:               true,
@@ -941,6 +943,7 @@ func getTestCloud() (az *Cloud) {
 			},
 			ResourceGroup:                "rg",
 			VnetResourceGroup:            "rg",
+			RouteTableResourceGroup:      "rg",
 			Location:                     "westus",
 			VnetName:                     "vnet",
 			SubnetName:                   "subnet",
@@ -1524,6 +1527,7 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"aadClientCertPath": "--aad-client-cert-path--",
 		"aadClientCertPassword": "--aad-client-cert-password--",
 		"resourceGroup": "--resource-group--",
+		"routeTableResourceGroup": "--route-table-resource-group--",
 		"location": "--location--",
 		"subnetName": "--subnet-name--",
 		"securityGroupName": "--security-group-name--",
@@ -1557,7 +1561,8 @@ aadClientSecret: --aad-client-secret--
 	validateEmptyConfig(t, config)
 }
 
-// Test Configuration deserialization (yaml)
+// Test Configuration deserialization (yaml) without
+// specific resource group for the route table
 func TestNewCloudFromYAML(t *testing.T) {
 	config := `
 tenantId: --tenant-id--
@@ -1567,6 +1572,7 @@ aadClientSecret: --aad-client-secret--
 aadClientCertPath: --aad-client-cert-path--
 aadClientCertPassword: --aad-client-cert-password--
 resourceGroup: --resource-group--
+routeTableResourceGroup: --route-table-resource-group--
 location: --location--
 subnetName: --subnet-name--
 securityGroupName: --security-group-name--
@@ -1608,6 +1614,9 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.ResourceGroup != "--resource-group--" {
 		t.Errorf("got incorrect value for ResourceGroup")
+	}
+	if azureCloud.RouteTableResourceGroup != "--route-table-resource-group--" {
+		t.Errorf("got incorrect value for RouteTableResourceGroup")
 	}
 	if azureCloud.Location != "--location--" {
 		t.Errorf("got incorrect value for Location")
