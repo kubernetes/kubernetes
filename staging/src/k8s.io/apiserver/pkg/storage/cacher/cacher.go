@@ -413,7 +413,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		c.watcherIdx++
 	}()
 
-	go watcher.process(initEvents, watchRV)
+	go watcher.process(ctx, initEvents, watchRV)
 	return watcher, nil
 }
 
@@ -1063,7 +1063,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	}
 }
 
-func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion uint64) {
+func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEvent, resourceVersion uint64) {
 	defer utilruntime.HandleCrash()
 
 	// Check how long we are processing initEvents.
@@ -1099,10 +1099,18 @@ func (c *cacheWatcher) process(initEvents []*watchCacheEvent, resourceVersion ui
 
 	defer close(c.result)
 	defer c.Stop()
-	for event := range c.input {
-		// only send events newer than resourceVersion
-		if event.ResourceVersion > resourceVersion {
-			c.sendWatchCacheEvent(event)
+	for {
+		select {
+		case event, ok := <-c.input:
+			if !ok {
+				return
+			}
+			// only send events newer than resourceVersion
+			if event.ResourceVersion > resourceVersion {
+				c.sendWatchCacheEvent(event)
+			}
+		case <-ctx.Done():
+			return
 		}
 	}
 }
