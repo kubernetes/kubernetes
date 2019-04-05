@@ -41,12 +41,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 type testRESTMapper struct {
@@ -73,12 +75,13 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	}
 	client := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 0)
 
 	// No monitor will be constructed for the non-core resource, but the GC
 	// construction will not fail.
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(dynamicClient, rm, twoResources, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(dynamicClient, rm, twoResources, map[schema.GroupResource]struct{}{}, controller.NewInformerFactory(sharedInformers, dynamicInformers), alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}

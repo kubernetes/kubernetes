@@ -34,9 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
@@ -104,7 +104,7 @@ type GraphBuilder struct {
 	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
 	absentOwnerCache *UIDCache
-	sharedInformers  informers.SharedInformerFactory
+	sharedInformers  controller.InformerFactory
 	ignoredResources map[schema.GroupResource]struct{}
 }
 
@@ -180,20 +180,8 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 		// need to clone because it's from a shared cache
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
 		return shared.Informer().GetController(), shared.Informer().GetStore(), nil
-	} else {
-		klog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
 	}
-
-	// TODO: consider store in one storage.
-	klog.V(5).Infof("create storage for resource %s", resource)
-	store, monitor := cache.NewInformer(
-		listWatcher(gb.dynamicClient, resource),
-		nil,
-		ResourceResyncTime,
-		// don't need to clone because it's not from shared cache
-		handlers,
-	)
-	return monitor, store, nil
+	return nil, nil, fmt.Errorf("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
 }
 
 // syncMonitors rebuilds the monitor set according to the supplied resources,
