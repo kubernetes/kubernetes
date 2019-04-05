@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -69,6 +70,25 @@ func (m *MockedFakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGrou
 }
 
 func (m *MockedFakeEC2) CreateVolume(request *ec2.CreateVolumeInput) (*ec2.Volume, error) {
+	// mock requires stable input, and in CreateDisk we invoke buildTags which uses
+	// a map to create tags, which then get converted into an array. This leads to
+	// unstable sorting order which confuses mock. Sorted tags are not needed in
+	// regular code, but are a must in tests here:
+	for i := 0; i < len(request.TagSpecifications); i++ {
+		if request.TagSpecifications[i] == nil {
+			continue
+		}
+		tags := request.TagSpecifications[i].Tags
+		sort.Slice(tags, func(i, j int) bool {
+			if tags[i] == nil && tags[j] != nil {
+				return false
+			}
+			if tags[i] != nil && tags[j] == nil {
+				return true
+			}
+			return *tags[i].Key < *tags[j].Key
+		})
+	}
 	args := m.Called(request)
 	return args.Get(0).(*ec2.Volume), nil
 }
@@ -1788,6 +1808,8 @@ func TestCreateDisk(t *testing.T) {
 		Size:             aws.Int64(10),
 		TagSpecifications: []*ec2.TagSpecification{
 			{ResourceType: aws.String(ec2.ResourceTypeVolume), Tags: []*ec2.Tag{
+				// CreateVolume from MockedFakeEC2 expects sorted tags, so we need to
+				// always have these tags sorted:
 				{Key: aws.String(TagNameKubernetesClusterLegacy), Value: aws.String(TestClusterID)},
 				{Key: aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, TestClusterID)), Value: aws.String(ResourceLifecycleOwned)},
 			}},
