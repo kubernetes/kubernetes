@@ -100,6 +100,7 @@ function generate-pki-config {
   gen-kube-bearertoken
   gen-kube-basicauth
   create-certs "${MASTER_IP}"
+  create-etcd-apiserver-certs "etcd-${MASTER_NAME}" "${MASTER_NAME}"
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
@@ -122,6 +123,12 @@ function write-pki-config-to-master {
     sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/ca.crt\" && \
     sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/server.cert\" && \
     sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/server.key\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_CA_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/etcd-apiserver-ca.key\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_CA_CERT_BASE64} | base64 --decode | gunzip > /home/kubernetes/k8s_auth_data/etcd-apiserver-ca.crt\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_SERVER_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/etcd-apiserver-server.key\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_SERVER_CERT_BASE64} | base64 --decode | gunzip > /home/kubernetes/k8s_auth_data/etcd-apiserver-server.crt\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_CLIENT_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/etcd-apiserver-client.key\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_CLIENT_CERT_BASE64} | base64 --decode | gunzip > /home/kubernetes/k8s_auth_data/etcd-apiserver-client.crt\" && \
     sudo bash -c \"echo ${REQUESTHEADER_CA_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/aggr_ca.crt\" && \
     sudo bash -c \"echo ${PROXY_CLIENT_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/proxy_client.crt\" && \
     sudo bash -c \"echo ${PROXY_CLIENT_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/proxy_client.key\" && \

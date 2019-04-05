@@ -469,9 +469,17 @@ EOF
 # Computes command line arguments to be passed to etcd.
 function compute-etcd-params {
 	local params="${ETCD_TEST_ARGS:-}"
+	params+=" --name=etcd-$(hostname -s)"
 	params+=" --listen-peer-urls=http://127.0.0.1:2380"
 	params+=" --advertise-client-urls=http://127.0.0.1:2379"
 	params+=" --listen-client-urls=http://0.0.0.0:2379"
+
+	# Enable apiserver->etcd auth.
+	params+=" --client-cert-auth"
+	params+=" --trusted-ca-file /etc/srv/kubernetes/etcd-apiserver-ca.crt"
+	params+=" --cert-file /etc/srv/kubernetes/etcd-apiserver-server.crt"
+	params+=" --key-file /etc/srv/kubernetes/etcd-apiserver-server.key"
+
 	params+=" --data-dir=/var/etcd/data"
 	params+=" ${ETCD_QUOTA_BYTES}"
 	echo "${params}"
@@ -480,6 +488,7 @@ function compute-etcd-params {
 # Computes command line arguments to be passed to etcd-events.
 function compute-etcd-events-params {
 	local params="${ETCD_TEST_ARGS:-}"
+	params+=" --name=etcd-$(hostname -s)"
 	params+=" --listen-peer-urls=http://127.0.0.1:2381"
 	params+=" --advertise-client-urls=http://127.0.0.1:4002"
 	params+=" --listen-client-urls=http://0.0.0.0:4002"
@@ -497,6 +506,11 @@ function compute-kube-apiserver-params {
 	elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
 		params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
 	fi
+	# Enable apiserver->etcd auth.
+	params+=" --etcd-cafile=/etc/srv/kubernetes/etcd-apiserver-ca.crt"
+	params+=" --etcd-certfile=/etc/srv/kubernetes/etcd-apiserver-client.crt"
+	params+=" --etcd-keyfile=/etc/srv/kubernetes/etcd-apiserver-client.key"
+
 	params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
 	params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
 	params+=" --requestheader-client-ca-file=/etc/srv/kubernetes/aggr_ca.crt"
