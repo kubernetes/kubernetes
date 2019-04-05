@@ -390,7 +390,12 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 		return err
 	}
 
-	url := strings.TrimRight(h.extenderURL, "/") + "/" + action
+	var url string
+	if action == "/" {
+		url = strings.TrimRight(h.extenderURL, "/")
+	} else {
+		url = strings.TrimRight(h.extenderURL, "/") + "/" + action
+	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewReader(out))
 	if err != nil {
