@@ -81,6 +81,13 @@ type DensityTestConfig struct {
 	DaemonConfigs    []*testutils.DaemonConfig
 }
 
+type saturationTime struct {
+	TimeToSaturate time.Duration `json:"timeToSaturate"`
+	NumberOfNodes  int           `json:"numberOfNodes"`
+	NumberOfPods   int           `json:"numberOfPods"`
+	Throughput     float32       `json:"throughput"`
+}
+
 func (dtc *DensityTestConfig) runSecretConfigs(testPhase *timer.Phase) {
 	defer testPhase.End()
 	for _, sc := range dtc.SecretConfigs {
@@ -418,7 +425,7 @@ var _ = SIGDescribe("Density", func() {
 			saturationThreshold = MinSaturationThreshold
 		}
 		Expect(e2eStartupTime).NotTo(BeNumerically(">", saturationThreshold))
-		saturationData := framework.SaturationTime{
+		saturationData := saturationTime{
 			TimeToSaturate: e2eStartupTime,
 			NumberOfNodes:  nodeCount,
 			NumberOfPods:   totalPods,
