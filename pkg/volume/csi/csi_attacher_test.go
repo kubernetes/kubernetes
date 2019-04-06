@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -1433,11 +1434,19 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	}
 	fakeWatcher := watch.NewRaceFreeFake()
 	fakeClient.Fake.PrependWatchReactor("volumeattachments", core.DefaultWatchReactor(fakeWatcher, nil))
+
+	// Start informer for CSIDrivers.
+	factory := informers.NewSharedInformerFactory(fakeClient, csiResyncPeriod)
+	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
+	csiDriverLister := csiDriverInformer.Lister()
+	go factory.Start(wait.NeverStop)
+
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
 		nil,
 		"node",
+		csiDriverLister,
 	)
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
@@ -1455,7 +1464,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		// Wait until the informer in CSI volume plugin has all CSIDrivers.
 		wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
-			return csiPlug.csiDriverInformer.Informer().HasSynced(), nil
+			return csiDriverInformer.Informer().HasSynced(), nil
 		})
 	}
 

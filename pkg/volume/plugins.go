@@ -29,11 +29,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -321,6 +325,15 @@ type KubeletVolumeHost interface {
 	// SetKubeletError lets plugins set an error on the Kubelet runtime status
 	// that will cause the Kubelet to post NotReady status with the error message provided
 	SetKubeletError(err error)
+
+	// GetInformerFactory returns the informer factory for CSIDriverLister
+	GetInformerFactory() informers.SharedInformerFactory
+	// CSIDriverLister returns the informer lister for the CSIDriver API Object
+	CSIDriverLister() storagelisters.CSIDriverLister
+	// CSIDriverSynced returns the informer synced for the CSIDriver API Object
+	CSIDriversSynced() cache.InformerSynced
+	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
+	WaitForCacheSync() error
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
@@ -328,6 +341,9 @@ type KubeletVolumeHost interface {
 type AttachDetachVolumeHost interface {
 	// CSINodeLister returns the informer lister for the CSINode API Object
 	CSINodeLister() storagelisters.CSINodeLister
+
+	// CSIDriverLister returns the informer lister for the CSIDriver API Object
+	CSIDriverLister() storagelisters.CSIDriverLister
 
 	// IsAttachDetachController is an interface marker to strictly tie AttachDetachVolumeHost
 	// to the attachDetachController
@@ -1008,6 +1024,17 @@ func (pm *VolumePluginMgr) FindNodeExpandablePluginByName(name string) (NodeExpa
 	}
 
 	return nil, nil
+}
+
+func (pm *VolumePluginMgr) Run(stopCh <-chan struct{}) {
+	kletHost, ok := pm.Host.(KubeletVolumeHost)
+	if ok {
+		// start informer for CSIDriver
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+			informerFactory := kletHost.GetInformerFactory()
+			go informerFactory.Start(stopCh)
+		}
+	}
 }
 
 // NewPersistentVolumeRecyclerPodTemplate creates a template for a recycler
