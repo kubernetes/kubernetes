@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // FakeConfigurator is an implementation for test.
@@ -53,7 +52,7 @@ func (fc *FakeConfigurator) GetHardPodAffinitySymmetricWeight() int32 {
 }
 
 // MakeDefaultErrorFunc is not implemented yet.
-func (fc *FakeConfigurator) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error) {
+func (fc *FakeConfigurator) MakeDefaultErrorFunc(backoff *internalqueue.PodBackoffMap, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error) {
 	return nil
 }
 

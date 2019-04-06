@@ -214,7 +214,7 @@ type PriorityQueue struct {
 	stop  <-chan struct{}
 	clock util.Clock
 	// podBackoff tracks backoff for pods attempting to be rescheduled
-	podBackoff *util.PodBackoff
+	podBackoff *PodBackoffMap
 
 	lock sync.RWMutex
 	cond sync.Cond
@@ -282,7 +282,7 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock) *Priority
 	pq := &PriorityQueue{
 		clock:            clock,
 		stop:             stop,
-		podBackoff:       util.CreatePodBackoffWithClock(1*time.Second, 10*time.Second, clock),
+		podBackoff:       NewPodBackoffMap(1*time.Second, 10*time.Second),
 		activeQ:          util.NewHeap(podInfoKeyFunc, activeQComp),
 		unschedulableQ:   newUnschedulablePodsMap(),
 		nominatedPods:    newNominatedPodMap(),
@@ -383,7 +383,7 @@ func (p *PriorityQueue) isPodBackingOff(pod *v1.Pod) bool {
 // backoffPod checks if pod is currently undergoing backoff. If it is not it updates the backoff
 // timeout otherwise it does nothing.
 func (p *PriorityQueue) backoffPod(pod *v1.Pod) {
-	p.podBackoff.Gc()
+	p.podBackoff.CleanupPodsCompletesBackingoff()
 
 	podID := nsNameForPod(pod)
 	boTime, found := p.podBackoff.GetBackoffTime(podID)
