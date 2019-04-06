@@ -107,7 +107,7 @@ replace (
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 	golang.org/x/time => golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20190205050122-7f7074d5bcfd
+	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6
 	google.golang.org/grpc => google.golang.org/grpc v1.13.0

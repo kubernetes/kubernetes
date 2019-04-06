@@ -19,7 +19,7 @@ replace (
 	github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
 	golang.org/x/exp => golang.org/x/exp v0.0.0-20180321215751-8460e604b9de
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20190205050122-7f7074d5bcfd
+	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 	gonum.org/v1/gonum => gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e
 	k8s.io/api => ../api

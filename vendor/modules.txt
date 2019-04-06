@@ -982,7 +982,7 @@ golang.org/x/text/unicode/norm
 golang.org/x/text/width
 # golang.org/x/time v0.0.0-20161028155119-f51c12702a4d => golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
 golang.org/x/time/rate
-# golang.org/x/tools v0.0.0-20190328211700-ab21143f2384 => golang.org/x/tools v0.0.0-20190205050122-7f7074d5bcfd
+# golang.org/x/tools v0.0.0-20190328211700-ab21143f2384 => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 golang.org/x/tools/benchmark/parse
 golang.org/x/tools/container/intsets
 golang.org/x/tools/go/ast/astutil
