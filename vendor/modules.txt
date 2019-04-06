@@ -995,9 +995,10 @@ golang.org/x/tools/internal/fastwalk
 golang.org/x/tools/internal/gopathwalk
 golang.org/x/tools/internal/module
 golang.org/x/tools/internal/semver
-# gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485 => gonum.org/v1/gonum v0.0.0-20180726124543-cebdade430cc
+# gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485 => gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 gonum.org/v1/gonum/blas
 gonum.org/v1/gonum/blas/blas64
+gonum.org/v1/gonum/blas/cblas128
 gonum.org/v1/gonum/blas/gonum
 gonum.org/v1/gonum/floats
 gonum.org/v1/gonum/graph
@@ -1014,12 +1015,15 @@ gonum.org/v1/gonum/graph/internal/linear
 gonum.org/v1/gonum/graph/internal/ordered
 gonum.org/v1/gonum/graph/internal/set
 gonum.org/v1/gonum/graph/internal/uid
+gonum.org/v1/gonum/graph/iterator
 gonum.org/v1/gonum/graph/simple
 gonum.org/v1/gonum/graph/topo
 gonum.org/v1/gonum/graph/traverse
 gonum.org/v1/gonum/internal/asm/c128
+gonum.org/v1/gonum/internal/asm/c64
 gonum.org/v1/gonum/internal/asm/f32
 gonum.org/v1/gonum/internal/asm/f64
+gonum.org/v1/gonum/internal/cmplx64
 gonum.org/v1/gonum/internal/math32
 gonum.org/v1/gonum/lapack
 gonum.org/v1/gonum/lapack/gonum

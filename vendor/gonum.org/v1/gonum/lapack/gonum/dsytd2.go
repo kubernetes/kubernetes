@@ -9,15 +9,15 @@ import (
 	"gonum.org/v1/gonum/blas/blas64"
 )
 
-// Dsytd2 reduces a symmetric n×n matrix A to symmetric tridiagonal form T by an
-// orthogonal similarity transformation
+// Dsytd2 reduces a symmetric n×n matrix A to symmetric tridiagonal form T by
+// an orthogonal similarity transformation
 //  Q^T * A * Q = T
 // On entry, the matrix is contained in the specified triangle of a. On exit,
 // if uplo == blas.Upper, the diagonal and first super-diagonal of a are
 // overwritten with the elements of T. The elements above the first super-diagonal
-// are overwritten with the the elementary reflectors that are used with the
-// elements written to tau in order to construct Q. If uplo == blas.Lower, the
-// elements are written in the lower triangular region.
+// are overwritten with the elementary reflectors that are used with
+// the elements written to tau in order to construct Q. If uplo == blas.Lower,
+// the elements are written in the lower triangular region.
 //
 // d must have length at least n. e and tau must have length at least n-1. Dsytd2
 // will panic if these sizes are not met.
@@ -49,20 +49,33 @@ import (
 //
 // Dsytd2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dsytd2(uplo blas.Uplo, n int, a []float64, lda int, d, e, tau []float64) {
-	checkMatrix(n, n, a, lda)
-	if len(d) < n {
-		panic(badD)
+	switch {
+	case uplo != blas.Upper && uplo != blas.Lower:
+		panic(badUplo)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	if len(e) < n-1 {
-		panic(badE)
-	}
-	if len(tau) < n-1 {
-		panic(badTau)
-	}
-	if n <= 0 {
+
+	// Quick return if possible.
+	if n == 0 {
 		return
 	}
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
+	case len(d) < n:
+		panic(shortD)
+	case len(e) < n-1:
+		panic(shortE)
+	case len(tau) < n-1:
+		panic(shortTau)
+	}
+
 	bi := blas64.Implementation()
+
 	if uplo == blas.Upper {
 		// Reduce the upper triangle of A.
 		for i := n - 2; i >= 0; i-- {

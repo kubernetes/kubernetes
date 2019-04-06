@@ -23,8 +23,8 @@ func (Implementation) Dnrm2(n int, x []float64, incX int) float64 {
 		}
 		return 0
 	}
-	if incX > 0 && (n-1)*incX >= len(x) {
-		panic(badX)
+	if len(x) <= (n-1)*incX {
+		panic(shortX)
 	}
 	if n < 2 {
 		if n == 1 {
@@ -97,8 +97,8 @@ func (Implementation) Dasum(n int, x []float64, incX int) float64 {
 		}
 		return 0
 	}
-	if incX > 0 && (n-1)*incX >= len(x) {
-		panic(badX)
+	if len(x) <= (n-1)*incX {
+		panic(shortX)
 	}
 	if incX == 1 {
 		x = x[:n]
@@ -123,15 +123,15 @@ func (Implementation) Idamax(n int, x []float64, incX int) int {
 		}
 		return -1
 	}
-	if incX > 0 && (n-1)*incX >= len(x) {
-		panic(badX)
+	if len(x) <= (n-1)*incX {
+		panic(shortX)
 	}
 	if n < 2 {
 		if n == 1 {
 			return 0
 		}
 		if n == 0 {
-			return -1 // Netlib returns invalid index when n == 0
+			return -1 // Netlib returns invalid index when n == 0.
 		}
 		panic(nLT0)
 	}
@@ -175,11 +175,11 @@ func (Implementation) Dswap(n int, x []float64, incX int, y []float64, incY int)
 		}
 		panic(nLT0)
 	}
-	if (incX > 0 && (n-1)*incX >= len(x)) || (incX < 0 && (1-n)*incX >= len(x)) {
-		panic(badX)
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
-	if (incY > 0 && (n-1)*incY >= len(y)) || (incY < 0 && (1-n)*incY >= len(y)) {
-		panic(badY)
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
 	}
 	if incX == 1 && incY == 1 {
 		x = x[:n]
@@ -217,11 +217,11 @@ func (Implementation) Dcopy(n int, x []float64, incX int, y []float64, incY int)
 		}
 		panic(nLT0)
 	}
-	if (incX > 0 && (n-1)*incX >= len(x)) || (incX < 0 && (1-n)*incX >= len(x)) {
-		panic(badX)
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
-	if (incY > 0 && (n-1)*incY >= len(y)) || (incY < 0 && (1-n)*incY >= len(y)) {
-		panic(badY)
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
 	}
 	if incX == 1 && incY == 1 {
 		copy(y[:n], x[:n])
@@ -256,11 +256,11 @@ func (Implementation) Daxpy(n int, alpha float64, x []float64, incX int, y []flo
 		}
 		panic(nLT0)
 	}
-	if (incX > 0 && (n-1)*incX >= len(x)) || (incX < 0 && (1-n)*incX >= len(x)) {
-		panic(badX)
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
-	if (incY > 0 && (n-1)*incY >= len(y)) || (incY < 0 && (1-n)*incY >= len(y)) {
-		panic(badY)
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
 	}
 	if alpha == 0 {
 		return
@@ -289,7 +289,7 @@ func (Implementation) Daxpy(n int, alpha float64, x []float64, incX int, y []flo
 //  c = a/r, the cosine of the plane rotation
 //  s = b/r, the sine of the plane rotation
 //
-// NOTE: There is a discrepancy between the refence implementation and the BLAS
+// NOTE: There is a discrepancy between the reference implementation and the BLAS
 // technical manual regarding the sign for r when a or b are zero.
 // Drotg agrees with the definition in the manual and other
 // common BLAS implementations.
@@ -422,7 +422,7 @@ func (Implementation) Drotmg(d1, d2, x1, y1 float64) (p blas.DrotmParams, rd1, r
 	case blas.Rescaling:
 		p.H = [4]float64{h11, h21, h12, h22}
 	default:
-		panic("blas: unexpected blas.Flag")
+		panic(badFlag)
 	}
 
 	return p, d1, d2, x1
@@ -444,11 +444,11 @@ func (Implementation) Drot(n int, x []float64, incX int, y []float64, incY int, 
 		}
 		panic(nLT0)
 	}
-	if (incX > 0 && (n-1)*incX >= len(x)) || (incX < 0 && (1-n)*incX >= len(x)) {
-		panic(badX)
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
-	if (incY > 0 && (n-1)*incY >= len(y)) || (incY < 0 && (1-n)*incY >= len(y)) {
-		panic(badY)
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
 	}
 	if incX == 1 && incY == 1 {
 		x = x[:n]
@@ -488,11 +488,11 @@ func (Implementation) Drotm(n int, x []float64, incX int, y []float64, incY int,
 		}
 		panic(nLT0)
 	}
-	if (incX > 0 && (n-1)*incX >= len(x)) || (incX < 0 && (1-n)*incX >= len(x)) {
-		panic(badX)
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
-	if (incY > 0 && (n-1)*incY >= len(y)) || (incY < 0 && (1-n)*incY >= len(y)) {
-		panic(badY)
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
 	}
 
 	if p.Flag == blas.Identity {
@@ -590,14 +590,14 @@ func (Implementation) Dscal(n int, alpha float64, x []float64, incX int) {
 		}
 		return
 	}
-	if (n-1)*incX >= len(x) {
-		panic(badX)
-	}
 	if n < 1 {
 		if n == 0 {
 			return
 		}
 		panic(nLT0)
+	}
+	if (n-1)*incX >= len(x) {
+		panic(shortX)
 	}
 	if alpha == 0 {
 		if incX == 1 {

@@ -51,7 +51,7 @@ replace (
 	golang.org/x/text => golang.org/x/text v0.0.0-20170810154203-b19bf474d317
 	golang.org/x/time => golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190205050122-7f7074d5bcfd
-	gonum.org/v1/gonum => gonum.org/v1/gonum v0.0.0-20180726124543-cebdade430cc
+	gonum.org/v1/gonum => gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	gopkg.in/check.v1 => gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405

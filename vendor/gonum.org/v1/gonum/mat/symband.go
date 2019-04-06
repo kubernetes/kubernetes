@@ -14,6 +14,7 @@ var (
 	_            Matrix           = symBandDense
 	_            Symmetric        = symBandDense
 	_            Banded           = symBandDense
+	_            SymBanded        = symBandDense
 	_            RawSymBander     = symBandDense
 	_            MutableSymBanded = symBandDense
 
@@ -27,11 +28,22 @@ type SymBandDense struct {
 	mat blas64.SymmetricBand
 }
 
+// SymBanded is a symmetric band matrix interface type.
+type SymBanded interface {
+	Banded
+
+	// Symmetric returns the number of rows/columns in the matrix.
+	Symmetric() int
+
+	// SymBand returns the number of rows/columns in the matrix, and the size of
+	// the bandwidth.
+	SymBand() (n, k int)
+}
+
 // MutableSymBanded is a symmetric band matrix interface type that allows elements
 // to be altered.
 type MutableSymBanded interface {
-	Symmetric
-	Bandwidth() (kl, ku int)
+	SymBanded
 	SetSymBand(i, j int, v float64)
 }
 
@@ -46,7 +58,7 @@ type RawSymBander interface {
 // a new slice is allocated for the backing slice. If len(data) == n*(k+1),
 // data is used as the backing slice, and changes to the elements of the returned
 // SymBandDense will be reflected in data. If neither of these is true, NewSymBandDense
-// will panic. k must be at least zero and less than n, otherwise NewBandDense will panic.
+// will panic. k must be at least zero and less than n, otherwise NewSymBandDense will panic.
 //
 // The data must be arranged in row-major order constructed by removing the zeros
 // from the rows outside the band and aligning the diagonals. SymBandDense matrices
@@ -64,10 +76,13 @@ type RawSymBander interface {
 //    10 11 12
 //    13 14  *
 //    15  *  *
-// which is passed to NewBandDense as []float64{1, 2, 3, 4, ...} with k=2.
+// which is passed to NewSymBandDense as []float64{1, 2, ..., 15, *, *, *} with k=2.
 // Only the values in the band portion of the matrix are used.
 func NewSymBandDense(n, k int, data []float64) *SymBandDense {
-	if n < 0 || k < 0 {
+	if n <= 0 || k < 0 {
+		if n == 0 {
+			panic(ErrZeroLength)
+		}
 		panic("mat: negative dimension")
 	}
 	if k+1 > n {
@@ -91,13 +106,6 @@ func NewSymBandDense(n, k int, data []float64) *SymBandDense {
 	}
 }
 
-// NewDiagonal is a convenience function that returns a diagonal matrix represented by a
-// SymBandDense. The length of data must be n or data must be nil, otherwise NewDiagonal
-// will panic.
-func NewDiagonal(n int, data []float64) *SymBandDense {
-	return NewSymBandDense(n, 0, data)
-}
-
 // Dims returns the number of rows and columns in the matrix.
 func (s *SymBandDense) Dims() (r, c int) {
 	return s.mat.N, s.mat.N
@@ -111,6 +119,12 @@ func (s *SymBandDense) Symmetric() int {
 // Bandwidth returns the bandwidths of the matrix.
 func (s *SymBandDense) Bandwidth() (kl, ku int) {
 	return s.mat.K, s.mat.K
+}
+
+// SymBand returns the number of rows/columns in the matrix, and the size of
+// the bandwidth.
+func (s *SymBandDense) SymBand() (n, k int) {
+	return s.mat.N, s.mat.K
 }
 
 // T implements the Matrix interface. Symmetric matrices, by definition, are
@@ -129,6 +143,38 @@ func (s *SymBandDense) TBand() Banded {
 // in returned blas64.SymBand.
 func (s *SymBandDense) RawSymBand() blas64.SymmetricBand {
 	return s.mat
+}
+
+// SetRawSymBand sets the underlying blas64.SymmetricBand used by the receiver.
+// Changes to elements in the receiver following the call will be reflected
+// in the input.
+//
+// The supplied SymmetricBand must use blas.Upper storage format.
+func (s *SymBandDense) SetRawSymBand(mat blas64.SymmetricBand) {
+	if mat.Uplo != blas.Upper {
+		panic("mat: blas64.SymmetricBand does not have blas.Upper storage")
+	}
+	s.mat = mat
+}
+
+// Zero sets all of the matrix elements to zero.
+func (s *SymBandDense) Zero() {
+	for i := 0; i < s.mat.N; i++ {
+		u := min(1+s.mat.K, s.mat.N-i)
+		zero(s.mat.Data[i*s.mat.Stride : i*s.mat.Stride+u])
+	}
+}
+
+// DiagView returns the diagonal as a matrix backed by the original data.
+func (s *SymBandDense) DiagView() Diagonal {
+	n := s.mat.N
+	return &DiagDense{
+		mat: blas64.Vector{
+			N:    n,
+			Inc:  s.mat.Stride,
+			Data: s.mat.Data[:(n-1)*s.mat.Stride+1],
+		},
+	}
 }
 
 // DoNonZero calls the function fn for each of the non-zero elements of s. The function fn
