@@ -2,7 +2,6 @@ package objx
 
 /*
 	Inter (interface{} and []interface{})
-	--------------------------------------------------
 */
 
 // Inter gets the value as a interface{}, returns the optionalDefault
@@ -60,44 +59,35 @@ func (v *Value) IsInterSlice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachInter(callback func(int, interface{}) bool) *Value {
-
 	for index, val := range v.MustInterSlice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereInter uses the specified decider function to select items
 // from the []interface{}.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereInter(decider func(int, interface{}) bool) *Value {
-
 	var selected []interface{}
-
 	v.EachInter(func(index int, val interface{}) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupInter uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]interface{}.
 func (v *Value) GroupInter(grouper func(int, interface{}) string) *Value {
-
 	groups := make(map[string][]interface{})
-
 	v.EachInter(func(index int, val interface{}) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -106,47 +96,37 @@ func (v *Value) GroupInter(grouper func(int, interface{}) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceInter uses the specified function to replace each interface{}s
 // by iterating each item.  The data in the returned result will be a
 // []interface{} containing the replaced items.
 func (v *Value) ReplaceInter(replacer func(int, interface{}) interface{}) *Value {
-
 	arr := v.MustInterSlice()
 	replaced := make([]interface{}, len(arr))
-
 	v.EachInter(func(index int, val interface{}) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectInter uses the specified collector function to collect a value
 // for each of the interface{}s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectInter(collector func(int, interface{}) interface{}) *Value {
-
 	arr := v.MustInterSlice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachInter(func(index int, val interface{}) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	MSI (map[string]interface{} and []map[string]interface{})
-	--------------------------------------------------
 */
 
 // MSI gets the value as a map[string]interface{}, returns the optionalDefault
@@ -204,44 +184,35 @@ func (v *Value) IsMSISlice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachMSI(callback func(int, map[string]interface{}) bool) *Value {
-
 	for index, val := range v.MustMSISlice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereMSI uses the specified decider function to select items
 // from the []map[string]interface{}.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereMSI(decider func(int, map[string]interface{}) bool) *Value {
-
 	var selected []map[string]interface{}
-
 	v.EachMSI(func(index int, val map[string]interface{}) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupMSI uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]map[string]interface{}.
 func (v *Value) GroupMSI(grouper func(int, map[string]interface{}) string) *Value {
-
 	groups := make(map[string][]map[string]interface{})
-
 	v.EachMSI(func(index int, val map[string]interface{}) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -250,47 +221,37 @@ func (v *Value) GroupMSI(grouper func(int, map[string]interface{}) string) *Valu
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceMSI uses the specified function to replace each map[string]interface{}s
 // by iterating each item.  The data in the returned result will be a
 // []map[string]interface{} containing the replaced items.
 func (v *Value) ReplaceMSI(replacer func(int, map[string]interface{}) map[string]interface{}) *Value {
-
 	arr := v.MustMSISlice()
 	replaced := make([]map[string]interface{}, len(arr))
-
 	v.EachMSI(func(index int, val map[string]interface{}) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectMSI uses the specified collector function to collect a value
 // for each of the map[string]interface{}s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectMSI(collector func(int, map[string]interface{}) interface{}) *Value {
-
 	arr := v.MustMSISlice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachMSI(func(index int, val map[string]interface{}) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	ObjxMap ((Map) and [](Map))
-	--------------------------------------------------
 */
 
 // ObjxMap gets the value as a (Map), returns the optionalDefault
@@ -348,44 +309,35 @@ func (v *Value) IsObjxMapSlice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachObjxMap(callback func(int, Map) bool) *Value {
-
 	for index, val := range v.MustObjxMapSlice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereObjxMap uses the specified decider function to select items
 // from the [](Map).  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereObjxMap(decider func(int, Map) bool) *Value {
-
 	var selected [](Map)
-
 	v.EachObjxMap(func(index int, val Map) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupObjxMap uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][](Map).
 func (v *Value) GroupObjxMap(grouper func(int, Map) string) *Value {
-
 	groups := make(map[string][](Map))
-
 	v.EachObjxMap(func(index int, val Map) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -394,47 +346,37 @@ func (v *Value) GroupObjxMap(grouper func(int, Map) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceObjxMap uses the specified function to replace each (Map)s
 // by iterating each item.  The data in the returned result will be a
 // [](Map) containing the replaced items.
 func (v *Value) ReplaceObjxMap(replacer func(int, Map) Map) *Value {
-
 	arr := v.MustObjxMapSlice()
 	replaced := make([](Map), len(arr))
-
 	v.EachObjxMap(func(index int, val Map) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectObjxMap uses the specified collector function to collect a value
 // for each of the (Map)s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectObjxMap(collector func(int, Map) interface{}) *Value {
-
 	arr := v.MustObjxMapSlice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachObjxMap(func(index int, val Map) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Bool (bool and []bool)
-	--------------------------------------------------
 */
 
 // Bool gets the value as a bool, returns the optionalDefault
@@ -492,44 +434,35 @@ func (v *Value) IsBoolSlice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachBool(callback func(int, bool) bool) *Value {
-
 	for index, val := range v.MustBoolSlice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereBool uses the specified decider function to select items
 // from the []bool.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereBool(decider func(int, bool) bool) *Value {
-
 	var selected []bool
-
 	v.EachBool(func(index int, val bool) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupBool uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]bool.
 func (v *Value) GroupBool(grouper func(int, bool) string) *Value {
-
 	groups := make(map[string][]bool)
-
 	v.EachBool(func(index int, val bool) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -538,47 +471,37 @@ func (v *Value) GroupBool(grouper func(int, bool) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceBool uses the specified function to replace each bools
 // by iterating each item.  The data in the returned result will be a
 // []bool containing the replaced items.
 func (v *Value) ReplaceBool(replacer func(int, bool) bool) *Value {
-
 	arr := v.MustBoolSlice()
 	replaced := make([]bool, len(arr))
-
 	v.EachBool(func(index int, val bool) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectBool uses the specified collector function to collect a value
 // for each of the bools in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectBool(collector func(int, bool) interface{}) *Value {
-
 	arr := v.MustBoolSlice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachBool(func(index int, val bool) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Str (string and []string)
-	--------------------------------------------------
 */
 
 // Str gets the value as a string, returns the optionalDefault
@@ -636,44 +559,35 @@ func (v *Value) IsStrSlice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachStr(callback func(int, string) bool) *Value {
-
 	for index, val := range v.MustStrSlice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereStr uses the specified decider function to select items
 // from the []string.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereStr(decider func(int, string) bool) *Value {
-
 	var selected []string
-
 	v.EachStr(func(index int, val string) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupStr uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]string.
 func (v *Value) GroupStr(grouper func(int, string) string) *Value {
-
 	groups := make(map[string][]string)
-
 	v.EachStr(func(index int, val string) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -682,47 +596,37 @@ func (v *Value) GroupStr(grouper func(int, string) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceStr uses the specified function to replace each strings
 // by iterating each item.  The data in the returned result will be a
 // []string containing the replaced items.
 func (v *Value) ReplaceStr(replacer func(int, string) string) *Value {
-
 	arr := v.MustStrSlice()
 	replaced := make([]string, len(arr))
-
 	v.EachStr(func(index int, val string) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectStr uses the specified collector function to collect a value
 // for each of the strings in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectStr(collector func(int, string) interface{}) *Value {
-
 	arr := v.MustStrSlice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachStr(func(index int, val string) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Int (int and []int)
-	--------------------------------------------------
 */
 
 // Int gets the value as a int, returns the optionalDefault
@@ -780,44 +684,35 @@ func (v *Value) IsIntSlice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachInt(callback func(int, int) bool) *Value {
-
 	for index, val := range v.MustIntSlice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereInt uses the specified decider function to select items
 // from the []int.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereInt(decider func(int, int) bool) *Value {
-
 	var selected []int
-
 	v.EachInt(func(index int, val int) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupInt uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]int.
 func (v *Value) GroupInt(grouper func(int, int) string) *Value {
-
 	groups := make(map[string][]int)
-
 	v.EachInt(func(index int, val int) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -826,47 +721,37 @@ func (v *Value) GroupInt(grouper func(int, int) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceInt uses the specified function to replace each ints
 // by iterating each item.  The data in the returned result will be a
 // []int containing the replaced items.
 func (v *Value) ReplaceInt(replacer func(int, int) int) *Value {
-
 	arr := v.MustIntSlice()
 	replaced := make([]int, len(arr))
-
 	v.EachInt(func(index int, val int) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectInt uses the specified collector function to collect a value
 // for each of the ints in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectInt(collector func(int, int) interface{}) *Value {
-
 	arr := v.MustIntSlice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachInt(func(index int, val int) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Int8 (int8 and []int8)
-	--------------------------------------------------
 */
 
 // Int8 gets the value as a int8, returns the optionalDefault
@@ -924,44 +809,35 @@ func (v *Value) IsInt8Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachInt8(callback func(int, int8) bool) *Value {
-
 	for index, val := range v.MustInt8Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereInt8 uses the specified decider function to select items
 // from the []int8.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereInt8(decider func(int, int8) bool) *Value {
-
 	var selected []int8
-
 	v.EachInt8(func(index int, val int8) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupInt8 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]int8.
 func (v *Value) GroupInt8(grouper func(int, int8) string) *Value {
-
 	groups := make(map[string][]int8)
-
 	v.EachInt8(func(index int, val int8) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -970,47 +846,37 @@ func (v *Value) GroupInt8(grouper func(int, int8) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceInt8 uses the specified function to replace each int8s
 // by iterating each item.  The data in the returned result will be a
 // []int8 containing the replaced items.
 func (v *Value) ReplaceInt8(replacer func(int, int8) int8) *Value {
-
 	arr := v.MustInt8Slice()
 	replaced := make([]int8, len(arr))
-
 	v.EachInt8(func(index int, val int8) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectInt8 uses the specified collector function to collect a value
 // for each of the int8s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectInt8(collector func(int, int8) interface{}) *Value {
-
 	arr := v.MustInt8Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachInt8(func(index int, val int8) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Int16 (int16 and []int16)
-	--------------------------------------------------
 */
 
 // Int16 gets the value as a int16, returns the optionalDefault
@@ -1068,44 +934,35 @@ func (v *Value) IsInt16Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachInt16(callback func(int, int16) bool) *Value {
-
 	for index, val := range v.MustInt16Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereInt16 uses the specified decider function to select items
 // from the []int16.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereInt16(decider func(int, int16) bool) *Value {
-
 	var selected []int16
-
 	v.EachInt16(func(index int, val int16) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupInt16 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]int16.
 func (v *Value) GroupInt16(grouper func(int, int16) string) *Value {
-
 	groups := make(map[string][]int16)
-
 	v.EachInt16(func(index int, val int16) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -1114,47 +971,37 @@ func (v *Value) GroupInt16(grouper func(int, int16) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceInt16 uses the specified function to replace each int16s
 // by iterating each item.  The data in the returned result will be a
 // []int16 containing the replaced items.
 func (v *Value) ReplaceInt16(replacer func(int, int16) int16) *Value {
-
 	arr := v.MustInt16Slice()
 	replaced := make([]int16, len(arr))
-
 	v.EachInt16(func(index int, val int16) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectInt16 uses the specified collector function to collect a value
 // for each of the int16s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectInt16(collector func(int, int16) interface{}) *Value {
-
 	arr := v.MustInt16Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachInt16(func(index int, val int16) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Int32 (int32 and []int32)
-	--------------------------------------------------
 */
 
 // Int32 gets the value as a int32, returns the optionalDefault
@@ -1212,44 +1059,35 @@ func (v *Value) IsInt32Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachInt32(callback func(int, int32) bool) *Value {
-
 	for index, val := range v.MustInt32Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereInt32 uses the specified decider function to select items
 // from the []int32.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereInt32(decider func(int, int32) bool) *Value {
-
 	var selected []int32
-
 	v.EachInt32(func(index int, val int32) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupInt32 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]int32.
 func (v *Value) GroupInt32(grouper func(int, int32) string) *Value {
-
 	groups := make(map[string][]int32)
-
 	v.EachInt32(func(index int, val int32) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -1258,47 +1096,37 @@ func (v *Value) GroupInt32(grouper func(int, int32) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceInt32 uses the specified function to replace each int32s
 // by iterating each item.  The data in the returned result will be a
 // []int32 containing the replaced items.
 func (v *Value) ReplaceInt32(replacer func(int, int32) int32) *Value {
-
 	arr := v.MustInt32Slice()
 	replaced := make([]int32, len(arr))
-
 	v.EachInt32(func(index int, val int32) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectInt32 uses the specified collector function to collect a value
 // for each of the int32s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectInt32(collector func(int, int32) interface{}) *Value {
-
 	arr := v.MustInt32Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachInt32(func(index int, val int32) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Int64 (int64 and []int64)
-	--------------------------------------------------
 */
 
 // Int64 gets the value as a int64, returns the optionalDefault
@@ -1356,44 +1184,35 @@ func (v *Value) IsInt64Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachInt64(callback func(int, int64) bool) *Value {
-
 	for index, val := range v.MustInt64Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereInt64 uses the specified decider function to select items
 // from the []int64.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereInt64(decider func(int, int64) bool) *Value {
-
 	var selected []int64
-
 	v.EachInt64(func(index int, val int64) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupInt64 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]int64.
 func (v *Value) GroupInt64(grouper func(int, int64) string) *Value {
-
 	groups := make(map[string][]int64)
-
 	v.EachInt64(func(index int, val int64) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -1402,47 +1221,37 @@ func (v *Value) GroupInt64(grouper func(int, int64) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceInt64 uses the specified function to replace each int64s
 // by iterating each item.  The data in the returned result will be a
 // []int64 containing the replaced items.
 func (v *Value) ReplaceInt64(replacer func(int, int64) int64) *Value {
-
 	arr := v.MustInt64Slice()
 	replaced := make([]int64, len(arr))
-
 	v.EachInt64(func(index int, val int64) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectInt64 uses the specified collector function to collect a value
 // for each of the int64s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectInt64(collector func(int, int64) interface{}) *Value {
-
 	arr := v.MustInt64Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachInt64(func(index int, val int64) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Uint (uint and []uint)
-	--------------------------------------------------
 */
 
 // Uint gets the value as a uint, returns the optionalDefault
@@ -1500,44 +1309,35 @@ func (v *Value) IsUintSlice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachUint(callback func(int, uint) bool) *Value {
-
 	for index, val := range v.MustUintSlice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereUint uses the specified decider function to select items
 // from the []uint.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereUint(decider func(int, uint) bool) *Value {
-
 	var selected []uint
-
 	v.EachUint(func(index int, val uint) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupUint uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]uint.
 func (v *Value) GroupUint(grouper func(int, uint) string) *Value {
-
 	groups := make(map[string][]uint)
-
 	v.EachUint(func(index int, val uint) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -1546,47 +1346,37 @@ func (v *Value) GroupUint(grouper func(int, uint) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceUint uses the specified function to replace each uints
 // by iterating each item.  The data in the returned result will be a
 // []uint containing the replaced items.
 func (v *Value) ReplaceUint(replacer func(int, uint) uint) *Value {
-
 	arr := v.MustUintSlice()
 	replaced := make([]uint, len(arr))
-
 	v.EachUint(func(index int, val uint) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectUint uses the specified collector function to collect a value
 // for each of the uints in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectUint(collector func(int, uint) interface{}) *Value {
-
 	arr := v.MustUintSlice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachUint(func(index int, val uint) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Uint8 (uint8 and []uint8)
-	--------------------------------------------------
 */
 
 // Uint8 gets the value as a uint8, returns the optionalDefault
@@ -1644,44 +1434,35 @@ func (v *Value) IsUint8Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachUint8(callback func(int, uint8) bool) *Value {
-
 	for index, val := range v.MustUint8Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereUint8 uses the specified decider function to select items
 // from the []uint8.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereUint8(decider func(int, uint8) bool) *Value {
-
 	var selected []uint8
-
 	v.EachUint8(func(index int, val uint8) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupUint8 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]uint8.
 func (v *Value) GroupUint8(grouper func(int, uint8) string) *Value {
-
 	groups := make(map[string][]uint8)
-
 	v.EachUint8(func(index int, val uint8) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -1690,47 +1471,37 @@ func (v *Value) GroupUint8(grouper func(int, uint8) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceUint8 uses the specified function to replace each uint8s
 // by iterating each item.  The data in the returned result will be a
 // []uint8 containing the replaced items.
 func (v *Value) ReplaceUint8(replacer func(int, uint8) uint8) *Value {
-
 	arr := v.MustUint8Slice()
 	replaced := make([]uint8, len(arr))
-
 	v.EachUint8(func(index int, val uint8) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectUint8 uses the specified collector function to collect a value
 // for each of the uint8s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectUint8(collector func(int, uint8) interface{}) *Value {
-
 	arr := v.MustUint8Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachUint8(func(index int, val uint8) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Uint16 (uint16 and []uint16)
-	--------------------------------------------------
 */
 
 // Uint16 gets the value as a uint16, returns the optionalDefault
@@ -1788,44 +1559,35 @@ func (v *Value) IsUint16Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachUint16(callback func(int, uint16) bool) *Value {
-
 	for index, val := range v.MustUint16Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereUint16 uses the specified decider function to select items
 // from the []uint16.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereUint16(decider func(int, uint16) bool) *Value {
-
 	var selected []uint16
-
 	v.EachUint16(func(index int, val uint16) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupUint16 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]uint16.
 func (v *Value) GroupUint16(grouper func(int, uint16) string) *Value {
-
 	groups := make(map[string][]uint16)
-
 	v.EachUint16(func(index int, val uint16) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -1834,47 +1596,37 @@ func (v *Value) GroupUint16(grouper func(int, uint16) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceUint16 uses the specified function to replace each uint16s
 // by iterating each item.  The data in the returned result will be a
 // []uint16 containing the replaced items.
 func (v *Value) ReplaceUint16(replacer func(int, uint16) uint16) *Value {
-
 	arr := v.MustUint16Slice()
 	replaced := make([]uint16, len(arr))
-
 	v.EachUint16(func(index int, val uint16) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectUint16 uses the specified collector function to collect a value
 // for each of the uint16s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectUint16(collector func(int, uint16) interface{}) *Value {
-
 	arr := v.MustUint16Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachUint16(func(index int, val uint16) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Uint32 (uint32 and []uint32)
-	--------------------------------------------------
 */
 
 // Uint32 gets the value as a uint32, returns the optionalDefault
@@ -1932,44 +1684,35 @@ func (v *Value) IsUint32Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachUint32(callback func(int, uint32) bool) *Value {
-
 	for index, val := range v.MustUint32Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereUint32 uses the specified decider function to select items
 // from the []uint32.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereUint32(decider func(int, uint32) bool) *Value {
-
 	var selected []uint32
-
 	v.EachUint32(func(index int, val uint32) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupUint32 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]uint32.
 func (v *Value) GroupUint32(grouper func(int, uint32) string) *Value {
-
 	groups := make(map[string][]uint32)
-
 	v.EachUint32(func(index int, val uint32) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -1978,47 +1721,37 @@ func (v *Value) GroupUint32(grouper func(int, uint32) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceUint32 uses the specified function to replace each uint32s
 // by iterating each item.  The data in the returned result will be a
 // []uint32 containing the replaced items.
 func (v *Value) ReplaceUint32(replacer func(int, uint32) uint32) *Value {
-
 	arr := v.MustUint32Slice()
 	replaced := make([]uint32, len(arr))
-
 	v.EachUint32(func(index int, val uint32) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectUint32 uses the specified collector function to collect a value
 // for each of the uint32s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectUint32(collector func(int, uint32) interface{}) *Value {
-
 	arr := v.MustUint32Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachUint32(func(index int, val uint32) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Uint64 (uint64 and []uint64)
-	--------------------------------------------------
 */
 
 // Uint64 gets the value as a uint64, returns the optionalDefault
@@ -2076,44 +1809,35 @@ func (v *Value) IsUint64Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachUint64(callback func(int, uint64) bool) *Value {
-
 	for index, val := range v.MustUint64Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereUint64 uses the specified decider function to select items
 // from the []uint64.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereUint64(decider func(int, uint64) bool) *Value {
-
 	var selected []uint64
-
 	v.EachUint64(func(index int, val uint64) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupUint64 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]uint64.
 func (v *Value) GroupUint64(grouper func(int, uint64) string) *Value {
-
 	groups := make(map[string][]uint64)
-
 	v.EachUint64(func(index int, val uint64) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -2122,47 +1846,37 @@ func (v *Value) GroupUint64(grouper func(int, uint64) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceUint64 uses the specified function to replace each uint64s
 // by iterating each item.  The data in the returned result will be a
 // []uint64 containing the replaced items.
 func (v *Value) ReplaceUint64(replacer func(int, uint64) uint64) *Value {
-
 	arr := v.MustUint64Slice()
 	replaced := make([]uint64, len(arr))
-
 	v.EachUint64(func(index int, val uint64) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectUint64 uses the specified collector function to collect a value
 // for each of the uint64s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectUint64(collector func(int, uint64) interface{}) *Value {
-
 	arr := v.MustUint64Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachUint64(func(index int, val uint64) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Uintptr (uintptr and []uintptr)
-	--------------------------------------------------
 */
 
 // Uintptr gets the value as a uintptr, returns the optionalDefault
@@ -2220,44 +1934,35 @@ func (v *Value) IsUintptrSlice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachUintptr(callback func(int, uintptr) bool) *Value {
-
 	for index, val := range v.MustUintptrSlice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereUintptr uses the specified decider function to select items
 // from the []uintptr.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereUintptr(decider func(int, uintptr) bool) *Value {
-
 	var selected []uintptr
-
 	v.EachUintptr(func(index int, val uintptr) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupUintptr uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]uintptr.
 func (v *Value) GroupUintptr(grouper func(int, uintptr) string) *Value {
-
 	groups := make(map[string][]uintptr)
-
 	v.EachUintptr(func(index int, val uintptr) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -2266,47 +1971,37 @@ func (v *Value) GroupUintptr(grouper func(int, uintptr) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceUintptr uses the specified function to replace each uintptrs
 // by iterating each item.  The data in the returned result will be a
 // []uintptr containing the replaced items.
 func (v *Value) ReplaceUintptr(replacer func(int, uintptr) uintptr) *Value {
-
 	arr := v.MustUintptrSlice()
 	replaced := make([]uintptr, len(arr))
-
 	v.EachUintptr(func(index int, val uintptr) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectUintptr uses the specified collector function to collect a value
 // for each of the uintptrs in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectUintptr(collector func(int, uintptr) interface{}) *Value {
-
 	arr := v.MustUintptrSlice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachUintptr(func(index int, val uintptr) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Float32 (float32 and []float32)
-	--------------------------------------------------
 */
 
 // Float32 gets the value as a float32, returns the optionalDefault
@@ -2364,44 +2059,35 @@ func (v *Value) IsFloat32Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachFloat32(callback func(int, float32) bool) *Value {
-
 	for index, val := range v.MustFloat32Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereFloat32 uses the specified decider function to select items
 // from the []float32.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereFloat32(decider func(int, float32) bool) *Value {
-
 	var selected []float32
-
 	v.EachFloat32(func(index int, val float32) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupFloat32 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]float32.
 func (v *Value) GroupFloat32(grouper func(int, float32) string) *Value {
-
 	groups := make(map[string][]float32)
-
 	v.EachFloat32(func(index int, val float32) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -2410,47 +2096,37 @@ func (v *Value) GroupFloat32(grouper func(int, float32) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceFloat32 uses the specified function to replace each float32s
 // by iterating each item.  The data in the returned result will be a
 // []float32 containing the replaced items.
 func (v *Value) ReplaceFloat32(replacer func(int, float32) float32) *Value {
-
 	arr := v.MustFloat32Slice()
 	replaced := make([]float32, len(arr))
-
 	v.EachFloat32(func(index int, val float32) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectFloat32 uses the specified collector function to collect a value
 // for each of the float32s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectFloat32(collector func(int, float32) interface{}) *Value {
-
 	arr := v.MustFloat32Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachFloat32(func(index int, val float32) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Float64 (float64 and []float64)
-	--------------------------------------------------
 */
 
 // Float64 gets the value as a float64, returns the optionalDefault
@@ -2508,44 +2184,35 @@ func (v *Value) IsFloat64Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachFloat64(callback func(int, float64) bool) *Value {
-
 	for index, val := range v.MustFloat64Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereFloat64 uses the specified decider function to select items
 // from the []float64.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereFloat64(decider func(int, float64) bool) *Value {
-
 	var selected []float64
-
 	v.EachFloat64(func(index int, val float64) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupFloat64 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]float64.
 func (v *Value) GroupFloat64(grouper func(int, float64) string) *Value {
-
 	groups := make(map[string][]float64)
-
 	v.EachFloat64(func(index int, val float64) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -2554,47 +2221,37 @@ func (v *Value) GroupFloat64(grouper func(int, float64) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceFloat64 uses the specified function to replace each float64s
 // by iterating each item.  The data in the returned result will be a
 // []float64 containing the replaced items.
 func (v *Value) ReplaceFloat64(replacer func(int, float64) float64) *Value {
-
 	arr := v.MustFloat64Slice()
 	replaced := make([]float64, len(arr))
-
 	v.EachFloat64(func(index int, val float64) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectFloat64 uses the specified collector function to collect a value
 // for each of the float64s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectFloat64(collector func(int, float64) interface{}) *Value {
-
 	arr := v.MustFloat64Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachFloat64(func(index int, val float64) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Complex64 (complex64 and []complex64)
-	--------------------------------------------------
 */
 
 // Complex64 gets the value as a complex64, returns the optionalDefault
@@ -2652,44 +2309,35 @@ func (v *Value) IsComplex64Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachComplex64(callback func(int, complex64) bool) *Value {
-
 	for index, val := range v.MustComplex64Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereComplex64 uses the specified decider function to select items
 // from the []complex64.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereComplex64(decider func(int, complex64) bool) *Value {
-
 	var selected []complex64
-
 	v.EachComplex64(func(index int, val complex64) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupComplex64 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]complex64.
 func (v *Value) GroupComplex64(grouper func(int, complex64) string) *Value {
-
 	groups := make(map[string][]complex64)
-
 	v.EachComplex64(func(index int, val complex64) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -2698,47 +2346,37 @@ func (v *Value) GroupComplex64(grouper func(int, complex64) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceComplex64 uses the specified function to replace each complex64s
 // by iterating each item.  The data in the returned result will be a
 // []complex64 containing the replaced items.
 func (v *Value) ReplaceComplex64(replacer func(int, complex64) complex64) *Value {
-
 	arr := v.MustComplex64Slice()
 	replaced := make([]complex64, len(arr))
-
 	v.EachComplex64(func(index int, val complex64) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectComplex64 uses the specified collector function to collect a value
 // for each of the complex64s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectComplex64(collector func(int, complex64) interface{}) *Value {
-
 	arr := v.MustComplex64Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachComplex64(func(index int, val complex64) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }
 
 /*
 	Complex128 (complex128 and []complex128)
-	--------------------------------------------------
 */
 
 // Complex128 gets the value as a complex128, returns the optionalDefault
@@ -2796,44 +2434,35 @@ func (v *Value) IsComplex128Slice() bool {
 //
 // Panics if the object is the wrong type.
 func (v *Value) EachComplex128(callback func(int, complex128) bool) *Value {
-
 	for index, val := range v.MustComplex128Slice() {
 		carryon := callback(index, val)
-		if carryon == false {
+		if !carryon {
 			break
 		}
 	}
-
 	return v
-
 }
 
 // WhereComplex128 uses the specified decider function to select items
 // from the []complex128.  The object contained in the result will contain
 // only the selected items.
 func (v *Value) WhereComplex128(decider func(int, complex128) bool) *Value {
-
 	var selected []complex128
-
 	v.EachComplex128(func(index int, val complex128) bool {
 		shouldSelect := decider(index, val)
-		if shouldSelect == false {
+		if !shouldSelect {
 			selected = append(selected, val)
 		}
 		return true
 	})
-
 	return &Value{data: selected}
-
 }
 
 // GroupComplex128 uses the specified grouper function to group the items
 // keyed by the return of the grouper.  The object contained in the
 // result will contain a map[string][]complex128.
 func (v *Value) GroupComplex128(grouper func(int, complex128) string) *Value {
-
 	groups := make(map[string][]complex128)
-
 	v.EachComplex128(func(index int, val complex128) bool {
 		group := grouper(index, val)
 		if _, ok := groups[group]; !ok {
@@ -2842,40 +2471,31 @@ func (v *Value) GroupComplex128(grouper func(int, complex128) string) *Value {
 		groups[group] = append(groups[group], val)
 		return true
 	})
-
 	return &Value{data: groups}
-
 }
 
 // ReplaceComplex128 uses the specified function to replace each complex128s
 // by iterating each item.  The data in the returned result will be a
 // []complex128 containing the replaced items.
 func (v *Value) ReplaceComplex128(replacer func(int, complex128) complex128) *Value {
-
 	arr := v.MustComplex128Slice()
 	replaced := make([]complex128, len(arr))
-
 	v.EachComplex128(func(index int, val complex128) bool {
 		replaced[index] = replacer(index, val)
 		return true
 	})
-
 	return &Value{data: replaced}
-
 }
 
 // CollectComplex128 uses the specified collector function to collect a value
 // for each of the complex128s in the slice.  The data returned will be a
 // []interface{}.
 func (v *Value) CollectComplex128(collector func(int, complex128) interface{}) *Value {
-
 	arr := v.MustComplex128Slice()
 	collected := make([]interface{}, len(arr))
-
 	v.EachComplex128(func(index int, val complex128) bool {
 		collected[index] = collector(index, val)
 		return true
 	})
-
 	return &Value{data: collected}
 }

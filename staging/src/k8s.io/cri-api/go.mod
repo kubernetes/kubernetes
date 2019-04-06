@@ -24,7 +24,7 @@ replace (
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf => github.com/golang/protobuf v1.1.0
 	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
-	github.com/stretchr/testify => github.com/stretchr/testify v0.0.0-20180319223459-c679ae2cc0cb
+	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/text => golang.org/x/text v0.0.0-20170810154203-b19bf474d317

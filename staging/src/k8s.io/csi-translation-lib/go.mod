@@ -91,8 +91,8 @@ replace (
 	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.2.0
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.3
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
-	github.com/stretchr/objx => github.com/stretchr/objx v0.0.0-20150928122152-1a9d0bb9f541
-	github.com/stretchr/testify => github.com/stretchr/testify v0.0.0-20180319223459-c679ae2cc0cb
+	github.com/stretchr/objx => github.com/stretchr/objx v0.1.1
+	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
 	github.com/tinylib/msgp => github.com/tinylib/msgp v1.1.0
 	github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8
 	github.com/ugorji/go => github.com/ugorji/go v0.0.0-20171019201919-bdcc60b419d1

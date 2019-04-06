@@ -44,7 +44,7 @@ replace (
 	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 	github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
-	github.com/stretchr/testify => github.com/stretchr/testify v0.0.0-20180319223459-c679ae2cc0cb
+	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20180808211826-de0752318171
 	golang.org/x/exp => golang.org/x/exp v0.0.0-20180321215751-8460e604b9de
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006

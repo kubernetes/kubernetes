@@ -54,21 +54,23 @@ type Comparison func() (success bool)
 //
 // This function does no assertion of any kind.
 func ObjectsAreEqual(expected, actual interface{}) bool {
-
 	if expected == nil || actual == nil {
 		return expected == actual
 	}
-	if exp, ok := expected.([]byte); ok {
-		act, ok := actual.([]byte)
-		if !ok {
-			return false
-		} else if exp == nil || act == nil {
-			return exp == nil && act == nil
-		}
-		return bytes.Equal(exp, act)
-	}
-	return reflect.DeepEqual(expected, actual)
 
+	exp, ok := expected.([]byte)
+	if !ok {
+		return reflect.DeepEqual(expected, actual)
+	}
+
+	act, ok := actual.([]byte)
+	if !ok {
+		return false
+	}
+	if exp == nil || act == nil {
+		return exp == nil && act == nil
+	}
+	return bytes.Equal(exp, act)
 }
 
 // ObjectsAreEqualValues gets whether two objects are equal, or if their
@@ -874,7 +876,7 @@ func Panics(t TestingT, f PanicTestFunc, msgAndArgs ...interface{}) bool {
 	}
 
 	if funcDidPanic, panicValue := didPanic(f); !funcDidPanic {
-		return Fail(t, fmt.Sprintf("func %#v should panic\n\tPanic value:\t%v", f, panicValue), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("func %#v should panic\n\tPanic value:\t%#v", f, panicValue), msgAndArgs...)
 	}
 
 	return true
@@ -891,10 +893,10 @@ func PanicsWithValue(t TestingT, expected interface{}, f PanicTestFunc, msgAndAr
 
 	funcDidPanic, panicValue := didPanic(f)
 	if !funcDidPanic {
-		return Fail(t, fmt.Sprintf("func %#v should panic\n\tPanic value:\t%v", f, panicValue), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("func %#v should panic\n\tPanic value:\t%#v", f, panicValue), msgAndArgs...)
 	}
 	if panicValue != expected {
-		return Fail(t, fmt.Sprintf("func %#v should panic with value:\t%v\n\tPanic value:\t%v", f, expected, panicValue), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("func %#v should panic with value:\t%#v\n\tPanic value:\t%#v", f, expected, panicValue), msgAndArgs...)
 	}
 
 	return true
@@ -1338,12 +1340,18 @@ func diff(expected interface{}, actual interface{}) string {
 		return ""
 	}
 
-	if ek != reflect.Struct && ek != reflect.Map && ek != reflect.Slice && ek != reflect.Array {
+	if ek != reflect.Struct && ek != reflect.Map && ek != reflect.Slice && ek != reflect.Array && ek != reflect.String {
 		return ""
 	}
 
-	e := spewConfig.Sdump(expected)
-	a := spewConfig.Sdump(actual)
+	var e, a string
+	if ek != reflect.String {
+		e = spewConfig.Sdump(expected)
+		a = spewConfig.Sdump(actual)
+	} else {
+		e = expected.(string)
+		a = actual.(string)
+	}
 
 	diff, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
 		A:        difflib.SplitLines(e),

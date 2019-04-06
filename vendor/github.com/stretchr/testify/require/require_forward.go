@@ -307,7 +307,7 @@ func (a *Assertions) FileExistsf(path string, msg string, args ...interface{}) {
 // HTTPBodyContains asserts that a specified handler returns a
 // body that contains a string.
 //
-//  a.HTTPBodyContains(myHandler, "www.google.com", nil, "I'm Feeling Lucky")
+//  a.HTTPBodyContains(myHandler, "GET", "www.google.com", nil, "I'm Feeling Lucky")
 //
 // Returns whether the assertion was successful (true) or not (false).
 func (a *Assertions) HTTPBodyContains(handler http.HandlerFunc, method string, url string, values url.Values, str interface{}, msgAndArgs ...interface{}) {
@@ -320,7 +320,7 @@ func (a *Assertions) HTTPBodyContains(handler http.HandlerFunc, method string, u
 // HTTPBodyContainsf asserts that a specified handler returns a
 // body that contains a string.
 //
-//  a.HTTPBodyContainsf(myHandler, "www.google.com", nil, "I'm Feeling Lucky", "error message %s", "formatted")
+//  a.HTTPBodyContainsf(myHandler, "GET", "www.google.com", nil, "I'm Feeling Lucky", "error message %s", "formatted")
 //
 // Returns whether the assertion was successful (true) or not (false).
 func (a *Assertions) HTTPBodyContainsf(handler http.HandlerFunc, method string, url string, values url.Values, str interface{}, msg string, args ...interface{}) {
@@ -333,7 +333,7 @@ func (a *Assertions) HTTPBodyContainsf(handler http.HandlerFunc, method string, 
 // HTTPBodyNotContains asserts that a specified handler returns a
 // body that does not contain a string.
 //
-//  a.HTTPBodyNotContains(myHandler, "www.google.com", nil, "I'm Feeling Lucky")
+//  a.HTTPBodyNotContains(myHandler, "GET", "www.google.com", nil, "I'm Feeling Lucky")
 //
 // Returns whether the assertion was successful (true) or not (false).
 func (a *Assertions) HTTPBodyNotContains(handler http.HandlerFunc, method string, url string, values url.Values, str interface{}, msgAndArgs ...interface{}) {
@@ -346,7 +346,7 @@ func (a *Assertions) HTTPBodyNotContains(handler http.HandlerFunc, method string
 // HTTPBodyNotContainsf asserts that a specified handler returns a
 // body that does not contain a string.
 //
-//  a.HTTPBodyNotContainsf(myHandler, "www.google.com", nil, "I'm Feeling Lucky", "error message %s", "formatted")
+//  a.HTTPBodyNotContainsf(myHandler, "GET", "www.google.com", nil, "I'm Feeling Lucky", "error message %s", "formatted")
 //
 // Returns whether the assertion was successful (true) or not (false).
 func (a *Assertions) HTTPBodyNotContainsf(handler http.HandlerFunc, method string, url string, values url.Values, str interface{}, msg string, args ...interface{}) {

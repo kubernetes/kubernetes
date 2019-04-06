@@ -400,10 +400,10 @@ github.com/spf13/viper v0.0.0-20160820190039-7fb2782df3d8 h1:hh6dlnX5EheZdLFxYsR
 github.com/spf13/viper v0.0.0-20160820190039-7fb2782df3d8/go.mod h1:A8kyI5cUJhb8N+3pkfONlcEcZbueH6nhAm0Fq7SrnBM=
 github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc h1:n+WYaU0kQ6WIiuEyWSgbXqkBx16irO69kYCtwVYoO5s=
 github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc/go.mod h1:ZrLn+e0ZuF3Y65PNF6dIwbJPZqfmtCXxFm9ckv0agOY=
-github.com/stretchr/objx v0.0.0-20150928122152-1a9d0bb9f541 h1:nvL7eaZN/Zw5emVOGaOclbLMeFO030UrPtWFTUS0p80=
-github.com/stretchr/objx v0.0.0-20150928122152-1a9d0bb9f541/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
-github.com/stretchr/testify v0.0.0-20180319223459-c679ae2cc0cb h1:Idl4I/YpJ3WG7+/dNrHOGfnClSTk6iesxWxAjzvemdg=
-github.com/stretchr/testify v0.0.0-20180319223459-c679ae2cc0cb/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
+github.com/stretchr/objx v0.1.1 h1:2vfRuCMp5sSVIDSqO8oNnWJq7mPa6KVP3iPIwFBuy8A=
+github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
+github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=
+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/syndtr/gocapability v0.0.0-20160928074757-e7cb7fa329f4 h1:w58e6FAOMd+rUgOfhaBb+ZVOQIOfUkpv5AAQVmf6hsI=
 github.com/syndtr/gocapability v0.0.0-20160928074757-e7cb7fa329f4/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/tinylib/msgp v1.1.0 h1:9fQd+ICuRIu/ue4vxJZu6/LzxN0HwMds2nq/0cFvxHU=
