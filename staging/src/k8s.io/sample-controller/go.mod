@@ -15,6 +15,7 @@ require (
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v11.1.0+incompatible
+	github.com/BurntSushi/xgb => github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802
 	github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda
 	github.com/docker/spdystream => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
@@ -45,7 +46,9 @@ replace (
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
 	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
-	golang.org/x/exp => golang.org/x/exp v0.0.0-20180321215751-8460e604b9de
+	golang.org/x/exp => golang.org/x/exp v0.0.0-20190312203227-4b39c73a6495
+	golang.org/x/image => golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
+	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20190312151609-d3739f865fa6
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
