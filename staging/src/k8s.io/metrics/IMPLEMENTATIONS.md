@@ -30,3 +30,5 @@ They are listed here for convenience.***
   Coming soon: Implementation of the custom metrics provider to support in-cluster metrics collected by the Datadog Agents.
 
 - [Kube Metrics Adapter](https://github.com/zalando-incubator/kube-metrics-adapter). A general purpose metrics adapter for Kubernetes that can collect and serve custom and external metrics for Horizontal Pod Autoscaling.
+  Provides the ability to scrape pods directly or from Prometheus through user defined queries.
+  Also capable of serving external metrics from a number of sources including AWS' SQS and [ZMON monitoring](https://github.com/zalando/zmon).
