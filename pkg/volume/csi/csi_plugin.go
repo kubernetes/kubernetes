@@ -384,20 +384,6 @@ func (p *csiPlugin) NewMounter(
 		return nil, errors.New("failed to get a Kubernetes client")
 	}
 
-	mounter := &csiMountMgr{
-		plugin:       p,
-		k8s:          k8s,
-		spec:         spec,
-		pod:          pod,
-		podUID:       pod.UID,
-		driverName:   csiDriverName(driverName),
-		driverMode:   driverMode,
-		volumeID:     volumeHandle,
-		specVolumeID: spec.Name(),
-		readOnly:     readOnly,
-	}
-	mounter.csiClientGetter.driverName = csiDriverName(driverName)
-
 	// Save volume info in pod dir
 	dir := mounter.GetPath()
 	dataDir := path.Dir(dir) // dropoff /mount at end
@@ -407,6 +393,21 @@ func (p *csiPlugin) NewMounter(
 		return nil, err
 	}
 	klog.V(4).Info(log("created path successfully [%s]", dataDir))
+
+	mounter := &csiMountMgr{
+		plugin:          p,
+		k8s:             k8s,
+		spec:            spec,
+		pod:             pod,
+		podUID:          pod.UID,
+		driverName:      csiDriverName(driverName),
+		driverMode:      driverMode,
+		volumeID:        volumeHandle,
+		specVolumeID:    spec.Name(),
+		readOnly:        readOnly,
+		MetricsProvider: NewMetricsCsi(volumeHandle, dataDir),
+	}
+	mounter.csiClientGetter.driverName = csiDriverName(driverName)
 
 	// persist volume info data for teardown
 	node := string(p.host.GetNodeName())
