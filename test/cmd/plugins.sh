@@ -44,6 +44,10 @@ run_plugins_tests() {
   output_message=$(PATH=${PATH}:"test/fixtures/pkg/kubectl/plugins" kubectl foo)
   kube::test::if_has_string "${output_message}" 'plugin foo'
 
+  # check arguments passed to the plugin
+  output_message=$(PATH=${PATH}:"test/fixtures/pkg/kubectl/plugins/bar" kubectl bar arg1)
+  kube::test::if_has_string "${output_message}" 'test/fixtures/pkg/kubectl/plugins/bar/kubectl-bar arg1'
+
   # ensure that a kubectl command supersedes a plugin that overshadows it
   output_message=$(PATH=${PATH}:"test/fixtures/pkg/kubectl/plugins/version" kubectl version)
   kube::test::if_has_string "${output_message}" 'Client Version'
