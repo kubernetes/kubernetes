@@ -106,6 +106,7 @@ type DeleteOptions struct {
 	ForceDeletion       bool
 	WaitForDeletion     bool
 	Quiet               bool
+	WarnClusterScope    bool
 
 	GracePeriod int
 	Timeout     time.Duration
@@ -148,6 +149,8 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	if err != nil {
 		return err
 	}
+
+	o.WarnClusterScope = enforceNamespace && !o.DeleteAllNamespaces
 
 	if o.DeleteAll || len(o.LabelSelector) > 0 || len(o.FieldSelector) > 0 {
 		if f := cmd.Flags().Lookup("ignore-not-found"); f != nil && !f.Changed {
@@ -216,6 +219,7 @@ func (o *DeleteOptions) Validate() error {
 	case o.ForceDeletion:
 		fmt.Fprintf(o.ErrOut, "warning: --force is ignored because --grace-period is not 0.\n")
 	}
+
 	return nil
 }
 
@@ -228,6 +232,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	if o.IgnoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)
 	}
+	warnClusterScope := o.WarnClusterScope
 	deletedInfos := []*resource.Info{}
 	uidMap := cmdwait.UIDMap{}
 	err := r.Visit(func(info *resource.Info, err error) error {
@@ -247,6 +252,10 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		}
 		options.PropagationPolicy = &policy
 
+		if warnClusterScope && info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			fmt.Fprintf(o.ErrOut, "warning: deleting cluster-scoped resources, not scoped to the provided namespace\n")
+			warnClusterScope = false
+		}
 		response, err := o.deleteResource(info, options)
 		if err != nil {
 			return err
