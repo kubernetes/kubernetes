@@ -48,8 +48,6 @@ fi
 # Exclude vendor checks in certain cases, if they're running in a separate job.
 if [[ ${EXCLUDE_GODEP:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
-    "verify-godeps.sh"             # runs in separate godeps job
-    "verify-godeps-licenses.sh"    # runs in separate godeps job
     "verify-vendor.sh"             # runs in separate godeps job
     "verify-vendor-licenses.sh"    # runs in separate godeps job
     )
