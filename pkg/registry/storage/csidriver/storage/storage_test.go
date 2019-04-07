@@ -101,6 +101,11 @@ func TestUpdate(t *testing.T) {
 	test.TestUpdate(
 		// valid
 		validNewCSIDriver("foo"),
+		// update func
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*storageapi.CSIDriver)
+			return object
+		},
 		//invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*storageapi.CSIDriver)
