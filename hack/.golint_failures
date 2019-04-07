@@ -59,6 +59,7 @@ pkg/controller/certificates/signer
 pkg/controller/certificates/signer/config/v1alpha1
 pkg/controller/cloud
 pkg/controller/clusterroleaggregation
+pkg/controller/cronjob
 pkg/controller/daemon
 pkg/controller/daemon/config/v1alpha1
 pkg/controller/deployment
@@ -116,7 +117,6 @@ pkg/kubelet/apis/deviceplugin/v1beta1
 pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
 pkg/kubelet/client
 pkg/kubelet/cm
-pkg/kubelet/config
 pkg/kubelet/container
 pkg/kubelet/container/testing
 pkg/kubelet/dockershim
@@ -129,7 +129,6 @@ pkg/kubelet/dockershim/network/kubenet
 pkg/kubelet/dockershim/network/testing
 pkg/kubelet/events
 pkg/kubelet/lifecycle
-pkg/kubelet/metrics
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption

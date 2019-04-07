@@ -86,7 +86,7 @@ const (
 )
 
 var (
-	// NodeName is a Gauge that tracks the name of the assigned via the label "node_key".
+	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
 	NodeName = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Subsystem: KubeletSubsystem,
@@ -115,7 +115,7 @@ var (
 		},
 		[]string{"operation_type"},
 	)
-	// PodStartDuration is a Histogram that tracks the duration (in seconds) it takes for single pod to go from pending to running.
+	// PodStartDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to go from pending to running.
 	PodStartDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: KubeletSubsystem,

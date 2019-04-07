@@ -129,7 +129,8 @@ func (s *sourceFile) produceWatchEvent(e *fsnotify.Event) error {
 func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 	switch e.eventType {
 	case podAdd, podModify:
-		if pod, err := s.extractFromFile(e.fileName); err != nil {
+		pod, err := s.extractFromFile(e.fileName)
+		if err != nil {
 			return fmt.Errorf("can't process config file %q: %v", e.fileName, err)
 		}
 		return s.store.Add(pod)

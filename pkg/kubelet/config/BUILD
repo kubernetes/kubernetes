@@ -21,7 +21,6 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
-        "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/kubelet/checkpoint:go_default_library",
