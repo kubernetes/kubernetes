@@ -38,11 +38,26 @@ func MarshalToYaml(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
 	return MarshalToYamlForCodecs(obj, gv, clientsetscheme.Codecs)
 }
 
+// MarshalToJSON marshals an object into json.
+func MarshalToJSON(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
+	return MarshalToJSONForCodecs(obj, gv, clientsetscheme.Codecs)
+}
+
 // MarshalToYamlForCodecs marshals an object into yaml using the specified codec
-// TODO: Is specifying the gv really needed here?
-// TODO: Can we support json out of the box easily here?
 func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs serializer.CodecFactory) ([]byte, error) {
 	const mediaType = runtime.ContentTypeYAML
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return []byte{}, errors.Errorf("unsupported media type %q", mediaType)
+	}
+
+	encoder := codecs.EncoderForVersion(info.Serializer, gv)
+	return runtime.Encode(encoder, obj)
+}
+
+// MarshalToJSONForCodecs marshals an object into json using the specified codec
+func MarshalToJSONForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs serializer.CodecFactory) ([]byte, error) {
+	const mediaType = runtime.ContentTypeJSON
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return []byte{}, errors.Errorf("unsupported media type %q", mediaType)
@@ -58,8 +73,6 @@ func UnmarshalFromYaml(buffer []byte, gv schema.GroupVersion) (runtime.Object, e
 }
 
 // UnmarshalFromYamlForCodecs unmarshals yaml into an object using the specified codec
-// TODO: Is specifying the gv really needed here?
-// TODO: Can we support json out of the box easily here?
 func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs serializer.CodecFactory) (runtime.Object, error) {
 	const mediaType = runtime.ContentTypeYAML
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)

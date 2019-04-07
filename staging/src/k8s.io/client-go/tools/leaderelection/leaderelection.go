@@ -172,14 +172,18 @@ type LeaderElector struct {
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer func() {
 		runtime.HandleCrash()
-		le.config.Callbacks.OnStoppedLeading()
+		if le.config.Callbacks.OnStoppedLeading != nil {
+			le.config.Callbacks.OnStoppedLeading()
+		}
 	}()
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	go le.config.Callbacks.OnStartedLeading(ctx)
+	if le.config.Callbacks.OnStartedLeading != nil {
+		go le.config.Callbacks.OnStartedLeading(ctx)
+	}
 	le.renew(ctx)
 }
 

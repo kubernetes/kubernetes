@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // TODO: We should invent a dynamic mechanism for this using the dynamic client instead of hard-coding these functions per-type
@@ -46,6 +47,25 @@ func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error
 
 		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(cm); err != nil {
 			return errors.Wrap(err, "unable to update configmap")
+		}
+	}
+	return nil
+}
+
+// CreateOrPatchConfigMap creates a ConfigMap if the target resource doesn't exist. If the resource exists already, this function will patch the resource instead.
+func CreateOrPatchConfigMap(client clientset.Interface, cm *v1.ConfigMap) error {
+	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			return errors.Wrap(err, "unable to create configmap")
+		}
+
+		configMapPatch, err := kubeadmutil.MarshalToJSON(cm, v1.SchemeGroupVersion)
+		if err != nil {
+			return errors.Wrap(err, "unable to generate strategic patch from config map")
+		}
+
+		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Patch(cm.ObjectMeta.Name, types.StrategicMergePatchType, configMapPatch); err != nil {
+			return errors.Wrap(err, "unable to patch configmap")
 		}
 	}
 	return nil

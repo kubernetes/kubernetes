@@ -21,8 +21,11 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	types "k8s.io/apimachinery/pkg/types"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
@@ -87,7 +90,15 @@ func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 		return err
 	}
 	cml.cm.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
-	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(cml.cm)
+
+	info, _ := runtime.SerializerInfoForMediaType(clientsetscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	encoder := clientsetscheme.Codecs.EncoderForVersion(info.Serializer, v1.SchemeGroupVersion)
+	cmlPatch, err := runtime.Encode(encoder, cml.cm)
+	if err != nil {
+		return err
+	}
+
+	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Patch(cml.ConfigMapMeta.Name, types.StrategicMergePatchType, cmlPatch)
 	return err
 }
 
