@@ -68,6 +68,7 @@ data:
             pods insecure
             upstream
             fallthrough in-addr.arpa ip6.arpa
+            ttl 30
         }
         prometheus :9153
         forward . /etc/resolv.conf
