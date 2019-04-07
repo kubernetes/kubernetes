@@ -60,6 +60,9 @@ const (
 	// to ensure that a certain minimum of nodes are checked for feasibility.
 	// This in turn helps ensure a minimum level of spreading.
 	minFeasibleNodesPercentageToFind = 5
+	// the num of goroutine to exec `findNodesThatFit`, `PrioritizeNodes`,
+	// `selectNodesForPreemption`
+	parallelizeGoroutineNum = 16
 )
 
 // FailedPredicateMap declares a map[string][]algorithm.PredicateFailureReason type.
@@ -444,7 +447,9 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
-		filtered = make([]*v1.Node, numNodesToFind)
+		// filtered is not exact numNodesToFind,
+		// need a buffer space for `checkNode` goroutine
+		filtered = make([]*v1.Node, numNodesToFind+parallelizeGoroutineNum)
 		errs := errors.MessageCountMap{}
 		var (
 			predicateResultLock sync.Mutex
@@ -474,11 +479,9 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 			}
 			if fits {
 				length := atomic.AddInt32(&filteredLen, 1)
+				filtered[length-1] = g.nodeInfoSnapshot.NodeInfoMap[nodeName].Node()
 				if length > numNodesToFind {
 					cancel()
-					atomic.AddInt32(&filteredLen, -1)
-				} else {
-					filtered[length-1] = g.nodeInfoSnapshot.NodeInfoMap[nodeName].Node()
 				}
 			} else {
 				predicateResultLock.Lock()
@@ -489,7 +492,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 
 		// Stops searching for more nodes once the configured number of feasible nodes
 		// are found.
-		workqueue.ParallelizeUntil(ctx, 16, int(allNodes), checkNode)
+		workqueue.ParallelizeUntil(ctx, parallelizeGoroutineNum, int(allNodes), checkNode)
 
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
@@ -695,7 +698,7 @@ func PrioritizeNodes(
 		}
 	}
 
-	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) {
+	workqueue.ParallelizeUntil(context.TODO(), parallelizeGoroutineNum, len(nodes), func(index int) {
 		nodeInfo := nodeNameToInfo[nodes[index].Name]
 		for i := range priorityConfigs {
 			if priorityConfigs[i].Function != nil {
@@ -943,7 +946,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 			resultLock.Unlock()
 		}
 	}
-	workqueue.ParallelizeUntil(context.TODO(), 16, len(potentialNodes), checkNode)
+	workqueue.ParallelizeUntil(context.TODO(), parallelizeGoroutineNum, len(potentialNodes), checkNode)
 	return nodeToVictims, nil
 }
 
