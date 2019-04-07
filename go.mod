@@ -1,6 +1,7 @@
 // This is a generated file. Do not edit directly.
 // Run hack/pin-dependency.sh to change pinned dependency versions.
 // Run hack/update-vendor.sh to update go.mod files and the vendor directory.
+// touch
 
 module k8s.io/kubernetes
 
