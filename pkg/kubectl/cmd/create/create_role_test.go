@@ -52,7 +52,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: "test",
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -70,7 +71,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: "test",
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -88,7 +90,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: "test",
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -106,7 +109,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: "test",
 				},
 				Rules: []rbac.PolicyRule{
 					{
