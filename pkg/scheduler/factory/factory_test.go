@@ -26,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -252,47 +253,124 @@ func TestDefaultErrorFunc(t *testing.T) {
 	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	queue := &internalqueue.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
-	schedulerCache := internalcache.New(30*time.Second, stopCh)
-	podBackoff := internalqueue.NewPodBackoffMap(1*time.Second, 60*time.Second)
-	errFunc := MakeDefaultErrorFunc(client, podBackoff, queue, schedulerCache, stopCh)
 
+	timestamp := time.Now()
+	queue := internalqueue.NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp))
+	schedulerCache := internalcache.New(30*time.Second, stopCh)
+	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache, stopCh)
+
+	// Trigger error handling again to put the pod in unschedulable queue
 	errFunc(testPod, nil)
 
-	for {
-		// This is a terrible way to do this but I plan on replacing this
-		// whole error handling system in the future. The test will time
-		// out if something doesn't work.
-		time.Sleep(10 * time.Millisecond)
-		got, exists, _ := queue.Get(testPod)
-		if !exists {
+	// Try up to a minute to retrieve the error pod from priority queue
+	foundPodFlag := false
+	maxIterations := 10 * 60
+	for i := 0; i < maxIterations; i++ {
+		time.Sleep(100 * time.Millisecond)
+		got := getPodfromPriorityQueue(queue, testPod)
+		if got == nil {
 			continue
 		}
-		requestReceived := false
-		actions := client.Actions()
-		for _, a := range actions {
-			if a.GetVerb() == "get" {
-				getAction, ok := a.(clienttesting.GetAction)
-				if !ok {
-					t.Errorf("Can't cast action object to GetAction interface")
-					break
-				}
-				name := getAction.GetName()
-				ns := a.GetNamespace()
-				if name != "foo" || ns != "bar" {
-					t.Errorf("Expected name %s namespace %s, got %s %s",
-						"foo", "bar", name, ns)
-				}
-				requestReceived = true
-			}
-		}
-		if !requestReceived {
-			t.Errorf("Get pod request not received")
-		}
+
+		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
+
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
+
+		foundPodFlag = true
 		break
+	}
+
+	if !foundPodFlag {
+		t.Errorf("Failed to get pod from the unschedulable queue after waiting for a minute: %v", testPod)
+	}
+
+	// Remove the pod from priority queue to test putting error
+	// pod in backoff queue.
+	queue.Delete(testPod)
+
+	// Trigger a move request
+	queue.MoveAllToActiveQueue()
+
+	// Trigger error handling again to put the pod in backoff queue
+	errFunc(testPod, nil)
+
+	foundPodFlag = false
+	for i := 0; i < maxIterations; i++ {
+		time.Sleep(100 * time.Millisecond)
+		// The pod should be found from backoff queue at this time
+		got := getPodfromPriorityQueue(queue, testPod)
+		if got == nil {
+			continue
+		}
+
+		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
+
+		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+
+		foundPodFlag = true
+		break
+	}
+
+	if !foundPodFlag {
+		t.Errorf("Failed to get pod from the backoff queue after waiting for a minute: %v", testPod)
+	}
+}
+
+// getPodfromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
+// the specific pod from the given priority queue. It returns the found pod in the priority queue.
+func getPodfromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
+	podList := queue.PendingPods()
+	if len(podList) == 0 {
+		return nil
+	}
+
+	queryPodKey, err := cache.MetaNamespaceKeyFunc(pod)
+	if err != nil {
+		return nil
+	}
+
+	for _, foundPod := range podList {
+		foundPodKey, err := cache.MetaNamespaceKeyFunc(foundPod)
+		if err != nil {
+			return nil
+		}
+
+		if foundPodKey == queryPodKey {
+			return foundPod
+		}
+	}
+
+	return nil
+}
+
+// testClientGetPodRequest function provides a routine used by TestDefaultErrorFunc test.
+// It tests whether the fake client can receive request and correctly "get" the namespace
+// and name of the error pod.
+func testClientGetPodRequest(client *fake.Clientset, t *testing.T, podNs string, podName string) {
+	requestReceived := false
+	actions := client.Actions()
+	for _, a := range actions {
+		if a.GetVerb() == "get" {
+			getAction, ok := a.(clienttesting.GetAction)
+			if !ok {
+				t.Errorf("Can't cast action object to GetAction interface")
+				break
+			}
+			name := getAction.GetName()
+			ns := a.GetNamespace()
+			if name != podName || ns != podNs {
+				t.Errorf("Expected name %s namespace %s, got %s %s",
+					podName, podNs, name, ns)
+			}
+			requestReceived = true
+		}
+	}
+	if !requestReceived {
+		t.Errorf("Get pod request not received")
 	}
 }
 

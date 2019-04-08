@@ -689,11 +689,6 @@ func TestSchedulingQueue_Close(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name:        "FIFO close",
-			q:           NewFIFO(),
-			expectedErr: fmt.Errorf(queueClosed),
-		},
-		{
 			name:        "PriorityQueue close",
 			q:           NewPriorityQueue(nil),
 			expectedErr: fmt.Errorf(queueClosed),
