@@ -178,7 +178,12 @@ var _ = SIGDescribe("PreStop", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 
-	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func() {
+	/*
+		Release : v1.15
+		Testname: Pods, prestop hook with graceful termination
+		Description: Create a pod with prestop lifecycle, terminate the pod with graceful period seconds. Wait up to the graceful termination period seconds, then verify the pod is in running state after the graceful termination period seconds.
+	*/
+	framework.ConformanceIt("should wait gracefully terminated pod until preStop hook completes the process", func() {
 		gracefulTerminationPeriodSeconds := int64(30)
 		ginkgo.By("creating the pod")
 		name := "pod-prestop-hook-" + string(uuid.NewUUID())

@@ -203,6 +203,7 @@ test/e2e/node/events.go: "should be sent by kubelets and the scheduler about pod
 test/e2e/node/pods.go: "should be submitted and removed"
 test/e2e/node/pods.go: "should be submitted and removed"
 test/e2e/node/pre_stop.go: "should call prestop when killing a pod"
+test/e2e/node/pre_stop.go: "should wait gracefully terminated pod until preStop hook completes the process"
 test/e2e/scheduling/predicates.go: "validates resource limits of pods that are allowed to run"
 test/e2e/scheduling/predicates.go: "validates that NodeSelector is respected if not matching"
 test/e2e/scheduling/predicates.go: "validates that NodeSelector is respected if matching"
