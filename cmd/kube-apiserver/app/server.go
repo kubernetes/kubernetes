@@ -222,9 +222,12 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer g
 
 // CreateNodeDialer creates the dialer infrastructure to connect to the nodes.
 func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Transport, error) {
+	proxyTransport := utilnet.NewDefaultTransport()
+	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
+	proxyTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
 	// Setup nodeTunneler if needed
 	var nodeTunneler tunneler.Tunneler
-	var proxyDialerFn utilnet.DialFunc
 	if len(s.SSHUser) > 0 {
 		// Get ssh key distribution func, if supported
 		var installSSHKey tunneler.InstallSSHKey
@@ -254,14 +257,8 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 		nodeTunneler = tunneler.New(s.SSHUser, s.SSHKeyfile, healthCheckPath, installSSHKey)
 
 		// Use the nodeTunneler's dialer when proxying to pods, services, and nodes
-		proxyDialerFn = nodeTunneler.Dial
+		proxyTransport.DialContext = nodeTunneler.Dial
 	}
-	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
-	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
-	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
-		DialContext:     proxyDialerFn,
-		TLSClientConfig: proxyTLSClientConfig,
-	})
 	return nodeTunneler, proxyTransport, nil
 }
 

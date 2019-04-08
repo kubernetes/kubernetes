@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1informers "k8s.io/client-go/informers/core/v1"
@@ -102,15 +103,12 @@ func NewAvailableConditionController(
 
 	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
 	// that's not so bad) and sets a very short timeout.
-	discoveryClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-		// the request should happen quickly.
-		Timeout: 5 * time.Second,
-	}
+	discoveryClient := &http.Client{Timeout: 5 * time.Second}
 	if proxyTransport != nil {
 		discoveryClient.Transport = proxyTransport
+	} else {
+		transport := utilnet.NewDefaultTransport()
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 	c.discoveryClient = discoveryClient
 

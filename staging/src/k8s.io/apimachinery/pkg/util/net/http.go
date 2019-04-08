@@ -30,6 +30,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/net/http2"
 	"k8s.io/klog"
@@ -442,4 +443,20 @@ func CloneHeader(in http.Header) http.Header {
 		out[key] = newValues
 	}
 	return out
+}
+
+// NewDefaultTransport returns a new instance of http.DefaultTransport
+func NewDefaultTransport() *http.Transport {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 }
