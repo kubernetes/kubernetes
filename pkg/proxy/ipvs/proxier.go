@@ -758,9 +758,9 @@ func (proxier *Proxier) syncProxyRules() {
 	staleServices := serviceUpdateResult.UDPStaleClusterIP
 	// merge stale services gathered from updateEndpointsMap
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
-		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.GetProtocol() == v1.ProtocolUDP {
-			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIPString())
-			staleServices.Insert(svcInfo.ClusterIPString())
+		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.Protocol() == v1.ProtocolUDP {
+			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIP().String())
+			staleServices.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				staleServices.Insert(extIP)
 			}
@@ -815,7 +815,7 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.Errorf("Failed to cast serviceInfo %q", svcName.String())
 			continue
 		}
-		protocol := strings.ToLower(string(svcInfo.Protocol))
+		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		// Precompute svcNameString; with many services the many calls
 		// to ServicePortName.String() show up in CPU profiles.
 		svcNameString := svcName.String()
@@ -853,8 +853,8 @@ func (proxier *Proxier) syncProxyRules() {
 		// Capture the clusterIP.
 		// ipset call
 		entry := &utilipset.Entry{
-			IP:       svcInfo.ClusterIP.String(),
-			Port:     svcInfo.Port,
+			IP:       svcInfo.ClusterIP().String(),
+			Port:     svcInfo.Port(),
 			Protocol: protocol,
 			SetType:  utilipset.HashIPPort,
 		}
@@ -867,15 +867,15 @@ func (proxier *Proxier) syncProxyRules() {
 		proxier.ipsetList[kubeClusterIPSet].activeEntries.Insert(entry.String())
 		// ipvs call
 		serv := &utilipvs.VirtualServer{
-			Address:   svcInfo.ClusterIP,
-			Port:      uint16(svcInfo.Port),
-			Protocol:  string(svcInfo.Protocol),
+			Address:   svcInfo.ClusterIP(),
+			Port:      uint16(svcInfo.Port()),
+			Protocol:  string(svcInfo.Protocol()),
 			Scheduler: proxier.ipvsScheduler,
 		}
 		// Set session affinity flag and timeout for IPVS service
-		if svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP {
+		if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 			serv.Flags |= utilipvs.FlagPersistent
-			serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds)
+			serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 		}
 		// We need to bind ClusterIP to dummy interface, so set `bindAddr` parameter to `true` in syncService()
 		if err := proxier.syncService(svcNameString, serv, true); err == nil {
@@ -891,16 +891,16 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture externalIPs.
-		for _, externalIP := range svcInfo.ExternalIPs {
+		for _, externalIP := range svcInfo.ExternalIPStrings() {
 			if local, err := utilproxy.IsLocalIP(externalIP); err != nil {
 				klog.Errorf("can't determine if IP is local, assuming not: %v", err)
 				// We do not start listening on SCTP ports, according to our agreement in the
 				// SCTP support KEP
-			} else if local && (svcInfo.GetProtocol() != v1.ProtocolSCTP) {
+			} else if local && (svcInfo.Protocol() != v1.ProtocolSCTP) {
 				lp := utilproxy.LocalPort{
 					Description: "externalIP for " + svcNameString,
 					IP:          externalIP,
-					Port:        svcInfo.Port,
+					Port:        svcInfo.Port(),
 					Protocol:    protocol,
 				}
 				if proxier.portsMap[lp] != nil {
@@ -928,7 +928,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// ipset call
 			entry := &utilipset.Entry{
 				IP:       externalIP,
-				Port:     svcInfo.Port,
+				Port:     svcInfo.Port(),
 				Protocol: protocol,
 				SetType:  utilipset.HashIPPort,
 			}
@@ -942,13 +942,13 @@ func (proxier *Proxier) syncProxyRules() {
 			// ipvs call
 			serv := &utilipvs.VirtualServer{
 				Address:   net.ParseIP(externalIP),
-				Port:      uint16(svcInfo.Port),
-				Protocol:  string(svcInfo.Protocol),
+				Port:      uint16(svcInfo.Port()),
+				Protocol:  string(svcInfo.Protocol()),
 				Scheduler: proxier.ipvsScheduler,
 			}
-			if svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP {
+			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				serv.Flags |= utilipvs.FlagPersistent
-				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds)
+				serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 			}
 			if err := proxier.syncService(svcNameString, serv, true); err == nil {
 				activeIPVSServices[serv.String()] = true
@@ -962,12 +962,12 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
-			if ingress.IP != "" {
+		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
+			if ingress != "" {
 				// ipset call
 				entry = &utilipset.Entry{
-					IP:       ingress.IP,
-					Port:     svcInfo.Port,
+					IP:       ingress,
+					Port:     svcInfo.Port(),
 					Protocol: protocol,
 					SetType:  utilipset.HashIPPort,
 				}
@@ -981,14 +981,14 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 				proxier.ipsetList[kubeLoadBalancerSet].activeEntries.Insert(entry.String())
 				// insert loadbalancer entry to lbIngressLocalSet if service externaltrafficpolicy=local
-				if svcInfo.OnlyNodeLocalEndpoints {
+				if svcInfo.OnlyNodeLocalEndpoints() {
 					if valid := proxier.ipsetList[kubeLoadBalancerLocalSet].validateEntry(entry); !valid {
 						klog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeLoadBalancerLocalSet].Name))
 						continue
 					}
 					proxier.ipsetList[kubeLoadBalancerLocalSet].activeEntries.Insert(entry.String())
 				}
-				if len(svcInfo.LoadBalancerSourceRanges) != 0 {
+				if len(svcInfo.LoadBalancerSourceRanges()) != 0 {
 					// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
 					// This currently works for loadbalancers that preserves source ips.
 					// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
@@ -998,11 +998,11 @@ func (proxier *Proxier) syncProxyRules() {
 					}
 					proxier.ipsetList[kubeLoadbalancerFWSet].activeEntries.Insert(entry.String())
 					allowFromNode := false
-					for _, src := range svcInfo.LoadBalancerSourceRanges {
+					for _, src := range svcInfo.LoadBalancerSourceRanges() {
 						// ipset call
 						entry = &utilipset.Entry{
-							IP:       ingress.IP,
-							Port:     svcInfo.Port,
+							IP:       ingress,
+							Port:     svcInfo.Port(),
 							Protocol: protocol,
 							Net:      src,
 							SetType:  utilipset.HashIPPortNet,
@@ -1025,10 +1025,10 @@ func (proxier *Proxier) syncProxyRules() {
 					// Need to add the following rule to allow request on host.
 					if allowFromNode {
 						entry = &utilipset.Entry{
-							IP:       ingress.IP,
-							Port:     svcInfo.Port,
+							IP:       ingress,
+							Port:     svcInfo.Port(),
 							Protocol: protocol,
-							IP2:      ingress.IP,
+							IP2:      ingress,
 							SetType:  utilipset.HashIPPortIP,
 						}
 						// enumerate all white list source ip
@@ -1042,19 +1042,19 @@ func (proxier *Proxier) syncProxyRules() {
 
 				// ipvs call
 				serv := &utilipvs.VirtualServer{
-					Address:   net.ParseIP(ingress.IP),
-					Port:      uint16(svcInfo.Port),
-					Protocol:  string(svcInfo.Protocol),
+					Address:   net.ParseIP(ingress),
+					Port:      uint16(svcInfo.Port()),
+					Protocol:  string(svcInfo.Protocol()),
 					Scheduler: proxier.ipvsScheduler,
 				}
-				if svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP {
+				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 					serv.Flags |= utilipvs.FlagPersistent
-					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds)
+					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 				}
 				if err := proxier.syncService(svcNameString, serv, true); err == nil {
 					activeIPVSServices[serv.String()] = true
 					activeBindAddrs[serv.Address.String()] = true
-					if err := proxier.syncEndpoint(svcName, svcInfo.OnlyNodeLocalEndpoints, serv); err != nil {
+					if err := proxier.syncEndpoint(svcName, svcInfo.OnlyNodeLocalEndpoints(), serv); err != nil {
 						klog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 					}
 				} else {
@@ -1063,7 +1063,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 		}
 
-		if svcInfo.NodePort != 0 {
+		if svcInfo.NodePort() != 0 {
 			addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
 			if err != nil {
 				klog.Errorf("Failed to get node ip address matching nodeport cidr: %v", err)
@@ -1075,7 +1075,7 @@ func (proxier *Proxier) syncProxyRules() {
 				lp := utilproxy.LocalPort{
 					Description: "nodePort for " + svcNameString,
 					IP:          address,
-					Port:        svcInfo.NodePort,
+					Port:        svcInfo.NodePort(),
 					Protocol:    protocol,
 				}
 				if utilproxy.IsZeroCIDR(address) {
@@ -1095,14 +1095,14 @@ func (proxier *Proxier) syncProxyRules() {
 					replacementPortsMap[lp] = proxier.portsMap[lp]
 					// We do not start listening on SCTP ports, according to our agreement in the
 					// SCTP support KEP
-				} else if svcInfo.GetProtocol() != v1.ProtocolSCTP {
+				} else if svcInfo.Protocol() != v1.ProtocolSCTP {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
 					if err != nil {
 						klog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
 						continue
 					}
 					if lp.Protocol == "udp" {
-						isIPv6 := utilnet.IsIPv6(svcInfo.ClusterIP)
+						isIPv6 := utilnet.IsIPv6(svcInfo.ClusterIP())
 						conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, v1.ProtocolUDP)
 					}
 					replacementPortsMap[lp] = socket
@@ -1111,13 +1111,14 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// Nodeports need SNAT, unless they're local.
 			// ipset call
+
 			var nodePortSet *IPSet
 			switch protocol {
 			case "tcp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetTCP]
 				entry = &utilipset.Entry{
 					// No need to provide ip info
-					Port:     svcInfo.NodePort,
+					Port:     svcInfo.NodePort(),
 					Protocol: protocol,
 					SetType:  utilipset.BitmapPort,
 				}
@@ -1125,7 +1126,7 @@ func (proxier *Proxier) syncProxyRules() {
 				nodePortSet = proxier.ipsetList[kubeNodePortSetUDP]
 				entry = &utilipset.Entry{
 					// No need to provide ip info
-					Port:     svcInfo.NodePort,
+					Port:     svcInfo.NodePort(),
 					Protocol: protocol,
 					SetType:  utilipset.BitmapPort,
 				}
@@ -1133,7 +1134,7 @@ func (proxier *Proxier) syncProxyRules() {
 				nodePortSet = proxier.ipsetList[kubeNodePortSetSCTP]
 				entry = &utilipset.Entry{
 					IP:       proxier.nodeIP.String(),
-					Port:     svcInfo.NodePort,
+					Port:     svcInfo.NodePort(),
 					Protocol: protocol,
 					SetType:  utilipset.HashIPPort,
 				}
@@ -1150,7 +1151,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Add externaltrafficpolicy=local type nodeport entry
-			if svcInfo.OnlyNodeLocalEndpoints {
+			if svcInfo.OnlyNodeLocalEndpoints() {
 				var nodePortLocalSet *IPSet
 				switch protocol {
 				case "tcp":
@@ -1189,18 +1190,18 @@ func (proxier *Proxier) syncProxyRules() {
 				// ipvs call
 				serv := &utilipvs.VirtualServer{
 					Address:   nodeIP,
-					Port:      uint16(svcInfo.NodePort),
-					Protocol:  string(svcInfo.Protocol),
+					Port:      uint16(svcInfo.NodePort()),
+					Protocol:  string(svcInfo.Protocol()),
 					Scheduler: proxier.ipvsScheduler,
 				}
-				if svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP {
+				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 					serv.Flags |= utilipvs.FlagPersistent
-					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds)
+					serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
 				}
 				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
 				if err := proxier.syncService(svcNameString, serv, false); err == nil {
 					activeIPVSServices[serv.String()] = true
-					if err := proxier.syncEndpoint(svcName, svcInfo.OnlyNodeLocalEndpoints, serv); err != nil {
+					if err := proxier.syncEndpoint(svcName, svcInfo.OnlyNodeLocalEndpoints(), serv); err != nil {
 						klog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 					}
 				} else {
@@ -1529,9 +1530,9 @@ func (proxier *Proxier) getExistingChains(buffer *bytes.Buffer, table utiliptabl
 // This assumes the proxier mutex is held
 func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceEndpoint) {
 	for _, epSvcPair := range connectionMap {
-		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && svcInfo.GetProtocol() == v1.ProtocolUDP {
+		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && svcInfo.Protocol() == v1.ProtocolUDP {
 			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
-			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIPString(), endpointIP, v1.ProtocolUDP)
+			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, v1.ProtocolUDP)
 			if err != nil {
 				klog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
 			}
