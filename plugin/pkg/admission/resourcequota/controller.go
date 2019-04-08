@@ -407,6 +407,20 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 	// if we have limited resources enabled for this resource, always calculate usage
 	inputObject := a.GetObject()
 
+	// if request is for delete, no need to calculate usage
+	// since admission control is incapable of guaranteeing a DELETE request actually succeeds.
+	metadata, err := meta.Accessor(inputObject)
+	if err != nil {
+		return quotas, nil
+	}
+	if metadata != nil {
+		deletionTimestamp := metadata.GetDeletionTimestamp()
+		// deletionTimestamp indicates that object is being terminated.
+		if deletionTimestamp != nil && !deletionTimestamp.IsZero() {
+			return quotas, nil
+		}
+	}
+
 	// Check if object matches AdmissionConfiguration matchScopes
 	limitedScopes, err := getMatchedLimitedScopes(evaluator, inputObject, limited)
 	if err != nil {
