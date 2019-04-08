@@ -91,9 +91,7 @@ function base64_decode_or_die {
 function setup_vertical_pod_autoscaler_component {
   local component=$1
   local manifests_dir=$2
-  token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  append_or_replace_prefixed_line /etc/srv/kubernetes/known_tokens.csv "${token}," "vpa-${component},uid:vpa-${component}"
-  create-vpa-kubeconfig vpa-${component} ${token}
+  create-static-auth-kubeconfig-for-component vpa-${component}
 
   # Prepare manifest
   local src_file="${manifests_dir}/internal-vpa-${component}.manifest"
@@ -124,18 +122,26 @@ function generate_vertical_pod_autoscaler_admission_controller_certs {
   fi
 }
 
-function create-vpa-kubeconfig {
-  component_=$1
-  token_=$2
-  echo "Creating kubeconfig file for VPA component ${component_}"
-  mkdir -p /etc/srv/kubernetes/${component_}
-  cat <<EOF >/etc/srv/kubernetes/${component_}/kubeconfig
+function create-static-auth-kubeconfig-for-component {
+  local component=$1
+  echo "Creating token for component ${component}"
+  local token="$(secure_random 32)"
+  append_or_replace_prefixed_line /etc/srv/kubernetes/known_tokens.csv "${token}," "system:${component},uid:system:${component}"
+  create-kubeconfig ${component} ${token}
+}
+
+function create-kubeconfig {
+  local component=$1
+  local token=$2
+  echo "Creating kubeconfig file for component ${component}"
+  mkdir -p /etc/srv/kubernetes/${component}
+  cat <<EOF >/etc/srv/kubernetes/${component}/kubeconfig
 apiVersion: v1
 kind: Config
 users:
-- name: ${component_}
+- name: ${component}
   user:
-    token: ${token_}
+    token: ${token}
 clusters:
 - name: local
   cluster:
@@ -144,9 +150,9 @@ clusters:
 contexts:
 - context:
     cluster: local
-    user: ${component_}
-  name: ${component_}
-current-context: ${component_}
+    user: ${component}
+  name: ${component}
+current-context: ${component}
 EOF
 }
 

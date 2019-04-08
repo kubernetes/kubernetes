@@ -190,7 +190,7 @@ roleRef:
   name: system:gke-vpa-metrics-reader
 subjects:
 - kind: User
-  name: vpa-recommender
+  name: system:vpa-recommender
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -205,7 +205,7 @@ roleRef:
   name: system:gke-vpa-cr-actor
 subjects:
 - kind: User
-  name: vpa-updater
+  name: system:vpa-updater
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -220,10 +220,10 @@ roleRef:
   name: system:gke-vpa-actor
 subjects:
 - kind: User
-  name: vpa-recommender
+  name: system:vpa-recommender
   namespace: kube-system
 - kind: User
-  name: vpa-updater
+  name: system:vpa-updater
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -238,7 +238,7 @@ roleRef:
   name: system:gke-vpa-checkpoint-actor
 subjects:
 - kind: User
-  name: vpa-recommender
+  name: system:vpa-recommender
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -253,13 +253,13 @@ roleRef:
   name: system:gke-vpa-target-reader
 subjects:
 - kind: User
-  name: vpa-recommender
+  name: system:vpa-recommender
   namespace: kube-system
 - kind: User
-  name: vpa-admission-controller
+  name: system:vpa-admission-controller
   namespace: kube-system
 - kind: User
-  name: vpa-updater
+  name: system:vpa-updater
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -274,7 +274,7 @@ roleRef:
   name: system:gke-vpa-evictioner
 subjects:
 - kind: User
-  name: vpa-updater
+  name: system:vpa-updater
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -334,5 +334,5 @@ roleRef:
   name: system:gke-vpa-admission-controller
 subjects:
 - kind: User
-  name: vpa-admission-controller
+  name: system:vpa-admission-controller
   namespace: kube-system
