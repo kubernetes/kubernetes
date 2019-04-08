@@ -489,10 +489,9 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				if int(deploy.Status.UpdatedReplicas) == replicas {
 					if res.Len() == replicas {
 						return true, nil
-					} else {
-						framework.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
-						return false, nil
 					}
+					framework.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
+					return false, nil
 
 				} else {
 					framework.Logf("Waiting for rolling update to finished. Keep sending traffic.")
@@ -928,7 +927,7 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJ
 	Expect(err).NotTo(HaveOccurred(), "Failed to verify backside re-encryption ingress")
 }
 
-func detectHttpVersionAndSchemeTest(f *framework.Framework, jig *ingress.TestJig, address, version, scheme string) {
+func detectHTTPVersionAndSchemeTest(f *framework.Framework, jig *ingress.TestJig, address, version, scheme string) {
 	timeoutClient := &http.Client{Timeout: ingress.IngressReqTimeout}
 	resp := ""
 	err := wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
