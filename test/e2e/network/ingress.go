@@ -189,10 +189,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			Expect(hcAfterSync.HttpHealthCheck.RequestPath).To(Equal(hcToChange.HttpHealthCheck.RequestPath))
 		})
 
-		It("should create ingress with pre-shared certificate", func() {
-			executePresharedCertTest(f, jig, "")
-		})
-
 		It("should support multiple TLS certs", func() {
 			By("Creating an ingress with no certs.")
 			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "multiple-certs"), ns, map[string]string{
