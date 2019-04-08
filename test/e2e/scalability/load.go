@@ -133,7 +133,7 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
-	options := framework.FrameworkOptions{
+	options := framework.Options{
 		ClientQPS:   float32(math.Max(50.0, float64(2*throughput))),
 		ClientBurst: int(math.Max(100.0, float64(4*throughput))),
 	}
