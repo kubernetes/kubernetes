@@ -30,7 +30,7 @@ import (
 // ResourceConsumerHandler holds metrics for a resource consumer.
 type ResourceConsumerHandler struct {
 	metrics     map[string]float64
-	metricsLock sync.Mutex
+	metricsLock sync.RWMutex
 }
 
 // NewResourceConsumerHandler creates and initializes a ResourceConsumerHandler to defaults.
@@ -129,8 +129,8 @@ func (handler *ResourceConsumerHandler) handleGetCurrentStatus(w http.ResponseWr
 }
 
 func (handler *ResourceConsumerHandler) handleMetrics(w http.ResponseWriter) {
-	handler.metricsLock.Lock()
-	defer handler.metricsLock.Unlock()
+	handler.metricsLock.RLock()
+	defer handler.metricsLock.RUnlock()
 	for k, v := range handler.metrics {
 		fmt.Fprintf(w, "# HELP %s info message.\n", k)
 		fmt.Fprintf(w, "# TYPE %s gauge\n", k)
