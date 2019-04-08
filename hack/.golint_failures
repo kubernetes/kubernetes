@@ -142,10 +142,10 @@ pkg/kubectl/cmd/expose
 pkg/kubectl/cmd/get
 pkg/kubectl/cmd/help
 pkg/kubectl/cmd/label
+pkg/kubectl/cmd/logs
 pkg/kubectl/cmd/patch
 pkg/kubectl/cmd/plugin
 pkg/kubectl/cmd/portforward
-pkg/kubectl/cmd/proxy
 pkg/kubectl/cmd/replace
 pkg/kubectl/cmd/rollingupdate
 pkg/kubectl/cmd/rollout
