@@ -70,6 +70,9 @@ var (
 		kubectl proxy --api-prefix=/k8s-api`))
 )
 
+//NewCmdProxy creates a new kubectl proxy command with
+//a help string, short and long descriptions, example use case, and the
+//function to actually exectute the command.
 func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
@@ -97,6 +100,18 @@ func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	return cmd
 }
 
+//RunProxy sanity checks and runs a kubectl proxy command
+//
+//RunProxy will error if:
+// - both a port and unix socket are specified, only at most one should be
+// - the input command cannot generate a valid REST config
+//
+//RunProxy will log warnings if
+// - the directory specified by the www flag (the static file server flag) is not actually a directory
+// - the directory specified by the www flag cannot be stat'd
+// - the disable-filter flag is passed and kubectl proxy is run on an accessible port
+//
+//Otherwise RunProxy will start a proxy with the supplied configuration
 func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	path := cmdutil.GetFlagString(cmd, "unix-socket")
 	port := cmdutil.GetFlagInt(cmd, "port")
