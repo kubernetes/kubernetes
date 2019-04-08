@@ -351,6 +351,44 @@ foo    0/0              0          <unknown>   <none>
 	}
 }
 
+func TestGetEmptyTable(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	emptyTable := ioutil.NopCloser(bytes.NewBufferString(`{
+"kind":"Table",
+"apiVersion":"meta.k8s.io/v1beta1",
+"metadata":{
+	"selfLink":"/api/v1/namespaces/default/pods",
+	"resourceVersion":"346"
+},
+"columnDefinitions":[
+	{"name":"Name","type":"string","format":"name","description":"the name","priority":0}
+],
+"rows":[]
+}`))
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTable},
+	}
+
+	streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"pods"})
+
+	expected := ``
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+	expectedErr := `No resources found.
+`
+	if e, a := expectedErr, errbuf.String(); e != a {
+		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
+	}
+}
+
 func TestGetObjectIgnoreNotFound(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
 
@@ -464,9 +502,49 @@ c      0/0              0          <unknown>
 	}
 }
 
+func TestGetSortedObjectsUnstructuredTable(t *testing.T) {
+	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(sortTestTableData()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	unstructuredBytes, err := encjson.MarshalIndent(unstructuredMap, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// t.Log(string(unstructuredBytes))
+	body := ioutil.NopCloser(bytes.NewReader(unstructuredBytes))
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body},
+	}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &corev1.SchemeGroupVersion}}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	// sorting with metedata.name
+	cmd.Flags().Set("sort-by", ".metadata.name")
+	cmd.Run(cmd, []string{"pods"})
+
+	expected := `NAME   CUSTOM
+a      custom-a
+b      custom-b
+c      custom-c
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
 func sortTestData() []runtime.Object {
 	return []runtime.Object{
 		&corev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 			ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
 			Spec: corev1.PodSpec{
 				RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -477,6 +555,7 @@ func sortTestData() []runtime.Object {
 			},
 		},
 		&corev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
 			Spec: corev1.PodSpec{
 				RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -487,6 +566,7 @@ func sortTestData() []runtime.Object {
 			},
 		},
 		&corev1.Pod{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 			ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
 			Spec: corev1.PodSpec{
 				RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -502,11 +582,17 @@ func sortTestData() []runtime.Object {
 func sortTestTableData() []runtime.Object {
 	return []runtime.Object{
 		&metav1beta1.Table{
-			TypeMeta: metav1.TypeMeta{Kind: "Table"},
+			TypeMeta: metav1.TypeMeta{APIVersion: "meta.k8s.io/v1beta1", Kind: "Table"},
+			ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+				{Name: "NAME", Type: "string", Format: "name"},
+				{Name: "CUSTOM", Type: "string", Format: ""},
+			},
 			Rows: []metav1beta1.TableRow{
 				{
+					Cells: []interface{}{"c", "custom-c"},
 					Object: runtime.RawExtension{
 						Object: &corev1.Pod{
+							TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 							ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
 							Spec: corev1.PodSpec{
 								RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -519,8 +605,10 @@ func sortTestTableData() []runtime.Object {
 					},
 				},
 				{
+					Cells: []interface{}{"b", "custom-b"},
 					Object: runtime.RawExtension{
 						Object: &corev1.Pod{
+							TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 							ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
 							Spec: corev1.PodSpec{
 								RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -533,8 +621,10 @@ func sortTestTableData() []runtime.Object {
 					},
 				},
 				{
+					Cells: []interface{}{"a", "custom-a"},
 					Object: runtime.RawExtension{
 						Object: &corev1.Pod{
+							TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 							ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
 							Spec: corev1.PodSpec{
 								RestartPolicy:                 corev1.RestartPolicyAlways,
@@ -1313,6 +1403,113 @@ foo    0/0              0          <unknown>
 	}
 }
 
+func TestWatchResourceTable(t *testing.T) {
+	columns := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: "the name", Priority: 0},
+		{Name: "Active", Type: "boolean", Description: "active", Priority: 0},
+	}
+
+	listTable := &metav1beta1.Table{
+		TypeMeta:          metav1.TypeMeta{APIVersion: "meta.k8s.io/v1beta1", Kind: "Table"},
+		ColumnDefinitions: columns,
+		Rows: []metav1beta1.TableRow{
+			{
+				Cells: []interface{}{"a", true},
+				Object: runtime.RawExtension{
+					Object: &corev1.Pod{
+						TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+						ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "10"},
+					},
+				},
+			},
+			{
+				Cells: []interface{}{"b", true},
+				Object: runtime.RawExtension{
+					Object: &corev1.Pod{
+						TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+						ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "20"},
+					},
+				},
+			},
+		},
+	}
+
+	events := []watch.Event{
+		{
+			Type: watch.Added,
+			Object: &metav1beta1.Table{
+				TypeMeta:          metav1.TypeMeta{APIVersion: "meta.k8s.io/v1beta1", Kind: "Table"},
+				ColumnDefinitions: columns, // first event includes the columns
+				Rows: []metav1beta1.TableRow{{
+					Cells: []interface{}{"a", false},
+					Object: runtime.RawExtension{
+						Object: &corev1.Pod{
+							TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+							ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "30"},
+						},
+					},
+				}},
+			},
+		},
+		{
+			Type: watch.Deleted,
+			Object: &metav1beta1.Table{
+				ColumnDefinitions: []metav1beta1.TableColumnDefinition{},
+				Rows: []metav1beta1.TableRow{{
+					Cells: []interface{}{"b", false},
+					Object: runtime.RawExtension{
+						Object: &corev1.Pod{
+							TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+							ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "40"},
+						},
+					},
+				}},
+			},
+		},
+	}
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") != "true" && req.URL.Query().Get("fieldSelector") == "" {
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, listTable)}, nil
+				}
+				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "" {
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events)}, nil
+				}
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("watch", "true")
+	cmd.Run(cmd, []string{"pods"})
+
+	expected := `NAME   ACTIVE
+a      true
+b      true
+a      false
+b      false
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
 func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	pods, events := watchTestData()
 
@@ -1448,7 +1645,9 @@ func watchBody(codec runtime.Codec, events []watch.Event) io.ReadCloser {
 	buf := bytes.NewBuffer([]byte{})
 	enc := restclientwatch.NewEncoder(streaming.NewEncoder(buf, codec), codec)
 	for i := range events {
-		enc.Encode(&events[i])
+		if err := enc.Encode(&events[i]); err != nil {
+			panic(err)
+		}
 	}
 	return json.Framer.NewFrameReader(ioutil.NopCloser(buf))
 }

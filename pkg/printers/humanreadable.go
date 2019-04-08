@@ -63,6 +63,7 @@ type HumanReadablePrinter struct {
 	defaultHandler *handlerEntry
 	options        PrintOptions
 	lastType       interface{}
+	lastColumns    []metav1beta1.TableColumnDefinition
 	skipTabWriter  bool
 	encoder        runtime.Encoder
 	decoder        runtime.Decoder
@@ -289,10 +290,26 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 	// display tables following the rules of options
 	if table, ok := obj.(*metav1beta1.Table); ok {
-		if err := DecorateTable(table, h.options); err != nil {
+		// Do not print headers if this table has no column definitions, or they are the same as the last ones we printed
+		localOptions := h.options
+		if len(table.ColumnDefinitions) == 0 || reflect.DeepEqual(table.ColumnDefinitions, h.lastColumns) {
+			localOptions.NoHeaders = true
+		}
+
+		if len(table.ColumnDefinitions) == 0 {
+			// If this table has no column definitions, use the columns from the last table we printed for decoration and layout.
+			// This is done when receiving tables in watch events to save bandwidth.
+			localOptions.NoHeaders = true
+			table.ColumnDefinitions = h.lastColumns
+		} else {
+			// If this table has column definitions, remember them for future use.
+			h.lastColumns = table.ColumnDefinitions
+		}
+
+		if err := DecorateTable(table, localOptions); err != nil {
 			return err
 		}
-		return PrintTable(table, output, h.options)
+		return PrintTable(table, output, localOptions)
 	}
 
 	// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand before
