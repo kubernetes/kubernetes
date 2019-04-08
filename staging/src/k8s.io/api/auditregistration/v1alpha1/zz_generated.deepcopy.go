@@ -131,6 +131,11 @@ func (in *ServiceReference) DeepCopyInto(out *ServiceReference) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.Port != nil {
+		in, out := &in.Port, &out.Port
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

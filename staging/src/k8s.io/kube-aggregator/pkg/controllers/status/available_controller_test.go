@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -31,13 +32,18 @@ import (
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 )
 
+const (
+	testServicePort     = 1234
+	testServicePortName = "testPort"
+)
+
 func newEndpoints(namespace, name string) *v1.Endpoints {
 	return &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
 	}
 }
 
-func newEndpointsWithAddress(namespace, name string) *v1.Endpoints {
+func newEndpointsWithAddress(namespace, name string, port int32, portName string) *v1.Endpoints {
 	return &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
 		Subsets: []v1.EndpointSubset{
@@ -47,18 +53,24 @@ func newEndpointsWithAddress(namespace, name string) *v1.Endpoints {
 						IP: "val",
 					},
 				},
+				Ports: []v1.EndpointPort{
+					{
+						Name: portName,
+						Port: port,
+					},
+				},
 			},
 		},
 	}
 }
 
-func newService(namespace, name string) *v1.Service {
+func newService(namespace, name string, port int32, portName string) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeClusterIP,
 			Ports: []v1.ServicePort{
-				{Port: 443},
+				{Port: port, Name: portName},
 			},
 		},
 	}
@@ -77,6 +89,7 @@ func newRemoteAPIService(name string) *apiregistration.APIService {
 			Service: &apiregistration.ServiceReference{
 				Namespace: "foo",
 				Name:      "bar",
+				Port:      testServicePort,
 			},
 		},
 	}
@@ -107,7 +120,7 @@ func TestSync(t *testing.T) {
 			name:           "no service",
 			apiServiceName: "remote.group",
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
-			services:       []*v1.Service{newService("foo", "not-bar")},
+			services:       []*v1.Service{newService("foo", "not-bar", testServicePort, testServicePortName)},
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -128,19 +141,19 @@ func TestSync(t *testing.T) {
 					},
 				},
 			}},
-			endpoints: []*v1.Endpoints{newEndpointsWithAddress("foo", "bar")},
+			endpoints: []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
 				Reason:  "ServicePortError",
-				Message: `service/bar in "foo" is not listening on port 443`,
+				Message: fmt.Sprintf(`service/bar in "foo" is not listening on port %d`, testServicePort),
 			},
 		},
 		{
 			name:           "no endpoints",
 			apiServiceName: "remote.group",
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
-			services:       []*v1.Service{newService("foo", "bar")},
+			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -152,21 +165,34 @@ func TestSync(t *testing.T) {
 			name:           "missing endpoints",
 			apiServiceName: "remote.group",
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
-			services:       []*v1.Service{newService("foo", "bar")},
+			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
 			endpoints:      []*v1.Endpoints{newEndpoints("foo", "bar")},
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
 				Reason:  "MissingEndpoints",
-				Message: `endpoints for service/bar in "foo" have no addresses`,
+				Message: `endpoints for service/bar in "foo" have no addresses with port name "testPort"`,
+			},
+		},
+		{
+			name:           "wrong endpoint port name",
+			apiServiceName: "remote.group",
+			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, "wrongName")},
+			expectedAvailability: apiregistration.APIServiceCondition{
+				Type:    apiregistration.Available,
+				Status:  apiregistration.ConditionFalse,
+				Reason:  "MissingEndpoints",
+				Message: fmt.Sprintf(`endpoints for service/bar in "foo" have no addresses with port name "%s"`, testServicePortName),
 			},
 		},
 		{
 			name:           "remote",
 			apiServiceName: "remote.group",
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
-			services:       []*v1.Service{newService("foo", "bar")},
-			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar")},
+			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionTrue,

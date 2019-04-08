@@ -20,6 +20,7 @@ import (
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -54,5 +55,12 @@ func SetDefaults_Rule(obj *admissionregistrationv1beta1.Rule) {
 	if obj.Scope == nil {
 		s := admissionregistrationv1beta1.AllScopes
 		obj.Scope = &s
+	}
+}
+
+// SetDefaults_ServiceReference sets defaults for Webhook's ServiceReference
+func SetDefaults_ServiceReference(obj *admissionregistrationv1beta1.ServiceReference) {
+	if obj.Port == nil {
+		obj.Port = utilpointer.Int32Ptr(443)
 	}
 }
