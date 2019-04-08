@@ -68,10 +68,10 @@ That said, if you have questions, reach out to us
 [announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
 [Borg]: https://research.google.com/pubs/pub43438.html
 [CNCF]: https://www.cncf.io/about
-[communication]: https://git.k8s.io/community/communication
-[community repository]: https://git.k8s.io/community
+[communication]: https://github.com/kubernetes/kubernetes/blob/master/SUPPORT.md
+[community repository]: https://kubernetes.io/docs
 [containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
-[developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
+[developer's documentation]: https://kubernetes.io/docs/contribute
 [Docker environment]: https://docs.docker.com/engine
 [Go environment]: https://golang.org/doc/install
 [GoDoc]: https://godoc.org/k8s.io/kubernetes
