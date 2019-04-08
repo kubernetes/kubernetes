@@ -363,27 +363,25 @@ while true; do sleep 1; done
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
-			ginkgo.It("should be able to pull image from gcr.io [LinuxOnly] [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.DebianBase)
-				imagePullTest(image, false, v1.PodRunning, false, false)
-			})
-
 			ginkgo.It("should be able to pull image from gcr.io [NodeConformance]", func() {
-				framework.SkipUnlessNodeOSDistroIs("windows")
-				image := imageutils.GetE2EImage(imageutils.WindowsNanoServer)
-				imagePullTest(image, false, v1.PodRunning, false, true)
-			})
-
-			ginkgo.It("should be able to pull image from docker hub [LinuxOnly] [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.Alpine)
-				imagePullTest(image, false, v1.PodRunning, false, false)
+				image := imageutils.GetE2EImage(imageutils.DebianBase)
+				isWindows := false
+				if framework.NodeOSDistroIs("windows") {
+					image = imageutils.GetE2EImage(imageutils.WindowsNanoServer)
+					isWindows = true
+				}
+				imagePullTest(image, false, v1.PodRunning, false, isWindows)
 			})
 
 			ginkgo.It("should be able to pull image from docker hub [NodeConformance]", func() {
-				framework.SkipUnlessNodeOSDistroIs("windows")
-				// TODO(claudiub): Switch to nanoserver image manifest list.
-				image := "e2eteam/busybox:1.29"
-				imagePullTest(image, false, v1.PodRunning, false, true)
+				image := imageutils.GetE2EImage(imageutils.Alpine)
+				isWindows := false
+				if framework.NodeOSDistroIs("windows") {
+					// TODO(claudiub): Switch to nanoserver image manifest list.
+					image = "e2eteam/busybox:1.29"
+					isWindows = true
+				}
+				imagePullTest(image, false, v1.PodRunning, false, isWindows)
 			})
 
 			ginkgo.It("should not be able to pull from private registry without secret [NodeConformance]", func() {
@@ -391,15 +389,14 @@ while true; do sleep 1; done
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
-			ginkgo.It("should be able to pull from private registry with secret [LinuxOnly] [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
-				imagePullTest(image, true, v1.PodRunning, false, false)
-			})
-
 			ginkgo.It("should be able to pull from private registry with secret [NodeConformance]", func() {
-				framework.SkipUnlessNodeOSDistroIs("windows")
-				image := imageutils.GetE2EImage(imageutils.AuthenticatedWindowsNanoServer)
-				imagePullTest(image, true, v1.PodRunning, false, true)
+				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
+				isWindows := false
+				if framework.NodeOSDistroIs("windows") {
+					image = imageutils.GetE2EImage(imageutils.AuthenticatedWindowsNanoServer)
+					isWindows = true
+				}
+				imagePullTest(image, true, v1.PodRunning, false, isWindows)
 			})
 		})
 	})
