@@ -4433,6 +4433,9 @@ func formatEndpoints(endpoints *corev1.Endpoints, ports sets.String) string {
 	count := 0
 	for i := range endpoints.Subsets {
 		ss := &endpoints.Subsets[i]
+		if len(ss.NotReadyAddresses) != 0 {
+			continue
+		}
 		if len(ss.Ports) == 0 {
 			// It's possible to have headless services with no ports.
 			for i := range ss.Addresses {
