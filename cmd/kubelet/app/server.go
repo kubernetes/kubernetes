@@ -374,7 +374,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		if err != nil {
 			return nil, err
 		}
-		mounter = nsutil.NewNsenterMounter(s.RootDirectory, ne)
+		mounter = nsutil.NewMounter(s.RootDirectory, ne)
 		// NSenter only valid on Linux
 		subpather = subpath.NewNSEnter(mounter, ne, s.RootDirectory)
 		// an exec interface which can use nsenter for flex plugin calls

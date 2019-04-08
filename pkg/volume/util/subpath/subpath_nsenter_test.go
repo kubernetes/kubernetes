@@ -106,7 +106,7 @@ func TestCheckDeviceInode(t *testing.T) {
 	}
 }
 
-func newFakeNsenterMounter(tmpdir string, t *testing.T) (*nsutil.NsenterMounter, string, string, *nsenter.Nsenter, error) {
+func newFakeNsenterMounter(tmpdir string, t *testing.T) (*nsutil.Mounter, string, string, *nsenter.Nsenter, error) {
 	rootfsPath := filepath.Join(tmpdir, "rootfs")
 	if err := os.Mkdir(rootfsPath, 0755); err != nil {
 		return nil, "", "", nil, err
@@ -121,7 +121,7 @@ func newFakeNsenterMounter(tmpdir string, t *testing.T) (*nsutil.NsenterMounter,
 		return nil, "", "", nil, err
 	}
 
-	return nsutil.NewNsenterMounter(varlibPath, ne), rootfsPath, varlibPath, ne, nil
+	return nsutil.NewMounter(varlibPath, ne), rootfsPath, varlibPath, ne, nil
 }
 
 func TestNsenterSafeMakeDir(t *testing.T) {
