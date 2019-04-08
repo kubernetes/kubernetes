@@ -475,7 +475,7 @@ var _ = SIGDescribe("Density", func() {
 		Expect(missingMeasurements <= MaxMissingPodStartupMeasurements).To(Equal(true))
 	})
 
-	options := framework.FrameworkOptions{
+	options := framework.Options{
 		ClientQPS:   50.0,
 		ClientBurst: 100,
 	}

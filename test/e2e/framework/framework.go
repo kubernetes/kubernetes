@@ -105,7 +105,7 @@ type Framework struct {
 	cleanupHandle CleanupActionHandle
 
 	// configuration for framework's client
-	Options FrameworkOptions
+	Options Options
 
 	// Place where various additional data is stored during test run to be printed to ReportDir,
 	// or stdout if ReportDir is not set once test ends.
@@ -122,8 +122,8 @@ type TestDataSummary interface {
 	PrintJSON() string
 }
 
-// FrameworkOptions is a struct for managing test framework options.
-type FrameworkOptions struct {
+// Options is a struct for managing test framework options.
+type Options struct {
 	ClientQPS    float32
 	ClientBurst  int
 	GroupVersion *schema.GroupVersion
@@ -132,7 +132,7 @@ type FrameworkOptions struct {
 // NewDefaultFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewDefaultFramework(baseName string) *Framework {
-	options := FrameworkOptions{
+	options := Options{
 		ClientQPS:   20,
 		ClientBurst: 50,
 	}
@@ -140,7 +140,7 @@ func NewDefaultFramework(baseName string) *Framework {
 }
 
 // NewFramework creates a test framework.
-func NewFramework(baseName string, options FrameworkOptions, client clientset.Interface) *Framework {
+func NewFramework(baseName string, options Options, client clientset.Interface) *Framework {
 	f := &Framework{
 		BaseName:                 baseName,
 		AddonResourceConstraints: make(map[string]ResourceConstraint),
@@ -667,7 +667,7 @@ func kubectlExecWithRetry(namespace string, podName, containerName string, args 
 
 		return stdOutBytes, stdErrBytes, err
 	}
-	err := fmt.Errorf("Failed: kubectl exec failed %d times with \"i/o timeout\". Giving up.", maxKubectlExecRetries)
+	err := fmt.Errorf("Failed: kubectl exec failed %d times with \"i/o timeout\". Giving up", maxKubectlExecRetries)
 	return nil, nil, err
 }
 
