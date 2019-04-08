@@ -206,7 +206,7 @@ func (f CodecFactory) UniversalDecoder(versions ...schema.GroupVersion) runtime.
 	} else {
 		versioner = schema.GroupVersions(versions)
 	}
-	return f.CodecForVersions(nil, f.universal, nil, versioner)
+	return f.CodecForVersions(nil, f.universal, runtime.DisabledGroupVersioner, versioner)
 }
 
 // CodecForVersions creates a codec with the provided serializer. If an object is decoded and its group is not in the list,
@@ -225,12 +225,12 @@ func (f CodecFactory) CodecForVersions(encoder runtime.Encoder, decoder runtime.
 
 // DecoderToVersion returns a decoder that targets the provided group version.
 func (f CodecFactory) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	return f.CodecForVersions(nil, decoder, nil, gv)
+	return f.CodecForVersions(nil, decoder, runtime.DisabledGroupVersioner, gv)
 }
 
 // EncoderForVersion returns an encoder that targets the provided group version.
 func (f CodecFactory) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	return f.CodecForVersions(encoder, nil, gv, nil)
+	return f.CodecForVersions(encoder, nil, gv, runtime.InternalGroupVersioner)
 }
 
 // WithoutConversionCodecFactory is a CodecFactory that will explicitly ignore requests to perform conversion.
