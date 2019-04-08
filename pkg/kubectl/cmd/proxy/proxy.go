@@ -109,7 +109,7 @@ func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 //RunProxy will log warnings if
 // - the directory specified by the www flag (the static file server flag) is not actually a directory
 // - the directory specified by the www flag cannot be stat'd
-// - the disable-filter flag is passed and kubectl proxy is being run on an accessible port
+// - the disable-filter flag is passed and kubectl proxy is run on an accessible port
 //
 //Otherwise RunProxy will start a proxy with the supplied configuration
 func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
