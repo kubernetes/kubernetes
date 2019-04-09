@@ -48,7 +48,7 @@ import (
 
 // ServiceResolver knows how to convert a service reference into an actual location.
 type ServiceResolver interface {
-	ResolveEndpoint(namespace, name string) (*url.URL, error)
+	ResolveEndpoint(namespace, name string, port int32) (*url.URL, error)
 }
 
 // AvailableConditionController handles checking the availability of registered API services.
@@ -185,17 +185,20 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 
 	if service.Spec.Type == v1.ServiceTypeClusterIP {
-		// if we have a cluster IP service, it must be listening on 443 and we can check that
+		// if we have a cluster IP service, it must be listening on configured port and we can check that
+		servicePort := apiService.Spec.Service.Port
+		portName := ""
 		foundPort := false
 		for _, port := range service.Spec.Ports {
-			if port.Port == 443 {
+			if port.Port == servicePort {
 				foundPort = true
+				portName = port.Name
 			}
 		}
 		if !foundPort {
 			availableCondition.Status = apiregistration.ConditionFalse
 			availableCondition.Reason = "ServicePortError"
-			availableCondition.Message = fmt.Sprintf("service/%s in %q is not listening on port 443", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
+			availableCondition.Message = fmt.Sprintf("service/%s in %q is not listening on port %d", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, apiService.Spec.Service.Port)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
 			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
 			return err
@@ -219,15 +222,19 @@ func (c *AvailableConditionController) sync(key string) error {
 		}
 		hasActiveEndpoints := false
 		for _, subset := range endpoints.Subsets {
-			if len(subset.Addresses) > 0 {
-				hasActiveEndpoints = true
-				break
+			if len(subset.Addresses) == 0 {
+				continue
+			}
+			for _, endpointPort := range subset.Ports {
+				if endpointPort.Name == portName {
+					hasActiveEndpoints = true
+				}
 			}
 		}
 		if !hasActiveEndpoints {
 			availableCondition.Status = apiregistration.ConditionFalse
 			availableCondition.Reason = "MissingEndpoints"
-			availableCondition.Message = fmt.Sprintf("endpoints for service/%s in %q have no addresses", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
+			availableCondition.Message = fmt.Sprintf("endpoints for service/%s in %q have no addresses with port name %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, portName)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
 			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
 			return err
@@ -235,7 +242,7 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 	// actually try to hit the discovery endpoint when it isn't local and when we're routing as a service.
 	if apiService.Spec.Service != nil && c.serviceResolver != nil {
-		discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name)
+		discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, apiService.Spec.Service.Port)
 		if err != nil {
 			return err
 		}

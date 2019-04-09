@@ -25,7 +25,6 @@ import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -160,7 +159,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		framework.InjectHtml(f.ClientSet, config, fsGroup, tests[0].Volume, tests[0].ExpectedContent)
+		framework.InjectHTML(f.ClientSet, config, fsGroup, tests[0].Volume, tests[0].ExpectedContent)
 		framework.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
 	})
 
@@ -226,5 +225,5 @@ func testScriptInPod(
 
 	By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
-	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
+	framework.ExpectNoError(err, "while deleting pod")
 }

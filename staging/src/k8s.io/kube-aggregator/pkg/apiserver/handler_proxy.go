@@ -78,6 +78,8 @@ type proxyHandlingInfo struct {
 	serviceNamespace string
 	// serviceAvailable indicates this APIService is available or not
 	serviceAvailable bool
+	// servicePort is the port of the service this handler proxies to
+	servicePort int32
 }
 
 func proxyError(w http.ResponseWriter, req *http.Request, error string, code int) {
@@ -128,7 +130,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "https"
-	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName)
+	rloc, err := r.serviceResolver.ResolveEndpoint(handlingInfo.serviceNamespace, handlingInfo.serviceName, handlingInfo.servicePort)
 	if err != nil {
 		klog.Errorf("error resolving %s/%s: %v", handlingInfo.serviceNamespace, handlingInfo.serviceName, err)
 		proxyError(w, req, "service unavailable", http.StatusServiceUnavailable)
@@ -226,6 +228,7 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationapi.APIServic
 		},
 		serviceName:      apiService.Spec.Service.Name,
 		serviceNamespace: apiService.Spec.Service.Namespace,
+		servicePort:      apiService.Spec.Service.Port,
 		serviceAvailable: apiregistrationapi.IsAPIServiceConditionTrue(apiService, apiregistrationapi.Available),
 	}
 	if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {

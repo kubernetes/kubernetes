@@ -75,6 +75,7 @@ func webhookClientConfigForCRD(crd *internal.CustomResourceDefinition) *webhook.
 		ret.Service = &webhook.ClientConfigService{
 			Name:      apiConfig.Service.Name,
 			Namespace: apiConfig.Service.Namespace,
+			Port:      apiConfig.Service.Port,
 		}
 		if apiConfig.Service.Path != nil {
 			ret.Service.Path = *apiConfig.Service.Path

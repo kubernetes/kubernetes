@@ -665,8 +665,8 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 	}
 	podReadyCondition := GeneratePodReadyCondition(&pod.Spec, pod.Status.Conditions, pod.Status.ContainerStatuses, pod.Status.Phase)
 	i, curCondition := podutil.GetPodConditionFromList(pod.Status.Conditions, v1.PodReady)
-	// Only reconcile if "Ready" condition is present
-	if i >= 0 && curCondition.Status != podReadyCondition.Status {
+	// Only reconcile if "Ready" condition is present and Status or Message is not expected
+	if i >= 0 && (curCondition.Status != podReadyCondition.Status || curCondition.Message != podReadyCondition.Message) {
 		return true
 	}
 	return false

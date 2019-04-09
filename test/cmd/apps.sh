@@ -309,6 +309,8 @@ run_deployment_tests() {
   kubectl-with-retry rollout pause deployment nginx "${kube_flags[@]}"
   # A paused deployment cannot be rolled back
   ! kubectl rollout undo deployment nginx "${kube_flags[@]}"
+  # A paused deployment cannot be restarted
+  ! kubectl rollout restart deployment nginx "${kube_flags[@]}"
   # Resume the deployment
   kubectl-with-retry rollout resume deployment nginx "${kube_flags[@]}"
   # The resumed deployment can now be rolled back
@@ -318,6 +320,12 @@ run_deployment_tests() {
   kubectl get rs "${newrs}" -o yaml | grep "deployment.kubernetes.io/revision-history: 1,3"
   # Check that trying to watch the status of a superseded revision returns an error
   ! kubectl rollout status deployment/nginx --revision=3
+  # Restarting the deployment creates a new replicaset
+  kubectl rollout restart deployment/nginx
+  sleep 1
+  newrs="$(kubectl describe deployment nginx | grep NewReplicaSet | awk '{print $2}')"
+  rs="$(kubectl get rs "${newrs}" -o yaml)"
+  kube::test::if_has_string "${rs}" "deployment.kubernetes.io/revision: \"6\""
   cat hack/testdata/deployment-revision1.yaml | ${SED} "s/name: nginx$/name: nginx2/" | kubectl create -f - "${kube_flags[@]}"
   # Deletion of both deployments should not be blocked
   kubectl delete deployment nginx2 "${kube_flags[@]}"

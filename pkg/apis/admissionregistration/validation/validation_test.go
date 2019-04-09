@@ -377,6 +377,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 						Service: &admissionregistration.ServiceReference{
 							Namespace: "ns",
 							Name:      "n",
+							Port:      443,
 						},
 						URL: strPtr("example.com/k8s/webhook"),
 					},
@@ -478,6 +479,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Namespace: "ns",
 							Name:      "n",
 							Path:      strPtr("foo/"),
+							Port:      443,
 						},
 					},
 				},
@@ -494,6 +496,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Namespace: "ns",
 							Name:      "n",
 							Path:      strPtr("/"),
+							Port:      443,
 						},
 					},
 				},
@@ -510,6 +513,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Namespace: "ns",
 							Name:      "n",
 							Path:      strPtr("/foo"),
+							Port:      443,
 						},
 					},
 				},
@@ -526,6 +530,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Namespace: "ns",
 							Name:      "n",
 							Path:      strPtr("//"),
+							Port:      443,
 						},
 					},
 				},
@@ -542,6 +547,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Namespace: "ns",
 							Name:      "n",
 							Path:      strPtr("/foo//bar/"),
+							Port:      443,
 						},
 					},
 				},
@@ -557,6 +563,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Namespace: "ns",
 							Name:      "n",
 							Path:      strPtr("/foo/bar//"),
+							Port:      443,
 						},
 					},
 				},
@@ -573,11 +580,48 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Namespace: "ns",
 							Name:      "n",
 							Path:      strPtr("/apis/foo.bar/v1alpha1/--bad"),
+							Port:      443,
 						},
 					},
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
+		},
+		{
+			name: "invalid port 0",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("https://apis/foo.bar"),
+								Port:      0,
+							},
+						},
+					},
+				}, true),
+			expectedError: `Invalid value: 0: port is not valid: must be between 1 and 65535, inclusive`,
+		},
+		{
+			name: "invalid port >65535",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							Service: &admissionregistration.ServiceReference{
+								Namespace: "ns",
+								Name:      "n",
+								Path:      strPtr("https://apis/foo.bar"),
+								Port:      65536,
+							},
+						},
+					},
+				}, true),
+			expectedError: `Invalid value: 65536: port is not valid: must be between 1 and 65535, inclusive`,
 		},
 		{
 			name: "timeout seconds cannot be greater than 30",

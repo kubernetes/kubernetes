@@ -32,6 +32,10 @@ reviewers:
   - MaciekPytel # for test/e2e/common/autoscaling_utils.go
   - oomichi
   - xichengliudui
+  - andrewsykim
+  - neolit123
+  - stevesloka
+  - johnSchnake
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker

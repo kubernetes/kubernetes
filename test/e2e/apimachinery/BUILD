@@ -28,7 +28,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/apimachinery",
     deps = [
-        "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/printers:go_default_library",
@@ -89,6 +88,7 @@ go_library(
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

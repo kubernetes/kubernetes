@@ -472,7 +472,11 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		if tc.finished {
 			return true, &v1.Event{}, nil
 		}
-		obj := action.(core.CreateAction).GetObject().(*v1.Event)
+		create, ok := action.(core.CreateAction)
+		if !ok {
+			return false, nil, nil
+		}
+		obj := create.GetObject().(*v1.Event)
 		if tc.verifyEvents {
 			switch obj.Reason {
 			case "SuccessfulRescale":

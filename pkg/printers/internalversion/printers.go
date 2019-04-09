@@ -35,7 +35,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -441,8 +441,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	priorityClassColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Value", Type: "integer", Description: schedulingv1beta1.PriorityClass{}.SwaggerDoc()["value"]},
-		{Name: "Global-Default", Type: "boolean", Description: schedulingv1beta1.PriorityClass{}.SwaggerDoc()["globalDefault"]},
+		{Name: "Value", Type: "integer", Description: schedulingv1.PriorityClass{}.SwaggerDoc()["value"]},
+		{Name: "Global-Default", Type: "boolean", Description: schedulingv1.PriorityClass{}.SwaggerDoc()["globalDefault"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(priorityClassColumnDefinitions, printPriorityClass)

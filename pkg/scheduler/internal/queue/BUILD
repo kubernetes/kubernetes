@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["scheduling_queue.go"],
+    srcs = [
+        "pod_backoff.go",
+        "scheduling_queue.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/internal/queue",
     visibility = ["//pkg/scheduler:__subpackages__"],
     deps = [
@@ -21,7 +24,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["scheduling_queue_test.go"],
+    srcs = [
+        "pod_backoff_test.go",
+        "scheduling_queue_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",

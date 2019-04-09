@@ -1,4 +1,4 @@
-// This is a generated file.
+// This is a generated file. Do not edit directly.
 // Run hack/pin-dependency.sh to change pinned dependency versions.
 // Run hack/update-vendor.sh to update go.mod files and the vendor directory.
 
@@ -191,7 +191,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/cri-api v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
-	k8s.io/gengo v0.0.0-20181106084056-51747d6e00da
+	k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/heapster v1.2.0-beta.1
 	k8s.io/klog v0.0.0-20190306015804-8e90cee79f82
 	k8s.io/kube-aggregator v0.0.0
@@ -474,7 +474,7 @@ replace (
 	k8s.io/component-base => ./staging/src/k8s.io/component-base
 	k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
-	k8s.io/gengo => k8s.io/gengo v0.0.0-20181106084056-51747d6e00da
+	k8s.io/gengo => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/heapster => k8s.io/heapster v1.2.0-beta.1
 	k8s.io/klog => k8s.io/klog v0.0.0-20190306015804-8e90cee79f82
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator

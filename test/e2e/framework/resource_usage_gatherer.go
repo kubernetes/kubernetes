@@ -34,22 +34,27 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 )
 
+// ResourceConstraint is a struct to hold constraints.
 type ResourceConstraint struct {
 	CPUConstraint    float64
 	MemoryConstraint uint64
 }
 
+// SingleContainerSummary is a struct to hold single container summary.
 type SingleContainerSummary struct {
 	Name string
-	Cpu  float64
+	CPU  float64
 	Mem  uint64
 }
 
+// ResourceUsageSummary is a struct to hold resource usage summary.
 // we can't have int here, as JSON does not accept integer keys.
 type ResourceUsageSummary map[string][]SingleContainerSummary
 
+// NoCPUConstraint is the number of constraint for CPU.
 const NoCPUConstraint = math.MaxFloat64
 
+// PrintHumanReadable prints resource usage summary in human readable.
 func (s *ResourceUsageSummary) PrintHumanReadable() string {
 	buf := &bytes.Buffer{}
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
@@ -57,17 +62,19 @@ func (s *ResourceUsageSummary) PrintHumanReadable() string {
 		buf.WriteString(fmt.Sprintf("%v percentile:\n", perc))
 		fmt.Fprintf(w, "container\tcpu(cores)\tmemory(MB)\n")
 		for _, summary := range summaries {
-			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", summary.Name, summary.Cpu, float64(summary.Mem)/(1024*1024))
+			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", summary.Name, summary.CPU, float64(summary.Mem)/(1024*1024))
 		}
 		w.Flush()
 	}
 	return buf.String()
 }
 
+// PrintJSON prints resource usage summary in JSON.
 func (s *ResourceUsageSummary) PrintJSON() string {
 	return PrettyPrintJSON(*s)
 }
 
+// SummaryKind returns string of ResourceUsageSummary
 func (s *ResourceUsageSummary) SummaryKind() string {
 	return "ResourceUsageSummary"
 }
@@ -193,6 +200,7 @@ func (w *resourceGatherWorker) gather(initialSleep time.Duration) {
 	}
 }
 
+// ContainerResourceGatherer is a struct for gathering container resource.
 type ContainerResourceGatherer struct {
 	client       clientset.Interface
 	stopCh       chan struct{}
@@ -202,6 +210,7 @@ type ContainerResourceGatherer struct {
 	options      ResourceGathererOptions
 }
 
+// ResourceGathererOptions is a struct to hold options for resource.
 type ResourceGathererOptions struct {
 	InKubemark                  bool
 	Nodes                       NodesSet
@@ -210,14 +219,19 @@ type ResourceGathererOptions struct {
 	PrintVerboseLogs            bool
 }
 
+// NodesSet is a value of nodes set.
 type NodesSet int
 
 const (
-	AllNodes          NodesSet = 0 // All containers on all nodes
-	MasterNodes       NodesSet = 1 // All containers on Master nodes only
-	MasterAndDNSNodes NodesSet = 2 // All containers on Master nodes and DNS containers on other nodes
+	// AllNodes means all containers on all nodes.
+	AllNodes NodesSet = 0
+	// MasterNodes means all containers on Master nodes only.
+	MasterNodes NodesSet = 1
+	// MasterAndDNSNodes means all containers on Master nodes and DNS containers on other nodes.
+	MasterAndDNSNodes NodesSet = 2
 )
 
+// NewResourceUsageGatherer returns a new ContainerResourceGatherer.
 func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions, pods *v1.PodList) (*ContainerResourceGatherer, error) {
 	g := ContainerResourceGatherer{
 		client:       c,
@@ -360,7 +374,7 @@ func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constrai
 			usage := data[perc][name]
 			summary[strconv.Itoa(perc)] = append(summary[strconv.Itoa(perc)], SingleContainerSummary{
 				Name: name,
-				Cpu:  usage.CPUUsageInCores,
+				CPU:  usage.CPUUsageInCores,
 				Mem:  usage.MemoryWorkingSetInBytes,
 			})
 			// Verifying 99th percentile of resource usage

@@ -161,7 +161,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		Expect(err).To(HaveOccurred())
 		errorMsg := "invalid option \\\"objectSpaceReserve\\\" for volume plugin kubernetes.io/vsphere-volume"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -176,7 +176,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		Expect(err).To(HaveOccurred())
 		errorMsg := "Invalid value for " + Policy_DiskStripes + "."
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -190,7 +190,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		Expect(err).To(HaveOccurred())
 		errorMsg := "Invalid value for " + Policy_HostFailuresToTolerate + "."
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -207,7 +207,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		errorMsg := "The specified datastore: \\\"" + VmfsDatastore + "\\\" is not a VSAN datastore. " +
 			"The policy parameters will work only with VSAN Datastore."
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -238,7 +238,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		Expect(err).To(HaveOccurred())
 		errorMsg := "User specified datastore is not compatible with the storagePolicy: \\\"" + tagPolicy + "\\\""
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -251,7 +251,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		Expect(err).To(HaveOccurred())
 		errorMsg := "no pbm profile found with name: \\\"" + BronzeStoragePolicy + "\\"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -266,7 +266,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		Expect(err).To(HaveOccurred())
 		errorMsg := "Cannot specify storage policy capabilities along with storage policy name. Please specify only one"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 })
@@ -274,24 +274,24 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, namespace string, scParameters map[string]string) {
 	By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters, nil))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
+	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	By("Waiting for claim to be in bound phase")
 	persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
 	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	By("Verify the volume is accessible and available in the pod")
 	verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
@@ -306,12 +306,12 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, scParameters map[string]string) error {
 	By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters, nil))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
+	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	By("Waiting for claim to be in bound phase")
@@ -325,12 +325,12 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterNode string, namespace string, clusterName string, scParameters map[string]string) {
 	By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters, nil))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
+	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
@@ -339,7 +339,7 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterN
 	Expect(err).To(HaveOccurred())
 
 	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(pvclaim.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	vmName := clusterName + "-dynamic-pvc-" + string(updatedClaim.UID)
 	framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 	// Wait for 6 minutes to let the vSphere Cloud Provider clean up routine delete the dummy VM

@@ -56,18 +56,12 @@ func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
 	return unstructured.UnstructuredJSONScheme.Encode(obj, w)
 }
 
-// ContentConfig returns a rest.ContentConfig for dynamic types.  It includes enough codecs to act as a "normal"
+// UnstructuredPlusDefaultContentConfig returns a rest.ContentConfig for dynamic types.  It includes enough codecs to act as a "normal"
 // serializer for the rest.client with options, status and the like.
 func UnstructuredPlusDefaultContentConfig() rest.ContentConfig {
-	var jsonInfo runtime.SerializerInfo
 	// TODO: scheme.Codecs here should become "pkg/apis/server/scheme" which is the minimal core you need
 	// to talk to a kubernetes server
-	for _, info := range scheme.Codecs.SupportedMediaTypes() {
-		if info.MediaType == runtime.ContentTypeJSON {
-			jsonInfo = info
-			break
-		}
-	}
+	jsonInfo, _ := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 
 	jsonInfo.Serializer = dynamicCodec{}
 	jsonInfo.PrettySerializer = nil

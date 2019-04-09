@@ -250,7 +250,7 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 	case cc.URL != nil:
 		allErrors = append(allErrors, webhook.ValidateWebhookURL(fldPath.Child("clientConfig").Child("url"), *cc.URL, true)...)
 	case cc.Service != nil:
-		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path)...)
+		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, cc.Service.Port)...)
 	}
 	return allErrors
 }

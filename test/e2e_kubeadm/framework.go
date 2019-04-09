@@ -18,6 +18,7 @@ package e2e_kubeadm
 
 import "k8s.io/kubernetes/test/e2e/framework"
 
+// KubeadmDescribe annotates the test with the Kubeadm label.
 func KubeadmDescribe(text string, body func()) bool {
 	return framework.KubeDescribe("[sig-cluster-lifecycle] [area-kubeadm] "+text, body)
 }

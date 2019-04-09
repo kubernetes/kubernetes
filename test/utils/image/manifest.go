@@ -28,7 +28,6 @@ import (
 type RegistryList struct {
 	DockerLibraryRegistry string `yaml:"dockerLibraryRegistry"`
 	E2eRegistry           string `yaml:"e2eRegistry"`
-	EtcdRegistry          string `yaml:"etcdRegistry"`
 	GcRegistry            string `yaml:"gcRegistry"`
 	PrivateRegistry       string `yaml:"privateRegistry"`
 	SampleRegistry        string `yaml:"sampleRegistry"`
@@ -60,7 +59,6 @@ func initReg() RegistryList {
 	registry := RegistryList{
 		DockerLibraryRegistry: "docker.io/library",
 		E2eRegistry:           "gcr.io/kubernetes-e2e-test-images",
-		EtcdRegistry:          "quay.io/coreos",
 		GcRegistry:            "k8s.gcr.io",
 		PrivateRegistry:       "gcr.io/k8s-authenticated-test",
 		SampleRegistry:        "gcr.io/google-samples",
@@ -86,7 +84,6 @@ var (
 	registry              = initReg()
 	dockerLibraryRegistry = registry.DockerLibraryRegistry
 	e2eRegistry           = registry.E2eRegistry
-	etcdRegistry          = registry.EtcdRegistry
 	gcRegistry            = registry.GcRegistry
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
@@ -101,6 +98,8 @@ const (
 	CRDConversionWebhook = iota
 	// AdmissionWebhook image
 	AdmissionWebhook
+	// Agnhost image
+	Agnhost
 	// APIServer image
 	APIServer
 	// AppArmorLoader image
@@ -196,6 +195,7 @@ func initImageConfigs() map[int]Config {
 	configs := map[int]Config{}
 	configs[CRDConversionWebhook] = Config{e2eRegistry, "crd-conversion-webhook", "1.13rev2"}
 	configs[AdmissionWebhook] = Config{e2eRegistry, "webhook", "1.14v1"}
+	configs[Agnhost] = Config{e2eRegistry, "agnhost", "1.0"}
 	configs[APIServer] = Config{e2eRegistry, "sample-apiserver", "1.10"}
 	configs[AppArmorLoader] = Config{e2eRegistry, "apparmor-loader", "1.0"}
 	configs[AuditProxy] = Config{e2eRegistry, "audit-proxy", "1.0"}
@@ -206,7 +206,7 @@ func initImageConfigs() map[int]Config {
 	configs[Dnsutils] = Config{e2eRegistry, "dnsutils", "1.1"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
 	configs[EntrypointTester] = Config{e2eRegistry, "entrypoint-tester", "1.0"}
-	configs[Etcd] = Config{etcdRegistry, "etcd", "v3.3.10"}
+	configs[Etcd] = Config{gcRegistry, "etcd", "3.3.10"}
 	configs[Fakegitserver] = Config{e2eRegistry, "fakegitserver", "1.0"}
 	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
 	configs[GBRedisSlave] = Config{sampleRegistry, "gb-redisslave", "v3"}

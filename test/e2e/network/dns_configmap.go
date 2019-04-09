@@ -35,7 +35,7 @@ type dnsFederationsConfigMapTest struct {
 }
 
 var (
-	googleDnsHostname = "google-public-dns-a.google.com"
+	googleDNSHostname = "google-public-dns-a.google.com"
 	// The ConfigMap update mechanism takes longer than the standard
 	// wait.ForeverTestTimeout.
 	moreForeverTestTimeout = 2 * 60 * time.Second
@@ -43,7 +43,7 @@ var (
 
 var _ = SIGDescribe("DNS configMap federations [Feature:Federation]", func() {
 
-	t := &dnsFederationsConfigMapTest{dnsTestCommon: newDnsTestCommon()}
+	t := &dnsFederationsConfigMapTest{dnsTestCommon: newDNSTestCommon()}
 
 	It("should be able to change federation configuration [Slow][Serial]", func() {
 		t.c = t.f.ClientSet
@@ -314,13 +314,13 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
 	if isIPv6 {
 		t.checkDNSRecordFrom(
 			"2001:4860:4860::8888",
-			func(actual []string) bool { return len(actual) == 1 && actual[0] == googleDnsHostname+"." },
+			func(actual []string) bool { return len(actual) == 1 && actual[0] == googleDNSHostname+"." },
 			"ptr-record",
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
 			"8.8.8.8",
-			func(actual []string) bool { return len(actual) == 1 && actual[0] == googleDnsHostname+"." },
+			func(actual []string) bool { return len(actual) == 1 && actual[0] == googleDNSHostname+"." },
 			"ptr-record",
 			moreForeverTestTimeout)
 	}
@@ -401,7 +401,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 
 	f := t.f
 	serviceName := "dns-externalname-upstream-test"
-	externalNameService := framework.CreateServiceSpec(serviceName, googleDnsHostname, false, nil)
+	externalNameService := framework.CreateServiceSpec(serviceName, googleDNSHostname, false, nil)
 	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameService); err != nil {
 		Fail(fmt.Sprintf("Failed when creating service: %v", err))
 	}
@@ -421,7 +421,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 		t.checkDNSRecordFrom(
 			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
-				return len(actual) >= 1 && actual[0] == googleDnsHostname+"."
+				return len(actual) >= 1 && actual[0] == googleDNSHostname+"."
 			},
 			"cluster-dns-ipv6",
 			moreForeverTestTimeout)
@@ -429,7 +429,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 		t.checkDNSRecordFrom(
 			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
-				return len(actual) >= 1 && actual[0] == googleDnsHostname+"."
+				return len(actual) >= 1 && actual[0] == googleDNSHostname+"."
 			},
 			"cluster-dns",
 			moreForeverTestTimeout)
@@ -478,7 +478,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 var _ = SIGDescribe("DNS configMap nameserver [IPv4]", func() {
 
 	Context("Change stubDomain", func() {
-		nsTest := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
+		nsTest := &dnsNameserverTest{dnsTestCommon: newDNSTestCommon()}
 
 		It("should be able to change stubDomain configuration [Slow][Serial]", func() {
 			nsTest.c = nsTest.f.ClientSet
@@ -487,7 +487,7 @@ var _ = SIGDescribe("DNS configMap nameserver [IPv4]", func() {
 	})
 
 	Context("Forward PTR lookup", func() {
-		fwdTest := &dnsPtrFwdTest{dnsTestCommon: newDnsTestCommon()}
+		fwdTest := &dnsPtrFwdTest{dnsTestCommon: newDNSTestCommon()}
 
 		It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func() {
 			fwdTest.c = fwdTest.f.ClientSet
@@ -496,7 +496,7 @@ var _ = SIGDescribe("DNS configMap nameserver [IPv4]", func() {
 	})
 
 	Context("Forward external name lookup", func() {
-		externalNameTest := &dnsExternalNameTest{dnsTestCommon: newDnsTestCommon()}
+		externalNameTest := &dnsExternalNameTest{dnsTestCommon: newDNSTestCommon()}
 
 		It("should forward externalname lookup to upstream nameserver [Slow][Serial]", func() {
 			externalNameTest.c = externalNameTest.f.ClientSet
@@ -508,7 +508,7 @@ var _ = SIGDescribe("DNS configMap nameserver [IPv4]", func() {
 var _ = SIGDescribe("DNS configMap nameserver [Feature:Networking-IPv6]", func() {
 
 	Context("Change stubDomain", func() {
-		nsTest := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
+		nsTest := &dnsNameserverTest{dnsTestCommon: newDNSTestCommon()}
 
 		It("should be able to change stubDomain configuration [Slow][Serial]", func() {
 			nsTest.c = nsTest.f.ClientSet
@@ -517,7 +517,7 @@ var _ = SIGDescribe("DNS configMap nameserver [Feature:Networking-IPv6]", func()
 	})
 
 	Context("Forward PTR lookup", func() {
-		fwdTest := &dnsPtrFwdTest{dnsTestCommon: newDnsTestCommon()}
+		fwdTest := &dnsPtrFwdTest{dnsTestCommon: newDNSTestCommon()}
 
 		It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func() {
 			fwdTest.c = fwdTest.f.ClientSet
@@ -526,7 +526,7 @@ var _ = SIGDescribe("DNS configMap nameserver [Feature:Networking-IPv6]", func()
 	})
 
 	Context("Forward external name lookup", func() {
-		externalNameTest := &dnsExternalNameTest{dnsTestCommon: newDnsTestCommon()}
+		externalNameTest := &dnsExternalNameTest{dnsTestCommon: newDNSTestCommon()}
 
 		It("should forward externalname lookup to upstream nameserver [Slow][Serial]", func() {
 			externalNameTest.c = externalNameTest.f.ClientSet

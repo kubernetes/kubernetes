@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -261,14 +261,14 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					}
 				})
 
-				It("should set fsGroup for one pod", func() {
+				It("should set fsGroup for one pod [Slow]", func() {
 					By("Checking fsGroup is set")
 					pod := createPodWithFsGroupTest(config, testVol, 1234, 1234)
 					By("Deleting pod")
 					framework.DeletePodOrFail(config.client, config.ns, pod.Name)
 				})
 
-				It("should set same fsGroup for two pods simultaneously", func() {
+				It("should set same fsGroup for two pods simultaneously [Slow]", func() {
 					fsGroup := int64(1234)
 					By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup, fsGroup)
