@@ -17,7 +17,7 @@ limitations under the License.
 package framework
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog"
@@ -40,11 +40,9 @@ const (
 // TODO make this generic and not linked to COS only
 func NumberOfNVIDIAGPUs(node *v1.Node) int64 {
 	val, ok := node.Status.Capacity[NVIDIAGPUResourceName]
-
 	if !ok {
 		return 0
 	}
-
 	return val.Value()
 }
 
@@ -57,12 +55,10 @@ func NVIDIADevicePlugin() *v1.Pod {
 			Name:      "device-plugin-nvidia-gpu-" + string(uuid.NewUUID()),
 			Namespace: metav1.NamespaceSystem,
 		},
-
 		Spec: ds.Spec.Template.Spec,
 	}
 	// Remove node affinity
 	p.Spec.Affinity = nil
-
 	return p
 }
 
