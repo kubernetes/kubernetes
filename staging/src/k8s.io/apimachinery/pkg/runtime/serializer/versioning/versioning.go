@@ -234,8 +234,10 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	return err
 }
 
-// DirectEncoder was movend and renamed in 1.15 and will be removed in 1.16.
+// DirectEncoder was moved and renamed to runtime.WithVersionEncoder in 1.15.
+// TODO: remove in 1.16.
 type DirectEncoder = runtime.WithVersionEncoder
 
-// DirectDecoder was movend and renamed in 1.15 and will be removed in 1.16.
+// DirectDecoder was moved and renamed to runtime.WithoutVersionDecoder in 1.15.
+// TODO: remove in 1.16.
 type DirectDecoder = runtime.WithoutVersionDecoder

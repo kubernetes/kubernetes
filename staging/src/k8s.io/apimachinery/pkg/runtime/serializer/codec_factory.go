@@ -256,3 +256,7 @@ func (f WithoutConversionCodecFactory) DecoderToVersion(serializer runtime.Decod
 		Decoder: serializer,
 	}
 }
+
+// DirectCodecFactory was renamed to WithoutConversionCodecFactory in 1.15.
+// TODO: remove in 1.16.
+type DirectCodecFactory = WithoutConversionCodecFactory
