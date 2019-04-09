@@ -23,29 +23,35 @@ import (
 )
 
 // MapStringString can be set from the command line with the format `--flag "string=string"`.
-// Multiple flag invocations are supported. For example: `--flag "a=foo" --flag "b=bar"`. If this is desired
-// to be the only type invocation `NoSplit` should be set to true.
-// Multiple comma-separated key-value pairs in a single invocation are supported if `NoSplit`
-// is set to false. For example: `--flag "a=foo,b=bar"`.
+// Multiple flag invocations are supported.
+// For example: `--flag "a=foo" --flag "b=bar"`.
+// Multiple comma-separated key-value pairs in a single invocation are supported,
+// when MapStringStringOptions.DisableCommaSeparatedPairs=false.
+// For example: `--flag "a=foo,b=bar"`.
 type MapStringString struct {
 	Map         *map[string]string
 	initialized bool
-	NoSplit     bool
+	options     *MapStringStringOptions
+}
+
+// MapStringStringOptions contains options that control how the values are parsed
+type MapStringStringOptions struct {
+	// DisableCommaSeparatedPairs disables parsing multiple comma-separated key-value pairs
+	// from a single invocation. Instead, the entire string after the = separator
+	// will be parsed as the value. This can be convenient if values contain commas.
+	DisableCommaSeparatedPairs bool
 }
 
 // NewMapStringString takes a pointer to a map[string]string and returns the
 // MapStringString flag parsing shim for that map
 func NewMapStringString(m *map[string]string) *MapStringString {
-	return &MapStringString{Map: m}
+	return &MapStringString{Map: m, options: &MapStringStringOptions{}}
 }
 
-// NewMapStringString takes a pointer to a map[string]string and sets `NoSplit`
-// value to `true` and returns the MapStringString flag parsing shim for that map
-func NewMapStringStringNoSplit(m *map[string]string) *MapStringString {
-	return &MapStringString{
-		Map:     m,
-		NoSplit: true,
-	}
+// WithOptions sets the MapStringStringOptions and returns a pointer to the MapStringString
+func (m *MapStringString) WithOptions(o *MapStringStringOptions) *MapStringString {
+	m.options = o
+	return m
 }
 
 // String implements github.com/spf13/pflag.Value
@@ -73,7 +79,7 @@ func (m *MapStringString) Set(value string) error {
 	}
 
 	// account for comma-separated key-value pairs in a single invocation
-	if !m.NoSplit {
+	if !m.options.DisableCommaSeparatedPairs {
 		for _, s := range strings.Split(value, ",") {
 			if len(s) == 0 {
 				continue

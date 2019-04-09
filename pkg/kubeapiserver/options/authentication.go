@@ -249,10 +249,14 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"'alg' header value not in this list will be rejected. "+
 			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
 
-		fs.Var(cliflag.NewMapStringStringNoSplit(&s.OIDC.RequiredClaims), "oidc-required-claim", ""+
-			"A key=value pair that describes a required claim in the ID Token. "+
-			"If set, the claim is verified to be present in the ID Token with a matching value. "+
-			"Repeat this flag to specify multiple claims.")
+		fs.Var(cliflag.NewMapStringString(&s.OIDC.RequiredClaims).
+			WithOptions(&cliflag.MapStringStringOptions{
+				DisableCommaSeparatedPairs: true,
+			}),
+			"oidc-required-claim", ""+
+				"A key=value pair that describes a required claim in the ID Token. "+
+				"If set, the claim is verified to be present in the ID Token with a matching value. "+
+				"Repeat this flag to specify multiple claims.")
 	}
 
 	if s.PasswordFile != nil {
