@@ -31,7 +31,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, storageapi.GroupName)
+	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, storageapi.SchemeGroupVersion.WithResource("csidrivers").GroupResource())
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
