@@ -39,7 +39,6 @@ func TestRemoveImage(t *testing.T) {
 			[]libdocker.CalledDetail{
 				libdocker.NewCalledDetail("inspect_image", nil),
 				libdocker.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
-				libdocker.NewCalledDetail("remove_image", []interface{}{"1111", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 			},
 		},
 		"multiple tags": {
@@ -48,7 +47,6 @@ func TestRemoveImage(t *testing.T) {
 				libdocker.NewCalledDetail("inspect_image", nil),
 				libdocker.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 				libdocker.NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
-				libdocker.NewCalledDetail("remove_image", []interface{}{"2222", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 			},
 		},
 		"single tag multiple repo digests": {
@@ -58,7 +56,6 @@ func TestRemoveImage(t *testing.T) {
 				libdocker.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 				libdocker.NewCalledDetail("remove_image", []interface{}{"foo@3333", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 				libdocker.NewCalledDetail("remove_image", []interface{}{"example.com/foo@3333", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
-				libdocker.NewCalledDetail("remove_image", []interface{}{"3333", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 			},
 		},
 		"no tags multiple repo digests": {
@@ -67,7 +64,13 @@ func TestRemoveImage(t *testing.T) {
 				libdocker.NewCalledDetail("inspect_image", nil),
 				libdocker.NewCalledDetail("remove_image", []interface{}{"foo@4444", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 				libdocker.NewCalledDetail("remove_image", []interface{}{"example.com/foo@4444", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
-				libdocker.NewCalledDetail("remove_image", []interface{}{"4444", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
+			},
+		},
+		"no tags or digests": {
+			dockertypes.ImageInspect{ID: "5555"},
+			[]libdocker.CalledDetail{
+				libdocker.NewCalledDetail("inspect_image", nil),
+				libdocker.NewCalledDetail("remove_image", []interface{}{"5555", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 			},
 		},
 	}

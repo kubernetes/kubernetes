@@ -132,16 +132,23 @@ func (ds *dockerService) RemoveImage(_ context.Context, r *runtimeapi.RemoveImag
 		return &runtimeapi.RemoveImageResponse{}, nil
 	}
 
-	// An image can have different numbers of RepoTags and RepoDigests.
-	// Iterating over both of them plus the image ID ensures the image really got removed.
-	// It also prevents images from being deleted, which actually are deletable using this approach.
-	var images []string
-	images = append(images, imageInspect.RepoTags...)
-	images = append(images, imageInspect.RepoDigests...)
-	images = append(images, image.Image)
-
-	for _, image := range images {
-		if _, err := ds.client.RemoveImage(image, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil && !libdocker.IsImageNotFoundError(err) {
+	// If an image has tags/digests referencing it, remove the image by removing all the references.
+	// Removing the last reference will remove the image.
+	// If the image has no references, just remove it directly.
+	if len(imageInspect.RepoTags) > 0 || len(imageInspect.RepoDigests) > 0 {
+		// remove image by removing all references
+		var references []string
+		references = append(references, imageInspect.RepoTags...)
+		references = append(references, imageInspect.RepoDigests...)
+		for _, ref := range references {
+			klog.V(5).Infof("Untagging reference %v on image %v", ref, image.Image)
+			if _, err := ds.client.RemoveImage(ref, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil && !libdocker.IsImageNotFoundError(err) {
+				return nil, err
+			}
+		}
+	} else {
+		// remove image directly because there are no references
+		if _, err := ds.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil && !libdocker.IsImageNotFoundError(err) {
 			return nil, err
 		}
 	}
