@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -80,46 +79,6 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 			},
 		},
 	}
-}
-
-// ScaleRCByLabels scales an RC via ns/label lookup. If replicas == 0 it waits till
-// none are running, otherwise it does what a synchronous scale operation would do.
-func ScaleRCByLabels(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns string, l map[string]string, replicas uint) error {
-	listOpts := metav1.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(l)).String()}
-	rcs, err := clientset.CoreV1().ReplicationControllers(ns).List(listOpts)
-	if err != nil {
-		return err
-	}
-	if len(rcs.Items) == 0 {
-		return fmt.Errorf("RC with labels %v not found in ns %v", l, ns)
-	}
-	Logf("Scaling %v RCs with labels %v in ns %v to %v replicas.", len(rcs.Items), l, ns, replicas)
-	for _, labelRC := range rcs.Items {
-		name := labelRC.Name
-		if err := ScaleRC(clientset, scalesGetter, ns, name, replicas, false); err != nil {
-			return err
-		}
-		rc, err := clientset.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if replicas == 0 {
-			ps, err := testutils.NewPodStore(clientset, rc.Namespace, labels.SelectorFromSet(rc.Spec.Selector), fields.Everything())
-			if err != nil {
-				return err
-			}
-			defer ps.Stop()
-			if err = waitForPodsGone(ps, 10*time.Second, 10*time.Minute); err != nil {
-				return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
-			}
-		} else {
-			if err := testutils.WaitForPodsWithLabelRunning(
-				clientset, ns, labels.SelectorFromSet(labels.Set(rc.Spec.Selector))); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 type updateRcFunc func(d *v1.ReplicationController)
