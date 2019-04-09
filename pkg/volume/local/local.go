@@ -441,7 +441,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("invalid path: %s %v", m.globalPath, err)
 	}
 
-	notMnt, err := m.mounter.IsNotMountPoint(dir)
+	notMnt, err := mount.IsNotMountPoint(m.mounter, dir)
 	klog.V(4).Infof("LocalVolume mount setup: PodDir(%s) VolDir(%s) Mounted(%t) Error(%v), ReadOnly(%t)", dir, m.globalPath, !notMnt, err, m.readOnly)
 	if err != nil && !os.IsNotExist(err) {
 		klog.Errorf("cannot validate mount point: %s %v", dir, err)
@@ -492,7 +492,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	err = m.mounter.Mount(globalPath, dir, "", mountOptions)
 	if err != nil {
 		klog.Errorf("Mount of volume %s failed: %v", dir, err)
-		notMnt, mntErr := m.mounter.IsNotMountPoint(dir)
+		notMnt, mntErr := mount.IsNotMountPoint(m.mounter, dir)
 		if mntErr != nil {
 			klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 			return err
@@ -502,7 +502,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			notMnt, mntErr = m.mounter.IsNotMountPoint(dir)
+			notMnt, mntErr = mount.IsNotMountPoint(m.mounter, dir)
 			if mntErr != nil {
 				klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 				return err

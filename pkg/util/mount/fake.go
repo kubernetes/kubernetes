@@ -136,10 +136,6 @@ func (f *FakeMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 	return mp.Path == dir
 }
 
-func (f *FakeMounter) IsNotMountPoint(dir string) (bool, error) {
-	return isNotMountPoint(f, dir)
-}
-
 func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()

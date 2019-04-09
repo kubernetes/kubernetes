@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package nsenter
 
 import (
 	"io/ioutil"
@@ -74,7 +74,7 @@ func TestParseFindMnt(t *testing.T) {
 	}
 }
 
-func newFakeNsenterMounter(tmpdir string, t *testing.T) (mounter *NsenterMounter, rootfsPath string, varlibPath string, err error) {
+func newFakeNsenterMounter(tmpdir string, t *testing.T) (mounter *Mounter, rootfsPath string, varlibPath string, err error) {
 	rootfsPath = filepath.Join(tmpdir, "rootfs")
 	if err := os.Mkdir(rootfsPath, 0755); err != nil {
 		return nil, "", "", err
@@ -89,7 +89,7 @@ func newFakeNsenterMounter(tmpdir string, t *testing.T) (mounter *NsenterMounter
 		return nil, "", "", err
 	}
 
-	return NewNsenterMounter(varlibPath, ne), rootfsPath, varlibPath, nil
+	return NewMounter(varlibPath, ne), rootfsPath, varlibPath, nil
 }
 
 func TestNsenterExistsFile(t *testing.T) {

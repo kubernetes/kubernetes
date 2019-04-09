@@ -86,6 +86,7 @@ filegroup(
         ":package-srcs",
         "//pkg/volume/util/fs:all-srcs",
         "//pkg/volume/util/nestedpendingoperations:all-srcs",
+        "//pkg/volume/util/nsenter:all-srcs",
         "//pkg/volume/util/operationexecutor:all-srcs",
         "//pkg/volume/util/recyclerclient:all-srcs",
         "//pkg/volume/util/subpath:all-srcs",

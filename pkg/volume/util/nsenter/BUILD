@@ -3,13 +3,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "subpath.go",
-        "subpath_linux.go",
-        "subpath_nsenter.go",
-        "subpath_unsupported.go",
-        "subpath_windows.go",
+        "nsenter_mount.go",
+        "nsenter_mount_unsupported.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/volume/util/subpath",
+    importpath = "k8s.io/kubernetes/pkg/volume/util/nsenter",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
@@ -30,9 +27,9 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/util/mount:go_default_library",
-            "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
+            "//vendor/k8s.io/utils/path:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/util/mount:go_default_library",
@@ -56,7 +53,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/util/mount:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
         "//conditions:default": [],
@@ -65,22 +61,11 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "subpath_linux_test.go",
-        "subpath_nsenter_test.go",
-        "subpath_windows_test.go",
-    ],
+    srcs = ["nsenter_mount_test.go"],
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/util/mount:go_default_library",
-            "//pkg/volume/util/nsenter:go_default_library",
-            "//vendor/golang.org/x/sys/unix:go_default_library",
-            "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "//vendor/github.com/stretchr/testify/assert:go_default_library",
         ],
         "//conditions:default": [],
     }),
