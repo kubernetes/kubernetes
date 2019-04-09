@@ -66,6 +66,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
