@@ -15,27 +15,35 @@ import (
 // norm == lapack.MaxColumnSum work must have length at least n, otherwise work
 // is unused.
 func (impl Implementation) Dlantr(norm lapack.MatrixNorm, uplo blas.Uplo, diag blas.Diag, m, n int, a []float64, lda int, work []float64) float64 {
-	checkMatrix(m, n, a, lda)
-	switch norm {
-	case lapack.MaxRowSum, lapack.MaxColumnSum, lapack.NormFrob, lapack.MaxAbs:
-	default:
+	switch {
+	case norm != lapack.MaxRowSum && norm != lapack.MaxColumnSum && norm != lapack.Frobenius && norm != lapack.MaxAbs:
 		panic(badNorm)
-	}
-	if uplo != blas.Upper && uplo != blas.Lower {
+	case uplo != blas.Upper && uplo != blas.Lower:
 		panic(badUplo)
-	}
-	if diag != blas.Unit && diag != blas.NonUnit {
+	case diag != blas.Unit && diag != blas.NonUnit:
 		panic(badDiag)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	if norm == lapack.MaxColumnSum && len(work) < n {
-		panic(badWork)
-	}
-	if min(m, n) == 0 {
+
+	// Quick return if possible.
+	minmn := min(m, n)
+	if minmn == 0 {
 		return 0
 	}
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case norm == lapack.MaxColumnSum && len(work) < n:
+		panic(shortWork)
+	}
+
 	switch norm {
 	default:
-		panic("unreachable")
+		panic(badNorm)
 	case lapack.MaxAbs:
 		if diag == blas.Unit {
 			value := 1.0
@@ -95,10 +103,10 @@ func (impl Implementation) Dlantr(norm lapack.MatrixNorm, uplo blas.Uplo, diag b
 		return value
 	case lapack.MaxColumnSum:
 		if diag == blas.Unit {
-			for i := 0; i < min(m, n); i++ {
+			for i := 0; i < minmn; i++ {
 				work[i] = 1
 			}
-			for i := min(m, n); i < n; i++ {
+			for i := minmn; i < n; i++ {
 				work[i] = 0
 			}
 			if uplo == blas.Upper {
@@ -148,7 +156,7 @@ func (impl Implementation) Dlantr(norm lapack.MatrixNorm, uplo blas.Uplo, diag b
 			if uplo == blas.Upper {
 				for i := 0; i < m; i++ {
 					var sum float64
-					if i < min(m, n) {
+					if i < minmn {
 						sum = 1
 					}
 					for j := i + 1; j < n; j++ {
@@ -165,7 +173,7 @@ func (impl Implementation) Dlantr(norm lapack.MatrixNorm, uplo blas.Uplo, diag b
 			} else {
 				for i := 1; i < m; i++ {
 					var sum float64
-					if i < min(m, n) {
+					if i < minmn {
 						sum = 1
 					}
 					for j := 0; j < min(i, n); j++ {
@@ -211,7 +219,7 @@ func (impl Implementation) Dlantr(norm lapack.MatrixNorm, uplo blas.Uplo, diag b
 				return maxsum
 			}
 		}
-	case lapack.NormFrob:
+	case lapack.Frobenius:
 		var nrm float64
 		if diag == blas.Unit {
 			if uplo == blas.Upper {
@@ -229,7 +237,7 @@ func (impl Implementation) Dlantr(norm lapack.MatrixNorm, uplo blas.Uplo, diag b
 					}
 				}
 			}
-			nrm += float64(min(m, n))
+			nrm += float64(minmn)
 		} else {
 			if uplo == blas.Upper {
 				for i := 0; i < m; i++ {

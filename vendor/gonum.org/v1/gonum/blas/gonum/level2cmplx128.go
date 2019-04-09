@@ -11,29 +11,66 @@ import (
 	"gonum.org/v1/gonum/internal/asm/c128"
 )
 
+var _ blas.Complex128Level2 = Implementation{}
+
 // Zgbmv performs one of the matrix-vector operations
 //  y = alpha * A * x + beta * y    if trans = blas.NoTrans
 //  y = alpha * A^T * x + beta * y  if trans = blas.Trans
 //  y = alpha * A^H * x + beta * y  if trans = blas.ConjTrans
 // where alpha and beta are scalars, x and y are vectors, and A is an m×n band matrix
 // with kL sub-diagonals and kU super-diagonals.
-func (Implementation) Zgbmv(trans blas.Transpose, m, n, kL, kU int, alpha complex128, ab []complex128, ldab int, x []complex128, incX int, beta complex128, y []complex128, incY int) {
-	checkZBandMatrix('A', m, n, kL, kU, ab, ldab)
-	var lenX, lenY int
+func (Implementation) Zgbmv(trans blas.Transpose, m, n, kL, kU int, alpha complex128, a []complex128, lda int, x []complex128, incX int, beta complex128, y []complex128, incY int) {
 	switch trans {
 	default:
 		panic(badTranspose)
-	case blas.NoTrans:
-		lenX = n
-		lenY = m
-	case blas.Trans, blas.ConjTrans:
-		lenX = m
-		lenY = n
+	case blas.NoTrans, blas.Trans, blas.ConjTrans:
 	}
-	checkZVector('x', lenX, x, incX)
-	checkZVector('y', lenY, y, incY)
+	if m < 0 {
+		panic(mLT0)
+	}
+	if n < 0 {
+		panic(nLT0)
+	}
+	if kL < 0 {
+		panic(kLLT0)
+	}
+	if kU < 0 {
+		panic(kULT0)
+	}
+	if lda < kL+kU+1 {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
+	if incY == 0 {
+		panic(zeroIncY)
+	}
 
-	if m == 0 || n == 0 || (alpha == 0 && beta == 1) {
+	// Quick return if possible.
+	if m == 0 || n == 0 {
+		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if len(a) < lda*(min(m, n+kL)-1)+kL+kU+1 {
+		panic(shortA)
+	}
+	var lenX, lenY int
+	if trans == blas.NoTrans {
+		lenX, lenY = n, m
+	} else {
+		lenX, lenY = m, n
+	}
+	if (incX > 0 && len(x) <= (lenX-1)*incX) || (incX < 0 && len(x) <= (1-lenX)*incX) {
+		panic(shortX)
+	}
+	if (incY > 0 && len(y) <= (lenY-1)*incY) || (incY < 0 && len(y) <= (1-lenY)*incY) {
+		panic(shortY)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 && beta == 1 {
 		return
 	}
 
@@ -82,7 +119,7 @@ func (Implementation) Zgbmv(trans blas.Transpose, m, n, kL, kU int, alpha comple
 			for i := 0; i < nRow; i++ {
 				l := max(0, kL-i)
 				u := min(nCol, n+kL-i)
-				aRow := ab[i*ldab+l : i*ldab+u]
+				aRow := a[i*lda+l : i*lda+u]
 				off := max(0, i-kL)
 				xtmp := x[off : off+u-l]
 				var sum complex128
@@ -96,7 +133,7 @@ func (Implementation) Zgbmv(trans blas.Transpose, m, n, kL, kU int, alpha comple
 			for i := 0; i < nRow; i++ {
 				l := max(0, kL-i)
 				u := min(nCol, n+kL-i)
-				aRow := ab[i*ldab+l : i*ldab+u]
+				aRow := a[i*lda+l : i*lda+u]
 				off := max(0, i-kL) * incX
 				jx := kx
 				var sum complex128
@@ -113,7 +150,7 @@ func (Implementation) Zgbmv(trans blas.Transpose, m, n, kL, kU int, alpha comple
 			for i := 0; i < nRow; i++ {
 				l := max(0, kL-i)
 				u := min(nCol, n+kL-i)
-				aRow := ab[i*ldab+l : i*ldab+u]
+				aRow := a[i*lda+l : i*lda+u]
 				off := max(0, i-kL) * incY
 				alphaxi := alpha * x[i]
 				jy := ky
@@ -127,7 +164,7 @@ func (Implementation) Zgbmv(trans blas.Transpose, m, n, kL, kU int, alpha comple
 			for i := 0; i < nRow; i++ {
 				l := max(0, kL-i)
 				u := min(nCol, n+kL-i)
-				aRow := ab[i*ldab+l : i*ldab+u]
+				aRow := a[i*lda+l : i*lda+u]
 				off := max(0, i-kL) * incY
 				alphaxi := alpha * x[ix]
 				jy := ky
@@ -143,7 +180,7 @@ func (Implementation) Zgbmv(trans blas.Transpose, m, n, kL, kU int, alpha comple
 			for i := 0; i < nRow; i++ {
 				l := max(0, kL-i)
 				u := min(nCol, n+kL-i)
-				aRow := ab[i*ldab+l : i*ldab+u]
+				aRow := a[i*lda+l : i*lda+u]
 				off := max(0, i-kL) * incY
 				alphaxi := alpha * x[i]
 				jy := ky
@@ -157,7 +194,7 @@ func (Implementation) Zgbmv(trans blas.Transpose, m, n, kL, kU int, alpha comple
 			for i := 0; i < nRow; i++ {
 				l := max(0, kL-i)
 				u := min(nCol, n+kL-i)
-				aRow := ab[i*ldab+l : i*ldab+u]
+				aRow := a[i*lda+l : i*lda+u]
 				off := max(0, i-kL) * incY
 				alphaxi := alpha * x[ix]
 				jy := ky
@@ -177,22 +214,33 @@ func (Implementation) Zgbmv(trans blas.Transpose, m, n, kL, kU int, alpha comple
 //  y = alpha * A^H * x + beta * y  if trans = blas.ConjTrans
 // where alpha and beta are scalars, x and y are vectors, and A is an m×n dense matrix.
 func (Implementation) Zgemv(trans blas.Transpose, m, n int, alpha complex128, a []complex128, lda int, x []complex128, incX int, beta complex128, y []complex128, incY int) {
-	checkZMatrix('A', m, n, a, lda)
 	switch trans {
 	default:
 		panic(badTranspose)
-	case blas.NoTrans:
-		checkZVector('x', n, x, incX)
-		checkZVector('y', m, y, incY)
-	case blas.Trans, blas.ConjTrans:
-		checkZVector('x', m, x, incX)
-		checkZVector('y', n, y, incY)
+	case blas.NoTrans, blas.Trans, blas.ConjTrans:
+	}
+	if m < 0 {
+		panic(mLT0)
+	}
+	if n < 0 {
+		panic(nLT0)
+	}
+	if lda < max(1, n) {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
+	if incY == 0 {
+		panic(zeroIncY)
 	}
 
-	if m == 0 || n == 0 || (alpha == 0 && beta == 1) {
+	// Quick return if possible.
+	if m == 0 || n == 0 {
 		return
 	}
 
+	// For zero matrix size the following slice length checks are trivially satisfied.
 	var lenX, lenY int
 	if trans == blas.NoTrans {
 		lenX = n
@@ -201,6 +249,21 @@ func (Implementation) Zgemv(trans blas.Transpose, m, n int, alpha complex128, a 
 		lenX = m
 		lenY = n
 	}
+	if len(a) < lda*(m-1)+n {
+		panic(shortA)
+	}
+	if (incX > 0 && len(x) <= (lenX-1)*incX) || (incX < 0 && len(x) <= (1-lenX)*incX) {
+		panic(shortX)
+	}
+	if (incY > 0 && len(y) <= (lenY-1)*incY) || (incY < 0 && len(y) <= (1-lenY)*incY) {
+		panic(shortY)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 && beta == 1 {
+		return
+	}
+
 	var kx int
 	if incX < 0 {
 		kx = (1 - lenX) * incX
@@ -305,11 +368,40 @@ func (Implementation) Zgemv(trans blas.Transpose, m, n int, alpha complex128, a 
 // where A is an m×n dense matrix, alpha is a scalar, x is an m element vector,
 // and y is an n element vector.
 func (Implementation) Zgerc(m, n int, alpha complex128, x []complex128, incX int, y []complex128, incY int, a []complex128, lda int) {
-	checkZMatrix('A', m, n, a, lda)
-	checkZVector('x', m, x, incX)
-	checkZVector('y', n, y, incY)
+	if m < 0 {
+		panic(mLT0)
+	}
+	if n < 0 {
+		panic(nLT0)
+	}
+	if lda < max(1, n) {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
+	if incY == 0 {
+		panic(zeroIncY)
+	}
 
-	if m == 0 || n == 0 || alpha == 0 {
+	// Quick return if possible.
+	if m == 0 || n == 0 {
+		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if (incX > 0 && len(x) <= (m-1)*incX) || (incX < 0 && len(x) <= (1-m)*incX) {
+		panic(shortX)
+	}
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
+	}
+	if len(a) < lda*(m-1)+n {
+		panic(shortA)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 {
 		return
 	}
 
@@ -334,11 +426,40 @@ func (Implementation) Zgerc(m, n int, alpha complex128, x []complex128, incX int
 // where A is an m×n dense matrix, alpha is a scalar, x is an m element vector,
 // and y is an n element vector.
 func (Implementation) Zgeru(m, n int, alpha complex128, x []complex128, incX int, y []complex128, incY int, a []complex128, lda int) {
-	checkZMatrix('A', m, n, a, lda)
-	checkZVector('x', m, x, incX)
-	checkZVector('y', n, y, incY)
+	if m < 0 {
+		panic(mLT0)
+	}
+	if n < 0 {
+		panic(nLT0)
+	}
+	if lda < max(1, n) {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
+	if incY == 0 {
+		panic(zeroIncY)
+	}
 
-	if m == 0 || n == 0 || alpha == 0 {
+	// Quick return if possible.
+	if m == 0 || n == 0 {
+		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if (incX > 0 && len(x) <= (m-1)*incX) || (incX < 0 && len(x) <= (1-m)*incX) {
+		panic(shortX)
+	}
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
+	}
+	if len(a) < lda*(m-1)+n {
+		panic(shortA)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 {
 		return
 	}
 
@@ -374,15 +495,46 @@ func (Implementation) Zgeru(m, n int, alpha complex128, x []complex128, incX int
 // where alpha and beta are scalars, x and y are vectors, and A is an n×n
 // Hermitian band matrix with k super-diagonals. The imaginary parts of
 // the diagonal elements of A are ignored and assumed to be zero.
-func (Implementation) Zhbmv(uplo blas.Uplo, n, k int, alpha complex128, ab []complex128, ldab int, x []complex128, incX int, beta complex128, y []complex128, incY int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+func (Implementation) Zhbmv(uplo blas.Uplo, n, k int, alpha complex128, a []complex128, lda int, x []complex128, incX int, beta complex128, y []complex128, incY int) {
+	switch uplo {
+	default:
 		panic(badUplo)
+	case blas.Upper, blas.Lower:
 	}
-	checkZhbMatrix('A', n, k, ab, ldab)
-	checkZVector('x', n, x, incX)
-	checkZVector('y', n, y, incY)
+	if n < 0 {
+		panic(nLT0)
+	}
+	if k < 0 {
+		panic(kLT0)
+	}
+	if lda < k+1 {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
+	if incY == 0 {
+		panic(zeroIncY)
+	}
 
-	if n == 0 || (alpha == 0 && beta == 1) {
+	// Quick return if possible.
+	if n == 0 {
+		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if len(a) < lda*(n-1)+k+1 {
+		panic(shortA)
+	}
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
+	}
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 && beta == 1 {
 		return
 	}
 
@@ -428,13 +580,13 @@ func (Implementation) Zhbmv(uplo blas.Uplo, n, k int, alpha complex128, ab []com
 		return
 	}
 
-	// The elements of A are accessed sequentially with one pass through ab.
+	// The elements of A are accessed sequentially with one pass through a.
 	switch uplo {
 	case blas.Upper:
 		iy := ky
 		if incX == 1 {
 			for i := 0; i < n; i++ {
-				aRow := ab[i*ldab:]
+				aRow := a[i*lda:]
 				alphaxi := alpha * x[i]
 				sum := alphaxi * complex(real(aRow[0]), 0)
 				u := min(k+1, n-i)
@@ -451,7 +603,7 @@ func (Implementation) Zhbmv(uplo blas.Uplo, n, k int, alpha complex128, ab []com
 		} else {
 			ix := kx
 			for i := 0; i < n; i++ {
-				aRow := ab[i*ldab:]
+				aRow := a[i*lda:]
 				alphaxi := alpha * x[ix]
 				sum := alphaxi * complex(real(aRow[0]), 0)
 				u := min(k+1, n-i)
@@ -476,7 +628,7 @@ func (Implementation) Zhbmv(uplo blas.Uplo, n, k int, alpha complex128, ab []com
 				l := max(0, k-i)
 				alphaxi := alpha * x[i]
 				jy := l * incY
-				aRow := ab[i*ldab:]
+				aRow := a[i*lda:]
 				for j := l; j < k; j++ {
 					v := aRow[j]
 					y[iy] += alpha * v * x[i-k+j]
@@ -493,7 +645,7 @@ func (Implementation) Zhbmv(uplo blas.Uplo, n, k int, alpha complex128, ab []com
 				alphaxi := alpha * x[ix]
 				jx := l * incX
 				jy := l * incY
-				aRow := ab[i*ldab:]
+				aRow := a[i*lda:]
 				for j := l; j < k; j++ {
 					v := aRow[j]
 					y[iy] += alpha * v * x[ix-k*incX+jx]
@@ -515,14 +667,42 @@ func (Implementation) Zhbmv(uplo blas.Uplo, n, k int, alpha complex128, ab []com
 // Hermitian matrix. The imaginary parts of the diagonal elements of A are
 // ignored and assumed to be zero.
 func (Implementation) Zhemv(uplo blas.Uplo, n int, alpha complex128, a []complex128, lda int, x []complex128, incX int, beta complex128, y []complex128, incY int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch uplo {
+	default:
 		panic(badUplo)
+	case blas.Upper, blas.Lower:
 	}
-	checkZMatrix('A', n, n, a, lda)
-	checkZVector('x', n, x, incX)
-	checkZVector('y', n, y, incY)
+	if n < 0 {
+		panic(nLT0)
+	}
+	if lda < max(1, n) {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
+	if incY == 0 {
+		panic(zeroIncY)
+	}
 
-	if n == 0 || (alpha == 0 && beta == 1) {
+	// Quick return if possible.
+	if n == 0 {
+		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if len(a) < lda*(n-1)+n {
+		panic(shortA)
+	}
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
+	}
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 && beta == 1 {
 		return
 	}
 
@@ -647,13 +827,36 @@ func (Implementation) Zhemv(uplo blas.Uplo, n int, alpha complex128, a []complex
 // element vector. On entry, the imaginary parts of the diagonal elements of A
 // are ignored and assumed to be zero, on return they will be set to zero.
 func (Implementation) Zher(uplo blas.Uplo, n int, alpha float64, x []complex128, incX int, a []complex128, lda int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch uplo {
+	default:
 		panic(badUplo)
+	case blas.Upper, blas.Lower:
 	}
-	checkZMatrix('A', n, n, a, lda)
-	checkZVector('x', n, x, incX)
+	if n < 0 {
+		panic(nLT0)
+	}
+	if lda < max(1, n) {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
 
-	if n == 0 || alpha == 0 {
+	// Quick return if possible.
+	if n == 0 {
+		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
+	}
+	if len(a) < lda*(n-1)+n {
+		panic(shortA)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 {
 		return
 	}
 
@@ -746,14 +949,42 @@ func (Implementation) Zher(uplo blas.Uplo, n int, alpha float64, x []complex128,
 // Hermitian matrix. On entry, the imaginary parts of the diagonal elements are
 // ignored and assumed to be zero. On return they will be set to zero.
 func (Implementation) Zher2(uplo blas.Uplo, n int, alpha complex128, x []complex128, incX int, y []complex128, incY int, a []complex128, lda int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch uplo {
+	default:
 		panic(badUplo)
+	case blas.Upper, blas.Lower:
 	}
-	checkZMatrix('A', n, n, a, lda)
-	checkZVector('x', n, x, incX)
-	checkZVector('y', n, y, incY)
+	if n < 0 {
+		panic(nLT0)
+	}
+	if lda < max(1, n) {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
+	if incY == 0 {
+		panic(zeroIncY)
+	}
 
-	if n == 0 || alpha == 0 {
+	// Quick return if possible.
+	if n == 0 {
+		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
+	}
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
+	}
+	if len(a) < lda*(n-1)+n {
+		panic(shortA)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 {
 		return
 	}
 
@@ -855,16 +1086,39 @@ func (Implementation) Zher2(uplo blas.Uplo, n int, alpha complex128, x []complex
 // Hermitian matrix in packed form. The imaginary parts of the diagonal
 // elements of A are ignored and assumed to be zero.
 func (Implementation) Zhpmv(uplo blas.Uplo, n int, alpha complex128, ap []complex128, x []complex128, incX int, beta complex128, y []complex128, incY int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch uplo {
+	default:
 		panic(badUplo)
+	case blas.Upper, blas.Lower:
 	}
-	checkZVector('x', n, x, incX)
-	checkZVector('y', n, y, incY)
-	if len(ap) < n*(n+1)/2 {
-		panic("blas: insufficient A packed matrix slice length")
+	if n < 0 {
+		panic(nLT0)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
+	if incY == 0 {
+		panic(zeroIncY)
 	}
 
-	if n == 0 || (alpha == 0 && beta == 1) {
+	// Quick return if possible.
+	if n == 0 {
+		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if len(ap) < n*(n+1)/2 {
+		panic(shortAP)
+	}
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
+	}
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 && beta == 1 {
 		return
 	}
 
@@ -999,18 +1253,33 @@ func (Implementation) Zhpmv(uplo blas.Uplo, n int, alpha complex128, ap []comple
 // in packed form. On entry, the imaginary parts of the diagonal elements are
 // assumed to be zero, and on return they are set to zero.
 func (Implementation) Zhpr(uplo blas.Uplo, n int, alpha float64, x []complex128, incX int, ap []complex128) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch uplo {
+	default:
 		panic(badUplo)
+	case blas.Upper, blas.Lower:
 	}
 	if n < 0 {
 		panic(nLT0)
 	}
-	checkZVector('x', n, x, incX)
-	if len(ap) < n*(n+1)/2 {
-		panic("blas: insufficient A packed matrix slice length")
+	if incX == 0 {
+		panic(zeroIncX)
 	}
 
-	if n == 0 || alpha == 0 {
+	// Quick return if possible.
+	if n == 0 {
+		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
+	}
+	if len(ap) < n*(n+1)/2 {
+		panic(shortAP)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 {
 		return
 	}
 
@@ -1118,19 +1387,39 @@ func (Implementation) Zhpr(uplo blas.Uplo, n int, alpha float64, x []complex128,
 // n×n Hermitian matrix, supplied in packed form. On entry, the imaginary parts
 // of the diagonal elements are assumed to be zero, and on return they are set to zero.
 func (Implementation) Zhpr2(uplo blas.Uplo, n int, alpha complex128, x []complex128, incX int, y []complex128, incY int, ap []complex128) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch uplo {
+	default:
 		panic(badUplo)
+	case blas.Upper, blas.Lower:
 	}
 	if n < 0 {
 		panic(nLT0)
 	}
-	checkZVector('x', n, x, incX)
-	checkZVector('y', n, y, incY)
-	if len(ap) < n*(n+1)/2 {
-		panic("blas: insufficient A packed matrix slice length")
+	if incX == 0 {
+		panic(zeroIncX)
+	}
+	if incY == 0 {
+		panic(zeroIncY)
 	}
 
-	if n == 0 || alpha == 0 {
+	// Quick return if possible.
+	if n == 0 {
+		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
+	}
+	if (incY > 0 && len(y) <= (n-1)*incY) || (incY < 0 && len(y) <= (1-n)*incY) {
+		panic(shortY)
+	}
+	if len(ap) < n*(n+1)/2 {
+		panic(shortAP)
+	}
+
+	// Quick return if possible.
+	if alpha == 0 {
 		return
 	}
 
@@ -1245,21 +1534,46 @@ func (Implementation) Zhpr2(uplo blas.Uplo, n int, alpha complex128, x []complex
 //  x = A^H * x  if trans = blas.ConjTrans
 // where x is an n element vector and A is an n×n triangular band matrix, with
 // (k+1) diagonals.
-func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag, n, k int, ab []complex128, ldab int, x []complex128, incX int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
-		panic(badUplo)
-	}
-	if trans != blas.NoTrans && trans != blas.Trans && trans != blas.ConjTrans {
+func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag, n, k int, a []complex128, lda int, x []complex128, incX int) {
+	switch trans {
+	default:
 		panic(badTranspose)
+	case blas.NoTrans, blas.Trans, blas.ConjTrans:
 	}
-	if diag != blas.Unit && diag != blas.NonUnit {
+	switch uplo {
+	default:
+		panic(badUplo)
+	case blas.Upper, blas.Lower:
+	}
+	switch diag {
+	default:
 		panic(badDiag)
+	case blas.NonUnit, blas.Unit:
 	}
-	checkZtbMatrix('A', n, k, ab, ldab)
-	checkZVector('x', n, x, incX)
+	if n < 0 {
+		panic(nLT0)
+	}
+	if k < 0 {
+		panic(kLT0)
+	}
+	if lda < k+1 {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
 
+	// Quick return if possible.
 	if n == 0 {
 		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if len(a) < lda*(n-1)+k+1 {
+		panic(shortA)
+	}
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
 
 	// Set up start index in X.
@@ -1275,10 +1589,10 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				for i := 0; i < n; i++ {
 					xi := x[i]
 					if diag == blas.NonUnit {
-						xi *= ab[i*ldab]
+						xi *= a[i*lda]
 					}
 					kk := min(k, n-i-1)
-					for j, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for j, aij := range a[i*lda+1 : i*lda+kk+1] {
 						xi += x[i+j+1] * aij
 					}
 					x[i] = xi
@@ -1288,11 +1602,11 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				for i := 0; i < n; i++ {
 					xi := x[ix]
 					if diag == blas.NonUnit {
-						xi *= ab[i*ldab]
+						xi *= a[i*lda]
 					}
 					kk := min(k, n-i-1)
 					jx := ix + incX
-					for _, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for _, aij := range a[i*lda+1 : i*lda+kk+1] {
 						xi += x[jx] * aij
 						jx += incX
 					}
@@ -1305,10 +1619,10 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				for i := n - 1; i >= 0; i-- {
 					xi := x[i]
 					if diag == blas.NonUnit {
-						xi *= ab[i*ldab+k]
+						xi *= a[i*lda+k]
 					}
 					kk := min(k, i)
-					for j, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for j, aij := range a[i*lda+k-kk : i*lda+k] {
 						xi += x[i-kk+j] * aij
 					}
 					x[i] = xi
@@ -1318,11 +1632,11 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				for i := n - 1; i >= 0; i-- {
 					xi := x[ix]
 					if diag == blas.NonUnit {
-						xi *= ab[i*ldab+k]
+						xi *= a[i*lda+k]
 					}
 					kk := min(k, i)
 					jx := ix - kk*incX
-					for _, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for _, aij := range a[i*lda+k-kk : i*lda+k] {
 						xi += x[jx] * aij
 						jx += incX
 					}
@@ -1337,11 +1651,11 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				for i := n - 1; i >= 0; i-- {
 					kk := min(k, n-i-1)
 					xi := x[i]
-					for j, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for j, aij := range a[i*lda+1 : i*lda+kk+1] {
 						x[i+j+1] += xi * aij
 					}
 					if diag == blas.NonUnit {
-						x[i] *= ab[i*ldab]
+						x[i] *= a[i*lda]
 					}
 				}
 			} else {
@@ -1350,12 +1664,12 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 					kk := min(k, n-i-1)
 					jx := ix + incX
 					xi := x[ix]
-					for _, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for _, aij := range a[i*lda+1 : i*lda+kk+1] {
 						x[jx] += xi * aij
 						jx += incX
 					}
 					if diag == blas.NonUnit {
-						x[ix] *= ab[i*ldab]
+						x[ix] *= a[i*lda]
 					}
 					ix -= incX
 				}
@@ -1365,11 +1679,11 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				for i := 0; i < n; i++ {
 					kk := min(k, i)
 					xi := x[i]
-					for j, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for j, aij := range a[i*lda+k-kk : i*lda+k] {
 						x[i-kk+j] += xi * aij
 					}
 					if diag == blas.NonUnit {
-						x[i] *= ab[i*ldab+k]
+						x[i] *= a[i*lda+k]
 					}
 				}
 			} else {
@@ -1378,12 +1692,12 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 					kk := min(k, i)
 					jx := ix - kk*incX
 					xi := x[ix]
-					for _, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for _, aij := range a[i*lda+k-kk : i*lda+k] {
 						x[jx] += xi * aij
 						jx += incX
 					}
 					if diag == blas.NonUnit {
-						x[ix] *= ab[i*ldab+k]
+						x[ix] *= a[i*lda+k]
 					}
 					ix += incX
 				}
@@ -1395,11 +1709,11 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				for i := n - 1; i >= 0; i-- {
 					kk := min(k, n-i-1)
 					xi := x[i]
-					for j, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for j, aij := range a[i*lda+1 : i*lda+kk+1] {
 						x[i+j+1] += xi * cmplx.Conj(aij)
 					}
 					if diag == blas.NonUnit {
-						x[i] *= cmplx.Conj(ab[i*ldab])
+						x[i] *= cmplx.Conj(a[i*lda])
 					}
 				}
 			} else {
@@ -1408,12 +1722,12 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 					kk := min(k, n-i-1)
 					jx := ix + incX
 					xi := x[ix]
-					for _, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for _, aij := range a[i*lda+1 : i*lda+kk+1] {
 						x[jx] += xi * cmplx.Conj(aij)
 						jx += incX
 					}
 					if diag == blas.NonUnit {
-						x[ix] *= cmplx.Conj(ab[i*ldab])
+						x[ix] *= cmplx.Conj(a[i*lda])
 					}
 					ix -= incX
 				}
@@ -1423,11 +1737,11 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				for i := 0; i < n; i++ {
 					kk := min(k, i)
 					xi := x[i]
-					for j, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for j, aij := range a[i*lda+k-kk : i*lda+k] {
 						x[i-kk+j] += xi * cmplx.Conj(aij)
 					}
 					if diag == blas.NonUnit {
-						x[i] *= cmplx.Conj(ab[i*ldab+k])
+						x[i] *= cmplx.Conj(a[i*lda+k])
 					}
 				}
 			} else {
@@ -1436,12 +1750,12 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 					kk := min(k, i)
 					jx := ix - kk*incX
 					xi := x[ix]
-					for _, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for _, aij := range a[i*lda+k-kk : i*lda+k] {
 						x[jx] += xi * cmplx.Conj(aij)
 						jx += incX
 					}
 					if diag == blas.NonUnit {
-						x[ix] *= cmplx.Conj(ab[i*ldab+k])
+						x[ix] *= cmplx.Conj(a[i*lda+k])
 					}
 					ix += incX
 				}
@@ -1462,21 +1776,46 @@ func (Implementation) Ztbmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 //
 // No test for singularity or near-singularity is included in this
 // routine. Such tests must be performed before calling this routine.
-func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag, n, k int, ab []complex128, ldab int, x []complex128, incX int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
-		panic(badUplo)
-	}
-	if trans != blas.NoTrans && trans != blas.Trans && trans != blas.ConjTrans {
+func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag, n, k int, a []complex128, lda int, x []complex128, incX int) {
+	switch trans {
+	default:
 		panic(badTranspose)
+	case blas.NoTrans, blas.Trans, blas.ConjTrans:
 	}
-	if diag != blas.Unit && diag != blas.NonUnit {
+	switch uplo {
+	default:
+		panic(badUplo)
+	case blas.Upper, blas.Lower:
+	}
+	switch diag {
+	default:
 		panic(badDiag)
+	case blas.NonUnit, blas.Unit:
 	}
-	checkZtbMatrix('A', n, k, ab, ldab)
-	checkZVector('x', n, x, incX)
+	if n < 0 {
+		panic(nLT0)
+	}
+	if k < 0 {
+		panic(kLT0)
+	}
+	if lda < k+1 {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
 
+	// Quick return if possible.
 	if n == 0 {
 		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if len(a) < lda*(n-1)+k+1 {
+		panic(shortA)
+	}
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
 
 	// Set up start index in X.
@@ -1492,12 +1831,12 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				for i := n - 1; i >= 0; i-- {
 					kk := min(k, n-i-1)
 					var sum complex128
-					for j, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for j, aij := range a[i*lda+1 : i*lda+kk+1] {
 						sum += x[i+1+j] * aij
 					}
 					x[i] -= sum
 					if diag == blas.NonUnit {
-						x[i] /= ab[i*ldab]
+						x[i] /= a[i*lda]
 					}
 				}
 			} else {
@@ -1506,13 +1845,13 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 					kk := min(k, n-i-1)
 					var sum complex128
 					jx := ix + incX
-					for _, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for _, aij := range a[i*lda+1 : i*lda+kk+1] {
 						sum += x[jx] * aij
 						jx += incX
 					}
 					x[ix] -= sum
 					if diag == blas.NonUnit {
-						x[ix] /= ab[i*ldab]
+						x[ix] /= a[i*lda]
 					}
 					ix -= incX
 				}
@@ -1522,12 +1861,12 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				for i := 0; i < n; i++ {
 					kk := min(k, i)
 					var sum complex128
-					for j, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for j, aij := range a[i*lda+k-kk : i*lda+k] {
 						sum += x[i-kk+j] * aij
 					}
 					x[i] -= sum
 					if diag == blas.NonUnit {
-						x[i] /= ab[i*ldab+k]
+						x[i] /= a[i*lda+k]
 					}
 				}
 			} else {
@@ -1536,13 +1875,13 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 					kk := min(k, i)
 					var sum complex128
 					jx := ix - kk*incX
-					for _, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for _, aij := range a[i*lda+k-kk : i*lda+k] {
 						sum += x[jx] * aij
 						jx += incX
 					}
 					x[ix] -= sum
 					if diag == blas.NonUnit {
-						x[ix] /= ab[i*ldab+k]
+						x[ix] /= a[i*lda+k]
 					}
 					ix += incX
 				}
@@ -1553,11 +1892,11 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 			if incX == 1 {
 				for i := 0; i < n; i++ {
 					if diag == blas.NonUnit {
-						x[i] /= ab[i*ldab]
+						x[i] /= a[i*lda]
 					}
 					kk := min(k, n-i-1)
 					xi := x[i]
-					for j, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for j, aij := range a[i*lda+1 : i*lda+kk+1] {
 						x[i+1+j] -= xi * aij
 					}
 				}
@@ -1565,12 +1904,12 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				ix := kx
 				for i := 0; i < n; i++ {
 					if diag == blas.NonUnit {
-						x[ix] /= ab[i*ldab]
+						x[ix] /= a[i*lda]
 					}
 					kk := min(k, n-i-1)
 					xi := x[ix]
 					jx := ix + incX
-					for _, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for _, aij := range a[i*lda+1 : i*lda+kk+1] {
 						x[jx] -= xi * aij
 						jx += incX
 					}
@@ -1581,11 +1920,11 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 			if incX == 1 {
 				for i := n - 1; i >= 0; i-- {
 					if diag == blas.NonUnit {
-						x[i] /= ab[i*ldab+k]
+						x[i] /= a[i*lda+k]
 					}
 					kk := min(k, i)
 					xi := x[i]
-					for j, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for j, aij := range a[i*lda+k-kk : i*lda+k] {
 						x[i-kk+j] -= xi * aij
 					}
 				}
@@ -1593,12 +1932,12 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				ix := kx + (n-1)*incX
 				for i := n - 1; i >= 0; i-- {
 					if diag == blas.NonUnit {
-						x[ix] /= ab[i*ldab+k]
+						x[ix] /= a[i*lda+k]
 					}
 					kk := min(k, i)
 					xi := x[ix]
 					jx := ix - kk*incX
-					for _, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for _, aij := range a[i*lda+k-kk : i*lda+k] {
 						x[jx] -= xi * aij
 						jx += incX
 					}
@@ -1611,11 +1950,11 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 			if incX == 1 {
 				for i := 0; i < n; i++ {
 					if diag == blas.NonUnit {
-						x[i] /= cmplx.Conj(ab[i*ldab])
+						x[i] /= cmplx.Conj(a[i*lda])
 					}
 					kk := min(k, n-i-1)
 					xi := x[i]
-					for j, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for j, aij := range a[i*lda+1 : i*lda+kk+1] {
 						x[i+1+j] -= xi * cmplx.Conj(aij)
 					}
 				}
@@ -1623,12 +1962,12 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				ix := kx
 				for i := 0; i < n; i++ {
 					if diag == blas.NonUnit {
-						x[ix] /= cmplx.Conj(ab[i*ldab])
+						x[ix] /= cmplx.Conj(a[i*lda])
 					}
 					kk := min(k, n-i-1)
 					xi := x[ix]
 					jx := ix + incX
-					for _, aij := range ab[i*ldab+1 : i*ldab+kk+1] {
+					for _, aij := range a[i*lda+1 : i*lda+kk+1] {
 						x[jx] -= xi * cmplx.Conj(aij)
 						jx += incX
 					}
@@ -1639,11 +1978,11 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 			if incX == 1 {
 				for i := n - 1; i >= 0; i-- {
 					if diag == blas.NonUnit {
-						x[i] /= cmplx.Conj(ab[i*ldab+k])
+						x[i] /= cmplx.Conj(a[i*lda+k])
 					}
 					kk := min(k, i)
 					xi := x[i]
-					for j, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for j, aij := range a[i*lda+k-kk : i*lda+k] {
 						x[i-kk+j] -= xi * cmplx.Conj(aij)
 					}
 				}
@@ -1651,12 +1990,12 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				ix := kx + (n-1)*incX
 				for i := n - 1; i >= 0; i-- {
 					if diag == blas.NonUnit {
-						x[ix] /= cmplx.Conj(ab[i*ldab+k])
+						x[ix] /= cmplx.Conj(a[i*lda+k])
 					}
 					kk := min(k, i)
 					xi := x[ix]
 					jx := ix - kk*incX
-					for _, aij := range ab[i*ldab+k-kk : i*ldab+k] {
+					for _, aij := range a[i*lda+k-kk : i*lda+k] {
 						x[jx] -= xi * cmplx.Conj(aij)
 						jx += incX
 					}
@@ -1674,22 +2013,39 @@ func (Implementation) Ztbsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 // where x is an n element vector and A is an n×n triangular matrix, supplied in
 // packed form.
 func (Implementation) Ztpmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag, n int, ap []complex128, x []complex128, incX int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch uplo {
+	default:
 		panic(badUplo)
+	case blas.Upper, blas.Lower:
 	}
-	if trans != blas.NoTrans && trans != blas.Trans && trans != blas.ConjTrans {
+	switch trans {
+	default:
 		panic(badTranspose)
+	case blas.NoTrans, blas.Trans, blas.ConjTrans:
 	}
-	if diag != blas.Unit && diag != blas.NonUnit {
+	switch diag {
+	default:
 		panic(badDiag)
+	case blas.NonUnit, blas.Unit:
 	}
-	checkZVector('x', n, x, incX)
-	if len(ap) < n*(n+1)/2 {
-		panic("blas: insufficient A packed matrix slice length")
+	if n < 0 {
+		panic(nLT0)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
 	}
 
+	// Quick return if possible.
 	if n == 0 {
 		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if len(ap) < n*(n+1)/2 {
+		panic(shortAP)
+	}
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
 
 	// Set up start index in X.
@@ -1901,22 +2257,39 @@ func (Implementation) Ztpmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 // No test for singularity or near-singularity is included in this
 // routine. Such tests must be performed before calling this routine.
 func (Implementation) Ztpsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag, n int, ap []complex128, x []complex128, incX int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch uplo {
+	default:
 		panic(badUplo)
+	case blas.Upper, blas.Lower:
 	}
-	if trans != blas.NoTrans && trans != blas.Trans && trans != blas.ConjTrans {
+	switch trans {
+	default:
 		panic(badTranspose)
+	case blas.NoTrans, blas.Trans, blas.ConjTrans:
 	}
-	if diag != blas.Unit && diag != blas.NonUnit {
+	switch diag {
+	default:
 		panic(badDiag)
+	case blas.NonUnit, blas.Unit:
 	}
-	if len(ap) < n*(n+1)/2 {
-		panic("blas: insufficient A packed matrix slice length")
+	if n < 0 {
+		panic(nLT0)
 	}
-	checkZVector('x', n, x, incX)
+	if incX == 0 {
+		panic(zeroIncX)
+	}
 
+	// Quick return if possible.
 	if n == 0 {
 		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if len(ap) < n*(n+1)/2 {
+		panic(shortAP)
+	}
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
 
 	// Set up start index in X.
@@ -1961,7 +2334,7 @@ func (Implementation) Ztpsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 			if incX == 1 {
 				for i := 0; i < n; i++ {
 					if i > 0 {
-						x[i] -= c128.DotuUnitary(x[:i], ap[kk:kk+i+1])
+						x[i] -= c128.DotuUnitary(x[:i], ap[kk:kk+i])
 					}
 					if diag == blas.NonUnit {
 						x[i] /= ap[kk+i]
@@ -1972,7 +2345,7 @@ func (Implementation) Ztpsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 				ix := kx
 				for i := 0; i < n; i++ {
 					if i > 0 {
-						x[ix] -= c128.DotuInc(x, ap[kk:kk+i+1], uintptr(i), uintptr(incX), 1, uintptr(kx), 0)
+						x[ix] -= c128.DotuInc(x, ap[kk:kk+i], uintptr(i), uintptr(incX), 1, uintptr(kx), 0)
 					}
 					if diag == blas.NonUnit {
 						x[ix] /= ap[kk+i]
@@ -2113,20 +2486,42 @@ func (Implementation) Ztpsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 //  x = A^H * x  if trans = blas.ConjTrans
 // where x is a vector, and A is an n×n triangular matrix.
 func (Implementation) Ztrmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag, n int, a []complex128, lda int, x []complex128, incX int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
-		panic(badUplo)
-	}
-	if trans != blas.NoTrans && trans != blas.Trans && trans != blas.ConjTrans {
+	switch trans {
+	default:
 		panic(badTranspose)
+	case blas.NoTrans, blas.Trans, blas.ConjTrans:
 	}
-	if diag != blas.Unit && diag != blas.NonUnit {
+	switch uplo {
+	default:
+		panic(badUplo)
+	case blas.Upper, blas.Lower:
+	}
+	switch diag {
+	default:
 		panic(badDiag)
+	case blas.NonUnit, blas.Unit:
 	}
-	checkZMatrix('A', n, n, a, lda)
-	checkZVector('x', n, x, incX)
+	if n < 0 {
+		panic(nLT0)
+	}
+	if lda < max(1, n) {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
 
+	// Quick return if possible.
 	if n == 0 {
 		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if len(a) < lda*(n-1)+n {
+		panic(shortA)
+	}
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
 
 	// Set up start index in X.
@@ -2305,20 +2700,42 @@ func (Implementation) Ztrmv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag
 // No test for singularity or near-singularity is included in this
 // routine. Such tests must be performed before calling this routine.
 func (Implementation) Ztrsv(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag, n int, a []complex128, lda int, x []complex128, incX int) {
-	if uplo != blas.Upper && uplo != blas.Lower {
-		panic(badUplo)
-	}
-	if trans != blas.NoTrans && trans != blas.Trans && trans != blas.ConjTrans {
+	switch trans {
+	default:
 		panic(badTranspose)
+	case blas.NoTrans, blas.Trans, blas.ConjTrans:
 	}
-	if diag != blas.Unit && diag != blas.NonUnit {
+	switch uplo {
+	default:
+		panic(badUplo)
+	case blas.Upper, blas.Lower:
+	}
+	switch diag {
+	default:
 		panic(badDiag)
+	case blas.NonUnit, blas.Unit:
 	}
-	checkZMatrix('A', n, n, a, lda)
-	checkZVector('x', n, x, incX)
+	if n < 0 {
+		panic(nLT0)
+	}
+	if lda < max(1, n) {
+		panic(badLdA)
+	}
+	if incX == 0 {
+		panic(zeroIncX)
+	}
 
+	// Quick return if possible.
 	if n == 0 {
 		return
+	}
+
+	// For zero matrix size the following slice length checks are trivially satisfied.
+	if len(a) < lda*(n-1)+n {
+		panic(shortA)
+	}
+	if (incX > 0 && len(x) <= (n-1)*incX) || (incX < 0 && len(x) <= (1-n)*incX) {
+		panic(shortX)
 	}
 
 	// Set up start index in X.

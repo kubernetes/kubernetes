@@ -15,12 +15,17 @@ require (
 )
 
 replace (
+	github.com/BurntSushi/xgb => github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802
 	github.com/gogo/protobuf => github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
 	github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
-	golang.org/x/exp => golang.org/x/exp v0.0.0-20180321215751-8460e604b9de
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20190205050122-7f7074d5bcfd
-	gonum.org/v1/gonum => gonum.org/v1/gonum v0.0.0-20180726124543-cebdade430cc
+	golang.org/x/exp => golang.org/x/exp v0.0.0-20190312203227-4b39c73a6495
+	golang.org/x/image => golang.org/x/image v0.0.0-20190227222117-0694c2d4d067
+	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20190312151609-d3739f865fa6
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
+	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
+	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
+	gonum.org/v1/gonum => gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver

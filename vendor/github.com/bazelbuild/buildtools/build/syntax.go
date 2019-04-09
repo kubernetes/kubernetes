@@ -57,9 +57,8 @@ type Expr interface {
 
 // A Comment represents a single # comment.
 type Comment struct {
-	Start  Position
-	Token  string // without trailing newline
-	Suffix bool   // an end of line (not whole line) comment
+	Start Position
+	Token string // without trailing newline
 }
 
 // Comments collects the comments associated with an expression.
@@ -87,12 +86,12 @@ type File struct {
 	Stmt []Expr
 }
 
-func (x *File) Span() (start, end Position) {
-	if len(x.Stmt) == 0 {
+func (f *File) Span() (start, end Position) {
+	if len(f.Stmt) == 0 {
 		return
 	}
-	start, _ = x.Stmt[0].Span()
-	_, end = x.Stmt[len(x.Stmt)-1].Span()
+	start, _ = f.Stmt[0].Span()
+	_, end = f.Stmt[len(f.Stmt)-1].Span()
 	return start, end
 }
 
@@ -360,15 +359,17 @@ func (x *ParenExpr) Span() (start, end Position) {
 	return x.Start, x.End.Pos.add(")")
 }
 
-// A SliceExpr represents a slice expression: X[Y:Z].
+// A SliceExpr represents a slice expression: expr[from:to] or expr[from:to:step] .
 type SliceExpr struct {
 	Comments
-	X          Expr
-	SliceStart Position
-	Y          Expr
-	Colon      Position
-	Z          Expr
-	End        Position
+	X           Expr
+	SliceStart  Position
+	From        Expr
+	FirstColon  Position
+	To          Expr
+	SecondColon Position
+	Step        Expr
+	End         Position
 }
 
 func (x *SliceExpr) Span() (start, end Position) {
@@ -420,4 +421,75 @@ func (x *ConditionalExpr) Span() (start, end Position) {
 	start, _ = x.Then.Span()
 	_, end = x.Else.Span()
 	return start, end
+}
+
+// A CodeBlock represents an indented code block.
+type CodeBlock struct {
+	Statements []Expr
+	Start      Position
+	End
+}
+
+func (x *CodeBlock) Span() (start, end Position) {
+	return x.Start, x.End.Pos
+}
+
+// A FuncDef represents a function definition expression: def foo(List):.
+type FuncDef struct {
+	Comments
+	Start          Position // position of def
+	Name           string
+	ListStart      Position // position of (
+	Args           []Expr
+	Body           CodeBlock
+	End                 // position of the end
+	ForceCompact   bool // force compact (non-multiline) form when printing
+	ForceMultiLine bool // force multiline form when printing
+}
+
+func (x *FuncDef) Span() (start, end Position) {
+	return x.Start, x.End.Pos
+}
+
+// A ReturnExpr represents a return statement: return f(x).
+type ReturnExpr struct {
+	Comments
+	Start Position
+	X     Expr
+	End   Position
+}
+
+func (x *ReturnExpr) Span() (start, end Position) {
+	return x.Start, x.End
+}
+
+// A ForLoop represents a for loop block: for x in range(10):.
+type ForLoop struct {
+	Comments
+	Start    Position // position of for
+	LoopVars []Expr
+	Iterable Expr
+	Body     CodeBlock
+	End      // position of the end
+}
+
+func (x *ForLoop) Span() (start, end Position) {
+	return x.Start, x.End.Pos
+}
+
+// An IfElse represents an if-else blocks sequence: if x: ... elif y: ... else: ... .
+type IfElse struct {
+	Comments
+	Start      Position // position of if
+	Conditions []Condition
+	End        // position of the end
+}
+
+type Condition struct {
+	If   Expr
+	Then CodeBlock
+}
+
+func (x *IfElse) Span() (start, end Position) {
+	return x.Start, x.End.Pos
 }

@@ -34,7 +34,7 @@ package identifier
 // - http://www.iana.org/assignments/character-sets/character-sets.xhtml
 // - http://www.iana.org/assignments/ianacharset-mib/ianacharset-mib
 // - http://www.ietf.org/rfc/rfc2978.txt
-// - http://www.unicode.org/reports/tr22/
+// - https://www.unicode.org/reports/tr22/
 // - http://www.w3.org/TR/encoding/
 // - https://encoding.spec.whatwg.org/
 // - https://encoding.spec.whatwg.org/encodings.json

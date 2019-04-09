@@ -18,7 +18,7 @@ require (
 	github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937
 	github.com/spf13/pflag v1.0.1
 	github.com/stretchr/testify v1.2.2
-	golang.org/x/text v0.3.0
+	golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
@@ -29,9 +29,9 @@ require (
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v11.1.0+incompatible
-	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.0.0
-	github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20160726150825-5bd2802263f2
-	github.com/davecgh/go-spew => github.com/davecgh/go-spew v0.0.0-20170626231645-782f4967f2dc
+	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.0
+	github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
+	github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda
 	github.com/docker/spdystream => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
 	github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e
@@ -48,7 +48,7 @@ replace (
 	github.com/golang/protobuf => github.com/golang/protobuf v1.1.0
 	github.com/google/btree => github.com/google/btree v0.0.0-20160524151835-7d79101e329e
 	github.com/google/gofuzz => github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
-	github.com/google/uuid => github.com/google/uuid v0.0.0-20171113160352-8c31c18f31ed
+	github.com/google/uuid => github.com/google/uuid v1.0.0
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.0.0-20190126172459-c818fa66e4c8
 	github.com/gregjones/httpcache => github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7
@@ -57,7 +57,7 @@ replace (
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/inconshreveable/mousetrap => github.com/inconshreveable/mousetrap v1.0.0
 	github.com/json-iterator/go => github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be
-	github.com/mailru/easyjson => github.com/mailru/easyjson v0.0.0-20170624190925-2f5df55504eb
+	github.com/mailru/easyjson => github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
 	github.com/modern-go/concurrent => github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 	github.com/modern-go/reflect2 => github.com/modern-go/reflect2 v1.0.1
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
@@ -65,17 +65,18 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v0.0.0-20190113212917-5533ce8a0da3
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/pkg/errors => github.com/pkg/errors v0.8.0
-	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v0.0.0-20181226105442-5d4384ee4fb2
+	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 	github.com/spf13/cobra => github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
-	github.com/stretchr/testify => github.com/stretchr/testify v0.0.0-20180319223459-c679ae2cc0cb
-	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20180808211826-de0752318171
+	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
+	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20171031081856-95c657629925
-	golang.org/x/text => golang.org/x/text v0.0.0-20170810154203-b19bf474d317
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
+	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 	golang.org/x/time => golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
+	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	gopkg.in/check.v1 => gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405
 	gopkg.in/fsnotify.v1 => gopkg.in/fsnotify.v1 v1.4.7

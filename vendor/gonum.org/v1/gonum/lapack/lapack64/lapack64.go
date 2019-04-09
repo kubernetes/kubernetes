@@ -19,6 +19,13 @@ func Use(l lapack.Float64) {
 	lapack64 = l
 }
 
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 // Potrf computes the Cholesky factorization of a.
 // The factorization has the form
 //  A = U^T * U if a.Uplo == blas.Upper, or
@@ -28,13 +35,42 @@ func Use(l lapack.Float64) {
 // a and t is shared. The returned bool indicates whether a is positive
 // definite and the factorization could be finished.
 func Potrf(a blas64.Symmetric) (t blas64.Triangular, ok bool) {
-	ok = lapack64.Dpotrf(a.Uplo, a.N, a.Data, a.Stride)
+	ok = lapack64.Dpotrf(a.Uplo, a.N, a.Data, max(1, a.Stride))
 	t.Uplo = a.Uplo
 	t.N = a.N
 	t.Data = a.Data
 	t.Stride = a.Stride
 	t.Diag = blas.NonUnit
 	return
+}
+
+// Potri computes the inverse of a real symmetric positive definite matrix A
+// using its Cholesky factorization.
+//
+// On entry, t contains the triangular factor U or L from the Cholesky
+// factorization A = U^T*U or A = L*L^T, as computed by Potrf.
+//
+// On return, the upper or lower triangle of the (symmetric) inverse of A is
+// stored in t, overwriting the input factor U or L, and also returned in a. The
+// underlying data between a and t is shared.
+//
+// The returned bool indicates whether the inverse was computed successfully.
+func Potri(t blas64.Triangular) (a blas64.Symmetric, ok bool) {
+	ok = lapack64.Dpotri(t.Uplo, t.N, t.Data, max(1, t.Stride))
+	a.Uplo = t.Uplo
+	a.N = t.N
+	a.Data = t.Data
+	a.Stride = t.Stride
+	return
+}
+
+// Potrs solves a system of n linear equations A*X = B where A is an n×n
+// symmetric positive definite matrix and B is an n×nrhs matrix, using the
+// Cholesky factorization A = U^T*U or A = L*L^T. t contains the corresponding
+// triangular factor as returned by Potrf. On entry, B contains the right-hand
+// side matrix B, on return it contains the solution matrix X.
+func Potrs(t blas64.Triangular, b blas64.General) {
+	lapack64.Dpotrs(t.Uplo, t.N, b.Cols, t.Data, max(1, t.Stride), b.Data, max(1, b.Stride))
 }
 
 // Gecon estimates the reciprocal of the condition number of the n×n matrix A
@@ -49,7 +85,7 @@ func Potrf(a blas64.Symmetric) (t blas64.Triangular, ok bool) {
 //
 // iwork is a temporary data slice of length at least n and Gecon will panic otherwise.
 func Gecon(norm lapack.MatrixNorm, a blas64.General, anorm float64, work []float64, iwork []int) float64 {
-	return lapack64.Dgecon(norm, a.Cols, a.Data, a.Stride, anorm, work, iwork)
+	return lapack64.Dgecon(norm, a.Cols, a.Data, max(1, a.Stride), anorm, work, iwork)
 }
 
 // Gels finds a minimum-norm solution based on the matrices A and B using the
@@ -82,7 +118,7 @@ func Gecon(norm lapack.MatrixNorm, a blas64.General, anorm float64, work []float
 // In the special case that lwork == -1, work[0] will be set to the optimal working
 // length.
 func Gels(trans blas.Transpose, a blas64.General, b blas64.General, work []float64, lwork int) bool {
-	return lapack64.Dgels(trans, a.Rows, a.Cols, b.Cols, a.Data, a.Stride, b.Data, b.Stride, work, lwork)
+	return lapack64.Dgels(trans, a.Rows, a.Cols, b.Cols, a.Data, max(1, a.Stride), b.Data, max(1, b.Stride), work, lwork)
 }
 
 // Geqrf computes the QR factorization of the m×n matrix A using a blocked
@@ -108,7 +144,7 @@ func Gels(trans blas.Transpose, a blas64.General, b blas64.General, work []float
 // by the temporary space available. If lwork == -1, instead of performing Geqrf,
 // the optimal work length will be stored into work[0].
 func Geqrf(a blas64.General, tau, work []float64, lwork int) {
-	lapack64.Dgeqrf(a.Rows, a.Cols, a.Data, a.Stride, tau, work, lwork)
+	lapack64.Dgeqrf(a.Rows, a.Cols, a.Data, max(1, a.Stride), tau, work, lwork)
 }
 
 // Gelqf computes the LQ factorization of the m×n matrix A using a blocked
@@ -128,7 +164,7 @@ func Geqrf(a blas64.General, tau, work []float64, lwork int) {
 // by the temporary space available. If lwork == -1, instead of performing Gelqf,
 // the optimal work length will be stored into work[0].
 func Gelqf(a blas64.General, tau, work []float64, lwork int) {
-	lapack64.Dgelqf(a.Rows, a.Cols, a.Data, a.Stride, tau, work, lwork)
+	lapack64.Dgelqf(a.Rows, a.Cols, a.Data, max(1, a.Stride), tau, work, lwork)
 }
 
 // Gesvd computes the singular value decomposition of the input matrix A.
@@ -143,7 +179,7 @@ func Gelqf(a blas64.General, tau, work []float64, lwork int) {
 // jobU and jobVT are options for computing the singular vectors. The behavior
 // is as follows
 //  jobU == lapack.SVDAll       All m columns of U are returned in u
-//  jobU == lapack.SVDInPlace   The first min(m,n) columns are returned in u
+//  jobU == lapack.SVDStore     The first min(m,n) columns are returned in u
 //  jobU == lapack.SVDOverwrite The first min(m,n) columns of U are written into a
 //  jobU == lapack.SVDNone      The columns of U are not computed.
 // The behavior is the same for jobVT and the rows of V^T. At most one of jobU
@@ -157,12 +193,12 @@ func Gelqf(a blas64.General, tau, work []float64, lwork int) {
 // values in decreasing order.
 //
 // u contains the left singular vectors on exit, stored columnwise. If
-// jobU == lapack.SVDAll, u is of size m×m. If jobU == lapack.SVDInPlace u is
+// jobU == lapack.SVDAll, u is of size m×m. If jobU == lapack.SVDStore u is
 // of size m×min(m,n). If jobU == lapack.SVDOverwrite or lapack.SVDNone, u is
 // not used.
 //
 // vt contains the left singular vectors on exit, stored rowwise. If
-// jobV == lapack.SVDAll, vt is of size n×m. If jobVT == lapack.SVDInPlace vt is
+// jobV == lapack.SVDAll, vt is of size n×m. If jobVT == lapack.SVDStore vt is
 // of size min(m,n)×n. If jobVT == lapack.SVDOverwrite or lapack.SVDNone, vt is
 // not used.
 //
@@ -174,7 +210,7 @@ func Gelqf(a blas64.General, tau, work []float64, lwork int) {
 //
 // Gesvd returns whether the decomposition successfully completed.
 func Gesvd(jobU, jobVT lapack.SVDJob, a, u, vt blas64.General, s, work []float64, lwork int) (ok bool) {
-	return lapack64.Dgesvd(jobU, jobVT, a.Rows, a.Cols, a.Data, a.Stride, s, u.Data, u.Stride, vt.Data, vt.Stride, work, lwork)
+	return lapack64.Dgesvd(jobU, jobVT, a.Rows, a.Cols, a.Data, max(1, a.Stride), s, u.Data, max(1, u.Stride), vt.Data, max(1, vt.Stride), work, lwork)
 }
 
 // Getrf computes the LU decomposition of the m×n matrix A.
@@ -195,7 +231,7 @@ func Gesvd(jobU, jobVT lapack.SVDJob, a, u, vt blas64.General, s, work []float64
 // will occur if the false is returned and the result is used to solve a
 // system of equations.
 func Getrf(a blas64.General, ipiv []int) bool {
-	return lapack64.Dgetrf(a.Rows, a.Cols, a.Data, a.Stride, ipiv)
+	return lapack64.Dgetrf(a.Rows, a.Cols, a.Data, max(1, a.Stride), ipiv)
 }
 
 // Getri computes the inverse of the matrix A using the LU factorization computed
@@ -211,7 +247,7 @@ func Getrf(a blas64.General, ipiv []int) bool {
 // by the temporary space available. If lwork == -1, instead of performing Getri,
 // the optimal work length will be stored into work[0].
 func Getri(a blas64.General, ipiv []int, work []float64, lwork int) (ok bool) {
-	return lapack64.Dgetri(a.Cols, a.Data, a.Stride, ipiv, work, lwork)
+	return lapack64.Dgetri(a.Cols, a.Data, max(1, a.Stride), ipiv, work, lwork)
 }
 
 // Getrs solves a system of equations using an LU factorization.
@@ -226,7 +262,7 @@ func Getri(a blas64.General, ipiv []int, work []float64, lwork int) (ok bool) {
 // a and ipiv contain the LU factorization of A and the permutation indices as
 // computed by Getrf. ipiv is zero-indexed.
 func Getrs(trans blas.Transpose, a blas64.General, b blas64.General, ipiv []int) {
-	lapack64.Dgetrs(trans, a.Cols, b.Cols, a.Data, a.Stride, ipiv, b.Data, b.Stride)
+	lapack64.Dgetrs(trans, a.Cols, b.Cols, a.Data, max(1, a.Stride), ipiv, b.Data, max(1, b.Stride))
 }
 
 // Ggsvd3 computes the generalized singular value decomposition (GSVD)
@@ -326,7 +362,7 @@ func Getrs(trans blas.Transpose, a blas64.General, b blas64.General, ipiv []int)
 // lwork is -1, work[0] holds the optimal lwork on return, but Ggsvd3 does
 // not perform the GSVD.
 func Ggsvd3(jobU, jobV, jobQ lapack.GSVDJob, a, b blas64.General, alpha, beta []float64, u, v, q blas64.General, work []float64, lwork int, iwork []int) (k, l int, ok bool) {
-	return lapack64.Dggsvd3(jobU, jobV, jobQ, a.Rows, a.Cols, b.Rows, a.Data, a.Stride, b.Data, b.Stride, alpha, beta, u.Data, u.Stride, v.Data, v.Stride, q.Data, q.Stride, work, lwork, iwork)
+	return lapack64.Dggsvd3(jobU, jobV, jobQ, a.Rows, a.Cols, b.Rows, a.Data, max(1, a.Stride), b.Data, max(1, b.Stride), alpha, beta, u.Data, max(1, u.Stride), v.Data, max(1, v.Stride), q.Data, max(1, q.Stride), work, lwork, iwork)
 }
 
 // Lange computes the matrix norm of the general m×n matrix A. The input norm
@@ -338,7 +374,7 @@ func Ggsvd3(jobU, jobV, jobQ lapack.GSVDJob, a, b blas64.General, alpha, beta []
 // If norm == lapack.MaxColumnSum, work must be of length n, and this function will panic otherwise.
 // There are no restrictions on work for the other matrix norms.
 func Lange(norm lapack.MatrixNorm, a blas64.General, work []float64) float64 {
-	return lapack64.Dlange(norm, a.Rows, a.Cols, a.Data, a.Stride, work)
+	return lapack64.Dlange(norm, a.Rows, a.Cols, a.Data, max(1, a.Stride), work)
 }
 
 // Lansy computes the specified norm of an n×n symmetric matrix. If
@@ -346,14 +382,14 @@ func Lange(norm lapack.MatrixNorm, a blas64.General, work []float64) float64 {
 // at least n and this function will panic otherwise.
 // There are no restrictions on work for the other matrix norms.
 func Lansy(norm lapack.MatrixNorm, a blas64.Symmetric, work []float64) float64 {
-	return lapack64.Dlansy(norm, a.Uplo, a.N, a.Data, a.Stride, work)
+	return lapack64.Dlansy(norm, a.Uplo, a.N, a.Data, max(1, a.Stride), work)
 }
 
 // Lantr computes the specified norm of an m×n trapezoidal matrix A. If
 // norm == lapack.MaxColumnSum work must have length at least n and this function
 // will panic otherwise. There are no restrictions on work for the other matrix norms.
 func Lantr(norm lapack.MatrixNorm, a blas64.Triangular, work []float64) float64 {
-	return lapack64.Dlantr(norm, a.Uplo, a.Diag, a.N, a.N, a.Data, a.Stride, work)
+	return lapack64.Dlantr(norm, a.Uplo, a.Diag, a.N, a.N, a.Data, max(1, a.Stride), work)
 }
 
 // Lapmt rearranges the columns of the m×n matrix X as specified by the
@@ -369,7 +405,7 @@ func Lantr(norm lapack.MatrixNorm, a blas64.Triangular, work []float64) float64 
 //
 // k must have length n, otherwise Lapmt will panic. k is zero-indexed.
 func Lapmt(forward bool, x blas64.General, k []int) {
-	lapack64.Dlapmt(forward, x.Rows, x.Cols, x.Data, x.Stride, k)
+	lapack64.Dlapmt(forward, x.Rows, x.Cols, x.Data, max(1, x.Stride), k)
 }
 
 // Ormlq multiplies the matrix C by the othogonal matrix Q defined by
@@ -391,7 +427,7 @@ func Lapmt(forward bool, x blas64.General, k []int) {
 // Tau contains the Householder scales and must have length at least k, and
 // this function will panic otherwise.
 func Ormlq(side blas.Side, trans blas.Transpose, a blas64.General, tau []float64, c blas64.General, work []float64, lwork int) {
-	lapack64.Dormlq(side, trans, c.Rows, c.Cols, a.Rows, a.Data, a.Stride, tau, c.Data, c.Stride, work, lwork)
+	lapack64.Dormlq(side, trans, c.Rows, c.Cols, a.Rows, a.Data, max(1, a.Stride), tau, c.Data, max(1, c.Stride), work, lwork)
 }
 
 // Ormqr multiplies an m×n matrix C by an orthogonal matrix Q as
@@ -422,7 +458,7 @@ func Ormlq(side blas.Side, trans blas.Transpose, a blas64.General, tau []float64
 // If lwork is -1, instead of performing Ormqr, the optimal workspace size will
 // be stored into work[0].
 func Ormqr(side blas.Side, trans blas.Transpose, a blas64.General, tau []float64, c blas64.General, work []float64, lwork int) {
-	lapack64.Dormqr(side, trans, c.Rows, c.Cols, a.Cols, a.Data, a.Stride, tau, c.Data, c.Stride, work, lwork)
+	lapack64.Dormqr(side, trans, c.Rows, c.Cols, a.Cols, a.Data, max(1, a.Stride), tau, c.Data, max(1, c.Stride), work, lwork)
 }
 
 // Pocon estimates the reciprocal of the condition number of a positive-definite
@@ -435,7 +471,7 @@ func Ormqr(side blas.Side, trans blas.Transpose, a blas64.General, tau []float64
 //
 // iwork is a temporary data slice of length at least n and Pocon will panic otherwise.
 func Pocon(a blas64.Symmetric, anorm float64, work []float64, iwork []int) float64 {
-	return lapack64.Dpocon(a.Uplo, a.N, a.Data, a.Stride, anorm, work, iwork)
+	return lapack64.Dpocon(a.Uplo, a.N, a.Data, max(1, a.Stride), anorm, work, iwork)
 }
 
 // Syev computes all eigenvalues and, optionally, the eigenvectors of a real
@@ -445,16 +481,16 @@ func Pocon(a blas64.Symmetric, anorm float64, work []float64, iwork []int) float
 // at least n, and Syev will panic otherwise.
 //
 // On entry, a contains the elements of the symmetric matrix A in the triangular
-// portion specified by uplo. If jobz == lapack.ComputeEV a contains the
-// orthonormal eigenvectors of A on exit, otherwise on exit the specified
-// triangular region is overwritten.
+// portion specified by uplo. If jobz == lapack.EVCompute, a contains the
+// orthonormal eigenvectors of A on exit, otherwise jobz must be lapack.EVNone
+// and on exit the specified triangular region is overwritten.
 //
 // Work is temporary storage, and lwork specifies the usable memory length. At minimum,
 // lwork >= 3*n-1, and Syev will panic otherwise. The amount of blocking is
 // limited by the usable length. If lwork == -1, instead of computing Syev the
 // optimal work length is stored into work[0].
 func Syev(jobz lapack.EVJob, a blas64.Symmetric, w, work []float64, lwork int) (ok bool) {
-	return lapack64.Dsyev(jobz, a.Uplo, a.N, a.Data, a.Stride, w, work, lwork)
+	return lapack64.Dsyev(jobz, a.Uplo, a.N, a.Data, max(1, a.Stride), w, work, lwork)
 }
 
 // Trcon estimates the reciprocal of the condition number of a triangular matrix A.
@@ -464,7 +500,7 @@ func Syev(jobz lapack.EVJob, a blas64.Symmetric, w, work []float64, lwork int) (
 //
 // iwork is a temporary data slice of length at least n and Trcon will panic otherwise.
 func Trcon(norm lapack.MatrixNorm, a blas64.Triangular, work []float64, iwork []int) float64 {
-	return lapack64.Dtrcon(norm, a.Uplo, a.Diag, a.N, a.Data, a.Stride, work, iwork)
+	return lapack64.Dtrcon(norm, a.Uplo, a.Diag, a.N, a.Data, max(1, a.Stride), work, iwork)
 }
 
 // Trtri computes the inverse of a triangular matrix, storing the result in place
@@ -473,13 +509,13 @@ func Trcon(norm lapack.MatrixNorm, a blas64.Triangular, work []float64, iwork []
 // Trtri will not perform the inversion if the matrix is singular, and returns
 // a boolean indicating whether the inversion was successful.
 func Trtri(a blas64.Triangular) (ok bool) {
-	return lapack64.Dtrtri(a.Uplo, a.Diag, a.N, a.Data, a.Stride)
+	return lapack64.Dtrtri(a.Uplo, a.Diag, a.N, a.Data, max(1, a.Stride))
 }
 
 // Trtrs solves a triangular system of the form A * X = B or A^T * X = B. Trtrs
 // returns whether the solve completed successfully. If A is singular, no solve is performed.
 func Trtrs(trans blas.Transpose, a blas64.Triangular, b blas64.General) (ok bool) {
-	return lapack64.Dtrtrs(a.Uplo, trans, a.Diag, a.N, b.Cols, a.Data, a.Stride, b.Data, b.Stride)
+	return lapack64.Dtrtrs(a.Uplo, trans, a.Diag, a.N, b.Cols, a.Data, max(1, a.Stride), b.Data, max(1, b.Stride))
 }
 
 // Geev computes the eigenvalues and, optionally, the left and/or right
@@ -506,10 +542,10 @@ func Trtrs(trans blas.Transpose, a blas64.Triangular, b blas64.General) (ok bool
 // where i is the imaginary unit. The computed eigenvectors are normalized to
 // have Euclidean norm equal to 1 and largest component real.
 //
-// Left eigenvectors will be computed only if jobvl == lapack.ComputeLeftEV,
-// otherwise jobvl must be lapack.None.
-// Right eigenvectors will be computed only if jobvr == lapack.ComputeRightEV,
-// otherwise jobvr must be lapack.None.
+// Left eigenvectors will be computed only if jobvl == lapack.LeftEVCompute,
+// otherwise jobvl must be lapack.LeftEVNone.
+// Right eigenvectors will be computed only if jobvr == lapack.RightEVCompute,
+// otherwise jobvr must be lapack.RightEVNone.
 // For other values of jobvl and jobvr Geev will panic.
 //
 // On return, wr and wi will contain the real and imaginary parts, respectively,
@@ -535,11 +571,11 @@ func Geev(jobvl lapack.LeftEVJob, jobvr lapack.RightEVJob, a blas64.General, wr,
 	if a.Cols != n {
 		panic("lapack64: matrix not square")
 	}
-	if jobvl == lapack.ComputeLeftEV && (vl.Rows != n || vl.Cols != n) {
+	if jobvl == lapack.LeftEVCompute && (vl.Rows != n || vl.Cols != n) {
 		panic("lapack64: bad size of VL")
 	}
-	if jobvr == lapack.ComputeRightEV && (vr.Rows != n || vr.Cols != n) {
+	if jobvr == lapack.RightEVCompute && (vr.Rows != n || vr.Cols != n) {
 		panic("lapack64: bad size of VR")
 	}
-	return lapack64.Dgeev(jobvl, jobvr, n, a.Data, a.Stride, wr, wi, vl.Data, vl.Stride, vr.Data, vr.Stride, work, lwork)
+	return lapack64.Dgeev(jobvl, jobvr, n, a.Data, max(1, a.Stride), wr, wi, vl.Data, max(1, vl.Stride), vr.Data, max(1, vr.Stride), work, lwork)
 }

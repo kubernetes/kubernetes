@@ -404,7 +404,7 @@ userAuthLoop:
 			perms, authErr = config.PasswordCallback(s, password)
 		case "keyboard-interactive":
 			if config.KeyboardInteractiveCallback == nil {
-				authErr = errors.New("ssh: keyboard-interactive auth not configubred")
+				authErr = errors.New("ssh: keyboard-interactive auth not configured")
 				break
 			}
 

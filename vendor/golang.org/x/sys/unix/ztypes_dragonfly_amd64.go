@@ -6,11 +6,11 @@
 package unix
 
 const (
-	sizeofPtr      = 0x8
-	sizeofShort    = 0x2
-	sizeofInt      = 0x4
-	sizeofLong     = 0x8
-	sizeofLongLong = 0x8
+	SizeofPtr      = 0x8
+	SizeofShort    = 0x2
+	SizeofInt      = 0x4
+	SizeofLong     = 0x8
+	SizeofLongLong = 0x8
 )
 
 type (
@@ -56,23 +56,6 @@ type Rlimit struct {
 
 type _Gid_t uint32
 
-const (
-	S_IFMT   = 0xf000
-	S_IFIFO  = 0x1000
-	S_IFCHR  = 0x2000
-	S_IFDIR  = 0x4000
-	S_IFBLK  = 0x6000
-	S_IFREG  = 0x8000
-	S_IFLNK  = 0xa000
-	S_IFSOCK = 0xc000
-	S_ISUID  = 0x800
-	S_ISGID  = 0x400
-	S_ISVTX  = 0x200
-	S_IRUSR  = 0x100
-	S_IWUSR  = 0x80
-	S_IXUSR  = 0x40
-)
-
 type Stat_t struct {
 	Ino      uint64
 	Nlink    uint32
@@ -108,7 +91,7 @@ type Statfs_t struct {
 	Owner       uint32
 	Type        int32
 	Flags       int32
-	Pad_cgo_0   [4]byte
+	_           [4]byte
 	Syncwrites  int64
 	Asyncwrites int64
 	Fstypename  [16]int8
@@ -118,7 +101,7 @@ type Statfs_t struct {
 	Spares1     int16
 	Mntfromname [80]int8
 	Spares2     int16
-	Pad_cgo_1   [4]byte
+	_           [4]byte
 	Spare       [2]int64
 }
 
@@ -142,6 +125,10 @@ type Dirent struct {
 type Fsid struct {
 	Val [2]int32
 }
+
+const (
+	PathMax = 0x400
+)
 
 type RawSockaddrInet4 struct {
 	Len    uint8
@@ -215,10 +202,10 @@ type IPv6Mreq struct {
 type Msghdr struct {
 	Name       *byte
 	Namelen    uint32
-	Pad_cgo_0  [4]byte
+	_          [4]byte
 	Iov        *Iovec
 	Iovlen     int32
-	Pad_cgo_1  [4]byte
+	_          [4]byte
 	Control    *byte
 	Controllen uint32
 	Flags      int32
@@ -290,14 +277,14 @@ const (
 )
 
 type IfMsghdr struct {
-	Msglen    uint16
-	Version   uint8
-	Type      uint8
-	Addrs     int32
-	Flags     int32
-	Index     uint16
-	Pad_cgo_0 [2]byte
-	Data      IfData
+	Msglen  uint16
+	Version uint8
+	Type    uint8
+	Addrs   int32
+	Flags   int32
+	Index   uint16
+	_       [2]byte
+	Data    IfData
 }
 
 type IfData struct {
@@ -307,7 +294,7 @@ type IfData struct {
 	Hdrlen     uint8
 	Recvquota  uint8
 	Xmitquota  uint8
-	Pad_cgo_0  [2]byte
+	_          [2]byte
 	Mtu        uint64
 	Metric     uint64
 	Link_state uint64
@@ -329,24 +316,24 @@ type IfData struct {
 }
 
 type IfaMsghdr struct {
-	Msglen    uint16
-	Version   uint8
-	Type      uint8
-	Addrs     int32
-	Flags     int32
-	Index     uint16
-	Pad_cgo_0 [2]byte
-	Metric    int32
+	Msglen  uint16
+	Version uint8
+	Type    uint8
+	Addrs   int32
+	Flags   int32
+	Index   uint16
+	_       [2]byte
+	Metric  int32
 }
 
 type IfmaMsghdr struct {
-	Msglen    uint16
-	Version   uint8
-	Type      uint8
-	Addrs     int32
-	Flags     int32
-	Index     uint16
-	Pad_cgo_0 [2]byte
+	Msglen  uint16
+	Version uint8
+	Type    uint8
+	Addrs   int32
+	Flags   int32
+	Index   uint16
+	_       [2]byte
 }
 
 type IfAnnounceMsghdr struct {
@@ -359,19 +346,19 @@ type IfAnnounceMsghdr struct {
 }
 
 type RtMsghdr struct {
-	Msglen    uint16
-	Version   uint8
-	Type      uint8
-	Index     uint16
-	Pad_cgo_0 [2]byte
-	Flags     int32
-	Addrs     int32
-	Pid       int32
-	Seq       int32
-	Errno     int32
-	Use       int32
-	Inits     uint64
-	Rmx       RtMetrics
+	Msglen  uint16
+	Version uint8
+	Type    uint8
+	Index   uint16
+	_       [2]byte
+	Flags   int32
+	Addrs   int32
+	Pid     int32
+	Seq     int32
+	Errno   int32
+	Use     int32
+	Inits   uint64
+	Rmx     RtMetrics
 }
 
 type RtMetrics struct {
@@ -387,7 +374,7 @@ type RtMetrics struct {
 	Hopcount  uint64
 	Mssopt    uint16
 	Pad       uint16
-	Pad_cgo_0 [4]byte
+	_         [4]byte
 	Msl       uint64
 	Iwmaxsegs uint64
 	Iwcapsegs uint64
@@ -412,9 +399,9 @@ type BpfStat struct {
 }
 
 type BpfProgram struct {
-	Len       uint32
-	Pad_cgo_0 [4]byte
-	Insns     *BpfInsn
+	Len   uint32
+	_     [4]byte
+	Insns *BpfInsn
 }
 
 type BpfInsn struct {
@@ -425,11 +412,11 @@ type BpfInsn struct {
 }
 
 type BpfHdr struct {
-	Tstamp    Timeval
-	Caplen    uint32
-	Datalen   uint32
-	Hdrlen    uint16
-	Pad_cgo_0 [6]byte
+	Tstamp  Timeval
+	Caplen  uint32
+	Datalen uint32
+	Hdrlen  uint16
+	_       [6]byte
 }
 
 type Termios struct {
@@ -440,6 +427,13 @@ type Termios struct {
 	Cc     [20]uint8
 	Ispeed uint32
 	Ospeed uint32
+}
+
+type Winsize struct {
+	Row    uint16
+	Col    uint16
+	Xpixel uint16
+	Ypixel uint16
 }
 
 const (
@@ -465,3 +459,11 @@ const (
 	POLLWRBAND = 0x100
 	POLLWRNORM = 0x4
 )
+
+type Utsname struct {
+	Sysname  [32]byte
+	Nodename [32]byte
+	Release  [32]byte
+	Version  [32]byte
+	Machine  [32]byte
+}

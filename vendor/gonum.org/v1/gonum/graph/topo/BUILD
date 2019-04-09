@@ -20,6 +20,7 @@ go_library(
         "//vendor/gonum.org/v1/gonum/graph/internal/linear:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/internal/ordered:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/internal/set:go_default_library",
+        "//vendor/gonum.org/v1/gonum/graph/iterator:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/traverse:go_default_library",
     ],
 )

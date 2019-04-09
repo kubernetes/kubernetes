@@ -124,7 +124,7 @@ func (e *Encoder) Writer(w io.Writer) io.Writer {
 }
 
 // ASCIISub is the ASCII substitute character, as recommended by
-// http://unicode.org/reports/tr36/#Text_Comparison
+// https://unicode.org/reports/tr36/#Text_Comparison
 const ASCIISub = '\x1a'
 
 // Nop is the nop encoding. Its transformed bytes are the same as the source

@@ -37,6 +37,7 @@ package unix
 #include <sys/time.h>
 #include <sys/uio.h>
 #include <sys/un.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <net/bpf.h>
 #include <net/if.h>
@@ -66,14 +67,14 @@ struct sockaddr_any {
 */
 import "C"
 
-// Machine characteristics; for internal use.
+// Machine characteristics
 
 const (
-	sizeofPtr      = C.sizeofPtr
-	sizeofShort    = C.sizeof_short
-	sizeofInt      = C.sizeof_int
-	sizeofLong     = C.sizeof_long
-	sizeofLongLong = C.sizeof_longlong
+	SizeofPtr      = C.sizeofPtr
+	SizeofShort    = C.sizeof_short
+	SizeofInt      = C.sizeof_int
+	SizeofLong     = C.sizeof_long
+	SizeofLongLong = C.sizeof_longlong
 )
 
 // Basic types
@@ -110,6 +111,23 @@ type Flock_t C.struct_flock
 type Dirent C.struct_dirent
 
 type Fsid C.fsid_t
+
+// File system limits
+
+const (
+	PathMax = C.PATH_MAX
+)
+
+// Advice to Fadvise
+
+const (
+	FADV_NORMAL     = C.POSIX_FADV_NORMAL
+	FADV_RANDOM     = C.POSIX_FADV_RANDOM
+	FADV_SEQUENTIAL = C.POSIX_FADV_SEQUENTIAL
+	FADV_WILLNEED   = C.POSIX_FADV_WILLNEED
+	FADV_DONTNEED   = C.POSIX_FADV_DONTNEED
+	FADV_NOREUSE    = C.POSIX_FADV_NOREUSE
+)
 
 // Sockets
 
@@ -228,6 +246,10 @@ type BpfTimeval C.struct_bpf_timeval
 
 type Termios C.struct_termios
 
+type Winsize C.struct_winsize
+
+type Ptmget C.struct_ptmget
+
 // fchmodat-like syscalls.
 
 const (
@@ -255,3 +277,13 @@ const (
 // Sysctl
 
 type Sysctlnode C.struct_sysctlnode
+
+// Uname
+
+type Utsname C.struct_utsname
+
+// Clockinfo
+
+const SizeofClockinfo = C.sizeof_struct_clockinfo
+
+type Clockinfo C.struct_clockinfo

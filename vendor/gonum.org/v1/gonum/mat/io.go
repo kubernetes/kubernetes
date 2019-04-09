@@ -259,7 +259,7 @@ func (m *Dense) UnmarshalBinaryFrom(r io.Reader) (int, error) {
 //  32 - 39  0                      (int64)
 //  40 - ..  vector's data elements (float64)
 func (v VecDense) MarshalBinary() ([]byte, error) {
-	bufLen := int64(headerSize) + int64(v.n)*int64(sizeFloat64)
+	bufLen := int64(headerSize) + int64(v.mat.N)*int64(sizeFloat64)
 	if bufLen <= 0 {
 		// bufLen is too big and has wrapped around.
 		return nil, errTooBig
@@ -267,7 +267,7 @@ func (v VecDense) MarshalBinary() ([]byte, error) {
 
 	header := storage{
 		Form: 'G', Packing: 'F', Uplo: 'A',
-		Rows: int64(v.n), Cols: 1,
+		Rows: int64(v.mat.N), Cols: 1,
 		Version: version,
 	}
 	buf := make([]byte, bufLen)
@@ -277,7 +277,7 @@ func (v VecDense) MarshalBinary() ([]byte, error) {
 	}
 
 	p := headerSize
-	for i := 0; i < v.n; i++ {
+	for i := 0; i < v.mat.N; i++ {
 		binary.LittleEndian.PutUint64(buf[p:p+sizeFloat64], math.Float64bits(v.at(i)))
 		p += sizeFloat64
 	}
@@ -292,7 +292,7 @@ func (v VecDense) MarshalBinary() ([]byte, error) {
 func (v VecDense) MarshalBinaryTo(w io.Writer) (int, error) {
 	header := storage{
 		Form: 'G', Packing: 'F', Uplo: 'A',
-		Rows: int64(v.n), Cols: 1,
+		Rows: int64(v.mat.N), Cols: 1,
 		Version: version,
 	}
 	n, err := header.marshalBinaryTo(w)
@@ -301,7 +301,7 @@ func (v VecDense) MarshalBinaryTo(w io.Writer) (int, error) {
 	}
 
 	var buf [8]byte
-	for i := 0; i < v.n; i++ {
+	for i := 0; i < v.mat.N; i++ {
 		binary.LittleEndian.PutUint64(buf[:], math.Float64bits(v.at(i)))
 		nn, err := w.Write(buf[:])
 		n += nn
