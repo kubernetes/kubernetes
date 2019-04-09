@@ -64,7 +64,7 @@ mkdir -p "${_tmp}"
 
 # Add the require directive
 echo "Running: go get ${dep}@${sha}"
-go get -d "${dep}@${sha}"
+go get -m -d "${dep}@${sha}"
 
 # Find the resolved version
 rev=$(go mod edit -json | jq -r ".Require[] | select(.Path == \"${dep}\") | .Version")
