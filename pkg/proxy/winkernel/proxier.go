@@ -34,7 +34,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -182,12 +182,14 @@ func (ep *endpointsInfo) Cleanup() {
 	// Never delete a Local Endpoint. Local Endpoints are already created by other entities.
 	// Remove only remote endpoints created by this service
 	if ep.refCount <= 0 && !ep.isLocal {
-		klog.V(4).Infof("Removing endpoints for %v, since no one is referencing it", ep)
-		err := ep.hns.deleteEndpoint(ep.hnsID)
-		if err == nil {
-			ep.hnsID = ""
-		} else {
-			klog.Errorf("Endpoint deletion failed for %v: %v", ep.ip, err)
+		if proxier != nil && !proxier.IsHnsEndpointStillUsed(ep.hnsID) {
+			klog.V(4).Infof("Removing endpoints for %v, since no one is referencing it", ep)
+			err := ep.hns.deleteEndpoint(ep.hnsID)
+			if err == nil {
+				ep.hnsID = ""
+			} else {
+				klog.Errorf("Endpoint deletion failed for %v: %v", ep.ip, err)
+			}
 		}
 	}
 }
@@ -482,7 +484,7 @@ type closeable interface {
 }
 
 // Proxier implements ProxyProvider
-var _ proxy.ProxyProvider = &Proxier{}
+var proxier *Proxier = nil
 
 // NewProxier returns a new Proxier
 func NewProxier(
@@ -586,7 +588,7 @@ func NewProxier(
 		}
 	}
 
-	proxier := &Proxier{
+	proxier = &Proxier{
 		portsMap:         make(map[localPort]closeable),
 		serviceMap:       make(proxyServiceMap),
 		serviceChanges:   newServiceChangeMap(),
@@ -1215,6 +1217,17 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(5).Infof("Pending delete stale service IP %s connections", svcIP)
 	}
 
+}
+
+func (proxier *Proxier) IsHnsEndpointStillUsed(hnsID string) bool {
+	for _, eps := range proxier.endpointsMap {
+		for _, ep := range eps {
+			if ep.hnsID == hnsID {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type endpointServicePair struct {
