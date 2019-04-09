@@ -492,8 +492,8 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	return plugin.NewDetacherCallCount
 }
 
-func (plugin *FakeVolumePlugin) CanAttach(spec *Spec) bool {
-	return true
+func (plugin *FakeVolumePlugin) CanAttach(spec *Spec) (bool, error) {
+	return true, nil
 }
 
 func (plugin *FakeVolumePlugin) CanDeviceMount(spec *Spec) (bool, error) {
@@ -654,8 +654,8 @@ func (f *FakeAttachableVolumePlugin) NewDetacher() (Detacher, error) {
 	return f.Plugin.NewDetacher()
 }
 
-func (f *FakeAttachableVolumePlugin) CanAttach(spec *Spec) bool {
-	return true
+func (f *FakeAttachableVolumePlugin) CanAttach(spec *Spec) (bool, error) {
+	return true, nil
 }
 
 var _ VolumePlugin = &FakeAttachableVolumePlugin{}

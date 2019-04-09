@@ -880,6 +880,7 @@ func TestPluginCanAttach(t *testing.T) {
 		driverName string
 		spec       *volume.Spec
 		canAttach  bool
+		shouldFail bool
 	}{
 		{
 			name:       "non-attachable inline",
@@ -893,6 +894,19 @@ func TestPluginCanAttach(t *testing.T) {
 			spec:       volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "attachable-pv", testVol), true),
 			canAttach:  true,
 		},
+		{
+			name:       "incomplete spec",
+			driverName: "attachable-pv",
+			spec:       &volume.Spec{ReadOnly: true},
+			canAttach:  false,
+			shouldFail: true,
+		},
+		{
+			name:       "nil spec",
+			driverName: "attachable-pv",
+			canAttach:  false,
+			shouldFail: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -902,10 +916,80 @@ func TestPluginCanAttach(t *testing.T) {
 			plug, tmpDir := newTestPlugin(t, fakeCSIClient)
 			defer os.RemoveAll(tmpDir)
 
-			pluginCanAttach := plug.CanAttach(test.spec)
+			pluginCanAttach, err := plug.CanAttach(test.spec)
+			if err != nil && !test.shouldFail {
+				t.Fatalf("unexected plugin.CanAttach error: %s", err)
+			}
 			if pluginCanAttach != test.canAttach {
 				t.Fatalf("expecting plugin.CanAttach %t got %t", test.canAttach, pluginCanAttach)
-				return
+			}
+		})
+	}
+}
+
+func TestPluginFindAttachablePlugin(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	tests := []struct {
+		name       string
+		driverName string
+		spec       *volume.Spec
+		canAttach  bool
+		shouldFail bool
+	}{
+		{
+			name:       "non-attachable inline",
+			driverName: "attachable-inline",
+			spec:       volume.NewSpecFromVolume(makeTestVol("test-vol", "attachable-inline")),
+			canAttach:  false,
+		},
+		{
+			name:       "attachable PV",
+			driverName: "attachable-pv",
+			spec:       volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "attachable-pv", testVol), true),
+			canAttach:  true,
+		},
+		{
+			name:       "incomplete spec",
+			driverName: "attachable-pv",
+			spec:       &volume.Spec{ReadOnly: true},
+			canAttach:  false,
+			shouldFail: true,
+		},
+		{
+			name:       "nil spec",
+			driverName: "attachable-pv",
+			canAttach:  false,
+			shouldFail: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tmpDir, err := utiltesting.MkTmpdir("csi-test")
+			if err != nil {
+				t.Fatalf("can't create temp dir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			client := fakeclient.NewSimpleClientset(getCSIDriver(test.driverName, nil, &test.canAttach))
+			factory := informers.NewSharedInformerFactory(client, csiResyncPeriod)
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(
+				tmpDir,
+				client,
+				nil,
+				"fakeNode",
+				factory.Storage().V1beta1().CSIDrivers().Lister(),
+			)
+
+			plugMgr := &volume.VolumePluginMgr{}
+			plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+
+			plugin, err := plugMgr.FindAttachablePluginBySpec(test.spec)
+			if err != nil && !test.shouldFail {
+				t.Fatalf("unexected error calling pluginMgr.FindAttachablePluginBySpec: %s", err)
+			}
+			if (plugin != nil) != test.canAttach {
+				t.Fatal("expecting attachable plugin, but got nil")
 			}
 		})
 	}

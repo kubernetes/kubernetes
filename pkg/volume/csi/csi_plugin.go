@@ -581,34 +581,30 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-// TODO change CanAttach to return error to propagate ability
-// to support Attachment or an error - see https://github.com/kubernetes/kubernetes/issues/74810
-func (p *csiPlugin) CanAttach(spec *volume.Spec) bool {
+func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
 	driverMode, err := p.getDriverMode(spec)
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	if driverMode == ephemeralDriverMode {
-		klog.V(4).Info(log("driver ephemeral mode detected for spec %v", spec.Name))
-		return false
+		klog.V(5).Info(log("plugin.CanAttach = false, ephemeral mode detected for spec %v", spec.Name()))
+		return false, nil
 	}
 
 	pvSrc, err := getCSISourceFromSpec(spec)
 	if err != nil {
-		klog.Error(log("plugin.CanAttach failed to get info from spec: %s", err))
-		return false
+		return false, err
 	}
 
 	driverName := pvSrc.Driver
 
 	skipAttach, err := p.skipAttach(driverName)
 	if err != nil {
-		klog.Error(log("plugin.CanAttach error when calling plugin.skipAttach for driver %s: %s", driverName, err))
-		return false
+		return false, err
 	}
 
-	return !skipAttach
+	return !skipAttach, nil
 }
 
 // TODO (#75352) add proper logic to determine device moutability by inspecting the spec.

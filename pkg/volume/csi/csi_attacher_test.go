@@ -348,7 +348,10 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			csiAttacher := attacher.(*csiAttacher)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
-			pluginCanAttach := plug.CanAttach(spec)
+			pluginCanAttach, err := plug.CanAttach(spec)
+			if err != nil {
+				t.Fatalf("attacher.CanAttach failed: %s", err)
+			}
 			if pluginCanAttach != test.expectVolumeAttachment {
 				t.Errorf("attacher.CanAttach does not match expected attachment status %t", test.expectVolumeAttachment)
 			}
@@ -429,7 +432,10 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 			csiAttacher := attacher.(*csiAttacher)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
-			pluginCanAttach := plug.CanAttach(spec)
+			pluginCanAttach, err := plug.CanAttach(spec)
+			if err != nil {
+				t.Fatalf("plugin.CanAttach test failed: %s", err)
+			}
 			if !pluginCanAttach {
 				t.Log("plugin is not attachable")
 				return

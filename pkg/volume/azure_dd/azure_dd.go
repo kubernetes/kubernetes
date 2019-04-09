@@ -238,8 +238,8 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (plugin *azureDataDiskPlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *azureDataDiskPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func (plugin *azureDataDiskPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {

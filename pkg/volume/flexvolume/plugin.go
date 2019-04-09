@@ -256,8 +256,8 @@ func (plugin *flexVolumeAttachablePlugin) NewDeviceUnmounter() (volume.DeviceUnm
 	return plugin.NewDetacher()
 }
 
-func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func (plugin *flexVolumeAttachablePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
