@@ -31,7 +31,7 @@ cleanup() {
   rm -rf "${workspace}"
   echo "Workspace deleted: ${workspace}" 1>&2
 }
-trap "cleanup '${workspace}'" EXIT
+trap 'cleanup "${workspace}"' EXIT
 
 pushd "${workspace}" > /dev/null
 bash -ceu "${cmd}"
