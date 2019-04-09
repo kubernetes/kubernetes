@@ -527,6 +527,7 @@ func testResourcePatch(c *testContext) {
 }
 
 func testResourceDelete(c *testContext) {
+	// Verify that an immediate delete triggers the webhook and populates the admisssionRequest.oldObject.
 	obj, err := createOrGetResource(c.client, c.gvr, c.resource)
 	if err != nil {
 		c.t.Error(err)
@@ -534,13 +535,85 @@ func testResourceDelete(c *testContext) {
 	}
 	background := metav1.DeletePropagationBackground
 	zero := int64(0)
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
 		return
 	}
+	c.admissionHolder.verify(c.t)
 
+	// wait for the item to be gone
+	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		if err == nil {
+			c.t.Logf("waiting for %#v to be deleted (name: %s, finalizers: %v)...\n", c.gvr, obj.GetName(), obj.GetFinalizers())
+			return false, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	// Verify that an update-on-delete triggers the webhook and populates the admisssionRequest.oldObject.
+	obj, err = createOrGetResource(c.client, c.gvr, c.resource)
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+	// Adding finalizer to the object, then deleting it.
+	// We don't add finalizers by setting DeleteOptions.PropagationPolicy
+	// because some resource (e.g., events) do not support garbage
+	// collector finalizers.
+	_, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Patch(
+		obj.GetName(),
+		types.MergePatchType,
+		[]byte(`{"metadata":{"finalizers":["test/k8s.io"]}}`),
+		metav1.PatchOptions{})
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
+	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+	c.admissionHolder.verify(c.t)
+
+	// wait other finalizers (e.g., crd's customresourcecleanup finalizer) to be removed.
+	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		finalizers := obj.GetFinalizers()
+		if len(finalizers) != 1 {
+			c.t.Logf("waiting for other finalizers on %#v %s to be removed, existing finalizers are %v", c.gvr, obj.GetName(), obj.GetFinalizers())
+			return false, nil
+		}
+		if finalizers[0] != "test/k8s.io" {
+			return false, fmt.Errorf("expected the single finalizer on %#v %s to be test/k8s.io, got %v", c.gvr, obj.GetName(), obj.GetFinalizers())
+		}
+		return true, nil
+	})
+
+	// remove the finalizer
+	_, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Patch(
+		obj.GetName(),
+		types.MergePatchType,
+		[]byte(`{"metadata":{"finalizers":[]}}`),
+		metav1.PatchOptions{})
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
 	// wait for the item to be gone
 	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
@@ -580,7 +653,7 @@ func testResourceDeletecollection(c *testContext) {
 	}
 
 	// set expectations
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, "", obj.GetNamespace(), false, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, "", obj.GetNamespace(), false, true, true)
 
 	// delete
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).DeleteCollection(&metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}, metav1.ListOptions{LabelSelector: "webhooktest=true"})
@@ -708,7 +781,7 @@ func testNamespaceDelete(c *testContext) {
 	background := metav1.DeletePropagationBackground
 	zero := int64(0)
 
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)

@@ -447,7 +447,7 @@ func (storage *SimpleRESTStorage) Delete(ctx context.Context, id string, deleteV
 	if err := storage.errors["delete"]; err != nil {
 		return nil, false, err
 	}
-	if err := deleteValidation(nil); err != nil {
+	if err := deleteValidation(&storage.item); err != nil {
 		return nil, false, err
 	}
 	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
@@ -572,18 +572,6 @@ func (s *ConnecterRESTStorage) NewConnectOptions() (runtime.Object, bool, string
 	return s.emptyConnectOptions, false, ""
 }
 
-<<<<<<< HEAD
-=======
-type LegacyRESTStorage struct {
-	*SimpleRESTStorage
-}
-
-func (storage LegacyRESTStorage) Delete(ctx context.Context, id string) (runtime.Object, error) {
-	obj, _, err := storage.SimpleRESTStorage.Delete(ctx, id, nil, nil)
-	return obj, err
-}
-
->>>>>>> ab07482ecb... validate deletion admission object
 type MetadataRESTStorage struct {
 	*SimpleRESTStorage
 	types []string

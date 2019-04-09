@@ -162,10 +162,6 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 	// upon first request to delete, we switch the phase to start namespace termination
 	// TODO: enhance graceful deletion's calls to DeleteStrategy to allow phase change and finalizer patterns
 	if namespace.DeletionTimestamp.IsZero() {
-		if err := deleteValidation(nsObj); err != nil {
-			return nil, false, err
-		}
-
 		key, err := r.store.KeyFunc(ctx, name)
 		if err != nil {
 			return nil, false, err
@@ -181,6 +177,9 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 				if !ok {
 					// wrong type
 					return nil, fmt.Errorf("expected *api.Namespace, got %v", existing)
+				}
+				if err := deleteValidation(existingNamespace); err != nil {
+					return nil, err
 				}
 				// Set the deletion timestamp if needed
 				if existingNamespace.DeletionTimestamp.IsZero() {

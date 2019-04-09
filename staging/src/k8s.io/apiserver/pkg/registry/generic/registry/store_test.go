@@ -1885,7 +1885,7 @@ func TestDeleteWithCachedObject(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The object shouldn't be deleted, because the persisted object has pending finalizers.
-	_, _, err = registry.Delete(ctx, podName, nil)
+	_, _, err = registry.Delete(ctx, podName, rest.ValidateAllObjectFunc, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1893,5 +1893,89 @@ func TestDeleteWithCachedObject(t *testing.T) {
 	_, err = registry.Get(ctx, podName, &metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestRetryDeleteValidation checks if the deleteValidation is called again if
+// the GuaranteedUpdate in the Delete handler conflicts with a simultaneous
+// Update.
+func TestRetryDeleteValidation(t *testing.T) {
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	tests := []struct {
+		pod     *example.Pod
+		deleted bool
+	}{
+		{
+			pod: &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", Finalizers: []string{"pending"}},
+				Spec:       example.PodSpec{NodeName: "machine"},
+			},
+			deleted: false,
+		},
+
+		{
+			pod: &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test"},
+				Spec:       example.PodSpec{NodeName: "machine"},
+			},
+			deleted: true,
+		},
+	}
+
+	for _, test := range tests {
+		ready := make(chan struct{})
+		updated := make(chan struct{})
+		var readyOnce, updatedOnce sync.Once
+		var called int
+		deleteValidation := func(runtime.Object) error {
+			readyOnce.Do(func() {
+				close(ready)
+			})
+			// wait for the update completes
+			<-updated
+			called++
+			return nil
+		}
+
+		if _, err := registry.Create(testContext, test.pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		transformer := func(ctx context.Context, newObj runtime.Object, oldObj runtime.Object) (transformedNewObj runtime.Object, err error) {
+			<-ready
+			pod, ok := newObj.(*example.Pod)
+			if !ok {
+				t.Fatalf("unexpected object %v", newObj)
+			}
+			pod.Labels = map[string]string{
+				"modified": "true",
+			}
+			return pod, nil
+		}
+
+		go func() {
+			// This update will cause the Delete to retry due to conflict.
+			_, _, err := registry.Update(testContext, test.pod.Name, rest.DefaultUpdatedObjectInfo(test.pod, transformer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			updatedOnce.Do(func() {
+				close(updated)
+			})
+		}()
+
+		_, deleted, err := registry.Delete(testContext, test.pod.Name, deleteValidation, &metav1.DeleteOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if a, e := deleted, test.deleted; a != e {
+			t.Fatalf("expected deleted to be %v, got %v", e, a)
+		}
+		if called != 2 {
+			t.Fatalf("expected deleteValidation to be called twice")
+		}
 	}
 }

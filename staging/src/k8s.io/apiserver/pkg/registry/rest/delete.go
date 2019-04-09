@@ -147,27 +147,33 @@ func AdmissionToValidateObjectDeleteFunc(admit admission.Interface, staticAttrib
 	mutatingAdmission, isMutatingAdmission := admit.(admission.MutationInterface)
 	validatingAdmission, isValidatingAdmission := admit.(admission.ValidationInterface)
 
+	mutating := isMutatingAdmission && mutatingAdmission.Handles(staticAttributes.GetOperation())
+	validating := isValidatingAdmission && validatingAdmission.Handles(staticAttributes.GetOperation())
+
 	return func(old runtime.Object) error {
-		if !isMutatingAdmission && !isValidatingAdmission {
+		if !mutating && !validating {
 			return nil
 		}
 		finalAttributes := admission.NewAttributesRecord(
 			nil,
-			old,
+			// Deep copy the object to avoid accidentally changing the object.
+			old.DeepCopyObject(),
 			staticAttributes.GetKind(),
 			staticAttributes.GetNamespace(),
 			staticAttributes.GetName(),
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),
+			staticAttributes.GetOperationOptions(),
+			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
 		)
-		if isMutatingAdmission && mutatingAdmission.Handles(finalAttributes.GetOperation()) {
+		if mutating {
 			if err := mutatingAdmission.Admit(finalAttributes, objInterfaces); err != nil {
 				return err
 			}
 		}
-		if isValidatingAdmission && validatingAdmission.Handles(finalAttributes.GetOperation()) {
+		if validating {
 			if err := validatingAdmission.Validate(finalAttributes, objInterfaces); err != nil {
 				return err
 			}

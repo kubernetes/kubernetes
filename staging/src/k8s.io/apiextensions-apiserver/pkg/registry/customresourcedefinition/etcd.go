@@ -103,10 +103,6 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 
 	// upon first request to delete, add our finalizer and then delegate
 	if crd.DeletionTimestamp.IsZero() {
-		if err := deleteValidation(obj); err != nil {
-			return nil, false, err
-		}
-
 		key, err := r.Store.KeyFunc(ctx, name)
 		if err != nil {
 			return nil, false, err
@@ -122,6 +118,9 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 				if !ok {
 					// wrong type
 					return nil, fmt.Errorf("expected *apiextensions.CustomResourceDefinition, got %v", existing)
+				}
+				if err := deleteValidation(existingCRD); err != nil {
+					return nil, err
 				}
 
 				// Set the deletion timestamp if needed
