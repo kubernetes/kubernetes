@@ -35,3 +35,5 @@ approvers:
   - soltysh # for sig-cli related stuff
   - dims # for local-up-cluster related files
   - spiffxp
+labels:
+- area/hack
