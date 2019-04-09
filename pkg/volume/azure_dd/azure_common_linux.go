@@ -144,7 +144,7 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 				}
 				model := libstrings.TrimSpace(string(modelBytes))
 				if libstrings.ToUpper(model) != "VIRTUAL DISK" {
-					klog.V(4).Infof("model doesn't match VHD, got %s", model)
+					klog.V(4).Infof("model doesn't match VIRTUAL DISK, got %s", model)
 					continue
 				}
 
