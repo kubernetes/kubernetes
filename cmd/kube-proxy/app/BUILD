@@ -31,6 +31,7 @@ go_library(
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/proxy/ipvs:go_default_library",
         "//pkg/proxy/userspace:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/filesystem:go_default_library",
         "//pkg/util/flag:go_default_library",
