@@ -31,8 +31,8 @@ github.com/PuerkitoBio/purell v1.1.0 h1:rmGxhojJlM0tuKtfdvliR84CFHljx9ag64t2xmVk
 github.com/PuerkitoBio/purell v1.1.0/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
 github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 h1:d+Bc7a5rLufV/sSk/8dngufqelfh6jnri85riMAaF/M=
 github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578/go.mod h1:uGdkoq3SwY9Y+13GIhn11/XLaGBb4BfwItxLd5jeuXE=
-github.com/Rican7/retry v0.0.0-20160712041035-272ad122d6e5 h1:lL761TuQsL4xn4Pn0CNk9YrPvrT8kzBMvW4YgCB7HMg=
-github.com/Rican7/retry v0.0.0-20160712041035-272ad122d6e5/go.mod h1:FgOROf8P5bebcC1DS0PdOQiqGUridaZvikzUmkFW6gg=
+github.com/Rican7/retry v0.1.0 h1:FqK94z34ly8Baa6K+G8Mmza9rYWTKOJk+yckIBB5qVk=
+github.com/Rican7/retry v0.1.0/go.mod h1:FgOROf8P5bebcC1DS0PdOQiqGUridaZvikzUmkFW6gg=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e h1:QEF07wC0T1rKkctt1RINW/+RMTVmiwxETico2l3gxJA=
@@ -89,8 +89,8 @@ github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7 h1:u9SHYsPQNyt5t
 github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea h1:n2Ltr3SrfQlf/9nOna1DoGKxLx3qTSI8Ttl6Xrqp6mw=
 github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea/go.mod h1:E3G3o1h8I7cfcXa63jLwjI0eiQQMgzzUDFVpN/nH/eA=
-github.com/coreos/rkt v1.25.0 h1:4rDjbXDtLwReumvn9/fH0D4aTXWXk2kpUcpjJNH2F/g=
-github.com/coreos/rkt v1.25.0/go.mod h1:O634mlH6U7qk87poQifK6M2rsFNt+FyUTWNMnP1hF1U=
+github.com/coreos/rkt v1.30.0 h1:Kkt6sYeEGKxA3Y7SCrY+nHoXkWed6Jr2BBY42GqMymM=
+github.com/coreos/rkt v1.30.0/go.mod h1:O634mlH6U7qk87poQifK6M2rsFNt+FyUTWNMnP1hF1U=
 github.com/cpuguy83/go-md2man v1.0.4 h1:OwjhDpK9YGCcI5CDf8HcdfsXqr6znFyAJfuZ27ixJsc=
 github.com/cpuguy83/go-md2man v1.0.4/go.mod h1:N6JayAiVKtlHSnuTCeuLSQVs75hb8q+dYQLjr7cDsKY=
 github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299 h1:2pOMM/RaFhI52FyCITl8aTf5HZ9LoHD8SkjbghAEG1E=
@@ -186,8 +186,8 @@ github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e h1:KhcknUwkWHKZ
 github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e/go.mod h1:0AA//k/eakGydO4jKRoRL2j92ZKSzTgj9tclaCrvXHk=
 github.com/google/btree v0.0.0-20160524151835-7d79101e329e h1:JHB7F/4TJCrYBW8+GZO8VkWDj1jxcWuCl6uxKODiyi4=
 github.com/google/btree v0.0.0-20160524151835-7d79101e329e/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
-github.com/google/cadvisor v0.33.1 h1:XdozWGjfQ3/mUSuk+m11M7uacH+iu4GV1cKbLGMrQDY=
-github.com/google/cadvisor v0.33.1/go.mod h1:1nql6U13uTHaLYB8rLS5x9IJc2qT6Xd/Tr1sTX6NE48=
+github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a h1:4N3IykedbdXG1ganAZbAKlViPjrtfrx2nC4qzUHieOk=
+github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a/go.mod h1:1nql6U13uTHaLYB8rLS5x9IJc2qT6Xd/Tr1sTX6NE48=
 github.com/google/certificate-transparency-go v1.0.21 h1:Yf1aXowfZ2nuboBsg7iYGLmwsOARdV86pfH3g95wXmE=
 github.com/google/certificate-transparency-go v1.0.21/go.mod h1:QeJfpSbVSfYc7RgB3gJFj9cbuQMMchQxrWXz8Ruopmg=
 github.com/google/go-cmp v0.2.0 h1:+dTQ8DZQJz0Mb/HjFlkptS1FeQ4cWSnN941F8aEG4SQ=
@@ -289,8 +289,8 @@ github.com/mattn/go-sqlite3 v1.6.0 h1:TDwTWbeII+88Qy55nWlof0DclgAtI4LqGujkYMzmQI
 github.com/mattn/go-sqlite3 v1.6.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
 github.com/matttproud/golang_protobuf_extensions v1.0.1 h1:4hp9jkHxhMHkqkrB3Ix0jegS5sx/RkqARlsWZ6pIwiU=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
-github.com/mesos/mesos-go v0.0.0-20180906210748-ff8175bfda54 h1:xECydo+5ODuk5kTymjUybwJnS9Mg6mzbyM94dB5M+Bw=
-github.com/mesos/mesos-go v0.0.0-20180906210748-ff8175bfda54/go.mod h1:kPYCMQ9gsOXVAle1OsoY4I1+9kPu8GHkf88aV59fDr4=
+github.com/mesos/mesos-go v0.0.9 h1:w8V5sOEnxzHZ2kAOy273v/HgbolyI6XI+qe5jx5u+Y0=
+github.com/mesos/mesos-go v0.0.9/go.mod h1:kPYCMQ9gsOXVAle1OsoY4I1+9kPu8GHkf88aV59fDr4=
 github.com/mholt/caddy v0.0.0-20180213163048-2de495001514 h1:HQP0VPdc6NLcKWrpVDNyUZckK97MjCmK3qyXWn+j6L0=
 github.com/mholt/caddy v0.0.0-20180213163048-2de495001514/go.mod h1:Wb1PlT4DAYSqOEd03MsqkdkXnTxA8v9pKjdpxbqM1kY=
 github.com/miekg/dns v0.0.0-20160614162101-5d001d020961 h1:vX2vkMipgQZ8gfmAsFeZdcgmhHoB7jMo6chAtajG3AI=
