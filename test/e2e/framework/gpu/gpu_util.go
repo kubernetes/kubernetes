@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package gpu
 
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -48,8 +49,8 @@ func NumberOfNVIDIAGPUs(node *v1.Node) int64 {
 
 // NVIDIADevicePlugin returns the official Google Device Plugin pod for NVIDIA GPU in GKE
 func NVIDIADevicePlugin() *v1.Pod {
-	ds, err := DsFromManifest(GPUDevicePluginDSYAML)
-	ExpectNoError(err)
+	ds, err := framework.DsFromManifest(GPUDevicePluginDSYAML)
+	framework.ExpectNoError(err)
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "device-plugin-nvidia-gpu-" + string(uuid.NewUUID()),
@@ -64,7 +65,7 @@ func NVIDIADevicePlugin() *v1.Pod {
 
 // GetGPUDevicePluginImage returns the image of GPU device plugin.
 func GetGPUDevicePluginImage() string {
-	ds, err := DsFromManifest(GPUDevicePluginDSYAML)
+	ds, err := framework.DsFromManifest(GPUDevicePluginDSYAML)
 	if err != nil {
 		klog.Errorf("Failed to parse the device plugin image: %v", err)
 		return ""
