@@ -789,6 +789,14 @@ items:
     - ""
     resources:
     - endpoints
+    verbs:
+    - create
+    - delete
+    - get
+    - update
+  - apiGroups:
+    - ""
+    resources:
     - services
     verbs:
     - create
