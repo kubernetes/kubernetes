@@ -15,10 +15,10 @@
 IMAGE=staging-k8s.gcr.io/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v8.9
+VERSION=v8.9.1
 KUBECTL_VERSION?=v1.11.3
 
-BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.4.0
+BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):v1.0.0
 
 .PHONY: build push
 
