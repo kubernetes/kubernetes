@@ -338,7 +338,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	// lets scheduler find another place for them.
 	nominatedPods := g.getLowerPriorityNominatedPods(pod, candidateNode.Name)
 	if nodeInfo, ok := g.nodeInfoSnapshot.NodeInfoMap[candidateNode.Name]; ok {
-		return nodeInfo.Node(), nodeToVictims[candidateNode].Pods, nominatedPods, nil
+		return nodeInfo.Node(), util.DeduplicatePods(nodeToVictims[candidateNode].Pods), nominatedPods, nil
 	}
 
 	return nil, nil, nil, fmt.Errorf(

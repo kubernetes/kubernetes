@@ -18,11 +18,16 @@ package util
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 )
 
 // TestGetPodPriority tests GetPodPriority function.
@@ -206,4 +211,89 @@ func TestGetContainerPorts(t *testing.T) {
 			t.Errorf("Got different result than expected.\nDifference detected on:\n%s", diff.ObjectGoPrintSideBySide(test.expected, result))
 		}
 	}
+}
+
+// TestDeduplicatePods tests DeduplicatePods function.
+func TestDeduplicatePods(t *testing.T) {
+	tests := []struct {
+		name         string
+		pods         []*v1.Pod
+		expectedPods []*v1.Pod
+	}{
+		{
+			name: "should deduplicates two pods",
+			pods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+			},
+			expectedPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+			},
+		},
+		{
+			name: "all pods are unique",
+			pods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.2", UID: types.UID("m1.2")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m3.1", UID: types.UID("m3.1")}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine3"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+			},
+			expectedPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.2", UID: types.UID("m1.2")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m3.1", UID: types.UID("m3.1")}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine3"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			deduplicatedPods := DeduplicatePods(test.pods)
+			if reflect.DeepEqual(deduplicatedPods, test.expectedPods) {
+				t.Errorf("expected %v, got %v", test.expectedPods, deduplicatedPods)
+			}
+		})
+	}
+}
+
+var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
+var smallContainers = []v1.Container{
+	{
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				"cpu": resource.MustParse(
+					strconv.FormatInt(priorityutil.DefaultMilliCPURequest, 10) + "m"),
+				"memory": resource.MustParse(
+					strconv.FormatInt(priorityutil.DefaultMemoryRequest, 10)),
+			},
+		},
+	},
+}
+var mediumContainers = []v1.Container{
+	{
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				"cpu": resource.MustParse(
+					strconv.FormatInt(priorityutil.DefaultMilliCPURequest*2, 10) + "m"),
+				"memory": resource.MustParse(
+					strconv.FormatInt(priorityutil.DefaultMemoryRequest*2, 10)),
+			},
+		},
+	},
+}
+var largeContainers = []v1.Container{
+	{
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				"cpu": resource.MustParse(
+					strconv.FormatInt(priorityutil.DefaultMilliCPURequest*3, 10) + "m"),
+				"memory": resource.MustParse(
+					strconv.FormatInt(priorityutil.DefaultMemoryRequest*3, 10)),
+			},
+		},
+	},
 }

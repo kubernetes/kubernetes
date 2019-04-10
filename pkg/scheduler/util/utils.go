@@ -106,6 +106,20 @@ func GetEarliestPodStartTime(victims *api.Victims) *metav1.Time {
 	return earliestPodStartTime
 }
 
+// DeduplicatePods removes the duplicate pods given an array of pods.
+func DeduplicatePods(pods []*v1.Pod) []*v1.Pod {
+	podMap := make(map[*v1.Pod]bool)
+	for _, pod := range pods {
+		podMap[pod] = true
+	}
+
+	returnedPods := make([]*v1.Pod, len(podMap))
+	for pod := range podMap {
+		returnedPods = append(returnedPods, pod)
+	}
+	return returnedPods
+}
+
 // SortableList is a list that implements sort.Interface.
 type SortableList struct {
 	Items    []interface{}
