@@ -17,6 +17,7 @@ require (
 replace (
 	github.com/BurntSushi/xgb => github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802
 	github.com/gogo/protobuf => github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
+	github.com/google/cadvisor => github.com/liggitt/cadvisor v0.0.0-20190410021324-655e1c19b6a3
 	github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
 	golang.org/x/exp => golang.org/x/exp v0.0.0-20190312203227-4b39c73a6495

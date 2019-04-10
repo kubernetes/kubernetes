@@ -65,6 +65,7 @@ replace (
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/protobuf => github.com/golang/protobuf v1.1.0
 	github.com/google/btree => github.com/google/btree v0.0.0-20160524151835-7d79101e329e
+	github.com/google/cadvisor => github.com/liggitt/cadvisor v0.0.0-20190410021324-655e1c19b6a3
 	github.com/google/go-cmp => github.com/google/go-cmp v0.2.0
 	github.com/google/gofuzz => github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
 	github.com/google/uuid => github.com/google/uuid v1.0.0

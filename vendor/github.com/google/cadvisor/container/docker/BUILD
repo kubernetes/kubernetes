@@ -24,8 +24,8 @@ go_library(
         "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/machine:go_default_library",
-        "//vendor/github.com/google/cadvisor/manager/watcher:go_default_library",
         "//vendor/github.com/google/cadvisor/utils/docker:go_default_library",
+        "//vendor/github.com/google/cadvisor/watcher:go_default_library",
         "//vendor/github.com/google/cadvisor/zfs:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
@@ -43,7 +43,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/google/cadvisor/container/docker/install:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

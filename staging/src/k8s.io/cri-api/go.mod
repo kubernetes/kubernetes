@@ -23,6 +23,7 @@ replace (
 	github.com/gogo/protobuf => github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf => github.com/golang/protobuf v1.1.0
+	github.com/google/cadvisor => github.com/liggitt/cadvisor v0.0.0-20190410021324-655e1c19b6a3
 	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006

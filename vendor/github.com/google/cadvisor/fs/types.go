@@ -18,6 +18,23 @@ import (
 	"errors"
 )
 
+type Context struct {
+	// docker root directory.
+	Docker  DockerContext
+	RktPath string
+	Crio    CrioContext
+}
+
+type DockerContext struct {
+	Root         string
+	Driver       string
+	DriverStatus map[string]string
+}
+
+type CrioContext struct {
+	Root string
+}
+
 type DeviceInfo struct {
 	Device string
 	Major  uint
