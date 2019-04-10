@@ -65,6 +65,7 @@ type KubeControllerManagerOptions struct {
 	DeploymentController             *DeploymentControllerOptions
 	DeprecatedFlags                  *DeprecatedControllerOptions
 	EndpointController               *EndpointControllerOptions
+	ExpandController                 *ExpandControllerOptions
 	GarbageCollectorController       *GarbageCollectorControllerOptions
 	HPAController                    *HPAControllerOptions
 	JobController                    *JobControllerOptions
