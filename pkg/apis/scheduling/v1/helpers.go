@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,52 +14,54 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduling
+package v1
 
 import (
 	"fmt"
+	"k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
 // SystemPriorityClasses define system priority classes that are auto-created at cluster bootstrapping.
 // Our API validation logic ensures that any priority class that has a system prefix or its value
 // is higher than HighestUserDefinablePriority is equal to one of these SystemPriorityClasses.
-var systemPriorityClasses = []*PriorityClass{
+var systemPriorityClasses = []*v1.PriorityClass{
 	{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: SystemNodeCritical,
+			Name: scheduling.SystemNodeCritical,
 		},
-		Value:       SystemCriticalPriority + 1000,
+		Value:       scheduling.SystemCriticalPriority + 1000,
 		Description: "Used for system critical pods that must not be moved from their current node.",
 	},
 	{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: SystemClusterCritical,
+			Name: scheduling.SystemClusterCritical,
 		},
-		Value:       SystemCriticalPriority,
+		Value:       scheduling.SystemCriticalPriority,
 		Description: "Used for system critical pods that must run in the cluster, but can be moved to another node if necessary.",
 	},
 }
 
 // SystemPriorityClasses returns the list of system priority classes.
 // NOTE: be careful not to modify any of elements of the returned array directly.
-func SystemPriorityClasses() []*PriorityClass {
+func SystemPriorityClasses() []*v1.PriorityClass {
 	return systemPriorityClasses
 }
 
-// IsKnownSystemPriorityClass checks that "pc" is equal to one of the system PriorityClasses.
-// It ignores "description", labels, annotations, etc. of the PriorityClass.
-func IsKnownSystemPriorityClass(pc *PriorityClass) (bool, error) {
-	for _, spc := range systemPriorityClasses {
-		if spc.Name == pc.Name {
-			if spc.Value != pc.Value {
+// IsKnownSystemPriorityClass returns true if there's any of the system priority classes exactly
+// matches "name", "value", "globalDefault". otherwise it will return an error.
+func IsKnownSystemPriorityClass(name string, value int32, globalDefault bool) (bool, error) {
+	for _, spc := range SystemPriorityClasses() {
+		if spc.Name == name {
+			if spc.Value != value {
 				return false, fmt.Errorf("value of %v PriorityClass must be %v", spc.Name, spc.Value)
 			}
-			if spc.GlobalDefault != pc.GlobalDefault {
+			if spc.GlobalDefault != globalDefault {
 				return false, fmt.Errorf("globalDefault of %v PriorityClass must be %v", spc.Name, spc.GlobalDefault)
 			}
 			return true, nil
 		}
 	}
-	return false, fmt.Errorf("%v is not a known system priority class", pc.Name)
+	return false, fmt.Errorf("%v is not a known system priority class", name)
 }

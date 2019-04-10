@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -144,7 +145,7 @@ func priorityClassPermittedInNamespace(priorityClassName string, namespace strin
 	// Only allow system priorities in the system namespace. This is to prevent abuse or incorrect
 	// usage of these priorities. Pods created at these priorities could preempt system critical
 	// components.
-	for _, spc := range scheduling.SystemPriorityClasses() {
+	for _, spc := range schedulingapiv1.SystemPriorityClasses() {
 		if spc.Name == priorityClassName && namespace != metav1.NamespaceSystem {
 			return false
 		}
