@@ -40,7 +40,7 @@ type flexVolumeProber struct {
 	factory        PluginFactory
 	fs             utilfs.Filesystem
 	probeAllNeeded bool
-	eventsMap      map[string]volume.ProbeOperation // the key is the driver directory path, the value is the coresponding operation
+	eventsMap      map[string]volume.ProbeOperation // the key is the driver directory path, the value is the corresponding operation
 }
 
 // GetDynamicPluginProber creates dynamic plugin prober
