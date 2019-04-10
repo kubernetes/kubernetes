@@ -46,8 +46,8 @@ func (f *FakeVolumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan 
 }
 
 // WaitForAttachAndMount is not implemented
-func (f *FakeVolumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
-	return nil
+func (f *FakeVolumeManager) WaitForAttachAndMount(pod *v1.Pod) (bool, error) {
+	return false, nil
 }
 
 // GetMountedVolumesForPod is not implemented

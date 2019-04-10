@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
+	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -374,196 +375,128 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 	}
 }
 
-func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
-	// create dswp
-	mode := v1.PersistentVolumeFilesystem
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "dswp-test-volume-name",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
-			VolumeMode: &mode,
-		},
-	}
-	pvc := &v1.PersistentVolumeClaim{
-		Spec: v1.PersistentVolumeClaimSpec{
-			VolumeName: "dswp-test-volume-name",
-		},
-		Status: v1.PersistentVolumeClaimStatus{
-			Phase: v1.ClaimBound,
-		},
-	}
-	dswp, fakePodManager, _ := createDswpWithVolume(t, pv, pvc)
-
-	// create pod
-	containers := []v1.Container{
+func TestCheckVolumeMountsAndDevices(t *testing.T) {
+	pvName := "dswp-test-volume-name"
+	pvcName := "dswp-test-claim-name"
+	block := v1.PersistentVolumeBlock
+	filesystem := v1.PersistentVolumeFilesystem
+	containersWithVolumeMounts := []v1.Container{
 		{
 			VolumeMounts: []v1.VolumeMount{
 				{
-					Name:      "dswp-test-volume-name",
+					Name:      pvName,
 					MountPath: "/mnt",
 				},
 			},
 		},
 	}
-	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
-
-	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
-	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod.Name, pod.Namespace, mountsMap, devicesMap)
-
-	// Assert
-	if volumeSpec == nil || err != nil {
-		t.Fatalf("Failed to create volumeSpec with combination of filesystem mode and volumeMounts. err: %v", err)
-	}
-}
-
-func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
-	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
-
-	// create dswp
-	mode := v1.PersistentVolumeBlock
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "dswp-test-volume-name",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "block-bound"},
-			VolumeMode: &mode,
-		},
-	}
-	pvc := &v1.PersistentVolumeClaim{
-		Spec: v1.PersistentVolumeClaimSpec{
-			VolumeName: "dswp-test-volume-name",
-		},
-		Status: v1.PersistentVolumeClaimStatus{
-			Phase: v1.ClaimBound,
-		},
-	}
-	dswp, fakePodManager, _ := createDswpWithVolume(t, pv, pvc)
-
-	// create pod
-	containers := []v1.Container{
+	containersWithVolumeDevices := []v1.Container{
 		{
 			VolumeDevices: []v1.VolumeDevice{
 				{
-					Name:       "dswp-test-volume-name",
-					DevicePath: "/dev/sdb",
+					Name:       pvName,
+					DevicePath: "/mnt",
 				},
 			},
 		},
 	}
-	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "block-bound", containers)
 
-	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
-	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod.Name, pod.Namespace, mountsMap, devicesMap)
-
-	// Assert
-	if volumeSpec == nil || err != nil {
-		t.Fatalf("Failed to create volumeSpec with combination of block mode and volumeDevices. err: %v", err)
-	}
-}
-
-func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
-	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
-
-	// create dswp
-	mode := v1.PersistentVolumeFilesystem
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "dswp-test-volume-name",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
-			VolumeMode: &mode,
-		},
-	}
-	pvc := &v1.PersistentVolumeClaim{
-		Spec: v1.PersistentVolumeClaimSpec{
-			VolumeName: "dswp-test-volume-name",
-		},
-		Status: v1.PersistentVolumeClaimStatus{
-			Phase: v1.ClaimBound,
-		},
-	}
-	dswp, fakePodManager, _ := createDswpWithVolume(t, pv, pvc)
-
-	// create pod
-	containers := []v1.Container{
+	tests := []struct {
+		name        string
+		volumeMode  *v1.PersistentVolumeMode
+		containers  []v1.Container
+		expectError bool
+	}{
+		// Success cases
 		{
-			VolumeDevices: []v1.VolumeDevice{
-				{
-					Name:       "dswp-test-volume-name",
-					DevicePath: "/dev/sdb",
-				},
-			},
+			name:        "BlockVolume disabled, volume is in volumeMounts",
+			volumeMode:  nil,
+			containers:  containersWithVolumeMounts,
+			expectError: false,
 		},
-	}
-	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
-
-	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
-	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod.Name, pod.Namespace, mountsMap, devicesMap)
-
-	// Assert
-	if volumeSpec != nil || err == nil {
-		t.Fatalf("Unexpected volumeMode and volumeMounts/volumeDevices combination is accepted")
-	}
-}
-
-func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
-	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
-
-	// create dswp
-	mode := v1.PersistentVolumeBlock
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "dswp-test-volume-name",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "block-bound"},
-			VolumeMode: &mode,
-		},
-	}
-	pvc := &v1.PersistentVolumeClaim{
-		Spec: v1.PersistentVolumeClaimSpec{
-			VolumeName: "dswp-test-volume-name",
-		},
-		Status: v1.PersistentVolumeClaimStatus{
-			Phase: v1.ClaimBound,
-		},
-	}
-	dswp, fakePodManager, _ := createDswpWithVolume(t, pv, pvc)
-
-	// create pod
-	containers := []v1.Container{
 		{
-			VolumeMounts: []v1.VolumeMount{
-				{
-					Name:      "dswp-test-volume-name",
-					MountPath: "/mnt",
-				},
-			},
+			name:        "filesystem volume is in volumeMounts",
+			volumeMode:  &filesystem,
+			containers:  containersWithVolumeMounts,
+			expectError: false,
+		},
+		{
+			name:        "block volume is in volumeDevices",
+			volumeMode:  &block,
+			containers:  containersWithVolumeDevices,
+			expectError: false,
+		},
+		// Error cases
+		{
+			name:        "BlockVolume disabled, volume is not in volumeMounts",
+			volumeMode:  nil,
+			containers:  []v1.Container{},
+			expectError: true,
+		},
+		{
+			name:        "filesystem volume is not in volumeMounts",
+			volumeMode:  &filesystem,
+			containers:  []v1.Container{},
+			expectError: true,
+		},
+		{
+			name:        "block volume is not in volumeDevices",
+			volumeMode:  &block,
+			containers:  []v1.Container{},
+			expectError: true,
+		},
+		{
+			name:        "filesystem volume is in volumeDevices",
+			volumeMode:  &filesystem,
+			containers:  containersWithVolumeDevices,
+			expectError: true,
+		},
+		{
+			name:        "block volume is in volumeMounts",
+			volumeMode:  &block,
+			containers:  containersWithVolumeMounts,
+			expectError: true,
 		},
 	}
-	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "block-bound", containers)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.volumeMode != nil {
+				// Enable BlockVolume feature gate
+				defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
+			} else {
+				defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, false)()
+			}
 
-	fakePodManager.AddPod(pod)
-	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
-	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod.Name, pod.Namespace, mountsMap, devicesMap)
+			pv := &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pvName,
+				},
+				Spec: v1.PersistentVolumeSpec{
+					ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: pvcName},
+					VolumeMode: test.volumeMode,
+				},
+			}
+			pvc := &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					VolumeName: pvName,
+					VolumeMode: test.volumeMode,
+				},
+				Status: v1.PersistentVolumeClaimStatus{
+					Phase: v1.ClaimBound,
+				},
+			}
+			dswp, fakePodManager, _ := createDswpWithVolume(t, pv, pvc)
+			// create pod
+			pod := createPodWithVolume("dswp-test-pod", pvName, pvcName, test.containers)
 
-	// Assert
-	if volumeSpec != nil || err == nil {
-		t.Fatalf("Unexpected volumeMode and volumeMounts/volumeDevices combination is accepted")
+			fakePodManager.AddPod(pod)
+			mountsMap, devicesMap := dswp.makeVolumeMap(pod)
+			err := dswp.checkVolumeMountsAndDevices(volume.NewSpecFromPersistentVolume(pv, false), pvName, mountsMap, devicesMap)
+
+			if test.expectError && err == nil || !test.expectError && err != nil {
+				t.Errorf("test %q: expected error %v but got error %v", test.name, test.expectError, err)
+			}
+		})
 	}
 }
 

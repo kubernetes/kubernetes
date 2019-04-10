@@ -74,9 +74,9 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		stopCh,
 		manager)
 
-	err = manager.WaitForAttachAndMount(pod)
-	if err != nil {
-		t.Errorf("Expected success: %v", err)
+	giveUp, err := manager.WaitForAttachAndMount(pod)
+	if err != nil || giveUp == true {
+		t.Errorf("Expected success: %v, %v", giveUp, err)
 	}
 
 	expectedMounted := pod.Spec.Volumes[0].Name
@@ -124,9 +124,9 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	// delayed claim binding
 	go delayClaimBecomesBound(kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
 
-	err = manager.WaitForAttachAndMount(pod)
-	if err != nil {
-		t.Errorf("Expected success: %v", err)
+	giveUp, err := manager.WaitForAttachAndMount(pod)
+	if err != nil || giveUp == true {
+		t.Errorf("Expected success: %v, %v", giveUp, err)
 	}
 
 }
@@ -202,9 +202,9 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			stopCh,
 			manager)
 
-		err = manager.WaitForAttachAndMount(pod)
-		if err != nil {
-			t.Errorf("Expected success: %v", err)
+		giveUp, err := manager.WaitForAttachAndMount(pod)
+		if err != nil || giveUp == true {
+			t.Errorf("Expected success: %v, %v", giveUp, err)
 			continue
 		}
 
@@ -260,6 +260,15 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 			UID:       "1234",
 		},
 		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name: "vol1",
+						},
+					},
+				},
+			},
 			Volumes: []v1.Volume{
 				{
 					Name: "vol1",

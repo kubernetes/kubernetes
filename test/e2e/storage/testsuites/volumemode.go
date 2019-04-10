@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -26,6 +27,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -249,10 +251,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				Expect(err).To(HaveOccurred())
 			})
 		} else {
-			It("should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources", func() {
-				init()
-				defer cleanup()
-
+			createScPvPvc := func(l *local) {
 				var err error
 
 				By("Creating sc")
@@ -271,6 +270,13 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				l.pv, err = l.cs.CoreV1().PersistentVolumes().Get(l.pvc.Spec.VolumeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
+			}
+
+			It("should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources", func() {
+				init()
+				defer cleanup()
+
+				createScPvPvc(&l)
 
 				By("Creating pod")
 				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
@@ -287,12 +293,69 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				By("Checking if read/write to persistent volume works properly")
 				utils.CheckReadWriteToPath(pod, pattern.VolMode, "/mnt/volume1")
 			})
+
+			testPodFailedMount := func(l *local, switchMountsAndDevices bool) {
+				By("Creating pod")
+				pod := framework.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc}, false, "", false, false, framework.SELinuxLabel, nil)
+				pod.Spec.NodeName = l.config.ClientNodeName
+
+				// MakeSecPod makes a pod with 1 container and the PVC in the correct
+				// volumeMounts/volumeDevices field. Switch the fields
+				if pattern.VolMode == v1.PersistentVolumeBlock {
+					if switchMountsAndDevices {
+						var volumeMounts = []v1.VolumeMount{}
+						for _, vol := range pod.Spec.Containers[0].VolumeDevices {
+							volumeMounts = append(volumeMounts, v1.VolumeMount{Name: vol.Name, MountPath: vol.DevicePath})
+						}
+						pod.Spec.Containers[0].VolumeMounts = volumeMounts
+					}
+					pod.Spec.Containers[0].VolumeDevices = nil
+				} else {
+					if switchMountsAndDevices {
+						var volumeDevices = []v1.VolumeDevice{}
+						for _, vol := range pod.Spec.Containers[0].VolumeMounts {
+							volumeDevices = append(volumeDevices, v1.VolumeDevice{Name: vol.Name, DevicePath: vol.MountPath})
+						}
+						pod.Spec.Containers[0].VolumeDevices = volumeDevices
+					}
+					pod.Spec.Containers[0].VolumeMounts = nil
+				}
+
+				pod, err := l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
+				defer func() {
+					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
+				}()
+				framework.ExpectNoError(err, "pod Create failed")
+
+				By("Checking if pod fails with reason FailedMount")
+				framework.WaitForPodCondition(l.cs, l.ns.Name, pod.Name, "failedMount", 1*time.Minute,
+					func(pod *v1.Pod) (bool, error) {
+						return pod.Status.Phase == v1.PodFailed && pod.Status.Reason == events.FailedMountVolume, nil
+					},
+				)
+			}
+			It("should fail to start pod because pv is consumed by pod using the incorrect volumeMounts/volumeDevices field for its volumeMode", func() {
+				init()
+				defer cleanup()
+
+				createScPvPvc(&l)
+
+				testPodFailedMount(&l, true)
+			})
+			It("should fail to start pod because pv is not consumed by pod in either volumeMounts/volumeDevices field", func() {
+				init()
+				defer cleanup()
+
+				createScPvPvc(&l)
+
+				testPodFailedMount(&l, false)
+			})
 			// TODO(mkimuram): Add more tests
+			//
 		}
 	default:
 		framework.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
 	}
-
 }
 
 func generateConfigsForPreprovisionedPVTest(scName string, volBindMode storagev1.VolumeBindingMode,

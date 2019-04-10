@@ -98,7 +98,7 @@ type VolumeManager interface {
 	// actual state of the world).
 	// An error is returned if all volumes are not attached and mounted within
 	// the duration defined in podAttachAndMountTimeout.
-	WaitForAttachAndMount(pod *v1.Pod) error
+	WaitForAttachAndMount(pod *v1.Pod) (bool, error)
 
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
 	// referenced by the specified pod that are successfully attached and
@@ -336,15 +336,17 @@ func (vm *volumeManager) MarkVolumesAsReportedInUse(
 	vm.desiredStateOfWorld.MarkVolumesReportedInUse(volumesReportedAsInUse)
 }
 
-func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
+// WaitForAttachAndMount returns an error plus a bool to say whether the error
+// is final, i.e. whether volumeManager should give up waiting
+func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) (bool, error) {
 	if pod == nil {
-		return nil
+		return false, nil
 	}
 
 	expectedVolumes := getExpectedVolumes(pod)
 	if len(expectedVolumes) == 0 {
 		// No volumes to verify
-		return nil
+		return false, nil
 	}
 
 	klog.V(3).Infof("Waiting for volumes to attach and mount for pod %q", format.Pod(pod))
@@ -361,7 +363,6 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 		vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
 
 	if err != nil {
-		// Timeout expired
 		unmountedVolumes :=
 			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
 		// Also get unattached volumes for error message
@@ -369,19 +370,28 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 			vm.getUnattachedVolumes(expectedVolumes)
 
 		if len(unmountedVolumes) == 0 {
-			return nil
+			return false, nil
 		}
 
-		return fmt.Errorf(
-			"timeout expired waiting for volumes to attach or mount for pod %q/%q. list of unmounted volumes=%v. list of unattached volumes=%v",
+		if err == wait.ErrWaitTimeout {
+			return false, fmt.Errorf(
+				"timeout expired waiting for volumes to attach or mount for pod %q/%q. list of unmounted volumes=%v. list of unattached volumes=%v",
+				pod.Namespace,
+				pod.Name,
+				unmountedVolumes,
+				unattachedVolumes)
+		}
+		return true, fmt.Errorf(
+			"error waiting for volumes to attach or mount for pod %q/%q. list of unmounted volumes=%v. list of unattached volumes=%v. error: %v",
 			pod.Namespace,
 			pod.Name,
 			unmountedVolumes,
-			unattachedVolumes)
+			unattachedVolumes,
+			err)
 	}
 
 	klog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
-	return nil
+	return false, nil
 }
 
 // getUnattachedVolumes returns a list of the volumes that are expected to be attached but
@@ -400,7 +410,15 @@ func (vm *volumeManager) getUnattachedVolumes(expectedVolumes []string) []string
 // volumes are mounted.
 func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, expectedVolumes []string) wait.ConditionFunc {
 	return func() (done bool, err error) {
-		return len(vm.getUnmountedVolumes(podName, expectedVolumes)) == 0, nil
+		if len(vm.getUnmountedVolumes(podName, expectedVolumes)) == 0 {
+			return true, nil
+		}
+		for _, expectedVolume := range expectedVolumes {
+			if err := vm.desiredStateOfWorldPopulator.PodVolumeError(podName, expectedVolume); err != nil {
+				return false, err
+			}
+		}
+		return false, nil
 	}
 }
 

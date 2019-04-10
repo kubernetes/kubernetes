@@ -61,8 +61,9 @@ func TestListVolumesForPod(t *testing.T) {
 	defer close(stopCh)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	giveUp, err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	assert.NoError(t, err)
+	assert.False(t, giveUp)
 
 	podName := util.GetUniquePodName(pod)
 
@@ -144,8 +145,9 @@ func TestPodVolumesExist(t *testing.T) {
 
 	kubelet.podManager.SetPods(pods)
 	for _, pod := range pods {
-		err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+		giveUp, err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 		assert.NoError(t, err)
+		assert.False(t, giveUp)
 	}
 
 	for _, pod := range pods {
@@ -176,8 +178,9 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	defer close(stopCh)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	giveUp, err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	assert.NoError(t, err)
+	assert.False(t, giveUp)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
@@ -223,8 +226,9 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 
 	// Verify volumes attached
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	giveUp, err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	assert.NoError(t, err)
+	assert.False(t, giveUp)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
@@ -313,7 +317,9 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		stopCh,
 		kubelet.volumeManager)
 
-	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
+	giveUp, err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	assert.NoError(t, err)
+	assert.False(t, giveUp)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
@@ -381,7 +387,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		kubelet.volumeManager)
 
 	// Verify volumes attached
-	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
+	giveUp, err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	assert.NoError(t, err)
+	assert.False(t, giveUp)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))

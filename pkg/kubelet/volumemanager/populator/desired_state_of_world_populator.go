@@ -66,6 +66,10 @@ type DesiredStateOfWorldPopulator interface {
 	// a chance many or all pods are missing from the list of active pods and
 	// so few to none will have been added.
 	HasAddedPods() bool
+
+	// PodVolumeError returns the error preventing the volume in the pod from
+	// being mounted if one exists, or nil otherwise.
+	PodVolumeError(podName volumetypes.UniquePodName, outerVolumeSpecName string) error
 }
 
 // NewDesiredStateOfWorldPopulator returns a new instance of
@@ -118,6 +122,20 @@ type desiredStateOfWorldPopulator struct {
 	keepTerminatedPodVolumes  bool
 	hasAddedPods              bool
 	hasAddedPodsLock          sync.RWMutex
+	// podVolumeErrors is a map containing the set of pod-volume pairs that can't
+	// be added to dsw and so should not be mounted because of an error that's
+	// final. It exists so that volumeManager can immediately report the error
+	// rather than silently timeout when waiting for all a pod's Spec.Volumes to
+	// be mounted.
+	// e.g. if a volume is in the wrong volumeMounts or volumeDevices, or neither,
+	// the pod must be recreated so the error is final.
+	podVolumeErrors sync.Map
+}
+
+// podVolumeKey is a key for podVolumeErrors
+type podVolumeKey struct {
+	podName             volumetypes.UniquePodName
+	outerVolumeSpecName string
 }
 
 type processedPods struct {
@@ -148,6 +166,14 @@ func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
 	dswp.hasAddedPodsLock.RLock()
 	defer dswp.hasAddedPodsLock.RUnlock()
 	return dswp.hasAddedPods
+}
+
+func (dswp *desiredStateOfWorldPopulator) PodVolumeError(podName volumetypes.UniquePodName, outerVolumeSpecName string) error {
+	err, ok := dswp.podVolumeErrors.Load(podVolumeKey{podName, outerVolumeSpecName})
+	if ok {
+		return err.(error)
+	}
+	return nil
 }
 
 func (dswp *desiredStateOfWorldPopulator) populatorLoop() {
@@ -268,6 +294,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
 			volumeToMount.PodName, volumeToMount.VolumeName)
+		dswp.podVolumeErrors.Delete(podVolumeKey{volumeToMount.PodName, volumeToMount.OuterVolumeSpecName})
 		dswp.deleteProcessedPod(volumeToMount.PodName)
 	}
 }
@@ -288,7 +315,8 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 	}
 
 	allVolumesAdded := true
-	mountsMap, devicesMap := dswp.makeVolumeMap(pod.Spec.Containers)
+
+	mountsMap, devicesMap := dswp.makeVolumeMap(pod)
 
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
@@ -300,6 +328,20 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 				podVolume.Name,
 				format.Pod(pod),
 				err)
+			allVolumesAdded = false
+			continue
+		}
+
+		err = dswp.checkVolumeMountsAndDevices(volumeSpec, podVolume.Name, mountsMap, devicesMap)
+		if err != nil {
+			klog.Errorf(
+				"Error checking volume %q against the volumeMounts & volumeDevices of pod %q: %v",
+				podVolume.Name,
+				format.Pod(pod),
+				err)
+			// Pod will fail to start because volumemanager expects every volume
+			// volume in pod.Spec.Volumes to be mounted
+			dswp.podVolumeErrors.Store(podVolumeKey{uniquePodName, podVolume.Name}, err)
 			allVolumesAdded = false
 			continue
 		}
@@ -469,6 +511,58 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 	delete(dswp.pods.processedPods, podName)
 }
 
+// checkVolumeMountsAndDevices checks that a volume is in the correct field for its volumeMode: volumeMounts
+// for Filesystem and volumeDevices for Block. Being in the incorrect field or neither is an error.
+// If volumeMode is nil, only volumeMounts is checked.
+// apiserver validation only checks that a volume isn't in both volumeDevices & volumeMounts, it can't get a
+// pod's pvc's pv to check its volumeMode. It could be made to check the case where the volume is in neither
+// volumeMounts nor volumeDevices, but kubelet may be older and only see volumeMounts, so validation has to be
+// done again here in kubelet anyway.
+func (dswp *desiredStateOfWorldPopulator) checkVolumeMountsAndDevices(
+	volumeSpec *volume.Spec, podVolumeName string, mountsMap map[string]bool, devicesMap map[string]bool) error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		// If volume is not a PV, its mode is Filesystem
+		volumeMode, err := util.GetVolumeMode(volumeSpec)
+		if err != nil {
+			return err
+		}
+		// Error if a container has it in volumeMounts but the volumeMode of PVC isn't Filesystem
+		if mountsMap[podVolumeName] && volumeMode != v1.PersistentVolumeFilesystem {
+			return fmt.Errorf(
+				"volume %q has volumeMode %q, but is specified in volumeMounts",
+				podVolumeName,
+				volumeMode)
+		}
+		// Error if a container has it in volumeDevices but the volumeMode of PVC isn't Block
+		if devicesMap[podVolumeName] && volumeMode != v1.PersistentVolumeBlock {
+			return fmt.Errorf(
+				"volume %q has volumeMode %q, but is specified in volumeDevices",
+				podVolumeName,
+				volumeMode)
+		}
+		// Error if no container has it in volumeMounts but the volumeMode of PVC is Filesystem
+		if !mountsMap[podVolumeName] && volumeMode == v1.PersistentVolumeFilesystem {
+			return fmt.Errorf(
+				"volume %q has volumeMode %q, but is not specified in volumeMounts",
+				podVolumeName,
+				volumeMode)
+		}
+		// Error if no container has it in volumeDevices but the volumeMode of PVC is Block
+		if !devicesMap[podVolumeName] && volumeMode == v1.PersistentVolumeBlock {
+			return fmt.Errorf(
+				"volume %q has volumeMode %q, but is not specified in volumeDevices",
+				podVolumeName,
+				volumeMode)
+		}
+	} else if !mountsMap[podVolumeName] {
+		// Error if no container has it in volumeMounts
+		return fmt.Errorf(
+			"volume %q is not specified in volumeMounts",
+			podVolumeName)
+	}
+	return nil
+}
+
 // createVolumeSpec creates and returns a mutatable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
 // Returns an error if unable to obtain the volume at this time.
@@ -519,31 +613,6 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			pvcSource.ClaimName,
 			pvcUID)
 
-		// TODO: remove feature gate check after no longer needed
-		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-			volumeMode, err := util.GetVolumeMode(volumeSpec)
-			if err != nil {
-				return nil, nil, "", err
-			}
-			// Error if a container has volumeMounts but the volumeMode of PVC isn't Filesystem
-			if mountsMap[podVolume.Name] && volumeMode != v1.PersistentVolumeFilesystem {
-				return nil, nil, "", fmt.Errorf(
-					"Volume %q has volumeMode %q, but is specified in volumeMounts for pod %q/%q",
-					podVolume.Name,
-					volumeMode,
-					podNamespace,
-					podName)
-			}
-			// Error if a container has volumeDevices but the volumeMode of PVC isn't Block
-			if devicesMap[podVolume.Name] && volumeMode != v1.PersistentVolumeBlock {
-				return nil, nil, "", fmt.Errorf(
-					"Volume %q has volumeMode %q, but is specified in volumeDevices for pod %q/%q",
-					podVolume.Name,
-					volumeMode,
-					podNamespace,
-					podName)
-			}
-		}
 		return pvc, volumeSpec, volumeGidValue, nil
 	}
 
@@ -630,9 +699,13 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGidValue, nil
 }
 
-func (dswp *desiredStateOfWorldPopulator) makeVolumeMap(containers []v1.Container) (map[string]bool, map[string]bool) {
+func (dswp *desiredStateOfWorldPopulator) makeVolumeMap(pod *v1.Pod) (map[string]bool, map[string]bool) {
 	volumeDevicesMap := make(map[string]bool)
 	volumeMountsMap := make(map[string]bool)
+
+	containers := make([]v1.Container, len(pod.Spec.Containers))
+	copy(containers, pod.Spec.Containers)
+	containers = append(containers, pod.Spec.InitContainers...)
 
 	for _, container := range containers {
 		if container.VolumeMounts != nil {
