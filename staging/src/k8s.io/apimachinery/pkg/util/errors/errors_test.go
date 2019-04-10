@@ -328,6 +328,8 @@ func TestFlatten(t *testing.T) {
 }
 
 func TestCreateAggregateFromMessageCountMap(t *testing.T) {
+	var errCount1 int32 =1
+	var errCount2 int32 =2
 	testCases := []struct {
 		name     string
 		mcm      MessageCountMap
@@ -335,17 +337,17 @@ func TestCreateAggregateFromMessageCountMap(t *testing.T) {
 	}{
 		{
 			"input has single instance of one message",
-			MessageCountMap{"abc": 1},
+			MessageCountMap{"abc": &errCount1},
 			aggregate{fmt.Errorf("abc")},
 		},
 		{
 			"input has multiple messages",
-			MessageCountMap{"abc": 2, "ghi": 1},
+			MessageCountMap{"abc": &errCount2, "ghi": &errCount1},
 			aggregate{fmt.Errorf("abc (repeated 2 times)"), fmt.Errorf("ghi")},
 		},
 		{
 			"input has multiple messages",
-			MessageCountMap{"ghi": 1, "abc": 2},
+			MessageCountMap{"ghi": &errCount1, "abc": &errCount2},
 			aggregate{fmt.Errorf("abc (repeated 2 times)"), fmt.Errorf("ghi")},
 		},
 	}
