@@ -153,7 +153,7 @@ func (f *FakeExtender) ProcessPreemption(
 
 	for node, victims := range nodeToVictimsCopy {
 		// Try to do preemption on extender side.
-		extenderVictimPods, extendernPDBViolations, fits, err := f.selectVictimsOnNodeByExtender(pod, node, nodeNameToInfo)
+		extenderVictimPods, extenderPDBViolations, fits, err := f.selectVictimsOnNodeByExtender(pod, node, nodeNameToInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -164,13 +164,13 @@ func (f *FakeExtender) ProcessPreemption(
 		} else {
 			// Append new victims to original victims
 			nodeToVictimsCopy[node].Pods = append(victims.Pods, extenderVictimPods...)
-			nodeToVictimsCopy[node].NumPDBViolations = victims.NumPDBViolations + extendernPDBViolations
+			nodeToVictimsCopy[node].NumPDBViolations = victims.NumPDBViolations + extenderPDBViolations
 		}
 	}
 	return nodeToVictimsCopy, nil
 }
 
-// selectVictimsOnNodeByExtender checks the given nodes->pods map with predicates on extender's side.
+// selectVictimsOnNodeByExtender checks the given node->pods map with predicates on extender's side.
 // Returns:
 // 1. More victim pods (if any) amended by preemption phase of extender.
 // 2. Number of violating victim (used to calculate PDB).
@@ -214,7 +214,6 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 			removePod(p)
 		}
 	}
-	potentialVictims.Sort()
 
 	// If the new pod does not fit after removing all the lower priority pods,
 	// we are almost done and this node is not suitable for preemption.
@@ -225,6 +224,8 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	if !fits {
 		return nil, 0, false, nil
 	}
+
+	potentialVictims.Sort()
 
 	var victims []*v1.Pod
 

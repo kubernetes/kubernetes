@@ -114,13 +114,13 @@ func TestMostRequested(t *testing.T) {
 		{
 			/*
 				Node1 scores (used resources) on 0-10 scale
-				CPU Score: (0 * 10  / 4000 = 0
+				CPU Score: (0 * 10) / 4000 = 0
 				Memory Score: (0 * 10) / 10000 = 0
 				Node1 Score: (0 + 0) / 2 = 0
 
 				Node2 scores (used resources) on 0-10 scale
-				CPU Score: (0 * 10 / 4000 = 0
-				Memory Score: (0 * 10 / 10000 = 0
+				CPU Score: (0 * 10) / 4000 = 0
+				Memory Score: (0 * 10) / 10000 = 0
 				Node2 Score: (0 + 0) / 2 = 0
 			*/
 			pod:          &v1.Pod{Spec: noResources},
@@ -131,12 +131,12 @@ func TestMostRequested(t *testing.T) {
 		{
 			/*
 				Node1 scores on 0-10 scale
-				CPU Score: (3000 * 10 / 4000 = 7.5
+				CPU Score: (3000 * 10) / 4000 = 7.5 -> 7
 				Memory Score: (5000 * 10) / 10000 = 5
-				Node1 Score: (7.5 + 5) / 2 = 6
+				Node1 Score: (7 + 5) / 2 = 6
 
 				Node2 scores on 0-10 scale
-				CPU Score: (3000 * 10 / 6000 = 5
+				CPU Score: (3000 * 10) / 6000 = 5
 				Memory Score: (5000 * 10 / 10000 = 5
 				Node2 Score: (5 + 5) / 2 = 5
 			*/
@@ -149,13 +149,13 @@ func TestMostRequested(t *testing.T) {
 			/*
 				Node1 scores on 0-10 scale
 				CPU Score: (6000 * 10) / 10000 = 6
-				Memory Score: (0 * 10) / 20000 = 10
+				Memory Score: (0 * 10) / 20000 = 0
 				Node1 Score: (6 + 0) / 2 = 3
 
 				Node2 scores on 0-10 scale
 				CPU Score: (6000 * 10) / 10000 = 6
-				Memory Score: (5000 * 10) / 20000 = 2.5
-				Node2 Score: (6 + 2.5) / 2 = 4
+				Memory Score: (5000 * 10) / 20000 = 2.5 -> 2
+				Node2 Score: (6 + 2) / 2 = 4
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
@@ -172,8 +172,8 @@ func TestMostRequested(t *testing.T) {
 			/*
 				Node1 scores on 0-10 scale
 				CPU Score: (6000 * 10) / 10000 = 6
-				Memory Score: (5000 * 10) / 20000 = 2.5
-				Node1 Score: (6 + 2.5) / 2 = 4
+				Memory Score: (5000 * 10) / 20000 = 2.5 -> 2
+				Node1 Score: (6 + 2) / 2 = 4
 
 				Node2 scores on 0-10 scale
 				CPU Score: (6000 * 10) / 10000 = 6
@@ -204,7 +204,7 @@ func TestMostRequested(t *testing.T) {
 			pod:          &v1.Pod{Spec: bigCPUAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 10000, 8000)},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 4}, {Host: "machine2", Score: 2}},
-			name:         "resources requested with more than the node, pods scheduled with resources",
+			name:         "resources requested more than the node, nothing scheduled",
 		},
 	}
 
