@@ -815,7 +815,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 		epServiceName = p.provisionerConfig.customEpNamePrefix + "-" + string(p.options.PVC.UID)
 	}
 	epNamespace := p.options.PVC.Namespace
-	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, p.options.PVC.Name)
+	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, p.options.PVC)
 	if err != nil {
 		klog.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
 		return nil, 0, "", fmt.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
@@ -906,8 +906,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 // exist for the given namespace, PVC name, endpoint name
 // I.e. the endpoint or service is only created
 // if it does not exist yet.
-
-func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, pvcname string) (endpoint *v1.Endpoints, service *v1.Service, err error) {
+func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, pvc *v1.PersistentVolumeClaim) (endpoint *v1.Endpoints, service *v1.Service, err error) {
 	pvcNameOrID := ""
 	if len(pvc.Name) >= 63 {
 		pvcNameOrID = string(pvc.UID)
