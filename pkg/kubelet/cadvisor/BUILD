@@ -31,6 +31,10 @@ go_library(
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/google/cadvisor/cache/memory:go_default_library",
             "//vendor/github.com/google/cadvisor/container:go_default_library",
+            "//vendor/github.com/google/cadvisor/container/containerd/install:go_default_library",
+            "//vendor/github.com/google/cadvisor/container/crio/install:go_default_library",
+            "//vendor/github.com/google/cadvisor/container/docker/install:go_default_library",
+            "//vendor/github.com/google/cadvisor/container/systemd/install:go_default_library",
             "//vendor/github.com/google/cadvisor/fs:go_default_library",
             "//vendor/github.com/google/cadvisor/manager:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
