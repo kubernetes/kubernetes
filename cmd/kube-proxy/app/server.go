@@ -549,7 +549,7 @@ func (s *ProxyServer) Run() error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 	// remove iptables rules and exit
-	if s.CleanupAndExit {
+	if s.CleanupAndExit && s.CleanupIPVS {
 		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
 		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
 		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface, s.CleanupIPVS) || encounteredError
