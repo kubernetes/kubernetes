@@ -488,6 +488,14 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 				g.alwaysCheckAllPredicates,
 			)
 			if err != nil {
+				if _, ok := errs[err.Error()]; !ok {
+					predicateResultLock.Lock()
+					// double check
+					if _, ok := errs[err.Error()]; !ok {
+						errs[err.Error()] = new(int32)
+					}
+					predicateResultLock.Unlock()
+				}
 				atomic.AddInt32(errs[err.Error()], 1)
 				return
 			}
