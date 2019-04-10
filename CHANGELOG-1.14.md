@@ -155,6 +155,7 @@ filename | sha512 hash
     * [metatada-proxy addon] Bump prometheus-to-sd v0.5.0 to pick up security fixes.
 * kube-proxy no longer automatically cleans up network rules created by running kube-proxy in other modes. If you are switching the mode that kube-proxy is in running in (EG: iptables to IPVS), you will need to run `kube-proxy --cleanup`, or restart the worker node (recommended) before restarting kube-proxy. ([#76109](https://github.com/kubernetes/kubernetes/pull/76109), [@vllry](https://github.com/vllry))
     * If you are not switching kube-proxy between different modes, this change should not require any action.
+    * This fixes a bug where restarting the iptables proxier can cause connections to fail (https://github.com/kubernetes/kubernetes/issues/75360).
 * kubeadm: fixes error when upgrading from v1.13 to v1.14 clusters created with kubeadm v1.12. Please note that it is required to upgrade etcd during the final v1.13 to v1.14 upgrade. ([#75956](https://github.com/kubernetes/kubernetes/pull/75956), [@fabriziopandini](https://github.com/fabriziopandini))
 * Fixes a regression proxying responses from aggregated API servers which could cause watch requests to hang until the first event was received ([#75887](https://github.com/kubernetes/kubernetes/pull/75887), [@liggitt](https://github.com/liggitt))
 * Increased verbose level for local openapi aggregation logs to avoid flooding the log during normal operation ([#75781](https://github.com/kubernetes/kubernetes/pull/75781), [@roycaihw](https://github.com/roycaihw))
