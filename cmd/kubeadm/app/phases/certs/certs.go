@@ -17,7 +17,7 @@ limitations under the License.
 package certs
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 	"fmt"
 	"os"
@@ -80,7 +80,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string) error {
 }
 
 // NewServiceAccountSigningKey generate public/private key pairs for signing service account tokens.
-func NewServiceAccountSigningKey() (*rsa.PrivateKey, error) {
+func NewServiceAccountSigningKey() (crypto.Signer, error) {
 	// The key does NOT exist, let's generate it now
 	saSigningKey, err := pkiutil.NewPrivateKey()
 	if err != nil {
@@ -117,7 +117,7 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 }
 
 // NewCSR will generate a new CSR and accompanying key
-func NewCSR(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) (*x509.CertificateRequest, *rsa.PrivateKey, error) {
+func NewCSR(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) (*x509.CertificateRequest, crypto.Signer, error) {
 	certConfig, err := certSpec.GetConfig(cfg)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to retrieve cert configuration")
@@ -151,7 +151,7 @@ func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert,
 }
 
 // LoadCertificateAuthority tries to load a CA in the given directory with the given name.
-func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate, *rsa.PrivateKey, error) {
+func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate, crypto.Signer, error) {
 	// Checks if certificate authority exists in the PKI directory
 	if !pkiutil.CertOrKeyExist(pkiDir, baseName) {
 		return nil, nil, errors.Errorf("couldn't load %s certificate authority from %s", baseName, pkiDir)
@@ -175,7 +175,7 @@ func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate
 // If there already is a certificate file at the given path; kubeadm tries to load it and check if the values in the
 // existing and the expected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
-func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
+func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, caCert *x509.Certificate, caKey crypto.Signer) error {
 
 	// If cert or key exists, we should try to load them
 	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
@@ -210,7 +210,7 @@ func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, c
 // If there already is a certificate file at the given path; kubeadm tries to load it and check if the values in the
 // existing and the expected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
-func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert *x509.Certificate, cert *x509.Certificate, key *rsa.PrivateKey, cfg *certutil.Config) error {
+func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert *x509.Certificate, cert *x509.Certificate, key crypto.Signer, cfg *certutil.Config) error {
 
 	// Checks if the signed certificate exists in the PKI directory
 	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
@@ -250,7 +250,7 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 // If there already is a key file at the given path; kubeadm tries to load it and check if the values in the
 // existing and the expected key equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
-func writeKeyFilesIfNotExist(pkiDir string, baseName string, key *rsa.PrivateKey) error {
+func writeKeyFilesIfNotExist(pkiDir string, baseName string, key crypto.Signer) error {
 
 	// Checks if the key exists in the PKI directory
 	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
@@ -274,7 +274,7 @@ func writeKeyFilesIfNotExist(pkiDir string, baseName string, key *rsa.PrivateKey
 			return errors.Wrapf(err, "failure while saving %s key", baseName)
 		}
 
-		if err := pkiutil.WritePublicKey(pkiDir, baseName, &key.PublicKey); err != nil {
+		if err := pkiutil.WritePublicKey(pkiDir, baseName, key.Public()); err != nil {
 			return errors.Wrapf(err, "failure while saving %s public key", baseName)
 		}
 	}
@@ -285,7 +285,7 @@ func writeKeyFilesIfNotExist(pkiDir string, baseName string, key *rsa.PrivateKey
 // writeCSRFilesIfNotExist writes a new CSR to the given path.
 // If there already is a CSR file at the given path; kubeadm tries to load it and check if it's a valid certificate.
 // otherwise this function returns an error.
-func writeCSRFilesIfNotExist(csrDir string, baseName string, csr *x509.CertificateRequest, key *rsa.PrivateKey) error {
+func writeCSRFilesIfNotExist(csrDir string, baseName string, csr *x509.CertificateRequest, key crypto.Signer) error {
 	if pkiutil.CSROrKeyExist(csrDir, baseName) {
 		_, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(csrDir, baseName)
 		if err != nil {

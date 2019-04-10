@@ -17,7 +17,8 @@ limitations under the License.
 package certs
 
 import (
-	"crypto/rsa"
+	"bytes"
+	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
 	"io/ioutil"
@@ -31,6 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
@@ -38,7 +40,7 @@ import (
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
-func createTestCSR(t *testing.T) (*x509.CertificateRequest, *rsa.PrivateKey) {
+func createTestCSR(t *testing.T) (*x509.CertificateRequest, crypto.Signer) {
 	csr, key, err := pkiutil.NewCSRAndKey(
 		&certutil.Config{
 			CommonName: "testCert",
@@ -307,7 +309,7 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 	var tests = []struct {
 		setupFunc     func(pkiDir string) error
 		expectedError bool
-		expectedKey   *rsa.PrivateKey
+		expectedKey   crypto.Signer
 	}{
 		{ // key does not exists > key written
 			expectedKey: key,
@@ -349,7 +351,7 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 		} else if test.expectedError && err == nil {
 			t.Error("error writeKeyFilesIfNotExist didn't failed when expected")
 			continue
-		} else if test.expectedError {
+		} else if test.expectedError || test.expectedKey == nil {
 			continue
 		}
 
@@ -363,8 +365,18 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 			continue
 		}
 
-		//TODO: check if there is a better method to compare keys
-		if resultingKey.D == test.expectedKey.D {
+		resultingKeyPEM, err := keyutil.MarshalPrivateKeyToPEM(resultingKey)
+		if err != nil {
+			t.Errorf("failure marshaling created key: %v", err)
+			continue
+		}
+
+		expectedKeyPEM, err := keyutil.MarshalPrivateKeyToPEM(test.expectedKey)
+		if err != nil {
+			t.Fatalf("Failed to marshal expected private key: %v", err)
+		}
+
+		if bytes.Compare(resultingKeyPEM, expectedKeyPEM) != 0 {
 			t.Error("created key does not match expected key")
 		}
 	}
@@ -373,7 +385,7 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 func TestSharedCertificateExists(t *testing.T) {
 	caCert, caKey := certstestutil.CreateCACert(t)
 	_, key, _ := certstestutil.CreateTestCert(t, caCert, caKey, certutil.AltNames{})
-	publicKey := &key.PublicKey
+	publicKey := key.Public()
 
 	var tests = []struct {
 		name          string
@@ -664,7 +676,7 @@ func TestValidateMethods(t *testing.T) {
 		{
 			name: "validatePrivatePublicKey",
 			files: certstestutil.PKIFiles{
-				"sa.pub": &key.PublicKey,
+				"sa.pub": key.Public(),
 				"sa.key": key,
 			},
 			validateFunc:    validatePrivatePublicKey,
