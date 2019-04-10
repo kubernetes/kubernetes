@@ -249,8 +249,10 @@ func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
 			}
 		}
 
+		// Same AWS Disk mounted by multiple pods conflicts unless all pods mount it read-only.
 		if volume.AWSElasticBlockStore != nil && existingVolume.AWSElasticBlockStore != nil {
-			if volume.AWSElasticBlockStore.VolumeID == existingVolume.AWSElasticBlockStore.VolumeID {
+			vid, evid := volume.AWSElasticBlockStore.VolumeID, existingVolume.AWSElasticBlockStore.VolumeID
+			if vid == evid && !(volume.AWSElasticBlockStore.ReadOnly && existingVolume.AWSElasticBlockStore.ReadOnly) {
 				return true
 			}
 		}
