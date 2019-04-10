@@ -24,7 +24,7 @@ import (
 )
 
 // MessageCountMap contains occurrence for each error message.
-type MessageCountMap map[string]int
+type MessageCountMap map[string]*int32
 
 // Aggregate represents an object that contains multiple errors, but does not
 // necessarily have singular semantic meaning.
@@ -186,8 +186,8 @@ func CreateAggregateFromMessageCountMap(m MessageCountMap) Aggregate {
 	result := make([]error, 0, len(m))
 	for errStr, count := range m {
 		var countStr string
-		if count > 1 {
-			countStr = fmt.Sprintf(" (repeated %v times)", count)
+		if *count > int32(1) {
+			countStr = fmt.Sprintf(" (repeated %v times)", *count)
 		}
 		result = append(result, fmt.Errorf("%v%v", errStr, countStr))
 	}
