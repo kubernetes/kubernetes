@@ -95,18 +95,16 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 	etcdPeerAddress := etcdutil.GetPeerURL(&cfg.LocalAPIEndpoint)
 
 	klog.V(2).Infof("[etcd] get the member id from peer: %s", etcdPeerAddress)
-	id, err := etcdClient.GetMemberID(etcdPeerAddress)
-	if err != nil {
+	if id, err := etcdClient.GetMemberID(etcdPeerAddress); err != nil {
 		return err
+	} else {
+		klog.V(1).Infof("[etcd] removing etcd member: %s, id: %d", etcdPeerAddress, id)
+		members, err := etcdClient.RemoveMember(id)
+		if err != nil {
+			return err
+		}
+		klog.V(1).Infof("[etcd] Updated etcd member list: %v", members)
 	}
-
-	klog.V(1).Infof("[etcd] removing etcd member: %s, id: %d", etcdPeerAddress, id)
-	members, err := etcdClient.RemoveMember(id)
-	if err != nil {
-		return err
-	}
-	klog.V(1).Infof("[etcd] Updated etcd member list: %v", members)
-
 	return nil
 }
 
@@ -116,37 +114,33 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifestDir string, nodeName string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) error {
 	// creates an etcd client that connects to all the local/stacked etcd members
 	klog.V(1).Info("creating etcd client that connects to etcd pods")
-	etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
-	if err != nil {
+	if etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir); err != nil {
 		return err
-	}
+	} else {
+		// notifies the other members of the etcd cluster about the joining member
+		etcdPeerAddress := etcdutil.GetPeerURL(endpoint)
 
-	// notifies the other members of the etcd cluster about the joining member
-	etcdPeerAddress := etcdutil.GetPeerURL(endpoint)
+		klog.V(1).Infof("Adding etcd member: %s", etcdPeerAddress)
+		if initialCluster, err := etcdClient.AddMember(nodeName, etcdPeerAddress); err != nil {
+			return err
+		}
+		fmt.Println("[etcd] Announced new etcd member joining to the existing etcd cluster")
+		klog.V(1).Infof("Updated etcd member list: %v", initialCluster)
 
-	klog.V(1).Infof("Adding etcd member: %s", etcdPeerAddress)
-	initialCluster, err := etcdClient.AddMember(nodeName, etcdPeerAddress)
-	if err != nil {
-		return err
-	}
-	fmt.Println("[etcd] Announced new etcd member joining to the existing etcd cluster")
-	klog.V(1).Infof("Updated etcd member list: %v", initialCluster)
-
-	klog.V(1).Info("Creating local etcd static pod manifest file")
-	// gets etcd StaticPodSpec, actualized for the current InitConfiguration and the new list of etcd members
-	spec := GetEtcdPodSpec(cfg, endpoint, nodeName, initialCluster)
-	// writes etcd StaticPod to disk
-	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
-		return err
-	}
-
-	fmt.Printf("[etcd] Wrote Static Pod manifest for a local etcd member to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
-
-	fmt.Printf("[etcd] Waiting for the new etcd member to join the cluster. This can take up to %v\n", etcdHealthyCheckInterval*etcdHealthyCheckRetries)
-	if _, err := etcdClient.WaitForClusterAvailable(etcdHealthyCheckRetries, etcdHealthyCheckInterval); err != nil {
-		return err
-	}
-
+		klog.V(1).Info("Creating local etcd static pod manifest file")
+		// gets etcd StaticPodSpec, actualized for the current InitConfiguration and the new list of etcd members
+		spec := GetEtcdPodSpec(cfg, endpoint, nodeName, initialCluster)
+		// writes etcd StaticPod to disk
+		if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
+			return err
+		}
+		fmt.Printf("[etcd] Wrote Static Pod manifest for a local etcd member to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
+	
+        fmt.Printf("[etcd] Waiting for the new etcd member to join the cluster. This can take up to %v\n", etcdHealthyCheckInterval*etcdHealthyCheckRetries)
+        if _, err := etcdClient.WaitForClusterAvailable(etcdHealthyCheckRetries, etcdHealthyCheckInterval); err != nil {
+            return err
+        }    
+    }
 	return nil
 }
 
