@@ -202,15 +202,16 @@ func (s *specAggregator) tryUpdatingServiceSpecs(specInfo *openAPISpecInfo) erro
 	if specInfo == nil {
 		return fmt.Errorf("invalid input: specInfo must be non-nil")
 	}
-	orgSpecInfo, exists := s.openAPISpecs[specInfo.apiService.Name]
+	origSpecInfo, existedBefore := s.openAPISpecs[specInfo.apiService.Name]
+	s.openAPISpecs[specInfo.apiService.Name] = specInfo
+
 	// Skip aggregation if OpenAPI spec didn't change
-	if exists && orgSpecInfo != nil && orgSpecInfo.etag == specInfo.etag {
+	if existedBefore && origSpecInfo != nil && origSpecInfo.etag == specInfo.etag {
 		return nil
 	}
-	s.openAPISpecs[specInfo.apiService.Name] = specInfo
 	if err := s.updateOpenAPISpec(); err != nil {
-		if exists {
-			s.openAPISpecs[specInfo.apiService.Name] = orgSpecInfo
+		if existedBefore {
+			s.openAPISpecs[specInfo.apiService.Name] = origSpecInfo
 		} else {
 			delete(s.openAPISpecs, specInfo.apiService.Name)
 		}
