@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -316,10 +316,10 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
 	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
 		// The volume represented by this spec is CSI and thus should be migrated
-		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
+		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
 			eventRecorderFunc(&err)
-			return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.FindAttachablePluginByName failed", err)
+			return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.FindAttachablePluginBySpec failed", err)
 		}
 
 		csiSpec, err := translateSpec(volumeToAttach.VolumeSpec)
@@ -420,7 +420,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
 		if useCSIPlugin(og.volumePluginMgr, volumeToDetach.VolumeSpec) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
-			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
+			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginBySpec(volumeToDetach.VolumeSpec)
 			if err != nil || attachableVolumePlugin == nil {
 				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
 			}
@@ -851,21 +851,17 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
 
-	var pluginName string
 	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec) {
-		pluginName = csi.CSIPluginName
 		csiSpec, err := translateSpec(deviceToDetach.VolumeSpec)
 		if err != nil {
 			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.TranslateSpec failed", err)
 		}
 		deviceToDetach.VolumeSpec = csiSpec
-	} else {
-		pluginName = deviceToDetach.PluginName
 	}
 
 	// Get DeviceMounter plugin
 	deviceMountableVolumePlugin, err :=
-		og.volumePluginMgr.FindDeviceMountablePluginByName(pluginName)
+		og.volumePluginMgr.FindDeviceMountablePluginBySpec(deviceToDetach.VolumeSpec)
 	if err != nil || deviceMountableVolumePlugin == nil {
 		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.FindDeviceMountablePluginByName failed", err)
 	}
@@ -1137,9 +1133,9 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		volumeToUnmount.VolumeSpec = csiSpec
 
 		blockVolumePlugin, err =
-			og.volumePluginMgr.FindMapperPluginByName(csi.CSIPluginName)
+			og.volumePluginMgr.FindMapperPluginBySpec(csiSpec)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed", err)
+			return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginBySpec failed", err)
 		}
 	} else {
 		blockVolumePlugin, err =
@@ -1232,9 +1228,9 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 
 		deviceToDetach.VolumeSpec = csiSpec
 		blockVolumePlugin, err =
-			og.volumePluginMgr.FindMapperPluginByName(csi.CSIPluginName)
+			og.volumePluginMgr.FindMapperPluginBySpec(csiSpec)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed", err)
+			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginBySpec failed", err)
 		}
 	} else {
 		blockVolumePlugin, err =
