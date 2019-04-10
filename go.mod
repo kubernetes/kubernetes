@@ -306,7 +306,7 @@ replace (
 	github.com/golangplus/fmt => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v0.0.0-20160524151835-7d79101e329e
-	github.com/google/cadvisor => github.com/google/cadvisor v0.33.1
+	github.com/google/cadvisor => github.com/liggitt/cadvisor v0.0.0-20190410021324-655e1c19b6a3
 	github.com/google/certificate-transparency-go => github.com/google/certificate-transparency-go v1.0.21
 	github.com/google/go-cmp => github.com/google/go-cmp v0.2.0
 	github.com/google/gofuzz => github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
