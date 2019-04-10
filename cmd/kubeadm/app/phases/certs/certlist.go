@@ -17,7 +17,7 @@ limitations under the License.
 package certs
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 
 	"github.com/pkg/errors"
@@ -54,7 +54,7 @@ func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*certutil.Con
 }
 
 // CreateFromCA makes and writes a certificate using the given CA cert and key.
-func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) error {
+func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey crypto.Signer) error {
 	cfg, err := k.GetConfig(ic)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't create %q certificate", k.Name)
@@ -80,7 +80,7 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 }
 
 // CreateAsCA creates a certificate authority, writing the files to disk and also returning the created CA so it can be used to sign child certs.
-func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certificate, *rsa.PrivateKey, error) {
+func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certificate, crypto.Signer, error) {
 	cfg, err := k.GetConfig(ic)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "couldn't get configuration for %q CA certificate", k.Name)
@@ -114,7 +114,7 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 			return err
 		}
 
-		var caKey *rsa.PrivateKey
+		var caKey crypto.Signer
 
 		caCert, err := pkiutil.TryLoadCertFromDisk(ic.CertificatesDir, ca.BaseName)
 		if err == nil {
