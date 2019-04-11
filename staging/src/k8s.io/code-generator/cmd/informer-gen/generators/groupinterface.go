@@ -18,7 +18,7 @@ package generators
 
 import (
 	"io"
-	"path/filepath"
+	"path"
 	"strings"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
@@ -70,7 +70,7 @@ func (g *groupInterfaceGenerator) GenerateType(c *generator.Context, t *types.Ty
 	versions := make([]versionData, 0, len(g.groupVersions.Versions))
 	for _, version := range g.groupVersions.Versions {
 		gv := clientgentypes.GroupVersion{Group: g.groupVersions.Group, Version: version.Version}
-		versionPackage := filepath.Join(g.outputPackage, strings.ToLower(gv.Version.NonEmpty()))
+		versionPackage := path.Join(g.outputPackage, strings.ToLower(gv.Version.NonEmpty()))
 		iface := c.Universe.Type(types.Name{Package: versionPackage, Name: "Interface"})
 		versions = append(versions, versionData{
 			Name:      namer.IC(version.Version.NonEmpty()),

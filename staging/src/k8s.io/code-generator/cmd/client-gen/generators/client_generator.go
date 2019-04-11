@@ -18,6 +18,7 @@ limitations under the License.
 package generators
 
 import (
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -25,7 +26,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/fake"
 	"k8s.io/code-generator/cmd/client-gen/generators/scheme"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	"k8s.io/code-generator/cmd/client-gen/path"
+	kpath "k8s.io/code-generator/cmd/client-gen/path"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	codegennamer "k8s.io/code-generator/pkg/namer"
 	"k8s.io/gengo/args"
@@ -128,7 +129,7 @@ func DefaultNameSystem() string {
 }
 
 func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, groupPackageName string, groupGoName string, apiPath string, srcTreePath string, inputPackage string, boilerplate []byte) generator.Package {
-	groupVersionClientPackage := filepath.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()))
+	groupVersionClientPackage := path.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()))
 	return &generator.DefaultPackage{
 		PackageName: strings.ToLower(gv.Version.NonEmpty()),
 		PackagePath: groupVersionClientPackage,
@@ -224,7 +225,7 @@ func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage 
 }
 
 func packageForScheme(customArgs *clientgenargs.CustomArgs, clientsetPackage string, srcTreePath string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
-	schemePackage := filepath.Join(clientsetPackage, "scheme")
+	schemePackage := path.Join(clientsetPackage, "scheme")
 
 	// create runtime.Registry for internal client because it has to know about group versions
 	internalClient := false
@@ -330,7 +331,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	gvToTypes := map[clientgentypes.GroupVersion][]*types.Type{}
 	groupGoNames := make(map[clientgentypes.GroupVersion]string)
 	for gv, inputDir := range customArgs.GroupVersionPackages() {
-		p := context.Universe.Package(path.Vendorless(inputDir))
+		p := context.Universe.Package(kpath.Vendorless(inputDir))
 
 		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
 		// the Go group identifier in CamelCase. It defaults
@@ -369,7 +370,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	}
 
 	var packageList []generator.Package
-	clientsetPackage := filepath.Join(arguments.OutputPackagePath, customArgs.ClientsetName)
+	clientsetPackage := path.Join(arguments.OutputPackagePath, customArgs.ClientsetName)
 
 	packageList = append(packageList, packageForClientset(customArgs, clientsetPackage, groupGoNames, boilerplate))
 	packageList = append(packageList, packageForScheme(customArgs, clientsetPackage, arguments.OutputBase, groupGoNames, boilerplate))

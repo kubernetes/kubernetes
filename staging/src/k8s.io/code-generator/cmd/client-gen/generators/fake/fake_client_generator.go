@@ -17,22 +17,22 @@ limitations under the License.
 package fake
 
 import (
-	"path/filepath"
+	"path"
 	"strings"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/types"
 
 	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
-	scheme "k8s.io/code-generator/cmd/client-gen/generators/scheme"
+	"k8s.io/code-generator/cmd/client-gen/generators/scheme"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
 
 func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, groupPackageName string, groupGoName string, inputPackage string, boilerplate []byte) generator.Package {
-	outputPackage := filepath.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()), "fake")
+	outputPackage := path.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()), "fake")
 	// TODO: should make this a function, called by here and in client-generator.go
-	realClientPackage := filepath.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()))
+	realClientPackage := path.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()))
 	return &generator.DefaultPackage{
 		PackageName: "fake",
 		PackagePath: outputPackage,
@@ -89,7 +89,7 @@ func PackageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage 
 		// TODO: we'll generate fake clientset for different release in the future.
 		// Package name and path are hard coded for now.
 		PackageName: "fake",
-		PackagePath: filepath.Join(clientsetPackage, "fake"),
+		PackagePath: path.Join(clientsetPackage, "fake"),
 		HeaderText:  boilerplate,
 		PackageDocumentation: []byte(
 			`// This package has the automatically generated fake clientset.

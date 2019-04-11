@@ -19,7 +19,7 @@ package fake
 import (
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"strings"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
@@ -60,8 +60,8 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
-			groupClientPackage := filepath.Join(g.fakeClientsetPackage, "typed", strings.ToLower(group.PackageName), strings.ToLower(version.NonEmpty()))
-			fakeGroupClientPackage := filepath.Join(groupClientPackage, "fake")
+			groupClientPackage := path.Join(g.fakeClientsetPackage, "typed", strings.ToLower(group.PackageName), strings.ToLower(version.NonEmpty()))
+			fakeGroupClientPackage := path.Join(groupClientPackage, "fake")
 
 			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}])
 			imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), groupClientPackage))

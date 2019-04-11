@@ -86,7 +86,7 @@ func isInternal(m types.Member) bool {
 }
 
 func packageForInternalInterfaces(base string) string {
-	return filepath.Join(base, "internalinterfaces")
+	return path.Join(base, "internalinterfaces")
 }
 
 func vendorless(p string) string {
@@ -108,11 +108,11 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		klog.Fatalf("Wrong CustomArgs type: %T", arguments.CustomArgs)
 	}
 
-	internalVersionPackagePath := filepath.Join(arguments.OutputPackagePath)
-	externalVersionPackagePath := filepath.Join(arguments.OutputPackagePath)
+	internalVersionPackagePath := path.Join(arguments.OutputPackagePath)
+	externalVersionPackagePath := path.Join(arguments.OutputPackagePath)
 	if !customArgs.SingleDirectory {
-		internalVersionPackagePath = filepath.Join(arguments.OutputPackagePath, "internalversion")
-		externalVersionPackagePath = filepath.Join(arguments.OutputPackagePath, "externalversions")
+		internalVersionPackagePath = path.Join(arguments.OutputPackagePath, "internalversion")
+		externalVersionPackagePath = path.Join(arguments.OutputPackagePath, "externalversions")
 	}
 
 	var packageList generator.Packages
@@ -284,7 +284,7 @@ func factoryInterfacePackage(basePackage string, boilerplate []byte, clientSetPa
 }
 
 func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions, boilerplate []byte) generator.Package {
-	packagePath := filepath.Join(basePackage, groupVersions.PackageName)
+	packagePath := path.Join(basePackage, groupVersions.PackageName)
 	groupPkgName := strings.Split(string(groupVersions.PackageName), ".")[0]
 
 	return &generator.DefaultPackage{
@@ -311,7 +311,7 @@ func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions
 }
 
 func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Package {
-	packagePath := filepath.Join(basePackage, groupPkgName, strings.ToLower(gv.Version.NonEmpty()))
+	packagePath := path.Join(basePackage, groupPkgName, strings.ToLower(gv.Version.NonEmpty()))
 
 	return &generator.DefaultPackage{
 		PackageName: strings.ToLower(gv.Version.NonEmpty()),

@@ -18,14 +18,14 @@ package generators
 
 import (
 	"io"
-	"path/filepath"
+	"path"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	"k8s.io/code-generator/cmd/client-gen/path"
+	kpath "k8s.io/code-generator/cmd/client-gen/path"
 )
 
 // genGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
@@ -64,7 +64,7 @@ func (g *genGroup) Namers(c *generator.Context) namer.NameSystems {
 
 func (g *genGroup) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
-	imports = append(imports, filepath.Join(g.clientsetPackage, "scheme"))
+	imports = append(imports, path.Join(g.clientsetPackage, "scheme"))
 	return
 }
 
@@ -83,7 +83,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		groupName = ""
 	}
 	// allow user to define a group name that's different from the one parsed from the directory.
-	p := c.Universe.Package(path.Vendorless(g.inputPackage))
+	p := c.Universe.Package(kpath.Vendorless(g.inputPackage))
 	if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 		groupName = override[0]
 	}
@@ -102,7 +102,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"restDefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "DefaultKubernetesUserAgent"}),
 		"restRESTClientInterface":        c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"restRESTClientFor":              c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFor"}),
-		"SchemeGroupVersion":             c.Universe.Variable(types.Name{Package: path.Vendorless(g.inputPackage), Name: "SchemeGroupVersion"}),
+		"SchemeGroupVersion":             c.Universe.Variable(types.Name{Package: kpath.Vendorless(g.inputPackage), Name: "SchemeGroupVersion"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)

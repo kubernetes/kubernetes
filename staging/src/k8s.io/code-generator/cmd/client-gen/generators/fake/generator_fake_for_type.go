@@ -18,7 +18,7 @@ package fake
 
 import (
 	"io"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"k8s.io/gengo/generator"
@@ -26,7 +26,7 @@ import (
 	"k8s.io/gengo/types"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	"k8s.io/code-generator/cmd/client-gen/path"
+	kpath "k8s.io/code-generator/cmd/client-gen/path"
 )
 
 // genFakeForType produces a file for each top-level type.
@@ -86,7 +86,7 @@ func hasObjectMeta(t *types.Type) bool {
 // GenerateType makes the body of a file implementing the individual typed client for type t.
 func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	pkg := filepath.Base(t.Name.Package)
+	pkg := path.Base(t.Name.Package)
 	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 	if err != nil {
 		return err
@@ -102,7 +102,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	}
 
 	// allow user to define a group name that's different from the one parsed from the directory.
-	p := c.Universe.Package(path.Vendorless(g.inputPackage))
+	p := c.Universe.Package(kpath.Vendorless(g.inputPackage))
 	if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 		groupName = override[0]
 	}
