@@ -870,7 +870,13 @@ var _ = SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should be able to update NodePorts with two same port numbers but different protocols", func() {
+	/*
+		Release: v1.15
+		Testname: Service, update NodePort, same port different protocol
+		Description: Create a service of type "ClusterIP" to accept TCP requests. Service creation MUST be successful by assigning "ClusterIP" to the service.
+		When service type is updated to "NodePort" to support two protocols i.e. TCP and UDP on same assigned service port 80, service updation MUST be successful by allocating two "NodePorts" to the service.
+	*/
+	framework.ConformanceIt("should be able to update NodePorts with two same port numbers but different protocols", func() {
 		serviceName := "nodeport-update-service"
 		ns := f.Namespace.Name
 		jig := framework.NewServiceTestJig(cs, serviceName)
@@ -887,7 +893,6 @@ var _ = SIGDescribe("Services", func() {
 		e2elog.Logf("service port TCP: %d", svcPort)
 
 		// Change the services to NodePort and add a UDP port.
-
 		ginkgo.By("changing the TCP service to type=NodePort and add a UDP port")
 		newService := jig.UpdateServiceOrFail(ns, tcpService.Name, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
@@ -941,7 +946,14 @@ var _ = SIGDescribe("Services", func() {
 		jig.SanityCheckService(clusterIPService, v1.ServiceTypeClusterIP)
 	})
 
-	ginkgo.It("should be able to change the type from ExternalName to NodePort", func() {
+	/*
+		Release: v1.15
+		Testname: Service, change type, ExternalName to NodePort
+		Description: Create a service of type "ExternalName", pointing to external DNS. "ClusterIP" MUST not be assigned to the service.
+		Update the service from "ExternalName" to "NodePort" by assigning service port 80 and TCP protocol.
+		Service updation MUST be successful by exposing service on every node's IP on statically assigned "NodePort" and "ClusterIP" is assigned to route "NodePort" service requests.
+	*/
+	framework.ConformanceIt("should be able to change the type from ExternalName to NodePort", func() {
 		serviceName := "externalname-service"
 		ns := f.Namespace.Name
 		jig := framework.NewServiceTestJig(cs, serviceName)
@@ -965,7 +977,13 @@ var _ = SIGDescribe("Services", func() {
 		jig.SanityCheckService(nodePortService, v1.ServiceTypeNodePort)
 	})
 
-	ginkgo.It("should be able to change the type from ClusterIP to ExternalName", func() {
+	/*
+		Release: v1.15
+		Testname: Service, change type, ClusterIP to ExternalName
+		Description: Create a service of type "ClusterIP". Service creation MUST be successful by assigning "ClusterIP" to the service.
+		Update service type from "ClusterIP" to "ExternalName" by pointing to external DNS. Service updation MUST be successful by pointing to external DNS and service MUST not has associated "ClusterIP".
+	*/
+	framework.ConformanceIt("should be able to change the type from ClusterIP to ExternalName", func() {
 		serviceName := "clusterip-service"
 		ns := f.Namespace.Name
 		jig := framework.NewServiceTestJig(cs, serviceName)
@@ -987,7 +1005,13 @@ var _ = SIGDescribe("Services", func() {
 		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
 	})
 
-	ginkgo.It("should be able to change the type from NodePort to ExternalName", func() {
+	/*
+		Release: v1.15
+		Testname: Service, change type, NodePort to ExternalName
+		Description: Create a service of type "NodePort". Service creation MUST be successful by exposing service on every node's IP on statically assigned "NodePort" and "ClusterIP" is assigned to route "NodePort" Service requests.
+		Update the service type from "NodePort" to "ExternalName" by pointing to external DNS. Service updation MUST be successful by pointing to external DNS and MUST not has "ClusterIP" associated with the service and allocated "NodePort" MUST be released from all the nodes.
+	*/
+	framework.ConformanceIt("should be able to change the type from NodePort to ExternalName", func() {
 		serviceName := "nodeport-service"
 		ns := f.Namespace.Name
 		jig := framework.NewServiceTestJig(cs, serviceName)
