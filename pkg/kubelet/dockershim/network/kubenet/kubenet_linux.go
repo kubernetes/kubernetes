@@ -74,7 +74,7 @@ type kubenetNetworkPlugin struct {
 	netConfig       *libcni.NetworkConfig
 	loConfig        *libcni.NetworkConfig
 	cniConfig       libcni.CNI
-	bandwidthShaper bandwidth.BandwidthShaper
+	bandwidthShaper bandwidth.Shaper
 	mu              sync.Mutex //Mutex for protecting podIPs map, netConfig, and shaper initialization
 	podIPs          map[kubecontainer.ContainerID]string
 	mtu             int
