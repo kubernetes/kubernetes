@@ -55,3 +55,10 @@ type PluginEnableConfig struct {
 type PluginDisableConfig struct {
 	ForceDisable bool
 }
+
+// NetworkListConfig stores the options available for listing networks
+type NetworkListConfig struct {
+	// TODO(@cpuguy83): naming is hard, this is pulled from what was being used in the router before moving here
+	Detailed bool
+	Verbose  bool
+}

@@ -27,12 +27,12 @@ func (cli *Client) SecretList(ctx context.Context, options types.SecretListOptio
 	}
 
 	resp, err := cli.get(ctx, "/secrets", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return nil, err
 	}
 
 	var secrets []swarm.Secret
 	err = json.NewDecoder(resp.body).Decode(&secrets)
-	ensureReaderClosed(resp)
 	return secrets, err
 }

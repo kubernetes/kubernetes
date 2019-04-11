@@ -18,10 +18,10 @@ func (cli *Client) ConfigInspectWithRaw(ctx context.Context, id string) (swarm.C
 		return swarm.Config{}, nil, err
 	}
 	resp, err := cli.get(ctx, "/configs/"+id, nil, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return swarm.Config{}, nil, wrapResponseError(err, resp, "config", id)
 	}
-	defer ensureReaderClosed(resp)
 
 	body, err := ioutil.ReadAll(resp.body)
 	if err != nil {
