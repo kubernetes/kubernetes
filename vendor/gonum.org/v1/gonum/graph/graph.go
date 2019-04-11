@@ -13,8 +13,15 @@ type Node interface {
 // edge is given from -> to, otherwise the edge is semantically
 // unordered.
 type Edge interface {
+	// From returns the from node of the edge.
 	From() Node
+
+	// To returns the to node of the edge.
 	To() Node
+
+	// ReversedEdge returns an edge that has
+	// the end points of the receiver swapped.
+	ReversedEdge() Edge
 }
 
 // WeightedEdge is a weighted graph edge. In directed graphs, the direction
@@ -27,16 +34,20 @@ type WeightedEdge interface {
 
 // Graph is a generalized graph.
 type Graph interface {
-	// Has returns whether a node with the given ID exists
-	// within the graph.
-	Has(id int64) bool
+	// Node returns the node with the given ID if it exists
+	// in the graph, and nil otherwise.
+	Node(id int64) Node
 
 	// Nodes returns all the nodes in the graph.
-	Nodes() []Node
+	//
+	// Nodes must not return nil.
+	Nodes() Nodes
 
 	// From returns all nodes that can be reached directly
 	// from the node with the given ID.
-	From(id int64) []Node
+	//
+	// From must not return nil.
+	From(id int64) Nodes
 
 	// HasEdgeBetween returns whether an edge exists between
 	// nodes with IDs xid and yid without considering direction.
@@ -99,7 +110,9 @@ type Directed interface {
 
 	// To returns all nodes that can reach directly
 	// to the node with the given ID.
-	To(id int64) []Node
+	//
+	// To must not return nil.
+	To(id int64) Nodes
 }
 
 // WeightedDirected is a weighted directed graph.
@@ -113,7 +126,9 @@ type WeightedDirected interface {
 
 	// To returns all nodes that can reach directly
 	// to the node with the given ID.
-	To(id int64) []Node
+	//
+	// To must not return nil.
+	To(id int64) Nodes
 }
 
 // NodeAdder is an interface for adding arbitrary nodes to a graph.
@@ -122,7 +137,7 @@ type NodeAdder interface {
 	// arbitrary ID.
 	NewNode() Node
 
-	// Adds a node to the graph. AddNode panics if
+	// AddNode adds a node to the graph. AddNode panics if
 	// the added node ID matches an existing node ID.
 	AddNode(Node)
 }
@@ -146,8 +161,10 @@ type EdgeAdder interface {
 	// will be added if they do not exist, otherwise
 	// SetEdge will panic.
 	// The behavior of an EdgeAdder when the IDs
-	// returned by e.From and e.To are equal is
+	// returned by e.From() and e.To() are equal is
 	// implementation-dependent.
+	// Whether e, e.From() and e.To() are stored
+	// within the graph is implementation dependent.
 	SetEdge(e Edge)
 }
 
@@ -162,8 +179,10 @@ type WeightedEdgeAdder interface {
 	// the nodes will be added if they do not exist,
 	// otherwise SetWeightedEdge will panic.
 	// The behavior of a WeightedEdgeAdder when the IDs
-	// returned by e.From and e.To are equal is
+	// returned by e.From() and e.To() are equal is
 	// implementation-dependent.
+	// Whether e, e.From() and e.To() are stored
+	// within the graph is implementation dependent.
 	SetWeightedEdge(e WeightedEdge)
 }
 
@@ -219,12 +238,17 @@ type DirectedWeightedBuilder interface {
 // be present in the destination after the copy is complete.
 func Copy(dst Builder, src Graph) {
 	nodes := src.Nodes()
-	for _, n := range nodes {
-		dst.AddNode(n)
+	for nodes.Next() {
+		dst.AddNode(nodes.Node())
 	}
-	for _, u := range nodes {
-		for _, v := range src.From(u.ID()) {
-			dst.SetEdge(dst.NewEdge(u, v))
+	nodes.Reset()
+	for nodes.Next() {
+		u := nodes.Node()
+		uid := u.ID()
+		to := src.From(uid)
+		for to.Next() {
+			v := to.Node()
+			dst.SetEdge(src.Edge(uid, v.ID()))
 		}
 	}
 }
@@ -242,12 +266,17 @@ func Copy(dst Builder, src Graph) {
 // to resolve such conflicts, an UndirectWeighted may be used to do this.
 func CopyWeighted(dst WeightedBuilder, src Weighted) {
 	nodes := src.Nodes()
-	for _, n := range nodes {
-		dst.AddNode(n)
+	for nodes.Next() {
+		dst.AddNode(nodes.Node())
 	}
-	for _, u := range nodes {
-		for _, v := range src.From(u.ID()) {
-			dst.SetWeightedEdge(dst.NewWeightedEdge(u, v, src.WeightedEdge(u.ID(), v.ID()).Weight()))
+	nodes.Reset()
+	for nodes.Next() {
+		u := nodes.Node()
+		uid := u.ID()
+		to := src.From(uid)
+		for to.Next() {
+			v := to.Node()
+			dst.SetWeightedEdge(src.WeightedEdge(uid, v.ID()))
 		}
 	}
 }

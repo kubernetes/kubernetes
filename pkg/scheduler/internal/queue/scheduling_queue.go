@@ -42,6 +42,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -283,13 +284,13 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock) *Priority
 		clock:            clock,
 		stop:             stop,
 		podBackoff:       NewPodBackoffMap(1*time.Second, 10*time.Second),
-		activeQ:          util.NewHeap(podInfoKeyFunc, activeQComp),
-		unschedulableQ:   newUnschedulablePodsMap(),
+		activeQ:          util.NewHeapWithRecorder(podInfoKeyFunc, activeQComp, metrics.NewActivePodsRecorder()),
+		unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
 		nominatedPods:    newNominatedPodMap(),
 		moveRequestCycle: -1,
 	}
 	pq.cond.L = &pq.lock
-	pq.podBackoffQ = util.NewHeap(podInfoKeyFunc, pq.podsCompareBackoffCompleted)
+	pq.podBackoffQ = util.NewHeapWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
 
 	pq.run()
 
@@ -777,16 +778,27 @@ type UnschedulablePodsMap struct {
 	// podInfoMap is a map key by a pod's full-name and the value is a pointer to the podInfo.
 	podInfoMap map[string]*podInfo
 	keyFunc    func(*v1.Pod) string
+	// metricRecorder updates the counter when elements of an unschedulablePodsMap
+	// get added or removed, and it does nothing if it's nil
+	metricRecorder metrics.MetricRecorder
 }
 
 // Add adds a pod to the unschedulable podInfoMap.
 func (u *UnschedulablePodsMap) addOrUpdate(pInfo *podInfo) {
-	u.podInfoMap[u.keyFunc(pInfo.pod)] = pInfo
+	podID := u.keyFunc(pInfo.pod)
+	if _, exists := u.podInfoMap[podID]; !exists && u.metricRecorder != nil {
+		u.metricRecorder.Inc()
+	}
+	u.podInfoMap[podID] = pInfo
 }
 
 // Delete deletes a pod from the unschedulable podInfoMap.
 func (u *UnschedulablePodsMap) delete(pod *v1.Pod) {
-	delete(u.podInfoMap, u.keyFunc(pod))
+	podID := u.keyFunc(pod)
+	if _, exists := u.podInfoMap[podID]; exists && u.metricRecorder != nil {
+		u.metricRecorder.Dec()
+	}
+	delete(u.podInfoMap, podID)
 }
 
 // Get returns the podInfo if a pod with the same key as the key of the given "pod"
@@ -802,13 +814,17 @@ func (u *UnschedulablePodsMap) get(pod *v1.Pod) *podInfo {
 // Clear removes all the entries from the unschedulable podInfoMap.
 func (u *UnschedulablePodsMap) clear() {
 	u.podInfoMap = make(map[string]*podInfo)
+	if u.metricRecorder != nil {
+		u.metricRecorder.Clear()
+	}
 }
 
 // newUnschedulablePodsMap initializes a new object of UnschedulablePodsMap.
-func newUnschedulablePodsMap() *UnschedulablePodsMap {
+func newUnschedulablePodsMap(metricRecorder metrics.MetricRecorder) *UnschedulablePodsMap {
 	return &UnschedulablePodsMap{
-		podInfoMap: make(map[string]*podInfo),
-		keyFunc:    util.GetPodFullName,
+		podInfoMap:     make(map[string]*podInfo),
+		keyFunc:        util.GetPodFullName,
+		metricRecorder: metricRecorder,
 	}
 }
 

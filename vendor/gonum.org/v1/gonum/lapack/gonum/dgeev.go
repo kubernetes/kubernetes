@@ -36,9 +36,10 @@ import (
 // where i is the imaginary unit. The computed eigenvectors are normalized to
 // have Euclidean norm equal to 1 and largest component real.
 //
-// Left eigenvectors will be computed only if jobvl == lapack.ComputeLeftEV,
-// otherwise jobvl must be lapack.None. Right eigenvectors will be computed
-// only if jobvr == lapack.ComputeRightEV, otherwise jobvr must be lapack.None.
+// Left eigenvectors will be computed only if jobvl == lapack.LeftEVCompute,
+// otherwise jobvl must be lapack.LeftEVNone.
+// Right eigenvectors will be computed only if jobvr == lapack.RightEVCompute,
+// otherwise jobvr must be lapack.RightEVNone.
 // For other values of jobvl and jobvr Dgeev will panic.
 //
 // wr and wi contain the real and imaginary parts, respectively, of the computed
@@ -60,50 +61,31 @@ import (
 // computed and wr[first:] and wi[first:] contain those eigenvalues which have
 // converged.
 func (impl Implementation) Dgeev(jobvl lapack.LeftEVJob, jobvr lapack.RightEVJob, n int, a []float64, lda int, wr, wi []float64, vl []float64, ldvl int, vr []float64, ldvr int, work []float64, lwork int) (first int) {
-	var wantvl bool
-	switch jobvl {
-	default:
-		panic("lapack: invalid LeftEVJob")
-	case lapack.ComputeLeftEV:
-		wantvl = true
-	case lapack.None:
-	}
-	var wantvr bool
-	switch jobvr {
-	default:
-		panic("lapack: invalid RightEVJob")
-	case lapack.ComputeRightEV:
-		wantvr = true
-	case lapack.None:
-	}
-	switch {
-	case n < 0:
-		panic(nLT0)
-	case len(work) < lwork:
-		panic(shortWork)
-	}
+	wantvl := jobvl == lapack.LeftEVCompute
+	wantvr := jobvr == lapack.RightEVCompute
 	var minwrk int
 	if wantvl || wantvr {
 		minwrk = max(1, 4*n)
 	} else {
 		minwrk = max(1, 3*n)
 	}
-	if lwork != -1 {
-		checkMatrix(n, n, a, lda)
-		if wantvl {
-			checkMatrix(n, n, vl, ldvl)
-		}
-		if wantvr {
-			checkMatrix(n, n, vr, ldvr)
-		}
-		switch {
-		case len(wr) != n:
-			panic("lapack: bad length of wr")
-		case len(wi) != n:
-			panic("lapack: bad length of wi")
-		case lwork < minwrk:
-			panic(badWork)
-		}
+	switch {
+	case jobvl != lapack.LeftEVCompute && jobvl != lapack.LeftEVNone:
+		panic(badLeftEVJob)
+	case jobvr != lapack.RightEVCompute && jobvr != lapack.RightEVNone:
+		panic(badRightEVJob)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case ldvl < 1 || (ldvl < n && wantvl):
+		panic(badLdVL)
+	case ldvr < 1 || (ldvr < n && wantvr):
+		panic(badLdVR)
+	case lwork < minwrk && lwork != -1:
+		panic(badLWork)
+	case len(work) < lwork:
+		panic(shortWork)
 	}
 
 	// Quick return if possible.
@@ -115,20 +97,20 @@ func (impl Implementation) Dgeev(jobvl lapack.LeftEVJob, jobvr lapack.RightEVJob
 	maxwrk := 2*n + n*impl.Ilaenv(1, "DGEHRD", " ", n, 1, n, 0)
 	if wantvl || wantvr {
 		maxwrk = max(maxwrk, 2*n+(n-1)*impl.Ilaenv(1, "DORGHR", " ", n, 1, n, -1))
-		impl.Dhseqr(lapack.EigenvaluesAndSchur, lapack.OriginalEV, n, 0, n-1,
-			nil, 1, nil, nil, nil, 1, work, -1)
+		impl.Dhseqr(lapack.EigenvaluesAndSchur, lapack.SchurOrig, n, 0, n-1,
+			a, lda, wr, wi, nil, n, work, -1)
 		maxwrk = max(maxwrk, max(n+1, n+int(work[0])))
-		side := lapack.LeftEV
+		side := lapack.EVLeft
 		if wantvr {
-			side = lapack.RightEV
+			side = lapack.EVRight
 		}
-		impl.Dtrevc3(side, lapack.AllEVMulQ, nil, n, nil, 1, nil, 1, nil, 1,
+		impl.Dtrevc3(side, lapack.EVAllMulQ, nil, n, a, lda, vl, ldvl, vr, ldvr,
 			n, work, -1)
 		maxwrk = max(maxwrk, n+int(work[0]))
 		maxwrk = max(maxwrk, 4*n)
 	} else {
-		impl.Dhseqr(lapack.EigenvaluesOnly, lapack.None, n, 0, n-1,
-			nil, 1, nil, nil, nil, 1, work, -1)
+		impl.Dhseqr(lapack.EigenvaluesOnly, lapack.SchurNone, n, 0, n-1,
+			a, lda, wr, wi, vr, ldvr, work, -1)
 		maxwrk = max(maxwrk, max(n+1, n+int(work[0])))
 	}
 	maxwrk = max(maxwrk, minwrk)
@@ -136,6 +118,19 @@ func (impl Implementation) Dgeev(jobvl lapack.LeftEVJob, jobvr lapack.RightEVJob
 	if lwork == -1 {
 		work[0] = float64(maxwrk)
 		return 0
+	}
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
+	case len(wr) != n:
+		panic(badLenWr)
+	case len(wi) != n:
+		panic(badLenWi)
+	case len(vl) < (n-1)*ldvl+n && wantvl:
+		panic(shortVL)
+	case len(vr) < (n-1)*ldvr+n && wantvr:
+		panic(shortVR)
 	}
 
 	// Get machine constants.
@@ -168,35 +163,35 @@ func (impl Implementation) Dgeev(jobvl lapack.LeftEVJob, jobvr lapack.RightEVJob
 
 	var side lapack.EVSide
 	if wantvl {
-		side = lapack.LeftEV
+		side = lapack.EVLeft
 		// Copy Householder vectors to VL.
 		impl.Dlacpy(blas.Lower, n, n, a, lda, vl, ldvl)
 		// Generate orthogonal matrix in VL.
 		impl.Dorghr(n, ilo, ihi, vl, ldvl, tau, work[iwrk:], lwork-iwrk)
 		// Perform QR iteration, accumulating Schur vectors in VL.
 		iwrk = n
-		first = impl.Dhseqr(lapack.EigenvaluesAndSchur, lapack.OriginalEV, n, ilo, ihi,
+		first = impl.Dhseqr(lapack.EigenvaluesAndSchur, lapack.SchurOrig, n, ilo, ihi,
 			a, lda, wr, wi, vl, ldvl, work[iwrk:], lwork-iwrk)
 		if wantvr {
 			// Want left and right eigenvectors.
 			// Copy Schur vectors to VR.
-			side = lapack.RightLeftEV
+			side = lapack.EVBoth
 			impl.Dlacpy(blas.All, n, n, vl, ldvl, vr, ldvr)
 		}
 	} else if wantvr {
-		side = lapack.RightEV
+		side = lapack.EVRight
 		// Copy Householder vectors to VR.
 		impl.Dlacpy(blas.Lower, n, n, a, lda, vr, ldvr)
 		// Generate orthogonal matrix in VR.
 		impl.Dorghr(n, ilo, ihi, vr, ldvr, tau, work[iwrk:], lwork-iwrk)
 		// Perform QR iteration, accumulating Schur vectors in VR.
 		iwrk = n
-		first = impl.Dhseqr(lapack.EigenvaluesAndSchur, lapack.OriginalEV, n, ilo, ihi,
+		first = impl.Dhseqr(lapack.EigenvaluesAndSchur, lapack.SchurOrig, n, ilo, ihi,
 			a, lda, wr, wi, vr, ldvr, work[iwrk:], lwork-iwrk)
 	} else {
 		// Compute eigenvalues only.
 		iwrk = n
-		first = impl.Dhseqr(lapack.EigenvaluesOnly, lapack.None, n, ilo, ihi,
+		first = impl.Dhseqr(lapack.EigenvaluesOnly, lapack.SchurNone, n, ilo, ihi,
 			a, lda, wr, wi, nil, 1, work[iwrk:], lwork-iwrk)
 	}
 
@@ -214,13 +209,13 @@ func (impl Implementation) Dgeev(jobvl lapack.LeftEVJob, jobvr lapack.RightEVJob
 
 	if wantvl || wantvr {
 		// Compute left and/or right eigenvectors.
-		impl.Dtrevc3(side, lapack.AllEVMulQ, nil, n,
+		impl.Dtrevc3(side, lapack.EVAllMulQ, nil, n,
 			a, lda, vl, ldvl, vr, ldvr, n, work[iwrk:], lwork-iwrk)
 	}
 	bi := blas64.Implementation()
 	if wantvl {
 		// Undo balancing of left eigenvectors.
-		impl.Dgebak(lapack.PermuteScale, lapack.LeftEV, n, ilo, ihi, workbal, n, vl, ldvl)
+		impl.Dgebak(lapack.PermuteScale, lapack.EVLeft, n, ilo, ihi, workbal, n, vl, ldvl)
 		// Normalize left eigenvectors and make largest component real.
 		for i, wii := range wi {
 			if wii < 0 {
@@ -247,7 +242,7 @@ func (impl Implementation) Dgeev(jobvl lapack.LeftEVJob, jobvr lapack.RightEVJob
 	}
 	if wantvr {
 		// Undo balancing of right eigenvectors.
-		impl.Dgebak(lapack.PermuteScale, lapack.RightEV, n, ilo, ihi, workbal, n, vr, ldvr)
+		impl.Dgebak(lapack.PermuteScale, lapack.EVRight, n, ilo, ihi, workbal, n, vr, ldvr)
 		// Normalize right eigenvectors and make largest component real.
 		for i, wii := range wi {
 			if wii < 0 {

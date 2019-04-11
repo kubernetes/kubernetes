@@ -14,7 +14,10 @@ import (
 	"gonum.org/v1/gonum/lapack/lapack64"
 )
 
-const badSliceLength = "mat: improper slice length"
+const (
+	badSliceLength = "mat: improper slice length"
+	badLU          = "mat: invalid LU factorization"
+)
 
 // LU is a type for creating and using the LU factorization of a matrix.
 type LU struct {
@@ -83,11 +86,16 @@ func (lu *LU) factorize(a Matrix, norm lapack.MatrixNorm) {
 	lu.updateCond(anorm, norm)
 }
 
+// isValid returns whether the receiver contains a factorization.
+func (lu *LU) isValid() bool {
+	return lu.lu != nil && !lu.lu.IsZero()
+}
+
 // Cond returns the condition number for the factorized matrix.
-// Cond will panic if the receiver does not contain a successful factorization.
+// Cond will panic if the receiver does not contain a factorization.
 func (lu *LU) Cond() float64 {
-	if lu.lu == nil || lu.lu.IsZero() {
-		panic("lu: no decomposition computed")
+	if !lu.isValid() {
+		panic(badLU)
 	}
 	return lu.cond
 }
@@ -107,6 +115,7 @@ func (lu *LU) isZero() bool {
 
 // Det returns the determinant of the matrix that has been factorized. In many
 // expressions, using LogDet will be more numerically stable.
+// Det will panic if the receiver does not contain a factorization.
 func (lu *LU) Det() float64 {
 	det, sign := lu.LogDet()
 	return math.Exp(det) * sign
@@ -115,7 +124,12 @@ func (lu *LU) Det() float64 {
 // LogDet returns the log of the determinant and the sign of the determinant
 // for the matrix that has been factorized. Numerical stability in product and
 // division expressions is generally improved by working in log space.
+// LogDet will panic if the receiver does not contain a factorization.
 func (lu *LU) LogDet() (det float64, sign float64) {
+	if !lu.isValid() {
+		panic(badLU)
+	}
+
 	_, n := lu.lu.Dims()
 	logDiag := getFloats(n, false)
 	defer putFloats(logDiag)
@@ -137,7 +151,12 @@ func (lu *LU) LogDet() (det float64, sign float64) {
 // matrix P (see Dense.Permutation). If swaps == nil, then new memory will be
 // allocated, otherwise the length of the input must be equal to the size of the
 // factorized matrix.
+// Pivot will panic if the receiver does not contain a factorization.
 func (lu *LU) Pivot(swaps []int) []int {
+	if !lu.isValid() {
+		panic(badLU)
+	}
+
 	_, n := lu.lu.Dims()
 	if swaps == nil {
 		swaps = make([]int, n)
@@ -161,7 +180,12 @@ func (lu *LU) Pivot(swaps []int) []int {
 // the original matrix A, storing the result into the receiver. That is, if in
 // the original LU decomposition P * L * U = A, in the updated decomposition
 // P * L * U = A + alpha * x * y^T.
+// RankOne will panic if orig does not contain a factorization.
 func (lu *LU) RankOne(orig *LU, alpha float64, x, y Vector) {
+	if !orig.isValid() {
+		panic(badLU)
+	}
+
 	// RankOne uses algorithm a1 on page 28 of "Multiple-Rank Updates to Matrix
 	// Factorizations for Nonlinear Analysis and Circuit Design" by Linzhong Deng.
 	// http://web.stanford.edu/group/SOL/dissertations/Linzhong-Deng-thesis.pdf
@@ -227,7 +251,12 @@ func (lu *LU) RankOne(orig *LU, alpha float64, x, y Vector) {
 
 // LTo extracts the lower triangular matrix from an LU factorization.
 // If dst is nil, a new matrix is allocated. The resulting L matrix is returned.
+// LTo will panic if the receiver does not contain a factorization.
 func (lu *LU) LTo(dst *TriDense) *TriDense {
+	if !lu.isValid() {
+		panic(badLU)
+	}
+
 	_, n := lu.lu.Dims()
 	if dst == nil {
 		dst = NewTriDense(n, Lower, nil)
@@ -249,7 +278,12 @@ func (lu *LU) LTo(dst *TriDense) *TriDense {
 
 // UTo extracts the upper triangular matrix from an LU factorization.
 // If dst is nil, a new matrix is allocated. The resulting U matrix is returned.
+// UTo will panic if the receiver does not contain a factorization.
 func (lu *LU) UTo(dst *TriDense) *TriDense {
+	if !lu.isValid() {
+		panic(badLU)
+	}
+
 	_, n := lu.lu.Dims()
 	if dst == nil {
 		dst = NewTriDense(n, Upper, nil)
@@ -281,16 +315,21 @@ func (m *Dense) Permutation(r int, swaps []int) {
 	}
 }
 
-// Solve solves a system of linear equations using the LU decomposition of a matrix.
+// SolveTo solves a system of linear equations using the LU decomposition of a matrix.
 // It computes
 //  A * X = B if trans == false
 //  A^T * X = B if trans == true
 // In both cases, A is represented in LU factorized form, and the matrix X is
-// stored into x.
+// stored into dst.
 //
 // If A is singular or near-singular a Condition error is returned. See
 // the documentation for Condition for more information.
-func (lu *LU) Solve(x *Dense, trans bool, b Matrix) error {
+// SolveTo will panic if the receiver does not contain a factorization.
+func (lu *LU) SolveTo(dst *Dense, trans bool, b Matrix) error {
+	if !lu.isValid() {
+		panic(badLU)
+	}
+
 	_, n := lu.lu.Dims()
 	br, bc := b.Dims()
 	if br != n {
@@ -302,49 +341,54 @@ func (lu *LU) Solve(x *Dense, trans bool, b Matrix) error {
 		return Condition(math.Inf(1))
 	}
 
-	x.reuseAs(n, bc)
+	dst.reuseAs(n, bc)
 	bU, _ := untranspose(b)
 	var restore func()
-	if x == bU {
-		x, restore = x.isolatedWorkspace(bU)
+	if dst == bU {
+		dst, restore = dst.isolatedWorkspace(bU)
 		defer restore()
 	} else if rm, ok := bU.(RawMatrixer); ok {
-		x.checkOverlap(rm.RawMatrix())
+		dst.checkOverlap(rm.RawMatrix())
 	}
 
-	x.Copy(b)
+	dst.Copy(b)
 	t := blas.NoTrans
 	if trans {
 		t = blas.Trans
 	}
-	lapack64.Getrs(t, lu.lu.mat, x.mat, lu.pivot)
+	lapack64.Getrs(t, lu.lu.mat, dst.mat, lu.pivot)
 	if lu.cond > ConditionTolerance {
 		return Condition(lu.cond)
 	}
 	return nil
 }
 
-// SolveVec solves a system of linear equations using the LU decomposition of a matrix.
+// SolveVecTo solves a system of linear equations using the LU decomposition of a matrix.
 // It computes
 //  A * x = b if trans == false
 //  A^T * x = b if trans == true
 // In both cases, A is represented in LU factorized form, and the vector x is
-// stored into x.
+// stored into dst.
 //
 // If A is singular or near-singular a Condition error is returned. See
 // the documentation for Condition for more information.
-func (lu *LU) SolveVec(x *VecDense, trans bool, b Vector) error {
+// SolveVecTo will panic if the receiver does not contain a factorization.
+func (lu *LU) SolveVecTo(dst *VecDense, trans bool, b Vector) error {
+	if !lu.isValid() {
+		panic(badLU)
+	}
+
 	_, n := lu.lu.Dims()
 	if br, bc := b.Dims(); br != n || bc != 1 {
 		panic(ErrShape)
 	}
 	switch rv := b.(type) {
 	default:
-		x.reuseAs(n)
-		return lu.Solve(x.asDense(), trans, b)
+		dst.reuseAs(n)
+		return lu.SolveTo(dst.asDense(), trans, b)
 	case RawVectorer:
-		if x != b {
-			x.checkOverlap(rv.RawVector())
+		if dst != b {
+			dst.checkOverlap(rv.RawVector())
 		}
 		// TODO(btracey): Should test the condition number instead of testing that
 		// the determinant is exactly zero.
@@ -352,18 +396,18 @@ func (lu *LU) SolveVec(x *VecDense, trans bool, b Vector) error {
 			return Condition(math.Inf(1))
 		}
 
-		x.reuseAs(n)
+		dst.reuseAs(n)
 		var restore func()
-		if x == b {
-			x, restore = x.isolatedWorkspace(b)
+		if dst == b {
+			dst, restore = dst.isolatedWorkspace(b)
 			defer restore()
 		}
-		x.CopyVec(b)
+		dst.CopyVec(b)
 		vMat := blas64.General{
 			Rows:   n,
 			Cols:   1,
-			Stride: x.mat.Inc,
-			Data:   x.mat.Data,
+			Stride: dst.mat.Inc,
+			Data:   dst.mat.Data,
 		}
 		t := blas.NoTrans
 		if trans {

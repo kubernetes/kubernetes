@@ -1,3 +1,55 @@
+# 1.2.0
+This new release introduces:
+  * A new method `SetReportCaller` in the `Logger` to enable the file, line and calling function from which the trace has been issued
+  * A new trace level named `Trace` whose level is below `Debug`
+  * A configurable exit function to be called upon a Fatal trace
+  * The `Level` object now implements `encoding.TextUnmarshaler` interface
+
+# 1.1.1
+This is a bug fix release.
+  * fix the build break on Solaris
+  * don't drop a whole trace in JSONFormatter when a field param is a function pointer which can not be serialized
+
+# 1.1.0
+This new release introduces:
+  * several fixes:
+    * a fix for a race condition on entry formatting
+    * proper cleanup of previously used entries before putting them back in the pool
+    * the extra new line at the end of message in text formatter has been removed
+  * a new global public API to check if a level is activated: IsLevelEnabled
+  * the following methods have been added to the Logger object
+    * IsLevelEnabled
+    * SetFormatter
+    * SetOutput
+    * ReplaceHooks
+  * introduction of go module
+  * an indent configuration for the json formatter
+  * output colour support for windows
+  * the field sort function is now configurable for text formatter
+  * the CLICOLOR and CLICOLOR\_FORCE environment variable support in text formater
+
+# 1.0.6
+
+This new release introduces:
+  * a new api WithTime which allows to easily force the time of the log entry
+    which is mostly useful for logger wrapper
+  * a fix reverting the immutability of the entry given as parameter to the hooks
+    a new configuration field of the json formatter in order to put all the fields
+    in a nested dictionnary
+  * a new SetOutput method in the Logger
+  * a new configuration of the textformatter to configure the name of the default keys
+  * a new configuration of the text formatter to disable the level truncation
+
+# 1.0.5
+
+* Fix hooks race (#707)
+* Fix panic deadlock (#695)
+
+# 1.0.4
+
+* Fix race when adding hooks (#612)
+* Fix terminal check in AppEngine (#635)
+
 # 1.0.3
 
 * Replace example files with testable examples

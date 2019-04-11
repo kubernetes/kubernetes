@@ -31,6 +31,7 @@ package build
 	forsifs   []*ForClauseWithIfClausesOpt
 	string    *StringExpr
 	strings   []*StringExpr
+	block     CodeBlock
 
 	// supporting information
 	comma     Position   // position of trailing comma in list, if present
@@ -69,7 +70,7 @@ package build
 // However, we do not want to export them from the Go package
 // we are creating, so prefix them all with underscores.
 
-%token	<pos>	_ADDEQ   // operator +=
+%token	<pos>	_AUGM    // augmented assignment
 %token	<pos>	_AND     // keyword and
 %token	<pos>	_COMMENT // top-level # comment
 %token	<pos>	_EOF     // end of file
@@ -79,34 +80,47 @@ package build
 %token	<pos>	_IDENT   // non-keyword identifier or number
 %token	<pos>	_IF      // keyword if
 %token	<pos>	_ELSE    // keyword else
+%token	<pos>	_ELIF    // keyword elif
 %token	<pos>	_IN      // keyword in
 %token	<pos>	_IS      // keyword is
 %token	<pos>	_LAMBDA  // keyword lambda
+%token	<pos>	_LOAD    // keyword load
 %token	<pos>	_LE      // operator <=
 %token	<pos>	_NE      // operator !=
 %token	<pos>	_NOT     // keyword not
 %token	<pos>	_OR      // keyword or
 %token	<pos>	_PYTHON  // uninterpreted Python block
 %token	<pos>	_STRING  // quoted string
+%token	<pos>	_DEF     // keyword def
+%token	<pos>	_RETURN  // keyword return
+%token	<pos>	_INDENT  // indentation
+%token	<pos>	_UNINDENT // unindentation
 
 %type	<pos>		comma_opt
 %type	<expr>		expr
 %type	<expr>		expr_opt
+%type	<expr>		primary_expr
 %type	<exprs>		exprs
 %type	<exprs>		exprs_opt
+%type	<exprs>		primary_exprs
 %type	<forc>		for_clause
 %type	<forifs>	for_clause_with_if_clauses_opt
 %type	<forsifs>	for_clauses_with_if_clauses_opt
 %type	<expr>		ident
-%type	<exprs>		idents
 %type	<ifs>		if_clauses_opt
 %type	<exprs>		stmts
-%type	<expr>		stmt
+%type	<exprs>		stmt          // a simple_stmt or a for/if/def block
+%type	<expr>		block_stmt    // a single for/if/def statement
+%type	<expr>		if_else_block // a single if-else statement
+%type	<exprs>		simple_stmt   // One or many small_stmts on one line, e.g. 'a = f(x); return str(a)'
+%type	<expr>		small_stmt    // A single statement, e.g. 'a = f(x)'
+%type <exprs>		small_stmts_continuation  // A sequence of `';' small_stmt`
 %type	<expr>		keyvalue
 %type	<exprs>		keyvalues
 %type	<exprs>		keyvalues_no_comma
 %type	<string>	string
 %type	<strings>	strings
+%type	<block>		suite
 
 // Operator precedence.
 // Operators listed lower in the table bind tighter.
@@ -120,25 +134,25 @@ package build
 
 %left	'\n'
 %left	_ASSERT
-// '=' and '+=' have the lowest precedence
+// '=' and augmented assignments have the lowest precedence
 // e.g. "x = a if c > 0 else 'bar'"
 // followed by
 // 'if' and 'else' which have lower precedence than all other operators.
 // e.g. "a, b if c > 0 else 'foo'" is either a tuple of (a,b) or 'foo'
 // and not a tuple of "(a, (b if ... ))"
-%left	'=' _ADDEQ
-%left   _IF _ELSE
-%left	','
-%left	':'
-%left	_IN _NOT _IS
-%left	_OR
-%left	_AND
-%left	'<' '>' _EQ _NE _LE _GE
-%left	'+' '-'
-%left	'*' '/' '%'
-%left	'.' '[' '('
-%right  _UNARY
-%left	_STRING
+%left  '=' _AUGM
+%left  _IF _ELSE _ELIF
+%left  ','
+%left  ':'
+%left  _IN _NOT _IS
+%left  _OR
+%left  _AND
+%left  '<' '>' _EQ _NE _LE _GE
+%left  '+' '-'
+%left  '*' '/' '%'
+%left  '.' '[' '('
+%right _UNARY
+%left  _STRING
 
 %%
 
@@ -155,26 +169,46 @@ file:
 		return 0
 	}
 
+suite:
+	'\n' _INDENT stmts _UNINDENT
+	{
+		$$ = CodeBlock{
+			Start: $2,
+			Statements: $3,
+			End: End{Pos: $4},
+		}
+	}
+| simple_stmt
+	{
+		// simple_stmt is never empty
+		start, _ := $1[0].Span()
+		_, end := $1[len($1)-1].Span()
+		$$ = CodeBlock{
+			Start: start,
+			Statements: $1,
+			End: End{Pos: end},
+		}
+	}
+
 stmts:
 	{
 		$$ = nil
 		$<lastRule>$ = nil
 	}
-|	stmts stmt comma_opt semi_opt
+|	stmts stmt
 	{
 		// If this statement follows a comment block,
 		// attach the comments to the statement.
 		if cb, ok := $<lastRule>1.(*CommentBlock); ok {
-			$$ = $1
-			$$[len($1)-1] = $2
-			$2.Comment().Before = cb.After
-			$<lastRule>$ = $2
+			$$ = append($1[:len($1)-1], $2...)
+			$2[0].Comment().Before = cb.After
+			$<lastRule>$ = $2[len($2)-1]
 			break
 		}
 
 		// Otherwise add to list.
-		$$ = append($1, $2)
-		$<lastRule>$ = $2
+		$$ = append($1, $2...)
+		$<lastRule>$ = $2[len($2)-1]
 
 		// Consider this input:
 		//
@@ -187,7 +221,8 @@ stmts:
 		// for baz() instead.
 		if x := $<lastRule>1; x != nil {
 			com := x.Comment()
-			$2.Comment().Before = com.After
+			// stmt is never empty
+			$2[0].Comment().Before = com.After
 			com.After = nil
 		}
 	}
@@ -197,7 +232,7 @@ stmts:
 		$$ = $1
 		$<lastRule>$ = nil
 	}
-|	stmts _COMMENT
+|	stmts _COMMENT '\n'
 	{
 		$$ = $1
 		$<lastRule>$ = $<lastRule>1
@@ -211,24 +246,209 @@ stmts:
 	}
 
 stmt:
+	simple_stmt
+	{
+		$$ = $1
+	}
+|	block_stmt
+	{
+		$$ = []Expr{$1}
+	}
+
+block_stmt:
+	_DEF _IDENT '(' exprs_opt ')' ':' suite
+	{
+		$$ = &FuncDef{
+			Start: $1,
+			Name: $<tok>2,
+			ListStart: $3,
+			Args: $4,
+			Body: $7,
+			End: $7.End,
+			ForceCompact: forceCompact($3, $4, $5),
+			ForceMultiLine: forceMultiLine($3, $4, $5),
+		}
+	}
+|	_FOR primary_exprs _IN expr ':' suite
+	{
+		$$ = &ForLoop{
+			Start: $1,
+			LoopVars: $2,
+			Iterable: $4,
+			Body: $6,
+			End: $6.End,
+		}
+	}
+| if_else_block
+	{
+		$$ = $1
+	}
+
+if_else_block:
+	_IF expr ':' suite
+	{
+		$$ = &IfElse{
+			Start: $1,
+			Conditions: []Condition{
+				Condition{
+					If: $2,
+					Then: $4,
+				},
+			},
+			End: $4.End,
+		}
+	}
+| if_else_block elif expr ':' suite
+	{
+		block := $1.(*IfElse)
+		block.Conditions = append(block.Conditions, Condition{
+			If: $3,
+			Then: $5,
+		})
+		block.End = $5.End
+		$$ = block
+	}
+| if_else_block _ELSE ':' suite
+	{
+		block := $1.(*IfElse)
+		block.Conditions = append(block.Conditions, Condition{
+			Then: $4,
+		})
+		block.End = $4.End
+		$$ = block
+	}
+
+elif:
+	_ELSE _IF
+|	_ELIF
+
+simple_stmt:
+	small_stmt small_stmts_continuation semi_opt '\n'
+	{
+		$$ = append([]Expr{$1}, $2...)
+		$<lastRule>$ = $$[len($$)-1]
+	}
+
+small_stmts_continuation:
+	{
+		$$ = []Expr{}
+	}
+| small_stmts_continuation ';' small_stmt
+	{
+		$$ = append($1, $3)
+	}
+
+small_stmt:
 	expr %prec ShiftInstead
+|	_RETURN expr
+	{
+		_, end := $2.Span()
+		$$ = &ReturnExpr{
+			X: $2,
+			End: end,
+		}
+	}
+|	_RETURN
+	{
+		$$ = &ReturnExpr{End: $1}
+	}
 |	_PYTHON
 	{
 		$$ = &PythonBlock{Start: $1, Token: $<tok>1}
 	}
 
 semi_opt:
-|	semi_opt ';'
+|	';'
 
-expr:
+primary_expr:
 	ident
+|	primary_expr '.' _IDENT
+	{
+		$$ = &DotExpr{
+			X: $1,
+			Dot: $2,
+			NamePos: $3,
+			Name: $<tok>3,
+		}
+	}
+|	_LOAD '(' exprs_opt ')'
+	{
+		$$ = &CallExpr{
+                        X: &LiteralExpr{Start: $1, Token: "load"},
+			ListStart: $2,
+			List: $3,
+			End: End{Pos: $4},
+			ForceCompact: forceCompact($2, $3, $4),
+			ForceMultiLine: forceMultiLine($2, $3, $4),
+		}
+	}
+|	primary_expr '(' exprs_opt ')'
+	{
+		$$ = &CallExpr{
+			X: $1,
+			ListStart: $2,
+			List: $3,
+			End: End{Pos: $4},
+			ForceCompact: forceCompact($2, $3, $4),
+			ForceMultiLine: forceMultiLine($2, $3, $4),
+		}
+	}
+|	primary_expr '[' expr ']'
+	{
+		$$ = &IndexExpr{
+			X: $1,
+			IndexStart: $2,
+			Y: $3,
+			End: $4,
+		}
+	}
+|	primary_expr '[' expr_opt ':' expr_opt ']'
+	{
+		$$ = &SliceExpr{
+			X: $1,
+			SliceStart: $2,
+			From: $3,
+			FirstColon: $4,
+			To: $5,
+			End: $6,
+		}
+	}
+|	primary_expr '[' expr_opt ':' expr_opt ':' expr_opt ']'
+	{
+		$$ = &SliceExpr{
+			X: $1,
+			SliceStart: $2,
+			From: $3,
+			FirstColon: $4,
+			To: $5,
+			SecondColon: $6,
+			Step: $7,
+			End: $8,
+		}
+	}
+|	primary_expr '(' expr for_clauses_with_if_clauses_opt ')'
+	{
+		$$ = &CallExpr{
+			X: $1,
+			ListStart: $2,
+			List: []Expr{
+				&ListForExpr{
+					Brack: "",
+					Start: $2,
+					X: $3,
+					For: $4,
+					End: End{Pos: $5},
+				},
+			},
+			End: End{Pos: $5},
+		}
+	}
 |	strings %prec ShiftInstead
 	{
 		if len($1) == 1 {
 			$$ = $1[0]
 			break
 		}
-
 		$$ = $1[0]
 		for _, x := range $1[1:] {
 			_, end := $$.Span()
@@ -322,63 +542,10 @@ expr:
 			}
 		}
 	}
-|	expr '.' _IDENT
-	{
-		$$ = &DotExpr{
-			X: $1,
-			Dot: $2,
-			NamePos: $3,
-			Name: $<tok>3,
-		}
-	}
-|	expr '(' exprs_opt ')'
-	{
-		$$ = &CallExpr{
-			X: $1,
-			ListStart: $2,
-			List: $3,
-			End: End{Pos: $4},
-			ForceCompact: forceCompact($2, $3, $4),
-			ForceMultiLine: forceMultiLine($2, $3, $4),
-		}
-	}
-|	expr '(' expr for_clauses_with_if_clauses_opt ')'
-	{
-		$$ = &CallExpr{
-			X: $1,
-			ListStart: $2,
-			List: []Expr{
-				&ListForExpr{
-					Brack: "",
-					Start: $2,
-					X: $3,
-					For: $4,
-					End: End{Pos: $5},
-				},
-			},
-			End: End{Pos: $5},
-		}
-	}
-|	expr '[' expr ']'
-	{
-		$$ = &IndexExpr{
-			X: $1,
-			IndexStart: $2,
-			Y: $3,
-			End: $4,
-		}
-	}
-|	expr '[' expr_opt ':' expr_opt ']'
-	{
-		$$ = &SliceExpr{
-			X: $1,
-			SliceStart: $2,
-			Y: $3,
-			Colon: $4,
-			Z: $5,
-			End: $6,
-		}
-	}
+|	'-' primary_expr  %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
+
+expr:
+	primary_expr
 |	_LAMBDA exprs ':' expr
 	{
 		$$ = &LambdaExpr{
@@ -388,7 +555,6 @@ expr:
 			Expr: $4,
 		}
 	}
-|	'-' expr  %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
 |	_NOT expr %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
 |	'*' expr  %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
 |	expr '*' expr      { $$ = binary($1, $2, $<tok>2, $3) }
@@ -403,7 +569,7 @@ expr:
 |	expr _NE expr      { $$ = binary($1, $2, $<tok>2, $3) }
 |	expr _GE expr      { $$ = binary($1, $2, $<tok>2, $3) }
 |	expr '=' expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr _ADDEQ expr   { $$ = binary($1, $2, $<tok>2, $3) }
+|	expr _AUGM expr    { $$ = binary($1, $2, $<tok>2, $3) }
 |	expr _IN expr      { $$ = binary($1, $2, $<tok>2, $3) }
 |	expr _NOT _IN expr { $$ = binary($1, $2, "not in", $4) }
 |	expr _OR expr      { $$ = binary($1, $2, $<tok>2, $3) }
@@ -416,15 +582,15 @@ expr:
 			$$ = binary($1, $2, $<tok>2, $3)
 		}
 	}
-|       expr _IF expr _ELSE expr
+| expr _IF expr _ELSE expr
 	{
-                $$ = &ConditionalExpr{
-                        Then: $1,
-                        IfStart: $2,
-                        Test: $3,
-                        ElseStart: $4,
-                        Else: $5,
-                }
+		$$ = &ConditionalExpr{
+			Then: $1,
+			IfStart: $2,
+			Test: $3,
+			ElseStart: $4,
+			Else: $5,
+		}
 	}
 
 expr_opt:
@@ -491,6 +657,16 @@ exprs_opt:
 		$$, $<comma>$ = $1, $2
 	}
 
+primary_exprs:
+	primary_expr
+	{
+		$$ = []Expr{$1}
+	}
+|	primary_exprs ',' primary_expr
+	{
+		$$ = append($1, $3)
+	}
+
 string:
 	_STRING
 	{
@@ -519,33 +695,14 @@ ident:
 		$$ = &LiteralExpr{Start: $1, Token: $<tok>1}
 	}
 
-idents:
-	ident
-	{
-		$$ = []Expr{$1}
-	}
-|	idents ',' ident
-	{
-		$$ = append($1, $3)
-	}
-
 for_clause:
-	_FOR idents _IN expr
+	_FOR primary_exprs _IN expr
 	{
 		$$ = &ForClause{
 			For: $1,
 			Var: $2,
 			In: $3,
 			Expr: $4,
-		}
-	}
-|	_FOR '(' idents ')' _IN expr
-	{
-		$$ = &ForClause{
-			For: $1,
-			Var: $3,
-			In: $5,
-			Expr: $6,
 		}
 	}
 
@@ -558,13 +715,13 @@ for_clause_with_if_clauses_opt:
 	}
 
 for_clauses_with_if_clauses_opt:
-  for_clause_with_if_clauses_opt
-  {
-    $$ = []*ForClauseWithIfClausesOpt{$1}
-  }
+	for_clause_with_if_clauses_opt
+	{
+		$$ = []*ForClauseWithIfClausesOpt{$1}
+	}
 | for_clauses_with_if_clauses_opt for_clause_with_if_clauses_opt {
-    $$ = append($1, $2)
-  }
+		$$ = append($1, $2)
+	}
 
 if_clauses_opt:
 	{
@@ -603,6 +760,30 @@ func binary(x Expr, pos Position, op string, y Expr) Expr {
 		Op:      op,
 		LineBreak: xend.Line < ystart.Line,
 		Y:       y,
+	}
+}
+
+// isSimpleExpression returns whether an expression is simple and allowed to exist in
+// compact forms of sequences.
+// The formal criteria are the following: an expression is considered simple if it's
+// a literal (variable, string or a number), a literal with a unary operator or an empty sequence.
+func isSimpleExpression(expr *Expr) bool {
+	switch x := (*expr).(type) {
+	case *LiteralExpr, *StringExpr:
+		return true
+	case *UnaryExpr:
+		_, ok := x.X.(*LiteralExpr)
+		return ok
+	case *ListExpr:
+		return len(x.List) == 0
+	case *TupleExpr:
+		return len(x.List) == 0
+	case *DictExpr:
+		return len(x.List) == 0
+	case *SetExpr:
+		return len(x.List) == 0
+	default:
+		return false
 	}
 }
 
@@ -654,10 +835,7 @@ func forceCompact(start Position, list []Expr, end Position) bool {
 			return false
 		}
 		line = end.Line
-		switch x.(type) {
-		case *LiteralExpr, *StringExpr, *UnaryExpr:
-			// ok
-		default:
+		if !isSimpleExpression(&x) {
 			return false
 		}
 	}

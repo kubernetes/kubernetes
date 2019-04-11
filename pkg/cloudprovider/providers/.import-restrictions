@@ -15,9 +15,7 @@
 			"SelectorRegexp": "k8s[.]io/kubernetes",
 			"AllowedPrefixes": [
 				"k8s.io/kubernetes/pkg/cloudprovider/providers",
-				"k8s.io/kubernetes/pkg/credentialprovider",
-				"k8s.io/kubernetes/pkg/util/mount",
-				"k8s.io/kubernetes/pkg/version"
+				"k8s.io/kubernetes/pkg/util/mount"
 			],
 			"ForbiddenPrefixes": []
 		}
