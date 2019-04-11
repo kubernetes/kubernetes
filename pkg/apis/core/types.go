@@ -416,11 +416,14 @@ type PersistentVolumeClaimSpec struct {
 	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode
-	// This field requires the VolumeSnapshotDataSource alpha feature gate to be
-	// enabled and currently VolumeSnapshot is the only supported data source.
-	// If the provisioner can support VolumeSnapshot data source, it will create
-	// a new volume and data will be restored to the volume at the same time.
-	// If the provisioner does not support VolumeSnapshot data source, volume will
+	// This field can be used to specify either:
+	// * An existing VolumeSnapshot
+	// * An existing Volume (PVC, Clone operation)
+	// In order to use either of these DataSource types, the appropriate feature gate
+	// must be enabled (VolumeSnapshotDataSource, VolumeDataSource)
+	// If the provisioner can support the specified data source, it will create
+	// a new volume based on the contents of the specified PVC or Snapshot.
+	// If the provisioner does not support the specified data source, the volume will
 	// not be created and the failure will be reported as an event.
 	// In the future, we plan to support more data source types and the behavior
 	// of the provisioner may change.

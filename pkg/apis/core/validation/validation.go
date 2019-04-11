@@ -1524,6 +1524,7 @@ var supportedVolumeModes = sets.NewString(string(core.PersistentVolumeBlock), st
 
 var supportedDataSourceAPIGroupKinds = map[schema.GroupKind]bool{
 	{Group: "snapshot.storage.k8s.io", Kind: "VolumeSnapshot"}: true,
+	{Group: "", Kind: "PersistentVolumeClaim"}:                 true,
 }
 
 func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
