@@ -364,7 +364,7 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 		}
 
 		//TODO: check if there is a better method to compare keys
-		if resultingKey.D == key.D {
+		if resultingKey.D == test.expectedKey.D {
 			t.Error("created key does not match expected key")
 		}
 	}
