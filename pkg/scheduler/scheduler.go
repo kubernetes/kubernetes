@@ -315,14 +315,17 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 			return "", err
 		}
 
+		var deletedVictimCount int
 		for _, victim := range victims {
 			if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
 				klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
+				metrics.PreemptionVictims.Set(float64(deletedVictimCount))
 				return "", err
 			}
+			deletedVictimCount++
 			sched.config.Recorder.Eventf(victim, v1.EventTypeNormal, "Preempted", "by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
 		}
-		metrics.PreemptionVictims.Set(float64(len(victims)))
+		metrics.PreemptionVictims.Set(float64(deletedVictimCount))
 	}
 	// Clearing nominated pods should happen outside of "if node != nil". Node could
 	// be nil when a pod with nominated node name is eligible to preempt again,
