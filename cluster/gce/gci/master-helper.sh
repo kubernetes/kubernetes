@@ -148,8 +148,8 @@ function create-master-instance-internal() {
       --disk "${disk}" \
       --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
       ${MASTER_MIN_CPU_ARCHITECTURE:+"--min-cpu-platform=${MASTER_MIN_CPU_ARCHITECTURE}"} \
-      ${preemptible_master} \
-      ${network} 2>&1); then
+      "${preemptible_master}" \
+      "${network}" 2>&1); then
       echo "${result}" >&2
       return 0
     else
