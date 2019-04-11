@@ -34,6 +34,8 @@ type execMounter struct {
 	exec           mount.Exec
 }
 
+// NewExecMounter returns a mounter that uses provided Exec interface to mount and
+// unmount a filesystem. For all other calls it uses a wrapped mounter.
 func NewExecMounter(exec mount.Exec, wrapped mount.Interface) mount.Interface {
 	return &execMounter{
 		wrappedMounter: wrapped,
@@ -66,7 +68,7 @@ func (m *execMounter) doExecMount(source, target, fstype string, options []strin
 	output, err := m.exec.Run("mount", mountArgs...)
 	klog.V(5).Infof("Exec mounted %v: %v: %s", mountArgs, err, string(output))
 	if err != nil {
-		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n",
+		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s",
 			err, "mount", source, target, fstype, options, string(output))
 	}
 

@@ -27,7 +27,7 @@ import (
 
 type execMounter struct{}
 
-// ExecMounter is a mounter that uses provided Exec interface to mount and
+// NewExecMounter returns a mounter that uses provided Exec interface to mount and
 // unmount a filesystem. For all other calls it uses a wrapped mounter.
 func NewExecMounter(exec mount.Exec, wrapped mount.Interface) mount.Interface {
 	return &execMounter{}
@@ -85,7 +85,7 @@ func (mounter *execMounter) ExistsPath(pathname string) (bool, error) {
 	return true, errors.New("not implemented")
 }
 
-func (m *execMounter) EvalHostSymlinks(pathname string) (string, error) {
+func (mounter *execMounter) EvalHostSymlinks(pathname string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
