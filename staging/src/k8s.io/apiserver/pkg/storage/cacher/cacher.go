@@ -234,6 +234,8 @@ type Cacher struct {
 // its internal cache and updating its cache in the background based on the
 // given configuration.
 func NewCacherFromConfig(config Config) *Cacher {
+	stopCh := make(chan struct{})
+
 	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc, config.Versioner)
 	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
@@ -245,7 +247,6 @@ func NewCacherFromConfig(config Config) *Cacher {
 		panic("storage codec doesn't seem to match given type: " + err.Error())
 	}
 
-	stopCh := make(chan struct{})
 	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
 	// Configure reflector's pager to for an appropriate pagination chunk size for fetching data from
 	// storage. The pager falls back to full list if paginated list calls fail due to an "Expired" error.
@@ -774,12 +775,9 @@ func (c *Cacher) isStopped() bool {
 
 // Stop implements the graceful termination.
 func (c *Cacher) Stop() {
-	// avoid stopping twice (note: cachers are shared with subresources)
-	if c.isStopped() {
-		return
-	}
 	c.stopLock.Lock()
 	if c.stopped {
+		// avoid stopping twice (note: cachers are shared with subresources)
 		c.stopLock.Unlock()
 		return
 	}
