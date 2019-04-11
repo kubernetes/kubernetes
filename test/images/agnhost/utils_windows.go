@@ -17,25 +17,25 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
-	"os/exec"
 	"strings"
 )
 
+const etcHostsFile = "C:/Windows/System32/drivers/etc/hosts"
+
 func getDNSSuffixList() []string {
-	var out bytes.Buffer
-	cmd := exec.Command("powershell", "-Command", "(Get-DnsClient)[0].SuffixSearchList")
-	cmd.Stdout = &out
-
-	err := cmd.Run()
-	if err != nil {
-		panic(err)
-	}
-
-	output := strings.TrimSpace(out.String())
+	output := runCommand("powershell", "-Command", "(Get-DnsClient)[0].SuffixSearchList")
 	if len(output) > 0 {
 		return strings.Split(output, "\r\n")
 	}
 
 	panic("Could not find DNS search list!")
+}
+
+func getDNSServerList() []string {
+	output := runCommand("powershell", "-Command", "(Get-DnsClientServerAddress).ServerAddresses")
+	if len(output) > 0 {
+		return strings.Split(output, "\r\n")
+	}
+
+	panic("Could not find DNS Server list!")
 }
