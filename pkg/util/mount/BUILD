@@ -5,8 +5,6 @@ go_library(
     srcs = [
         "doc.go",
         "exec.go",
-        "exec_mount.go",
-        "exec_mount_unsupported.go",
         "fake.go",
         "mount.go",
         "mount_helper_common.go",
@@ -38,7 +36,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "exec_mount_test.go",
         "mount_helper_test.go",
         "mount_linux_test.go",
         "mount_test.go",

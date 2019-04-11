@@ -16,13 +16,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package exec
 
 import (
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 var (
@@ -33,7 +35,7 @@ var (
 )
 
 func TestMount(t *testing.T) {
-	exec := NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
+	exec := mount.NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
 		if cmd != "mount" {
 			t.Errorf("expected mount command, got %q", cmd)
 		}
@@ -45,7 +47,7 @@ func TestMount(t *testing.T) {
 		return nil, nil
 	})
 
-	wrappedMounter := &fakeMounter{FakeMounter: &FakeMounter{}, t: t}
+	wrappedMounter := &fakeMounter{FakeMounter: &mount.FakeMounter{}, t: t}
 	mounter := NewExecMounter(exec, wrappedMounter)
 
 	mounter.Mount(sourcePath, destinationPath, fsType, mountOptions)
@@ -53,7 +55,7 @@ func TestMount(t *testing.T) {
 
 func TestBindMount(t *testing.T) {
 	cmdCount := 0
-	exec := NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
+	exec := mount.NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
 		cmdCount++
 		if cmd != "mount" {
 			t.Errorf("expected mount command, got %q", cmd)
@@ -73,14 +75,14 @@ func TestBindMount(t *testing.T) {
 		return nil, nil
 	})
 
-	wrappedMounter := &fakeMounter{FakeMounter: &FakeMounter{}, t: t}
+	wrappedMounter := &fakeMounter{FakeMounter: &mount.FakeMounter{}, t: t}
 	mounter := NewExecMounter(exec, wrappedMounter)
 	bindOptions := append(mountOptions, "bind")
 	mounter.Mount(sourcePath, destinationPath, fsType, bindOptions)
 }
 
 func TestUnmount(t *testing.T) {
-	exec := NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
+	exec := mount.NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
 		if cmd != "umount" {
 			t.Errorf("expected unmount command, got %q", cmd)
 		}
@@ -92,7 +94,7 @@ func TestUnmount(t *testing.T) {
 		return nil, nil
 	})
 
-	wrappedMounter := &fakeMounter{&FakeMounter{}, t}
+	wrappedMounter := &fakeMounter{&mount.FakeMounter{}, t}
 	mounter := NewExecMounter(exec, wrappedMounter)
 
 	mounter.Unmount(destinationPath)
@@ -100,7 +102,7 @@ func TestUnmount(t *testing.T) {
 
 /* Fake wrapped mounter */
 type fakeMounter struct {
-	*FakeMounter
+	*mount.FakeMounter
 	t *testing.T
 }
 
