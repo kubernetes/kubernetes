@@ -245,8 +245,8 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 
 // IsFitPredicateRegistered is useful for testing providers.
 func IsFitPredicateRegistered(name string) bool {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 	_, ok := fitPredicateMap[name]
 	return ok
 }
@@ -408,8 +408,8 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 }
 
 func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[string]predicates.FitPredicate, error) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	fitPredicates := map[string]predicates.FitPredicate{}
 	for _, name := range names.List() {
@@ -451,8 +451,8 @@ func getPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateM
 }
 
 func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]priorities.PriorityConfig, error) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	var configs []priorities.PriorityConfig
 	for _, name := range names.List() {
@@ -538,8 +538,8 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 
 // ListRegisteredFitPredicates returns the registered fit predicates.
 func ListRegisteredFitPredicates() []string {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	var names []string
 	for name := range fitPredicateMap {
@@ -550,8 +550,8 @@ func ListRegisteredFitPredicates() []string {
 
 // ListRegisteredPriorityFunctions returns the registered priority functions.
 func ListRegisteredPriorityFunctions() []string {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	var names []string
 	for name := range priorityFunctionMap {
