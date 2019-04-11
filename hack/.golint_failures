@@ -319,7 +319,6 @@ pkg/security/podsecuritypolicy/util
 pkg/securitycontext
 pkg/serviceaccount
 pkg/ssh
-pkg/util/bandwidth
 pkg/util/config
 pkg/util/ebtables
 pkg/util/env

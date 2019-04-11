@@ -43,7 +43,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 const (
@@ -65,12 +65,13 @@ const (
 	// on AWS. A few minutes is typical, so use 10m.
 	LoadBalancerLagTimeoutAWS = 10 * time.Minute
 
-	// How long to wait for a load balancer to be created/modified.
-	//TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
+	// LoadBalancerCreateTimeoutDefault is the default time to wait for a load balancer to be created/modified.
+	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	LoadBalancerCreateTimeoutDefault = 20 * time.Minute
-	LoadBalancerCreateTimeoutLarge   = 2 * time.Hour
+	// LoadBalancerCreateTimeoutLarge is the maximum time to wait for a load balancer to be created/modified.
+	LoadBalancerCreateTimeoutLarge = 2 * time.Hour
 
-	// Time required by the loadbalancer to cleanup, proportional to numApps/Ing.
+	// LoadBalancerCleanupTimeout is the time required by the loadbalancer to cleanup, proportional to numApps/Ing.
 	// Bring the cleanup timeout back down to 5m once b/33588344 is resolved.
 	LoadBalancerCleanupTimeout = 15 * time.Minute
 
@@ -97,10 +98,10 @@ const (
 	AffinityConfirmCount = 15
 )
 
-// This should match whatever the default/configured range is
+// ServiceNodePortRange should match whatever the default/configured range is
 var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 
-// A test jig to help service testing.
+// ServiceTestJig is a test jig to help service testing.
 type ServiceTestJig struct {
 	ID     string
 	Name   string
@@ -255,7 +256,7 @@ func (j *ServiceTestJig) ChangeServiceType(namespace, name string, newType v1.Se
 // If createPod is true, it also creates an RC with 1 replica of
 // the standard netexec container used everywhere in this test.
 func (j *ServiceTestJig) CreateOnlyLocalNodePortService(namespace, serviceName string, createPod bool) *v1.Service {
-	By("creating a service " + namespace + "/" + serviceName + " with type=NodePort and ExternalTrafficPolicy=Local")
+	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=NodePort and ExternalTrafficPolicy=Local")
 	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
@@ -263,7 +264,7 @@ func (j *ServiceTestJig) CreateOnlyLocalNodePortService(namespace, serviceName s
 	})
 
 	if createPod {
-		By("creating a pod to be part of the service " + serviceName)
+		ginkgo.By("creating a pod to be part of the service " + serviceName)
 		j.RunOrFail(namespace, nil)
 	}
 	j.SanityCheckService(svc, v1.ServiceTypeNodePort)
@@ -276,7 +277,7 @@ func (j *ServiceTestJig) CreateOnlyLocalNodePortService(namespace, serviceName s
 // the standard netexec container used everywhere in this test.
 func (j *ServiceTestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceName string, timeout time.Duration, createPod bool,
 	tweak func(svc *v1.Service)) *v1.Service {
-	By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer and ExternalTrafficPolicy=Local")
+	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer and ExternalTrafficPolicy=Local")
 	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		// We need to turn affinity off for our LB distribution tests
@@ -288,10 +289,10 @@ func (j *ServiceTestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceNa
 	})
 
 	if createPod {
-		By("creating a pod to be part of the service " + serviceName)
+		ginkgo.By("creating a pod to be part of the service " + serviceName)
 		j.RunOrFail(namespace, nil)
 	}
-	By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
+	ginkgo.By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
 	svc = j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
 	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	return svc
@@ -300,7 +301,7 @@ func (j *ServiceTestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceNa
 // CreateLoadBalancerService creates a loadbalancer service and waits
 // for it to acquire an ingress IP.
 func (j *ServiceTestJig) CreateLoadBalancerService(namespace, serviceName string, timeout time.Duration, tweak func(svc *v1.Service)) *v1.Service {
-	By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer")
+	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer")
 	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		// We need to turn affinity off for our LB distribution tests
@@ -310,7 +311,7 @@ func (j *ServiceTestJig) CreateLoadBalancerService(namespace, serviceName string
 		}
 	})
 
-	By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
+	ginkgo.By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
 	svc = j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
 	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	return svc
@@ -402,7 +403,7 @@ func (j *ServiceTestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
 	return nodeMap
 }
 
-// getNodes returns the first maxNodesForTest nodes. Useful in large clusters
+// GetNodes returns the first maxNodesForTest nodes. Useful in large clusters
 // where we don't eg: want to create an endpoint per node.
 func (j *ServiceTestJig) GetNodes(maxNodesForTest int) (nodes *v1.NodeList) {
 	nodes = GetReadySchedulableNodesOrDie(j.Client)
@@ -1053,13 +1054,13 @@ func (j *ServiceTestJig) TestHTTPHealthCheckNodePort(host string, port int, requ
 	return nil
 }
 
-// Simple helper class to avoid too much boilerplate in tests
+// ServiceTestFixture is a simple helper class to avoid too much boilerplate in tests
 type ServiceTestFixture struct {
 	ServiceName string
 	Namespace   string
 	Client      clientset.Interface
 
-	TestId string
+	TestID string
 	Labels map[string]string
 
 	rcs      map[string]bool
@@ -1073,9 +1074,9 @@ func NewServerTest(client clientset.Interface, namespace string, serviceName str
 	t.Client = client
 	t.Namespace = namespace
 	t.ServiceName = serviceName
-	t.TestId = t.ServiceName + "-" + string(uuid.NewUUID())
+	t.TestID = t.ServiceName + "-" + string(uuid.NewUUID())
 	t.Labels = map[string]string{
-		"testid": t.TestId,
+		"testid": t.TestID,
 	}
 
 	t.rcs = make(map[string]bool)
@@ -1087,7 +1088,7 @@ func NewServerTest(client clientset.Interface, namespace string, serviceName str
 	return t
 }
 
-// Build default config for a service (which can then be changed)
+// BuildServiceSpec builds default config for a service (which can then be changed)
 func (t *ServiceTestFixture) BuildServiceSpec() *v1.Service {
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1128,7 +1129,7 @@ func (t *ServiceTestFixture) CreateRC(rc *v1.ReplicationController) (*v1.Replica
 	return rc, err
 }
 
-// Create a service, and record it for cleanup
+// CreateService creates a service, and record it for cleanup
 func (t *ServiceTestFixture) CreateService(service *v1.Service) (*v1.Service, error) {
 	result, err := t.Client.CoreV1().Services(t.Namespace).Create(service)
 	if err == nil {
@@ -1137,7 +1138,7 @@ func (t *ServiceTestFixture) CreateService(service *v1.Service) (*v1.Service, er
 	return result, err
 }
 
-// Delete a service, and remove it from the cleanup list
+// DeleteService deletes a service, and remove it from the cleanup list
 func (t *ServiceTestFixture) DeleteService(serviceName string) error {
 	err := t.Client.CoreV1().Services(t.Namespace).Delete(serviceName, nil)
 	if err == nil {
@@ -1149,7 +1150,7 @@ func (t *ServiceTestFixture) DeleteService(serviceName string) error {
 func (t *ServiceTestFixture) Cleanup() []error {
 	var errs []error
 	for rcName := range t.rcs {
-		By("stopping RC " + rcName + " in namespace " + t.Namespace)
+		ginkgo.By("stopping RC " + rcName + " in namespace " + t.Namespace)
 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			// First, resize the RC to 0.
 			old, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Get(rcName, metav1.GetOptions{})
@@ -1182,7 +1183,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 	}
 
 	for serviceName := range t.services {
-		By("deleting service " + serviceName + " in namespace " + t.Namespace)
+		ginkgo.By("deleting service " + serviceName + " in namespace " + t.Namespace)
 		err := t.Client.CoreV1().Services(t.Namespace).Delete(serviceName, nil)
 		if err != nil {
 			if !errors.IsNotFound(err) {
@@ -1281,7 +1282,7 @@ func validatePortsOrFail(endpoints PortsByPodUID, expectedEndpoints PortsByPodUI
 }
 
 func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName string, expectedEndpoints PortsByPodName) {
-	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
+	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
 	i := 1
 	for start := time.Now(); time.Since(start) < ServiceStartTimeout; time.Sleep(1 * time.Second) {
 		endpoints, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
@@ -1323,7 +1324,7 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 func StartServeHostnameService(c clientset.Interface, svc *v1.Service, ns string, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
 	name := svc.ObjectMeta.Name
-	By("creating service " + name + " in namespace " + ns)
+	ginkgo.By("creating service " + name + " in namespace " + ns)
 	_, err := c.CoreV1().Services(ns).Create(svc)
 	if err != nil {
 		return podNames, "", err
@@ -1420,7 +1421,7 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 	}
 
 	expectedEndpoints := sets.NewString(expectedPods...)
-	By(fmt.Sprintf("verifying service has %d reachable backends", len(expectedPods)))
+	ginkgo.By(fmt.Sprintf("verifying service has %d reachable backends", len(expectedPods)))
 	for _, cmdFunc := range commands {
 		passed := false
 		gotEndpoints := sets.NewString()
@@ -1567,9 +1568,9 @@ func checkAffinityFailed(tracker affinityTracker, err string) {
 // number of same response observed in a row. If affinity is not expected, the
 // test will keep observe until different responses observed. The function will
 // return false only in case of unexpected errors.
-func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIp string, targetPort int, shouldHold bool) bool {
-	targetIpPort := net.JoinHostPort(targetIp, strconv.Itoa(targetPort))
-	cmd := fmt.Sprintf(`wget -qO- http://%s/ -T 2`, targetIpPort)
+func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIP string, targetPort int, shouldHold bool) bool {
+	targetIPPort := net.JoinHostPort(targetIP, strconv.Itoa(targetPort))
+	cmd := fmt.Sprintf(`wget -qO- http://%s/ -T 2`, targetIPPort)
 	timeout := ServiceTestTimeout
 	if execPod == nil {
 		timeout = LoadBalancerPollTimeout
@@ -1577,14 +1578,14 @@ func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIp string, target
 	var tracker affinityTracker
 	if pollErr := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		if execPod != nil {
-			if stdout, err := RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
-				Logf("Failed to get response from %s. Retry until timeout", targetIpPort)
+			stdout, err := RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			if err != nil {
+				Logf("Failed to get response from %s. Retry until timeout", targetIPPort)
 				return false, nil
-			} else {
-				tracker.recordHost(stdout)
 			}
+			tracker.recordHost(stdout)
 		} else {
-			rawResponse := jig.GetHTTPContent(targetIp, targetPort, timeout, "")
+			rawResponse := jig.GetHTTPContent(targetIP, targetPort, timeout, "")
 			tracker.recordHost(rawResponse.String())
 		}
 		trackerFulfilled, affinityHolds := tracker.checkHostTrace(AffinityConfirmCount)
@@ -1600,17 +1601,16 @@ func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIp string, target
 		if pollErr != wait.ErrWaitTimeout {
 			checkAffinityFailed(tracker, pollErr.Error())
 			return false
-		} else {
-			if !trackerFulfilled {
-				checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", targetIpPort))
-			}
-			if shouldHold {
-				checkAffinityFailed(tracker, "Affinity should hold but didn't.")
-			} else {
-				checkAffinityFailed(tracker, "Affinity shouldn't hold but did.")
-			}
-			return true
 		}
+		if !trackerFulfilled {
+			checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", targetIPPort))
+		}
+		if shouldHold {
+			checkAffinityFailed(tracker, "Affinity should hold but didn't.")
+		} else {
+			checkAffinityFailed(tracker, "Affinity shouldn't hold but did.")
+		}
+		return true
 	}
 	return true
 }

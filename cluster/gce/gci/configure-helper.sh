@@ -1150,19 +1150,19 @@ function create-master-etcd-apiserver-auth {
      echo "${ETCD_APISERVER_CA_KEY}" | base64 --decode > "${ETCD_APISERVER_CA_KEY_PATH}"
 
      ETCD_APISERVER_CA_CERT_PATH="${auth_dir}/etcd-apiserver-ca.crt"
-     echo "${ETCD_APISERVER_CA_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-apiserver-ca.crt"
+     echo "${ETCD_APISERVER_CA_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_CA_CERT_PATH}"
 
      ETCD_APISERVER_SERVER_KEY_PATH="${auth_dir}/etcd-apiserver-server.key"
      echo "${ETCD_APISERVER_SERVER_KEY}" | base64 --decode > "${ETCD_APISERVER_SERVER_KEY_PATH}"
 
      ETCD_APISERVER_SERVER_CERT_PATH="${auth_dir}/etcd-apiserver-server.crt"
-     echo "${ETCD_APISERVER_SERVER_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-apiserver-server.crt"
+     echo "${ETCD_APISERVER_SERVER_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_SERVER_CERT_PATH}"
 
      ETCD_APISERVER_CLIENT_KEY_PATH="${auth_dir}/etcd-apiserver-client.key"
-     echo "${ETCD_APISERVER_CLIENT_KEY}" | base64 --decode > "${auth_dir}/etcd-apiserver-client.key"
+     echo "${ETCD_APISERVER_CLIENT_KEY}" | base64 --decode > "${ETCD_APISERVER_CLIENT_KEY_PATH}"
 
      ETCD_APISERVER_CLIENT_CERT_PATH="${auth_dir}/etcd-apiserver-client.crt"
-     echo "${ETCD_APISERVER_CLIENT_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-apiserver-client.crt"
+     echo "${ETCD_APISERVER_CLIENT_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_CLIENT_CERT_PATH}"
    fi
 }
 
