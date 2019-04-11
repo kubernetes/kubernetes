@@ -135,7 +135,6 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 		os.Exit(1)
 	}
 
-	stopCh := make(chan struct{})
 	// Get the completed config
 	cc := c.Complete()
 
