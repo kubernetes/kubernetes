@@ -1082,9 +1082,6 @@ func (proxier *Proxier) syncProxyRules() {
 
 			if newHnsEndpoint == nil {
 				newHnsEndpoint, err = hns.getEndpointByIpAddress(ep.ip, hnsNetworkName)
-				if newHnsEndpoint != nil {
-					ep = newHnsEndpoint
-				}
 			}
 
 			// Need to add an OutboundNat policy to local endpoints for DSR loopback to properly work.
@@ -1110,7 +1107,7 @@ func (proxier *Proxier) syncProxyRules() {
 						if err != nil {
 							klog.Errorf("Error Setting DSR Endpoint Policy err: %v ", err)
 						} else {
-							ep.policies = append(ep.policies, loopbackPolicy)
+							newHnsEndpoint.policies = append(newHnsEndpoint.policies, loopbackPolicy)
 						}
 					}
 				}
@@ -1178,7 +1175,8 @@ func (proxier *Proxier) syncProxyRules() {
 			// Save the hnsId for reference
 			LogJson(newHnsEndpoint, "Hns Endpoint resource", 1)
 			hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
-			ep.hnsID = newHnsEndpoint.hnsID
+			*ep = *newHnsEndpoint
+
 			ep.refCount++
 			Log(ep, "Endpoint resource found", 3)
 		}
