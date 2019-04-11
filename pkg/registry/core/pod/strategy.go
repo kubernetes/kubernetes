@@ -128,17 +128,33 @@ func (podStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, 
 			period = *pod.Spec.TerminationGracePeriodSeconds
 		}
 	}
+
 	// if the pod is not scheduled, delete immediately
 	if len(pod.Spec.NodeName) == 0 {
 		period = 0
 	}
-	// if the pod is already terminated, delete immediately
-	if pod.Status.Phase == api.PodFailed || pod.Status.Phase == api.PodSucceeded {
-		period = 0
+
+	// if the pod has volume resource then don't set the period 0 because it breaks the storage protection feature
+	// for volume types that do not have deletion protection built-in, such as nfs
+	if !podHasPersistentVolumeClaim(pod) {
+		// if the pod is already terminated, delete immediately
+		if pod.Status.Phase == api.PodFailed || pod.Status.Phase == api.PodSucceeded {
+			period = 0
+		}
 	}
+
 	// ensure the options and the pod are in sync
 	options.GracePeriodSeconds = &period
 	return true
+}
+
+func podHasPersistentVolumeClaim(pod *api.Pod) bool {
+	for _, v := range pod.Spec.Volumes {
+		if v.PersistentVolumeClaim != nil {
+			return true
+		}
+	}
+	return false
 }
 
 type podStrategyWithoutGraceful struct {

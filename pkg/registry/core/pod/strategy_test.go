@@ -265,6 +265,26 @@ func TestCheckGracefulDelete(t *testing.T) {
 			},
 			gracePeriod: 0,
 		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					Volumes:  []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+					NodeName: "node1",
+				},
+				Status: api.PodStatus{Phase: api.PodSucceeded},
+			},
+			gracePeriod: 0,
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					Volumes:  []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{}}}},
+					NodeName: "node1",
+				},
+				Status: api.PodStatus{Phase: api.PodSucceeded},
+			},
+			gracePeriod: defaultGracePeriod,
+		},
 	}
 	for _, tc := range tcs {
 		out := &metav1.DeleteOptions{GracePeriodSeconds: &defaultGracePeriod}
