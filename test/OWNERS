@@ -36,6 +36,7 @@ reviewers:
   - neolit123
   - stevesloka
   - johnSchnake
+  - SataQiu
 approvers:
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker
