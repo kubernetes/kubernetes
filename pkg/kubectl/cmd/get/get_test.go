@@ -90,7 +90,7 @@ func testComponentStatusData() *corev1.ComponentStatusList {
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
-	t.Skip("This test is completely broken.  The first thing it does is add the object to the scheme!")
+	t.Skip("This test is completely broken. The first thing it does is add the object to the scheme!")
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
@@ -170,7 +170,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	// overide the openAPISchema function to return custom output
+	// override the openAPISchema function to return custom output
 	// for Pod type.
 	tf.OpenAPISchemaFunc = testOpenAPISchemaData
 	tf.UnstructuredClient = &fake.RESTClient{
