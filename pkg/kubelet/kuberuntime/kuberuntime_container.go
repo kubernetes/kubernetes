@@ -842,3 +842,41 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 func (m *kubeGenericRuntimeManager) DeleteContainer(containerID kubecontainer.ContainerID) error {
 	return m.removeContainer(containerID.ID)
 }
+
+// computeContainerToKill computes the containers in a pod to be killed
+func (m *kubeGenericRuntimeManager) computeContainerToKill(podStatus *kubecontainer.PodStatus, containers []v1.Container) map[kubecontainer.ContainerID]containerToKillInfo {
+	containerToKill := make(map[kubecontainer.ContainerID]containerToKillInfo)
+	for _, container := range containers {
+		containerStatus := podStatus.FindContainerStatusByName(container.Name)
+		if containerStatus == nil {
+			continue
+		}
+		message := fmt.Sprintf("Container %s(ID: %s) will be killed and recreated.", container.Name, containerStatus.ID)
+
+		containerToKill[containerStatus.ID] = containerToKillInfo{
+			name:      containerStatus.Name,
+			container: &container,
+			message:   message,
+		}
+	}
+	if len(containerToKill) > 0 {
+		klog.V(5).Infof("containers need to kill: %#v", containerToKill)
+	}
+	return containerToKill
+}
+
+// killPodContainersWitResult simply kills the containers in the containersToKill
+// it will return immediately if error occurs
+func (m *kubeGenericRuntimeManager) killPodContainersWitResult(pod *v1.Pod, containersToKill map[kubecontainer.ContainerID]containerToKillInfo, result *kubecontainer.PodSyncResult) {
+	for containerID, containerInfo := range containersToKill {
+		klog.V(3).Infof("Killing dead container %q(id=%q) for pod %q", containerInfo.name, containerID, format.Pod(pod))
+		killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
+		result.AddSyncResult(killContainerResult)
+		if err := m.killContainer(pod, containerID, containerInfo.name, containerInfo.message, nil); err != nil {
+			killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+			klog.Errorf("kill Container %q(id=%q) for pod %q failed: %v", containerInfo.name, containerID, format.Pod(pod), err)
+			return
+		}
+	}
+	return
+}

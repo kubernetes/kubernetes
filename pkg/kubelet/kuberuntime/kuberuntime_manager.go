@@ -493,6 +493,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			}
 			changes.ContainersToStart = append(changes.ContainersToStart, idx)
 		}
+		// if New sandbox created, any existing containers should be stopped/cleaned-up
+		changes.ContainersToKill = m.computeContainerToKill(podStatus, pod.Spec.Containers)
 		return changes
 	}
 
@@ -639,6 +641,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 
 		if podContainerChanges.CreateSandbox {
 			m.purgeInitContainers(pod, podStatus)
+		}
+
+		if len(podContainerChanges.ContainersToKill) > 0 {
+			// Try to kill containers even whatever its status in order to release allocated resources like cpu
+			klog.V(3).Infof("trying to kill containers even they were dead")
+			m.killPodContainersWitResult(pod, podContainerChanges.ContainersToKill, &result)
 		}
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
