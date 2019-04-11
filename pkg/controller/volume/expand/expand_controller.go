@@ -50,7 +50,7 @@ import (
 
 // ExpandController expands the pvs
 type ExpandController interface {
-	Run(stopCh <-chan struct{})
+	Run(workers int, stopCh <-chan struct{})
 }
 
 type expandController struct {
@@ -226,7 +226,7 @@ func (expc *expandController) expand(pvc *v1.PersistentVolumeClaim, pv *v1.Persi
 }
 
 // TODO make concurrency configurable (workers/threadiness argument). previously, nestedpendingoperations spawned unlimited goroutines
-func (expc *expandController) Run(stopCh <-chan struct{}) {
+func (expc *expandController) Run(workers int, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	defer expc.queue.ShutDown()
 
@@ -237,7 +237,9 @@ func (expc *expandController) Run(stopCh <-chan struct{}) {
 		return
 	}
 
-	go wait.Until(expc.runWorker, time.Second, stopCh)
+	for i := 0; i < workers; i++ {
+		go wait.Until(expc.runWorker, time.Second, stopCh)
+	}
 
 	<-stopCh
 }

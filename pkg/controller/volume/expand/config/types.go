@@ -18,7 +18,7 @@ package config
 
 // ExpandControllerConfiguration contains elements describing ExpandController.
 type ExpandControllerConfiguration struct {
-	// concurrentExpandSyncs is the number of expand syncing operations
+	// ConcurrentExpandSyncs is the number of expand syncing operations
 	// that will be done concurrently.
 	ConcurrentExpandSyncs int32
 }

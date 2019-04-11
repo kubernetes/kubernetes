@@ -250,7 +250,7 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 		if expandControllerErr != nil {
 			return nil, true, fmt.Errorf("failed to start volume expand controller : %v", expandControllerErr)
 		}
-		go expandController.Run(ctx.Stop)
+		go expandController.Run(int(ctx.ComponentConfig.ExpandController.ConcurrentExpandSyncs), ctx.Stop)
 		return nil, true, nil
 	}
 	return nil, false, nil
