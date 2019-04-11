@@ -195,7 +195,7 @@ var (
 	pendingPods = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "pending_pods_total",
+			Name:      "pending_pods",
 			Help:      "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.",
 		}, []string{"queue"})
 	ActivePods        = pendingPods.With(prometheus.Labels{"queue": "active"})
