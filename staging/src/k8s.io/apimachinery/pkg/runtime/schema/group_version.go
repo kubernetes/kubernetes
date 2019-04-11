@@ -197,17 +197,16 @@ func (gv GroupVersion) String() string {
 // TODO: Introduce an adapter type between GroupVersion and runtime.GroupVersioner, and use LegacyCodec(GroupVersion)
 //   in fewer places.
 func (gv GroupVersion) KindForGroupVersionKinds(kinds []GroupVersionKind) (target GroupVersionKind, ok bool) {
+	firstGvk := GroupVersionKind{}
 	for _, gvk := range kinds {
 		if gvk.Group == gv.Group && gvk.Version == gv.Version {
 			return gvk, true
 		}
-	}
-	for _, gvk := range kinds {
-		if gvk.Group == gv.Group {
-			return gv.WithKind(gvk.Kind), true
+		if firstGvk.Empty() && gvk.Group == gv.Group {
+			firstGvk = gv.WithKind(gvk.Kind)
 		}
 	}
-	return GroupVersionKind{}, false
+	return firstGvk, !firstGvk.Empty()
 }
 
 // ParseGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
@@ -250,6 +249,10 @@ type GroupVersions []GroupVersion
 // if none of the options match the group.
 func (gvs GroupVersions) KindForGroupVersionKinds(kinds []GroupVersionKind) (GroupVersionKind, bool) {
 	var targets []GroupVersionKind
+	kindsMap := make(map[GroupVersionKind]struct{})
+	for _, k := range kinds {
+		kindsMap[k] = struct{}{}
+	}
 	for _, gv := range gvs {
 		target, ok := gv.KindForGroupVersionKinds(kinds)
 		if !ok {
@@ -261,19 +264,17 @@ func (gvs GroupVersions) KindForGroupVersionKinds(kinds []GroupVersionKind) (Gro
 		return targets[0], true
 	}
 	if len(targets) > 1 {
-		return bestMatch(kinds, targets), true
+		return bestMatch(kindsMap, targets), true
 	}
 	return GroupVersionKind{}, false
 }
 
 // bestMatch tries to pick best matching GroupVersionKind and falls back to the first
 // found if no exact match exists.
-func bestMatch(kinds []GroupVersionKind, targets []GroupVersionKind) GroupVersionKind {
+func bestMatch(kinds map[GroupVersionKind]struct{}, targets []GroupVersionKind) GroupVersionKind {
 	for _, gvk := range targets {
-		for _, k := range kinds {
-			if k == gvk {
-				return k
-			}
+		if _, ok := kinds[gvk]; ok {
+			return gvk
 		}
 	}
 	return targets[0]
