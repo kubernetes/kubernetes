@@ -18,7 +18,9 @@ package apiserver
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -217,7 +219,7 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 	}
 
 	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
-		AbsPath("/apis/extensions/v1beta1").
+		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
@@ -553,5 +555,278 @@ func TestApplyRemoveContainerPort(t *testing.T) {
 
 	if len(deployment.Spec.Template.Spec.Containers[0].Ports) > 0 {
 		t.Fatalf("Expected no container ports but got: %v", deployment.Spec.Template.Spec.Containers[0].Ports)
+	}
+}
+
+// TestApplyFailsWithVersionMismatch ensures that a version mismatch between the
+// patch object and the live object will error
+func TestApplyFailsWithVersionMismatch(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Param("fieldManager", "apply_test").
+		Body(obj).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	obj = []byte(`{
+		"apiVersion": "extensions/v1beta",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 100,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Param("fieldManager", "apply_test").
+		Body([]byte(obj)).Do().Get()
+	if err == nil {
+		t.Fatalf("Expecting to get version mismatch when applying object")
+	}
+	status, ok := err.(*errors.StatusError)
+	if !ok {
+		t.Fatalf("Expecting to get version mismatch as API error")
+	}
+	if status.Status().Code != http.StatusBadRequest {
+		t.Fatalf("expected status code to be %d but was %d", http.StatusBadRequest, status.Status().Code)
+	}
+}
+
+// TestApplyConvertsManagedFieldsVersion checks that the apply
+// converts the API group-version in the field manager
+func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+			"labels": {"app": "nginx"},
+			"managedFields": [
+				{
+					"manager": "sidecar_controller",
+					"operation": "Apply",
+					"apiVersion": "extensions/v1beta1",
+					"fields": {
+						"f:metadata": {
+							"f:labels": {
+								"f:sidecar_version": {}
+							}
+						},
+						"f:spec": {
+							"f:template": {
+								"f: spec": {
+									"f:containers": {
+										"k:{\"name\":\"sidecar\"}": {
+											".": {},
+											"f:image": {}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			]
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Post().
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Body(obj).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	obj = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+			"labels": {"sidecar_version": "release"}
+		},
+		"spec": {
+			"template": {
+				"spec": {
+					"containers": [{
+						"name":  "sidecar",
+						"image": "sidecar:latest"
+					}]
+				}
+			}
+		}
+	}`)
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Param("fieldManager", "sidecar_controller").
+		Body([]byte(obj)).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to apply object: %v", err)
+	}
+
+	object, err := client.AppsV1().Deployments("default").Get("deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor: %v", err)
+	}
+
+	managed := accessor.GetManagedFields()
+	if len(managed) != 2 {
+		t.Fatalf("Expected 2 field managers, but got managed fields: %v", managed)
+	}
+
+	var actual *metav1.ManagedFieldsEntry
+	for i := range managed {
+		entry := &managed[i]
+		if entry.Manager == "sidecar_controller" && entry.APIVersion == "apps/v1" {
+			actual = entry
+		}
+	}
+
+	if actual == nil {
+		t.Fatalf("Expected managed fields to contain entry with manager '%v' with converted api version '%v', but got managed fields:\n%v", "sidecar_controller", "apps/v1", managed)
+	}
+
+	expected := &metav1.ManagedFieldsEntry{
+		Manager:    "sidecar_controller",
+		Operation:  metav1.ManagedFieldsOperationApply,
+		APIVersion: "apps/v1",
+		Time:       actual.Time,
+		Fields: &metav1.Fields{
+			Map: map[string]metav1.Fields{
+				"f:metadata": {
+					Map: map[string]metav1.Fields{
+						"f:labels": {
+							Map: map[string]metav1.Fields{
+								"f:sidecar_version": {Map: map[string]metav1.Fields{}},
+							},
+						},
+					},
+				},
+				"f:spec": {
+					Map: map[string]metav1.Fields{
+						"f:template": {
+							Map: map[string]metav1.Fields{
+								"f:spec": {
+									Map: map[string]metav1.Fields{
+										"f:containers": {
+											Map: map[string]metav1.Fields{
+												"k:{\"name\":\"sidecar\"}": {
+													Map: map[string]metav1.Fields{
+														".":       {Map: map[string]metav1.Fields{}},
+														"f:image": {Map: map[string]metav1.Fields{}},
+														"f:name":  {Map: map[string]metav1.Fields{}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("expected:\n%v\nbut got:\n%v", expected, actual)
 	}
 }
