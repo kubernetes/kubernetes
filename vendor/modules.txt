@@ -22,9 +22,6 @@ github.com/Azure/go-autorest/autorest/to
 github.com/Azure/go-autorest/autorest/validation
 github.com/Azure/go-autorest/logger
 github.com/Azure/go-autorest/version
-# github.com/GeertJohan/go.rice v0.0.0-20170420135705-c02ca9a983da => github.com/GeertJohan/go.rice v0.0.0-20170420135705-c02ca9a983da
-github.com/GeertJohan/go.rice
-github.com/GeertJohan/go.rice/embedded
 # github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100 => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud
 github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter
@@ -146,69 +143,19 @@ github.com/chai2010/gettext-go/gettext/po
 github.com/client9/misspell
 github.com/client9/misspell/cmd/misspell
 # github.com/cloudflare/cfssl v0.0.0-20180726162950-56268a613adf => github.com/cloudflare/cfssl v0.0.0-20180726162950-56268a613adf
-github.com/cloudflare/cfssl/api
-github.com/cloudflare/cfssl/api/bundle
-github.com/cloudflare/cfssl/api/certinfo
-github.com/cloudflare/cfssl/api/client
-github.com/cloudflare/cfssl/api/crl
-github.com/cloudflare/cfssl/api/gencrl
-github.com/cloudflare/cfssl/api/generator
-github.com/cloudflare/cfssl/api/health
-github.com/cloudflare/cfssl/api/info
-github.com/cloudflare/cfssl/api/initca
-github.com/cloudflare/cfssl/api/ocsp
-github.com/cloudflare/cfssl/api/revoke
-github.com/cloudflare/cfssl/api/scan
-github.com/cloudflare/cfssl/api/signhandler
 github.com/cloudflare/cfssl/auth
-github.com/cloudflare/cfssl/bundler
 github.com/cloudflare/cfssl/certdb
-github.com/cloudflare/cfssl/certdb/dbconf
-github.com/cloudflare/cfssl/certdb/sql
-github.com/cloudflare/cfssl/certinfo
-github.com/cloudflare/cfssl/cli
-github.com/cloudflare/cfssl/cli/bundle
-github.com/cloudflare/cfssl/cli/certinfo
-github.com/cloudflare/cfssl/cli/crl
-github.com/cloudflare/cfssl/cli/gencert
-github.com/cloudflare/cfssl/cli/gencrl
-github.com/cloudflare/cfssl/cli/gencsr
-github.com/cloudflare/cfssl/cli/genkey
-github.com/cloudflare/cfssl/cli/info
-github.com/cloudflare/cfssl/cli/ocspdump
-github.com/cloudflare/cfssl/cli/ocsprefresh
-github.com/cloudflare/cfssl/cli/ocspserve
-github.com/cloudflare/cfssl/cli/ocspsign
-github.com/cloudflare/cfssl/cli/printdefault
-github.com/cloudflare/cfssl/cli/revoke
-github.com/cloudflare/cfssl/cli/scan
-github.com/cloudflare/cfssl/cli/selfsign
-github.com/cloudflare/cfssl/cli/serve
-github.com/cloudflare/cfssl/cli/sign
-github.com/cloudflare/cfssl/cli/version
-github.com/cloudflare/cfssl/cmd/cfssl
-github.com/cloudflare/cfssl/cmd/cfssljson
 github.com/cloudflare/cfssl/config
-github.com/cloudflare/cfssl/crl
 github.com/cloudflare/cfssl/crypto/pkcs7
 github.com/cloudflare/cfssl/csr
 github.com/cloudflare/cfssl/errors
 github.com/cloudflare/cfssl/helpers
 github.com/cloudflare/cfssl/helpers/derhelpers
 github.com/cloudflare/cfssl/info
-github.com/cloudflare/cfssl/initca
 github.com/cloudflare/cfssl/log
-github.com/cloudflare/cfssl/ocsp
 github.com/cloudflare/cfssl/ocsp/config
-github.com/cloudflare/cfssl/revoke
-github.com/cloudflare/cfssl/scan
-github.com/cloudflare/cfssl/scan/crypto/tls
-github.com/cloudflare/cfssl/selfsign
 github.com/cloudflare/cfssl/signer
 github.com/cloudflare/cfssl/signer/local
-github.com/cloudflare/cfssl/signer/remote
-github.com/cloudflare/cfssl/signer/universal
-github.com/cloudflare/cfssl/ubiquity
 # github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313 => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 github.com/clusterhq/flocker-go
 # github.com/codedellemc/goscaleio v0.0.0-20170830184815-20e2ce2cf885 => github.com/codedellemc/goscaleio v0.0.0-20170830184815-20e2ce2cf885
@@ -331,8 +278,6 @@ github.com/cyphar/filepath-securejoin
 github.com/d2g/dhcp4
 # github.com/d2g/dhcp4client v0.0.0-20170829104524-6e570ed0a266 => github.com/d2g/dhcp4client v0.0.0-20170829104524-6e570ed0a266
 github.com/d2g/dhcp4client
-# github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb => github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb
-github.com/daaku/go.zipexe
 # github.com/davecgh/go-spew v1.1.1 => github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
@@ -426,8 +371,6 @@ github.com/go-openapi/validate
 # github.com/go-ozzo/ozzo-validation v3.5.0+incompatible => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 github.com/go-ozzo/ozzo-validation
 github.com/go-ozzo/ozzo-validation/is
-# github.com/go-sql-driver/mysql v1.3.0 => github.com/go-sql-driver/mysql v1.3.0
-github.com/go-sql-driver/mysql
 # github.com/godbus/dbus v0.0.0-20151105175453-c7fdd8b5cd55 => github.com/godbus/dbus v0.0.0-20151105175453-c7fdd8b5cd55
 github.com/godbus/dbus
 # github.com/gogo/protobuf v1.1.1 => github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
@@ -596,11 +539,6 @@ github.com/imdario/mergo
 github.com/inconshreveable/mousetrap
 # github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 github.com/jmespath/go-jmespath
-# github.com/jmhodges/clock v0.0.0-20160418191101-880ee4c33548 => github.com/jmhodges/clock v0.0.0-20160418191101-880ee4c33548
-github.com/jmhodges/clock
-# github.com/jmoiron/sqlx v0.0.0-20180124204410-05cef0741ade => github.com/jmoiron/sqlx v0.0.0-20180124204410-05cef0741ade
-github.com/jmoiron/sqlx
-github.com/jmoiron/sqlx/reflectx
 # github.com/jonboulle/clockwork v0.0.0-20141017032234-72f9bd7c4e0c => github.com/jonboulle/clockwork v0.0.0-20141017032234-72f9bd7c4e0c
 github.com/jonboulle/clockwork
 # github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be => github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be
@@ -616,15 +554,10 @@ github.com/jteeuwen/go-bindata/go-bindata
 github.com/kardianos/osext
 # github.com/karrick/godirwalk v1.7.5 => github.com/karrick/godirwalk v1.7.5
 github.com/karrick/godirwalk
-# github.com/kisielk/sqlstruct v0.0.0-20150923205031-648daed35d49 => github.com/kisielk/sqlstruct v0.0.0-20150923205031-648daed35d49
-github.com/kisielk/sqlstruct
 # github.com/konsorten/go-windows-terminal-sequences v1.0.1 => github.com/konsorten/go-windows-terminal-sequences v1.0.1
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169 => github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169
 github.com/kr/fs
-# github.com/lib/pq v0.0.0-20180201184707-88edab080323 => github.com/lib/pq v0.0.0-20180201184707-88edab080323
-github.com/lib/pq
-github.com/lib/pq/oid
 # github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875 => github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875
 github.com/libopenstorage/openstorage/api
 github.com/libopenstorage/openstorage/api/client
@@ -647,8 +580,6 @@ github.com/mailru/easyjson/jwriter
 github.com/marstr/guid
 # github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de => github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de
 github.com/mattn/go-shellwords
-# github.com/mattn/go-sqlite3 v1.6.0 => github.com/mattn/go-sqlite3 v1.6.0
-github.com/mattn/go-sqlite3
 # github.com/matttproud/golang_protobuf_extensions v1.0.1 => github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mholt/caddy v0.0.0-20180213163048-2de495001514 => github.com/mholt/caddy v0.0.0-20180213163048-2de495001514

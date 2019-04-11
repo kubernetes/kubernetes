@@ -11,7 +11,6 @@ require (
 	cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2
 	github.com/Azure/azure-sdk-for-go v21.3.0+incompatible
 	github.com/Azure/go-autorest v11.1.0+incompatible
-	github.com/GeertJohan/go.rice v0.0.0-20170420135705-c02ca9a983da // indirect
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
@@ -47,7 +46,6 @@ require (
 	github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299 // indirect
 	github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
 	github.com/d2g/dhcp4client v0.0.0-20170829104524-6e570ed0a266
-	github.com/daaku/go.zipexe v0.0.0-20150329023125-a5fe2436ffcb // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
@@ -68,7 +66,6 @@ require (
 	github.com/go-openapi/strfmt v0.17.0
 	github.com/go-openapi/validate v0.18.0
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
-	github.com/go-sql-driver/mysql v1.3.0 // indirect
 	github.com/godbus/dbus v0.0.0-20151105175453-c7fdd8b5cd55
 	github.com/gogo/protobuf v1.1.1
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
@@ -90,19 +87,15 @@ require (
 	github.com/heketi/rest v0.0.0-20180404230133-aa6a65207413 // indirect
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
 	github.com/heketi/utils v0.0.0-20170317161834-435bc5bdfa64 // indirect
-	github.com/jmhodges/clock v0.0.0-20160418191101-880ee4c33548 // indirect
-	github.com/jmoiron/sqlx v0.0.0-20180124204410-05cef0741ade // indirect
 	github.com/jonboulle/clockwork v0.0.0-20141017032234-72f9bd7c4e0c
 	github.com/json-iterator/go v0.0.0-20180701071628-ab8a2e0c74be
 	github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/jteeuwen/go-bindata v0.0.0-20151023091102-a0ff2567cfb7
 	github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22
 	github.com/karrick/godirwalk v1.7.5 // indirect
-	github.com/kisielk/sqlstruct v0.0.0-20150923205031-648daed35d49 // indirect
 	github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169 // indirect
 	github.com/kr/pretty v0.0.0-20140812000539-f31442d60e51 // indirect
 	github.com/kr/text v0.0.0-20130911015532-6807e777504f // indirect
-	github.com/lib/pq v0.0.0-20180201184707-88edab080323 // indirect
 	github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent v1.1.0
@@ -110,7 +103,6 @@ require (
 	github.com/magiconair/properties v0.0.0-20160816085511-61b492c03cf4 // indirect
 	github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c // indirect
 	github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de // indirect
-	github.com/mattn/go-sqlite3 v1.6.0 // indirect
 	github.com/mesos/mesos-go v0.0.9 // indirect
 	github.com/mholt/caddy v0.0.0-20180213163048-2de495001514
 	github.com/miekg/dns v0.0.0-20160614162101-5d001d020961
