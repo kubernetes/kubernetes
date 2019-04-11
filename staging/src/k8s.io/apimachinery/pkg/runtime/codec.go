@@ -218,17 +218,18 @@ func (s base64Serializer) Decode(data []byte, defaults *schema.GroupVersionKind,
 // SerializerInfoForMediaType returns the first info in types that has a matching media type (which cannot
 // include media-type parameters), or the first info with an empty media type, or false if no type matches.
 func SerializerInfoForMediaType(types []SerializerInfo, mediaType string) (SerializerInfo, bool) {
+	firstInfo := SerializerInfo{}
+	firstInfoAssigned := false
 	for _, info := range types {
 		if info.MediaType == mediaType {
 			return info, true
 		}
-	}
-	for _, info := range types {
-		if len(info.MediaType) == 0 {
-			return info, true
+		if !firstInfoAssigned && len(info.MediaType) == 0 {
+			firstInfo = info
+			firstInfoAssigned = true
 		}
 	}
-	return SerializerInfo{}, false
+	return firstInfo, firstInfoAssigned
 }
 
 var (
