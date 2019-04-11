@@ -51,7 +51,6 @@
 ./hack/update-gofmt.sh
 ./hack/update-openapi-spec.sh
 ./hack/update-translations.sh
-./hack/update-vendor-licenses.sh
 ./hack/update-vendor.sh
 ./hack/verify-api-groups.sh
 ./hack/verify-boilerplate.sh
