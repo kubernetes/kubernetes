@@ -59,7 +59,6 @@ pkg/controller/certificates/signer
 pkg/controller/certificates/signer/config/v1alpha1
 pkg/controller/cloud
 pkg/controller/clusterroleaggregation
-pkg/controller/cronjob
 pkg/controller/daemon
 pkg/controller/daemon/config/v1alpha1
 pkg/controller/deployment

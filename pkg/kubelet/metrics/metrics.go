@@ -247,7 +247,7 @@ var (
 		},
 		[]string{"operation_type"},
 	)
-	// DeprecatedPodStartLatency is a Summary that tracks the latency (in microseconds) for a single pod to go from pending to runing.
+	// DeprecatedPodStartLatency is a Summary that tracks the latency (in microseconds) for a single pod to go from pending to running.
 	// This metric is deprecated.
 	DeprecatedPodStartLatency = prometheus.NewSummary(
 		prometheus.SummaryOpts{
