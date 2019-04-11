@@ -152,8 +152,6 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		v1.LabelInstanceType,
 		v1.LabelOSStable,
 		v1.LabelArchStable,
-		kubeletapis.LabelOS,
-		kubeletapis.LabelArch,
 	}
 
 	needsUpdate := false
@@ -219,8 +217,6 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 				v1.LabelHostname:      kl.hostname,
 				v1.LabelOSStable:      goruntime.GOOS,
 				v1.LabelArchStable:    goruntime.GOARCH,
-				kubeletapis.LabelOS:   goruntime.GOOS,
-				kubeletapis.LabelArch: goruntime.GOARCH,
 			},
 		},
 		Spec: v1.NodeSpec{
