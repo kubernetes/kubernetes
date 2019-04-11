@@ -68,7 +68,7 @@ func main() {
 		}
 	case "kube-controller-manager":
 		// generate manpage for kube-controller-manager
-		controllermanager := cmapp.NewControllerManagerCommand()
+		controllermanager := cmapp.NewControllerManagerCommand(server.SetupSignalHandler())
 		genMarkdown(controllermanager, "", outDir)
 		for _, c := range controllermanager.Commands() {
 			genMarkdown(c, "kube-controller-manager", outDir)
@@ -82,7 +82,7 @@ func main() {
 		}
 	case "kube-scheduler":
 		// generate manpage for kube-scheduler
-		scheduler := schapp.NewSchedulerCommand()
+		scheduler := schapp.NewSchedulerCommand(server.SetupSignalHandler())
 		genMarkdown(scheduler, "", outDir)
 		for _, c := range scheduler.Commands() {
 			genMarkdown(c, "kube-scheduler", outDir)

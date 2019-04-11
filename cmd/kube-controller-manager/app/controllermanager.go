@@ -157,6 +157,16 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 
 // Run runs the KubeControllerManagerOptions.  This should never exit.
 func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	go func() {
+		select {
+		case <-stopCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
@@ -180,16 +190,20 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	if c.SecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
-		// TODO: handle stoppedCh returned by c.SecureServing.Serve
-		if _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		if serverStoppedCh, err := c.SecureServing.Serve(handler, 0, ctx.Done()); err != nil {
 			return err
+		} else {
+			defer func() {
+				cancel()
+				<-serverStoppedCh
+			}()
 		}
 	}
 	if c.InsecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		insecureSuperuserAuthn := server.AuthenticationInfo{Authenticator: &server.InsecureSuperuser{}}
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, nil, &insecureSuperuserAuthn)
-		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
+		if err := c.InsecureServing.Serve(handler, 0, ctx.Done()); err != nil {
 			return err
 		}
 	}
@@ -268,7 +282,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		klog.Fatalf("error creating lock: %v", err)
 	}
 
-	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
@@ -276,13 +290,15 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
-				klog.Fatalf("leaderelection lost")
+				cancel()
+				utilruntime.HandleError(fmt.Errorf("leaderelection lost"))
 			},
 		},
 		WatchDog: electionChecker,
 		Name:     "kube-controller-manager",
 	})
-	panic("unreachable")
+
+	return nil
 }
 
 // ControllerContext defines the context object for controller
