@@ -39,6 +39,7 @@ import (
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	testutil "k8s.io/kubernetes/test/utils"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -421,7 +422,7 @@ func testRolloverDeployment(f *framework.Framework) {
 
 	// Wait for replica set to become ready before adopting it.
 	framework.Logf("Waiting for pods owned by replica set %q to become ready", rsName)
-	Expect(framework.WaitForReadyReplicaSet(c, ns, rsName)).NotTo(HaveOccurred())
+	Expect(replicaset.WaitForReadyReplicaSet(c, ns, rsName)).NotTo(HaveOccurred())
 
 	// Create a deployment to delete nginx pods and instead bring up redis-slave pods.
 	// We use a nonexistent image here, so that we make sure it won't finish
@@ -527,7 +528,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "create"
-	err = framework.CheckNewRSAnnotations(c, ns, deploymentName, createAnnotation)
+	err = replicaset.CheckNewRSAnnotations(c, ns, deploymentName, createAnnotation)
 	Expect(err).NotTo(HaveOccurred())
 
 	// 2. Update the deployment to create redis pods.
@@ -553,7 +554,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "update"
-	err = framework.CheckNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
+	err = replicaset.CheckNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
 	Expect(err).NotTo(HaveOccurred())
 
 	// 3. Update the deploymentRollback to rollback to revision 1
@@ -576,7 +577,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "create", after the rollback
-	err = framework.CheckNewRSAnnotations(c, ns, deploymentName, createAnnotation)
+	err = replicaset.CheckNewRSAnnotations(c, ns, deploymentName, createAnnotation)
 	Expect(err).NotTo(HaveOccurred())
 
 	// 4. Update the deploymentRollback to rollback to last revision
@@ -597,7 +598,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "update", after the rollback
-	err = framework.CheckNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
+	err = replicaset.CheckNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
 	Expect(err).NotTo(HaveOccurred())
 
 	// 5. Update the deploymentRollback to rollback to revision 10
@@ -875,17 +876,17 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// First rollout's replicaset should have Deployment's (replicas - maxUnavailable) = 10 - 2 = 8 available replicas.
 	minAvailableReplicas := replicas - int32(maxUnavailable)
 	framework.Logf("Waiting for the first rollout's replicaset to have .status.availableReplicas = %d", minAvailableReplicas)
-	Expect(framework.WaitForReplicaSetTargetAvailableReplicas(c, firstRS, minAvailableReplicas)).NotTo(HaveOccurred())
+	Expect(replicaset.WaitForReplicaSetTargetAvailableReplicas(c, firstRS, minAvailableReplicas)).NotTo(HaveOccurred())
 
 	// First rollout's replicaset should have .spec.replicas = 8 too.
 	framework.Logf("Waiting for the first rollout's replicaset to have .spec.replicas = %d", minAvailableReplicas)
-	Expect(framework.WaitForReplicaSetTargetSpecReplicas(c, firstRS, minAvailableReplicas)).NotTo(HaveOccurred())
+	Expect(replicaset.WaitForReplicaSetTargetSpecReplicas(c, firstRS, minAvailableReplicas)).NotTo(HaveOccurred())
 
 	// The desired replicas wait makes sure that the RS controller has created expected number of pods.
 	framework.Logf("Waiting for the first rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
 	firstRS, err = c.AppsV1().ReplicaSets(ns).Get(firstRS.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
-	err = framework.WaitForReplicaSetDesiredReplicas(c.AppsV1(), firstRS)
+	err = replicaset.WaitForReplicaSetDesiredReplicas(c.AppsV1(), firstRS)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Checking state of second rollout's replicaset.
@@ -902,13 +903,13 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// Second rollout's replicaset should have Deployment's (replicas + maxSurge - first RS's replicas) = 10 + 3 - 8 = 5 for .spec.replicas.
 	newReplicas := replicas + int32(maxSurge) - minAvailableReplicas
 	framework.Logf("Waiting for the second rollout's replicaset to have .spec.replicas = %d", newReplicas)
-	Expect(framework.WaitForReplicaSetTargetSpecReplicas(c, secondRS, newReplicas)).NotTo(HaveOccurred())
+	Expect(replicaset.WaitForReplicaSetTargetSpecReplicas(c, secondRS, newReplicas)).NotTo(HaveOccurred())
 
 	// The desired replicas wait makes sure that the RS controller has created expected number of pods.
 	framework.Logf("Waiting for the second rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
 	secondRS, err = c.AppsV1().ReplicaSets(ns).Get(secondRS.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
-	err = framework.WaitForReplicaSetDesiredReplicas(c.AppsV1(), secondRS)
+	err = replicaset.WaitForReplicaSetDesiredReplicas(c.AppsV1(), secondRS)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check the deployment's minimum availability.
@@ -934,12 +935,12 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// First rollout's replicaset should have .spec.replicas = 8 + (30-10)*(8/13) = 8 + 12 = 20 replicas.
 	// Note that 12 comes from rounding (30-10)*(8/13) to nearest integer.
 	framework.Logf("Verifying that first rollout's replicaset has .spec.replicas = 20")
-	Expect(framework.WaitForReplicaSetTargetSpecReplicas(c, firstRS, 20)).NotTo(HaveOccurred())
+	Expect(replicaset.WaitForReplicaSetTargetSpecReplicas(c, firstRS, 20)).NotTo(HaveOccurred())
 
 	// Second rollout's replicaset should have .spec.replicas = 5 + (30-10)*(5/13) = 5 + 8 = 13 replicas.
 	// Note that 8 comes from rounding (30-10)*(5/13) to nearest integer.
 	framework.Logf("Verifying that second rollout's replicaset has .spec.replicas = 13")
-	Expect(framework.WaitForReplicaSetTargetSpecReplicas(c, secondRS, 13)).NotTo(HaveOccurred())
+	Expect(replicaset.WaitForReplicaSetTargetSpecReplicas(c, secondRS, 13)).NotTo(HaveOccurred())
 }
 
 func checkDeploymentReplicaSetsControllerRef(c clientset.Interface, ns string, uid types.UID, label map[string]string) error {

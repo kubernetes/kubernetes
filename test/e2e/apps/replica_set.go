@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	replicasetutil "k8s.io/kubernetes/test/e2e/framework/replicaset"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -228,7 +229,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Scaling down replica set %q to satisfy pod quota", name))
-	rs, err = framework.UpdateReplicaSetWithRetries(c, namespace, name, func(update *apps.ReplicaSet) {
+	rs, err = replicasetutil.UpdateReplicaSetWithRetries(c, namespace, name, func(update *apps.ReplicaSet) {
 		x := int32(2)
 		update.Spec.Replicas = &x
 	})
