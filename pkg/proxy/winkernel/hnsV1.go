@@ -21,11 +21,10 @@ package winkernel
 import (
 	"encoding/json"
 	"fmt"
-	"net"
-	"strings"
-
 	"github.com/Microsoft/hcsshim"
 	"k8s.io/klog"
+	"net"
+	"strings"
 )
 
 type HostNetworkService interface {

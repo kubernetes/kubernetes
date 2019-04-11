@@ -114,7 +114,6 @@ func policiesToPoliciesinfo(hcnendpointpolicies []hcn.EndpointPolicy) []*policie
 			Type:     string(po.Type),
 			Settings: po.Settings,
 		})
-		klog.V(3).Infof("endpoint policy we placed:%s", string(po.Settings))
 	}
 	return endpointPolicies
 }
