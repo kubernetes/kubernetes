@@ -65,7 +65,6 @@ func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
 			*pvcSpec.DataSource.APIGroup == "snapshot.storage.k8s.io" &&
 			utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) {
 			return true
-
 		}
 	}
 	return false
