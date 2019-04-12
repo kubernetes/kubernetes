@@ -44,7 +44,6 @@
 ./hack/make-rules/vet.sh
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
-./hack/update-codegen.sh
 ./hack/update-generated-kms-dockerized.sh
 ./hack/update-generated-protobuf-dockerized.sh
 ./hack/update-generated-runtime-dockerized.sh
