@@ -29,7 +29,6 @@
 ./hack/pin-dependency.sh
 ./hack/test-integration.sh
 ./hack/update-vendor.sh
-./hack/verify-golint.sh
 ./hack/verify-test-featuregates.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
