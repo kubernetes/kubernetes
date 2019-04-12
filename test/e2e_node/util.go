@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -233,7 +234,7 @@ func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource)
 	nodeclient := f.ClientSet.CoreV1().Nodes()
 
 	// get the node
-	node, err := nodeclient.Get(framework.TestContext.NodeName, metav1.GetOptions{})
+	node, err := nodeclient.Get(testcontext.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -252,7 +253,7 @@ func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource)
 
 // Causes the test to fail, or returns a status 200 response from the /configz endpoint
 func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Response {
-	endpoint := fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", framework.TestContext.NodeName)
+	endpoint := fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", testcontext.TestContext.NodeName)
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	framework.ExpectNoError(err)
@@ -353,7 +354,7 @@ func logKubeletLatencyMetrics(metricNames ...string) {
 	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+	metric, err := metrics.GrabKubeletMetricsWithoutProxy(testcontext.TestContext.NodeName+":10255", "/metrics")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
@@ -364,7 +365,7 @@ func logKubeletLatencyMetrics(metricNames ...string) {
 // returns config related metrics from the local kubelet, filtered to the filterMetricNames passed in
 func getKubeletMetrics(filterMetricNames sets.String) (frameworkmetrics.KubeletMetrics, error) {
 	// grab Kubelet metrics
-	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+	ms, err := metrics.GrabKubeletMetricsWithoutProxy(testcontext.TestContext.NodeName+":10255", "/metrics")
 	if err != nil {
 		return nil, err
 	}
@@ -393,16 +394,16 @@ func runCommand(cmd ...string) (string, error) {
 func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
-	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
+	runtimeEndpoint := testcontext.TestContext.ContainerRuntimeEndpoint
 	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout)
 	if err != nil {
 		return nil, nil, err
 	}
 	imageManagerEndpoint := runtimeEndpoint
-	if framework.TestContext.ImageServiceEndpoint != "" {
+	if testcontext.TestContext.ImageServiceEndpoint != "" {
 		//ImageServiceEndpoint is the same as ContainerRuntimeEndpoint if not
 		//explicitly specified
-		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
+		imageManagerEndpoint = testcontext.TestContext.ImageServiceEndpoint
 	}
 	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout)
 	if err != nil {
@@ -425,7 +426,7 @@ func restartKubelet() {
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {
-	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+	if testcontext.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
 	} else {
 		return cgroupName.ToCgroupfs()

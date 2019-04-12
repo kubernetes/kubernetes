@@ -42,6 +42,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -800,7 +801,7 @@ func GetReadySchedulableRandomNodeInfo() *NodeInfo {
 func invokeVCenterServiceControl(command, service, host string) error {
 	sshCmd := fmt.Sprintf("service-control --%s %s", command, service)
 	framework.Logf("Invoking command %v on vCenter host %v", sshCmd, host)
-	result, err := framework.SSH(sshCmd, host, framework.TestContext.Provider)
+	result, err := framework.SSH(sshCmd, host, testcontext.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		framework.LogSSHResult(result)
 		return fmt.Errorf("couldn't execute command: %s on vCenter host: %v", sshCmd, err)

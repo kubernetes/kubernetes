@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 
@@ -162,9 +163,9 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 			}()
 
 			ginkgo.By("Waiting for events to ingest")
-			location := framework.TestContext.CloudConfig.Zone
-			if framework.TestContext.CloudConfig.MultiMaster {
-				location = framework.TestContext.CloudConfig.Region
+			location := testcontext.TestContext.CloudConfig.Zone
+			if testcontext.TestContext.CloudConfig.MultiMaster {
+				location = testcontext.TestContext.CloudConfig.Region
 			}
 			c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLocation(location), utils.JustTimeout, "")
 			err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
@@ -176,7 +177,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 		withLogProviderForScope(f, systemScope, func(p *sdLogProvider) {
 			ginkgo.By("Waiting for some kubelet logs to be ingested from each node", func() {
 				nodeIds := utils.GetNodeIds(f.ClientSet)
-				log := fmt.Sprintf("projects/%s/logs/kubelet", framework.TestContext.CloudConfig.ProjectID)
+				log := fmt.Sprintf("projects/%s/logs/kubelet", testcontext.TestContext.CloudConfig.ProjectID)
 				c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLog(log), utils.JustTimeout, nodeIds...)
 				err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
 				framework.ExpectNoError(err)
@@ -184,7 +185,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 
 			ginkgo.By("Waiting for some container runtime logs to be ingested from each node", func() {
 				nodeIds := utils.GetNodeIds(f.ClientSet)
-				log := fmt.Sprintf("projects/%s/logs/container-runtime", framework.TestContext.CloudConfig.ProjectID)
+				log := fmt.Sprintf("projects/%s/logs/container-runtime", testcontext.TestContext.CloudConfig.ProjectID)
 				c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLog(log), utils.JustTimeout, nodeIds...)
 				err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
 				framework.ExpectNoError(err)

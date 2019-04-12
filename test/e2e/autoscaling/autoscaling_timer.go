@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -48,7 +49,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 
 			BeforeEach(func() {
 				// Make sure there is only 1 node group, otherwise this test becomes useless.
-				nodeGroups := strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",")
+				nodeGroups := strings.Split(testcontext.TestContext.CloudConfig.NodeInstanceGroup, ",")
 				if len(nodeGroups) != 1 {
 					framework.Skipf("test expects 1 node group, found %d", len(nodeGroups))
 				}

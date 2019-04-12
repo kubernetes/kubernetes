@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -78,7 +79,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 	Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {
 		Context("once the node is setup", func() {
 			It("container runtime's oom-score-adj should be -999", func() {
-				runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+				runtimePids, err := getPidsForProcess(testcontext.TestContext.ContainerRuntimeProcessName, testcontext.TestContext.ContainerRuntimePidFile)
 				Expect(err).To(BeNil(), "failed to get list of container runtime pids")
 				for _, pid := range runtimePids {
 					Eventually(func() error {

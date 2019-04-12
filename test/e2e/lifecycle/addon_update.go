@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -359,9 +360,9 @@ func waitForReplicationControllerwithSelectorInAddonTest(c clientset.Interface, 
 // differently.
 func getMasterSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
-	signer, err := framework.GetSigner(framework.TestContext.Provider)
+	signer, err := framework.GetSigner(testcontext.TestContext.Provider)
 	if err != nil {
-		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", framework.TestContext.Provider, err)
+		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", testcontext.TestContext.Provider, err)
 	}
 
 	sshUser := os.Getenv("KUBE_SSH_USER")

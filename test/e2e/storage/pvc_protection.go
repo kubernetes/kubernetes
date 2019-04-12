@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -44,7 +45,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 	BeforeEach(func() {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, testcontext.TestContext.NodeSchedulableTimeout))
 
 		By("Creating a PVC")
 		suffix := "pvc-protection"

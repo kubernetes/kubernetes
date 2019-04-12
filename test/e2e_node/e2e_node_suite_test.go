@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e_node/services"
 
 	"github.com/kardianos/osext"
@@ -76,7 +77,7 @@ func init() {
 func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
-	framework.AfterReadingAllFlags(&framework.TestContext)
+	framework.AfterReadingAllFlags(&testcontext.TestContext)
 	setExtraEnvs()
 	os.Exit(m.Run())
 }
@@ -106,7 +107,7 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("Failed to load system spec: %v", err)
 			}
 		}
-		if framework.TestContext.NodeConformance {
+		if testcontext.TestContext.NodeConformance {
 			// Chroot to /rootfs to make system validation can check system
 			// as in the root filesystem.
 			// TODO(random-liu): Consider to chroot the whole test process to make writing
@@ -115,7 +116,7 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if _, err := system.ValidateSpec(*spec, framework.TestContext.ContainerRuntime); err != nil {
+		if _, err := system.ValidateSpec(*spec, testcontext.TestContext.ContainerRuntime); err != nil {
 			klog.Exitf("system validation failed: %v", err)
 		}
 		return
@@ -123,14 +124,14 @@ func TestE2eNode(t *testing.T) {
 	// If run-services-mode is not specified, run test.
 	RegisterFailHandler(Fail)
 	reporters := []Reporter{}
-	reportDir := framework.TestContext.ReportDir
+	reportDir := testcontext.TestContext.ReportDir
 	if reportDir != "" {
 		// Create the directory if it doesn't already exists
 		if err := os.MkdirAll(reportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory
-			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
+			junitFile := fmt.Sprintf("junit_%s_%02d.xml", testcontext.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
 			junitPath := path.Join(reportDir, junitFile)
 			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}
@@ -145,7 +146,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
-	if framework.TestContext.PrepullImages {
+	if testcontext.TestContext.PrepullImages {
 		klog.Infof("Pre-pulling images so that they are cached for the tests.")
 		updateImageWhiteList()
 		err := PrePullAllImages()
@@ -258,7 +259,7 @@ func updateTestContext() error {
 	if err != nil {
 		return fmt.Errorf("failed to get node: %v", err)
 	}
-	framework.TestContext.NodeName = node.Name // Set node name.
+	testcontext.TestContext.NodeName = node.Name // Set node name.
 	// Update test context with current kubelet configuration.
 	// This assumes all tests which dynamically change kubelet configuration
 	// must: 1) run in serial; 2) restore kubelet configuration after test.
@@ -266,7 +267,7 @@ func updateTestContext() error {
 	if err != nil {
 		return fmt.Errorf("failed to get kubelet configuration: %v", err)
 	}
-	framework.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
+	testcontext.TestContext.KubeletConfig = *kubeletCfg // Set kubelet config
 	return nil
 }
 
@@ -326,7 +327,7 @@ func isNodeReady(node *v1.Node) bool {
 }
 
 func setExtraEnvs() {
-	for name, value := range framework.TestContext.ExtraEnvs {
+	for name, value := range testcontext.TestContext.ExtraEnvs {
 		os.Setenv(name, value)
 	}
 }

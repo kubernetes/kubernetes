@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -185,7 +186,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 // logAndVerifyResource prints the resource usage as perf data and verifies whether resource usage satisfies the limit.
 func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimits framework.ContainersCPUSummary,
 	memLimits framework.ResourceUsagePerContainer, testInfo map[string]string, isVerify bool) {
-	nodeName := framework.TestContext.NodeName
+	nodeName := testcontext.TestContext.NodeName
 
 	// Obtain memory PerfData
 	usagePerContainer, err := rc.GetLatest()
@@ -284,7 +285,7 @@ func verifyCPULimits(expected framework.ContainersCPUSummary, actual framework.N
 }
 
 func logPods(c clientset.Interface) {
-	nodeName := framework.TestContext.NodeName
+	nodeName := testcontext.TestContext.NodeName
 	podList, err := framework.GetKubeletRunningPods(c, nodeName)
 	if err != nil {
 		framework.Logf("Unable to retrieve kubelet pods for node %v", nodeName)

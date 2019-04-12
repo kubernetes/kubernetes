@@ -43,6 +43,7 @@ import (
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e_node/perftype"
 
 	. "github.com/onsi/ginkgo"
@@ -87,7 +88,7 @@ func NewResourceCollector(interval time.Duration) *ResourceCollector {
 func (r *ResourceCollector) Start() {
 	// Get the cgroup container names for kubelet and runtime
 	kubeletContainer, err1 := getContainerNameForProcess(kubeletProcessName, "")
-	runtimeContainer, err2 := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+	runtimeContainer, err2 := getContainerNameForProcess(testcontext.TestContext.ContainerRuntimeProcessName, testcontext.TestContext.ContainerRuntimePidFile)
 	if err1 == nil && err2 == nil {
 		systemContainers = map[string]string{
 			stats.SystemContainerKubelet: kubeletContainer,

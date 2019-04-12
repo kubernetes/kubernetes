@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -222,8 +223,8 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 
 	// Confirm that the file can be accessed from a second
 	// pod using host_path with the same MCS label
-	volumeHostPath := fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~empty-dir/%s", framework.TestContext.KubeVolumeDir, foundPod.UID, volumeName)
-	By(fmt.Sprintf("confirming a container with the same label can read the file under --volume-dir=%s", framework.TestContext.KubeVolumeDir))
+	volumeHostPath := fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~empty-dir/%s", testcontext.TestContext.KubeVolumeDir, foundPod.UID, volumeName)
+	By(fmt.Sprintf("confirming a container with the same label can read the file under --volume-dir=%s", testcontext.TestContext.KubeVolumeDir))
 	pod = scTestPod(hostIPC, hostPID)
 	pod.Spec.NodeName = foundPod.Spec.NodeName
 	volumeMounts := []v1.VolumeMount{

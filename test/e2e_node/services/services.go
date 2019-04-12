@@ -29,6 +29,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 )
 
 // E2EServices starts and stops e2e services in a separate process. The test
@@ -65,7 +66,7 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 // standard kubelet launcher)
 func (e *E2EServices) Start() error {
 	var err error
-	if !framework.TestContext.NodeConformance {
+	if !testcontext.TestContext.NodeConformance {
 		// Start kubelet
 		e.kubelet, err = e.startKubelet()
 		if err != nil {
@@ -79,7 +80,7 @@ func (e *E2EServices) Start() error {
 // Stop stops the e2e services.
 func (e *E2EServices) Stop() {
 	defer func() {
-		if !framework.TestContext.NodeConformance {
+		if !testcontext.TestContext.NodeConformance {
 			// Collect log files.
 			e.collectLogFiles()
 		}
@@ -109,7 +110,7 @@ func (e *E2EServices) Stop() {
 func RunE2EServices(t *testing.T) {
 	// Populate global DefaultFeatureGate with value from TestContext.FeatureGates.
 	// This way, statically-linked components see the same feature gate config as the test context.
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates); err != nil {
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(testcontext.TestContext.FeatureGates); err != nil {
 		t.Fatal(err)
 	}
 	e := newE2EServices()
@@ -142,13 +143,13 @@ func (e *E2EServices) startInternalServices() (*server, error) {
 // treated as normal files and file contents will be copied over.
 func (e *E2EServices) collectLogFiles() {
 	// Nothing to do if report dir is not specified.
-	if framework.TestContext.ReportDir == "" {
+	if testcontext.TestContext.ReportDir == "" {
 		return
 	}
 	klog.Info("Fetching log files...")
 	journaldFound := isJournaldAvailable()
 	for targetFileName, log := range e.logs {
-		targetLink := path.Join(framework.TestContext.ReportDir, targetFileName)
+		targetLink := path.Join(testcontext.TestContext.ReportDir, targetFileName)
 		if journaldFound {
 			// Skip log files that do not have an equivalent in journald-based machines.
 			if len(log.JournalctlCommand) == 0 {

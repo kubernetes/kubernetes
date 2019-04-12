@@ -29,6 +29,7 @@ import (
 	// "github.com/onsi/ginkgo"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/framework/viperconfig"
 	"k8s.io/kubernetes/test/e2e/generated"
@@ -66,22 +67,22 @@ func init() {
 		os.Exit(1)
 	}
 
-	if framework.TestContext.ListImages {
+	if testcontext.TestContext.ListImages {
 		for _, v := range image.GetImageConfigs() {
 			fmt.Println(v.GetE2EImage())
 		}
 		os.Exit(0)
 	}
 
-	framework.AfterReadingAllFlags(&framework.TestContext)
+	framework.AfterReadingAllFlags(&testcontext.TestContext)
 
 	// TODO: Deprecating repo-root over time... instead just use gobindata_util.go , see #23987.
 	// Right now it is still needed, for example by
 	// test/e2e/framework/ingress/ingress_utils.go
 	// for providing the optional secret.yaml file and by
 	// test/e2e/framework/util.go for cluster/log-dump.
-	if framework.TestContext.RepoRoot != "" {
-		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
+	if testcontext.TestContext.RepoRoot != "" {
+		testfiles.AddFileSource(testfiles.RootFileSource{Root: testcontext.TestContext.RepoRoot})
 	}
 
 	// Enable bindata file lookup as fallback.

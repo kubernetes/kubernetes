@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -60,7 +61,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, testcontext.TestContext.NodeSchedulableTimeout))
 
 		nodes := framework.GetReadySchedulableNodesOrDie(client)
 		numNodes = len(nodes.Items)

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -81,7 +82,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		if originalSizes == nil {
 			originalSizes = make(map[string]int)
 			sum = 0
-			for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
+			for _, mig := range strings.Split(testcontext.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 				size, err := framework.GroupSize(mig)
 				framework.ExpectNoError(err)
 				By(fmt.Sprintf("Initial size of %s: %d", mig, size))

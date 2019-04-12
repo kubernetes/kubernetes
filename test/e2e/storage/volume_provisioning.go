@@ -46,6 +46,7 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -124,7 +125,7 @@ func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool)
 	tokens := strings.Split(diskName, "/")
 	volumeID := tokens[len(tokens)-1]
 
-	zone := framework.TestContext.CloudConfig.Zone
+	zone := testcontext.TestContext.CloudConfig.Zone
 	if len(zone) > 0 {
 		region := zone[:len(zone)-1]
 		cfg := aws.Config{Region: &region}
@@ -533,7 +534,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err)
 
 			// Get a list of all zones in the project
-			zones, err := gceCloud.ComputeServices().GA.Zones.List(framework.TestContext.CloudConfig.ProjectID).Do()
+			zones, err := gceCloud.ComputeServices().GA.Zones.List(testcontext.TestContext.CloudConfig.ProjectID).Do()
 			framework.ExpectNoError(err)
 			for _, z := range zones.Items {
 				allZones.Insert(z.Name)
@@ -661,7 +662,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					},
 				},
 			}
-			switch framework.TestContext.Provider {
+			switch testcontext.TestContext.Provider {
 			case "aws":
 				pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
 					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{

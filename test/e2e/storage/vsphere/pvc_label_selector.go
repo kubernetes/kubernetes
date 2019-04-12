@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -63,7 +64,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 		ns = f.Namespace.Name
 		Bootstrap(f)
 		nodeInfo = GetReadySchedulableRandomNodeInfo()
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, testcontext.TestContext.NodeSchedulableTimeout))
 		ssdlabels = make(map[string]string)
 		ssdlabels["volume-type"] = "ssd"
 		vvollabels = make(map[string]string)

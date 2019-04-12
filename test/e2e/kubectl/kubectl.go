@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -408,7 +409,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 		ginkgo.It("should support exec through an HTTP proxy", func() {
 			// Fail if the variable isn't set
-			if framework.TestContext.Host == "" {
+			if testcontext.TestContext.Host == "" {
 				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
 			}
 
@@ -431,7 +432,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				}
 
 				// Verify the proxy server logs saw the connection
-				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(framework.TestContext.Host, "https://"), "/api"))
+				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(testcontext.TestContext.Host, "https://"), "/api"))
 
 				proxyLog := proxyLogs.String()
 				if !strings.Contains(proxyLog, expectedProxyLog) {
@@ -442,7 +443,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 		ginkgo.It("should support exec through kubectl proxy", func() {
 			// Fail if the variable isn't set
-			if framework.TestContext.Host == "" {
+			if testcontext.TestContext.Host == "" {
 				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
 			}
 
@@ -614,7 +615,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("overriding icc with values provided by flags")
-			kubectlPath := framework.TestContext.KubectlPath
+			kubectlPath := testcontext.TestContext.KubectlPath
 			// we need the actual kubectl binary, not the script wrapper
 			kubectlPathNormalizer := exec.Command("which", kubectlPath)
 			if strings.HasSuffix(kubectlPath, "kubectl.sh") {

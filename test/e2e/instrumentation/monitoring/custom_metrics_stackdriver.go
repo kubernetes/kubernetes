@@ -36,6 +36,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 )
@@ -95,7 +96,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 })
 
 func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, customMetricsClient customclient.CustomMetricsClient, discoveryClient *discovery.DiscoveryClient, adapterDeployment string) {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := testcontext.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
@@ -141,7 +142,7 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 
 // TODO(kawych): migrate this test to new resource model
 func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface, externalMetricsClient externalclient.ExternalMetricsClient) {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := testcontext.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)

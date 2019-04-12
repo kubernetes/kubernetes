@@ -61,6 +61,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/ingress:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
+        "//test/e2e/framework/testcontext:go_default_library",
         "//test/e2e/network/scale:go_default_library",
         "//test/images/net/nat:go_default_library",
         "//test/utils:go_default_library",

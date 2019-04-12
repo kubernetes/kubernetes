@@ -30,6 +30,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -60,7 +61,7 @@ var NodeImageWhiteList = sets.NewString(
 
 // updateImageWhiteList updates the framework.ImageWhiteList with
 // 1. the hard coded lists
-// 2. the ones passed in from framework.TestContext.ExtraEnvs
+// 2. the ones passed in from testcontext.TestContext.ExtraEnvs
 // So this function needs to be called after the extra envs are applied.
 func updateImageWhiteList() {
 	// Union NodeImageWhiteList and CommonImageWhiteList into the framework image white list.
@@ -116,7 +117,7 @@ func (rp *remotePuller) Pull(image string) ([]byte, error) {
 }
 
 func getPuller() (puller, error) {
-	runtime := framework.TestContext.ContainerRuntime
+	runtime := testcontext.TestContext.ContainerRuntime
 	switch runtime {
 	case "docker":
 		return &dockerPuller{}, nil

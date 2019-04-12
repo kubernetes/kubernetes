@@ -38,6 +38,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/remote"
 )
@@ -108,7 +109,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	klog.Info("Starting kubelet")
 
 	// set feature gates so we can check which features are enabled and pass the appropriate flags
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates); err != nil {
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(testcontext.TestContext.FeatureGates); err != nil {
 		return nil, err
 	}
 
@@ -264,9 +265,9 @@ func (e *E2EServices) startKubelet() (*server, error) {
 
 	// Apply test framework feature gates by default. This could also be overridden
 	// by kubelet-flags.
-	if len(framework.TestContext.FeatureGates) > 0 {
-		cmdArgs = append(cmdArgs, "--feature-gates", cliflag.NewMapStringBool(&framework.TestContext.FeatureGates).String())
-		kc.FeatureGates = framework.TestContext.FeatureGates
+	if len(testcontext.TestContext.FeatureGates) > 0 {
+		cmdArgs = append(cmdArgs, "--feature-gates", cliflag.NewMapStringBool(&testcontext.TestContext.FeatureGates).String())
+		kc.FeatureGates = testcontext.TestContext.FeatureGates
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
@@ -295,20 +296,20 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--cni-conf-dir", cniConfDir)
 
 	// Keep hostname override for convenience.
-	if framework.TestContext.NodeName != "" { // If node name is specified, set hostname override.
-		cmdArgs = append(cmdArgs, "--hostname-override", framework.TestContext.NodeName)
+	if testcontext.TestContext.NodeName != "" { // If node name is specified, set hostname override.
+		cmdArgs = append(cmdArgs, "--hostname-override", testcontext.TestContext.NodeName)
 	}
 
-	if framework.TestContext.ContainerRuntime != "" {
-		cmdArgs = append(cmdArgs, "--container-runtime", framework.TestContext.ContainerRuntime)
+	if testcontext.TestContext.ContainerRuntime != "" {
+		cmdArgs = append(cmdArgs, "--container-runtime", testcontext.TestContext.ContainerRuntime)
 	}
 
-	if framework.TestContext.ContainerRuntimeEndpoint != "" {
-		cmdArgs = append(cmdArgs, "--container-runtime-endpoint", framework.TestContext.ContainerRuntimeEndpoint)
+	if testcontext.TestContext.ContainerRuntimeEndpoint != "" {
+		cmdArgs = append(cmdArgs, "--container-runtime-endpoint", testcontext.TestContext.ContainerRuntimeEndpoint)
 	}
 
-	if framework.TestContext.ImageServiceEndpoint != "" {
-		cmdArgs = append(cmdArgs, "--image-service-endpoint", framework.TestContext.ImageServiceEndpoint)
+	if testcontext.TestContext.ImageServiceEndpoint != "" {
+		cmdArgs = append(cmdArgs, "--image-service-endpoint", testcontext.TestContext.ImageServiceEndpoint)
 	}
 
 	// Write config file or flags, depending on whether --generate-kubelet-config-file was provided

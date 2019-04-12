@@ -27,6 +27,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 
 	. "github.com/onsi/ginkgo"
@@ -53,7 +54,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		var err error
 		cs = f.ClientSet
-		cloudConfig = framework.TestContext.CloudConfig
+		cloudConfig = testcontext.TestContext.CloudConfig
 		gceCloud, err = gce.GetGCECloud()
 		Expect(err).NotTo(HaveOccurred())
 	})

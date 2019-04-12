@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 )
 
@@ -82,7 +83,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 	Expect(extraZone).NotTo(Equal(""), fmt.Sprintf("No extra zones available in region %s", region))
 
 	By(fmt.Sprintf("starting a compute instance in unused zone: %v\n", extraZone))
-	project := framework.TestContext.CloudConfig.ProjectID
+	project := testcontext.TestContext.CloudConfig.ProjectID
 	zone := extraZone
 	myuuid := string(uuid.NewUUID())
 	name := "compute-" + myuuid

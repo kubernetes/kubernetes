@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 )
 
@@ -56,7 +57,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 })
 
 func testAgent(f *framework.Framework, kubeClient clientset.Interface) {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := testcontext.TestContext.CloudConfig.ProjectID
 	resourceType := "k8s_container"
 	uniqueContainerName := fmt.Sprintf("test-container-%v", time.Now().Unix())
 	endpoint := fmt.Sprintf(

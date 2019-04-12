@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -135,7 +136,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
 		Expect(err).NotTo(HaveOccurred(), "waiting for output from pod exec")
 
-		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain))
+		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", testcontext.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, testcontext.TestContext.ClusterDNSDomain))
 
 		// create a pod in each namespace
 		for _, ns := range namespaces {

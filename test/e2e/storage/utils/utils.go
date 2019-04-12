@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
 )
@@ -109,14 +110,14 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	nodeIP = nodeIP + ":22"
 
 	framework.Logf("Checking if sudo command is present")
-	sshResult, err := framework.SSH("sudo --version", nodeIP, framework.TestContext.Provider)
+	sshResult, err := framework.SSH("sudo --version", nodeIP, testcontext.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	if !strings.Contains(sshResult.Stderr, "command not found") {
 		sudoPresent = true
 	}
 
 	framework.Logf("Checking if systemctl command is present")
-	sshResult, err = framework.SSH("systemctl --version", nodeIP, framework.TestContext.Provider)
+	sshResult, err = framework.SSH("systemctl --version", nodeIP, testcontext.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	if !strings.Contains(sshResult.Stderr, "command not found") {
 		command = fmt.Sprintf("systemctl %s kubelet", string(kOp))
@@ -133,7 +134,7 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	}
 
 	framework.Logf("Attempting `%s`", command)
-	sshResult, err = framework.SSH(command, nodeIP, framework.TestContext.Provider)
+	sshResult, err = framework.SSH(command, nodeIP, testcontext.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	framework.LogSSHResult(sshResult)
 	Expect(sshResult.Code).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
@@ -177,7 +178,7 @@ func getKubeletMainPid(nodeIP string, sudoPresent bool, systemctlPresent bool) s
 		command = fmt.Sprintf("sudo %s", command)
 	}
 	framework.Logf("Attempting `%s`", command)
-	sshResult, err := framework.SSH(command, nodeIP, framework.TestContext.Provider)
+	sshResult, err := framework.SSH(command, nodeIP, testcontext.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", nodeIP))
 	framework.LogSSHResult(sshResult)
 	Expect(sshResult.Code).To(BeZero(), "Failed to get kubelet PID")
@@ -211,14 +212,14 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 	nodeIP = nodeIP + ":22"
 
 	By("Expecting the volume mount to be found.")
-	result, err := framework.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+	result, err := framework.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, testcontext.TestContext.Provider)
 	framework.LogSSHResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	Expect(result.Code).To(BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 
 	if checkSubpath {
 		By("Expecting the volume subpath mount to be found.")
-		result, err := framework.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+		result, err := framework.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, testcontext.TestContext.Provider)
 		framework.LogSSHResult(result)
 		framework.ExpectNoError(err, "Encountered SSH error.")
 		Expect(result.Code).To(BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
@@ -253,7 +254,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 	}
 
 	By("Expecting the volume mount not to be found.")
-	result, err = framework.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+	result, err = framework.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, testcontext.TestContext.Provider)
 	framework.LogSSHResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	Expect(result.Stdout).To(BeEmpty(), "Expected grep stdout to be empty (i.e. no mount found).")
@@ -261,7 +262,7 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 
 	if checkSubpath {
 		By("Expecting the volume subpath mount not to be found.")
-		result, err = framework.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+		result, err = framework.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, testcontext.TestContext.Provider)
 		framework.LogSSHResult(result)
 		framework.ExpectNoError(err, "Encountered SSH error.")
 		Expect(result.Stdout).To(BeEmpty(), "Expected grep stdout to be empty (i.e. no subpath mount found).")

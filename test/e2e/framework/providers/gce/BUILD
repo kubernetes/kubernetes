@@ -19,6 +19,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/testcontext:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",

@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -70,7 +71,7 @@ type restartDaemonConfig struct {
 // NewRestartConfig creates a restartDaemonConfig for the given node and daemon.
 func NewRestartConfig(nodeName, daemonName string, healthzPort int, pollInterval, pollTimeout time.Duration) *restartDaemonConfig {
 	if !framework.ProviderIs("gce") {
-		framework.Logf("WARNING: SSH through the restart config might not work on %s", framework.TestContext.Provider)
+		framework.Logf("WARNING: SSH through the restart config might not work on %s", testcontext.TestContext.Provider)
 	}
 	return &restartDaemonConfig{
 		nodeName:     nodeName,

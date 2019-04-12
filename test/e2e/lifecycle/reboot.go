@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -136,7 +137,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 	if hook != nil {
 		defer func() {
 			framework.Logf("Executing termination hook on nodes")
-			hook(framework.TestContext.Provider, nodelist)
+			hook(testcontext.TestContext.Provider, nodelist)
 		}()
 	}
 	result := make([]bool, len(nodelist.Items))
@@ -148,7 +149,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 		go func(ix int) {
 			defer wg.Done()
 			n := nodelist.Items[ix]
-			result[ix] = rebootNode(c, framework.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)
+			result[ix] = rebootNode(c, testcontext.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)
 			if !result[ix] {
 				failed = true
 			}

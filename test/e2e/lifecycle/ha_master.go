@@ -28,11 +28,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 )
 
 func addMasterReplica(zone string) error {
 	framework.Logf(fmt.Sprintf("Adding a new master replica, zone: %s", zone))
-	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "true", "false")
+	_, _, err := framework.RunCmd(path.Join(testcontext.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "true", "false")
 	if err != nil {
 		return err
 	}
@@ -41,7 +42,7 @@ func addMasterReplica(zone string) error {
 
 func removeMasterReplica(zone string) error {
 	framework.Logf(fmt.Sprintf("Removing an existing master replica, zone: %s", zone))
-	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "false", "false")
+	_, _, err := framework.RunCmd(path.Join(testcontext.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "false", "false")
 	if err != nil {
 		return err
 	}
@@ -50,7 +51,7 @@ func removeMasterReplica(zone string) error {
 
 func addWorkerNodes(zone string) error {
 	framework.Logf(fmt.Sprintf("Adding worker nodes, zone: %s", zone))
-	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "false", "true")
+	_, _, err := framework.RunCmd(path.Join(testcontext.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "false", "true")
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ func addWorkerNodes(zone string) error {
 
 func removeWorkerNodes(zone string) error {
 	framework.Logf(fmt.Sprintf("Removing worker nodes, zone: %s", zone))
-	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "true", "true")
+	_, _, err := framework.RunCmd(path.Join(testcontext.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "true", "true")
 	if err != nil {
 		return err
 	}
@@ -122,7 +123,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		framework.SkipUnlessProviderIs("gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
+		framework.ExpectNoError(framework.WaitForMasters(testcontext.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
 		additionalReplicaZones = make([]string, 0)
 		existingRCs = make([]string, 0)
 	})
@@ -138,7 +139,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		for _, zone := range additionalReplicaZones {
 			removeMasterReplica(zone)
 		}
-		framework.ExpectNoError(framework.WaitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
+		framework.ExpectNoError(framework.WaitForMasters(testcontext.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
 	})
 
 	type Action int
@@ -166,7 +167,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 			framework.ExpectNoError(removeWorkerNodes(zone))
 			additionalNodesZones = removeZoneFromZones(additionalNodesZones, zone)
 		}
-		framework.ExpectNoError(framework.WaitForMasters(framework.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute))
+		framework.ExpectNoError(framework.WaitForMasters(testcontext.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute))
 		framework.ExpectNoError(framework.AllNodesReady(c, 5*time.Minute))
 
 		// Verify that API server works correctly with HA master.
@@ -177,7 +178,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	}
 
 	It("survive addition/removal replicas same zone [Serial][Disruptive]", func() {
-		zone := framework.TestContext.CloudConfig.Zone
+		zone := testcontext.TestContext.CloudConfig.Zone
 		step(None, "")
 		numAdditionalReplicas := 2
 		for i := 0; i < numAdditionalReplicas; i++ {
@@ -189,7 +190,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	})
 
 	It("survive addition/removal replicas different zones [Serial][Disruptive]", func() {
-		zone := framework.TestContext.CloudConfig.Zone
+		zone := testcontext.TestContext.CloudConfig.Zone
 		region := findRegionForZone(zone)
 		zones := findZonesForRegion(region)
 		zones = removeZoneFromZones(zones, zone)
@@ -207,7 +208,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	})
 
 	It("survive addition/removal replicas multizone workers [Serial][Disruptive]", func() {
-		zone := framework.TestContext.CloudConfig.Zone
+		zone := testcontext.TestContext.CloudConfig.Zone
 		region := findRegionForZone(zone)
 		zones := findZonesForRegion(region)
 		zones = removeZoneFromZones(zones, zone)

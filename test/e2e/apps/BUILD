@@ -61,6 +61,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/testcontext:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",

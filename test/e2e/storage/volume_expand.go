@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -54,7 +55,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		framework.SkipUnlessProviderIs("aws", "gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, testcontext.TestContext.NodeSchedulableTimeout))
 		test := testsuites.StorageClassTest{
 			Name:                 "default",
 			ClaimSize:            "2Gi",

@@ -34,6 +34,7 @@ import (
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -153,7 +154,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			By("Generate event list options")
 			selector := fields.Set{
 				"involvedObject.kind":      "Node",
-				"involvedObject.name":      framework.TestContext.NodeName,
+				"involvedObject.name":      testcontext.TestContext.NodeName,
 				"involvedObject.namespace": metav1.NamespaceAll,
 				"source":                   source,
 			}.AsSelector().String()
@@ -205,7 +206,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 						{
 							Name:    name,
 							Image:   image,
-							Command: []string{"sh", "-c", "touch " + logFile + " && /node-problem-detector --logtostderr --system-log-monitors=" + configFile + fmt.Sprintf(" --apiserver-override=%s?inClusterConfig=false", framework.TestContext.Host)},
+							Command: []string{"sh", "-c", "touch " + logFile + " && /node-problem-detector --logtostderr --system-log-monitors=" + configFile + fmt.Sprintf(" --apiserver-override=%s?inClusterConfig=false", testcontext.TestContext.Host)},
 							Env: []v1.EnvVar{
 								{
 									Name: "NODE_NAME",
@@ -238,7 +239,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			pod, err := f.PodClient().Get(name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			// TODO: remove hardcoded kubelet volume directory path
-			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
+			// testcontext.TestContext.KubeVolumeDir is currently not populated for node e2e
 			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
 		})
 
@@ -366,7 +367,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 		})
 
 		AfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+			if CurrentGinkgoTestDescription().Failed && testcontext.TestContext.DumpLogsOnFailure {
 				By("Get node problem detector log")
 				log, err := framework.GetPodLogs(c, ns, name, name)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -382,7 +383,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(metav1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
 			By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
-			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do()
+			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(testcontext.TestContext.NodeName).SubResource("status").Body(patch).Do()
 		})
 	})
 })
@@ -440,7 +441,7 @@ func verifyTotalEvents(e coreclientset.EventInterface, options metav1.ListOption
 
 // verifyNodeCondition verifies specific node condition is generated, if reason and message are empty, they will not be checked
 func verifyNodeCondition(n coreclientset.NodeInterface, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
-	node, err := n.Get(framework.TestContext.NodeName, metav1.GetOptions{})
+	node, err := n.Get(testcontext.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

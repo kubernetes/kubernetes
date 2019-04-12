@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 )
 
 func init() {
@@ -32,13 +33,13 @@ func init() {
 }
 
 func newProvider() (framework.ProviderInterface, error) {
-	if framework.TestContext.CloudConfig.ConfigFile == "" {
+	if testcontext.TestContext.CloudConfig.ConfigFile == "" {
 		return nil, fmt.Errorf("config-file must be specified for Azure")
 	}
-	config, err := os.Open(framework.TestContext.CloudConfig.ConfigFile)
+	config, err := os.Open(testcontext.TestContext.CloudConfig.ConfigFile)
 	if err != nil {
 		framework.Logf("Couldn't open cloud provider configuration %s: %#v",
-			framework.TestContext.CloudConfig.ConfigFile, err)
+			testcontext.TestContext.CloudConfig.ConfigFile, err)
 	}
 	defer config.Close()
 	azureCloud, err := azure.NewCloud(config)
@@ -61,7 +62,7 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 
 // CreatePD creates a persistent volume
 func (p *Provider) CreatePD(zone string) (string, error) {
-	pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
+	pdName := fmt.Sprintf("%s-%s", testcontext.TestContext.Prefix, string(uuid.NewUUID()))
 	_, diskURI, _, err := p.azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 1 /* sizeGb */)
 	if err != nil {
 		return "", err

@@ -81,6 +81,7 @@ go_library(
         "//test/e2e/apps:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
+        "//test/e2e/framework/testcontext:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/crd:go_default_library",
         "//test/utils/image:go_default_library",

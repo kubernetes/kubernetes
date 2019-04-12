@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"github.com/prometheus/common/model"
@@ -99,7 +100,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 			if !CurrentGinkgoTestDescription().Failed {
 				return
 			}
-			if framework.TestContext.DumpLogsOnFailure {
+			if testcontext.TestContext.DumpLogsOnFailure {
 				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 			}
 			By("Recording processes in system cgroups")
@@ -109,7 +110,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 })
 
 func getV1alpha1ResourceMetrics() (metrics.KubeletMetrics, error) {
-	return metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics/resource/"+v1alpha1.Version)
+	return metrics.GrabKubeletMetricsWithoutProxy(testcontext.TestContext.NodeName+":10255", "/metrics/resource/"+v1alpha1.Version)
 }
 
 func nodeId(element interface{}) string {

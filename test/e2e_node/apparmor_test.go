@@ -35,6 +35,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	"github.com/davecgh/go-spew/spew"
 	. "github.com/onsi/ginkgo"
@@ -205,20 +206,20 @@ func expectSoftRejection(status v1.PodStatus) {
 
 func isAppArmorEnabled() bool {
 	// TODO(tallclair): Pass this through the image setup rather than hardcoding.
-	if strings.Contains(framework.TestContext.NodeName, "-gci-dev-") {
+	if strings.Contains(testcontext.TestContext.NodeName, "-gci-dev-") {
 		gciVersionRe := regexp.MustCompile("-gci-dev-([0-9]+)-")
-		matches := gciVersionRe.FindStringSubmatch(framework.TestContext.NodeName)
+		matches := gciVersionRe.FindStringSubmatch(testcontext.TestContext.NodeName)
 		if len(matches) == 2 {
 			version, err := strconv.Atoi(matches[1])
 			if err != nil {
-				klog.Errorf("Error parsing GCI version from NodeName %q: %v", framework.TestContext.NodeName, err)
+				klog.Errorf("Error parsing GCI version from NodeName %q: %v", testcontext.TestContext.NodeName, err)
 				return false
 			}
 			return version >= 54
 		}
 		return false
 	}
-	if strings.Contains(framework.TestContext.NodeName, "-ubuntu-") {
+	if strings.Contains(testcontext.TestContext.NodeName, "-ubuntu-") {
 		return true
 	}
 	return apparmor.IsAppArmorEnabled()

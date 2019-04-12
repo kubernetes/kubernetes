@@ -50,6 +50,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -349,8 +350,8 @@ func createClients(numberOfClients int) ([]clientset.Interface, []scaleclient.Sc
 		Expect(err).NotTo(HaveOccurred())
 		config.QPS = 100
 		config.Burst = 200
-		if framework.TestContext.KubeAPIContentType != "" {
-			config.ContentType = framework.TestContext.KubeAPIContentType
+		if testcontext.TestContext.KubeAPIContentType != "" {
+			config.ContentType = testcontext.TestContext.KubeAPIContentType
 		}
 
 		// For the purpose of this test, we want to force that clients

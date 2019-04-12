@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -119,7 +120,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		Expect(waitForDNSReplicasSatisfied(c, getExpectReplicasLinear, DNSdefaultTimeout)).NotTo(HaveOccurred())
 
 		originalSizes := make(map[string]int)
-		for _, mig := range strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
+		for _, mig := range strings.Split(testcontext.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 			size, err := framework.GroupSize(mig)
 			Expect(err).NotTo(HaveOccurred())
 			By(fmt.Sprintf("Initial size of %s: %d", mig, size))

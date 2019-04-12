@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	"k8s.io/kubernetes/test/utils/image"
@@ -56,7 +57,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 })
 
 func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
-	projectID := framework.TestContext.CloudConfig.ProjectID
+	projectID := testcontext.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)

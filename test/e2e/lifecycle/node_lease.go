@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -43,10 +44,10 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 		systemPods, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
 		Expect(err).To(BeNil())
 		systemPodsNo = int32(len(systemPods))
-		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
-			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
+		if strings.Index(testcontext.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
+			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", testcontext.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
-			group = framework.TestContext.CloudConfig.NodeInstanceGroup
+			group = testcontext.TestContext.CloudConfig.NodeInstanceGroup
 		}
 	})
 
@@ -66,7 +67,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			}
 
 			By("restoring the original node instance group size")
-			if err := framework.ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+			if err := framework.ResizeGroup(group, int32(testcontext.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
@@ -81,11 +82,11 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				By("waiting 5 minutes for all dead tunnels to be dropped")
 				time.Sleep(5 * time.Minute)
 			}
-			if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+			if err := framework.WaitForGroupSize(group, int32(testcontext.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 
-			if err := framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
+			if err := framework.WaitForReadyNodes(c, testcontext.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
 				framework.Failf("Couldn't restore the original cluster size: %v", err)
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
@@ -97,12 +98,12 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 
 		It("node lease should be deleted when corresponding node is deleted", func() {
 			leaseClient := c.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease)
-			err := framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute)
+			err := framework.WaitForReadyNodes(c, testcontext.TestContext.CloudConfig.NumNodes, 10*time.Minute)
 			Expect(err).To(BeNil())
 
 			By("verify node lease exists for every nodes")
 			originalNodes := framework.GetReadySchedulableNodesOrDie(c)
-			Expect(len(originalNodes.Items)).To(Equal(framework.TestContext.CloudConfig.NumNodes))
+			Expect(len(originalNodes.Items)).To(Equal(testcontext.TestContext.CloudConfig.NumNodes))
 
 			Eventually(func() error {
 				pass := true
@@ -118,13 +119,13 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				return fmt.Errorf("some node lease is not ready")
 			}, 1*time.Minute, 5*time.Second).Should(BeNil())
 
-			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
+			targetNumNodes := int32(testcontext.TestContext.CloudConfig.NumNodes - 1)
 			By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
 			Expect(err).To(BeNil())
 			err = framework.WaitForGroupSize(group, targetNumNodes)
 			Expect(err).To(BeNil())
-			err = framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
+			err = framework.WaitForReadyNodes(c, testcontext.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
 			Expect(err).To(BeNil())
 			targetNodes := framework.GetReadySchedulableNodesOrDie(c)
 			Expect(len(targetNodes.Items)).To(Equal(int(targetNumNodes)))

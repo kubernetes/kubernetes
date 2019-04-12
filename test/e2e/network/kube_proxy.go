@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/images/net/nat"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -80,7 +81,7 @@ var _ = SIGDescribe("Network", func() {
 		// Some distributions (Ubuntu 16.04 etc.) don't support the proc file.
 		_, err := framework.IssueSSHCommandWithResult(
 			"ls /proc/net/nf_conntrack",
-			framework.TestContext.Provider,
+			testcontext.TestContext.Provider,
 			clientNodeInfo.node)
 		if err != nil && strings.Contains(err.Error(), "No such file or directory") {
 			framework.Skipf("The node %s does not support /proc/net/nf_conntrack", clientNodeInfo.name)
@@ -183,7 +184,7 @@ var _ = SIGDescribe("Network", func() {
 		framework.IssueSSHCommandWithResult(
 			fmt.Sprintf("sudo cat /proc/net/nf_conntrack | grep 'dport=%v'",
 				testDaemonTCPPort),
-			framework.TestContext.Provider,
+			testcontext.TestContext.Provider,
 			clientNodeInfo.node)
 
 		// Timeout in seconds is available as the fifth column from
@@ -196,7 +197,7 @@ var _ = SIGDescribe("Network", func() {
 					"| awk '{print $5}' ",
 				serverNodeInfo.nodeIP,
 				testDaemonTCPPort),
-			framework.TestContext.Provider,
+			testcontext.TestContext.Provider,
 			clientNodeInfo.node)
 		framework.ExpectNoError(err)
 

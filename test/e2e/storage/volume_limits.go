@@ -22,6 +22,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -33,7 +34,7 @@ var _ = utils.SIGDescribe("Volume limits", func() {
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("aws", "gce", "gke")
 		c = f.ClientSet
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, testcontext.TestContext.NodeSchedulableTimeout))
 	})
 
 	It("should verify that all nodes have volume limits", func() {

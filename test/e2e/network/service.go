@@ -38,6 +38,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -91,7 +92,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning load balancer resource for %s", lb)
-			framework.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+			framework.CleanupServiceResources(cs, lb, testcontext.TestContext.CloudConfig.Region, testcontext.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -279,7 +280,7 @@ var _ = SIGDescribe("Services", func() {
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 
 		if len(nodes.Items) == 1 {
-			framework.Skipf("The test requires two Ready nodes on %s, but found just one.", framework.TestContext.Provider)
+			framework.Skipf("The test requires two Ready nodes on %s, but found just one.", testcontext.TestContext.Provider)
 		}
 
 		node1 := nodes.Items[0]
@@ -410,7 +411,7 @@ var _ = SIGDescribe("Services", func() {
 		result, err := framework.SSH(`
 			sudo iptables -t nat -F KUBE-SERVICES || true;
 			sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
-			sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, framework.TestContext.Provider)
+			sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, testcontext.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			framework.LogSSHResult(result)
 			framework.Failf("couldn't remove iptable rules: %v", err)
@@ -1308,7 +1309,7 @@ var _ = SIGDescribe("Services", func() {
 		By("Verifying pods for RC " + t.Name)
 		framework.ExpectNoError(framework.VerifyPods(t.Client, t.Namespace, t.Name, false, 1))
 
-		svcName := fmt.Sprintf("%v.%v.svc.%v", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		svcName := fmt.Sprintf("%v.%v.svc.%v", serviceName, f.Namespace.Name, testcontext.TestContext.ClusterDNSDomain)
 		By("Waiting for endpoints of Service with DNS name " + svcName)
 
 		execPodName := framework.CreateExecPodOrFail(f.ClientSet, f.Namespace.Name, "execpod-", nil)
@@ -1864,7 +1865,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning load balancer resource for %s", lb)
-			framework.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+			framework.CleanupServiceResources(cs, lb, testcontext.TestContext.CloudConfig.Region, testcontext.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -2271,7 +2272,7 @@ func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface
 		framework.StopServeHostnameService(cs, ns, serviceName)
 		lb := cloudprovider.DefaultLoadBalancerName(svc)
 		framework.Logf("cleaning load balancer resource for %s", lb)
-		framework.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+		framework.CleanupServiceResources(cs, lb, testcontext.TestContext.CloudConfig.Region, testcontext.TestContext.CloudConfig.Zone)
 	}()
 	ingressIP := framework.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 	port := int(svc.Spec.Ports[0].Port)

@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	"fmt"
 	"os/exec"
@@ -98,7 +99,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 					// Wait for container runtime to be running
 					var pid int
 					Eventually(func() error {
-						runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+						runtimePids, err := getPidsForProcess(testcontext.TestContext.ContainerRuntimeProcessName, testcontext.TestContext.ContainerRuntimePidFile)
 						if err != nil {
 							return err
 						}

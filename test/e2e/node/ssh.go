@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -77,7 +78,7 @@ var _ = SIGDescribe("SSH", func() {
 			By(fmt.Sprintf("SSH'ing to %d nodes and running %s", len(testhosts), testCase.cmd))
 
 			for _, host := range testhosts {
-				result, err := framework.SSH(testCase.cmd, host, framework.TestContext.Provider)
+				result, err := framework.SSH(testCase.cmd, host, testcontext.TestContext.Provider)
 				stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 				if err != testCase.expectedError {
 					framework.Failf("Ran %s on %s, got error %v, expected %v", testCase.cmd, host, err, testCase.expectedError)
@@ -103,7 +104,7 @@ var _ = SIGDescribe("SSH", func() {
 
 		// Quickly test that SSH itself errors correctly.
 		By("SSH'ing to a nonexistent host")
-		if _, err = framework.SSH(`echo "hello"`, "i.do.not.exist", framework.TestContext.Provider); err == nil {
+		if _, err = framework.SSH(`echo "hello"`, "i.do.not.exist", testcontext.TestContext.Provider); err == nil {
 			framework.Failf("Expected error trying to SSH to nonexistent host.")
 		}
 	})

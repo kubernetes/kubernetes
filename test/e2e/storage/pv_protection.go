@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -50,7 +51,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	BeforeEach(func() {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, testcontext.TestContext.NodeSchedulableTimeout))
 
 		// Enforce binding only within test space via selector labels
 		volLabel = labels.Set{framework.VolumeSelectorKey: nameSpace}

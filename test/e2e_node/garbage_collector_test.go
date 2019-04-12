@@ -27,6 +27,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -261,7 +262,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 				return nil
 			}, garbageCollectDuration, runtimePollInterval).Should(BeNil())
 
-			if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+			if CurrentGinkgoTestDescription().Failed && testcontext.TestContext.DumpLogsOnFailure {
 				logNodeEvents(f)
 				logPodEvents(f)
 			}

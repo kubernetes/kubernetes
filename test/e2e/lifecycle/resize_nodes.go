@@ -25,6 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -53,10 +54,10 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 		systemPods, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = int32(len(systemPods))
-		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
-			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
+		if strings.Index(testcontext.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
+			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", testcontext.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
-			group = framework.TestContext.CloudConfig.NodeInstanceGroup
+			group = testcontext.TestContext.CloudConfig.NodeInstanceGroup
 		}
 	})
 
@@ -78,7 +79,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			}
 
 			By("restoring the original node instance group size")
-			if err := framework.ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+			if err := framework.ResizeGroup(group, int32(testcontext.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
@@ -93,7 +94,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 				By("waiting 5 minutes for all dead tunnels to be dropped")
 				time.Sleep(5 * time.Minute)
 			}
-			if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+			if err := framework.WaitForGroupSize(group, int32(testcontext.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 
@@ -118,7 +119,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
 			Expect(err).NotTo(HaveOccurred())
 
-			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
+			targetNumNodes := int32(testcontext.TestContext.CloudConfig.NumNodes - 1)
 			By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
 			Expect(err).NotTo(HaveOccurred())
@@ -149,7 +150,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
 			Expect(err).NotTo(HaveOccurred())
 
-			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes + 1)
+			targetNumNodes := int32(testcontext.TestContext.CloudConfig.NumNodes + 1)
 			By(fmt.Sprintf("increasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
 			Expect(err).NotTo(HaveOccurred())

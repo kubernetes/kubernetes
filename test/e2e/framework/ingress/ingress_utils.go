@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -441,7 +442,7 @@ func (j *TestJig) runCreate(ing *extensions.Ingress) (*extensions.Ingress, error
 		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Create(ing)
 	}
 	// Use kubemci to create a multicluster ingress.
-	filePath := framework.TestContext.OutputDir + "/mci.yaml"
+	filePath := testcontext.TestContext.OutputDir + "/mci.yaml"
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
@@ -456,7 +457,7 @@ func (j *TestJig) runUpdate(ing *extensions.Ingress) (*extensions.Ingress, error
 	}
 	// Use kubemci to update a multicluster ingress.
 	// kubemci does not have an update command. We use "create --force" to update an existing ingress.
-	filePath := framework.TestContext.OutputDir + "/mci.yaml"
+	filePath := testcontext.TestContext.OutputDir + "/mci.yaml"
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
@@ -563,7 +564,7 @@ func (j *TestJig) runDelete(ing *extensions.Ingress) error {
 		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
 	}
 	// Use kubemci to delete a multicluster ingress.
-	filePath := framework.TestContext.OutputDir + "/mci.yaml"
+	filePath := testcontext.TestContext.OutputDir + "/mci.yaml"
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return err
 	}
@@ -796,7 +797,7 @@ func (j *TestJig) ConstructFirewallForIngress(firewallRuleName string, nodeTags 
 
 	fw := compute.Firewall{}
 	fw.Name = firewallRuleName
-	fw.SourceRanges = framework.TestContext.CloudConfig.Provider.LoadBalancerSrcRanges()
+	fw.SourceRanges = testcontext.TestContext.CloudConfig.Provider.LoadBalancerSrcRanges()
 	fw.TargetTags = nodeTags
 	fw.Allowed = []*compute.FirewallAllowed{
 		{

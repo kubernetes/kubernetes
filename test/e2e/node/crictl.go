@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -55,7 +56,7 @@ var _ = SIGDescribe("crictl", func() {
 			host := hosts[0]
 			By(fmt.Sprintf("SSH'ing to node %q to run %q", host, testCase.cmd))
 
-			result, err := framework.SSH(testCase.cmd, host, framework.TestContext.Provider)
+			result, err := framework.SSH(testCase.cmd, host, testcontext.TestContext.Provider)
 			stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 			if err != nil {
 				framework.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)

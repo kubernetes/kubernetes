@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	dm "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
@@ -83,7 +84,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			By("Waiting for the resource exported by the stub device plugin to become available on the local node")
 			devsLen := int64(len(devs))
 			Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(testcontext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
 					numberOfDevicesAllocatable(node, resourceName) == devsLen
@@ -124,7 +125,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			// Otherwise, Kubelet DeviceManager may remove the re-registered sockets after it starts.
 			By("Wait for node is ready")
 			Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(testcontext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				for _, cond := range node.Status.Conditions {
 					if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue && cond.LastHeartbeatTime.After(restartTime) {
@@ -150,7 +151,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			By("Waiting for resource to become available on the local node after re-registration")
 			Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(testcontext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
 					numberOfDevicesAllocatable(node, resourceName) == devsLen
@@ -170,7 +171,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			By("Waiting for stub device plugin to become unhealthy on the local node")
 			Eventually(func() int64 {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(testcontext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesAllocatable(node, resourceName)
 			}, 30*time.Second, framework.Poll).Should(Equal(int64(0)))
@@ -195,7 +196,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			By("Waiting for the resource exported by the stub device plugin to become healthy on the local node")
 			Eventually(func() int64 {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(testcontext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesAllocatable(node, resourceName)
 			}, 30*time.Second, framework.Poll).Should(Equal(devsLen))
@@ -206,7 +207,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			By("Waiting for stub device plugin to become unavailable on the local node")
 			Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(testcontext.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfDevicesCapacity(node, resourceName) <= 0
 			}, 10*time.Minute, framework.Poll).Should(BeTrue())

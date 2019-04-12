@@ -26,6 +26,7 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -43,7 +44,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, testcontext.TestContext.NodeSchedulableTimeout))
 		framework.ExpectNoError(err)
 		workingDir = os.Getenv("VSPHERE_WORKING_DIR")
 		Expect(workingDir).NotTo(BeEmpty())

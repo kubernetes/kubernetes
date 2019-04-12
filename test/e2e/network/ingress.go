@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 
@@ -89,7 +90,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
-				Cloud:  framework.TestContext.CloudConfig,
+				Cloud:  testcontext.TestContext.CloudConfig,
 			}
 			err := gceController.Init()
 			Expect(err).NotTo(HaveOccurred())
@@ -313,7 +314,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
-				Cloud:  framework.TestContext.CloudConfig,
+				Cloud:  testcontext.TestContext.CloudConfig,
 			}
 			err := gceController.Init()
 			Expect(err).NotTo(HaveOccurred())
@@ -652,7 +653,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			gceController = &gce.IngressController{
 				Ns:     ns,
 				Client: jig.Client,
-				Cloud:  framework.TestContext.CloudConfig,
+				Cloud:  testcontext.TestContext.CloudConfig,
 			}
 			err := gceController.Init()
 			Expect(err).NotTo(HaveOccurred())
@@ -717,7 +718,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			verifyKubemciStatusHas(name, "is spread across 1 cluster")
 			// Validate that removing the ingress from all clusters throws an error.
 			// Reuse the ingress file created while creating the ingress.
-			filePath := filepath.Join(framework.TestContext.OutputDir, "mci.yaml")
+			filePath := filepath.Join(testcontext.TestContext.OutputDir, "mci.yaml")
 			output, err := framework.RunKubemciWithKubeconfig("remove-clusters", name, "--ingress="+filePath)
 			if err != nil {
 				framework.Failf("unexpected error in running kubemci remove-clusters command to remove from all clusters: %s", err)
@@ -781,7 +782,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// but we want to allow easy testing where a user might've hand
 			// configured firewalls.
 			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(gce.GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
+				framework.ExpectNoError(gce.GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), testcontext.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", testcontext.TestContext.CloudConfig.Network))
 			} else {
 				framework.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
 			}
@@ -791,7 +792,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		AfterEach(func() {
 			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(gce.GcloudComputeResourceDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
+				framework.ExpectNoError(gce.GcloudComputeResourceDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), testcontext.TestContext.CloudConfig.ProjectID))
 			}
 			if CurrentGinkgoTestDescription().Failed {
 				framework.DescribeIng(ns)

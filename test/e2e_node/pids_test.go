@@ -28,6 +28,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -39,7 +40,7 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *apiv1.Po
 	// convert the cgroup name to its literal form
 	cgroupFsName := ""
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
-	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+	if testcontext.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		cgroupFsName = cgroupName.ToSystemd()
 	} else {
 		cgroupFsName = cgroupName.ToCgroupfs()

@@ -23,6 +23,7 @@ import (
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	"k8s.io/klog"
 )
@@ -126,7 +127,7 @@ func (es *e2eServices) startApiServer(etcdStorage *storagebackend.Config) error 
 // startNamespaceController starts the embedded namespace controller or returns an error.
 func (es *e2eServices) startNamespaceController() error {
 	klog.Info("Starting namespace controller")
-	es.nsController = NewNamespaceController(framework.TestContext.Host)
+	es.nsController = NewNamespaceController(testcontext.TestContext.Host)
 	return es.nsController.Start()
 }
 

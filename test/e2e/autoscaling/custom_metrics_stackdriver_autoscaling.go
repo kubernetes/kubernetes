@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
 
 	. "github.com/onsi/ginkgo"
@@ -226,7 +227,7 @@ type CustomMetricTestCase struct {
 }
 
 func (tc *CustomMetricTestCase) Run() {
-	projectId := framework.TestContext.CloudConfig.ProjectID
+	projectId := testcontext.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)

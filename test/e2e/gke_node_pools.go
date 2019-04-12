@@ -21,6 +21,7 @@ import (
 	"os/exec"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -40,9 +41,9 @@ var _ = framework.KubeDescribe("GKE node pools [Feature:GKENodePool]", func() {
 })
 
 func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
-	framework.Logf("Create node pool: %q in cluster: %q", poolName, framework.TestContext.CloudConfig.Cluster)
+	framework.Logf("Create node pool: %q in cluster: %q", poolName, testcontext.TestContext.CloudConfig.Cluster)
 
-	clusterStr := fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster)
+	clusterStr := fmt.Sprintf("--cluster=%s", testcontext.TestContext.CloudConfig.Cluster)
 
 	out, err := exec.Command("gcloud", "container", "node-pools", "create",
 		poolName,
@@ -57,7 +58,7 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 	out, err = exec.Command("gcloud", "container", "node-pools", "list",
 		clusterStr).CombinedOutput()
 	if err != nil {
-		framework.Failf("Failed to list node pools from cluster %q. Err: %v\n%v", framework.TestContext.CloudConfig.Cluster, err, string(out))
+		framework.Failf("Failed to list node pools from cluster %q. Err: %v\n%v", testcontext.TestContext.CloudConfig.Cluster, err, string(out))
 	}
 	framework.Logf("Node pools:\n%s", string(out))
 
@@ -68,7 +69,7 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 	}
 	framework.Logf("Success, found 2 nodes with correct node pool labels.")
 
-	framework.Logf("Deleting node pool: %q in cluster: %q", poolName, framework.TestContext.CloudConfig.Cluster)
+	framework.Logf("Deleting node pool: %q in cluster: %q", poolName, testcontext.TestContext.CloudConfig.Cluster)
 	out, err = exec.Command("gcloud", "container", "node-pools", "delete",
 		poolName,
 		clusterStr,
@@ -82,7 +83,7 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 	out, err = exec.Command("gcloud", "container", "node-pools", "list",
 		clusterStr).CombinedOutput()
 	if err != nil {
-		framework.Failf("\nFailed to list node pools from cluster %q. Err: %v\n%v", framework.TestContext.CloudConfig.Cluster, err, string(out))
+		framework.Failf("\nFailed to list node pools from cluster %q. Err: %v\n%v", testcontext.TestContext.CloudConfig.Cluster, err, string(out))
 	}
 	framework.Logf("\nNode pools:\n%s", string(out))
 

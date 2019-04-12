@@ -43,6 +43,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -145,7 +146,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	controllerMem = math.MaxUint64
 	schedulerCPU := math.MaxFloat32
 	schedulerMem = math.MaxUint64
-	framework.Logf("Setting resource constraints for provider: %s", framework.TestContext.Provider)
+	framework.Logf("Setting resource constraints for provider: %s", testcontext.TestContext.Provider)
 	if framework.ProviderIs("kubemark") {
 		if numNodes <= 5 {
 			apiserverCPU = 0.35
@@ -519,7 +520,7 @@ var _ = SIGDescribe("Density", func() {
 
 		framework.ExpectNoError(framework.ResetSchedulerMetrics(c))
 		framework.ExpectNoError(framework.ResetMetrics(c))
-		framework.ExpectNoError(os.Mkdir(fmt.Sprintf(framework.TestContext.OutputDir+"/%s", uuid), 0777))
+		framework.ExpectNoError(os.Mkdir(fmt.Sprintf(testcontext.TestContext.OutputDir+"/%s", uuid), 0777))
 
 		framework.Logf("Listing nodes for easy debugging:\n")
 		for _, node := range nodes.Items {
@@ -624,7 +625,7 @@ var _ = SIGDescribe("Density", func() {
 				f.AddonResourceConstraints = func() map[string]framework.ResourceConstraint { return density30AddonResourceVerifier(nodeCount) }()
 			}
 			totalPods = (podsPerNode - itArg.daemonsPerNode) * nodeCount
-			fileHndl, err := os.Create(fmt.Sprintf(framework.TestContext.OutputDir+"/%s/pod_states.csv", uuid))
+			fileHndl, err := os.Create(fmt.Sprintf(testcontext.TestContext.OutputDir+"/%s/pod_states.csv", uuid))
 			framework.ExpectNoError(err)
 			defer fileHndl.Close()
 			nodePrepPhase.End()

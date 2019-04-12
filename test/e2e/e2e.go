@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/manifest"
@@ -55,7 +56,7 @@ import (
 )
 
 var (
-	cloudConfig      = &framework.TestContext.CloudConfig
+	cloudConfig      = &testcontext.TestContext.CloudConfig
 	nodeKillerStopCh = make(chan struct{})
 )
 
@@ -70,7 +71,7 @@ var (
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only on Ginkgo node 1
 
-	switch framework.TestContext.Provider {
+	switch testcontext.TestContext.Provider {
 	case "gce", "gke":
 		framework.LogClusterImageSources()
 	}
@@ -82,7 +83,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	// Delete any namespaces except those created by the system. This ensures no
 	// lingering resources are left over from a previous test run.
-	if framework.TestContext.CleanStart {
+	if testcontext.TestContext.CleanStart {
 		deleted, err := framework.DeleteNamespaces(c, nil, /* deleteFilter */
 			[]string{
 				metav1.NamespaceSystem,
@@ -101,30 +102,30 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// In large clusters we may get to this point but still have a bunch
 	// of nodes without Routes created. Since this would make a node
 	// unschedulable, we need to wait until all of them are schedulable.
-	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, testcontext.TestContext.NodeSchedulableTimeout))
 
 	// If NumNodes is not specified then auto-detect how many are scheduleable and not tainted
-	if framework.TestContext.CloudConfig.NumNodes == framework.DefaultNumNodes {
-		framework.TestContext.CloudConfig.NumNodes = len(framework.GetReadySchedulableNodesOrDie(c).Items)
+	if testcontext.TestContext.CloudConfig.NumNodes == framework.DefaultNumNodes {
+		testcontext.TestContext.CloudConfig.NumNodes = len(framework.GetReadySchedulableNodesOrDie(c).Items)
 	}
 
 	// Ensure all pods are running and ready before starting tests (otherwise,
 	// cluster infrastructure pods that are being pulled or started can block
 	// test pods from running, and tests that ensure all pods are running and
 	// ready will fail).
-	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
+	podStartupTimeout := testcontext.TestContext.SystemPodsStartupTimeout
 	// TODO: In large clusters, we often observe a non-starting pods due to
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
-	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
+	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(testcontext.TestContext.MinStartupPods), int32(testcontext.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		framework.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
-	if err := framework.WaitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
+	if err := framework.WaitForDaemonSets(c, metav1.NamespaceSystem, int32(testcontext.TestContext.AllowedNotReadyNodes), testcontext.TestContext.SystemDaemonsetStartupTimeout); err != nil {
 		framework.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
 	}
 
@@ -144,8 +145,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
 
-	if framework.TestContext.NodeKiller.Enabled {
-		nodeKiller := framework.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
+	if testcontext.TestContext.NodeKiller.Enabled {
+		nodeKiller := framework.NewNodeKiller(testcontext.TestContext.NodeKiller, c, testcontext.TestContext.Provider)
 		nodeKillerStopCh = make(chan struct{})
 		go nodeKiller.Run(nodeKillerStopCh)
 	}
@@ -165,15 +166,15 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 }, func() {
 	// Run only Ginkgo on node 1
 	framework.Logf("Running AfterSuite actions on node 1")
-	if framework.TestContext.ReportDir != "" {
-		framework.CoreDump(framework.TestContext.ReportDir)
+	if testcontext.TestContext.ReportDir != "" {
+		framework.CoreDump(testcontext.TestContext.ReportDir)
 	}
-	if framework.TestContext.GatherSuiteMetricsAfterTest {
+	if testcontext.TestContext.GatherSuiteMetricsAfterTest {
 		if err := gatherTestSuiteMetrics(); err != nil {
 			framework.Logf("Error gathering metrics: %v", err)
 		}
 	}
-	if framework.TestContext.NodeKiller.Enabled {
+	if testcontext.TestContext.NodeKiller.Enabled {
 		close(nodeKillerStopCh)
 	}
 })
@@ -186,7 +187,7 @@ func gatherTestSuiteMetrics() error {
 	}
 
 	// Grab metrics for apiserver, scheduler, controller-manager, kubelet (for non-kubemark case) and cluster autoscaler (optionally).
-	grabber, err := metrics.NewMetricsGrabber(c, nil, !framework.ProviderIs("kubemark"), true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics)
+	grabber, err := metrics.NewMetricsGrabber(c, nil, !framework.ProviderIs("kubemark"), true, true, true, testcontext.TestContext.IncludeClusterAutoscalerMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create MetricsGrabber: %v", err)
 	}
@@ -198,8 +199,8 @@ func gatherTestSuiteMetrics() error {
 
 	metricsForE2E := (*framework.MetricsForE2E)(&received)
 	metricsJSON := metricsForE2E.PrintJSON()
-	if framework.TestContext.ReportDir != "" {
-		filePath := path.Join(framework.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
+	if testcontext.TestContext.ReportDir != "" {
+		filePath := path.Join(testcontext.TestContext.ReportDir, "MetricsForE2ESuite_"+time.Now().Format(time.RFC3339)+".json")
 		if err := ioutil.WriteFile(filePath, []byte(metricsJSON), 0644); err != nil {
 			return fmt.Errorf("error writing to %q: %v", filePath, err)
 		}
@@ -228,13 +229,13 @@ func RunE2ETests(t *testing.T) {
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
-	if framework.TestContext.ReportDir != "" {
+	if testcontext.TestContext.ReportDir != "" {
 		// TODO: we should probably only be trying to create this directory once
 		// rather than once-per-Ginkgo-node.
-		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
+		if err := os.MkdirAll(testcontext.TestContext.ReportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
+			r = append(r, reporters.NewJUnitReporter(path.Join(testcontext.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", testcontext.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
 		}
 	}
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunId, config.GinkgoConfig.ParallelNode)

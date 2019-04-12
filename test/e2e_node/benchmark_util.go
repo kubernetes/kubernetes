@@ -29,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	nodeperftype "k8s.io/kubernetes/test/e2e_node/perftype"
 
@@ -44,7 +45,7 @@ const (
 // data for the test into the file with the specified prefix.
 func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
 	testName := labels["test"]
-	fileName := path.Join(framework.TestContext.ReportDir, fmt.Sprintf("%s-%s-%s.json", prefix, framework.TestContext.ReportPrefix, testName))
+	fileName := path.Join(testcontext.TestContext.ReportDir, fmt.Sprintf("%s-%s-%s.json", prefix, testcontext.TestContext.ReportPrefix, testName))
 	labels["timestamp"] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
 	framework.Logf("Dumping perf data for test %q to %q.", testName, fileName)
 	if err := ioutil.WriteFile(fileName, []byte(framework.PrettyPrintJSON(data)), 0644); err != nil {
@@ -53,11 +54,11 @@ func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
 }
 
 // logPerfData writes the perf data to a standalone json file if the
-// framework.TestContext.ReportDir is non-empty, or to the general build log
+// testcontext.TestContext.ReportDir is non-empty, or to the general build log
 // otherwise. The perfType identifies which type of the perf data it is, such
 // as "cpu" and "memory". If an error occurs, no perf data will be logged.
 func logPerfData(p *perftype.PerfData, perfType string) {
-	if framework.TestContext.ReportDir == "" {
+	if testcontext.TestContext.ReportDir == "" {
 		framework.PrintPerfData(p)
 		return
 	}
@@ -65,7 +66,7 @@ func logPerfData(p *perftype.PerfData, perfType string) {
 }
 
 // logDensityTimeSeries writes the time series data of operation and resource
-// usage to a standalone json file if the framework.TestContext.ReportDir is
+// usage to a standalone json file if the testcontext.TestContext.ReportDir is
 // non-empty, or to the general build log otherwise. If an error occurs,
 // no perf data will be logged.
 func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1.Time, testInfo map[string]string) {
@@ -81,7 +82,7 @@ func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1
 	// Attach resource time series.
 	timeSeries.ResourceData = rc.GetResourceTimeSeries()
 
-	if framework.TestContext.ReportDir == "" {
+	if testcontext.TestContext.ReportDir == "" {
 		framework.Logf("%s %s\n%s", TimeSeriesTag, framework.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
 		return
 	}
@@ -153,7 +154,7 @@ func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatenc
 // description, the name of the node on which the test will be run, the image
 // name of the node, and the node capacities.
 func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[string]string {
-	nodeName := framework.TestContext.NodeName
+	nodeName := testcontext.TestContext.NodeName
 	node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
@@ -178,8 +179,8 @@ func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[stri
 	}
 
 	image := node.Status.NodeInfo.OSImage
-	if framework.TestContext.ImageDescription != "" {
-		image = fmt.Sprintf("%s (%s)", image, framework.TestContext.ImageDescription)
+	if testcontext.TestContext.ImageDescription != "" {
+		image = fmt.Sprintf("%s (%s)", image, testcontext.TestContext.ImageDescription)
 	}
 	return map[string]string{
 		"node":    nodeName,

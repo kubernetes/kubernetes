@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -153,7 +154,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	Describe("QOS containers", func() {
 		Context("On enabling QOS cgroup hierarchy", func() {
 			It("Top level QoS containers should have been created [NodeConformance]", func() {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !testcontext.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
 				cgroupsToVerify := []string{burstableCgroup, bestEffortCgroup}
@@ -168,7 +169,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	Describe("Pod containers [NodeConformance]", func() {
 		Context("On scheduling a Guaranteed Pod", func() {
 			It("Pod containers should have been created under the cgroup-root", func() {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !testcontext.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
 				var (
@@ -212,7 +213,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		})
 		Context("On scheduling a BestEffort Pod", func() {
 			It("Pod containers should have been created under the BestEffort cgroup", func() {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !testcontext.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
 				var (
@@ -256,7 +257,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		})
 		Context("On scheduling a Burstable Pod", func() {
 			It("Pod containers should have been created under the Burstable cgroup", func() {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+				if !testcontext.TestContext.KubeletConfig.CgroupsPerQOS {
 					return
 				}
 				var (

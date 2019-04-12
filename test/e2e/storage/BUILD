@@ -68,6 +68,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
+        "//test/e2e/framework/testcontext:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/storage/drivers:go_default_library",
         "//test/e2e/storage/testpatterns:go_default_library",

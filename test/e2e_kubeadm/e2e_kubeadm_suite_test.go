@@ -30,6 +30,7 @@ import (
 
 	morereporters "github.com/onsi/ginkgo/reporters"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 )
 
 func init() {
@@ -41,21 +42,21 @@ func init() {
 
 func TestMain(m *testing.M) {
 	pflag.Parse()
-	framework.AfterReadingAllFlags(&framework.TestContext)
+	framework.AfterReadingAllFlags(&testcontext.TestContext)
 	os.Exit(m.Run())
 }
 
 func TestE2E(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	reporters := []ginkgo.Reporter{}
-	reportDir := framework.TestContext.ReportDir
+	reportDir := testcontext.TestContext.ReportDir
 	if reportDir != "" {
 		// Create the directory if it doesn't already exists
 		if err := os.MkdirAll(reportDir, 0755); err != nil {
 			t.Fatalf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory
-			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
+			junitFile := fmt.Sprintf("junit_%s_%02d.xml", testcontext.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
 			junitPath := filepath.Join(reportDir, junitFile)
 			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}

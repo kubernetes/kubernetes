@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testcontext"
 
 	"fmt"
 
@@ -105,7 +106,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 										Name: "kubelet-pods",
 										VolumeSource: v1.VolumeSource{
 											// TODO: remove hardcoded kubelet volume directory path
-											// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
+											// testcontext.TestContext.KubeVolumeDir is currently not populated for node e2e
 											HostPath: &v1.HostPathVolumeSource{Path: "/var/lib/kubelet/pods"},
 										},
 									},
