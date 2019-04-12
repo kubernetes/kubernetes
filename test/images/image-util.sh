@@ -131,7 +131,7 @@ push() {
   export DOCKER_CLI_EXPERIMENTAL="enabled"
   # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${IMAGE}-amd64:${TAG} ${REGISTRY}/${IMAGE}-ppc64le:${TAG}'
   manifest=$(echo "$archs" | ${SED} -e "s~[^ ]*~$REGISTRY\/$IMAGE\-&:$TAG~g")
-  docker manifest create --amend "${REGISTRY}/${IMAGE}:${TAG}" "${manifest}"
+  docker manifest create --amend "${REGISTRY}/${IMAGE}:${TAG}" ${manifest}
   for arch in ${archs}; do
     docker manifest annotate --arch "${arch}" "${REGISTRY}/${IMAGE}:${TAG}" "${REGISTRY}/${IMAGE}-${arch}:${TAG}"
   done
