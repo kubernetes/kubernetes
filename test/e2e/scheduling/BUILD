@@ -46,6 +46,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/gpu:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
+        "//test/e2e/framework/replicaset:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
