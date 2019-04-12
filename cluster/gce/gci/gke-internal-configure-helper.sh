@@ -169,3 +169,71 @@ function gke-internal-master-start {
   start_vertical_pod_autoscaler
   echo "Internal GKE configuration done"
 }
+
+# Configure the node kernel parameters.
+#
+# This function expects no arguments.
+#
+# This function
+#   - Reads the kernel parameter default values from release artifacts and the
+#     overrides from SYSCTL_OVERRIDES, generates the sysctl conf files under
+#     /etc/sysctl.d/, and applies them using systemd-sysctl.
+#   - Sets the variable POD_SYSCTLS with the namespaced GKE fleetwide kernel
+#     parameters and the user overrides. The variable is expected to be read
+#     by the start-kubelet function.
+function configure-node-sysctls {
+  local -r dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/sysctl"
+  local -r sysctl_overrides="${SYSCTL_OVERRIDES:-}"
+  local -r namespaced_sysctl_names="${dir}/namespaced-sysctl-names.yaml"
+  # Use the GKE fleetwide default values if ENABLE_SYSCTL_TUNING is "true".
+  if [[ "${ENABLE_SYSCTL_TUNING:-}" == "true" ]]; then
+    local -r sysctl_defaults="${dir}/sysctl-defaults.yaml"
+  else
+    local -r sysctl_defaults="/dev/null"
+  fi
+
+  local -r conf_dir="/etc/sysctl.d"
+  # The overrides must be applied after the defaults. This is guaranteed by
+  # the alphabetical order of the file names.
+  #
+  # It's guaranteed that 99-sysctl.conf is the only file that comes after
+  # 99-gke-defaults.conf and 99-gke-overrides.conf in the current sysctl config
+  # layout on COS and Ubuntu.
+  #
+  # On both images, 99-sysctl.conf is a symlink to /etc/sysctl.conf, which
+  # contains no settings.
+  #
+  # TODO(b/131158180): Allow GKE to provide sysctl config files in a more
+  # reliable way by renaming the existing 99-*.conf files to 8x-*.conf.
+  local -r output_defaults="${conf_dir}/99-gke-defaults.conf"
+  local -r output_overrides="${conf_dir}/99-gke-overrides.conf"
+
+  # Create the directory in case it doesn't exist.
+  mkdir -p "${conf_dir}"
+
+  echo "Sysctl overrides: ${sysctl_overrides}"
+
+  # Generate the kernel parameter defaults and overrides configs in
+  # /etc/sysctl.d/. They will be loaded by systemd-sysctl on reboot.
+  python "${dir}/generate-conf-files.py" \
+    --sysctl-defaults="${sysctl_defaults}" \
+    --sysctl-overrides="${sysctl_overrides}" \
+    --output-defaults=${output_defaults} \
+    --output-overrides=${output_overrides}
+
+  # Extract the namespaced kernel parameter defaults and overrides that should
+  # be passed to kubelet and set inside pod namespaces.
+  POD_SYSCTLS=$(python "${dir}/extract-namespaced.py" \
+    --sysctl-defaults="${sysctl_defaults}" \
+    --sysctl-overrides="${sysctl_overrides}" \
+    --namespaced-sysctl-names="${namespaced_sysctl_names}")
+
+  echo "Sysctls to be set in pod namespaces: ${POD_SYSCTLS}"
+
+  # Run systemd-sysctl to apply the kernel parameters on node.
+  if [[ -e "/usr/lib/systemd/systemd-sysctl" ]]; then
+    /usr/lib/systemd/systemd-sysctl
+  else
+    /lib/systemd/systemd-sysctl
+  fi
+}
