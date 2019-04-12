@@ -58,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -1699,7 +1700,7 @@ metadata:
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			err := framework.WaitForJobGone(c, ns, jobName, wait.ForeverTestTimeout)
+			err := jobutil.WaitForJobGone(c, ns, jobName, wait.ForeverTestTimeout)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("verifying the job " + jobName + " was deleted")

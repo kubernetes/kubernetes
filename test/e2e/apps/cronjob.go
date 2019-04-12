@@ -34,6 +34,7 @@ import (
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/e2e/framework"
+	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -210,7 +211,7 @@ var _ = SIGDescribe("CronJob", func() {
 		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name))
 
 		By("Ensuring job was deleted")
-		_, err = framework.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
+		_, err = jobutil.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 

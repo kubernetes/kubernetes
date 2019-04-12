@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -39,12 +40,12 @@ var _ = SIGDescribe("Job", func() {
 	// Simplest case: all pods succeed promptly
 	It("should run a job to completion when tasks succeed", func() {
 		By("Creating a job")
-		job := framework.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
-		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		job := jobutil.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 
 		By("Ensuring job reaches completions")
-		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
+		err = jobutil.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
@@ -58,12 +59,12 @@ var _ = SIGDescribe("Job", func() {
 		// up to 5 minutes between restarts, making test timeouts
 		// due to successive failures too likely with a reasonable
 		// test timeout.
-		job := framework.NewTestJob("failOnce", "fail-once-local", v1.RestartPolicyOnFailure, parallelism, completions, nil, backoffLimit)
-		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		job := jobutil.NewTestJob("failOnce", "fail-once-local", v1.RestartPolicyOnFailure, parallelism, completions, nil, backoffLimit)
+		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 
 		By("Ensuring job reaches completions")
-		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
+		err = jobutil.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
@@ -79,61 +80,61 @@ var _ = SIGDescribe("Job", func() {
 		// With the introduction of backoff limit and high failure rate this
 		// is hitting its timeout, the 3 is a reasonable that should make this
 		// test less flaky, for now.
-		job := framework.NewTestJob("randomlySucceedOrFail", "rand-non-local", v1.RestartPolicyNever, parallelism, 3, nil, 999)
-		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		job := jobutil.NewTestJob("randomlySucceedOrFail", "rand-non-local", v1.RestartPolicyNever, parallelism, 3, nil, 999)
+		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 
 		By("Ensuring job reaches completions")
-		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, *job.Spec.Completions)
+		err = jobutil.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, *job.Spec.Completions)
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
 	It("should exceed active deadline", func() {
 		By("Creating a job")
 		var activeDeadlineSeconds int64 = 1
-		job := framework.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
-		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		job := jobutil.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
+		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 		By("Ensuring job past active deadline")
-		err = framework.WaitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, time.Duration(activeDeadlineSeconds+10)*time.Second, "DeadlineExceeded")
+		err = jobutil.WaitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, time.Duration(activeDeadlineSeconds+10)*time.Second, "DeadlineExceeded")
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
 	})
 
 	It("should delete a job", func() {
 		By("Creating a job")
-		job := framework.NewTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
-		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		job := jobutil.NewTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 
 		By("Ensuring active pods == parallelism")
-		err = framework.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure active pods == parallelism in namespace: %s", f.Namespace.Name)
 
 		By("delete a job")
 		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name))
 
 		By("Ensuring job was deleted")
-		_, err = framework.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
+		_, err = jobutil.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
 		Expect(err).To(HaveOccurred(), "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 	})
 
 	It("should adopt matching orphans and release non-matching pods", func() {
 		By("Creating a job")
-		job := framework.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job := jobutil.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		// Replace job with the one returned from Create() so it has the UID.
 		// Save Kind since it won't be populated in the returned job.
 		kind := job.Kind
-		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 		job.Kind = kind
 
 		By("Ensuring active pods == parallelism")
-		err = framework.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
+		err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure active pods == parallelism in namespace: %s", f.Namespace.Name)
 
 		By("Orphaning one of the Job's Pods")
-		pods, err := framework.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+		pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
 		Expect(err).NotTo(HaveOccurred(), "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
 		Expect(pods.Items).To(HaveLen(int(parallelism)))
 		pod := pods.Items[0]
@@ -142,7 +143,7 @@ var _ = SIGDescribe("Job", func() {
 		})
 
 		By("Checking that the Job readopts the Pod")
-		Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "adopted", framework.JobTimeout,
+		Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "adopted", jobutil.JobTimeout,
 			func(pod *v1.Pod) (bool, error) {
 				controllerRef := metav1.GetControllerOf(pod)
 				if controllerRef == nil {
@@ -161,7 +162,7 @@ var _ = SIGDescribe("Job", func() {
 		})
 
 		By("Checking that the Job releases the Pod")
-		Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "released", framework.JobTimeout,
+		Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "released", jobutil.JobTimeout,
 			func(pod *v1.Pod) (bool, error) {
 				controllerRef := metav1.GetControllerOf(pod)
 				if controllerRef != nil {
@@ -175,16 +176,16 @@ var _ = SIGDescribe("Job", func() {
 	It("should exceed backoffLimit", func() {
 		By("Creating a job")
 		backoff := 1
-		job := framework.NewTestJob("fail", "backofflimit", v1.RestartPolicyNever, 1, 1, nil, int32(backoff))
-		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		job := jobutil.NewTestJob("fail", "backofflimit", v1.RestartPolicyNever, 1, 1, nil, int32(backoff))
+		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
 		By("Ensuring job exceed backofflimit")
 
-		err = framework.WaitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, framework.JobTimeout, "BackoffLimitExceeded")
+		err = jobutil.WaitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, jobutil.JobTimeout, "BackoffLimitExceeded")
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure job exceed backofflimit in namespace: %s", f.Namespace.Name)
 
 		By(fmt.Sprintf("Checking that %d pod created and status is failed", backoff+1))
-		pods, err := framework.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+		pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
 		Expect(err).NotTo(HaveOccurred(), "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
 		// Expect(pods.Items).To(HaveLen(backoff + 1))
 		// due to NumRequeus not being stable enough, especially with failed status
