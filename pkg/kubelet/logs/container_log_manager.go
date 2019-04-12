@@ -349,7 +349,7 @@ func (c *containerLogManager) compressLog(log string) error {
 	defer f.Close()
 	w := gzip.NewWriter(f)
 	defer w.Close()
-	if _, err := io.Copy(w, r); err != nil {
+	if _, err := io.CopyN(w, r, c.policy.MaxSize); err != nil {
 		return fmt.Errorf("failed to compress %q to %q: %v", log, tmpLog, err)
 	}
 	compressedLog := log + compressSuffix
