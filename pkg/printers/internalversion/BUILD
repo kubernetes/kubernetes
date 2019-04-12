@@ -26,7 +26,6 @@ go_test(
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/apis/storage:go_default_library",
-        "//pkg/printers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -81,7 +80,6 @@ go_library(
         "//pkg/apis/storage:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
-        "//pkg/printers:go_default_library",
         "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta1:go_default_library",
@@ -103,6 +101,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/duration:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
     ],
 )
 

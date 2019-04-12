@@ -31,7 +31,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/storage",
     deps = [
         "//pkg/apis/policy:go_default_library",
-        "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/printers/storage:go_default_library",
         "//pkg/registry/policy/poddisruptionbudget:go_default_library",
@@ -40,6 +39,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
     ],
 )
 

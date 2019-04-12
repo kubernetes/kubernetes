@@ -36,7 +36,6 @@ go_library(
         "//pkg/kubectl/util/interrupt:go_default_library",
         "//pkg/kubectl/util/printers:go_default_library",
         "//pkg/kubectl/util/templates:go_default_library",
-        "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

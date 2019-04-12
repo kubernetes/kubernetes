@@ -30,7 +30,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/core/namespace/storage",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/printers/storage:go_default_library",
         "//pkg/registry/core/namespace:go_default_library",
@@ -46,6 +45,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/dryrun:go_default_library",
+        "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
     ],
 )
 

@@ -14,6 +14,7 @@ require (
 	github.com/go-openapi/spec v0.17.2 // indirect
 	github.com/go-openapi/swag v0.17.2 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/pkg/errors v0.8.0
 	github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937
 	github.com/spf13/pflag v1.0.1

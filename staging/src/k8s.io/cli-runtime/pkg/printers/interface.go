@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // ResourcePrinterFunc is a function that can print objects
@@ -34,4 +35,24 @@ func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
 type ResourcePrinter interface {
 	// Print receives a runtime object, formats it and prints it to a writer.
 	PrintObj(runtime.Object, io.Writer) error
+}
+
+type PrintOptions struct {
+	// supported Format types can be found in pkg/printers/printers.go
+	OutputFormatType     string
+	OutputFormatArgument string
+
+	NoHeaders          bool
+	WithNamespace      bool
+	WithKind           bool
+	Wide               bool
+	ShowLabels         bool
+	AbsoluteTimestamps bool
+	Kind               schema.GroupKind
+	ColumnLabels       []string
+
+	SortBy string
+
+	// indicates if it is OK to ignore missing keys for rendering an output template.
+	AllowMissingKeys bool
 }
