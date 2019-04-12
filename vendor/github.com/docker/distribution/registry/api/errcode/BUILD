@@ -3,13 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "attributes.go",
-        "gotty.go",
-        "parser.go",
-        "types.go",
+        "errors.go",
+        "handler.go",
+        "register.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/Nvveen/Gotty",
-    importpath = "github.com/Nvveen/Gotty",
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/distribution/registry/api/errcode",
+    importpath = "github.com/docker/distribution/registry/api/errcode",
     visibility = ["//visibility:public"],
 )
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/docker/docker/api/types/versions"
+	"github.com/docker/docker/errdefs"
 	"github.com/pkg/errors"
 )
 
@@ -32,16 +33,19 @@ func ErrorConnectionFailed(host string) error {
 	return errConnectionFailed{host: host}
 }
 
+// Deprecated: use the errdefs.NotFound() interface instead. Kept for backward compatibility
 type notFound interface {
 	error
-	NotFound() bool // Is the error a NotFound error
+	NotFound() bool
 }
 
 // IsErrNotFound returns true if the error is a NotFound error, which is returned
 // by the API when some object is not found.
 func IsErrNotFound(err error) bool {
-	te, ok := err.(notFound)
-	return ok && te.NotFound()
+	if _, ok := err.(notFound); ok {
+		return ok
+	}
+	return errdefs.IsNotFound(err)
 }
 
 type objectNotFoundError struct {
@@ -49,9 +53,7 @@ type objectNotFoundError struct {
 	id     string
 }
 
-func (e objectNotFoundError) NotFound() bool {
-	return true
-}
+func (e objectNotFoundError) NotFound() {}
 
 func (e objectNotFoundError) Error() string {
 	return fmt.Sprintf("Error: No such %s: %s", e.object, e.id)
@@ -64,7 +66,7 @@ func wrapResponseError(err error, resp serverResponse, object, id string) error 
 	case resp.statusCode == http.StatusNotFound:
 		return objectNotFoundError{object: object, id: id}
 	case resp.statusCode == http.StatusNotImplemented:
-		return notImplementedError{message: err.Error()}
+		return errdefs.NotImplemented(err)
 	default:
 		return err
 	}
@@ -83,8 +85,10 @@ func (u unauthorizedError) Error() string {
 // IsErrUnauthorized returns true if the error is caused
 // when a remote registry authentication fails
 func IsErrUnauthorized(err error) bool {
-	_, ok := err.(unauthorizedError)
-	return ok
+	if _, ok := err.(unauthorizedError); ok {
+		return ok
+	}
+	return errdefs.IsUnauthorized(err)
 }
 
 type pluginPermissionDenied struct {
@@ -118,8 +122,10 @@ func (e notImplementedError) NotImplemented() bool {
 // This is returned by the API when a requested feature has not been
 // implemented.
 func IsErrNotImplemented(err error) bool {
-	te, ok := err.(notImplementedError)
-	return ok && te.NotImplemented()
+	if _, ok := err.(notImplementedError); ok {
+		return ok
+	}
+	return errdefs.IsNotImplemented(err)
 }
 
 // NewVersionError returns an error if the APIVersion required

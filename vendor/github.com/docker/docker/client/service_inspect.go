@@ -20,10 +20,10 @@ func (cli *Client) ServiceInspectWithRaw(ctx context.Context, serviceID string, 
 	query := url.Values{}
 	query.Set("insertDefaults", fmt.Sprintf("%v", opts.InsertDefaults))
 	serverResp, err := cli.get(ctx, "/services/"+serviceID, query, nil)
+	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return swarm.Service{}, nil, wrapResponseError(err, serverResp, "service", serviceID)
 	}
-	defer ensureReaderClosed(serverResp)
 
 	body, err := ioutil.ReadAll(serverResp.body)
 	if err != nil {
