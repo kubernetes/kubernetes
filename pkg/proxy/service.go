@@ -284,15 +284,15 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 
 // apply the changes to ServiceMap and update the stale udp cluster IP set. The UDPStaleClusterIP argument is passed in to store the
 // udp protocol service cluster ip when service is deleted from the ServiceMap.
-func (serviceMap *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP sets.String) {
+func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP sets.String) {
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
-		serviceMap.merge(change.current)
+		sm.merge(change.current)
 		// filter out the Update event of current changes from previous changes before calling unmerge() so that can
 		// skip deleting the Update events.
 		change.previous.filter(change.current)
-		serviceMap.unmerge(change.previous, UDPStaleClusterIP)
+		sm.unmerge(change.previous, UDPStaleClusterIP)
 	}
 	// clear changes after applying them to ServiceMap.
 	changes.items = make(map[types.NamespacedName]*serviceChange)
