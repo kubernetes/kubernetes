@@ -28,8 +28,6 @@
 ./hack/ginkgo-e2e.sh
 ./hack/grab-profiles.sh
 ./hack/lib/init.sh
-./hack/lib/logging.sh
-./hack/lib/protoc.sh
 ./hack/lib/swagger.sh
 ./hack/lib/test.sh
 ./hack/lib/version.sh
