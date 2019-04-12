@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
 
 	"k8s.io/api/core/v1"
