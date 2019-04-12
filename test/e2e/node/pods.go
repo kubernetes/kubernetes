@@ -46,13 +46,13 @@ var _ = SIGDescribe("Pods Extended", func() {
 		BeforeEach(func() {
 			podClient = f.PodClient()
 		})
-		// TODO: Fix Flaky issue #68066 and then re-add this back into Conformance Suite
+
 		/*
-			Release : v1.9
+			Release : v1.15
 			Testname: Pods, delete grace period
-			Description: Create a pod, make sure it is running, create a watch to observe Pod creation. Create a 'kubectl local proxy', capture the port the proxy is listening. Using the http client send a ‘delete’ with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
+			Description: Create a pod, make sure it is running. Create a 'kubectl local proxy', capture the port the proxy is listening. Using the http client send a ‘delete’ with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
 		*/
-		It("should be submitted and removed  [Flaky]", func() {
+		framework.ConformanceIt("should be submitted and removed", func() {
 			By("creating the pod")
 			name := "pod-submit-remove-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
