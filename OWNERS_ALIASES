@@ -265,7 +265,7 @@ aliases:
     - liggitt
     - smarterclayton
 
-  sig-cli-api-reviewers:
+  sig-cli-api-approvers:
     - liggitt
     - smarterclayton
 
