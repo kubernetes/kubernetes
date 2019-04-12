@@ -74,6 +74,7 @@ var (
 		// should be all lowercase and separated by underscores.
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
 	)
+	// TODO(logicalhan): remove this deprecated metrics after fixing the dependencies
 	deprecatedRequestCounter = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:              "apiserver_request_count",
@@ -104,17 +105,7 @@ var (
 		},
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
 	)
-	deprecatedRequestLatencies = compbasemetrics.NewHistogramVec(
-		&compbasemetrics.HistogramOpts{
-			Name: "apiserver_request_latencies",
-			Help: "Response latency distribution in microseconds for each verb, group, version, resource, subresource, scope and component.",
-			// Use buckets ranging from 125 ms to 8 seconds.
-			Buckets:           compbasemetrics.ExponentialBuckets(125000, 2.0, 7),
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
-	)
+	// TODO(wojtek-t): remove this deprecated metrics after fixing the dependencies
 	deprecatedRequestLatenciesSummary = compbasemetrics.NewSummaryVec(
 		&compbasemetrics.SummaryOpts{
 			Name: "apiserver_request_latencies_summary",
@@ -143,15 +134,6 @@ var (
 			Name:           "apiserver_dropped_requests_total",
 			Help:           "Number of requests dropped with 'Try again later' response",
 			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"requestKind"},
-	)
-	DeprecatedDroppedRequests = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:              "apiserver_dropped_requests",
-			Help:              "Number of requests dropped with 'Try again later' response",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"requestKind"},
 	)
@@ -207,11 +189,9 @@ var (
 		deprecatedRequestCounter,
 		longRunningRequestGauge,
 		requestLatencies,
-		deprecatedRequestLatencies,
 		deprecatedRequestLatenciesSummary,
 		responseSizes,
 		DroppedRequests,
-		DeprecatedDroppedRequests,
 		RegisteredWatchers,
 		WatchEvents,
 		WatchEventsSizes,
@@ -307,7 +287,6 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
 	deprecatedRequestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
 	requestLatencies.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
-	deprecatedRequestLatencies.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
 	deprecatedRequestLatenciesSummary.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
