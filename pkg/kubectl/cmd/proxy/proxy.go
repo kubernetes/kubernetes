@@ -145,6 +145,9 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	keepalive := cmdutil.GetFlagDuration(cmd, "keepalive")
 
 	server, err := proxy.NewServer(staticDir, apiProxyPrefix, staticPrefix, filter, clientConfig, keepalive)
+	if err != nil {
+		return err
+	}
 
 	// Separate listening from serving so we can report the bound port
 	// when it is chosen by os (eg: port == 0)
