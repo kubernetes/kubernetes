@@ -238,9 +238,9 @@ func initImageConfigs() map[int]Config {
 	configs[ServeHostname] = Config{e2eRegistry, "serve-hostname", "1.1"}
 	configs[TestWebserver] = Config{e2eRegistry, "test-webserver", "1.0"}
 	configs[VolumeNFSServer] = Config{e2eRegistry, "volume/nfs", "1.0"}
-	configs[VolumeISCSIServer] = Config{e2eRegistry, "volume/iscsi", "1.0"}
+	configs[VolumeISCSIServer] = Config{"quay.io", "jsafrane/iscsi-test", "2.0"}
 	configs[VolumeGlusterServer] = Config{e2eRegistry, "volume/gluster", "1.0"}
-	configs[VolumeRBDServer] = Config{e2eRegistry, "volume/rbd", "1.0.1"}
+	configs[VolumeRBDServer] = Config{"quay.io", "jsafrane/rbd-test", "2.0"}
 	return configs
 }
 

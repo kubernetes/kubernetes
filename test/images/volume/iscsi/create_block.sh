@@ -40,7 +40,7 @@ mkfs.ext2 block
 
 # Add index.html to it
 mount -o loop block $MNTDIR
-echo "Hello from iSCSI" > $MNTDIR/index.html
+echo "Hello from iscsi" > $MNTDIR/index.html
 umount $MNTDIR
 
 rm block.tar.gz 2>/dev/null || :
