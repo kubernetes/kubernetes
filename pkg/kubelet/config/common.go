@@ -43,6 +43,10 @@ import (
 	"k8s.io/klog"
 )
 
+const (
+	maxConfigLength = 10 * 1 << 20 // 10MB
+)
+
 // Generate a pod name that is unique among nodes by appending the nodeName.
 func generatePodName(name string, nodeName types.NodeName) string {
 	return fmt.Sprintf("%s-%s", name, strings.ToLower(string(nodeName)))
