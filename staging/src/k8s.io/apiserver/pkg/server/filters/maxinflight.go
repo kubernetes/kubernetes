@@ -173,10 +173,8 @@ func WithMaxInFlightLimit(
 				// We need to split this data between buckets used for throttling.
 				if isMutatingRequest {
 					metrics.DroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
-					metrics.DeprecatedDroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
 				} else {
 					metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
-					metrics.DeprecatedDroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
 				}
 				metrics.RecordRequestTermination(r, requestInfo, metrics.APIServerComponent, http.StatusTooManyRequests)
 				tooManyRequests(r, w)
