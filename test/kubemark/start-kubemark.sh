@@ -494,6 +494,7 @@ function start-master {
   start-master-components
 }
 start-master &
+start_master_pid=$!
 
 # Setup for hollow-nodes.
 function start-hollow-nodes {
@@ -503,8 +504,11 @@ function start-hollow-nodes {
   wait-for-hollow-nodes-to-run-or-timeout
 }
 start-hollow-nodes &
+start_hollow_nodes_pid=$!
 
-wait
+wait $start_master_pid || { echo "Failed to start kubemark master" ; exit 1 ; }
+wait $start_hollow_nodes_pid ||{ echo "Failed to start hollow nodes" ; exit 1 ; }
+
 echo ""
 echo "Master IP: ${MASTER_IP}"
 echo "Password to kubemark master: ${KUBE_PASSWORD}"
