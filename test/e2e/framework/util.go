@@ -2351,8 +2351,10 @@ func (f *Framework) MatchContainerOutput(
 	return nil
 }
 
+// EventsLister is a func that lists events.
 type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error)
 
+// DumpEventsInNamespace dumps events in the given namespace.
 func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	By(fmt.Sprintf("Collecting events from namespace %q.", namespace))
 	events, err := eventsLister(metav1.ListOptions{}, namespace)
@@ -2372,6 +2374,7 @@ func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	// you may or may not see the killing/deletion/Cleanup events.
 }
 
+// DumpAllNamespaceInfo dumps events, pods and nodes information in the given namespace.
 func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 	DumpEventsInNamespace(func(opts metav1.ListOptions, ns string) (*v1.EventList, error) {
 		return c.CoreV1().Events(ns).List(opts)
@@ -2429,6 +2432,7 @@ func dumpAllNodeInfo(c clientset.Interface) {
 	DumpNodeDebugInfo(c, names, Logf)
 }
 
+// DumpNodeDebugInfo dumps debug information of the given nodes.
 func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(fmt string, args ...interface{})) {
 	for _, n := range nodeNames {
 		logFunc("\nLogging node info for node %v", n)
@@ -2640,6 +2644,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 	})
 }
 
+// GetPodSecretUpdateTimeout reuturns the timeout duration for updating pod secret.
 func GetPodSecretUpdateTimeout(c clientset.Interface) time.Duration {
 	// With SecretManager(ConfigMapManager), we may have to wait up to full sync period +
 	// TTL of secret(configmap) to elapse before the Kubelet projects the update into the
@@ -2676,10 +2681,12 @@ func getNodeTTLAnnotationValue(c clientset.Interface) (time.Duration, error) {
 	return time.Duration(intValue) * time.Second, nil
 }
 
+// AddOrUpdateLabelOnNode adds the given label key and value to the given node or updates value.
 func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, labelValue string) {
 	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
 }
 
+// AddOrUpdateLabelOnNodeAndReturnOldValue adds the given label key and value to the given node or updates value and returns the old label value.
 func AddOrUpdateLabelOnNodeAndReturnOldValue(c clientset.Interface, nodeName string, labelKey, labelValue string) string {
 	var oldValue string
 	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
@@ -2689,6 +2696,7 @@ func AddOrUpdateLabelOnNodeAndReturnOldValue(c clientset.Interface, nodeName str
 	return oldValue
 }
 
+// ExpectNodeHasLabel expects that the given node has the given label pair.
 func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string, labelValue string) {
 	By("verifying the node has the label " + labelKey + " " + labelValue)
 	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
@@ -2696,11 +2704,13 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 	Expect(node.Labels[labelKey]).To(Equal(labelValue))
 }
 
+// RemoveTaintOffNode removes the given taint from the given node.
 func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint v1.Taint) {
 	ExpectNoError(controller.RemoveTaintOffNode(c, nodeName, nil, &taint))
 	verifyThatTaintIsGone(c, nodeName, &taint)
 }
 
+// AddOrUpdateTaintOnNode adds the given taint to the given node or updates taint.
 func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taint v1.Taint) {
 	ExpectNoError(controller.AddOrUpdateTaintOnNode(c, nodeName, &taint))
 }
@@ -2724,6 +2734,7 @@ func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Tai
 	}
 }
 
+// ExpectNodeHasTaint expects that the node has the given taint.
 func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) {
 	By("verifying the node has the taint " + taint.ToString())
 	if has, err := NodeHasTaint(c, nodeName, taint); !has {
@@ -2732,6 +2743,7 @@ func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint)
 	}
 }
 
+// NodeHasTaint returns true if the node has the given taint, else returns false.
 func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool, error) {
 	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	if err != nil {
@@ -2746,7 +2758,7 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 	return true, nil
 }
 
-//AddOrUpdateAvoidPodOnNode adds avoidPods annotations to node, will override if it exists
+// AddOrUpdateAvoidPodOnNode adds avoidPods annotations to node, will override if it exists
 func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods v1.AvoidPods) {
 	err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
 		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
@@ -2777,7 +2789,7 @@ func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 	ExpectNoError(err)
 }
 
-//RemoveAnnotationOffNode removes AvoidPods annotations from the node. It does not fail if no such annotation exists.
+// RemoveAvoidPodsOffNode removes AvoidPods annotations from the node. It does not fail if no such annotation exists.
 func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 	err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
 		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
@@ -2805,6 +2817,7 @@ func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 	ExpectNoError(err)
 }
 
+// ScaleResource scales resource to the given size.
 func ScaleResource(
 	clientset clientset.Interface,
 	scalesGetter scaleclient.ScalesGetter,
@@ -2824,7 +2837,7 @@ func ScaleResource(
 	return WaitForControlledPodsRunning(clientset, ns, name, kind)
 }
 
-// Wait up to 10 minutes for pods to become Running.
+// WaitForControlledPodsRunning waits up to 10 minutes for pods to become Running.
 func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind schema.GroupKind) error {
 	rtObject, err := getRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
@@ -2845,7 +2858,7 @@ func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind s
 	return nil
 }
 
-// Wait up to PodListTimeout for getting pods of the specified controller name and return them.
+// WaitForControlledPods waits up to PodListTimeout for getting pods of the specified controller name and return them.
 func WaitForControlledPods(c clientset.Interface, ns, name string, kind schema.GroupKind) (pods *v1.PodList, err error) {
 	rtObject, err := getRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
@@ -2858,7 +2871,7 @@ func WaitForControlledPods(c clientset.Interface, ns, name string, kind schema.G
 	return WaitForPodsWithLabel(c, ns, selector)
 }
 
-// Wait for all matching pods to become scheduled and at least one
+// WaitForPodsWithLabelScheduled waits for all matching pods to become scheduled and at least one
 // matching pod exists.  Return the list of matching pods.
 func WaitForPodsWithLabelScheduled(c clientset.Interface, ns string, label labels.Selector) (pods *v1.PodList, err error) {
 	err = wait.PollImmediate(Poll, podScheduledBeforeTimeout,
@@ -2877,7 +2890,7 @@ func WaitForPodsWithLabelScheduled(c clientset.Interface, ns string, label label
 	return pods, err
 }
 
-// Wait up to PodListTimeout for getting pods with certain label
+// WaitForPodsWithLabel waits up to PodListTimeout for getting pods with certain label
 func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selector) (pods *v1.PodList, err error) {
 	for t := time.Now(); time.Since(t) < PodListTimeout; time.Sleep(Poll) {
 		options := metav1.ListOptions{LabelSelector: label.String()}
@@ -2898,7 +2911,7 @@ func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selecto
 	return
 }
 
-// Wait for exact amount of matching pods to become running and ready.
+// WaitForPodsWithLabelRunningReady waits for exact amount of matching pods to become running and ready.
 // Return the list of matching pods.
 func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label labels.Selector, num int, timeout time.Duration) (pods *v1.PodList, err error) {
 	var current int
@@ -3129,6 +3142,7 @@ func waitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) er
 	return err
 }
 
+// WaitForPodsReady waits for the pods to become ready.
 func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
@@ -3146,7 +3160,7 @@ func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds in
 	})
 }
 
-// WaitForNPods tries to list restarting pods using ps until it finds expect of them,
+// WaitForNRestartablePods tries to list restarting pods using ps until it finds expect of them,
 // returning their names if it can do so before timeout.
 func WaitForNRestartablePods(ps *testutils.PodStore, expect int, timeout time.Duration) ([]string, error) {
 	var pods []*v1.Pod
@@ -3172,7 +3186,7 @@ func WaitForNRestartablePods(ps *testutils.PodStore, expect int, timeout time.Du
 	return podNames, nil
 }
 
-// FilterIrrelevantPods filters out pods that will never get recreated if deleted after termination.
+// FilterNonRestartablePods filters out pods that will never get recreated if deleted after termination.
 func FilterNonRestartablePods(pods []*v1.Pod) []*v1.Pod {
 	var results []*v1.Pod
 	for _, p := range pods {
@@ -3197,6 +3211,8 @@ func isNotRestartAlwaysMirrorPod(p *v1.Pod) bool {
 
 type updateDSFunc func(*apps.DaemonSet)
 
+// UpdateDaemonSetWithRetries updates daemonsets with the given applyUpdate func
+// until it succeeds or a timeout expires.
 func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *apps.DaemonSet, err error) {
 	daemonsets := c.AppsV1().DaemonSets(namespace)
 	var updateErr error
@@ -3350,6 +3366,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 	return created.Name
 }
 
+// CreatePodOrFail creates a pod with the specified containerPorts.
 func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
 	By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
 	pod := &v1.Pod{
@@ -3374,6 +3391,7 @@ func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 	ExpectNoError(err, "failed to create pod %s in namespace %s", name, ns)
 }
 
+// DeletePodOrFail deletes the pod of the specified namespace and name.
 func DeletePodOrFail(c clientset.Interface, ns, name string) {
 	By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
 	err := c.CoreV1().Pods(ns).Delete(name, nil)
@@ -3499,14 +3517,17 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 	return false
 }
 
+// IsNodeConditionSetAsExpected returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue with detailed logging.
 func IsNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
 	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
 }
 
+// IsNodeConditionSetAsExpectedSilent returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue.
 func IsNodeConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
 	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
 }
 
+// IsNodeConditionUnset returns true if conditions of the given node do not have a match to the given conditionType, otherwise false.
 func IsNodeConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
 	for _, cond := range node.Status.Conditions {
 		if cond.Type == conditionType {
@@ -3537,7 +3558,7 @@ func WaitForNodeToBe(c clientset.Interface, name string, conditionType v1.NodeCo
 	return false
 }
 
-// Checks whether all registered nodes are ready.
+// AllNodesReady checks whether all registered nodes are ready.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
@@ -3583,7 +3604,7 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	return nil
 }
 
-// checks whether all registered nodes are ready and all required Pods are running on them.
+// WaitForAllNodesHealthy checks whether all registered nodes are ready and all required Pods are running on them.
 func WaitForAllNodesHealthy(c clientset.Interface, timeout time.Duration) error {
 	Logf("Waiting up to %v for all nodes to be ready", timeout)
 
@@ -3651,7 +3672,7 @@ func WaitForAllNodesHealthy(c clientset.Interface, timeout time.Duration) error 
 
 }
 
-// Filters nodes in NodeList in place, removing nodes that do not
+// FilterNodes filters nodes in NodeList in place, removing nodes that do not
 // satisfy the given condition
 // TODO: consider merging with pkg/client/cache.NodeLister
 func FilterNodes(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
