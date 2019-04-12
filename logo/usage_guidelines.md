@@ -10,7 +10,7 @@ A compliant implementation is an implementation of the unmodified Cloud Native
 Compute Foundation (CNCF)
 version of Kubernetes found at https://github.com/kubernetes/kubernetes and
 compatible branches thereof, together with published specifications, APIs and
-operational patterns.  Acceptable related uses include display, modification,
+operational patterns. Acceptable related uses include display, modification,
 or use of the Kubernetes logo in connection with your compliant implementation,
 your integration with a compliant implementation, your support for a compliant
 implementation, your Kubernetes-compatible product, or in collateral,
