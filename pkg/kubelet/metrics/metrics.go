@@ -34,45 +34,33 @@ import (
 
 // This const block defines the metric names for the kubelet metrics.
 const (
-	KubeletSubsystem                     = "kubelet"
-	NodeNameKey                          = "node_name"
-	NodeLabelKey                         = "node"
-	PodWorkerDurationKey                 = "pod_worker_duration_seconds"
-	PodStartDurationKey                  = "pod_start_duration_seconds"
-	CgroupManagerOperationsKey           = "cgroup_manager_duration_seconds"
-	PodWorkerStartDurationKey            = "pod_worker_start_duration_seconds"
-	PLEGRelistDurationKey                = "pleg_relist_duration_seconds"
-	PLEGDiscardEventsKey                 = "pleg_discard_events"
-	PLEGRelistIntervalKey                = "pleg_relist_interval_seconds"
-	PLEGLastSeenKey                      = "pleg_last_seen_seconds"
-	EvictionsKey                         = "evictions"
-	EvictionStatsAgeKey                  = "eviction_stats_age_seconds"
-	PreemptionsKey                       = "preemptions"
-	DeprecatedPodWorkerLatencyKey        = "pod_worker_latency_microseconds"
-	DeprecatedPodStartLatencyKey         = "pod_start_latency_microseconds"
-	DeprecatedCgroupManagerOperationsKey = "cgroup_manager_latency_microseconds"
-	DeprecatedPodWorkerStartLatencyKey   = "pod_worker_start_latency_microseconds"
-	DeprecatedPLEGRelistLatencyKey       = "pleg_relist_latency_microseconds"
-	DeprecatedPLEGRelistIntervalKey      = "pleg_relist_interval_microseconds"
-	DeprecatedEvictionStatsAgeKey        = "eviction_stats_age_microseconds"
-	VolumeStatsCapacityBytesKey          = "volume_stats_capacity_bytes"
-	VolumeStatsAvailableBytesKey         = "volume_stats_available_bytes"
-	VolumeStatsUsedBytesKey              = "volume_stats_used_bytes"
-	VolumeStatsInodesKey                 = "volume_stats_inodes"
-	VolumeStatsInodesFreeKey             = "volume_stats_inodes_free"
-	VolumeStatsInodesUsedKey             = "volume_stats_inodes_used"
+	KubeletSubsystem             = "kubelet"
+	NodeNameKey                  = "node_name"
+	NodeLabelKey                 = "node"
+	PodWorkerDurationKey         = "pod_worker_duration_seconds"
+	PodStartDurationKey          = "pod_start_duration_seconds"
+	CgroupManagerOperationsKey   = "cgroup_manager_duration_seconds"
+	PodWorkerStartDurationKey    = "pod_worker_start_duration_seconds"
+	PLEGRelistDurationKey        = "pleg_relist_duration_seconds"
+	PLEGDiscardEventsKey         = "pleg_discard_events"
+	PLEGRelistIntervalKey        = "pleg_relist_interval_seconds"
+	PLEGLastSeenKey              = "pleg_last_seen_seconds"
+	EvictionsKey                 = "evictions"
+	EvictionStatsAgeKey          = "eviction_stats_age_seconds"
+	PreemptionsKey               = "preemptions"
+	VolumeStatsCapacityBytesKey  = "volume_stats_capacity_bytes"
+	VolumeStatsAvailableBytesKey = "volume_stats_available_bytes"
+	VolumeStatsUsedBytesKey      = "volume_stats_used_bytes"
+	VolumeStatsInodesKey         = "volume_stats_inodes"
+	VolumeStatsInodesFreeKey     = "volume_stats_inodes_free"
+	VolumeStatsInodesUsedKey     = "volume_stats_inodes_used"
 	// Metrics keys of remote runtime operations
-	RuntimeOperationsKey                  = "runtime_operations_total"
-	RuntimeOperationsDurationKey          = "runtime_operations_duration_seconds"
-	RuntimeOperationsErrorsKey            = "runtime_operations_errors_total"
-	DeprecatedRuntimeOperationsKey        = "runtime_operations"
-	DeprecatedRuntimeOperationsLatencyKey = "runtime_operations_latency_microseconds"
-	DeprecatedRuntimeOperationsErrorsKey  = "runtime_operations_errors"
+	RuntimeOperationsKey         = "runtime_operations_total"
+	RuntimeOperationsDurationKey = "runtime_operations_duration_seconds"
+	RuntimeOperationsErrorsKey   = "runtime_operations_errors_total"
 	// Metrics keys of device plugin operations
-	DevicePluginRegistrationCountKey           = "device_plugin_registration_total"
-	DevicePluginAllocationDurationKey          = "device_plugin_alloc_duration_seconds"
-	DeprecatedDevicePluginRegistrationCountKey = "device_plugin_registration_count"
-	DeprecatedDevicePluginAllocationLatencyKey = "device_plugin_alloc_latency_microseconds"
+	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
+	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
 
 	// Metric keys for node config
 	AssignedConfigKey             = "node_config_assigned"
@@ -289,146 +277,6 @@ var (
 		},
 		[]string{"resource_name"},
 	)
-	// DeprecatedPodWorkerLatency is a Summary that tracks the latency (in microseconds) to sync a single pod.
-	// Broken down by operation type. This metric is deprecated.
-	DeprecatedPodWorkerLatency = metrics.NewSummaryVec(
-		&metrics.SummaryOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedPodWorkerLatencyKey,
-			Help:              "Latency in microseconds to sync a single pod. Broken down by operation type: create, update, or sync",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"operation_type"},
-	)
-	// DeprecatedPodStartLatency is a Summary that tracks the latency (in microseconds) for a single pod to go from pending to running.
-	// This metric is deprecated.
-	DeprecatedPodStartLatency = metrics.NewSummary(
-		&metrics.SummaryOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedPodStartLatencyKey,
-			Help:              "Latency in microseconds for a single pod to go from pending to running.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-	)
-	// DeprecatedCgroupManagerLatency is a Summary that tracks the latency (in microseconds) for cgroup manager operations to complete.
-	// Broken down by operation type. This metric is deprecated.
-	DeprecatedCgroupManagerLatency = metrics.NewSummaryVec(
-		&metrics.SummaryOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedCgroupManagerOperationsKey,
-			Help:              "Latency in microseconds for cgroup manager operations. Broken down by method.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"operation_type"},
-	)
-	// DeprecatedPodWorkerStartLatency is a Summary that tracks the latency (in microseconds) from seeing a pod to starting a worker.
-	// This metric is deprecated.
-	DeprecatedPodWorkerStartLatency = metrics.NewSummary(
-		&metrics.SummaryOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedPodWorkerStartLatencyKey,
-			Help:              "Latency in microseconds from seeing a pod to starting a worker.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-	)
-	// DeprecatedPLEGRelistLatency is a Summary that tracks the latency (in microseconds) for relisting pods in PLEG.
-	// This metric is deprecated.
-	DeprecatedPLEGRelistLatency = metrics.NewSummary(
-		&metrics.SummaryOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedPLEGRelistLatencyKey,
-			Help:              "Latency in microseconds for relisting pods in PLEG.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-	)
-	// DeprecatedPLEGRelistInterval is a Summary that tracks the interval (in microseconds) between relistings in PLEG.
-	// This metric is deprecated.
-	DeprecatedPLEGRelistInterval = metrics.NewSummary(
-		&metrics.SummaryOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedPLEGRelistIntervalKey,
-			Help:              "Interval in microseconds between relisting in PLEG.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-	)
-	// DeprecatedRuntimeOperations is a Counter that tracks the cumulative number of remote runtime operations.
-	// Broken down by operation type. This metric is deprecated.
-	DeprecatedRuntimeOperations = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedRuntimeOperationsKey,
-			Help:              "Cumulative number of runtime operations by operation type.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"operation_type"},
-	)
-	// DeprecatedRuntimeOperationsLatency is a Summary that tracks the latency (in microseconds) of remote runtime operations
-	// to complete. Broken down by operation type. This metric is deprecated.
-	DeprecatedRuntimeOperationsLatency = metrics.NewSummaryVec(
-		&metrics.SummaryOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedRuntimeOperationsLatencyKey,
-			Help:              "Latency in microseconds of runtime operations. Broken down by operation type.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"operation_type"},
-	)
-	// DeprecatedRuntimeOperationsErrors is a Counter that tracks the cumulative number of remote runtime operation errors.
-	// Broken down by operation type. This metric is deprecated.
-	DeprecatedRuntimeOperationsErrors = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedRuntimeOperationsErrorsKey,
-			Help:              "Cumulative number of runtime operation errors by operation type.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"operation_type"},
-	)
-	// DeprecatedEvictionStatsAge is a Summary that tracks the time (in microseconds) between when stats are collected and when a pod
-	// is evicted based on those stats. Broken down by eviction signal. This metric is deprecated.
-	DeprecatedEvictionStatsAge = metrics.NewSummaryVec(
-		&metrics.SummaryOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedEvictionStatsAgeKey,
-			Help:              "Time between when stats are collected, and when pod is evicted based on those stats by eviction signal",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"eviction_signal"},
-	)
-	// DeprecatedDevicePluginRegistrationCount is a Counter that tracks the cumulative number of device plugin registrations.
-	// Broken down by resource name. This metric is deprecated.
-	DeprecatedDevicePluginRegistrationCount = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedDevicePluginRegistrationCountKey,
-			Help:              "Cumulative number of device plugin registrations. Broken down by resource name.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"resource_name"},
-	)
-	// DeprecatedDevicePluginAllocationLatency is a Summary that tracks the latncy (in microseconds) for serving device plugin allocation requests.
-	// Broken down by resource name. This metric is deprecated.
-	DeprecatedDevicePluginAllocationLatency = metrics.NewSummaryVec(
-		&metrics.SummaryOpts{
-			Subsystem:         KubeletSubsystem,
-			Name:              DeprecatedDevicePluginAllocationLatencyKey,
-			Help:              "Latency in microseconds to serve a device plugin Allocation request. Broken down by resource name.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"resource_name"},
-	)
 
 	// Metrics for node config
 
@@ -542,18 +390,6 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.S
 		legacyregistry.MustRegister(Preemptions)
 		legacyregistry.MustRegister(DevicePluginRegistrationCount)
 		legacyregistry.MustRegister(DevicePluginAllocationDuration)
-		legacyregistry.MustRegister(DeprecatedPodWorkerLatency)
-		legacyregistry.MustRegister(DeprecatedPodStartLatency)
-		legacyregistry.MustRegister(DeprecatedCgroupManagerLatency)
-		legacyregistry.MustRegister(DeprecatedPodWorkerStartLatency)
-		legacyregistry.MustRegister(DeprecatedPLEGRelistLatency)
-		legacyregistry.MustRegister(DeprecatedPLEGRelistInterval)
-		legacyregistry.MustRegister(DeprecatedRuntimeOperations)
-		legacyregistry.MustRegister(DeprecatedRuntimeOperationsLatency)
-		legacyregistry.MustRegister(DeprecatedRuntimeOperationsErrors)
-		legacyregistry.MustRegister(DeprecatedEvictionStatsAge)
-		legacyregistry.MustRegister(DeprecatedDevicePluginRegistrationCount)
-		legacyregistry.MustRegister(DeprecatedDevicePluginAllocationLatency)
 		legacyregistry.MustRegister(RunningContainerCount)
 		legacyregistry.MustRegister(RunningPodCount)
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
