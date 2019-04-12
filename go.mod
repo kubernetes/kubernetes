@@ -18,7 +18,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.11
 	github.com/Microsoft/hcsshim v0.0.0-20190110205307-69ac8d3f7fc1
 	github.com/PuerkitoBio/purell v1.1.0
-	github.com/Rican7/retry v0.0.0-20160712041035-272ad122d6e5 // indirect
+	github.com/Rican7/retry v0.1.0 // indirect
 	github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7 // indirect
 	github.com/aws/aws-sdk-go v1.16.26
@@ -42,7 +42,7 @@ require (
 	github.com/coreos/go-semver v0.0.0-20180108230905-e214231b295a
 	github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
-	github.com/coreos/rkt v1.25.0 // indirect
+	github.com/coreos/rkt v1.30.0 // indirect
 	github.com/cpuguy83/go-md2man v1.0.4
 	github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299 // indirect
 	github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
@@ -77,7 +77,7 @@ require (
 	github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450 // indirect
 	github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995 // indirect
 	github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e // indirect
-	github.com/google/cadvisor v0.33.1
+	github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
@@ -111,7 +111,7 @@ require (
 	github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c // indirect
 	github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de // indirect
 	github.com/mattn/go-sqlite3 v1.6.0 // indirect
-	github.com/mesos/mesos-go v0.0.0-20180906210748-ff8175bfda54 // indirect
+	github.com/mesos/mesos-go v0.0.9 // indirect
 	github.com/mholt/caddy v0.0.0-20180213163048-2de495001514
 	github.com/miekg/dns v0.0.0-20160614162101-5d001d020961
 	github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2 // indirect
@@ -226,7 +226,7 @@ replace (
 	github.com/Nvveen/Gotty => github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5
 	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.0
 	github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
-	github.com/Rican7/retry => github.com/Rican7/retry v0.0.0-20160712041035-272ad122d6e5
+	github.com/Rican7/retry => github.com/Rican7/retry v0.1.0
 	github.com/alecthomas/template => github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc
 	github.com/alecthomas/units => github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf
 	github.com/armon/circbuf => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
@@ -256,7 +256,7 @@ replace (
 	github.com/coreos/go-semver => github.com/coreos/go-semver v0.0.0-20180108230905-e214231b295a
 	github.com/coreos/go-systemd => github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
-	github.com/coreos/rkt => github.com/coreos/rkt v1.25.0
+	github.com/coreos/rkt => github.com/coreos/rkt v1.30.0
 	github.com/cpuguy83/go-md2man => github.com/cpuguy83/go-md2man v1.0.4
 	github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299
 	github.com/d2g/dhcp4 => github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
@@ -306,7 +306,7 @@ replace (
 	github.com/golangplus/fmt => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v0.0.0-20160524151835-7d79101e329e
-	github.com/google/cadvisor => github.com/google/cadvisor v0.33.1
+	github.com/google/cadvisor => github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a
 	github.com/google/certificate-transparency-go => github.com/google/certificate-transparency-go v1.0.21
 	github.com/google/go-cmp => github.com/google/go-cmp v0.2.0
 	github.com/google/gofuzz => github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
@@ -359,7 +359,7 @@ replace (
 	github.com/mattn/go-shellwords => github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de
 	github.com/mattn/go-sqlite3 => github.com/mattn/go-sqlite3 v1.6.0
 	github.com/matttproud/golang_protobuf_extensions => github.com/matttproud/golang_protobuf_extensions v1.0.1
-	github.com/mesos/mesos-go => github.com/mesos/mesos-go v0.0.0-20180906210748-ff8175bfda54
+	github.com/mesos/mesos-go => github.com/mesos/mesos-go v0.0.9
 	github.com/mholt/caddy => github.com/mholt/caddy v0.0.0-20180213163048-2de495001514
 	github.com/miekg/dns => github.com/miekg/dns v0.0.0-20160614162101-5d001d020961
 	github.com/mindprince/gonvml => github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2

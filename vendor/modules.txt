@@ -62,11 +62,6 @@ github.com/NYTimes/gziphandler
 github.com/PuerkitoBio/purell
 # github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
 github.com/PuerkitoBio/urlesc
-# github.com/Rican7/retry v0.0.0-20160712041035-272ad122d6e5 => github.com/Rican7/retry v0.0.0-20160712041035-272ad122d6e5
-github.com/Rican7/retry
-github.com/Rican7/retry/backoff
-github.com/Rican7/retry/jitter
-github.com/Rican7/retry/strategy
 # github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 github.com/armon/circbuf
 # github.com/asaskevich/govalidator v0.0.0-20180720115003-f9ffefc3facf => github.com/asaskevich/govalidator v0.0.0-20180720115003-f9ffefc3facf
@@ -328,8 +323,6 @@ github.com/coreos/go-systemd/util
 # github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea => github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
 github.com/coreos/pkg/capnslog
 github.com/coreos/pkg/dlopen
-# github.com/coreos/rkt v1.25.0 => github.com/coreos/rkt v1.25.0
-github.com/coreos/rkt/api/v1alpha
 # github.com/cpuguy83/go-md2man v1.0.4 => github.com/cpuguy83/go-md2man v1.0.4
 github.com/cpuguy83/go-md2man/md2man
 # github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299 => github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299
@@ -480,7 +473,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v0.0.0-20160524151835-7d79101e329e => github.com/google/btree v0.0.0-20160524151835-7d79101e329e
 github.com/google/btree
-# github.com/google/cadvisor v0.33.1 => github.com/google/cadvisor v0.33.1
+# github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a => github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
@@ -488,13 +481,15 @@ github.com/google/cadvisor/collector
 github.com/google/cadvisor/container
 github.com/google/cadvisor/container/common
 github.com/google/cadvisor/container/containerd
+github.com/google/cadvisor/container/containerd/install
 github.com/google/cadvisor/container/crio
+github.com/google/cadvisor/container/crio/install
 github.com/google/cadvisor/container/docker
+github.com/google/cadvisor/container/docker/install
 github.com/google/cadvisor/container/libcontainer
-github.com/google/cadvisor/container/mesos
 github.com/google/cadvisor/container/raw
-github.com/google/cadvisor/container/rkt
 github.com/google/cadvisor/container/systemd
+github.com/google/cadvisor/container/systemd/install
 github.com/google/cadvisor/devicemapper
 github.com/google/cadvisor/events
 github.com/google/cadvisor/fs
@@ -502,9 +497,6 @@ github.com/google/cadvisor/info/v1
 github.com/google/cadvisor/info/v2
 github.com/google/cadvisor/machine
 github.com/google/cadvisor/manager
-github.com/google/cadvisor/manager/watcher
-github.com/google/cadvisor/manager/watcher/raw
-github.com/google/cadvisor/manager/watcher/rkt
 github.com/google/cadvisor/metrics
 github.com/google/cadvisor/storage
 github.com/google/cadvisor/summary
@@ -517,6 +509,7 @@ github.com/google/cadvisor/utils/oomparser
 github.com/google/cadvisor/utils/sysfs
 github.com/google/cadvisor/utils/sysinfo
 github.com/google/cadvisor/version
+github.com/google/cadvisor/watcher
 github.com/google/cadvisor/zfs
 # github.com/google/certificate-transparency-go v1.0.21 => github.com/google/certificate-transparency-go v1.0.21
 github.com/google/certificate-transparency-go
@@ -658,21 +651,6 @@ github.com/mattn/go-shellwords
 github.com/mattn/go-sqlite3
 # github.com/matttproud/golang_protobuf_extensions v1.0.1 => github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/mesos/mesos-go v0.0.0-20180906210748-ff8175bfda54 => github.com/mesos/mesos-go v0.0.0-20180906210748-ff8175bfda54
-github.com/mesos/mesos-go/api/v1/lib
-github.com/mesos/mesos-go/api/v1/lib/agent
-github.com/mesos/mesos-go/api/v1/lib/agent/calls
-github.com/mesos/mesos-go/api/v1/lib/client
-github.com/mesos/mesos-go/api/v1/lib/debug
-github.com/mesos/mesos-go/api/v1/lib/encoding
-github.com/mesos/mesos-go/api/v1/lib/encoding/codecs
-github.com/mesos/mesos-go/api/v1/lib/encoding/framing
-github.com/mesos/mesos-go/api/v1/lib/encoding/json
-github.com/mesos/mesos-go/api/v1/lib/encoding/proto
-github.com/mesos/mesos-go/api/v1/lib/httpcli
-github.com/mesos/mesos-go/api/v1/lib/httpcli/apierrors
-github.com/mesos/mesos-go/api/v1/lib/recordio
-github.com/mesos/mesos-go/api/v1/lib/roles
 # github.com/mholt/caddy v0.0.0-20180213163048-2de495001514 => github.com/mholt/caddy v0.0.0-20180213163048-2de495001514
 github.com/mholt/caddy/caddyfile
 # github.com/miekg/dns v0.0.0-20160614162101-5d001d020961 => github.com/miekg/dns v0.0.0-20160614162101-5d001d020961
@@ -784,9 +762,6 @@ github.com/pmezard/go-difflib/difflib
 # github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 github.com/pquerna/cachecontrol
 github.com/pquerna/cachecontrol/cacheobject
-# github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20 => github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20
-github.com/pquerna/ffjson/fflib/v1
-github.com/pquerna/ffjson/fflib/v1/internal
 # github.com/prometheus/client_golang v0.9.2 => github.com/prometheus/client_golang v0.9.2
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
