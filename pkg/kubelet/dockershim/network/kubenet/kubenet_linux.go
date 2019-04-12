@@ -597,7 +597,7 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 // shaper retrieves the bandwidth shaper and, if it hasn't been fetched before,
 // initializes it and ensures the bridge is appropriately configured
 // This function should only be called while holding the `plugin.mu` lock
-func (plugin *kubenetNetworkPlugin) shaper() bandwidth.BandwidthShaper {
+func (plugin *kubenetNetworkPlugin) shaper() bandwidth.Shaper {
 	if plugin.bandwidthShaper == nil {
 		plugin.bandwidthShaper = bandwidth.NewTCShaper(BridgeName)
 		plugin.bandwidthShaper.ReconcileInterface()
