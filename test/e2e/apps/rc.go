@@ -56,7 +56,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 		TestReplicationControllerServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 
-	It("should surface a failure condition on a common issue like exceeded quota", func() {
+	/*
+		Release : v1.15
+		Testname: Replication Controller, check for issues like exceeding allocated quota
+		Description: Attempt to create a Replication Controller with pods exceeding the namespace quota. The creation MUST fail
+	*/
+	framework.ConformanceIt("should surface a failure condition on a common issue like exceeded quota", func() {
 		testReplicationControllerConditionCheck(f)
 	})
 
