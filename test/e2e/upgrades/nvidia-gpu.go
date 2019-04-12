@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/gpu"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -78,7 +79,7 @@ func (t *NvidiaGPUUpgradeTest) startJob(f *framework.Framework) {
 				Command: []string{"/bin/sh", "-c", "./vectorAdd && sleep 60"},
 				Resources: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						framework.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+						gpu.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
 					},
 				},
 			},

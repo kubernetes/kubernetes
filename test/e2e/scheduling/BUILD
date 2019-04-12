@@ -44,6 +44,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/gpu:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
