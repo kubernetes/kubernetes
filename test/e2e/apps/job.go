@@ -100,7 +100,12 @@ var _ = SIGDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
 	})
 
-	It("should delete a job", func() {
+	/*
+		Release : v1.15
+		Testname: Jobs, active pods, graceful termination
+		Description: Create a job. Ensure the active pods reflect paralellism in the namespace and delete the job. Job MUST be deleted successfully.
+	*/
+	framework.ConformanceIt("should delete a job", func() {
 		By("Creating a job")
 		job := jobutil.NewTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)

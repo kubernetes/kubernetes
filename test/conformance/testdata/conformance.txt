@@ -23,6 +23,7 @@ test/e2e/apps/deployment.go: "RecreateDeployment should delete old pods and crea
 test/e2e/apps/deployment.go: "deployment should delete old replica sets"
 test/e2e/apps/deployment.go: "deployment should support rollover"
 test/e2e/apps/deployment.go: "deployment should support proportional scaling"
+test/e2e/apps/job.go: "should delete a job"
 test/e2e/apps/rc.go: "should serve a basic image on each replica with a public image"
 test/e2e/apps/rc.go: "should adopt matching pods on creation"
 test/e2e/apps/rc.go: "should release no longer matching pods"
