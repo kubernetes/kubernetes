@@ -373,6 +373,9 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 	}
 	command += " || (mount | grep 'on /mnt/test'; false)"
 
+	if framework.NodeOSDistroIs("windows") {
+		command = "select-string 'hello world' /mnt/test/data"
+	}
 	RunInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, framework.NodeSelection{Name: actualNodeName})
 
 	return volume
