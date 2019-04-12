@@ -233,15 +233,15 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 	}
 	if cc.SecureServing != nil {
 		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, false, checks...), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
-		if serverStoppedCh, err := cc.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		serverStoppedCh, err := cc.SecureServing.Serve(handler, 0, stopCh)
+		if err != nil {
 			// fail early for secure handlers, removing the old error loop from above
 			return fmt.Errorf("failed to start secure server: %v", err)
-		} else {
-			defer func() {
-				cancel()
-				<-serverStoppedCh
-			}()
 		}
+		defer func() {
+			cancel()
+			<-serverStoppedCh
+		}()
 	}
 
 	// Start all informers.

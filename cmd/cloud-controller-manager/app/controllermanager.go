@@ -40,7 +40,6 @@ import (
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/version"
 	"k8s.io/klog"
-
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
@@ -116,7 +115,6 @@ the cloud specific control loops shipped with Kubernetes.`,
 // Run runs the ExternalCMServer.  This should never exit.
 func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error {
 	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
 	go func() {
 		select {
 		case <-stopCh:
@@ -163,14 +161,14 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 	if c.SecureServing != nil {
 		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
-		if serverStoppedCh, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		serverStoppedCh, err := c.SecureServing.Serve(handler, 0, stopCh)
+		if err != nil {
 			return err
-		} else {
-			defer func() {
-				cancel()
-				<-serverStoppedCh
-			}()
 		}
+		defer func() {
+			cancel()
+			<-serverStoppedCh
+		}()
 	}
 	if c.InsecureServing != nil {
 		unsecuredMux := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
@@ -188,7 +186,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 	}
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(context.TODO())
+		run(ctx)
 		panic("unreachable")
 	}
 
@@ -215,7 +213,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 	}
 
 	// Try and become the leader and start cloud controller manager loops
-	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
