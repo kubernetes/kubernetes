@@ -301,7 +301,7 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 	getLunMutex.LockKey(instanceid)
 	defer getLunMutex.UnlockKey(instanceid)
 
-	err = diskController.DetachDiskByName("", diskURI, nodeName)
+	err = diskController.DetachDisk("", diskURI, nodeName)
 	if err != nil {
 		klog.Errorf("failed to detach azure disk %q, err %v", diskURI, err)
 	}
