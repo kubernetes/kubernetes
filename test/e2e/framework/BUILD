@@ -34,7 +34,6 @@ go_library(
         "test_context.go",
         "upgrade_util.go",
         "util.go",
-        "volume_util.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework",
     deps = [
@@ -167,6 +166,7 @@ filegroup(
         "//test/e2e/framework/testfiles:all-srcs",
         "//test/e2e/framework/timer:all-srcs",
         "//test/e2e/framework/viperconfig:all-srcs",
+        "//test/e2e/framework/volume:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -1,26 +1,19 @@
 package(default_visibility = ["//visibility:public"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "persistent_volumes.go",
-        "volume_mode.go",
-    ],
-    importpath = "k8s.io/kubernetes/test/e2e/upgrades/storage",
+    srcs = ["fixtures.go"],
+    importpath = "k8s.io/kubernetes/test/e2e/framework/volume",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/framework/volume:go_default_library",
-        "//test/e2e/storage/utils:go_default_library",
-        "//test/e2e/upgrades:go_default_library",
+        "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
     ],

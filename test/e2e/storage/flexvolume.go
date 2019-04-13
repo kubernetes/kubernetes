@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -50,8 +51,8 @@ const (
 
 // testFlexVolume tests that a client pod using a given flexvolume driver
 // successfully mounts it and runs
-func testFlexVolume(driver string, cs clientset.Interface, config framework.VolumeTestConfig, f *framework.Framework) {
-	tests := []framework.VolumeTest{
+func testFlexVolume(driver string, cs clientset.Interface, config volume.TestConfig, f *framework.Framework) {
+	tests := []volume.Test{
 		{
 			Volume: v1.VolumeSource{
 				FlexVolume: &v1.FlexVolumeSource{
@@ -63,9 +64,9 @@ func testFlexVolume(driver string, cs clientset.Interface, config framework.Volu
 			ExpectedContent: "Hello from flexvolume!",
 		},
 	}
-	framework.TestVolumeClient(cs, config, nil, "" /* fsType */, tests)
+	volume.TestVolumeClient(cs, config, nil, "" /* fsType */, tests)
 
-	framework.VolumeTestCleanup(f, config)
+	volume.TestCleanup(f, config)
 }
 
 // installFlex installs the driver found at filePath on the node, and restarts
@@ -180,7 +181,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 	var cs clientset.Interface
 	var ns *v1.Namespace
 	var node v1.Node
-	var config framework.VolumeTestConfig
+	var config volume.TestConfig
 	var suffix string
 
 	BeforeEach(func() {
@@ -193,7 +194,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		ns = f.Namespace
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		node = nodes.Items[rand.Intn(len(nodes.Items))]
-		config = framework.VolumeTestConfig{
+		config = volume.TestConfig{
 			Namespace:      ns.Name,
 			Prefix:         "flex",
 			ClientNodeName: node.Name,

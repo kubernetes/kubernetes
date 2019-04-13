@@ -28,6 +28,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -66,7 +67,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		volLabel = labels.Set{framework.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
 		// Start the NFS server pod.
-		_, nfsServerPod, nfsServerIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+		_, nfsServerPod, nfsServerIP = volume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 		nfsPVconfig = framework.PersistentVolumeConfig{
 			NamePrefix: "nfs-",
 			Labels:     volLabel,
@@ -120,7 +121,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.SkipUnlessSSHKeyPresent()
 
 			By("Initializing first PD with PVPVC binding")
-			pvSource1, diskName1 = framework.CreateGCEVolume()
+			pvSource1, diskName1 = volume.CreateGCEVolume()
 			framework.ExpectNoError(err)
 			pvConfig1 = framework.PersistentVolumeConfig{
 				NamePrefix: "gce-",
@@ -133,7 +134,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv1, pvc1))
 
 			By("Initializing second PD with PVPVC binding")
-			pvSource2, diskName2 = framework.CreateGCEVolume()
+			pvSource2, diskName2 = volume.CreateGCEVolume()
 			framework.ExpectNoError(err)
 			pvConfig2 = framework.PersistentVolumeConfig{
 				NamePrefix: "gce-",

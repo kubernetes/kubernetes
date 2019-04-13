@@ -54,6 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -186,7 +187,7 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	case testpatterns.InlineVolume:
 		fallthrough
 	case testpatterns.PreprovisionedPV:
-		c, serverPod, serverIP := framework.NewNFSServer(cs, ns.Name, []string{})
+		c, serverPod, serverIP := volume.NewNFSServer(cs, ns.Name, []string{})
 		config.ServerConfig = &c
 		return &nfsVolume{
 			serverIP:  serverIP,
@@ -202,7 +203,7 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 }
 
 func (v *nfsVolume) DeleteVolume() {
-	framework.CleanUpVolumeServer(v.f, v.serverPod)
+	volume.CleanUpVolumeServer(v.f, v.serverPod)
 }
 
 // Gluster
@@ -290,7 +291,7 @@ func (g *glusterFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, _ := framework.NewGlusterfsServer(cs, ns.Name)
+	c, serverPod, _ := volume.NewGlusterfsServer(cs, ns.Name)
 	config.ServerConfig = &c
 	return &glusterVolume{
 		prefix:    config.Prefix,
@@ -418,7 +419,7 @@ func (i *iSCSIDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, serverIP, iqn := framework.NewISCSIServer(cs, ns.Name)
+	c, serverPod, serverIP, iqn := volume.NewISCSIServer(cs, ns.Name)
 	config.ServerConfig = &c
 	config.ClientNodeName = c.ClientNodeName
 	return &iSCSIVolume{
@@ -430,7 +431,7 @@ func (i *iSCSIDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 }
 
 func (v *iSCSIVolume) DeleteVolume() {
-	framework.CleanUpVolumeServer(v.f, v.serverPod)
+	volume.CleanUpVolumeServer(v.f, v.serverPod)
 }
 
 // Ceph RBD
@@ -542,7 +543,7 @@ func (r *rbdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, secret, serverIP := framework.NewRBDServer(cs, ns.Name)
+	c, serverPod, secret, serverIP := volume.NewRBDServer(cs, ns.Name)
 	config.ServerConfig = &c
 	return &rbdVolume{
 		serverPod: serverPod,
@@ -553,7 +554,7 @@ func (r *rbdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 }
 
 func (v *rbdVolume) DeleteVolume() {
-	framework.CleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
+	volume.CleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
 }
 
 // Ceph
@@ -651,7 +652,7 @@ func (c *cephFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	cfg, serverPod, secret, serverIP := framework.NewRBDServer(cs, ns.Name)
+	cfg, serverPod, secret, serverIP := volume.NewRBDServer(cs, ns.Name)
 	config.ServerConfig = &cfg
 	return &cephVolume{
 		serverPod: serverPod,
@@ -662,7 +663,7 @@ func (c *cephFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 }
 
 func (v *cephVolume) DeleteVolume() {
-	framework.CleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
+	volume.CleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
 }
 
 // Hostpath

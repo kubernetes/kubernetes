@@ -37,7 +37,7 @@ limitations under the License.
  * and checks, that Kubernetes can use it as a volume.
  */
 
-package framework
+package volume
 
 import (
 	"fmt"
@@ -51,6 +51,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -86,10 +87,10 @@ const (
 	iSCSIIQNTemplate = "iqn.2003-01.io.k8s:e2e.%s"
 )
 
-// VolumeTestConfig is a struct for configuration of one tests. The test consist of:
+// TestConfig is a struct for configuration of one tests. The test consist of:
 // - server pod - runs serverImage, exports ports[]
 // - client pod - does not need any special configuration
-type VolumeTestConfig struct {
+type TestConfig struct {
 	Namespace string
 	// Prefix of all pods. Typically the test name.
 	Prefix string
@@ -120,17 +121,17 @@ type VolumeTestConfig struct {
 	NodeSelector map[string]string
 }
 
-// VolumeTest contains a volume to mount into a client pod and its
+// Test contains a volume to mount into a client pod and its
 // expected content.
-type VolumeTest struct {
+type Test struct {
 	Volume          v1.VolumeSource
 	File            string
 	ExpectedContent string
 }
 
 // NewNFSServer is a NFS-specific wrapper for CreateStorageServer.
-func NewNFSServer(cs clientset.Interface, namespace string, args []string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
-	config = VolumeTestConfig{
+func NewNFSServer(cs clientset.Interface, namespace string, args []string) (config TestConfig, pod *v1.Pod, ip string) {
+	config = TestConfig{
 		Namespace:          namespace,
 		Prefix:             "nfs",
 		ServerImage:        imageutils.GetE2EImage(imageutils.VolumeNFSServer),
@@ -146,8 +147,8 @@ func NewNFSServer(cs clientset.Interface, namespace string, args []string) (conf
 }
 
 // NewGlusterfsServer is a GlusterFS-specific wrapper for CreateStorageServer. Also creates the gluster endpoints object.
-func NewGlusterfsServer(cs clientset.Interface, namespace string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
-	config = VolumeTestConfig{
+func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestConfig, pod *v1.Pod, ip string) {
+	config = TestConfig{
 		Namespace:   namespace,
 		Prefix:      "gluster",
 		ServerImage: imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
@@ -182,17 +183,16 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config Volume
 		},
 	}
 	endpoints, err := cs.CoreV1().Endpoints(namespace).Create(endpoints)
-	ExpectNoError(err, "failed to create endpoints for Gluster server")
+	framework.ExpectNoError(err, "failed to create endpoints for Gluster server")
 
 	return config, pod, ip
 }
 
 // NewISCSIServer is an iSCSI-specific wrapper for CreateStorageServer.
-func NewISCSIServer(cs clientset.Interface, namespace string) (config VolumeTestConfig, pod *v1.Pod, ip, iqn string) {
+func NewISCSIServer(cs clientset.Interface, namespace string) (config TestConfig, pod *v1.Pod, ip, iqn string) {
 	// Generate cluster-wide unique IQN
 	iqn = fmt.Sprintf(iSCSIIQNTemplate, namespace)
-
-	config = VolumeTestConfig{
+	config = TestConfig{
 		Namespace:   namespace,
 		Prefix:      "iscsi",
 		ServerImage: imageutils.GetE2EImage(imageutils.VolumeISCSIServer),
@@ -215,8 +215,8 @@ func NewISCSIServer(cs clientset.Interface, namespace string) (config VolumeTest
 }
 
 // NewRBDServer is a CephRBD-specific wrapper for CreateStorageServer.
-func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestConfig, pod *v1.Pod, secret *v1.Secret, ip string) {
-	config = VolumeTestConfig{
+func NewRBDServer(cs clientset.Interface, namespace string) (config TestConfig, pod *v1.Pod, secret *v1.Secret, ip string) {
+	config = TestConfig{
 		Namespace:   namespace,
 		Prefix:      "rbd",
 		ServerImage: imageutils.GetE2EImage(imageutils.VolumeRBDServer),
@@ -245,7 +245,7 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestCo
 
 	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(secret)
 	if err != nil {
-		Failf("Failed to create secrets for Ceph RBD: %v", err)
+		framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
 	}
 
 	return config, pod, secret, ip
@@ -254,19 +254,19 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config VolumeTestCo
 // CreateStorageServer is a wrapper for StartVolumeServer(). A storage server config is passed in, and a pod pointer
 // and ip address string are returned.
 // Note: Expect() is called so no error is returned.
-func CreateStorageServer(cs clientset.Interface, config VolumeTestConfig) (pod *v1.Pod, ip string) {
+func CreateStorageServer(cs clientset.Interface, config TestConfig) (pod *v1.Pod, ip string) {
 	pod = StartVolumeServer(cs, config)
 	gomega.Expect(pod).NotTo(gomega.BeNil(), "storage server pod should not be nil")
 	ip = pod.Status.PodIP
 	gomega.Expect(len(ip)).NotTo(gomega.BeZero(), fmt.Sprintf("pod %s's IP should not be empty", pod.Name))
-	Logf("%s server pod IP address: %s", config.Prefix, ip)
+	framework.Logf("%s server pod IP address: %s", config.Prefix, ip)
 	return pod, ip
 }
 
 // StartVolumeServer starts a container specified by config.serverImage and exports all
 // config.serverPorts from it. The returned pod should be used to get the server
 // IP address and create appropriate VolumeSource.
-func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.Pod {
+func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	podClient := client.CoreV1().Pods(config.Namespace)
 
 	portCount := len(config.ServerPorts)
@@ -353,85 +353,85 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	// ok if the server pod already exists. TODO: make this controllable by callers
 	if err != nil {
 		if apierrs.IsAlreadyExists(err) {
-			Logf("Ignore \"already-exists\" error, re-get pod...")
+			framework.Logf("Ignore \"already-exists\" error, re-get pod...")
 			ginkgo.By(fmt.Sprintf("re-getting the %q server pod", serverPodName))
 			serverPod, err = podClient.Get(serverPodName, metav1.GetOptions{})
-			ExpectNoError(err, "Cannot re-get the server pod %q: %v", serverPodName, err)
+			framework.ExpectNoError(err, "Cannot re-get the server pod %q: %v", serverPodName, err)
 			pod = serverPod
 		} else {
-			ExpectNoError(err, "Failed to create %q pod: %v", serverPodName, err)
+			framework.ExpectNoError(err, "Failed to create %q pod: %v", serverPodName, err)
 		}
 	}
 	if config.WaitForCompletion {
-		ExpectNoError(WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
-		ExpectNoError(podClient.Delete(serverPod.Name, nil))
+		framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
+		framework.ExpectNoError(podClient.Delete(serverPod.Name, nil))
 	} else {
-		ExpectNoError(WaitForPodRunningInNamespace(client, serverPod))
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, serverPod))
 		if pod == nil {
 			ginkgo.By(fmt.Sprintf("locating the %q server pod", serverPodName))
 			pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
-			ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
+			framework.ExpectNoError(err, "Cannot locate the server pod %q: %v", serverPodName, err)
 		}
 	}
 	if config.ServerReadyMessage != "" {
-		_, err := LookForStringInLog(pod.Namespace, pod.Name, serverPodName, config.ServerReadyMessage, VolumeServerPodStartupTimeout)
-		ExpectNoError(err, "Failed to find %q in pod logs: %s", config.ServerReadyMessage, err)
+		_, err := framework.LookForStringInLog(pod.Namespace, pod.Name, serverPodName, config.ServerReadyMessage, VolumeServerPodStartupTimeout)
+		framework.ExpectNoError(err, "Failed to find %q in pod logs: %s", config.ServerReadyMessage, err)
 	}
 	return pod
 }
 
 // CleanUpVolumeServer is a wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
-func CleanUpVolumeServer(f *Framework, serverPod *v1.Pod) {
+func CleanUpVolumeServer(f *framework.Framework, serverPod *v1.Pod) {
 	CleanUpVolumeServerWithSecret(f, serverPod, nil)
 }
 
 // CleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.
-func CleanUpVolumeServerWithSecret(f *Framework, serverPod *v1.Pod, secret *v1.Secret) {
+func CleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, secret *v1.Secret) {
 	cs := f.ClientSet
 	ns := f.Namespace
 
 	if secret != nil {
-		Logf("Deleting server secret %q...", secret.Name)
+		framework.Logf("Deleting server secret %q...", secret.Name)
 		err := cs.CoreV1().Secrets(ns.Name).Delete(secret.Name, &metav1.DeleteOptions{})
 		if err != nil {
-			Logf("Delete secret failed: %v", err)
+			framework.Logf("Delete secret failed: %v", err)
 		}
 	}
 
-	Logf("Deleting server pod %q...", serverPod.Name)
-	err := DeletePodWithWait(f, cs, serverPod)
+	framework.Logf("Deleting server pod %q...", serverPod.Name)
+	err := framework.DeletePodWithWait(f, cs, serverPod)
 	if err != nil {
-		Logf("Server pod delete failed: %v", err)
+		framework.Logf("Server pod delete failed: %v", err)
 	}
 }
 
-// VolumeTestCleanup cleans both server and client pods.
-func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
+// TestCleanup cleans both server and client pods.
+func TestCleanup(f *framework.Framework, config TestConfig) {
 	ginkgo.By(fmt.Sprint("cleaning the environment after ", config.Prefix))
 
 	defer ginkgo.GinkgoRecover()
 
 	cs := f.ClientSet
 
-	err := DeletePodWithWaitByName(f, cs, config.Prefix+"-client", config.Namespace)
+	err := framework.DeletePodWithWaitByName(f, cs, config.Prefix+"-client", config.Namespace)
 	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-client", config.Namespace)
 
 	if config.ServerImage != "" {
-		err := DeletePodWithWaitByName(f, cs, config.Prefix+"-server", config.Namespace)
+		err := framework.DeletePodWithWaitByName(f, cs, config.Prefix+"-server", config.Namespace)
 		gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 	}
 }
 
 // TestVolumeClient start a client pod using given VolumeSource (exported by startVolumeServer())
 // and check that the pod sees expected data, e.g. from the server pod.
-// Multiple VolumeTests can be specified to mount multiple volumes to a single
+// Multiple Tests can be specified to mount multiple volumes to a single
 // pod.
-func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, fsType string, tests []VolumeTest) {
+func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
 	ginkgo.By(fmt.Sprint("starting ", config.Prefix, "-client"))
 	var gracePeriod int64 = 1
 	var command string
 
-	if !NodeOSDistroIs("windows") {
+	if !framework.NodeOSDistroIs("windows") {
 		command = "while true ; do cat /opt/0/index.html ; sleep 2 ; ls -altrh /opt/  ; sleep 2 ; done "
 	} else {
 		command = "while(1) {cat /opt/0/index.html ; sleep 2 ; ls /opt/; sleep 2}"
@@ -452,7 +452,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 			Containers: []v1.Container{
 				{
 					Name:       config.Prefix + "-client",
-					Image:      GetTestImage(BusyBoxImage),
+					Image:      GetTestImage(framework.BusyBoxImage),
 					WorkingDir: "/opt",
 					// An imperative and easily debuggable container which reads vol contents for
 					// us to scan in the tests or by eye.
@@ -483,29 +483,29 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 	}
 	clientPod, err := podsNamespacer.Create(clientPod)
 	if err != nil {
-		Failf("Failed to create %s pod: %v", clientPod.Name, err)
+		framework.Failf("Failed to create %s pod: %v", clientPod.Name, err)
 
 	}
-	ExpectNoError(WaitForPodRunningInNamespace(client, clientPod))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, clientPod))
 
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
 		fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
 		commands := GenerateReadFileCmd(fileName)
-		_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, commands, test.ExpectedContent, time.Minute)
-		ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
+		_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, commands, test.ExpectedContent, time.Minute)
+		framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 	}
-	if !NodeOSDistroIs("windows") {
+	if !framework.NodeOSDistroIs("windows") {
 		if fsGroup != nil {
 			ginkgo.By("Checking fsGroup is correct.")
-			_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", "/opt/0"}, strconv.Itoa(int(*fsGroup)), time.Minute)
-			ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
+			_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"ls", "-ld", "/opt/0"}, strconv.Itoa(int(*fsGroup)), time.Minute)
+			framework.ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
 		}
 
 		if fsType != "" {
 			ginkgo.By("Checking fsType is correct.")
-			_, err = LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", " /opt/0 ", "/proc/mounts"}, fsType, time.Minute)
-			ExpectNoError(err, "failed: getting the right fsType %s", fsType)
+			_, err = framework.LookForStringInPodExec(config.Namespace, clientPod.Name, []string{"grep", " /opt/0 ", "/proc/mounts"}, fsType, time.Minute)
+			framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
 		}
 	}
 }
@@ -513,7 +513,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 // InjectHTML inserts index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func InjectHTML(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, volume v1.VolumeSource, content string) {
+func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, volume v1.VolumeSource, content string) {
 	ginkgo.By(fmt.Sprint("starting ", config.Prefix, " injector"))
 	podClient := client.CoreV1().Pods(config.Namespace)
 	podName := fmt.Sprintf("%s-injector-%s", config.Prefix, rand.String(4))
@@ -535,7 +535,7 @@ func InjectHTML(client clientset.Interface, config VolumeTestConfig, fsGroup *in
 			Containers: []v1.Container{
 				{
 					Name:    config.Prefix + "-injector",
-					Image:   GetTestImage(BusyBoxImage),
+					Image:   GetTestImage(framework.BusyBoxImage),
 					Command: GenerateWriteFileCmd(content, fileName),
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -566,15 +566,15 @@ func InjectHTML(client clientset.Interface, config VolumeTestConfig, fsGroup *in
 	}()
 
 	injectPod, err := podClient.Create(injectPod)
-	ExpectNoError(err, "Failed to create injector pod: %v", err)
-	err = WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
-	ExpectNoError(err)
+	framework.ExpectNoError(err, "Failed to create injector pod: %v", err)
+	err = framework.WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
+	framework.ExpectNoError(err)
 }
 
 // CreateGCEVolume creates PersistentVolumeSource for GCEVolume.
 func CreateGCEVolume() (*v1.PersistentVolumeSource, string) {
-	diskName, err := CreatePDWithRetry()
-	ExpectNoError(err)
+	diskName, err := framework.CreatePDWithRetry()
+	framework.ExpectNoError(err)
 	return &v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   diskName,
@@ -588,7 +588,7 @@ func CreateGCEVolume() (*v1.PersistentVolumeSource, string) {
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
 func GenerateScriptCmd(command string) []string {
 	var commands []string
-	if !NodeOSDistroIs("windows") {
+	if !framework.NodeOSDistroIs("windows") {
 		commands = []string{"/bin/sh", "-c", command}
 	} else {
 		commands = []string{"powershell", "/c", command}
@@ -600,7 +600,7 @@ func GenerateScriptCmd(command string) []string {
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
 func GenerateWriteFileCmd(content, fullPath string) []string {
 	var commands []string
-	if !NodeOSDistroIs("windows") {
+	if !framework.NodeOSDistroIs("windows") {
 		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + fullPath}
 	} else {
 		commands = []string{"powershell", "/c", "echo '" + content + "' > " + fullPath}
@@ -612,7 +612,7 @@ func GenerateWriteFileCmd(content, fullPath string) []string {
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
 func GenerateReadFileCmd(fullPath string) []string {
 	var commands []string
-	if !NodeOSDistroIs("windows") {
+	if !framework.NodeOSDistroIs("windows") {
 		commands = []string{"cat", fullPath}
 	} else {
 		commands = []string{"powershell", "/c", "type " + fullPath}
@@ -625,12 +625,12 @@ func GenerateReadFileCmd(fullPath string) []string {
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
 func GenerateWriteandExecuteScriptFileCmd(content, fileName, filePath string) []string {
 	// for windows cluster, modify the Pod spec.
-	if NodeOSDistroIs("windows") {
+	if framework.NodeOSDistroIs("windows") {
 		scriptName := fmt.Sprintf("%s.ps1", fileName)
 		fullPath := filepath.Join(filePath, scriptName)
 
 		cmd := "echo \"" + content + "\" > " + fullPath + "; .\\" + fullPath
-		Logf("generated pod command %s", cmd)
+		framework.Logf("generated pod command %s", cmd)
 		return []string{"powershell", "/c", cmd}
 	}
 	scriptName := fmt.Sprintf("%s.sh", fileName)
@@ -643,7 +643,7 @@ func GenerateWriteandExecuteScriptFileCmd(content, fileName, filePath string) []
 // If the Node OS is windows, currently we will ignore the inputs and return nil.
 // TODO: Will modify it after windows has its own security context
 func GenerateSecurityContext(privileged bool) *v1.SecurityContext {
-	if NodeOSDistroIs("windows") {
+	if framework.NodeOSDistroIs("windows") {
 		return nil
 	}
 	return &v1.SecurityContext{
@@ -655,7 +655,7 @@ func GenerateSecurityContext(privileged bool) *v1.SecurityContext {
 // If the Node OS is windows, currently we will ignore the inputs and return nil.
 // TODO: Will modify it after windows has its own security context
 func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOptions) *v1.PodSecurityContext {
-	if NodeOSDistroIs("windows") {
+	if framework.NodeOSDistroIs("windows") {
 		return nil
 	}
 	return &v1.PodSecurityContext{
@@ -668,7 +668,7 @@ func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOption
 // If the Node OS is windows, currently we return Nettest image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
 func GetTestImage(image string) string {
-	if NodeOSDistroIs("windows") {
+	if framework.NodeOSDistroIs("windows") {
 		return imageutils.GetE2EImage(imageutils.Nettest)
 	}
 	return image

@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -549,8 +550,8 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   framework.GetTestImage(framework.BusyBoxImage),
-					Command: framework.GenerateScriptCmd(command),
+					Image:   volume.GetTestImage(framework.BusyBoxImage),
+					Command: volume.GenerateScriptCmd(command),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",

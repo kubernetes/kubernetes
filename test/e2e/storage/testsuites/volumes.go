@@ -29,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -136,11 +137,11 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		skipPersistenceTest(driver)
 		init()
 		defer func() {
-			framework.VolumeTestCleanup(f, convertTestConfig(l.config))
+			volume.TestCleanup(f, convertTestConfig(l.config))
 			cleanup()
 		}()
 
-		tests := []framework.VolumeTest{
+		tests := []volume.Test{
 			{
 				Volume: *l.resource.volSource,
 				File:   "index.html",
@@ -159,8 +160,8 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		framework.InjectHTML(f.ClientSet, config, fsGroup, tests[0].Volume, tests[0].ExpectedContent)
-		framework.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+		volume.InjectHTML(f.ClientSet, config, fsGroup, tests[0].Volume, tests[0].ExpectedContent)
+		volume.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
 	})
 
 	It("should allow exec of files on the volume", func() {
@@ -190,7 +191,7 @@ func testScriptInPod(
 	} else {
 		content = fmt.Sprintf("ls %s", volPath)
 	}
-	command := framework.GenerateWriteandExecuteScriptFileCmd(content, fileName, volPath)
+	command := volume.GenerateWriteandExecuteScriptFileCmd(content, fileName, volPath)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("exec-volume-test-%s", suffix),
@@ -200,7 +201,7 @@ func testScriptInPod(
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("exec-container-%s", suffix),
-					Image:   framework.GetTestImage(imageutils.GetE2EImage(imageutils.Nginx)),
+					Image:   volume.GetTestImage(imageutils.GetE2EImage(imageutils.Nginx)),
 					Command: command,
 					VolumeMounts: []v1.VolumeMount{
 						{
