@@ -220,14 +220,18 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "EndpointsNotFound"
 			availableCondition.Message = fmt.Sprintf("cannot find endpoints for service/%s in %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			if _, err2 := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService); err2 != nil {
+				klog.Errorf("cannot update API service status: %v", err2)
+			}
 			return err
 		} else if err != nil {
 			availableCondition.Status = apiregistration.ConditionUnknown
 			availableCondition.Reason = "EndpointsAccessError"
 			availableCondition.Message = fmt.Sprintf("service/%s in %q cannot be checked due to: %v", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, err)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			if _, err2 := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService); err2 != nil {
+				klog.Errorf("cannot update API service status: %v", err2)
+			}
 			return err
 		}
 		hasActiveEndpoints := false
