@@ -174,7 +174,7 @@ func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool)
 	// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key, just continue rotating the cert
 	// TODO: We might want to reconsider this choice.
 	if err := backupAPIServerCertAndKey(certAndKeyDir); err != nil {
-		fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
+		fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v\n", err)
 	}
 	return certsphase.CreateCertAndKeyFilesWithCA(
 		&certsphase.KubeadmCertAPIServer,
