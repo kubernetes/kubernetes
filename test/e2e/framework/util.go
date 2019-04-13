@@ -85,6 +85,7 @@ import (
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/features"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -176,6 +177,10 @@ const (
 
 	// How long PVs have to become deleted
 	PVDeletingTimeout = 3 * time.Minute
+
+	// How long a node is allowed to become "Ready" after it is recreated before
+	// the test is considered failed.
+	RecreateNodeReadyAgainTimeout = 10 * time.Minute
 
 	// How long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
@@ -3302,6 +3307,55 @@ func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds in
 		}
 		return true, nil
 	})
+}
+
+// WaitForNPods tries to list restarting pods using ps until it finds expect of them,
+// returning their names if it can do so before timeout.
+func WaitForNRestartablePods(ps *testutils.PodStore, expect int, timeout time.Duration) ([]string, error) {
+	var pods []*v1.Pod
+	var errLast error
+	found := wait.Poll(Poll, timeout, func() (bool, error) {
+		allPods := ps.List()
+		pods = FilterNonRestartablePods(allPods)
+		if len(pods) != expect {
+			errLast = fmt.Errorf("expected to find %d pods but found only %d", expect, len(pods))
+			Logf("Error getting pods: %v", errLast)
+			return false, nil
+		}
+		return true, nil
+	}) == nil
+	podNames := make([]string, len(pods))
+	for i, p := range pods {
+		podNames[i] = p.ObjectMeta.Name
+	}
+	if !found {
+		return podNames, fmt.Errorf("couldn't find %d pods within %v; last error: %v",
+			expect, timeout, errLast)
+	}
+	return podNames, nil
+}
+
+// FilterIrrelevantPods filters out pods that will never get recreated if deleted after termination.
+func FilterNonRestartablePods(pods []*v1.Pod) []*v1.Pod {
+	var results []*v1.Pod
+	for _, p := range pods {
+		if isNotRestartAlwaysMirrorPod(p) {
+			// Mirror pods with restart policy == Never will not get
+			// recreated if they are deleted after the pods have
+			// terminated. For now, we discount such pods.
+			// https://github.com/kubernetes/kubernetes/issues/34003
+			continue
+		}
+		results = append(results, p)
+	}
+	return results
+}
+
+func isNotRestartAlwaysMirrorPod(p *v1.Pod) bool {
+	if !kubepod.IsMirrorPod(p) {
+		return false
+	}
+	return p.Spec.RestartPolicy != v1.RestartPolicyAlways
 }
 
 // Waits for the number of events on the given object to reach a desired count.
