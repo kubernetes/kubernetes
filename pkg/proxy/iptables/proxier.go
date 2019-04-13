@@ -324,6 +324,9 @@ func NewProxier(ipt utiliptables.Interface,
 	healthChecker := healthcheck.NewServer(hostname, recorder, nil, nil) // use default implementations of deps
 
 	isIPv6 := ipt.IsIpv6()
+	if nodeIP.To4() != nil && isIPv6 {
+		return nil, fmt.Errorf("Node ip and iptables have dirrerent protocol. NodeIPV4:%t IptablesIPV4:%t", nodeIP.To4() != nil, !ipt.IsIpv6())
+	}
 	proxier := &Proxier{
 		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		serviceMap:               make(proxy.ServiceMap),
