@@ -328,7 +328,6 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 	if b.readOnly {
 		options = append(options, "ro")
-
 	}
 
 	// Check for log-file,log-level options existence in user supplied mount options, if provided, use those.
@@ -348,7 +347,6 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 	// If logfile has not been provided, create driver specific log file.
 	if !hasLogFile {
-		log = ""
 		p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
 		if err := os.MkdirAll(p, 0750); err != nil {
 			return fmt.Errorf("failed to create directory %v: %v", p, err)
@@ -361,7 +359,6 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 		// Use derived log file in gluster fuse mount
 		options = append(options, "log-file="+log)
-
 	}
 
 	if !hasLogLevel {
