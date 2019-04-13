@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -84,42 +83,6 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	}
 
 	return csiPlug, tmpDir
-}
-
-func makeTestPV(name string, sizeGig int, driverName, volID string) *api.PersistentVolume {
-	return &api.PersistentVolume{
-		ObjectMeta: meta.ObjectMeta{
-			Name: name,
-		},
-		Spec: api.PersistentVolumeSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse(
-					fmt.Sprintf("%dGi", sizeGig),
-				),
-			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				CSI: &api.CSIPersistentVolumeSource{
-					Driver:       driverName,
-					VolumeHandle: volID,
-					ReadOnly:     false,
-				},
-			},
-		},
-	}
-}
-
-func makeTestVol(name string, driverName string) *api.Volume {
-	ro := false
-	return &api.Volume{
-		Name: name,
-		VolumeSource: api.VolumeSource{
-			CSI: &api.CSIVolumeSource{
-				Driver:   driverName,
-				ReadOnly: &ro,
-			},
-		},
-	}
 }
 
 func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
@@ -910,7 +873,7 @@ func TestPluginCanAttach(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		csiDriver := getCSIDriver(test.driverName, nil, &test.canAttach)
+		csiDriver := getTestCSIDriver(test.driverName, nil, &test.canAttach)
 		t.Run(test.name, func(t *testing.T) {
 			fakeCSIClient := fakeclient.NewSimpleClientset(csiDriver)
 			plug, tmpDir := newTestPlugin(t, fakeCSIClient)
@@ -971,7 +934,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			client := fakeclient.NewSimpleClientset(getCSIDriver(test.driverName, nil, &test.canAttach))
+			client := fakeclient.NewSimpleClientset(getTestCSIDriver(test.driverName, nil, &test.canAttach))
 			factory := informers.NewSharedInformerFactory(client, csiResyncPeriod)
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(
 				tmpDir,

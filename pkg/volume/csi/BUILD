@@ -50,6 +50,7 @@ go_test(
         "csi_drivers_store_test.go",
         "csi_mounter_test.go",
         "csi_plugin_test.go",
+        "csi_util_test.go",
         "expander_test.go",
     ],
     embed = [":go_default_library"],
