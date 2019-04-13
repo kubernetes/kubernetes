@@ -95,14 +95,32 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	return vmset.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
 }
 
-// DetachDiskByName detaches a vhd from host. The vhd can be identified by diskName or diskURI.
-func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error {
+// DetachDisk detaches a disk from host. The vhd can be identified by diskName or diskURI.
+func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.NodeName) error {
 	vmset, err := c.getNodeVMSet(nodeName)
 	if err != nil {
 		return err
 	}
 
-	return vmset.DetachDiskByName(diskName, diskURI, nodeName)
+	resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
+	if c.cloud.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
+		klog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
+		retryErr := kwait.ExponentialBackoff(c.cloud.requestBackoff(), func() (bool, error) {
+			resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
+			return c.cloud.processHTTPRetryResponse(nil, "", resp, err)
+		})
+		if retryErr != nil {
+			err = retryErr
+			klog.V(2).Infof("azureDisk - update abort backoff: detach disk(%s, %s), err: %v", diskName, diskURI, err)
+		}
+	}
+	if err != nil {
+		klog.Errorf("azureDisk - detach disk(%s, %s) failed, err: %v", diskName, diskURI, err)
+	} else {
+		klog.V(2).Infof("azureDisk - detach disk(%s, %s) succeeded", diskName, diskURI)
+	}
+
+	return err
 }
 
 // getNodeDataDisks invokes vmSet interfaces to get data disks for the node.
