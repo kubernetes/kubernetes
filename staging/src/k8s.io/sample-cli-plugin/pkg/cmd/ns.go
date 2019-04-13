@@ -88,11 +88,8 @@ func NewCmdNamespace(streams genericclioptions.IOStreams) *cobra.Command {
 			if err := o.Validate(); err != nil {
 				return err
 			}
-			if err := o.Run(); err != nil {
-				return err
-			}
 
-			return nil
+			return o.Run()
 		},
 	}
 
