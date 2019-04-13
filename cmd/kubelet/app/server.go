@@ -365,7 +365,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		return nil, err
 	}
 
-	mounter := mount.New(s.ExperimentalMounterPath)
+	mounter := mount.New(s.MounterPath)
 	subpather := subpath.New(mounter)
 	var pluginRunner = exec.New()
 	if s.Containerized {
@@ -374,9 +374,9 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		if err != nil {
 			return nil, err
 		}
-		mounter = nsutil.NewMounter(s.RootDirectory, ne)
+		mounter = nsutil.NewMounter(s.RootDir, ne)
 		// NSenter only valid on Linux
-		subpather = subpath.NewNSEnter(mounter, ne, s.RootDirectory)
+		subpather = subpath.NewNSEnter(mounter, ne, s.RootDir)
 		// an exec interface which can use nsenter for flex plugin calls
 		pluginRunner, err = nsenter.NewNsenter(nsenter.DefaultHostRootFsPath, exec.New())
 		if err != nil {
@@ -515,7 +515,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 
 	// About to get clients and such, detect standaloneMode
 	standaloneMode := true
-	if len(s.KubeConfig) > 0 {
+	if len(s.Kubeconfig) > 0 {
 		standaloneMode = false
 	}
 
@@ -614,7 +614,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDir, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
 		if err != nil {
 			return err
 		}
@@ -662,7 +662,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 				CgroupsPerQOS:         s.CgroupsPerQOS,
 				CgroupRoot:            s.CgroupRoot,
 				CgroupDriver:          s.CgroupDriver,
-				KubeletRootDir:        s.RootDirectory,
+				KubeletRootDir:        s.RootDir,
 				ProtectKernelDefaults: s.ProtectKernelDefaults,
 				NodeAllocatableConfig: cm.NodeAllocatableConfig{
 					KubeReservedCgroupName:   s.KubeReservedCgroup,
@@ -755,7 +755,7 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 		// bootstrap the cert manager with the contents of the initial client config.
 
 		klog.Infof("Client rotation is on, will bootstrap in background")
-		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory)
+		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.Kubeconfig, s.BootstrapKubeconfig, s.CertDir)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -765,7 +765,7 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 
 		kubeClientConfigOverrides(s, clientConfig)
 
-		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.CertDirectory, nodeName)
+		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.CertDir, nodeName)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -788,13 +788,13 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 	}
 
 	if len(s.BootstrapKubeconfig) > 0 {
-		if err := bootstrap.LoadClientCert(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
+		if err := bootstrap.LoadClientCert(s.Kubeconfig, s.BootstrapKubeconfig, s.CertDir, nodeName); err != nil {
 			return nil, nil, err
 		}
 	}
 
 	clientConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
@@ -875,8 +875,8 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
 func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletConfiguration) (*server.TLSOptions, error) {
 	if !kc.ServerTLSBootstrap && kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
-		kc.TLSCertFile = path.Join(kf.CertDirectory, "kubelet.crt")
-		kc.TLSPrivateKeyFile = path.Join(kf.CertDirectory, "kubelet.key")
+		kc.TLSCertFile = path.Join(kc.CertDir, "kubelet.crt")
+		kc.TLSPrivateKeyFile = path.Join(kc.CertDir, "kubelet.key")
 
 		canReadCertAndKey, err := certutil.CanReadCertAndKey(kc.TLSCertFile, kc.TLSPrivateKeyFile)
 		if err != nil {
@@ -997,8 +997,8 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	}
 	capabilities.Setup(kubeServer.AllowPrivileged, privilegedSources, 0)
 
-	credentialprovider.SetPreferredDockercfgPath(kubeServer.RootDirectory)
-	klog.V(2).Infof("Using root directory: %v", kubeServer.RootDirectory)
+	credentialprovider.SetPreferredDockercfgPath(kubeServer.RootDir)
+	klog.V(2).Infof("Using root directory: %v", kubeServer.RootDir)
 
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
@@ -1013,14 +1013,11 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.NodeIP,
 		kubeServer.ProviderID,
 		kubeServer.CloudProvider,
-		kubeServer.CertDirectory,
-		kubeServer.RootDirectory,
 		kubeServer.RegisterNode,
 		kubeServer.RegisterWithTaints,
 		kubeServer.AllowedUnsafeSysctls,
 		kubeServer.RemoteRuntimeEndpoint,
 		kubeServer.RemoteImageEndpoint,
-		kubeServer.ExperimentalMounterPath,
 		kubeServer.ExperimentalKernelMemcgNotification,
 		kubeServer.ExperimentalCheckNodeCapabilitiesBeforeMount,
 		kubeServer.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
@@ -1089,14 +1086,11 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeIP string,
 	providerID string,
 	cloudProvider string,
-	certDirectory string,
-	rootDirectory string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
-	experimentalMounterPath string,
 	experimentalKernelMemcgNotification bool,
 	experimentalCheckNodeCapabilitiesBeforeMount bool,
 	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
@@ -1123,14 +1117,11 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeIP,
 		providerID,
 		cloudProvider,
-		certDirectory,
-		rootDirectory,
 		registerNode,
 		registerWithTaints,
 		allowedUnsafeSysctls,
 		remoteRuntimeEndpoint,
 		remoteImageEndpoint,
-		experimentalMounterPath,
 		experimentalKernelMemcgNotification,
 		experimentalCheckNodeCapabilitiesBeforeMount,
 		experimentalNodeAllocatableIgnoreEvictionThreshold,

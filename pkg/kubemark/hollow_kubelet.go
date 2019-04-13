@@ -115,8 +115,6 @@ func GetHollowKubeletConfig(
 
 	// Flags struct
 	f := options.NewKubeletFlags()
-	f.EnableServer = true
-	f.RootDirectory = testRootDir
 	f.HostnameOverride = nodeName
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
 	f.MaxContainerCount = 100
@@ -130,6 +128,8 @@ func GetHollowKubeletConfig(
 		panic(err)
 	}
 
+	c.EnableServer = true
+	c.RootDir = testRootDir
 	c.StaticPodURL = ""
 	c.Address = "0.0.0.0" /* bind address */
 	c.Port = int32(kubeletPort)

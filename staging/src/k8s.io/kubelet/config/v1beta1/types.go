@@ -62,6 +62,11 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// rootDir is the directory path to place kubelet files (volume mounts, etc).
+	// Dynamic Kubelet Config (beta): Dynamically updating this field is not recommended.
+	// Default: /var/lib/kubelet
+	// +optional
+	RootDir string `json:"rootDir,omitempty"`
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
@@ -107,6 +112,12 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	StaticPodURLHeader map[string][]string `json:"staticPodURLHeader,omitempty"`
+	// enableServer enables the Kubelet's server
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may disrupt components that interact with the Kubelet server.
+	// Default: true
+	// +optional
+	EnableServer *bool `json:"enableServer,omitempty"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces).
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
@@ -127,11 +138,37 @@ type KubeletConfiguration struct {
 	// Default: 0 (disabled)
 	// +optional
 	ReadOnlyPort int32 `json:"readOnlyPort,omitempty"`
+	// kubeconfig is the path to a kubeconfig file, specifying how to connect to the
+	// API server. Providing this option enables API server mode, omitting it enables
+	// standalone mode.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may impact the Kubelet's ability to communicate with the API server.
+	// Default: ""
+	// +optional
+	Kubeconfig string `json:",kubeconfig,omitempty"`
+	// bootstrapKubeConfig is the path to a kubeconfig file that will be used to get
+	// client certificate for kubelet. If the file specified by kubeConfig does not
+	// exist, the bootstrap kubeconfig is used to request a client certificate from
+	// the API server. On success, a kubeconfig file referencing the generated client
+	// certificate and key is written to the path specified by kubeConfig. The client
+	// certificate and key file will be stored in the certDir.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may impact the Kubelet's ability to communicate with the API server.
+	// Default: ""
+	// +optional
+	BootstrapKubeconfig string `json:",bootstrapKubeconfig,omitempty"`
+	// certDir is the directory where the TLS certs are located.
+	// If tlsCertFile and tlsPrivateKeyFile are provided, this flag will be ignored.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may disrupt components that interact with the Kubelet server.
+	// Default: /var/lib/kubelet/pki
+	// +optional
+	CertDir string `json:",certDir,omitempty"`
 	// tlsCertFile is the file containing x509 Certificate for HTTPS. (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
 	// and key are generated for the public address and saved to the directory
-	// passed to the Kubelet's --cert-dir flag.
+	// passed to the Kubelet's certDir option.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// it may disrupt components that interact with the Kubelet server.
 	// Default: ""
@@ -584,6 +621,19 @@ type KubeletConfiguration struct {
 	// Default: 0
 	// +optional
 	PodsPerCore int32 `json:"podsPerCore,omitempty"`
+	// volumePluginDir is the full path of the directory in which to search
+	// for additional third party volume plugins.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may disrupt the Kubelet's ability to manage volume mounts.
+	// Default: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/
+	// +optional
+	VolumePluginDir string `json:"volumePluginDir,omitempty"`
+	// mounterPath is the path of mounter binary.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may disrupt the Kubelet's ability to manage volume mounts.
+	// Default: ""
+	// +optional
+	MounterPath string `json:"mounterPath,omitempty"`
 	// enableControllerAttachDetach enables the Attach/Detach controller to
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations

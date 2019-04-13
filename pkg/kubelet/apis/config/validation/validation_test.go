@@ -25,8 +25,10 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
+// TODO(mtaufen): update the test too
 func TestValidateKubeletConfiguration(t *testing.T) {
 	successCase := &kubeletconfig.KubeletConfiguration{
+		RootDir:                     "/var/lib/kubelet",
 		CgroupsPerQOS:               true,
 		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
 		SystemReservedCgroup:        "/system.slice",
@@ -59,6 +61,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}
 
 	errorCase := &kubeletconfig.KubeletConfiguration{
+		RootDir:                     "",
 		CgroupsPerQOS:               false,
 		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved", "illegal-key"},
 		SystemCgroups:               "/",
@@ -84,7 +87,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		NodeLeaseDurationSeconds:    -1,
 		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 0},
 	}
-	const numErrs = 25
+	const numErrs = 26
 	if allErrors := ValidateKubeletConfiguration(errorCase); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrs {
 		t.Errorf("expect %d errors, got %v", numErrs, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}

@@ -26,6 +26,7 @@ go_library(
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/apis/config/scheme:go_default_library",
+        "//pkg/kubelet/apis/config/v1beta1:go_default_library",
         "//pkg/kubelet/apis/config/validation:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/types:go_default_library",

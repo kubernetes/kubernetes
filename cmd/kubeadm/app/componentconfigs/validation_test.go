@@ -297,6 +297,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			clusterConfig: &kubeadm.ClusterConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					Kubelet: &kubeletconfig.KubeletConfiguration{
+						RootDir:                     "/var/lib/kubelet",
 						CgroupsPerQOS:               true,
 						EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
 						SystemReservedCgroup:        "/system.slice",

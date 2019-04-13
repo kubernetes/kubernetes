@@ -37,6 +37,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		// provide non-empty values for fields with defaults, so the defaulter doesn't change values during round-trip
 		func(obj *kubeletconfig.KubeletConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
+			obj.RootDir = kubeletconfigv1beta1.DefaultRootDir
 			obj.Authentication.Anonymous.Enabled = true
 			obj.Authentication.Webhook.Enabled = false
 			obj.Authentication.Webhook.CacheTTL = metav1.Duration{Duration: 2 * time.Minute}
@@ -49,6 +50,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CPUCFSQuota = true
 			obj.EventBurst = 10
 			obj.EventRecordQPS = 5
+			obj.VolumePluginDir = kubeletconfigv1beta1.DefaultVolumePluginDir
 			obj.EnableControllerAttachDetach = true
 			obj.EnableDebuggingHandlers = true
 			obj.FileCheckFrequency = metav1.Duration{Duration: 20 * time.Second}

@@ -39,6 +39,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		return err
 	}
 
+	if kc.RootDir == "" {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: RootDir (--root-dir) must be non-empty"))
+	}
 	if kc.NodeLeaseDurationSeconds <= 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLeaseDurationSeconds must be greater than 0"))
 	}

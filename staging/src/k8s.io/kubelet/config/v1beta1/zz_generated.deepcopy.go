@@ -104,6 +104,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			(*out)[key] = outVal
 		}
 	}
+	if in.EnableServer != nil {
+		in, out := &in.EnableServer, &out.EnableServer
+		*out = new(bool)
+		**out = **in
+	}
 	if in.TLSCipherSuites != nil {
 		in, out := &in.TLSCipherSuites, &out.TLSCipherSuites
 		*out = make([]string, len(*in))

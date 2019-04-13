@@ -33,6 +33,9 @@ const (
 	// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
 	DefaultIPTablesMasqueradeBit = 14
 	DefaultIPTablesDropBit       = 15
+	DefaultRootDir               = "/var/lib/kubelet"
+	DefaultCertDir               = "/var/lib/kubelet/pki"
+	DefaultVolumePluginDir       = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
 )
 
 var (
@@ -47,6 +50,9 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 }
 
 func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfiguration) {
+	if obj.RootDir == "" {
+		obj.RootDir = DefaultRootDir
+	}
 	if obj.SyncFrequency == zeroDuration {
 		obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}
 	}
@@ -56,11 +62,17 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.HTTPCheckFrequency == zeroDuration {
 		obj.HTTPCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
 	}
+	if obj.EnableServer == nil {
+		obj.EnableServer = utilpointer.BoolPtr(true)
+	}
 	if obj.Address == "" {
 		obj.Address = "0.0.0.0"
 	}
 	if obj.Port == 0 {
 		obj.Port = ports.KubeletPort
+	}
+	if obj.CertDir == "" {
+		obj.CertDir = DefaultCertDir
 	}
 	if obj.Authentication.Anonymous.Enabled == nil {
 		obj.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
@@ -192,6 +204,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.VolumePluginDir == "" {
+		obj.VolumePluginDir = DefaultVolumePluginDir
 	}
 	if obj.EnableControllerAttachDetach == nil {
 		obj.EnableControllerAttachDetach = utilpointer.BoolPtr(true)

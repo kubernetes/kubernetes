@@ -21,10 +21,16 @@ package config
 // passing the configuration to the application. This method must be kept up to date as new fields are added.
 func KubeletConfigurationPathRefs(kc *KubeletConfiguration) []*string {
 	paths := []*string{}
+	paths = append(paths, &kc.RootDir)
 	paths = append(paths, &kc.StaticPodPath)
+	paths = append(paths, &kc.Kubeconfig)
+	paths = append(paths, &kc.BootstrapKubeconfig)
+	paths = append(paths, &kc.CertDir)
 	paths = append(paths, &kc.Authentication.X509.ClientCAFile)
 	paths = append(paths, &kc.TLSCertFile)
 	paths = append(paths, &kc.TLSPrivateKeyFile)
 	paths = append(paths, &kc.ResolverConfig)
+	paths = append(paths, &kc.VolumePluginDir)
+	paths = append(paths, &kc.MounterPath)
 	return paths
 }

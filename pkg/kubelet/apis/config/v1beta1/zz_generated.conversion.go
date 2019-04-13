@@ -207,15 +207,22 @@ func Convert_config_KubeletAuthorization_To_v1beta1_KubeletAuthorization(in *con
 }
 
 func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in *v1beta1.KubeletConfiguration, out *config.KubeletConfiguration, s conversion.Scope) error {
+	out.RootDir = in.RootDir
 	out.StaticPodPath = in.StaticPodPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.StaticPodURL = in.StaticPodURL
 	out.StaticPodURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.StaticPodURLHeader))
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
+		return err
+	}
 	out.Address = in.Address
 	out.Port = in.Port
 	out.ReadOnlyPort = in.ReadOnlyPort
+	out.Kubeconfig = in.Kubeconfig
+	out.BootstrapKubeconfig = in.BootstrapKubeconfig
+	out.CertDir = in.CertDir
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.TLSCipherSuites = *(*[]string)(unsafe.Pointer(&in.TLSCipherSuites))
@@ -301,6 +308,8 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 	out.EvictionMinimumReclaim = *(*map[string]string)(unsafe.Pointer(&in.EvictionMinimumReclaim))
 	out.PodsPerCore = in.PodsPerCore
+	out.VolumePluginDir = in.VolumePluginDir
+	out.MounterPath = in.MounterPath
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}
@@ -337,15 +346,22 @@ func Convert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in *v1b
 }
 
 func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in *config.KubeletConfiguration, out *v1beta1.KubeletConfiguration, s conversion.Scope) error {
+	out.RootDir = in.RootDir
 	out.StaticPodPath = in.StaticPodPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.StaticPodURL = in.StaticPodURL
 	out.StaticPodURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.StaticPodURLHeader))
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
+		return err
+	}
 	out.Address = in.Address
 	out.Port = in.Port
 	out.ReadOnlyPort = in.ReadOnlyPort
+	out.Kubeconfig = in.Kubeconfig
+	out.BootstrapKubeconfig = in.BootstrapKubeconfig
+	out.CertDir = in.CertDir
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.TLSCipherSuites = *(*[]string)(unsafe.Pointer(&in.TLSCipherSuites))
@@ -431,6 +447,8 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 	out.EvictionMinimumReclaim = *(*map[string]string)(unsafe.Pointer(&in.EvictionMinimumReclaim))
 	out.PodsPerCore = in.PodsPerCore
+	out.VolumePluginDir = in.VolumePluginDir
+	out.MounterPath = in.MounterPath
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}

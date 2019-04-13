@@ -62,6 +62,8 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
+	// rootDir is the directory path to place kubelet files (volume mounts, etc).
+	RootDir string
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	StaticPodPath string
@@ -77,6 +79,8 @@ type KubeletConfiguration struct {
 	StaticPodURL string
 	// staticPodURLHeader is a map of slices with HTTP headers to use when accessing the podURL
 	StaticPodURLHeader map[string][]string
+	// enableServer enables the Kubelet's server
+	EnableServer bool
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces)
 	Address string
@@ -85,11 +89,26 @@ type KubeletConfiguration struct {
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
 	ReadOnlyPort int32
+	// kubeConfig is the path to a kubeconfig file, specifying how to connect to the
+	// API server. Providing this option enables API server mode, omitting it enables
+	// standalone mode.
+	Kubeconfig string
+	// bootstrapKubeConfig is the path to a kubeconfig file that will be used to get
+	// client certificate for kubelet. If the file specified by kubeConfig does not
+	// exist, the bootstrap kubeconfig is used to request a client certificate from
+	// the API server. On success, a kubeconfig file referencing the generated client
+	// certificate and key is written to the path specified by kubeConfig. The client
+	// certificate and key file will be stored in the certDir.
+	BootstrapKubeconfig string
+	// certDir is the directory where the TLS certs are located (by
+	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
+	// are provided, this flag will be ignored.
+	CertDir string
 	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
 	// and key are generated for the public address and saved to the directory
-	// passed to the Kubelet's --cert-dir flag.
+	// passed to the Kubelet's certDir option.
 	TLSCertFile string
 	// tlsPrivateKeyFile is the file containing x509 private key matching tlsCertFile
 	TLSPrivateKeyFile string
@@ -256,6 +275,11 @@ type KubeletConfiguration struct {
 	// podsPerCore is the maximum number of pods per core. Cannot exceed MaxPods.
 	// If 0, this field is ignored.
 	PodsPerCore int32
+	// volumePluginDir is the full path of the directory in which to search
+	// for additional third party volume plugins.
+	VolumePluginDir string
+	// mounterPath is the path of mounter binary.
+	MounterPath string
 	// enableControllerAttachDetach enables the Attach/Detach controller to
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations

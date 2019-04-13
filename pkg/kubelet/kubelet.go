@@ -207,14 +207,11 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeIP string,
 	providerID string,
 	cloudProvider string,
-	certDirectory string,
-	rootDirectory string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
-	experimentalMounterPath string,
 	experimentalKernelMemcgNotification bool,
 	experimentalCheckNodeCapabilitiesBeforeMount bool,
 	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
@@ -332,14 +329,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeIP string,
 	providerID string,
 	cloudProvider string,
-	certDirectory string,
-	rootDirectory string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
 	remoteRuntimeEndpoint string,
 	remoteImageEndpoint string,
-	experimentalMounterPath string,
 	experimentalKernelMemcgNotification bool,
 	experimentalCheckNodeCapabilitiesBeforeMount bool,
 	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
@@ -354,9 +348,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	seccompProfileRoot string,
 	bootstrapCheckpointPath string,
 	nodeStatusMaxImages int32) (*Kubelet, error) {
-	if rootDirectory == "" {
-		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
-	}
+
 	if kubeCfg.SyncFrequency.Duration <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", kubeCfg.SyncFrequency.Duration)
 	}
@@ -490,7 +482,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeClient:                              kubeDeps.KubeClient,
 		heartbeatClient:                         kubeDeps.HeartbeatClient,
 		onRepeatedHeartbeatFailure:              kubeDeps.OnHeartbeatFailure,
-		rootDirectory:                           rootDirectory,
+		rootDirectory:                           kubeCfg.RootDir,
 		resyncInterval:                          kubeCfg.SyncFrequency.Duration,
 		sourcesReady:                            config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
 		registerNode:                            registerNode,
@@ -752,7 +744,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
+		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, kubeCfg.CertDir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
 		}
@@ -789,13 +781,13 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		)
 	}
 
-	// If the experimentalMounterPathFlag is set, we do not want to
+	// If the MounterPath is configured, we do not want to
 	// check node capabilities since the mount path is not the default
-	if len(experimentalMounterPath) != 0 {
+	if kubeCfg.MounterPath != "" {
 		experimentalCheckNodeCapabilitiesBeforeMount = false
 		// Replace the nameserver in containerized-mounter's rootfs/etc/resolve.conf with kubelet.ClusterDNS
 		// so that service name could be resolved
-		klet.dnsConfigurer.SetupDNSinContainerizedMounter(experimentalMounterPath)
+		klet.dnsConfigurer.SetupDNSinContainerizedMounter(kubeCfg.MounterPath)
 	}
 
 	// setup volumeManager
