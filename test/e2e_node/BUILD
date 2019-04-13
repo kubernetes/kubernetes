@@ -158,6 +158,7 @@ go_test(
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
+        "//test/e2e/framework/volume:go_default_library",
         "//test/e2e_node/perf/workloads:go_default_library",
         "//test/e2e_node/services:go_default_library",
         "//test/utils:go_default_library",
