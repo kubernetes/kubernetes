@@ -584,6 +584,12 @@ func (q *Quantity) Neg() {
 	q.d.Dec.Neg(q.d.Dec)
 }
 
+// Equal checks equality of two Quantities. This is useful for testing with
+// cmp.Equal.
+func (q Quantity) Equal(v Quantity) bool {
+	return q.Cmp(v) == 0
+}
+
 // int64QuantityExpectedBytes is the expected width in bytes of the canonical string representation
 // of most Quantity values.
 const int64QuantityExpectedBytes = 18
