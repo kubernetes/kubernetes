@@ -241,9 +241,17 @@ $(go mod why ${loopback_deps})"
 
     # prune unused pinned replace directives
     comm -23 \
-      <(go mod edit -json | jq -r '.Replace[] | select(.Old.Path == .New.Path) | select(.New.Version != null) | .Old.Path' | sort) \
+      <(go mod edit -json | jq -r '.Replace[] | .Old.Path' | sort) \
       <(go list -m -json all | jq -r .Path | sort) |
     xargs -L 1 -I {} echo "-dropreplace={}" |
+    xargs -L 100 go mod edit -fmt
+
+    # prune replace directives that pin to the naturally selected version
+    go list -m -json all |
+      jq -r 'select(.Replace != null) | 
+             select(.Path == .Replace.Path) | 
+             select(.Version == .Replace.Version) | 
+             "-dropreplace \(.Replace.Path)"' |
     xargs -L 100 go mod edit -fmt
 
   popd >/dev/null 2>&1
