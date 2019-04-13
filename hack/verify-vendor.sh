@@ -50,8 +50,8 @@ mkdir -p "${_kubetmp}"
 git archive --format=tar --prefix=kubernetes/ "$(git write-tree)" | (cd "${_kubetmp}" && tar xf -)
 _kubetmp="${_kubetmp}/kubernetes"
 
-# Do all our work with an unset GOPATH
-export GOPATH=
+# Do all our work in module mode
+export GO111MODULE=on
 
 pushd "${_kubetmp}" > /dev/null 2>&1
   # Destroy deps in the copy of the kube tree

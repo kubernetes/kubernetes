@@ -23,8 +23,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
-# Explicitly clear GOPATH, to ensure nothing this script calls makes use of that path info
-export GOPATH=
 # Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
 export GOFLAGS=
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
