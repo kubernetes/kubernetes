@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"bytes"
+	"compress/flate"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -231,7 +232,18 @@ func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*ht
 		gzw := gzip.NewWriter(writer)
 		defer gzw.Close()
 		writer = gzw
-	// TODO: support flate, other encodings.
+	case "deflate":
+		var err error
+		reader = flate.NewReader(reader)
+		flw, err := flate.NewWriter(writer, flate.BestCompression)
+		if err != nil {
+			return nil, fmt.Errorf("errorf making flate writer: %v", err)
+		}
+		defer func() {
+			flw.Close()
+			flw.Flush()
+		}()
+		writer = flw
 	case "":
 		// This is fine
 	default:
