@@ -1716,8 +1716,8 @@ func (proxier *Proxier) isIPInExcludeCIDRs(ip net.IP) bool {
 	// make sure it does not fall within an excluded CIDR range.
 	for _, excludedCIDR := range proxier.excludeCIDRs {
 		// Any validation of this CIDR already should have occurred.
-		_, n, _ := net.ParseCIDR(excludedCIDR)
-		if n.Contains(ip) {
+		_, n, err := net.ParseCIDR(excludedCIDR)
+		if err == nil && n.Contains(ip) {
 			return true
 		}
 	}
