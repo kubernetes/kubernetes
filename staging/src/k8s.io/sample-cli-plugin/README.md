@@ -31,23 +31,23 @@ This is an example of how to build a kubectl plugin using the same set of tools 
 
 ```sh
 # assumes you have a working KUBECONFIG
-$ go build cmd/kubectl-ns.go
+go build cmd/kubectl-ns.go
 # place the built binary somewhere in your PATH
-$ cp ./kubectl-ns /usr/local/bin
+cp ./kubectl-ns /usr/local/bin
 
 # you can now begin using this plugin as a regular kubectl command:
 # update your configuration to point to "new-namespace"
-$ kubectl ns new-namespace
+kubectl ns new-namespace
 # any kubectl commands you perform from now on will use "new-namespace"
-$ kubectl get pod
+kubectl get pod
 NAME                READY     STATUS    RESTARTS   AGE
 new-namespace-pod   1/1       Running   0          1h
 
 # list all of the namespace in use by contexts in your KUBECONFIG
-$ kubectl ns --list
+kubectl ns --list
 
 # show the namespace that the currently set context in your KUBECONFIG points to
-$ kubectl ns
+kubectl ns
 ```
 
 ## Use Cases
@@ -62,7 +62,7 @@ third-party plugin development.
 
 You can "uninstall" this plugin from kubectl by simply removing it from your PATH:
 
-    $ rm /usr/local/bin/kubectl-ns
+    rm /usr/local/bin/kubectl-ns
 
 ## Compatibility
 
