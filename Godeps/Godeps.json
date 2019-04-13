@@ -1271,7 +1271,7 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/go-semver/semver",
-			"Comment": "v0.2.0-9-ge214231b295a8e",
+			"Comment": "v0.3.0",
 			"Rev": "e214231b295a8ea9479f11b70b35d5acf3556d9b"
 		},
 		{
