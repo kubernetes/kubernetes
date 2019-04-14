@@ -38,7 +38,7 @@ const (
 
 // GetCgroupDriverDocker runs 'docker info' to obtain the docker cgroup driver
 func GetCgroupDriverDocker(execer utilsexec.Interface) (string, error) {
-	info, err := callDockerInfo(execer)
+	info, err := callDockerCgroupDriver(execer)
 	if err != nil {
 		return "", err
 	}
@@ -56,10 +56,10 @@ func validateCgroupDriver(driver string) error {
 //     docker info -f "{{.CgroupDriver}}
 // If the minimum supported Docker version in K8s becomes 1.13, move to
 // this syntax.
-func callDockerInfo(execer utilsexec.Interface) (string, error) {
-	out, err := execer.Command("docker", "info").Output()
+func callDockerCgroupDriver(execer utilsexec.Interface) (string, error) {
+	out, err := execer.Command("docker", "info", "-f", "\"{{.CgroupDriver}}\"").Output()
 	if err != nil {
-		return "", errors.Wrap(err, "cannot execute 'docker info'")
+		return "", errors.Wrap(err, "cannot execute 'docker info -f \"{{.CgroupDriver}}\"'")
 	}
 	return string(out), nil
 }
