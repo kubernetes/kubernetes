@@ -1261,7 +1261,7 @@ func syncElbListeners(loadBalancerName string, listeners []*elb.Listener, listen
 		found := false
 		for i, expected := range listeners {
 			if expected == nil {
-				klog.Warning("Ignoring empty desired listener")
+				klog.Warning("Ignoring empty desired listener for loadbalancer: ", loadBalancerName)
 				continue
 			}
 			if elbListenersAreEqual(actual, expected) {
