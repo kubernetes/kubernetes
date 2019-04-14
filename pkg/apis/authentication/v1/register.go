@@ -34,7 +34,9 @@ func Resource(resource string) schema.GroupResource {
 
 var (
 	localSchemeBuilder = &authenticationv1.SchemeBuilder
-	AddToScheme        = localSchemeBuilder.AddToScheme
+
+	// AddToScheme adds the types of this group into the given scheme.
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
 func init() {
