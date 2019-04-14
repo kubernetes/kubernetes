@@ -2972,7 +2972,6 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 		nodesExpectAffinityFailureReasons [][]PredicateFailureReason
 		fits                              map[string]bool
 		name                              string
-		nometa                            bool
 	}{
 		{
 			pod: &v1.Pod{
@@ -3267,6 +3266,18 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 									},
 									TopologyKey: "region",
 								},
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "xx",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"yy"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
 							},
 						},
 					},
@@ -3316,8 +3327,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeC": false,
 				"nodeD": true,
 			},
-			name:   "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. NodeC has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB and nodeC but can be schedulerd onto nodeD",
-			nometa: true,
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. NodeC has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB and nodeC but can be schedulerd onto nodeD",
 		},
 		{
 			pod: &v1.Pod{
@@ -4024,44 +4034,46 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 	}
 
 	for indexTest, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
-			for indexNode, node := range test.nodes {
-				testFit := PodAffinityChecker{
-					nodeInfoLister: snapshot.NodeInfos(),
-					podLister:      snapshot.Pods(),
-				}
-
-				var meta Metadata
-				if !test.nometa {
-					factory := &MetadataProducerFactory{}
-					meta = factory.GetPredicateMetadata(test.pod, snapshot)
-				}
-
-				fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, snapshot.NodeInfoMap[node.Name])
-				if !fits && !reflect.DeepEqual(reasons, test.nodesExpectAffinityFailureReasons[indexNode]) {
-					t.Errorf("index: %d unexpected failure reasons: %v expect: %v", indexTest, reasons, test.nodesExpectAffinityFailureReasons[indexNode])
-				}
-				affinity := test.pod.Spec.Affinity
-				if affinity != nil && affinity.NodeAffinity != nil {
-					s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, []*v1.Node{node}))
-					factory := &MetadataProducerFactory{}
-					fits2, reasons, err := PodMatchNodeSelector(test.pod, factory.GetPredicateMetadata(test.pod, s), s.NodeInfoMap[node.Name])
-					if err != nil {
-						t.Errorf("unexpected error: %v", err)
+		for _, useMeta := range []bool{true, false} {
+			t.Run(fmt.Sprintf("[useMeta:%t]%v", useMeta, test.name), func(t *testing.T) {
+				snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+				for indexNode, node := range test.nodes {
+					testFit := PodAffinityChecker{
+						nodeInfoLister: snapshot.NodeInfos(),
+						podLister:      snapshot.Pods(),
 					}
-					selectorExpectedFailureReasons := []PredicateFailureReason{ErrNodeSelectorNotMatch}
-					if !fits2 && !reflect.DeepEqual(reasons, selectorExpectedFailureReasons) {
-						t.Errorf("unexpected failure reasons: %v, want: %v", reasons, selectorExpectedFailureReasons)
-					}
-					fits = fits && fits2
-				}
 
-				if fits != test.fits[node.Name] {
-					t.Errorf("expected %v for %s got %v", test.fits[node.Name], node.Name, fits)
+					var meta Metadata
+					if useMeta {
+						factory := &MetadataProducerFactory{}
+						meta = factory.GetPredicateMetadata(test.pod, snapshot)
+					}
+
+					fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, snapshot.NodeInfoMap[node.Name])
+					if !fits && !reflect.DeepEqual(reasons, test.nodesExpectAffinityFailureReasons[indexNode]) {
+						t.Errorf("index: %d unexpected failure reasons: %v expect: %v", indexTest, reasons, test.nodesExpectAffinityFailureReasons[indexNode])
+					}
+					affinity := test.pod.Spec.Affinity
+					if affinity != nil && affinity.NodeAffinity != nil {
+						s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, []*v1.Node{node}))
+						factory := &MetadataProducerFactory{}
+						fits2, reasons, err := PodMatchNodeSelector(test.pod, factory.GetPredicateMetadata(test.pod, s), s.NodeInfoMap[node.Name])
+						if err != nil {
+							t.Errorf("unexpected error: %v", err)
+						}
+						selectorExpectedFailureReasons := []PredicateFailureReason{ErrNodeSelectorNotMatch}
+						if !fits2 && !reflect.DeepEqual(reasons, selectorExpectedFailureReasons) {
+							t.Errorf("unexpected failure reasons: %v, want: %v", reasons, selectorExpectedFailureReasons)
+						}
+						fits = fits && fits2
+					}
+
+					if fits != test.fits[node.Name] {
+						t.Errorf("expected %v for %s got %v", test.fits[node.Name], node.Name, fits)
+					}
 				}
-			}
-		})
+			})
+		}
 	}
 }
 
@@ -5171,5 +5183,115 @@ func TestEvenPodsSpreadPredicate_MultipleConstraints(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGetMatchingAffinityTerms(t *testing.T) {
+	tests := []struct {
+		name             string
+		pod              *v1.Pod
+		targetpod        *v1.Pod
+		affinityProp     bool
+		wantmatchedterms []v1.PodAffinityTerm
+	}{
+		{
+			name: "The nil terms should have nil matchedterms",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{},
+			},
+			targetpod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			affinityProp:     true,
+			wantmatchedterms: nil,
+		},
+		{
+			name: "	Matchedterms should be the mutual terms both in pod and target pod",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			targetpod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "targetpod", Labels: map[string]string{"foo": "bar"}},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: &v1.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+									TopologyKey: "region",
+								},
+							},
+						},
+					},
+				},
+			},
+			affinityProp: true,
+			wantmatchedterms: []v1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"bar"},
+							},
+						},
+					},
+					TopologyKey: "region",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		matchedterms, _, _ := getMatchingAffinityTerms(tt.pod, tt.targetpod, tt.affinityProp)
+		if !reflect.DeepEqual(matchedterms, tt.wantmatchedterms) {
+			t.Errorf("expected %v,got %v", tt.wantmatchedterms, matchedterms)
+		}
 	}
 }

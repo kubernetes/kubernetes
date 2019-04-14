@@ -1235,36 +1235,50 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta Metadata,
 	return true, nil, nil
 }
 
-// podMatchesPodAffinityTerms checks if the "targetPod" matches the given "terms"
+// podMatchesPodAffinityTerms checks if the "targetPod" matches the "checkAffinity (true:affinity,false:anti-affinity)"
 // of the "pod" on the given "nodeInfo".Node(). It returns three values: 1) whether
-// targetPod matches all the terms and their topologies, 2) whether targetPod
-// matches all the terms label selector and namespaces (AKA term properties),
-// 3) any error.
-func (c *PodAffinityChecker) podMatchesPodAffinityTerms(pod, targetPod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo, terms []v1.PodAffinityTerm) (bool, bool, error) {
-	if len(terms) == 0 {
-		return false, false, fmt.Errorf("terms array is empty")
-	}
-	props, err := getAffinityTermProperties(pod, terms)
+// targetPod matches affinityTerms and their topologies based on the request of affinity or anti-affinity 2) whether targetPod
+// matches all the terms label selector and namespaces (AKA term properties), 3) any error.
+func (c *PodAffinityChecker) podMatchesPodAffinityTerms(pod, targetPod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo, checkAffinity bool) (bool, bool, error) {
+	matchedTerms, affinityTermsNum, err := getMatchingAffinityTerms(pod, targetPod, checkAffinity)
 	if err != nil {
 		return false, false, err
 	}
-	if !podMatchesAllAffinityTermProperties(targetPod, props) {
-		return false, false, nil
+
+	if affinityTermsNum == 0 {
+		return false, false, fmt.Errorf("pod's affinityTerms is empty")
+	}
+
+	termsSelectorMatched := len(matchedTerms) == affinityTermsNum
+	if (checkAffinity && !termsSelectorMatched) || len(matchedTerms) == 0 {
+		return false, false, err
 	}
 	// Namespace and selector of the terms have matched. Now we check topology of the terms.
 	targetPodNodeInfo, err := c.nodeInfoLister.Get(targetPod.Spec.NodeName)
 	if err != nil {
-		return false, false, err
+		return false, termsSelectorMatched, err
 	}
-	for _, term := range terms {
+
+	matchedTermCount := 0
+	// Namespace and selector of the terms have matched. Now we check topology of the terms.
+	for _, term := range matchedTerms {
 		if len(term.TopologyKey) == 0 {
-			return false, false, fmt.Errorf("empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
+			return false, termsSelectorMatched, fmt.Errorf("empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
 		}
-		if !priorityutil.NodesHaveSameTopologyKey(nodeInfo.Node(), targetPodNodeInfo.Node(), term.TopologyKey) {
-			return false, true, nil
+		topologyMatched := priorityutil.NodesHaveSameTopologyKey(nodeInfo.Node(), targetPodNodeInfo.Node(), term.TopologyKey)
+		if topologyMatched {
+			// When checking PodAntiAffinity, short-circuit to return it's match
+			if !checkAffinity {
+				return true, termsSelectorMatched, nil
+			// For podAffinity, we must check the total number of the affinityTerms, it must be the same as matchedTermCount.
+			} 
+			matchedTermCount++
 		}
 	}
-	return true, true, nil
+	if checkAffinity && matchedTermCount == affinityTermsNum && termsSelectorMatched {
+		return true, true, nil
+	}
+	return false, false, nil
 }
 
 // GetPodAffinityTerms gets pod affinity terms by a pod affinity object.
@@ -1293,6 +1307,32 @@ func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.Po
 		//}
 	}
 	return terms
+}
+
+// getMatchingAffinityTerms returns mutual terms of the pod and the target pod's labels based on "checkAffinity", also the pod`s affinityTerms number for further use.
+func getMatchingAffinityTerms(pod, targetPod *v1.Pod, checkAffinity bool) (matchedTerms []v1.PodAffinityTerm, affinityTermsNum int, err error) {
+	affinity := pod.Spec.Affinity
+	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
+		return nil, 0, nil
+	}
+	var terms []v1.PodAffinityTerm
+	if checkAffinity {
+		terms = GetPodAffinityTerms(affinity.PodAffinity)
+	} else {
+		terms = GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
+	}
+	affinityTermsNum = len(terms)
+	for _, term := range terms {
+		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
+		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+		if err != nil {
+			return nil, 0, err
+		}
+		if priorityutil.PodMatchesTermsNamespaceAndSelector(targetPod, namespaces, selector) {
+			matchedTerms = append(matchedTerms, term)
+		}
+	}
+	return matchedTerms, affinityTermsNum, nil
 }
 
 // getMatchingAntiAffinityTopologyPairs calculates the following for "existingPod" on given node:
@@ -1462,7 +1502,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 		for _, targetPod := range filteredPods {
 			// Check all affinity terms.
 			if !matchFound && len(affinityTerms) > 0 {
-				affTermsMatch, termsSelectorMatch, err := c.podMatchesPodAffinityTerms(pod, targetPod, nodeInfo, affinityTerms)
+				affTermsMatch, termsSelectorMatch, err := c.podMatchesPodAffinityTerms(pod, targetPod, nodeInfo, true)
 				if err != nil {
 					errMessage := fmt.Sprintf("Cannot schedule pod %s onto node %s, because of PodAffinity: %v", podName(pod), node.Name, err)
 					klog.Error(errMessage)
@@ -1478,7 +1518,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 
 			// Check all anti-affinity terms.
 			if len(antiAffinityTerms) > 0 {
-				antiAffTermsMatch, _, err := c.podMatchesPodAffinityTerms(pod, targetPod, nodeInfo, antiAffinityTerms)
+				antiAffTermsMatch, _, err := c.podMatchesPodAffinityTerms(pod, targetPod, nodeInfo, false)
 				if err != nil || antiAffTermsMatch {
 					klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAntiAffinityTerm, err: %v",
 						podName(pod), node.Name, err)
