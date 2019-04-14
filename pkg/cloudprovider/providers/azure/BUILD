@@ -69,6 +69,7 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/rubiojr/go-vhd/vhd:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/keymutex:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
@@ -78,6 +79,7 @@ go_test(
     srcs = [
         "azure_backoff_test.go",
         "azure_cache_test.go",
+        "azure_controller_common_test.go",
         "azure_instances_test.go",
         "azure_loadbalancer_test.go",
         "azure_metrics_test.go",
