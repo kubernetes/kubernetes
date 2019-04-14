@@ -39,6 +39,7 @@ go_library(
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider/providers/azure/auth:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
+        "//pkg/util/keymutex:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -78,6 +79,7 @@ go_test(
     srcs = [
         "azure_backoff_test.go",
         "azure_cache_test.go",
+        "azure_controller_common_test.go",
         "azure_instances_test.go",
         "azure_loadbalancer_test.go",
         "azure_metrics_test.go",
