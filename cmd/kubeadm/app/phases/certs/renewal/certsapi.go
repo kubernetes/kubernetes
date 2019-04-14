@@ -95,7 +95,7 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}
 
-	fmt.Printf("[certs] certificate request %q created\n", req.Name)
+	fmt.Printf("[certs] Certificate request %q created\n", req.Name)
 
 	certData, err := csrutil.WaitForCertificate(r.client.CertificateSigningRequests(), req, watchTimeout)
 	if err != nil {

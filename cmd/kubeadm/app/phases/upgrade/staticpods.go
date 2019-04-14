@@ -195,7 +195,7 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 		return err
 	}
 	if equal {
-		fmt.Printf("[upgrade/staticpods] current and new manifests of %s are equal, skipping upgrade\n", component)
+		fmt.Printf("[upgrade/staticpods] Current and new manifests of %s are equal, skipping upgrade\n", component)
 		return nil
 	}
 
@@ -425,7 +425,7 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 			if fatal {
 				return err
 			}
-			fmt.Printf("[upgrade/etcd] non fatal issue encountered during upgrade: %v\n", err)
+			fmt.Printf("[upgrade/etcd] Non fatal issue encountered during upgrade: %v\n", err)
 		}
 	}
 
