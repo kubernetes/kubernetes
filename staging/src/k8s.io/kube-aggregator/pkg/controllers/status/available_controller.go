@@ -203,6 +203,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			if port.Port == servicePort {
 				foundPort = true
 				portName = port.Name
+				break
 			}
 		}
 		if !foundPort {
