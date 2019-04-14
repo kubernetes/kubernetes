@@ -176,7 +176,6 @@ pkg/kubelet/client
 pkg/kubelet/cm
 pkg/kubelet/config
 pkg/kubelet/configmap
-pkg/kubelet/container
 pkg/kubelet/container/testing
 pkg/kubelet/custommetrics
 pkg/kubelet/dockershim

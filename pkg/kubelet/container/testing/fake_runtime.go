@@ -345,7 +345,7 @@ func (f *FakeRuntime) RemoveImage(image ImageSpec) error {
 	return f.Err
 }
 
-func (f *FakeRuntime) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
+func (f *FakeRuntime) GarbageCollect(gcPolicy GCPolicy, ready bool, evictNonDeletedPods bool) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -393,7 +393,7 @@ func (f *FakeStreamingRuntime) GetPortForward(podName, podNamespace string, podU
 	return &url.URL{Host: FakeHost}, f.Err
 }
 
-type FakeContainerCommandRunner struct {
+type FakeCommandRunner struct {
 	// what to return
 	Stdout string
 	Err    error
@@ -403,9 +403,9 @@ type FakeContainerCommandRunner struct {
 	Cmd         []string
 }
 
-var _ ContainerCommandRunner = &FakeContainerCommandRunner{}
+var _ ContainerCommandRunner = &FakeCommandRunner{}
 
-func (f *FakeContainerCommandRunner) RunInContainer(containerID ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+func (f *FakeCommandRunner) RunInContainer(containerID ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	// record invoked values
 	f.ContainerID = containerID
 	f.Cmd = cmd

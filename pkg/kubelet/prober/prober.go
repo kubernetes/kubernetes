@@ -53,7 +53,7 @@ type prober struct {
 	readinessHttp httprobe.Prober
 	livenessHttp  httprobe.Prober
 	tcp           tcprobe.Prober
-	runner        kubecontainer.ContainerCommandRunner
+	runner        kubecontainer.CommandRunner
 
 	refManager *kubecontainer.RefManager
 	recorder   record.EventRecorder
@@ -62,7 +62,7 @@ type prober struct {
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
 func newProber(
-	runner kubecontainer.ContainerCommandRunner,
+	runner kubecontainer.CommandRunner,
 	refManager *kubecontainer.RefManager,
 	recorder record.EventRecorder) *prober {
 

@@ -26,6 +26,8 @@ var (
 	defaultCachePeriod = time.Second * 2
 )
 
+// RuntimeCache interface defines operation that are to be implemented for a
+// runtime cache.
 type RuntimeCache interface {
 	GetPods() ([]*Pod, error)
 	ForceUpdateIfOlder(time.Time) error
@@ -57,7 +59,7 @@ type runtimeCache struct {
 }
 
 // GetPods returns the cached pods if they are not outdated; otherwise, it
-// retrieves the latest pods and return them.
+// retrieves the latest pods and returns them.
 func (r *runtimeCache) GetPods() ([]*Pod, error) {
 	r.Lock()
 	defer r.Unlock()
@@ -69,6 +71,8 @@ func (r *runtimeCache) GetPods() ([]*Pod, error) {
 	return r.pods, nil
 }
 
+// ForceUpdateIfOlder forces a cache update if the current cacheTime is older
+// than it should be.
 func (r *runtimeCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error {
 	r.Lock()
 	defer r.Unlock()

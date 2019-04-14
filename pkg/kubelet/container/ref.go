@@ -24,7 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
-var ImplicitContainerPrefix string = "implicitly required container "
+// ImplicitContainerPrefix defines a prefix for containers that implicitly started.
+var ImplicitContainerPrefix = "implicitly required container "
 
 // GenerateContainerRef returns an *v1.ObjectReference which references the given container
 // within the given pod. Returns an error if the reference can't be constructed or the

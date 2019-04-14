@@ -202,12 +202,12 @@ func TestContainerGC(t *testing.T) {
 	assert.NoError(t, err)
 
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
-	defaultGCPolicy := kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}
+	defaultGCPolicy := kubecontainer.GCPolicy{MinAge: time.Hour, MaxPerPodContainer: 2, MaxContainers: 6}
 
 	for c, test := range []struct {
 		description         string                           // description of the test case
 		containers          []containerTemplate              // templates of containers
-		policy              *kubecontainer.ContainerGCPolicy // container gc policy
+		policy              *kubecontainer.GCPolicy // container gc policy
 		remain              []int                            // template indexes of remaining containers
 		evictTerminatedPods bool
 		allSourcesReady     bool
@@ -217,7 +217,7 @@ func TestContainerGC(t *testing.T) {
 			containers: []containerTemplate{
 				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: 1, MaxContainers: 0},
+			policy:              &kubecontainer.GCPolicy{MinAge: time.Minute, MaxPerPodContainer: 1, MaxContainers: 0},
 			remain:              []int{},
 			evictTerminatedPods: false,
 			allSourcesReady:     true,
@@ -231,7 +231,7 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: 4},
+			policy:              &kubecontainer.GCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: 4},
 			remain:              []int{0, 1, 2, 3},
 			evictTerminatedPods: false,
 			allSourcesReady:     true,
@@ -243,7 +243,7 @@ func TestContainerGC(t *testing.T) {
 				makeGCContainer(podStateProvider, "foo", "bar", 1, 1, runtimeapi.ContainerState_CONTAINER_EXITED),
 				makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_EXITED),
 			},
-			policy:              &kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: -1},
+			policy:              &kubecontainer.GCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: -1},
 			remain:              []int{0, 1, 2},
 			evictTerminatedPods: false,
 			allSourcesReady:     true,
@@ -453,7 +453,7 @@ func TestUnknownStateContainerGC(t *testing.T) {
 	assert.NoError(t, err)
 
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
-	defaultGCPolicy := kubecontainer.ContainerGCPolicy{MinAge: time.Hour, MaxPerPodContainer: 0, MaxContainers: 0}
+	defaultGCPolicy := kubecontainer.GCPolicy{MinAge: time.Hour, MaxPerPodContainer: 0, MaxContainers: 0}
 
 	fakeContainers := makeFakeContainers(t, m, []containerTemplate{
 		makeGCContainer(podStateProvider, "foo", "bar", 0, 0, runtimeapi.ContainerState_CONTAINER_UNKNOWN),

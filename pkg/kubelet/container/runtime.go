@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+// Version is an interface whose implementation returns version information.
 type Version interface {
 	// Compare compares two versions of the runtime. On success it returns -1
 	// if the version is less than the other, 1 if it is greater than the other,
@@ -86,7 +87,7 @@ type Runtime interface {
 	// If evictNonDeletedPods is set to true, containers and sandboxes belonging to pods
 	// that are terminated, but not deleted will be evicted.  Otherwise, only deleted pods will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
-	GarbageCollect(gcPolicy ContainerGCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
+	GarbageCollect(gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
 	// Syncs the running pod into the desired pod.
 	SyncPod(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
@@ -123,6 +124,7 @@ type StreamingRuntime interface {
 	GetPortForward(podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error)
 }
 
+// ImageService is an interface whose implementations perform common image operations.
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
@@ -130,19 +132,21 @@ type ImageService interface {
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(image ImageSpec) (string, error)
-	// Gets all images currently on the machine.
+	// ListImages gets all images currently on the machine.
 	ListImages() ([]Image, error)
-	// Removes the specified image.
+	// RemoveImage removes the specified image.
 	RemoveImage(image ImageSpec) error
-	// Returns Image statistics.
+	// ImageStatus returns Image statistics.
 	ImageStats() (*ImageStats, error)
 }
 
-type ContainerAttacher interface {
+// Attacher is an interface whose implementations allow attaching to a running container.
+type Attacher interface {
 	AttachContainer(id ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) (err error)
 }
 
-type ContainerCommandRunner interface {
+// CommandRunner is an interface whose implementations run commands inside a container.
+type CommandRunner interface {
 	// RunInContainer synchronously executes the command in the container, and returns the output.
 	// If the command completes with a non-0 exit code, a k8s.io/utils/exec.ExitError will be returned.
 	RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
@@ -184,11 +188,12 @@ type ContainerID struct {
 	ID string
 }
 
+// BuildContainerID takes two string (type and ID) and returns a ContainerID.
 func BuildContainerID(typ, ID string) ContainerID {
 	return ContainerID{Type: typ, ID: ID}
 }
 
-// Convenience method for creating a ContainerID from an ID string.
+// ParseContainerID is a convenience method for creating a ContainerID from an ID string.
 func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
@@ -197,6 +202,7 @@ func ParseContainerID(containerID string) ContainerID {
 	return id
 }
 
+// ParseString sets the fields of a ContainerID from an ID string.
 func (c *ContainerID) ParseString(data string) error {
 	// Trim the quotes and split the type and ID.
 	parts := strings.Split(strings.Trim(data, "\""), "://")
@@ -211,21 +217,26 @@ func (c *ContainerID) String() string {
 	return fmt.Sprintf("%s://%s", c.Type, c.ID)
 }
 
+// IsEmpty checks whether the ContainerID is initialized.
 func (c *ContainerID) IsEmpty() bool {
 	return *c == ContainerID{}
 }
 
+// MarshalJSON marshals a ContainerID into JSON.
 func (c *ContainerID) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("%q", c.String())), nil
 }
 
+// UnmarshalJSON unmarshals JSON into ContainerID.
 func (c *ContainerID) UnmarshalJSON(data []byte) error {
 	return c.ParseString(string(data))
 }
 
-// DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
+// DockerID is an ID of docker container. It is a type to make it clear when we're working
+// with docker container IDs.
 type DockerID string
 
+// ContainerID creates a ContainerID from a DockerID.
 func (id DockerID) ContainerID() ContainerID {
 	return ContainerID{
 		Type: "docker",
@@ -233,13 +244,17 @@ func (id DockerID) ContainerID() ContainerID {
 	}
 }
 
+// ContainerState gives information about the current state of a container.
 type ContainerState string
 
 const (
+	// ContainerStateCreated indicates a container is created but not running yet.
 	ContainerStateCreated ContainerState = "created"
+	// ContainerStateRunning indicates a container is currently running.
 	ContainerStateRunning ContainerState = "running"
-	ContainerStateExited  ContainerState = "exited"
-	// This unknown encompasses all the states that we currently don't care.
+	// ContainerStateExited indicates that a container has completed running but is not yet deleted.
+	ContainerStateExited ContainerState = "exited"
+	// ContainerStateUnknown encompasses all the states that we currently don't care.
 	ContainerStateUnknown ContainerState = "unknown"
 )
 
@@ -314,7 +329,7 @@ type ContainerStatus struct {
 	Message string
 }
 
-// FindContainerStatusByName returns container status in the pod status with the given name.
+// FindContainerStatusByName returns the container's status in the pod status with the given name.
 // When there are multiple containers' statuses with the same name, the first match will be returned.
 func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *ContainerStatus {
 	for _, containerStatus := range podStatus.ContainerStatuses {
@@ -325,7 +340,7 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Con
 	return nil
 }
 
-// Get container status of all the running containers in a pod
+// GetRunningContainerStatuses returns the status of all the running containers in a pod.
 func (podStatus *PodStatus) GetRunningContainerStatuses() []*ContainerStatus {
 	runningContainerStatuses := []*ContainerStatus{}
 	for _, containerStatus := range podStatus.ContainerStatuses {
@@ -336,7 +351,7 @@ func (podStatus *PodStatus) GetRunningContainerStatuses() []*ContainerStatus {
 	return runningContainerStatuses
 }
 
-// Basic information about a container image.
+// Image contains basic information about a container image.
 type Image struct {
 	// ID of the image.
 	ID string
@@ -348,16 +363,19 @@ type Image struct {
 	Size int64
 }
 
+// EnvVar contains a container's environment variables.
 type EnvVar struct {
 	Name  string
 	Value string
 }
 
+// Annotation contains a container's annotations.
 type Annotation struct {
 	Name  string
 	Value string
 }
 
+// Mount contains information about a container's mounts.
 type Mount struct {
 	// Name of the volume mount.
 	// TODO(yifan): Remove this field, as this is not representing the unique name of the mount,
@@ -375,6 +393,7 @@ type Mount struct {
 	Propagation runtimeapi.MountPropagation
 }
 
+// PortMapping contains information about a container's mapped ports.
 type PortMapping struct {
 	// Name of the port mapping
 	Name string
@@ -388,6 +407,7 @@ type PortMapping struct {
 	HostIP string
 }
 
+// DeviceInfo contains information about device mappings between container and host.
 type DeviceInfo struct {
 	// Path on host for mapping
 	PathOnHost string
@@ -444,6 +464,7 @@ type VolumeInfo struct {
 	InnerVolumeSpecName string
 }
 
+// VolumeMap is a map of volumes and information about them.
 type VolumeMap map[string]VolumeInfo
 
 // RuntimeConditionType is the types of required runtime conditions.
@@ -474,9 +495,9 @@ func (r *RuntimeStatus) GetRuntimeCondition(t RuntimeConditionType) *RuntimeCond
 }
 
 // String formats the runtime status into human readable string.
-func (s *RuntimeStatus) String() string {
+func (r *RuntimeStatus) String() string {
 	var ss []string
-	for _, c := range s.Conditions {
+	for _, c := range r.Conditions {
 		ss = append(ss, c.String())
 	}
 	return fmt.Sprintf("Runtime Conditions: %s", strings.Join(ss, ", "))
@@ -499,6 +520,7 @@ func (c *RuntimeCondition) String() string {
 	return fmt.Sprintf("%s=%t reason:%s message:%s", c.Type, c.Status, c.Reason, c.Message)
 }
 
+// Pods is a list of Pods.
 type Pods []*Pod
 
 // FindPodByID finds and returns a pod in the pod list by UID. It will return an empty pod
@@ -545,6 +567,7 @@ func (p *Pod) FindContainerByName(containerName string) *Container {
 	return nil
 }
 
+// FindContainerByID returns the first container in the pod with the given ContainerID.
 func (p *Pod) FindContainerByID(id ContainerID) *Container {
 	for _, c := range p.Containers {
 		if c.ID == id {
@@ -554,6 +577,7 @@ func (p *Pod) FindContainerByID(id ContainerID) *Container {
 	return nil
 }
 
+// FindSandboxByID returns the first PodSandbox in the pod with the given ContainerID.
 func (p *Pod) FindSandboxByID(id ContainerID) *Container {
 	for _, c := range p.Sandboxes {
 		if c.ID == id {
@@ -592,12 +616,12 @@ func GetPodFullName(pod *v1.Pod) string {
 	return pod.Name + "_" + pod.Namespace
 }
 
-// Build the pod full name from pod name and namespace.
+// BuildPodFullName bulds the Pod's full name from name and namespace.
 func BuildPodFullName(name, namespace string) string {
 	return name + "_" + namespace
 }
 
-// Parse the pod full name.
+// ParsePodFullName parses the Pod's full name.
 func ParsePodFullName(podFullName string) (string, string, error) {
 	parts := strings.Split(podFullName, "_")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
@@ -610,7 +634,7 @@ func ParsePodFullName(podFullName string) (string, string, error) {
 // completely optional settings.
 type Option func(Runtime)
 
-// Sort the container statuses by creation time.
+// SortContainerStatusesByCreationTime sorts the container statuses by creation time.
 type SortContainerStatusesByCreationTime []*ContainerStatus
 
 func (s SortContainerStatusesByCreationTime) Len() int      { return len(s) }

@@ -95,7 +95,7 @@ type manager struct {
 func NewManager(
 	statusManager status.Manager,
 	livenessManager results.Manager,
-	runner kubecontainer.ContainerCommandRunner,
+	runner kubecontainer.CommandRunner,
 	refManager *kubecontainer.RefManager,
 	recorder record.EventRecorder) Manager {
 

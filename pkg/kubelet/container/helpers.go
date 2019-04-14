@@ -131,8 +131,8 @@ func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVa
 	return command
 }
 
+// ExpandContainerVolumeMounts expands a volume mount in accordance with environment variables.
 func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, error) {
-
 	envmap := EnvVarsToMap(envs)
 	missingKeys := sets.NewString()
 	expanded := expansion.Expand(mount.SubPathExpr, func(key string) string {
@@ -149,6 +149,7 @@ func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, e
 	return expanded, nil
 }
 
+// ExpandContainerCommandAndArgs returns a container's command and args in accordance with environment variables.
 func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (command []string, args []string) {
 	mapping := expansion.MappingFuncFor(EnvVarsToMap(envs))
 
@@ -167,7 +168,7 @@ func ExpandContainerCommandAndArgs(container *v1.Container, envs []EnvVar) (comm
 	return command, args
 }
 
-// Create an event recorder to record object's event except implicitly required container's, like infra container.
+// FilterEventRecorder creates an event recorder to record object's event except implicitly required container's, like infra container.
 func FilterEventRecorder(recorder record.EventRecorder) record.EventRecorder {
 	return &innerEventRecorder{
 		recorder: recorder,
@@ -216,12 +217,13 @@ func (irecorder *innerEventRecorder) AnnotatedEventf(object runtime.Object, anno
 
 }
 
-// Pod must not be nil.
+// IsHostNetworkPod returns True if the Pod is running on the host network. The checked Pod must not be nil.
 func IsHostNetworkPod(pod *v1.Pod) bool {
 	return pod.Spec.HostNetwork
 }
 
-// TODO(random-liu): Convert PodStatus to running Pod, should be deprecated soon
+// ConvertPodStatusToRunningPod converts PodStatus to "Running".
+// TODO(random-liu): should be deprecated soon
 func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod {
 	runningPod := Pod{
 		ID:        podStatus.ID,

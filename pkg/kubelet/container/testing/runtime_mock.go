@@ -132,7 +132,7 @@ func (r *Mock) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) err
 	return args.Error(0)
 }
 
-func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDeletedPods bool) error {
+func (r *Mock) GarbageCollect(gcPolicy GCPolicy, ready bool, evictNonDeletedPods bool) error {
 	args := r.Called(gcPolicy, ready, evictNonDeletedPods)
 	return args.Error(0)
 }

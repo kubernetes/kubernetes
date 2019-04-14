@@ -23,8 +23,8 @@ import (
 	"k8s.io/klog"
 )
 
-// Specified a policy for garbage collecting containers.
-type ContainerGCPolicy struct {
+// GCPolicy Specifies a policy for garbage collecting containers.
+type GCPolicy struct {
 	// Minimum age at which a container can be garbage collected, zero for no limit.
 	MinAge time.Duration
 
@@ -36,10 +36,8 @@ type ContainerGCPolicy struct {
 	MaxContainers int
 }
 
-// Manages garbage collection of dead containers.
-//
-// Implementation is thread-compatible.
-type ContainerGC interface {
+// GC is an interfance that manages garbage collection of dead containers. The implementation is thread-compatible.
+type GC interface {
 	// Garbage collect containers.
 	GarbageCollect() error
 	// Deletes all unused containers, including containers belonging to pods that are terminated but not deleted
@@ -53,35 +51,35 @@ type SourcesReadyProvider interface {
 }
 
 // TODO(vmarmol): Preferentially remove pod infra containers.
-type realContainerGC struct {
+type realGC struct {
 	// Container runtime
 	runtime Runtime
 
 	// Policy for garbage collection.
-	policy ContainerGCPolicy
+	policy GCPolicy
 
 	// sourcesReadyProvider provides the readiness of kubelet configuration sources.
 	sourcesReadyProvider SourcesReadyProvider
 }
 
-// New ContainerGC instance with the specified policy.
-func NewContainerGC(runtime Runtime, policy ContainerGCPolicy, sourcesReadyProvider SourcesReadyProvider) (ContainerGC, error) {
+// NewGC returns a GC instance with the specified policy.
+func NewGC(runtime Runtime, policy GCPolicy, sourcesReadyProvider SourcesReadyProvider) (GC, error) {
 	if policy.MinAge < 0 {
 		return nil, fmt.Errorf("invalid minimum garbage collection age: %v", policy.MinAge)
 	}
 
-	return &realContainerGC{
+	return &realGC{
 		runtime:              runtime,
 		policy:               policy,
 		sourcesReadyProvider: sourcesReadyProvider,
 	}, nil
 }
 
-func (cgc *realContainerGC) GarbageCollect() error {
+func (cgc *realGC) GarbageCollect() error {
 	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), false)
 }
 
-func (cgc *realContainerGC) DeleteAllUnusedContainers() error {
+func (cgc *realGC) DeleteAllUnusedContainers() error {
 	klog.Infof("attempting to delete unused containers")
 	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
 }

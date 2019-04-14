@@ -25,27 +25,38 @@ import (
 
 // TODO(random-liu): We need to better organize runtime errors for introspection.
 
-// Container Terminated and Kubelet is backing off the restart
+// ErrCrashLoopBackOff is returned when a container terminated and kubelet is
+// backing off the restart.
 var ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
 
 var (
-	// ErrContainerNotFound returned when a container in the given pod with the
-	// given container name was not found, amongst those managed by the kubelet.
+	// ErrContainerNotFound is returned when a container in the given pod with
+	// the given container name was not found, amongst those managed by the
+	// kubelet.
 	ErrContainerNotFound = errors.New("no matching container")
 )
 
 var (
-	ErrRunContainer     = errors.New("RunContainerError")
-	ErrKillContainer    = errors.New("KillContainerError")
-	ErrVerifyNonRoot    = errors.New("VerifyNonRootError")
+	// ErrRunContainer is returned when starting a container fails.
+	ErrRunContainer = errors.New("RunContainerError")
+	// ErrKillContainer is returned when killinga container fails.
+	ErrKillContainer = errors.New("KillContainerError")
+	// ErrVerifyNonRoot is returned when the user is not root.
+	ErrVerifyNonRoot = errors.New("VerifyNonRootError")
+	// ErrRunInitContainer is returned when starting an InitContainer fails.
 	ErrRunInitContainer = errors.New("RunInitContainerError")
+	// ErrCreatePodSandbox is returned when creating a new PodSandbox fails.
 	ErrCreatePodSandbox = errors.New("CreatePodSandboxError")
+	// ErrConfigPodSandbox is returned when configuring a PodSandbox fails.
 	ErrConfigPodSandbox = errors.New("ConfigPodSandboxError")
-	ErrKillPodSandbox   = errors.New("KillPodSandboxError")
+	// ErrKillPodSandbox is returned when killing a PodSandbox fails.
+	ErrKillPodSandbox = errors.New("KillPodSandboxError")
 )
 
 var (
-	ErrSetupNetwork    = errors.New("SetupNetworkError")
+	// ErrSetupNetwork is returned when setting up a network fails.
+	ErrSetupNetwork = errors.New("SetupNetworkError")
+	// ErrTeardownNetwork is returned when tearing down a network fails.
 	ErrTeardownNetwork = errors.New("TeardownNetworkError")
 )
 
@@ -54,14 +65,22 @@ var (
 type SyncAction string
 
 const (
-	StartContainer   SyncAction = "StartContainer"
-	KillContainer    SyncAction = "KillContainer"
-	SetupNetwork     SyncAction = "SetupNetwork"
-	TeardownNetwork  SyncAction = "TeardownNetwork"
-	InitContainer    SyncAction = "InitContainer"
+	// StartContainer indicates starting a container.
+	StartContainer SyncAction = "StartContainer"
+	// KillContainer indicates killing a container.
+	KillContainer SyncAction = "KillContainer"
+	// SetupNetwork indicates setting up a network.
+	SetupNetwork SyncAction = "SetupNetwork"
+	// TeardownNetwork indicates tearing down a network.
+	TeardownNetwork SyncAction = "TeardownNetwork"
+	// InitContainer indicates InitContainer.
+	InitContainer SyncAction = "InitContainer"
+	// CreatePodSandbox indicates creating a PodSandbox.
 	CreatePodSandbox SyncAction = "CreatePodSandbox"
+	// ConfigPodSandbox indicates configuring a PodSandbox.
 	ConfigPodSandbox SyncAction = "ConfigPodSandbox"
-	KillPodSandbox   SyncAction = "KillPodSandbox"
+	// KillPodSandbox indicates killing a PodSandbox.
+	KillPodSandbox SyncAction = "KillPodSandbox"
 )
 
 // SyncResult is the result of sync action.
@@ -116,11 +135,11 @@ func (p *PodSyncResult) Fail(err error) {
 func (p *PodSyncResult) Error() error {
 	errlist := []error{}
 	if p.SyncError != nil {
-		errlist = append(errlist, fmt.Errorf("failed to SyncPod: %v\n", p.SyncError))
+		errlist = append(errlist, fmt.Errorf("failed to SyncPod: %v", p.SyncError))
 	}
 	for _, result := range p.SyncResults {
 		if result.Error != nil {
-			errlist = append(errlist, fmt.Errorf("failed to %q for %q with %v: %q\n", result.Action, result.Target,
+			errlist = append(errlist, fmt.Errorf("failed to %q for %q with %v: %q", result.Action, result.Target,
 				result.Error, result.Message))
 		}
 	}
