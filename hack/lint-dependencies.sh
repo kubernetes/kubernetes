@@ -56,7 +56,7 @@ unused=$(comm -23 \
 if [[ -n "${unused}" ]]; then
   echo ""
   echo "Pinned module versions that aren't actually used:"
-  echo "${unused}"
+  echo "${unused}" | xargs -L 1 echo 'GO111MODULE=on go mod edit -dropreplace'
 fi
 
 if [[ -n "${unused}${outdated}" ]]; then
