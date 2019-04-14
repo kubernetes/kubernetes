@@ -34,5 +34,5 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_TokenRequest(in *v1.TokenRequest) {
-	SetDefaultsTokenRequestSpec(&in.Spec)
+	SetDefaults_TokenRequestSpec(&in.Spec)
 }
