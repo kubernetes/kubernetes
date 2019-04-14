@@ -4,12 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "parse.go",
-        "xfs.go",
+        "sysreadfile_linux.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/procfs/xfs",
-    importpath = "github.com/prometheus/procfs/xfs",
-    visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/prometheus/procfs/internal/util:go_default_library"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/procfs/internal/util",
+    importpath = "github.com/prometheus/procfs/internal/util",
+    visibility = ["//vendor/github.com/prometheus/procfs:__subpackages__"],
 )
 
 filegroup(

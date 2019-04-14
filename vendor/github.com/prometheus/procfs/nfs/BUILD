@@ -3,11 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "nfs.go",
         "parse.go",
-        "xfs.go",
+        "parse_nfs.go",
+        "parse_nfsd.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/procfs/xfs",
-    importpath = "github.com/prometheus/procfs/xfs",
+    importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/procfs/nfs",
+    importpath = "github.com/prometheus/procfs/nfs",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/prometheus/procfs/internal/util:go_default_library"],
 )

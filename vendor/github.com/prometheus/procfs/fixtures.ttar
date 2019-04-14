@@ -1,0 +1,462 @@
+# Archive created by ttar -c -f fixtures.ttar fixtures/
+Directory: fixtures
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/26231
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/cmdline
+Lines: 1
+vimNULLBYTEtest.goNULLBYTE+10NULLBYTEEOF
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/comm
+Lines: 1
+vim
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/cwd
+SymlinkTo: /usr/bin
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/exe
+SymlinkTo: /usr/bin/vim
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/26231/fd
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/fd/0
+SymlinkTo: ../../symlinktargets/abc
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/fd/1
+SymlinkTo: ../../symlinktargets/def
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/fd/10
+SymlinkTo: ../../symlinktargets/xyz
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/fd/2
+SymlinkTo: ../../symlinktargets/ghi
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/fd/3
+SymlinkTo: ../../symlinktargets/uvw
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/io
+Lines: 7
+rchar: 750339
+wchar: 818609
+syscr: 7405
+syscw: 5245
+read_bytes: 1024
+write_bytes: 2048
+cancelled_write_bytes: -1024
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/limits
+Lines: 17
+Limit                     Soft Limit           Hard Limit           Units
+Max cpu time              unlimited            unlimited            seconds
+Max file size             unlimited            unlimited            bytes
+Max data size             unlimited            unlimited            bytes
+Max stack size            8388608              unlimited            bytes
+Max core file size        0                    unlimited            bytes
+Max resident set          unlimited            unlimited            bytes
+Max processes             62898                62898                processes
+Max open files            2048                 4096                 files
+Max locked memory         65536                65536                bytes
+Max address space         8589934592           unlimited            bytes
+Max file locks            unlimited            unlimited            locks
+Max pending signals       62898                62898                signals
+Max msgqueue size         819200               819200               bytes
+Max nice priority         0                    0
+Max realtime priority     0                    0
+Max realtime timeout      unlimited            unlimited            us
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/mountstats
+Lines: 19
+device rootfs mounted on / with fstype rootfs
+device sysfs mounted on /sys with fstype sysfs
+device proc mounted on /proc with fstype proc
+device /dev/sda1 mounted on / with fstype ext4
+device 192.168.1.1:/srv/test mounted on /mnt/nfs/test with fstype nfs4 statvers=1.1
+	opts:	rw,vers=4.0,rsize=1048576,wsize=1048576,namlen=255,acregmin=3,acregmax=60,acdirmin=30,acdirmax=60,hard,proto=tcp,port=0,timeo=600,retrans=2,sec=sys,clientaddr=192.168.1.5,local_lock=none
+	age:	13968
+	caps:	caps=0xfff7,wtmult=512,dtsize=32768,bsize=0,namlen=255
+	nfsv4:	bm0=0xfdffafff,bm1=0xf9be3e,bm2=0x0,acl=0x0,pnfs=not configured
+	sec:	flavor=1,pseudoflavor=1
+	events:	52 226 0 0 1 13 398 0 0 331 0 47 0 0 77 0 0 77 0 0 0 0 0 0 0 0 0
+	bytes:	1207640230 0 0 0 1210214218 0 295483 0
+	RPC iostats version: 1.0  p/v: 100003/4 (nfs)
+	xprt:	tcp 832 0 1 0 11 6428 6428 0 12154 0 24 26 5726
+	per-op statistics
+	        NULL: 0 0 0 0 0 0 0 0
+	        READ: 1298 1298 0 207680 1210292152 6 79386 79407
+	       WRITE: 0 0 0 0 0 0 0 0
+
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/26231/net
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/net/dev
+Lines: 4
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+    lo:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+  eth0:     438       5    0    0    0     0          0         0      648       8    0    0    0     0       0          0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/26231/ns
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/ns/mnt
+SymlinkTo: mnt:[4026531840]
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/ns/net
+SymlinkTo: net:[4026531993]
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/root
+SymlinkTo: /
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26231/stat
+Lines: 1
+26231 (vim) R 5392 7446 5392 34835 7446 4218880 32533 309516 26 82 1677 44 158 99 20 0 1 0 82375 56274944 1981 18446744073709551615 4194304 6294284 140736914091744 140736914087944 139965136429984 0 0 12288 1870679807 0 0 0 17 0 0 0 31 0 0 8391624 8481048 16420864 140736914093252 140736914093279 140736914093279 140736914096107 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/26232
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/cmdline
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/comm
+Lines: 1
+ata_sff
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/cwd
+SymlinkTo: /does/not/exist
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/26232/fd
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/fd/0
+SymlinkTo: ../../symlinktargets/abc
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/fd/1
+SymlinkTo: ../../symlinktargets/def
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/fd/2
+SymlinkTo: ../../symlinktargets/ghi
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/fd/3
+SymlinkTo: ../../symlinktargets/uvw
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/fd/4
+SymlinkTo: ../../symlinktargets/xyz
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/limits
+Lines: 17
+Limit                     Soft Limit           Hard Limit           Units     
+Max cpu time              unlimited            unlimited            seconds   
+Max file size             unlimited            unlimited            bytes     
+Max data size             unlimited            unlimited            bytes     
+Max stack size            8388608              unlimited            bytes     
+Max core file size        0                    unlimited            bytes     
+Max resident set          unlimited            unlimited            bytes     
+Max processes             29436                29436                processes 
+Max open files            1024                 4096                 files     
+Max locked memory         65536                65536                bytes     
+Max address space         unlimited            unlimited            bytes     
+Max file locks            unlimited            unlimited            locks     
+Max pending signals       29436                29436                signals   
+Max msgqueue size         819200               819200               bytes     
+Max nice priority         0                    0                    
+Max realtime priority     0                    0                    
+Max realtime timeout      unlimited            unlimited            us        
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/root
+SymlinkTo: /does/not/exist
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26232/stat
+Lines: 1
+33 (ata_sff) S 2 0 0 0 -1 69238880 0 0 0 0 0 0 0 0 0 -20 1 0 5 0 0 18446744073709551615 0 0 0 0 0 0 0 2147483647 0 18446744073709551615 0 0 17 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/26233
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/26233/cmdline
+Lines: 1
+com.github.uiautomatorNULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTEEOF
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/584
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/584/stat
+Lines: 2
+1020 ((a b ) ( c d) ) R 28378 1020 28378 34842 1020 4218880 286 0 0 0 0 0 0 0 20 0 1 0 10839175 10395648 155 18446744073709551615 4194304 4238788 140736466511168 140736466511168 140609271124624 0 0 0 0 0 0 0 17 5 0 0 0 0 0 6336016 6337300 25579520 140736466515030 140736466515061 140736466515061 140736466518002 0
+#!/bin/cat /proc/self/stat
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/buddyinfo
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/buddyinfo/short
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/buddyinfo/short/buddyinfo
+Lines: 3
+Node 0, zone
+Node 0, zone
+Node 0, zone
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/buddyinfo/sizemismatch
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/buddyinfo/sizemismatch/buddyinfo
+Lines: 3
+Node 0, zone      DMA      1      0      1      0      2      1      1      0      1      1      3 
+Node 0, zone    DMA32    759    572    791    475    194     45     12      0      0      0      0      0
+Node 0, zone   Normal   4381   1093    185   1530    567    102      4      0      0      0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/buddyinfo/valid
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/buddyinfo/valid/buddyinfo
+Lines: 3
+Node 0, zone      DMA      1      0      1      0      2      1      1      0      1      1      3 
+Node 0, zone    DMA32    759    572    791    475    194     45     12      0      0      0      0 
+Node 0, zone   Normal   4381   1093    185   1530    567    102      4      0      0      0      0 
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/fs
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/fs/xfs
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/fs/xfs/stat
+Lines: 23
+extent_alloc 92447 97589 92448 93751
+abt 0 0 0 0
+blk_map 1767055 188820 184891 92447 92448 2140766 0
+bmbt 0 0 0 0
+dir 185039 92447 92444 136422
+trans 706 944304 0
+ig 185045 58807 0 126238 0 33637 22
+log 2883 113448 9 17360 739
+push_ail 945014 0 134260 15483 0 3940 464 159985 0 40
+xstrat 92447 0
+rw 107739 94045
+attr 4 0 0 0
+icluster 8677 7849 135802
+vnodes 92601 0 0 0 92444 92444 92444 0
+buf 2666287 7122 2659202 3599 2 7085 0 10297 7085
+abtb2 184941 1277345 13257 13278 0 0 0 0 0 0 0 0 0 0 2746147
+abtc2 345295 2416764 172637 172658 0 0 0 0 0 0 0 0 0 0 21406023
+bmbt2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ibt2 343004 1358467 0 0 0 0 0 0 0 0 0 0 0 0 0
+fibt2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+qm 0 0 0 0 0 0 0 0
+xpc 399724544 92823103 86219234
+debug 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/mdstat
+Lines: 26
+Personalities : [linear] [multipath] [raid0] [raid1] [raid6] [raid5] [raid4] [raid10]
+md3 : active raid6 sda1[8] sdh1[7] sdg1[6] sdf1[5] sde1[11] sdd1[3] sdc1[10] sdb1[9]
+      5853468288 blocks super 1.2 level 6, 64k chunk, algorithm 2 [8/8] [UUUUUUUU]
+      
+md127 : active raid1 sdi2[0] sdj2[1]
+      312319552 blocks [2/2] [UU]
+      
+md0 : active raid1 sdk[2](S) sdi1[0] sdj1[1]
+      248896 blocks [2/2] [UU]
+      
+md4 : inactive raid1 sda3[0] sdb3[1]
+      4883648 blocks [2/2] [UU]
+
+md6 : active raid1 sdb2[2] sda2[0]
+      195310144 blocks [2/1] [U_]
+      [=>...................]  recovery =  8.5% (16775552/195310144) finish=17.0min speed=259783K/sec
+
+md8 : active raid1 sdb1[1] sda1[0]
+      195310144 blocks [2/2] [UU]
+      [=>...................]  resync =  8.5% (16775552/195310144) finish=17.0min speed=259783K/sec
+
+md7 : active raid6 sdb1[0] sde1[3] sdd1[2] sdc1[1]
+      7813735424 blocks super 1.2 level 6, 512k chunk, algorithm 2 [4/3] [U_UU]
+      bitmap: 0/30 pages [0KB], 65536KB chunk
+
+unused devices: <none>
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/net
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/net/dev
+Lines: 6
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+vethf345468:     648       8    0    0    0     0          0         0      438       5    0    0    0     0       0          0
+    lo: 1664039048 1566805    0    0    0     0          0         0 1664039048 1566805    0    0    0     0       0          0
+docker0:    2568      38    0    0    0     0          0         0      438       5    0    0    0     0       0          0
+  eth0: 874354587 1036395    0    0    0     0          0         0 563352563  732147    0    0    0     0       0          0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/net/ip_vs
+Lines: 21
+IP Virtual Server version 1.2.1 (size=4096)
+Prot LocalAddress:Port Scheduler Flags
+  -> RemoteAddress:Port Forward Weight ActiveConn InActConn
+TCP  C0A80016:0CEA wlc
+  -> C0A85216:0CEA      Tunnel  100    248        2
+  -> C0A85318:0CEA      Tunnel  100    248        2
+  -> C0A85315:0CEA      Tunnel  100    248        1
+TCP  C0A80039:0CEA wlc
+  -> C0A85416:0CEA      Tunnel  0      0          0
+  -> C0A85215:0CEA      Tunnel  100    1499       0
+  -> C0A83215:0CEA      Tunnel  100    1498       0
+TCP  C0A80037:0CEA wlc
+  -> C0A8321A:0CEA      Tunnel  0      0          0
+  -> C0A83120:0CEA      Tunnel  100    0          0
+TCP  [2620:0000:0000:0000:0000:0000:0000:0001]:0050 sh
+  -> [2620:0000:0000:0000:0000:0000:0000:0002]:0050      Route   1      0          0
+  -> [2620:0000:0000:0000:0000:0000:0000:0003]:0050      Route   1      0          0
+  -> [2620:0000:0000:0000:0000:0000:0000:0004]:0050      Route   1      1          1
+FWM  10001000 wlc
+  -> C0A8321A:0CEA      Route   0      0          1
+  -> C0A83215:0CEA      Route   0      0          2
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/net/ip_vs_stats
+Lines: 6
+   Total Incoming Outgoing         Incoming         Outgoing
+   Conns  Packets  Packets            Bytes            Bytes
+ 16AA370 E33656E5        0     51D8C8883AB3                0
+
+ Conns/s   Pkts/s   Pkts/s          Bytes/s          Bytes/s
+       4    1FB3C        0          1282A8F                0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/net/rpc
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/net/rpc/nfs
+Lines: 5
+net 18628 0 18628 6
+rpc 4329785 0 4338291
+proc2 18 2 69 0 0 4410 0 0 0 0 0 0 0 0 0 0 0 99 2
+proc3 22 1 4084749 29200 94754 32580 186 47747 7981 8639 0 6356 0 6962 0 7958 0 0 241 4 4 2 39
+proc4 61 1 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/net/rpc/nfsd
+Lines: 11
+rc 0 6 18622
+fh 0 0 0 0 0
+io 157286400 0
+th 8 0 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000
+ra 32 0 0 0 0 0 0 0 0 0 0 0
+net 18628 0 18628 6
+rpc 18628 0 0 0 0
+proc2 18 2 69 0 0 4410 0 0 0 0 0 0 0 0 0 0 0 99 2
+proc3 22 2 112 0 2719 111 0 0 0 0 0 0 0 0 0 0 0 27 216 0 2 1 0
+proc4 2 2 10853
+proc4ops 72 0 0 0 1098 2 0 0 0 0 8179 5896 0 0 0 0 5900 0 0 2 0 2 0 9609 0 2 150 1272 0 0 0 1236 0 0 0 0 3 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/net/xfrm_stat
+Lines: 28
+XfrmInError                     1
+XfrmInBufferError               2
+XfrmInHdrError                  4
+XfrmInNoStates                  3
+XfrmInStateProtoError           40
+XfrmInStateModeError            100
+XfrmInStateSeqError             6000
+XfrmInStateExpired              4
+XfrmInStateMismatch             23451
+XfrmInStateInvalid              55555
+XfrmInTmplMismatch              51
+XfrmInNoPols                    65432
+XfrmInPolBlock                  100
+XfrmInPolError                  10000
+XfrmOutError                    1000000
+XfrmOutBundleGenError           43321
+XfrmOutBundleCheckError         555
+XfrmOutNoStates                 869
+XfrmOutStateProtoError          4542
+XfrmOutStateModeError           4
+XfrmOutStateSeqError            543
+XfrmOutStateExpired             565
+XfrmOutPolBlock                 43456
+XfrmOutPolDead                  7656
+XfrmOutPolError                 1454
+XfrmFwdHdrError                 6654
+XfrmOutStateInvalid             28765
+XfrmAcquireError                24532
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/self
+SymlinkTo: 26231
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/stat
+Lines: 16
+cpu  301854 612 111922 8979004 3552 2 3944 0 0 0
+cpu0 44490 19 21045 1087069 220 1 3410 0 0 0
+cpu1 47869 23 16474 1110787 591 0 46 0 0 0
+cpu2 46504 36 15916 1112321 441 0 326 0 0 0
+cpu3 47054 102 15683 1113230 533 0 60 0 0 0
+cpu4 28413 25 10776 1140321 217 0 8 0 0 0
+cpu5 29271 101 11586 1136270 672 0 30 0 0 0
+cpu6 29152 36 10276 1139721 319 0 29 0 0 0
+cpu7 29098 268 10164 1139282 555 0 31 0 0 0
+intr 8885917 17 0 0 0 0 0 0 0 1 79281 0 0 0 0 0 0 0 231237 0 0 0 0 250586 103 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 223424 190745 13 906 1283803 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ctxt 38014093
+btime 1418183276
+processes 26442
+procs_running 2
+procs_blocked 1
+softirq 5057579 250191 1481983 1647 211099 186066 0 1783454 622196 12499 508444
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/symlinktargets
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/symlinktargets/README
+Lines: 2
+This directory contains some empty files that are the symlinks the files in the "fd" directory point to.
+They are otherwise ignored by the tests
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/symlinktargets/abc
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/symlinktargets/def
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/symlinktargets/ghi
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/symlinktargets/uvw
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/symlinktargets/xyz
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/.unpacked
+Lines: 0
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
