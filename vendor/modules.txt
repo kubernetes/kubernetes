@@ -404,7 +404,7 @@ github.com/gogo/protobuf/vanity/command
 github.com/golang/groupcache/lru
 # github.com/golang/mock v0.0.0-20160127222235-bd3c8e81be01 => github.com/golang/mock v0.0.0-20160127222235-bd3c8e81be01
 github.com/golang/mock/gomock
-# github.com/golang/protobuf v1.2.0 => github.com/golang/protobuf v1.1.0
+# github.com/golang/protobuf v1.2.0 => github.com/golang/protobuf v1.2.0
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor

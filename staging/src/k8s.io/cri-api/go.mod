@@ -20,7 +20,6 @@ require (
 
 replace (
 	github.com/gogo/protobuf => github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
-	github.com/golang/protobuf => github.com/golang/protobuf v1.1.0
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 	k8s.io/cri-api => ../cri-api
 )

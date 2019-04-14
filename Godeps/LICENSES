@@ -8749,10 +8749,7 @@ third-party archives.
 ================================================================================
 = vendor/github.com/golang/protobuf licensed under: =
 
-Go support for Protocol Buffers - Google's data interchange format
-
 Copyright 2010 The Go Authors.  All rights reserved.
-https://github.com/golang/protobuf
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -8781,7 +8778,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-= vendor/github.com/golang/protobuf/LICENSE 14db3a56c3796a940ba32948a15f97d0
+= vendor/github.com/golang/protobuf/LICENSE 939cce1ec101726fa754e698ac871622
 ================================================================================
 
 
