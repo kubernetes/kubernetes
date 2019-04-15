@@ -32,7 +32,6 @@ pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation
 pkg/apis/core
-pkg/apis/core/helper
 pkg/apis/core/helper/qos
 pkg/apis/core/v1
 pkg/apis/core/v1/helper
