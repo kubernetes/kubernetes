@@ -147,22 +147,23 @@ func (spm *KubeStaticPodPathManager) BackupEtcdDir() string {
 
 // CleanupDirs cleans up all temporary directories except those the user has requested to keep around
 func (spm *KubeStaticPodPathManager) CleanupDirs() error {
+	var errlist []error
 	if err := os.RemoveAll(spm.TempManifestDir()); err != nil {
-		return err
+		errlist = append(errlist, err)
 	}
 	if !spm.keepManifestDir {
 		if err := os.RemoveAll(spm.BackupManifestDir()); err != nil {
-			return err
+			errlist = append(errlist, err)
 		}
 	}
 
 	if !spm.keepEtcdDir {
 		if err := os.RemoveAll(spm.BackupEtcdDir()); err != nil {
-			return err
+			errlist = append(errlist, err)
 		}
 	}
 
-	return nil
+	return utilerrors.NewAggregate(errlist)
 }
 
 func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, beforePodHash string, recoverManifests map[string]string) error {
