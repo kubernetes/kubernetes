@@ -63,7 +63,7 @@ func TestStreamWatcher(t *testing.T) {
 	}
 
 	fd := fakeDecoder{items: make(chan Event, 5)}
-	sw := NewStreamWatcher(fd, nil)
+	sw := NewStreamWatcherWithErrorReporter(fd, nil)
 
 	for _, item := range table {
 		fd.items <- item
@@ -86,7 +86,7 @@ func TestStreamWatcher(t *testing.T) {
 func TestStreamWatcherError(t *testing.T) {
 	fd := fakeDecoder{err: fmt.Errorf("test error")}
 	fr := &fakeReporter{}
-	sw := NewStreamWatcher(fd, fr)
+	sw := NewStreamWatcherWithErrorReporter(fd, fr)
 	evt, ok := <-sw.ResultChan()
 	if !ok {
 		t.Fatalf("unexpected close")

@@ -59,7 +59,17 @@ type StreamWatcher struct {
 }
 
 // NewStreamWatcher creates a StreamWatcher from the given decoder.
-func NewStreamWatcher(d Decoder, r Reporter) *StreamWatcher {
+// Equivalent to NewStreamWatcherWithErrorReporter(d, nil).
+// Deprecated in favor of NewStreamWatcherWithErrorReporter(), which allows providing
+// an error reporter to convert decode errors into watch error status objects.
+func NewStreamWatcher(d Decoder) *StreamWatcher {
+	return NewStreamWatcherWithErrorReporter(d, nil)
+}
+
+// NewStreamWatcher creates a StreamWatcher from the given decoder.
+// The provided reporter is called to convert decode errors into objects for returning as watch error events.
+// See k8s.io/apimachinery/pkg/api/errors#NewClientErrorReporter for a default reporter implementation.
+func NewStreamWatcherWithErrorReporter(d Decoder, r Reporter) *StreamWatcher {
 	sw := &StreamWatcher{
 		source:   d,
 		reporter: r,
@@ -115,11 +125,13 @@ func (sw *StreamWatcher) receive() {
 			default:
 				if net.IsProbableEOF(err) {
 					klog.V(5).Infof("Unable to decode an event from the watch stream: %v", err)
-				} else {
+				} else if sw.reporter != nil {
 					sw.result <- Event{
 						Type:   Error,
 						Object: sw.reporter.AsObject(fmt.Errorf("unable to decode an event from the watch stream: %v", err)),
 					}
+				} else {
+					klog.Errorf("Unable to decode an event from the watch stream: %v", err)
 				}
 			}
 			return

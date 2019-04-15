@@ -595,7 +595,7 @@ func (r *Request) WatchWithSpecificDecoders(wrapperDecoderFn func(io.ReadCloser)
 		return nil, fmt.Errorf("for request %s, got status: %v", url, resp.StatusCode)
 	}
 	wrapperDecoder := wrapperDecoderFn(resp.Body)
-	return watch.NewStreamWatcher(
+	return watch.NewStreamWatcherWithErrorReporter(
 		restclientwatch.NewDecoder(wrapperDecoder, embeddedDecoder),
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
