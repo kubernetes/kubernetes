@@ -132,7 +132,11 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 			// Disable Docker's health check until we officially support it
 			// (https://github.com/kubernetes/kubernetes/issues/25829).
 			Healthcheck: &dockercontainer.HealthConfig{
-				Test: []string{"NONE"},
+				Test:        config.Health.Command,
+				Interval:    config.Health.Interval,
+				Timeout:     config.Health.Timeout,
+				StartPeriod: config.Health.Period,
+				Retries:     config.Health.Retries,
 			},
 		},
 		HostConfig: &dockercontainer.HostConfig{

@@ -648,6 +648,15 @@ message WindowsContainerConfig {
     WindowsContainerSecurityContext security_context = 2;
 }
 
+// Container health check config
+message ContainerHealthConfig {   
+   repeated string command = 1;
+   int64 interval = 2;
+   int64 timeout = 3;
+   int64 period = 4;
+   int32 Retries = 5;
+}
+
 // WindowsContainerResources specifies Windows specific configuration for
 // resources.
 message WindowsContainerResources {
@@ -750,6 +759,7 @@ message ContainerConfig {
     LinuxContainerConfig linux = 15;
    // Configuration specific to Windows containers.
    WindowsContainerConfig windows = 16;
+   ContainerHealthConfig health = 17;
 }
 
 message CreateContainerRequest {
