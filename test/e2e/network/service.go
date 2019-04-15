@@ -1657,25 +1657,25 @@ var _ = SIGDescribe("Services", func() {
 	It("should have session affinity work for service with type clusterIP", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
-		execAffinityTestForNonLBService(f, cs, svc, false)
+		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
 	It("should be able to switch session affinity for service with type clusterIP", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
-		execAffinityTestForNonLBService(f, cs, svc, true)
+		execAffinityTestForNonLBServiceWithTransition(f, cs, svc)
 	})
 
 	It("should have session affinity work for NodePort service", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeNodePort
-		execAffinityTestForNonLBService(f, cs, svc, false)
+		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
 	It("should be able to switch session affinity for NodePort service", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeNodePort
-		execAffinityTestForNonLBService(f, cs, svc, true)
+		execAffinityTestForNonLBServiceWithTransition(f, cs, svc)
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
@@ -1686,7 +1686,7 @@ var _ = SIGDescribe("Services", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
-		execAffinityTestForLBService(f, cs, svc, false)
+		execAffinityTestForLBService(f, cs, svc)
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
@@ -1697,7 +1697,7 @@ var _ = SIGDescribe("Services", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
-		execAffinityTestForLBService(f, cs, svc, true)
+		execAffinityTestForLBServiceWithTransition(f, cs, svc)
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
@@ -1708,7 +1708,7 @@ var _ = SIGDescribe("Services", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
-		execAffinityTestForLBService(f, cs, svc, false)
+		execAffinityTestForLBService(f, cs, svc)
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
@@ -1719,7 +1719,7 @@ var _ = SIGDescribe("Services", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
-		execAffinityTestForLBService(f, cs, svc, true)
+		execAffinityTestForLBServiceWithTransition(f, cs, svc)
 	})
 
 	It("should implement service.kubernetes.io/service-proxy-name", func() {
@@ -2197,12 +2197,20 @@ func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeNam
 	return execPod.Status.PodIP, outputs[1]
 }
 
-// execAffinityTestForNonLBService is a helper function that wrap the logic of
+func execAffinityTestForNonLBServiceWithTransition(f *framework.Framework, cs clientset.Interface, svc *v1.Service) {
+	execAffinityTestForNonLBServiceWithOptionalTransition(f, cs, svc, true)
+}
+
+func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interface, svc *v1.Service) {
+	execAffinityTestForNonLBServiceWithOptionalTransition(f, cs, svc, false)
+}
+
+// execAffinityTestForNonLBServiceWithOptionalTransition is a helper function that wrap the logic of
 // affinity test for non-load-balancer services. Session afinity will be
 // enabled when the service is created. If parameter isTransitionTest is true,
 // session affinity will be switched off/on and test if the service converges
 // to a stable affinity state.
-func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interface, svc *v1.Service, isTransitionTest bool) {
+func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framework, cs clientset.Interface, svc *v1.Service, isTransitionTest bool) {
 	ns := f.Namespace.Name
 	numPods, servicePort, serviceName := 3, defaultServeHostnameServicePort, svc.ObjectMeta.Name
 	By("creating service in namespace " + ns)
@@ -2251,10 +2259,18 @@ func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interf
 	}
 }
 
-// execAffinityTestForLBService is a helper function that wrap the logic of
+func execAffinityTestForLBServiceWithTransition(f *framework.Framework, cs clientset.Interface, svc *v1.Service) {
+	execAffinityTestForLBServiceWithOptionalTransition(f, cs, svc, true)
+}
+
+func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface, svc *v1.Service) {
+	execAffinityTestForLBServiceWithOptionalTransition(f, cs, svc, false)
+}
+
+// execAffinityTestForLBServiceWithOptionalTransition is a helper function that wrap the logic of
 // affinity test for load balancer services, similar to
-// execAffinityTestForNonLBService.
-func execAffinityTestForLBService(f *framework.Framework, cs clientset.Interface, svc *v1.Service, isTransitionTest bool) {
+// execAffinityTestForNonLBServiceWithOptionalTransition.
+func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, cs clientset.Interface, svc *v1.Service, isTransitionTest bool) {
 	numPods, ns, serviceName := 3, f.Namespace.Name, svc.ObjectMeta.Name
 
 	By("creating service in namespace " + ns)
