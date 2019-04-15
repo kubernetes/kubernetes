@@ -53,50 +53,9 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		return nil, err
 	}
 
-	// This is the cluster object we've got from the cluster-info kubeconfig file
-	defaultCluster := kubeconfigutil.GetClusterFromKubeConfig(config)
-
-	// Create a new kubeconfig object from the given, just copy over the server and the CA cert
-	// We do this in order to not pick up other possible misconfigurations in the clusterinfo file
-	kubeconfig := kubeconfigutil.CreateBasic(
-		defaultCluster.Server,
-		clustername,
-		"", // no user provided
-		defaultCluster.CertificateAuthorityData,
-	)
-	// load pre-existing client certificates
-	if config.Contexts[config.CurrentContext] != nil && len(config.AuthInfos) > 0 {
-		user := config.Contexts[config.CurrentContext].AuthInfo
-		authInfo, ok := config.AuthInfos[user]
-		if !ok || authInfo == nil {
-			return nil, errors.Errorf("empty settings for user %q", user)
-		}
-		if len(authInfo.ClientCertificateData) == 0 && len(authInfo.ClientCertificate) != 0 {
-			clientCert, err := ioutil.ReadFile(authInfo.ClientCertificate)
-			if err != nil {
-				return nil, err
-			}
-			authInfo.ClientCertificateData = clientCert
-		}
-		if len(authInfo.ClientKeyData) == 0 && len(authInfo.ClientKey) != 0 {
-			clientKey, err := ioutil.ReadFile(authInfo.ClientKey)
-			if err != nil {
-				return nil, err
-			}
-			authInfo.ClientKeyData = clientKey
-		}
-
-		if len(authInfo.ClientCertificateData) == 0 || len(authInfo.ClientKeyData) == 0 {
-			return nil, errors.New("couldn't read authentication info from the given kubeconfig file")
-		}
-		kubeconfig = kubeconfigutil.CreateWithCerts(
-			defaultCluster.Server,
-			clustername,
-			"", // no user provided
-			defaultCluster.CertificateAuthorityData,
-			authInfo.ClientKeyData,
-			authInfo.ClientCertificateData,
-		)
+	kubeconfig, err := createKubeconfig(config, clustername)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := kubeconfigutil.ToClientSet(kubeconfig)
@@ -104,7 +63,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		return nil, err
 	}
 
-	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", defaultCluster.Server)
+	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", kubeconfig.Clusters[clustername].Server)
 
 	var clusterinfoCM *v1.ConfigMap
 	wait.PollInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
@@ -138,6 +97,59 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 	klog.V(1).Infoln("[discovery] Synced cluster-info information from the API Server so we have got the latest information")
 	// In an HA world in the future, this will make more sense, because now we've got new information, possibly about new API Servers to talk to
 	return refreshedBaseKubeConfig, nil
+}
+
+// createKubeconfig get the default Cluster of the specified config
+// and then create kubeconfig from the defaultCluster and clustername
+// if config has certificate, then create kubeconfig with the certificate
+func createKubeconfig(config *clientcmdapi.Config, clustername string) (*clientcmdapi.Config, error) {
+	// This is the cluster object we've got from the cluster-info kubeconfig
+	defaultCluster := kubeconfigutil.GetClusterFromKubeConfig(config)
+
+	// Create a new kubeconfig object from the given, just copy over the server and the CA cert
+	// We do this in order to not pick up other possible misconfigurations in the clusterinfo file
+	kubeconfig := kubeconfigutil.CreateBasic(
+		defaultCluster.Server,
+		clustername,
+		"", // no user provided
+		defaultCluster.CertificateAuthorityData,
+	)
+
+	// load pre-existing client certificates
+	if config.Contexts[config.CurrentContext] != nil && len(config.AuthInfos) > 0 {
+		user := config.Contexts[config.CurrentContext].AuthInfo
+		authInfo, ok := config.AuthInfos[user]
+		if !ok || authInfo == nil {
+			return nil, errors.Errorf("empty settings for user %q", user)
+		}
+		if len(authInfo.ClientCertificate) != 0 {
+			clientCert, err := ioutil.ReadFile(authInfo.ClientCertificate)
+			if err != nil {
+				return nil, err
+			}
+			authInfo.ClientCertificateData = clientCert
+		}
+		if len(authInfo.ClientKey) != 0 {
+			clientKey, err := ioutil.ReadFile(authInfo.ClientKey)
+			if err != nil {
+				return nil, err
+			}
+			authInfo.ClientKeyData = clientKey
+		}
+
+		if len(authInfo.ClientCertificateData) == 0 || len(authInfo.ClientKeyData) == 0 {
+			return nil, errors.New("couldn't read authentication info from the given kubeconfig file")
+		}
+		kubeconfig = kubeconfigutil.CreateWithCerts(
+			defaultCluster.Server,
+			clustername,
+			"", // no user provided
+			defaultCluster.CertificateAuthorityData,
+			authInfo.ClientKeyData,
+			authInfo.ClientCertificateData,
+		)
+	}
+	return kubeconfig, nil
 }
 
 // tryParseClusterInfoFromConfigMap tries to parse a kubeconfig file from a ConfigMap key
