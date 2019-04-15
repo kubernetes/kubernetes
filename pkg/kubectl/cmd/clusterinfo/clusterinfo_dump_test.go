@@ -17,7 +17,6 @@ limitations under the License.
 package clusterinfo
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,12 +26,9 @@ import (
 	"testing"
 
 	flag "github.com/spf13/pflag"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
@@ -80,108 +76,129 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	}
 }
 
-func TestCmdClusterInfoDump(t *testing.T) {
+func TestCmdClusterInfoDumpCustomNamespaces(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	ns := scheme.Codecs
-
-	encodeResp := func(obj runtime.Object, ver runtime.GroupVersioner) io.ReadCloser {
-		info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
-		encoder := ns.EncoderForVersion(info.Serializer, ver)
-
-		return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, obj))))
-	}
-
-	encodeRespForCoreGV := func(obj runtime.Object) io.ReadCloser {
-		return encodeResp(obj, corev1.SchemeGroupVersion)
-	}
-
-	encodeRespForAppsGV := func(obj runtime.Object) io.ReadCloser {
-		return encodeResp(obj, appsv1.SchemeGroupVersion)
-	}
-
 	tests := map[string]struct {
-		expNsListReq []string
-
-		dumpAllNs        bool
-		populateCmdFlags func(f *flag.FlagSet)
+		expectedNamespacesRequests []string
+		populateCmdFlags           func(f *flag.FlagSet) error
 	}{
 		"should dump default namespaces": {
-			expNsListReq: []string{"kube-system", "default"},
+			expectedNamespacesRequests: []string{"kube-system", "default"},
 
-			populateCmdFlags: func(f *flag.FlagSet) {
-				// use default options
+			populateCmdFlags: func(f *flag.FlagSet) error {
+				// do not populate any flags, use default options
+				return nil
 			},
 		},
-
 		"should dump requested namespaces": {
-			expNsListReq: []string{"qa", "production"},
+			expectedNamespacesRequests: []string{"qa", "production"},
 
-			populateCmdFlags: func(f *flag.FlagSet) {
-				f.Set("namespaces", "qa,production")
-			},
-		},
-
-		"should dump all available namespaces": {
-			expNsListReq: []string{"qa", "production", "test", "kube-system"},
-
-			dumpAllNs: true,
-			populateCmdFlags: func(f *flag.FlagSet) {
-				f.Set("all-namespaces", "true")
+			populateCmdFlags: func(f *flag.FlagSet) error {
+				return f.Set("namespaces", "qa,production")
 			},
 		},
 	}
 
-	for tn, tc := range tests {
-		t.Run(tn, func(t *testing.T) {
-			expListReq := map[string]io.ReadCloser{
-				"/api/v1/nodes": encodeRespForCoreGV(&corev1.NodeList{}),
+	for testName, testCase := range tests {
+		t.Run(testName, func(t *testing.T) {
+			expectedCalls := map[string]io.ReadCloser{
+				"/api/v1/nodes": dummyResponse(),
 			}
 
-			for _, ns := range tc.expNsListReq {
-				expListReq[fmt.Sprintf("/api/v1/namespaces/%s/events", ns)] = encodeRespForCoreGV(&corev1.EventList{})
-				expListReq[fmt.Sprintf("/api/v1/namespaces/%s/replicationcontrollers", ns)] = encodeRespForCoreGV(&corev1.ReplicationControllerList{})
-				expListReq[fmt.Sprintf("/api/v1/namespaces/%s/services", ns)] = encodeRespForCoreGV(&corev1.ServiceList{})
-				expListReq[fmt.Sprintf("/api/v1/namespaces/%s/pods", ns)] = encodeRespForCoreGV(&corev1.PodList{})
+			for _, ns := range testCase.expectedNamespacesRequests {
+				expectedCalls[fmt.Sprintf("/api/v1/namespaces/%s/events", ns)] = dummyResponse()
+				expectedCalls[fmt.Sprintf("/api/v1/namespaces/%s/replicationcontrollers", ns)] = dummyResponse()
+				expectedCalls[fmt.Sprintf("/api/v1/namespaces/%s/services", ns)] = dummyResponse()
+				expectedCalls[fmt.Sprintf("/api/v1/namespaces/%s/pods", ns)] = dummyResponse()
 
-				expListReq[fmt.Sprintf("/apis/apps/v1/namespaces/%s/daemonsets", ns)] = encodeRespForAppsGV(&appsv1.DaemonSetList{})
-				expListReq[fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", ns)] = encodeRespForAppsGV(&appsv1.DeploymentList{})
-				expListReq[fmt.Sprintf("/apis/apps/v1/namespaces/%s/replicasets", ns)] = encodeRespForAppsGV(&appsv1.ReplicaSetList{})
+				expectedCalls[fmt.Sprintf("/apis/apps/v1/namespaces/%s/daemonsets", ns)] = dummyResponse()
+				expectedCalls[fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", ns)] = dummyResponse()
+				expectedCalls[fmt.Sprintf("/apis/apps/v1/namespaces/%s/replicasets", ns)] = dummyResponse()
 			}
 
-			if tc.dumpAllNs { // register expected namespaces
-				var items []corev1.Namespace
-				for _, nsName := range tc.expNsListReq {
-					items = append(items, corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: nsName}})
-				}
-				expListReq["/api/v1/namespaces"] = encodeRespForCoreGV(&corev1.NamespaceList{
-					Items: items,
-				})
-			}
-
-			tf.Client = &fake.RESTClient{
-				NegotiatedSerializer: ns,
-				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					respBody, found := expListReq[req.URL.Path]
-					if !found {
-						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					}
-
-					return &http.Response{
-						StatusCode: http.StatusOK,
-						Header:     cmdtesting.DefaultHeader(),
-						Body:       respBody,
-					}, nil
-				}),
-			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			tf.ClientConfigVal.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				responseBody, isExpectedCall := expectedCalls[req.URL.Path]
+				if !isExpectedCall || req.Method != "GET" {
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: responseBody}, nil
+			})
 
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdClusterInfoDump(tf, ioStreams)
-			tc.populateCmdFlags(cmd.Flags())
 
+			err := testCase.populateCmdFlags(cmd.Flags())
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
 			cmd.Run(cmd, []string{})
 		})
 	}
+}
+
+func TestCmdClusterInfoDumpAllNamespaces(t *testing.T) {
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	namespacesAvailableInCluster := []string{"qa", "production", "test", "kube-system"}
+	var items []corev1.Namespace
+	for _, name := range namespacesAvailableInCluster {
+		items = append(items, corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	}
+	expectedCalls := map[string]io.ReadCloser{
+		"/api/v1/namespaces": cmdtesting.ObjBody(codec, &corev1.NamespaceList{Items: items}),
+		"/api/v1/nodes":      dummyResponse(),
+	}
+
+	for _, ns := range namespacesAvailableInCluster {
+		expectedCalls[fmt.Sprintf("/api/v1/namespaces/%s/events", ns)] = dummyResponse()
+		expectedCalls[fmt.Sprintf("/api/v1/namespaces/%s/replicationcontrollers", ns)] = dummyResponse()
+		expectedCalls[fmt.Sprintf("/api/v1/namespaces/%s/services", ns)] = dummyResponse()
+		expectedCalls[fmt.Sprintf("/api/v1/namespaces/%s/pods", ns)] = dummyResponse()
+
+		expectedCalls[fmt.Sprintf("/apis/apps/v1/namespaces/%s/daemonsets", ns)] = dummyResponse()
+		expectedCalls[fmt.Sprintf("/apis/apps/v1/namespaces/%s/deployments", ns)] = dummyResponse()
+		expectedCalls[fmt.Sprintf("/apis/apps/v1/namespaces/%s/replicasets", ns)] = dummyResponse()
+	}
+
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	tf.ClientConfigVal.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		responseBody, isExpectedCall := expectedCalls[req.URL.Path]
+		if !isExpectedCall || req.Method != "GET" {
+			t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+			return nil, nil
+		}
+
+		return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: responseBody}, nil
+	})
+
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdClusterInfoDump(tf, ioStreams)
+	err := cmd.Flags().Set("all-namespaces", "true")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	cmd.Run(cmd, []string{})
+}
+
+func dummyResponse() io.ReadCloser {
+	return cmdtesting.StringBody(`{
+		"metadata": {
+			"name": "dummyObject"
+		}
+	}`)
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }

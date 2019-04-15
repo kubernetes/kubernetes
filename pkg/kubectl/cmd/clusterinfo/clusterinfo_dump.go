@@ -133,14 +133,20 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 
 	o.PrintObj = printer.PrintObj
 
-	clientset, err := f.KubernetesClientSet()
+	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
 
-	o.CoreClient = clientset.CoreV1()
+	o.CoreClient, err = corev1client.NewForConfig(config)
+	if err != nil {
+		return err
+	}
 
-	o.AppsClient = clientset.AppsV1()
+	o.AppsClient, err = appsv1client.NewForConfig(config)
+	if err != nil {
+		return err
+	}
 
 	o.Timeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
