@@ -40,6 +40,7 @@
 ./hack/make-rules/update.sh
 ./hack/make-rules/verify.sh
 ./hack/make-rules/vet.sh
+./hack/pin-dependency.sh
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
 ./hack/update-generated-kms-dockerized.sh

@@ -70,10 +70,19 @@ function ensure_require_replace_directives_for_all_dependencies() {
   cat "${require_json}" | jq -r '"-replace \(.Path)=\(.Path)@\(.Version)"'            | xargs -L 100 go mod edit -fmt
   cat "${replace_json}" | jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"'| xargs -L 100 go mod edit -fmt
 
-  # 2. Add explicit require directives for indirect dependencies
+  # 2. Propagate root replace/require directives into staging modules, in case we are downgrading, so they don't bump the root required version back up
+  for repo in $(ls staging/src/k8s.io); do
+    pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
+      cat "${require_json}" | jq -r '"-require \(.Path)@\(.Version)"'                     | xargs -L 100 go mod edit -fmt
+      cat "${require_json}" | jq -r '"-replace \(.Path)=\(.Path)@\(.Version)"'            | xargs -L 100 go mod edit -fmt
+      cat "${replace_json}" | jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"'| xargs -L 100 go mod edit -fmt
+    popd >/dev/null 2>&1
+  done
+
+  # 3. Add explicit require directives for indirect dependencies
   go list -m -json all | jq -r 'select(.Main != true) | select(.Indirect == true) | "-require \(.Path)@\(.Version)"'          | xargs -L 100 go mod edit -fmt
 
-  # 3. Add explicit replace directives pinning dependencies that aren't pinned yet
+  # 4. Add explicit replace directives pinning dependencies that aren't pinned yet
   go list -m -json all | jq -r 'select(.Main != true) | select(.Replace == null)  | "-replace \(.Path)=\(.Path)@\(.Version)"' | xargs -L 100 go mod edit -fmt
 }
 
