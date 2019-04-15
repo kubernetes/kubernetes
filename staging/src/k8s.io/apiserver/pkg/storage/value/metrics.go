@@ -150,11 +150,6 @@ func RecordDataKeyGeneration(start time.Time, err error) {
 	dataKeyGenerationLatencies.Observe(sinceInSeconds(start))
 }
 
-// sinceInMicroseconds gets the time since the specified start in microseconds.
-func sinceInMicroseconds(start time.Time) float64 {
-	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
-}
-
 // sinceInSeconds gets the time since the specified start in seconds.
 func sinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
