@@ -199,9 +199,9 @@ func TestTimeEqual(t *testing.T) {
 func TestTimeBefore(t *testing.T) {
 	t1 := NewTime(time.Now())
 	cases := []struct {
-		name   string
-		x      *Time
-		y      *Time
+		name string
+		x    *Time
+		y    *Time
 	}{
 		{"nil <? nil", nil, nil},
 		{"!nil <? !nil", &t1, &t1},
@@ -233,7 +233,7 @@ func TestTimeIsZero(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			result := c.x.IsZero()
-			if result != c.result{
+			if result != c.result {
 				t.Errorf("Failed equality test for '%v': expected %+v, got %+v", c.x, c.result, result)
 			}
 		})

@@ -190,9 +190,9 @@ func TestMicroTimeEqualTime(t *testing.T) {
 func TestMicroTimeBefore(t *testing.T) {
 	t1 := NewMicroTime(time.Now())
 	cases := []struct {
-		name   string
-		x      *MicroTime
-		y      *MicroTime
+		name string
+		x    *MicroTime
+		y    *MicroTime
 	}{
 		{"nil <? nil", nil, nil},
 		{"!nil <? !nil", &t1, &t1},
@@ -213,9 +213,9 @@ func TestMicroTimeBeforeTime(t *testing.T) {
 	t1 := NewMicroTime(time.Now())
 	t2 := NewTime(t1.Time)
 	cases := []struct {
-		name   string
-		x      *MicroTime
-		y      *Time
+		name string
+		x    *MicroTime
+		y    *Time
 	}{
 		{"nil <? nil", nil, nil},
 		{"!nil <? !nil", &t1, &t2},
@@ -247,7 +247,7 @@ func TestMicroTimeIsZero(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			result := c.x.IsZero()
-			if result != c.result{
+			if result != c.result {
 				t.Errorf("Failed equality test for '%v': expected %+v, got %+v", c.x, c.result, result)
 			}
 		})
