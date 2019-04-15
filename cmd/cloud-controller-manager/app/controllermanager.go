@@ -18,6 +18,7 @@ package app
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -86,9 +87,12 @@ the cloud specific control loops shipped with Kubernetes.`,
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
-	// hoist this flag from the global flagset to preserve the commandline until
-	// the gce cloudprovider is removed.
-	globalflag.Register(namedFlagSets.FlagSet("generic"), "cloud-provider-gce-lb-src-cidrs")
+
+	if flag.CommandLine.Lookup("cloud-provider-gce-lb-src-cidrs") != nil {
+		// hoist this flag from the global flagset to preserve the commandline until
+		// the gce cloudprovider is removed.
+		globalflag.Register(namedFlagSets.FlagSet("generic"), "cloud-provider-gce-lb-src-cidrs")
+	}
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
