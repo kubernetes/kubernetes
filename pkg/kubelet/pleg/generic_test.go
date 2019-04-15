@@ -217,9 +217,17 @@ func TestEventChannelFull(t *testing.T) {
 		{ID: "1234", Type: ContainerDied, Data: "c2"},
 		{ID: "1234", Type: ContainerStarted, Data: "c3"},
 		{ID: "4567", Type: ContainerRemoved, Data: "c1"},
+		{ID: "4567", Type: ContainerStarted, Data: "c4"},
 	}
 	actual = getEventsFromChannel(ch)
-	verifyEvents(t, expected, actual)
+	assert.True(t, len(actual) == 4, "channel length should be 4")
+	for _, actualEvent := range actual {
+		for _, expectedEvent := range expected {
+			if actualEvent.ID == expectedEvent.ID && actualEvent.Data == expectedEvent.Data {
+				assert.True(t, actualEvent.Type == expectedEvent.Type, "event type should be equal")
+			}
+		}
+	}
 }
 
 func TestDetectingContainerDeaths(t *testing.T) {
