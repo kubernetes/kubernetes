@@ -2906,3 +2906,82 @@ func TestCleanLegacyService(t *testing.T) {
 		}
 	}
 }
+
+func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	gtm := NewGracefulTerminationManager(ipvs)
+
+	excludeCIDRs := []string{"4.4.4.4/32"}
+	proxier, err := NewProxier(
+		ipt,
+		ipvs,
+		ipset,
+		NewFakeSysctl(),
+		exec.New(),
+		250*time.Millisecond,
+		100*time.Millisecond,
+		excludeCIDRs,
+		false,
+		0,
+		"10.0.0.0/24",
+		testHostname,
+		net.ParseIP("127.0.0.1"),
+		nil,
+		nil,
+		DefaultScheduler,
+		make([]string, 0),
+	)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	proxier.gracefuldeleteManager = gtm
+
+	vs := &utilipvs.VirtualServer{
+		Address:   net.ParseIP("4.4.4.4"),
+		Protocol:  string(v1.ProtocolUDP),
+		Port:      56,
+		Scheduler: "rr",
+		Flags:     utilipvs.FlagHashed,
+	}
+
+	proxier.ipvs.AddVirtualServer(vs)
+
+	rss := []*utilipvs.RealServer{
+		{
+			Address:      net.ParseIP("10.10.10.10"),
+			Port:         56,
+			ActiveConn:   0,
+			InactiveConn: 0,
+		},
+		{
+			Address:      net.ParseIP("11.11.11.11"),
+			Port:         56,
+			ActiveConn:   0,
+			InactiveConn: 0,
+		},
+	}
+	for _, rs := range rss {
+		proxier.ipvs.AddRealServer(vs, rs)
+	}
+
+	proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+
+	proxier.netlinkHandle.EnsureAddressBind("4.4.4.4", DefaultDummyDevice)
+
+	proxier.cleanLegacyService(
+		map[string]bool{},
+		map[string]*utilipvs.VirtualServer{"ipvs0": vs},
+		map[string]bool{"4.4.4.4": true},
+	)
+
+	proxier.gracefuldeleteManager.tryDeleteRs()
+
+	remainingRealServers, _ := proxier.ipvs.GetRealServers(vs)
+
+	if len(remainingRealServers) != 2 {
+		t.Errorf("Expected number of remaining IPVS real servers after cleanup should be %v. Got %v", 2, len(remainingRealServers))
+	}
+}
