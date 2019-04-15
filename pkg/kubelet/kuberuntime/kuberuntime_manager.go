@@ -580,10 +580,21 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  4. Create sandbox if necessary.
 //  5. Create init containers.
 //  6. Create normal containers.
-func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
-	// Step 1: Compute sandbox and container changes.
-	podContainerChanges := m.computePodActions(pod, podStatus)
-	klog.V(3).Infof("computePodActions got %+v for pod %q", podContainerChanges, format.Pod(pod))
+func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, apiPodStatus v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+
+	// Step 1: Check if the pod is Succeeded or Failed, compute sandbox and container changes.
+	var podContainerChanges podActions
+	if apiPodStatus.Phase == v1.PodSucceeded || apiPodStatus.Phase == v1.PodFailed {
+		podContainerChanges = podActions{
+			KillPod:       true,
+			CreateSandbox: false,
+		}
+		klog.V(3).Infof("Pod %s has entered phase %v, need to be killed and don't create any more sandboxs", format.Pod(pod), apiPodStatus.Phase)
+	} else {
+		podContainerChanges = m.computePodActions(pod, podStatus)
+		klog.V(3).Infof("computePodActions got %+v for pod %q", podContainerChanges, format.Pod(pod))
+	}
+
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)
 		if err != nil {
