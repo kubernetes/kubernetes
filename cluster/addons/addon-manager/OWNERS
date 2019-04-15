@@ -2,3 +2,7 @@
 
 reviewers:
 - mrhohn
+approvers:
+- mrhohn
+labels:
+- sig/gcp
