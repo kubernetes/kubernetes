@@ -355,9 +355,9 @@ aliases:
   #   - 
   #   - 
   
-  # sig-cloud-provider-api-reviewers:
-  #   - 
-  #   - 
+  sig-cloud-provider-api-reviewers:
+    - andrewsykim
+    - cheftako
   
   # sig-cluster-lifecycle-api-reviewers:
   #   - 
