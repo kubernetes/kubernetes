@@ -902,7 +902,11 @@ func (f *fakeVMSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) EnsureBackendPoolDeleted(poolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
+func (f *fakeVMSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (f *fakeVMSet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
 	return fmt.Errorf("unimplemented")
 }
 
