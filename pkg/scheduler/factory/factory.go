@@ -20,6 +20,8 @@ package factory
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -455,6 +457,23 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
 	)
+
+	file, _ := os.OpenFile("/tmp/go.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	defer file.Close()
+
+	log.SetOutput(file)
+	log.SetFlags(log.Lshortfile | log.Ldate | log.Ltime)
+
+	log.Println("predicateKeys starts.")
+	for kkk := range predicateKeys {
+		log.Println(kkk)
+	}
+
+	log.Println("priorityKeys starts.")
+	for kkk := range priorityKeys {
+		log.Println(kkk)
+	}
+	log.Println("end...")
 
 	podBackoff := internalqueue.NewPodBackoffMap(1*time.Second, 60*time.Second)
 	return &Config{
