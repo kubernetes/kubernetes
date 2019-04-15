@@ -48,14 +48,15 @@ import (
 
 const (
 	// CloudProviderName is the value used for the --cloud-provider flag
-	CloudProviderName            = "azure"
-	rateLimitQPSDefault          = 1.0
-	rateLimitBucketDefault       = 5
-	backoffRetriesDefault        = 6
-	backoffExponentDefault       = 1.5
-	backoffDurationDefault       = 5 // in seconds
-	backoffJitterDefault         = 1.0
-	maximumLoadBalancerRuleCount = 148 // According to Azure LB rule default limit
+	CloudProviderName      = "azure"
+	rateLimitQPSDefault    = 1.0
+	rateLimitBucketDefault = 5
+	backoffRetriesDefault  = 6
+	backoffExponentDefault = 1.5
+	backoffDurationDefault = 5 // in seconds
+	backoffJitterDefault   = 1.0
+	// According to https://docs.microsoft.com/en-us/azure/azure-subscription-service-limits#load-balancer.
+	maximumLoadBalancerRuleCount = 250
 
 	vmTypeVMSS     = "vmss"
 	vmTypeStandard = "standard"
