@@ -66,8 +66,13 @@ remove_container () {
 # ensure we're linting the k8s source tree
 cd "${KUBE_ROOT}"
 
-# find all shell scripts excluding ./_*, ./.git/*, ./vendor*,
-# and anything git-ignored
+# Find all shell scripts excluding:
+# - Anything git-ignored - No need to lint untracked files.
+# - ./_* - No need to lint output directories.
+# - ./.git/* - Ignore anything in the git object store.
+# - ./vendor* - Vendored code should be fixed upstream instead.
+# - ./third_party/*, but re-include ./third_party/forked/*  - only code we
+#    forked should be linted and fixed.
 all_shell_scripts=()
 while IFS=$'\n' read -r script;
   do git check-ignore -q "$script" || all_shell_scripts+=("$script");
@@ -75,7 +80,8 @@ done < <(find . -name "*.sh" \
   -not \( \
     -path ./_\*      -o \
     -path ./.git\*   -o \
-    -path ./vendor\*    \
+    -path ./vendor\* -o \
+    \( -path ./third_party\* -a -not -path ./third_party/forked\* \) \
   \))
 
 # make sure known failures are sorted

@@ -89,6 +89,3 @@
 ./test/images/volume/gluster/run_gluster.sh
 ./test/images/volume/iscsi/create_block.sh
 ./test/images/volume/nfs/run_nfs.sh
-./third_party/intemp/intemp.sh
-./third_party/multiarch/qemu-user-static/register/qemu-binfmt-conf.sh
-./third_party/multiarch/qemu-user-static/register/register.sh
