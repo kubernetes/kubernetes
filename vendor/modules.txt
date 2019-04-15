@@ -373,7 +373,7 @@ github.com/go-ozzo/ozzo-validation
 github.com/go-ozzo/ozzo-validation/is
 # github.com/godbus/dbus v0.0.0-20151105175453-c7fdd8b5cd55 => github.com/godbus/dbus v0.0.0-20151105175453-c7fdd8b5cd55
 github.com/godbus/dbus
-# github.com/gogo/protobuf v1.1.1 => github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
+# github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415 => github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/plugin/compare
 github.com/gogo/protobuf/plugin/defaultcheck
