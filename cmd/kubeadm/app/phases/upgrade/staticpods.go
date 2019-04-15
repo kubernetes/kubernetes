@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -467,7 +468,8 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 		}
 	}
 	// Let the user know there were problems, but we tried to recover
-	return errors.New("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced")
+	return errors.Wrap(utilerrors.NewAggregate(errs),
+		"couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced")
 }
 
 // rollbackEtcdData rolls back the content of etcd folder if something went wrong.
