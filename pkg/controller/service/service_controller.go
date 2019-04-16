@@ -317,12 +317,24 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(key string, service *v1.Ser
 
 		// Update the status on the copy
 		service.Status.LoadBalancer = *newState
-
+		maxRetries := 3
 		if err := s.persistUpdate(service); err != nil {
 			// TODO: This logic needs to be revisited. We might want to retry on all the errors, not just conflicts.
-			if errors.IsConflict(err) {
-				return fmt.Errorf("not persisting update to service '%s/%s' that has been changed since we received it: %v", service.Namespace, service.Name, err)
-			}
+			go func() {
+				for i := 1; i <= maxRetries; i++ {
+					err = s.persistUpdate(service)
+
+					if err != nil {
+						runtime.HandleError(fmt.Errorf("failed to retry service '%s/%s' updated status to apiserver, retry time: %d", service.Namespace, service.Name, i))
+					} else {
+						klog.V(2).Infof("service '%s/%s' update status to apiserver succeed.", service.Namespace, service.Name)
+						return
+					}
+				}
+				runtime.HandleError(fmt.Errorf("failed to persist service %q updated status to apiserver, error: %v. Start retry", key, err))
+
+			}()
+
 			runtime.HandleError(fmt.Errorf("failed to persist service %q updated status to apiserver, even after retries. Giving up: %v", key, err))
 			return nil
 		}
