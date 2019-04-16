@@ -59,7 +59,7 @@ func (c *ManagedDiskController) CreateManagedDisk(diskName string, storageAccoun
 		Location: &c.common.location,
 		Tags:     newTags,
 		Sku: &compute.DiskSku{
-			Name: compute.StorageAccountTypes(storageAccountType),
+			Name: compute.DiskStorageAccountTypes(storageAccountType),
 		},
 		DiskProperties: &compute.DiskProperties{
 			DiskSizeGB:   &diskSizeGB,
