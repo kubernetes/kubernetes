@@ -124,24 +124,17 @@ func (w *Watcher) Start() error {
 			select {
 			case event := <-fsWatcher.Events:
 				//TODO: Handle errors by taking corrective measures
-
-				w.wg.Add(1)
-				func() {
-					defer w.wg.Done()
-
-					if event.Op&fsnotify.Create == fsnotify.Create {
-						err := w.handleCreateEvent(event)
-						if err != nil {
-							klog.Errorf("error %v when handling create event: %s", err, event)
-						}
-					} else if event.Op&fsnotify.Remove == fsnotify.Remove {
-						err := w.handleDeleteEvent(event)
-						if err != nil {
-							klog.Errorf("error %v when handling delete event: %s", err, event)
-						}
+				if event.Op&fsnotify.Create == fsnotify.Create {
+					err := w.handleCreateEvent(event)
+					if err != nil {
+						klog.Errorf("error %v when handling create event: %s", err, event)
 					}
-					return
-				}()
+				} else if event.Op&fsnotify.Remove == fsnotify.Remove {
+					err := w.handleDeleteEvent(event)
+					if err != nil {
+						klog.Errorf("error %v when handling delete event: %s", err, event)
+					}
+				}
 				continue
 			case err := <-fsWatcher.Errors:
 				if err != nil {
