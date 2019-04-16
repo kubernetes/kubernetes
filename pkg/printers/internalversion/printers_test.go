@@ -278,7 +278,7 @@ func TestFormatResourceName(t *testing.T) {
 		{schema.GroupKind{Group: "group", Kind: "Kind"}, "name", "kind.group/name"},
 	}
 	for _, tt := range tests {
-		if got := printers.FormatResourceName(tt.kind, tt.name, true); got != tt.want {
+		if got := formatResourceName(tt.kind, tt.name, true); got != tt.want {
 			t.Errorf("formatResourceName(%q, %q) = %q, want %q", tt.kind, tt.name, got, tt.want)
 		}
 	}
