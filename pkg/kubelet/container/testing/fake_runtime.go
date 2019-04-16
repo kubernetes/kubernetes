@@ -213,6 +213,7 @@ func (f *FakeRuntime) Status() (*container.RuntimeStatus, error) {
 	return f.RuntimeStatus, f.StatusErr
 }
 
+// GetPods simulates retrieving Pods from the FakeRuntime.
 func (f *FakeRuntime) GetPods(all bool) ([]*container.Pod, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -232,6 +233,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*container.Pod, error) {
 	return pods, f.Err
 }
 
+// SyncPod simulates syncing Pods.
 func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *container.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result container.PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
@@ -248,6 +250,7 @@ func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *container.PodStatus, _ []v1.Secret
 	return
 }
 
+// KillPod simulates killing pods.
 func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod container.Pod, gracePeriodOverride *int64) error {
 	f.Lock()
 	defer f.Unlock()
@@ -260,6 +263,7 @@ func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod container.Pod, gracePeriod
 	return f.Err
 }
 
+// RunContainerInPod simulates starting a container in a Pod.
 func (f *FakeRuntime) RunContainerInPod(container v1.Container, pod *v1.Pod, volumeMap map[string]volume.VolumePlugin) error {
 	f.Lock()
 	defer f.Unlock()
@@ -277,6 +281,7 @@ func (f *FakeRuntime) RunContainerInPod(container v1.Container, pod *v1.Pod, vol
 	return f.Err
 }
 
+// KillContainerInPod simulates killing a container in a Pod.
 func (f *FakeRuntime) KillContainerInPod(container v1.Container, pod *v1.Pod) error {
 	f.Lock()
 	defer f.Unlock()
@@ -294,6 +299,7 @@ func (f *FakeRuntime) KillContainerInPod(container v1.Container, pod *v1.Pod) er
 	return f.Err
 }
 
+// GetPodStatus simulates retrieving the Pod status.
 func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*container.PodStatus, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -303,6 +309,7 @@ func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*cont
 	return &status, f.Err
 }
 
+// GetContainerLogs simulates retrieving container logs.
 func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID container.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	f.Lock()
 	defer f.Unlock()
@@ -311,6 +318,7 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
+// PullImage simulates pulling an image.
 func (f *FakeRuntime) PullImage(image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -319,6 +327,7 @@ func (f *FakeRuntime) PullImage(image container.ImageSpec, pullSecrets []v1.Secr
 	return image.Image, f.Err
 }
 
+// GetImageRef simulates retrieving an image ref.
 func (f *FakeRuntime) GetImageRef(image container.ImageSpec) (string, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -332,6 +341,7 @@ func (f *FakeRuntime) GetImageRef(image container.ImageSpec) (string, error) {
 	return "", f.InspectErr
 }
 
+// ListImages simulates listing images.
 func (f *FakeRuntime) ListImages() ([]container.Image, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -340,6 +350,7 @@ func (f *FakeRuntime) ListImages() ([]container.Image, error) {
 	return f.ImageList, f.Err
 }
 
+// RemoveImage simulates removing an image.
 func (f *FakeRuntime) RemoveImage(image container.ImageSpec) error {
 	f.Lock()
 	defer f.Unlock()
@@ -357,6 +368,7 @@ func (f *FakeRuntime) RemoveImage(image container.ImageSpec) error {
 	return f.Err
 }
 
+// GarbageCollect simulates a GarbageCollect.
 func (f *FakeRuntime) GarbageCollect(gcPolicy container.GCPolicy, ready bool, evictNonDeletedPods bool) error {
 	f.Lock()
 	defer f.Unlock()
@@ -365,6 +377,7 @@ func (f *FakeRuntime) GarbageCollect(gcPolicy container.GCPolicy, ready bool, ev
 	return f.Err
 }
 
+// DeleteContainer simulates deleting a container.
 func (f *FakeRuntime) DeleteContainer(containerID container.ContainerID) error {
 	f.Lock()
 	defer f.Unlock()
@@ -373,6 +386,7 @@ func (f *FakeRuntime) DeleteContainer(containerID container.ContainerID) error {
 	return f.Err
 }
 
+// ImageStats simulates retrieving image stats.
 func (f *FakeRuntime) ImageStats() (*container.ImageStats, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -381,6 +395,7 @@ func (f *FakeRuntime) ImageStats() (*container.ImageStats, error) {
 	return nil, f.Err
 }
 
+// GetExec simualtes calling exec on a container.
 func (f *FakeStreamingRuntime) GetExec(id container.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -389,6 +404,7 @@ func (f *FakeStreamingRuntime) GetExec(id container.ContainerID, cmd []string, s
 	return &url.URL{Host: FakeHost}, f.Err
 }
 
+// GetAttach simualtes calling attach on a container.
 func (f *FakeStreamingRuntime) GetAttach(id container.ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -397,6 +413,7 @@ func (f *FakeStreamingRuntime) GetAttach(id container.ContainerID, stdin, stdout
 	return &url.URL{Host: FakeHost}, f.Err
 }
 
+// GetPortForward simulates port forwading in a Pod.
 func (f *FakeStreamingRuntime) GetPortForward(podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -405,6 +422,7 @@ func (f *FakeStreamingRuntime) GetPortForward(podName, podNamespace string, podU
 	return &url.URL{Host: FakeHost}, f.Err
 }
 
+// FakeCommandRunner is a CommandRunner for testing.
 type FakeCommandRunner struct {
 	// what to return
 	Stdout string
@@ -415,6 +433,7 @@ type FakeCommandRunner struct {
 	Cmd         []string
 }
 
+// RunInContainer fulfills the CommandRunner interface.
 func (f *FakeCommandRunner) RunInContainer(containerID container.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	// record invoked values
 	f.ContainerID = containerID
