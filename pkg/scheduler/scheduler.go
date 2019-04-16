@@ -132,6 +132,7 @@ func New(client clientset.Interface,
 	recorder record.EventRecorder,
 	schedulerAlgorithmSource kubeschedulerconfig.SchedulerAlgorithmSource,
 	stopCh <-chan struct{},
+	registry framework.Registry,
 	opts ...func(o *schedulerOptions)) (*Scheduler, error) {
 
 	options := defaultSchedulerOptions
@@ -156,7 +157,7 @@ func New(client clientset.Interface,
 		DisablePreemption:              options.disablePreemption,
 		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
 		BindTimeoutSeconds:             options.bindTimeoutSeconds,
-		Registry:                       framework.NewRegistry(),
+		Registry:                       registry,
 	})
 	var config *factory.Config
 	source := schedulerAlgorithmSource
