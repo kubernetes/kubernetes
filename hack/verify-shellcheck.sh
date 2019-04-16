@@ -169,7 +169,7 @@ else
     echo 'checking by adding it to hack/.shellcheck_failures (if your reviewer is okay with it).'
     echo
   } >&2
-  false
+  exit 1
 fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
@@ -181,7 +181,7 @@ if [[ ${#not_failing[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi
 
 # Check that all failing_packages actually still exist
@@ -199,5 +199,5 @@ if [[ ${#gone[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi
