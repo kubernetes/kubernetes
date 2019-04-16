@@ -198,11 +198,7 @@ func initTestSchedulerWithOptions(
 		podInformer,
 		context.informerFactory.Core().V1().PersistentVolumes(),
 		context.informerFactory.Core().V1().PersistentVolumeClaims(),
-		context.informerFactory.Core().V1().ReplicationControllers(),
-		context.informerFactory.Apps().V1().ReplicaSets(),
-		context.informerFactory.Apps().V1().StatefulSets(),
 		context.informerFactory.Core().V1().Services(),
-		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		context.informerFactory.Storage().V1().StorageClasses(),
 	)
 
