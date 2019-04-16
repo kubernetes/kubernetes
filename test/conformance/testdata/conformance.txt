@@ -13,6 +13,7 @@ test/e2e/apimachinery/watch.go: "should observe add, update, and delete watch no
 test/e2e/apimachinery/watch.go: "should be able to start watching from a specific resource version"
 test/e2e/apimachinery/watch.go: "should be able to restart watching from the last resource version observed by the previous watch"
 test/e2e/apimachinery/watch.go: "should observe an object deletion if it stops meeting the requirements of the selector"
+test/e2e/apimachinery/watch.go: "should receive events on concurrent watches in same order"
 test/e2e/apps/daemon_set.go: "should run and stop simple daemon"
 test/e2e/apps/daemon_set.go: "should run and stop complex daemon"
 test/e2e/apps/daemon_set.go: "should retry creating failed daemon pods"
