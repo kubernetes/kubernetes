@@ -82,6 +82,8 @@ QUICK_PATTERNS+=(
 
 EXCLUDED_CHECKS=$(ls ${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
 QUICK_CHECKS=$(ls ${QUICK_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
+TARGET_LIST=()
+IFS=" " read -r -a TARGET_LIST <<< "${WHAT:-}"
 
 function is-excluded {
   for e in ${EXCLUDED_CHECKS[@]}; do
@@ -104,10 +106,13 @@ function is-quick {
 function is-explicitly-chosen {
   local name="${1#verify-}"
   name="${name%.*}"
-  for e in ${WHAT}; do
+  index=0
+  for e in "${TARGET_LIST[@]}"; do
     if [[ "${e}" == "${name}" ]]; then
+      TARGET_LIST[${index}]=""
       return
     fi
+    index=$((index + 1))
   done
   return 1
 }
@@ -176,6 +181,20 @@ function run-checks {
   done
 }
 
+# Check invalid targets specified in "WHAT" and mark them as failure cases
+function missing-target-checks {
+  # In case WHAT is not specified
+  [[ ${#TARGET_LIST[@]} -eq 0 ]] && return
+
+  for v in "${TARGET_LIST[@]}"
+  do
+    [[ -z "${v}" ]] && continue
+      
+    FAILED_TESTS+=(${v})
+    ret=1
+  done
+}
+
 SILENT=${SILENT:-false}
 QUICK=${QUICK:-false}
 
@@ -190,6 +209,7 @@ fi
 ret=0
 run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
 run-checks "${KUBE_ROOT}/hack/verify-*.py" python
+missing-target-checks
 
 if [[ ${ret} -eq 1 ]]; then
     print-failed-tests
