@@ -320,7 +320,7 @@ func (j *ServiceTestJig) CreateLoadBalancerService(namespace, serviceName string
 func GetNodeAddresses(node *v1.Node, addressType v1.NodeAddressType) (ips []string) {
 	for j := range node.Status.Addresses {
 		nodeAddress := &node.Status.Addresses[j]
-		if nodeAddress.Type == addressType {
+		if nodeAddress.Type == addressType && nodeAddress.Address != "" {
 			ips = append(ips, nodeAddress.Address)
 		}
 	}

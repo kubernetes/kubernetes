@@ -3424,7 +3424,7 @@ func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 	hosts := []string{}
 	for _, n := range nodelist.Items {
 		for _, addr := range n.Status.Addresses {
-			if addr.Type == addrType {
+			if addr.Type == addrType && addr.Address != "" {
 				hosts = append(hosts, addr.Address)
 				break
 			}
@@ -4942,7 +4942,7 @@ func GetNodeExternalIP(node *v1.Node) (string, error) {
 	Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
-		if a.Type == v1.NodeExternalIP {
+		if a.Type == v1.NodeExternalIP && a.Address != "" {
 			host = net.JoinHostPort(a.Address, sshPort)
 			break
 		}
