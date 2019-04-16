@@ -231,7 +231,7 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 	for certOrKeyName, certOrKeyPath := range certsToTransfer(cfg) {
 		certOrKeyData, found := secretData[certOrKeyNameToSecretName(certOrKeyName)]
 		if !found {
-			return errors.New("couldn't find required certificate or key in Secret")
+			return errors.Errorf("the Secret does not include the required certificate or key - name: %s, path: %s", certOrKeyName, certOrKeyPath)
 		}
 		if len(certOrKeyData) == 0 {
 			klog.V(1).Infof("[download-certs] Not saving %q to disk, since it is empty in the %q Secret\n", certOrKeyName, kubeadmconstants.KubeadmCertsSecret)
