@@ -1267,6 +1267,8 @@ func (r *ready) check() bool {
 func (r *ready) set(ok bool) {
 	r.c.L.Lock()
 	defer r.c.L.Unlock()
-	r.ok = ok
-	r.c.Broadcast()
+	if r.ok != ok {
+		r.ok = ok
+		r.c.Broadcast()
+	}
 }
