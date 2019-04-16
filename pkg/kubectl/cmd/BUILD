@@ -215,6 +215,7 @@ go_test(
         "//pkg/printers:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
