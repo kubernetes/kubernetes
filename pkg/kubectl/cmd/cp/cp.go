@@ -419,9 +419,7 @@ func clean(fileName string) string {
 	return path.Clean(string(os.PathSeparator) + fileName)
 }
 
-func (o *CopyOptions) untarAll(reader io.Reader, destFile, prefix string) error {
-	entrySeq := -1
-
+func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {
 	// TODO: use compression here?
 	tarReader := tar.NewReader(reader)
 	for {
@@ -432,52 +430,60 @@ func (o *CopyOptions) untarAll(reader io.Reader, destFile, prefix string) error 
 			}
 			break
 		}
-		entrySeq++
-		mode := header.FileInfo().Mode()
-		// all the files will start with the prefix, which is the directory where
+
+		// All the files will start with the prefix, which is the directory where
 		// they were located on the pod, we need to strip down that prefix, but
-		// if the prefix is missing it means the tar was tempered with
+		// if the prefix is missing it means the tar was tempered with.
+		// For the case where prefix is empty we need to ensure that the path
+		// is not absolute, which also indicates the tar file was tempered with.
 		if !strings.HasPrefix(header.Name, prefix) {
 			return fmt.Errorf("tar contents corrupted")
 		}
-		outFileName := path.Join(destFile, clean(header.Name[len(prefix):]))
-		baseName := path.Dir(outFileName)
+
+		// basic file information
+		mode := header.FileInfo().Mode()
+		destFileName := path.Join(destDir, header.Name[len(prefix):])
+		baseName := path.Dir(destFileName)
+
 		if err := os.MkdirAll(baseName, 0755); err != nil {
 			return err
 		}
 		if header.FileInfo().IsDir() {
-			if err := os.MkdirAll(outFileName, 0755); err != nil {
+			if err := os.MkdirAll(destFileName, 0755); err != nil {
 				return err
 			}
 			continue
 		}
 
-		// handle coping remote file into local directory
-		if entrySeq == 0 && !header.FileInfo().IsDir() {
-			exists, err := dirExists(outFileName)
-			if err != nil {
-				return err
-			}
-			if exists {
-				outFileName = filepath.Join(outFileName, path.Base(clean(header.Name)))
-			}
+		// We need to ensure that the destination file is always within boundries
+		// of the destination directory. This prevents any kind of path traversal
+		// from within tar archive.
+		dir, file := filepath.Split(destFileName)
+		evaledPath, err := filepath.EvalSymlinks(dir)
+		if err != nil {
+			return err
+		}
+		// For scrutiny we verify both the actual destination as well as we follow
+		// all the links that might lead outside of the destination directory.
+		if !isDestRelative(destDir, destFileName) || !isDestRelative(destDir, filepath.Join(evaledPath, file)) {
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: link %q is pointing to %q which is outside target destination, skipping\n", destFileName, header.Linkname)
+			continue
 		}
 
 		if mode&os.ModeSymlink != 0 {
 			linkname := header.Linkname
-			// error is returned if linkname can't be made relative to destFile,
-			// but relative can end up being ../dir that's why we also need to
-			// verify if relative path is the same after Clean-ing
-			relative, err := filepath.Rel(destFile, linkname)
-			if path.IsAbs(linkname) && (err != nil || relative != stripPathShortcuts(relative)) {
-				fmt.Fprintf(o.IOStreams.ErrOut, "warning: link %q is pointing to %q which is outside target destination, skipping\n", outFileName, header.Linkname)
+			// We need to ensure that the link destination is always within boundries
+			// of the destination directory. This prevents any kind of path traversal
+			// from within tar archive.
+			if !isDestRelative(destDir, linkJoin(destFileName, linkname)) {
+				fmt.Fprintf(o.IOStreams.ErrOut, "warning: link %q is pointing to %q which is outside target destination, skipping\n", destFileName, header.Linkname)
 				continue
 			}
-			if err := os.Symlink(linkname, outFileName); err != nil {
+			if err := os.Symlink(linkname, destFileName); err != nil {
 				return err
 			}
 		} else {
-			outFile, err := os.Create(outFileName)
+			outFile, err := os.Create(destFileName)
 			if err != nil {
 				return err
 			}
@@ -491,12 +497,30 @@ func (o *CopyOptions) untarAll(reader io.Reader, destFile, prefix string) error 
 		}
 	}
 
-	if entrySeq == -1 {
-		//if no file was copied
-		errInfo := fmt.Sprintf("error: %s no such file or directory", prefix)
-		return errors.New(errInfo)
-	}
 	return nil
+}
+
+// linkJoin joins base and link to get the final path to be created.
+// It will consider whether link is an absolute path or not when returning result.
+func linkJoin(base, link string) string {
+	if filepath.IsAbs(link) {
+		return link
+	}
+	return filepath.Join(base, link)
+}
+
+// isDestRelative returns true if dest is pointing outside the base directory,
+// false otherwise.
+func isDestRelative(base, dest string) bool {
+	fullPath := dest
+	if !filepath.IsAbs(dest) {
+		fullPath = filepath.Join(base, dest)
+	}
+	relative, err := filepath.Rel(base, fullPath)
+	if err != nil {
+		return false
+	}
+	return relative == "." || relative == stripPathShortcuts(relative)
 }
 
 func getPrefix(file string) string {
@@ -524,16 +548,4 @@ func (o *CopyOptions) execute(options *exec.ExecOptions) error {
 		return err
 	}
 	return nil
-}
-
-// dirExists checks if a path exists and is a directory.
-func dirExists(path string) (bool, error) {
-	fi, err := os.Stat(path)
-	if err == nil && fi.IsDir() {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
 }

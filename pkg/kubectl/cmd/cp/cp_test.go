@@ -19,11 +19,11 @@ package cp
 import (
 	"archive/tar"
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -31,6 +31,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -189,6 +190,67 @@ func TestStripPathShortcuts(t *testing.T) {
 		if out != test.expected {
 			t.Errorf("expected: %s, saw: %s", test.expected, out)
 		}
+	}
+}
+func TestIsDestRelative(t *testing.T) {
+	tests := []struct {
+		base     string
+		dest     string
+		relative bool
+	}{
+		{
+			base:     "/dir",
+			dest:     "../link",
+			relative: false,
+		},
+		{
+			base:     "/dir",
+			dest:     "../../link",
+			relative: false,
+		},
+		{
+			base:     "/dir",
+			dest:     "/link",
+			relative: false,
+		},
+		{
+			base:     "/dir",
+			dest:     "link",
+			relative: true,
+		},
+		{
+			base:     "/dir",
+			dest:     "int/file/link",
+			relative: true,
+		},
+		{
+			base:     "/dir",
+			dest:     "int/../link",
+			relative: true,
+		},
+		{
+			base:     "/dir",
+			dest:     "/dir/link",
+			relative: true,
+		},
+		{
+			base:     "/dir",
+			dest:     "/dir/int/../link",
+			relative: true,
+		},
+		{
+			base:     "/dir",
+			dest:     "/dir/../../link",
+			relative: false,
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			if test.relative != isDestRelative(test.base, test.dest) {
+				t.Errorf("unexpected result for: base %q, dest %q", test.base, test.dest)
+			}
+		})
 	}
 }
 
@@ -367,97 +429,6 @@ func TestTarUntarWrongPrefix(t *testing.T) {
 	}
 }
 
-// TestCopyToLocalFileOrDir tests untarAll in two cases :
-// 1: copy pod file to local file
-// 2: copy pod file into local directory
-func TestCopyToLocalFileOrDir(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "input")
-	dir2, err2 := ioutil.TempDir(os.TempDir(), "output")
-	if err != nil || err2 != nil {
-		t.Errorf("unexpected error: %v | %v", err, err2)
-		t.FailNow()
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("Unexpected error cleaning up: %v", err)
-		}
-		if err := os.RemoveAll(dir2); err != nil {
-			t.Errorf("Unexpected error cleaning up: %v", err)
-		}
-	}()
-
-	files := []struct {
-		name          string
-		data          string
-		dest          string
-		destDirExists bool
-	}{
-		{
-			name:          "foo",
-			data:          "foobarbaz",
-			dest:          "path/to/dest",
-			destDirExists: false,
-		},
-		{
-			name:          "dir/blah",
-			data:          "bazblahfoo",
-			dest:          "dest/file/path",
-			destDirExists: true,
-		},
-	}
-
-	for _, file := range files {
-		func() {
-			// setup
-			srcFilePath := filepath.Join(dir, file.name)
-			destPath := filepath.Join(dir2, file.dest)
-			if err := os.MkdirAll(filepath.Dir(srcFilePath), 0755); err != nil {
-				t.Errorf("unexpected error: %v", err)
-				t.FailNow()
-			}
-			createTmpFile(t, srcFilePath, file.data)
-			if file.destDirExists {
-				if err := os.MkdirAll(destPath, 0755); err != nil {
-					t.Errorf("unexpected error: %v", err)
-					t.FailNow()
-				}
-			}
-
-			// start tests
-			srcTarFilePath := filepath.Join(dir, file.name+".tar")
-			// here use tar command to create tar file instead of calling makeTar func
-			// because makeTar func can not generate correct header name
-			err = exec.Command("tar", "cf", srcTarFilePath, srcFilePath).Run()
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				t.FailNow()
-			}
-			srcTarFile, err := os.Open(srcTarFilePath)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				t.FailNow()
-			}
-			defer srcTarFile.Close()
-
-			opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
-			if err := opts.untarAll(srcTarFile, destPath, getPrefix(srcFilePath)); err != nil {
-				t.Errorf("unexpected error: %v", err)
-				t.FailNow()
-			}
-			actualDestFilePath := destPath
-			if file.destDirExists {
-				actualDestFilePath = filepath.Join(destPath, filepath.Base(srcFilePath))
-			}
-			_, err = os.Stat(actualDestFilePath)
-			if err != nil && os.IsNotExist(err) {
-				t.Errorf("expecting %s exists, but actually it's missing", actualDestFilePath)
-			}
-			cmpFileData(t, actualDestFilePath, file.data)
-		}()
-	}
-
-}
-
 func TestTarDestinationName(t *testing.T) {
 	dir, err := ioutil.TempDir(os.TempDir(), "input")
 	dir2, err2 := ioutil.TempDir(os.TempDir(), "output")
@@ -544,7 +515,6 @@ func TestBadTar(t *testing.T) {
 		name string
 		body string
 	}{
-		{"/prefix/../../../tmp/foo", "Up to temp"},
 		{"/prefix/foo/bar/../../home/bburns/names.txt", "Down and back"},
 	}
 	for _, file := range files {
@@ -801,17 +771,24 @@ func TestUntar(t *testing.T) {
 		expected: filepath.Join(testdir, dest, "relative"),
 	}, { // Relative file outside dest
 		path:     "../unrelative",
-		expected: filepath.Join(testdir, dest, "unrelative"),
+		expected: "",
 	}, { // Nested relative file inside dest
 		path:     "nested/nest-rel",
 		expected: filepath.Join(testdir, dest, "nested/nest-rel"),
 	}, { // Nested relative file outside dest
 		path:     "nested/../../nest-unrelative",
-		expected: filepath.Join(testdir, dest, "nest-unrelative"),
+		expected: "",
 	}}
 
 	mkExpectation := func(expected, suffix string) string {
 		if expected == "" {
+			return ""
+		}
+		return expected + suffix
+	}
+	mkBacktickExpectation := func(expected, suffix string) string {
+		dir, _ := filepath.Split(filepath.Clean(expected))
+		if len(strings.Split(dir, string(os.PathSeparator))) <= 1 {
 			return ""
 		}
 		return expected + suffix
@@ -825,11 +802,11 @@ func TestUntar(t *testing.T) {
 		}, file{
 			path:       f.path + "-innerlink-abs",
 			linkTarget: filepath.Join(testdir, dest, "link-target"),
-			expected:   "",
+			expected:   mkExpectation(f.expected, "-innerlink-abs"),
 		}, file{
 			path:       f.path + "-outerlink",
 			linkTarget: filepath.Join(backtick(f.path), "link-target"),
-			expected:   "",
+			expected:   mkBacktickExpectation(f.expected, "-outerlink"),
 		}, file{
 			path:       f.path + "-outerlink-abs",
 			linkTarget: filepath.Join(testdir, "link-target"),
@@ -863,7 +840,19 @@ func TestUntar(t *testing.T) {
 			expected:   filepath.Join(testdir, dest, "back-link-second"),
 		},
 		file{
-			path: "nested/back-link-first/back-link-second/back-link-term",
+			// This case is chaining together symlinks that step back, so that
+			// if you just look at the target relative to the path it appears
+			// inside the destination directory, but if you actually follow each
+			// step of the path you end up outside the destination directory.
+			path:       "nested/back-link-first/back-link-second/back-link-term",
+			linkTarget: "",
+			expected:   "",
+		})
+
+	files = append(files,
+		file{ // Relative directory path with terminating /
+			path:     "direct/dir/",
+			expected: "",
 		})
 
 	buf := &bytes.Buffer{}
@@ -880,8 +869,10 @@ func TestUntar(t *testing.T) {
 				Size: int64(len(f.path)),
 			}
 			require.NoError(t, tw.WriteHeader(hdr), f.path)
-			_, err := tw.Write([]byte(f.path))
-			require.NoError(t, err, f.path)
+			if !strings.HasSuffix(f.path, "/") {
+				_, err := tw.Write([]byte(f.path))
+				require.NoError(t, err, f.path)
+			}
 		} else {
 			hdr := &tar.Header{
 				Name:     f.path,
