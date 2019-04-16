@@ -32,7 +32,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/apiserver/pkg/server"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	cloudcontrollermanager "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
@@ -49,7 +48,7 @@ import (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	hyperkubeCommand, allCommandFns := NewHyperKubeCommand(server.SetupSignalHandler())
+	hyperkubeCommand, allCommandFns := NewHyperKubeCommand()
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// cliflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
@@ -84,15 +83,15 @@ func commandFor(basename string, defaultCommand *cobra.Command, commands []func(
 }
 
 // NewHyperKubeCommand is the entry point for hyperkube
-func NewHyperKubeCommand(stopCh <-chan struct{}) (*cobra.Command, []func() *cobra.Command) {
+func NewHyperKubeCommand() (*cobra.Command, []func() *cobra.Command) {
 	// these have to be functions since the command is polymorphic. Cobra wants you to be top level
 	// command to get executed
-	apiserver := func() *cobra.Command { return kubeapiserver.NewAPIServerCommand(stopCh) }
+	apiserver := func() *cobra.Command { return kubeapiserver.NewAPIServerCommand() }
 	controller := func() *cobra.Command { return kubecontrollermanager.NewControllerManagerCommand() }
 	proxy := func() *cobra.Command { return kubeproxy.NewProxyCommand() }
 	scheduler := func() *cobra.Command { return kubescheduler.NewSchedulerCommand() }
 	kubectlCmd := func() *cobra.Command { return kubectl.NewDefaultKubectlCommand() }
-	kubelet := func() *cobra.Command { return kubelet.NewKubeletCommand(stopCh) }
+	kubelet := func() *cobra.Command { return kubelet.NewKubeletCommand() }
 	cloudController := func() *cobra.Command { return cloudcontrollermanager.NewCloudControllerManagerCommand() }
 
 	commandFns := []func() *cobra.Command{
