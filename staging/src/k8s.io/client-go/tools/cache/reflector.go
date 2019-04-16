@@ -271,6 +271,11 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			// We want to avoid situations of hanging watchers. Stop any wachers that do not
 			// receive any events within the timeout window.
 			TimeoutSeconds: &timeoutSeconds,
+			// To reduce load on kube-apiserver on watch restarts, you may enable watch bookmarks.
+			// Reflector doesn't assume bookmarks are returned at all (if the server do not support
+			// watch bookmarks, it will ignore this field).
+			// Disabled in Alpha release of watch bookmarks feature.
+			AllowWatchBookmarks: false,
 		}
 
 		w, err := r.listerWatcher.Watch(options)
@@ -368,6 +373,8 @@ loop:
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("%s: unable to delete watch event object (%#v) from store: %v", r.name, event.Object, err))
 				}
+			case watch.Bookmark:
+				// A `Bookmark` means watch has synced here, just update the resourceVersion
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
 			}

@@ -32,13 +32,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 )
 
 // verifies the cacheWatcher.process goroutine is properly cleaned up even if
@@ -63,7 +67,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	}
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
-	w = newCacheWatcher(0, filter, forget, testVersioner{})
+	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false)
 	go w.process(context.Background(), initEvents, 0)
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
@@ -183,8 +187,9 @@ TestCase:
 			testCase.events[j].ResourceVersion = uint64(j) + 1
 		}
 
-		w := newCacheWatcher(0, filter, forget, testVersioner{})
+		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false)
 		go w.process(context.Background(), testCase.events, 0)
+
 		ch := w.ResultChan()
 		for j, event := range testCase.expected {
 			e := <-ch
@@ -461,7 +466,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	// timeout to zero and run the Stop goroutine concurrently.
 	// May sure that the watch will not be blocked on Stop.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(0, filter, forget, testVersioner{})
+		w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false)
 		go w.Stop()
 		select {
 		case <-done:
@@ -470,16 +475,224 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 		}
 	}
 
+	deadline := time.Now().Add(time.Hour)
 	// After that, verifies the cacheWatcher.process goroutine works correctly.
 	for i := 0; i < maxRetriesToProduceTheRaceCondition; i++ {
-		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{})
+		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{}, deadline, false)
 		w.input <- &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}
-		ctx, _ := context.WithTimeout(context.Background(), time.Hour)
+		ctx, _ := context.WithDeadline(context.Background(), deadline)
 		go w.process(ctx, nil, 0)
 		select {
 		case <-w.ResultChan():
 		case <-time.After(time.Second):
 			t.Fatal("expected received a event on ResultChan")
+		}
+		w.Stop()
+	}
+}
+
+func TestTimeBucketWatchersBasic(t *testing.T) {
+	filter := func(_ string, _ labels.Set, _ fields.Set) bool {
+		return true
+	}
+	forget := func() {}
+
+	newWatcher := func(deadline time.Time) *cacheWatcher {
+		return newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true)
+	}
+
+	clock := clock.NewFakeClock(time.Now())
+	watchers := newTimeBucketWatchers(clock)
+	now := clock.Now()
+	watchers.addWatcher(newWatcher(now.Add(10 * time.Second)))
+	watchers.addWatcher(newWatcher(now.Add(20 * time.Second)))
+	watchers.addWatcher(newWatcher(now.Add(20 * time.Second)))
+
+	if len(watchers.watchersBuckets) != 2 {
+		t.Errorf("unexpected bucket size: %#v", watchers.watchersBuckets)
+	}
+	watchers0 := watchers.popExpiredWatchers()
+	if len(watchers0) != 0 {
+		t.Errorf("unexpected bucket size: %#v", watchers0)
+	}
+
+	clock.Step(10 * time.Second)
+	watchers1 := watchers.popExpiredWatchers()
+	if len(watchers1) != 1 || len(watchers1[0]) != 1 {
+		t.Errorf("unexpected bucket size: %v", watchers1)
+	}
+	watchers1 = watchers.popExpiredWatchers()
+	if len(watchers1) != 0 {
+		t.Errorf("unexpected bucket size: %#v", watchers1)
+	}
+
+	clock.Step(12 * time.Second)
+	watchers2 := watchers.popExpiredWatchers()
+	if len(watchers2) != 1 || len(watchers2[0]) != 2 {
+		t.Errorf("unexpected bucket size: %#v", watchers2)
+	}
+}
+
+func testCacherSendBookmarkEvents(t *testing.T, watchCacheEnabled, allowWatchBookmarks, expectedBookmarks bool) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, watchCacheEnabled)()
+	backingStorage := &dummyStorage{}
+	cacher, _ := newTestCacher(backingStorage, 1000)
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = allowWatchBookmarks
+
+	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+	w, err := cacher.Watch(ctx, "pods/ns", "0", pred)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+
+	resourceVersion := uint64(1000)
+	go func() {
+		deadline := time.Now().Add(time.Second)
+		for i := 0; time.Now().Before(deadline); i++ {
+			err = cacher.watchCache.Add(&examplev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            fmt.Sprintf("pod-%d", i),
+					Namespace:       "ns",
+					ResourceVersion: fmt.Sprintf("%v", resourceVersion+uint64(i)),
+				}})
+			if err != nil {
+				t.Fatalf("failed to add a pod: %v", err)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+
+	timeoutCh := time.After(2 * time.Second)
+	lastObservedRV := uint64(0)
+	for {
+		select {
+		case event, ok := <-w.ResultChan():
+			if !ok {
+				t.Fatal("Unexpected closed")
+			}
+			rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
+			if err != nil {
+				t.Errorf("failed to parse resource version from %#v", event.Object)
+			}
+			if event.Type == watch.Bookmark {
+				if !expectedBookmarks {
+					t.Fatalf("Unexpected bookmark events received")
+				}
+
+				if rv < lastObservedRV {
+					t.Errorf("Unexpected bookmark event resource version %v (last %v)", rv, lastObservedRV)
+				}
+				return
+			}
+			lastObservedRV = rv
+		case <-timeoutCh:
+			if expectedBookmarks {
+				t.Fatal("Unexpected timeout to receive a bookmark event")
+			}
+			return
+		}
+	}
+}
+
+func TestCacherSendBookmarkEvents(t *testing.T) {
+	testCases := []struct {
+		watchCacheEnabled   bool
+		allowWatchBookmarks bool
+		expectedBookmarks   bool
+	}{
+		{
+			watchCacheEnabled:   true,
+			allowWatchBookmarks: true,
+			expectedBookmarks:   true,
+		},
+		{
+			watchCacheEnabled:   true,
+			allowWatchBookmarks: false,
+			expectedBookmarks:   false,
+		},
+		{
+			watchCacheEnabled:   false,
+			allowWatchBookmarks: true,
+			expectedBookmarks:   false,
+		},
+		{
+			watchCacheEnabled:   false,
+			allowWatchBookmarks: false,
+			expectedBookmarks:   false,
+		},
+	}
+
+	for _, tc := range testCases {
+		testCacherSendBookmarkEvents(t, tc.watchCacheEnabled, tc.allowWatchBookmarks, tc.expectedBookmarks)
+	}
+}
+
+func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
+	backingStorage := &dummyStorage{}
+	cacher, _ := newTestCacher(backingStorage, 1000)
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+
+	// Ensure there is some budget for slowing down processing.
+	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
+
+	resourceVersion := uint64(1000)
+	err := cacher.watchCache.Add(&examplev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            fmt.Sprintf("pod-0"),
+			Namespace:       "ns",
+			ResourceVersion: fmt.Sprintf("%v", resourceVersion),
+		}})
+	if err != nil {
+		t.Fatalf("failed to add a pod: %v", err)
+	}
+
+	for i := 0; i < 1000; i++ {
+		pred := storage.Everything
+		pred.AllowWatchBookmarks = true
+		ctx, _ := context.WithTimeout(context.Background(), time.Second)
+		w, err := cacher.Watch(ctx, "pods/ns", "999", pred)
+		if err != nil {
+			t.Fatalf("Failed to create watch: %v", err)
+		}
+		bookmark := &watchCacheEvent{
+			Type:            watch.Bookmark,
+			ResourceVersion: uint64(i),
+			Object:          cacher.newFunc(),
+		}
+		err = cacher.versioner.UpdateObject(bookmark.Object, bookmark.ResourceVersion)
+		if err != nil {
+			t.Fatalf("failure to update version of object (%d) %#v", bookmark.ResourceVersion, bookmark.Object)
+		}
+
+		go func() {
+			cacher.dispatchEvent(bookmark)
+		}()
+
+		go func() {
+			w.Stop()
+		}()
+
+		done := make(chan struct{})
+		go func() {
+			for range w.ResultChan() {
+			}
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			break
+		case <-time.After(time.Second):
+			t.Fatal("receive result timeout")
 		}
 		w.Stop()
 	}
