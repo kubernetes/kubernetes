@@ -45,7 +45,7 @@ RUNTIME_CONFIG=""
 ETCDCTL=$(which etcdctl)
 KUBECTL="${KUBE_OUTPUT_HOSTBIN}/kubectl"
 UPDATE_ETCD_OBJECTS_SCRIPT="${KUBE_ROOT}/cluster/update-storage-objects.sh"
-DISABLE_ADMISSION_PLUGINS="ServiceAccount,NamespaceLifecycle,LimitRanger,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,PersistentVolumeLabel,DefaultStorageClass"
+DISABLE_ADMISSION_PLUGINS="ServiceAccount,NamespaceLifecycle,LimitRanger,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,PersistentVolumeLabel,DefaultStorageClass,StorageObjectInUseProtection"
 
 function startApiServer() {
   local storage_versions=${1:-""}
