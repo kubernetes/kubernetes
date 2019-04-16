@@ -23,18 +23,22 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/container"
 )
 
+// fakeCache embeds container.Runtime for testing.
 type fakeCache struct {
 	runtime container.Runtime
 }
 
+// NewFakeCache returns a new fakeCache.
 func NewFakeCache(runtime container.Runtime) container.Cache {
 	return &fakeCache{runtime: runtime}
 }
 
+// Get retrieves the Pod status from fakeCache.
 func (c *fakeCache) Get(id types.UID) (*container.PodStatus, error) {
 	return c.runtime.GetPodStatus(id, "", "")
 }
 
+// GetNewerThan retrieves a Pod status from the fakeCache that is newer than minTime.
 func (c *fakeCache) GetNewerThan(id types.UID, minTime time.Time) (*container.PodStatus, error) {
 	return c.Get(id)
 }
