@@ -889,7 +889,20 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 	}
 	_, err = kubeClient.CoreV1().Endpoints(epNamespace).Update(endpoint)
 	if err != nil {
+		deleteErr := cli.VolumeDelete(volume.Id)
+		if deleteErr != nil {
+			klog.Errorf("failed to delete volume: %v, manual deletion of the volume required", deleteErr)
+		}
+
+		klog.V(3).Infof("failed to update endpoint, deleting %s", endpoint)
+
+		err = kubeClient.CoreV1().Services(epNamespace).Delete(epServiceName, nil)
+		if err != nil {
+			klog.Errorf("failed to delete service %s/%s: %v", epNamespace, epServiceName, err)
+		}
+		klog.V(1).Infof("service/endpoint: %s/%s deleted successfully", epNamespace, epServiceName)
 		return nil, 0, "", fmt.Errorf("failed to update endpoint %s: %v", endpoint, err)
+
 	}
 
 	klog.V(3).Infof("endpoint %s updated successfully", endpoint)
