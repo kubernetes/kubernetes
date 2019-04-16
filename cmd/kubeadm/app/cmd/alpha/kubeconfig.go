@@ -37,11 +37,11 @@ var (
 	` + cmdutil.AlphaDisclaimer)
 
 	userKubeconfigLongDesc = normalizer.LongDesc(`
-	Outputs a kubeconfig file for an additional user.
+	Output a kubeconfig file for an additional user.
 	` + cmdutil.AlphaDisclaimer)
 
 	userKubeconfigExample = normalizer.Examples(`
-	# Outputs a kubeconfig file for an additional user named foo
+	# Output a kubeconfig file for an additional user named foo
 	kubeadm alpha kubeconfig user --client-name=foo
 	`)
 )
@@ -72,7 +72,7 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 	// Creates the UX Command
 	cmd := &cobra.Command{
 		Use:     "user",
-		Short:   "Outputs a kubeconfig file for an additional user",
+		Short:   "Output a kubeconfig file for an additional user",
 		Long:    userKubeconfigLongDesc,
 		Example: userKubeconfigExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -135,7 +135,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Run this command in order to set up the Kubernetes control plane.",
+		Short: "Run this command in order to set up the Kubernetes control plane",
 		Run: func(cmd *cobra.Command, args []string) {
 			c, err := initRunner.InitData(args)
 			kubeadmutil.CheckErr(err)
