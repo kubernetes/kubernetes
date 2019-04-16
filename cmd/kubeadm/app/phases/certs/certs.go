@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -324,7 +325,7 @@ func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error)
 		return false, err
 	}
 
-	if err := validatePrivatePublicKey(certKeyLocation{cfg.CertificatesDir, "", kubeadmconstants.ServiceAccountKeyBaseName, "service account"}); err != nil {
+	if err := validateServiceAccountKeyPair(cfg.CertificatesDir); err != nil {
 		return false, err
 	}
 
@@ -445,13 +446,18 @@ func validateSignedCertWithCA(l certKeyLocation, caCert *x509.Certificate) error
 	return nil
 }
 
-// validatePrivatePublicKey tries to load a private key from pkiDir
-func validatePrivatePublicKey(l certKeyLocation) error {
-	// Try to load key
-	_, _, err := pkiutil.TryLoadPrivatePublicKeyFromDisk(l.pkiDir, l.baseName)
+// validateServiceAccountKeyPair tries to load service account key pair from pkiDir
+func validateServiceAccountKeyPair(pkiDir string) error {
+	_, err := keyutil.PrivateKeyFromFile(filepath.Join(pkiDir, kubeadmconstants.ServiceAccountPrivateKeyName))
 	if err != nil {
-		return errors.Wrapf(err, "failure loading key for %s", l.uxName)
+		return errors.Wrap(err, "couldn't load Service Account's private key")
 	}
+
+	_, err = keyutil.PublicKeysFromFile(filepath.Join(pkiDir, kubeadmconstants.ServiceAccountPublicKeyName))
+	if err != nil {
+		return errors.Wrap(err, "couldn't load Service Account's public key")
+	}
+
 	return nil
 }
 

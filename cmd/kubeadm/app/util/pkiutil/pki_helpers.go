@@ -300,35 +300,6 @@ func TryLoadCSRAndKeyFromDisk(pkiPath, name string) (*x509.CertificateRequest, c
 	return csr, key, nil
 }
 
-// TryLoadPrivatePublicKeyFromDisk tries to load the key from the disk and validates that it is valid
-func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
-	privateKeyPath := pathForKey(pkiPath, name)
-
-	// Parse the private key from a file
-	privKey, err := keyutil.PrivateKeyFromFile(privateKeyPath)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't load the private key file %s", privateKeyPath)
-	}
-
-	publicKeyPath := pathForPublicKey(pkiPath, name)
-
-	// Parse the public key from a file
-	pubKeys, err := keyutil.PublicKeysFromFile(publicKeyPath)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't load the public key file %s", publicKeyPath)
-	}
-
-	// Allow RSA format only
-	k, ok := privKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, nil, errors.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
-	}
-
-	p := pubKeys[0].(*rsa.PublicKey)
-
-	return k, p, nil
-}
-
 // PathsForCertAndKey returns the paths for the certificate and key given the path and basename.
 func PathsForCertAndKey(pkiPath, name string) (string, string) {
 	return pathForCert(pkiPath, name), pathForKey(pkiPath, name)

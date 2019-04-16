@@ -674,13 +674,26 @@ func TestValidateMethods(t *testing.T) {
 			expectedSuccess: true,
 		},
 		{
-			name: "validatePrivatePublicKey",
+			name: "validateServiceAccountKeyPair without private key",
 			files: certstestutil.PKIFiles{
-				"sa.pub": key.Public(),
-				"sa.key": key,
+				kubeadmconstants.ServiceAccountPublicKeyName: key.Public(),
 			},
-			validateFunc:    validatePrivatePublicKey,
-			loc:             certKeyLocation{baseName: "sa", uxName: "service account"},
+			validateFunc: func(l certKeyLocation) error { return validateServiceAccountKeyPair(l.pkiDir) },
+		},
+		{
+			name: "validateServiceAccountKeyPair without public key",
+			files: certstestutil.PKIFiles{
+				kubeadmconstants.ServiceAccountPrivateKeyName: key,
+			},
+			validateFunc: func(l certKeyLocation) error { return validateServiceAccountKeyPair(l.pkiDir) },
+		},
+		{
+			name: "validateServiceAccountKeyPair everything is ok",
+			files: certstestutil.PKIFiles{
+				kubeadmconstants.ServiceAccountPublicKeyName:  key.Public(),
+				kubeadmconstants.ServiceAccountPrivateKeyName: key,
+			},
+			validateFunc:    func(l certKeyLocation) error { return validateServiceAccountKeyPair(l.pkiDir) },
 			expectedSuccess: true,
 		},
 	}
