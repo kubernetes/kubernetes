@@ -141,11 +141,6 @@ func (c *compressionResponseWriter) WriteHeader(status int) {
 	c.writer.WriteHeader(status)
 }
 
-// CloseNotify is part of http.CloseNotifier interface
-func (c *compressionResponseWriter) CloseNotify() <-chan bool {
-	return c.writer.(http.CloseNotifier).CloseNotify()
-}
-
 // Close the underlying compressor
 func (c *compressionResponseWriter) Close() error {
 	if c.compressorClosed() {

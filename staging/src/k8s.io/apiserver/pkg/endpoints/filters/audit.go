@@ -167,10 +167,9 @@ func decorateResponseWriter(responseWriter http.ResponseWriter, ev *auditinterna
 
 	// check if the ResponseWriter we're wrapping is the fancy one we need
 	// or if the basic is sufficient
-	_, cn := responseWriter.(http.CloseNotifier)
 	_, fl := responseWriter.(http.Flusher)
 	_, hj := responseWriter.(http.Hijacker)
-	if cn && fl && hj {
+	if fl && hj {
 		return &fancyResponseWriterDelegator{delegate}
 	}
 	return delegate
@@ -219,15 +218,10 @@ func (a *auditResponseWriter) WriteHeader(code int) {
 	a.ResponseWriter.WriteHeader(code)
 }
 
-// fancyResponseWriterDelegator implements http.CloseNotifier, http.Flusher and
-// http.Hijacker which are needed to make certain http operation (e.g. watch, rsh, etc)
-// working.
+// fancyResponseWriterDelegator implements http.Flusher and http.Hijacker
+// which are needed to make certain http operation (e.g. watch, rsh, etc) working.
 type fancyResponseWriterDelegator struct {
 	*auditResponseWriter
-}
-
-func (f *fancyResponseWriterDelegator) CloseNotify() <-chan bool {
-	return f.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
 
 func (f *fancyResponseWriterDelegator) Flush() {
@@ -247,6 +241,5 @@ func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, er
 	return f.ResponseWriter.(http.Hijacker).Hijack()
 }
 
-var _ http.CloseNotifier = &fancyResponseWriterDelegator{}
 var _ http.Flusher = &fancyResponseWriterDelegator{}
 var _ http.Hijacker = &fancyResponseWriterDelegator{}

@@ -131,19 +131,12 @@ type timeoutWriter interface {
 func newTimeoutWriter(w http.ResponseWriter) timeoutWriter {
 	base := &baseTimeoutWriter{w: w}
 
-	_, notifiable := w.(http.CloseNotifier)
 	_, hijackable := w.(http.Hijacker)
 
-	switch {
-	case notifiable && hijackable:
-		return &closeHijackTimeoutWriter{base}
-	case notifiable:
-		return &closeTimeoutWriter{base}
-	case hijackable:
+	if hijackable {
 		return &hijackTimeoutWriter{base}
-	default:
-		return base
 	}
+	return base
 }
 
 type baseTimeoutWriter struct {
@@ -239,19 +232,6 @@ func (tw *baseTimeoutWriter) timeout(err *apierrors.StatusError) {
 	}
 }
 
-func (tw *baseTimeoutWriter) closeNotify() <-chan bool {
-	tw.mu.Lock()
-	defer tw.mu.Unlock()
-
-	if tw.timedOut {
-		done := make(chan bool)
-		close(done)
-		return done
-	}
-
-	return tw.w.(http.CloseNotifier).CloseNotify()
-}
-
 func (tw *baseTimeoutWriter) hijack() (net.Conn, *bufio.ReadWriter, error) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
@@ -266,30 +246,10 @@ func (tw *baseTimeoutWriter) hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return conn, rw, err
 }
 
-type closeTimeoutWriter struct {
-	*baseTimeoutWriter
-}
-
-func (tw *closeTimeoutWriter) CloseNotify() <-chan bool {
-	return tw.closeNotify()
-}
-
 type hijackTimeoutWriter struct {
 	*baseTimeoutWriter
 }
 
 func (tw *hijackTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return tw.hijack()
-}
-
-type closeHijackTimeoutWriter struct {
-	*baseTimeoutWriter
-}
-
-func (tw *closeHijackTimeoutWriter) CloseNotify() <-chan bool {
-	return tw.closeNotify()
-}
-
-func (tw *closeHijackTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return tw.hijack()
 }

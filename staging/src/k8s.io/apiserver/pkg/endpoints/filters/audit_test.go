@@ -85,8 +85,6 @@ type fancyResponseWriter struct {
 	simpleResponseWriter
 }
 
-func (*fancyResponseWriter) CloseNotify() <-chan bool { return nil }
-
 func (*fancyResponseWriter) Flush() {}
 
 func (*fancyResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) { return nil, nil, nil }

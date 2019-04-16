@@ -190,11 +190,6 @@ func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return rl.w.(http.Hijacker).Hijack()
 }
 
-// CloseNotify implements http.CloseNotifier
-func (rl *respLogger) CloseNotify() <-chan bool {
-	return rl.w.(http.CloseNotifier).CloseNotify()
-}
-
 func (rl *respLogger) recordStatus(status int) {
 	rl.status = status
 	rl.statusRecorded = true
