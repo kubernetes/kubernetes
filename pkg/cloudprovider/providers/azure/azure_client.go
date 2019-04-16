@@ -91,7 +91,6 @@ type SecurityGroupsClient interface {
 type VirtualMachineScaleSetsClient interface {
 	Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error)
 	List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachineScaleSet, err error)
-	UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (resp *http.Response, err error)
 }
 
 // VirtualMachineScaleSetVMsClient defines needed functions for azure compute.VirtualMachineScaleSetVMsClient
@@ -879,30 +878,6 @@ func (az *azVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGro
 	}
 
 	return result, nil
-}
-
-func (az *azVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (resp *http.Response, err error) {
-	/* Write rate limiting */
-	if !az.rateLimiterWriter.TryAccept() {
-		err = createRateLimitErr(true, "VMSSUpdateInstances")
-		return
-	}
-
-	klog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%v): start", resourceGroupName, VMScaleSetName, VMInstanceIDs)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%v): end", resourceGroupName, VMScaleSetName, VMInstanceIDs)
-	}()
-
-	mc := newMetricContext("vmss", "update_instances", resourceGroupName, az.client.SubscriptionID)
-	future, err := az.client.UpdateInstances(ctx, resourceGroupName, VMScaleSetName, VMInstanceIDs)
-	mc.Observe(err)
-	if err != nil {
-		return future.Response(), err
-	}
-
-	err = future.WaitForCompletionRef(ctx, az.client.Client)
-	mc.Observe(err)
-	return future.Response(), err
 }
 
 // azVirtualMachineScaleSetVMsClient implements VirtualMachineScaleSetVMsClient.
