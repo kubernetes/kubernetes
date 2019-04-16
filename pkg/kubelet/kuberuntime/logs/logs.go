@@ -381,7 +381,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 				klog.V(2).Infof("Finish parsing log file %q, hit bytes limit %d(bytes)", path, opts.bytes)
 				return nil
 			}
-			klog.Errorf("Failed with err %v when writing log for log file %q: %+v", err, path, msg)
+			klog.Errorf("Failed with err %v when writing log for log file %q: %q", err, path, msg)
 			return err
 		}
 	}
