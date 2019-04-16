@@ -223,14 +223,20 @@ aliases:
     - nicksardo
     - thockin
     - rramkumar1
+  sig-apps-approvers:
+    - kow3ns
+    - janetkuo
+    - soltysh
+    - tnozicka
+    - erictune
+    - smarterclayton
   sig-apps-reviewers:
     - enisoc
     - erictune
     - foxish
     - janetkuo
     - kow3ns
-    - lukaszo
-    - mfojtik
+    - mortent
     - smarterclayton
     - soltysh
     - tnozicka
