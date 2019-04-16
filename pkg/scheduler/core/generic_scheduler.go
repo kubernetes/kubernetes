@@ -757,43 +757,51 @@ func PrioritizeNodes(
 
 	// Summarize all scores.
 	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
-
-	for i := range nodes {
-		result = append(result, schedulerapi.HostPriority{Host: nodes[i].Name, Score: 0})
-		for j := range priorityConfigs {
-			result[i].Score += results[j][i].Score * priorityConfigs[j].Weight
-		}
-	}
-
-	if len(extenders) != 0 && nodes != nil {
-		combinedScores := make(map[string]int, len(nodeNameToInfo))
-		for i := range extenders {
-			if !extenders[i].IsInterested(pod) {
-				continue
+	extendersExist := len(extenders) != 0
+	if !extendersExist {
+		for i := range nodes {
+			result = append(result, schedulerapi.HostPriority{Host: nodes[i].Name, Score: 0})
+			for j := range priorityConfigs {
+				result[i].Score += results[j][i].Score * priorityConfigs[j].Weight
 			}
-			wg.Add(1)
-			go func(extIndex int) {
-				defer wg.Done()
-				prioritizedList, weight, err := extenders[extIndex].Prioritize(pod, nodes)
-				if err != nil {
-					// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
-					return
-				}
-				mu.Lock()
-				for i := range *prioritizedList {
-					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
-					if klog.V(10) {
-						klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), host, extenders[extIndex].Name(), score)
-					}
-					combinedScores[host] += score * weight
-				}
-				mu.Unlock()
-			}(i)
 		}
-		// wait for all go routines to finish
-		wg.Wait()
-		for i := range result {
-			result[i].Score += combinedScores[result[i].Host]
+	} else {
+		if nodes != nil {
+			combinedScores := make(map[string]*int32, len(nodes))
+			for i := range nodes {
+				result = append(result, schedulerapi.HostPriority{Host: nodes[i].Name, Score: 0})
+				for j := range priorityConfigs {
+					result[i].Score += results[j][i].Score * priorityConfigs[j].Weight
+				}
+				combinedScores[nodes[i].Name] = new(int32)
+			}
+
+			for i := range extenders {
+				if !extenders[i].IsInterested(pod) {
+					continue
+				}
+				wg.Add(1)
+				go func(extIndex int) {
+					defer wg.Done()
+					prioritizedList, weight, err := extenders[extIndex].Prioritize(pod, nodes)
+					if err != nil {
+						// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
+						return
+					}
+					for i := range *prioritizedList {
+						host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
+						if klog.V(10) {
+							klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), host, extenders[extIndex].Name(), score)
+						}
+						atomic.AddInt32(combinedScores[host], int32(score*weight))
+					}
+				}(i)
+			}
+			// wait for all go routines to finish
+			wg.Wait()
+			for i := range result {
+				result[i].Score += int(*combinedScores[result[i].Host])
+			}
 		}
 	}
 
@@ -978,11 +986,11 @@ func selectNodesForPreemption(pod *v1.Pod,
 		}
 		pods, numPDBViolations, fits := selectVictimsOnNode(pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
 		if fits {
-			resultLock.Lock()
 			victims := schedulerapi.Victims{
 				Pods:             pods,
 				NumPDBViolations: numPDBViolations,
 			}
+			resultLock.Lock()
 			nodeToVictims[potentialNodes[i]] = &victims
 			resultLock.Unlock()
 		}
