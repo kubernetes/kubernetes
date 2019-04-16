@@ -29,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
@@ -74,35 +75,9 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 
 		klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", insecureBootstrapConfig.Clusters[clusterName].Server)
 
-		// Make an initial insecure connection to get the cluster-info ConfigMap
-		var insecureClusterInfo *v1.ConfigMap
-		wait.PollImmediateInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
-			var err error
-			insecureClusterInfo, err = insecureClient.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
-			if err != nil {
-				klog.V(1).Infof("[discovery] Failed to request cluster info, will try again: [%s]\n", err)
-				return false, nil
-			}
-			return true, nil
-		})
-
-		// Validate the MAC on the kubeconfig from the ConfigMap and load it
-		insecureKubeconfigString, ok := insecureClusterInfo.Data[bootstrapapi.KubeConfigKey]
-		if !ok || len(insecureKubeconfigString) == 0 {
-			return nil, errors.Errorf("there is no %s key in the %s ConfigMap. This API Server isn't set up for token bootstrapping, can't connect",
-				bootstrapapi.KubeConfigKey, bootstrapapi.ConfigMapClusterInfo)
-		}
-		detachedJWSToken, ok := insecureClusterInfo.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]
-		if !ok || len(detachedJWSToken) == 0 {
-			return nil, errors.Errorf("token id %q is invalid for this cluster or it has expired. Use \"kubeadm token create\" on the control-plane node to create a new valid token", token.ID)
-		}
-		if !bootstrap.DetachedTokenIsValid(detachedJWSToken, insecureKubeconfigString, token.ID, token.Secret) {
-			return nil, errors.New("failed to verify JWS signature of received cluster info object, can't trust this API Server")
-		}
-		insecureKubeconfigBytes := []byte(insecureKubeconfigString)
-		insecureConfig, err := clientcmd.Load(insecureKubeconfigBytes)
+		insecureKubeconfigBytes, insecureConfig, err := getInsecureConfig(insecureClient, token)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s configmap", bootstrapapi.ConfigMapClusterInfo)
+			return nil, err
 		}
 
 		// If no TLS root CA pinning was specified, we're done
@@ -112,9 +87,6 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		}
 
 		// Load the cluster CA from the Config
-		if len(insecureConfig.Clusters) != 1 {
-			return nil, errors.Errorf("expected the kubeconfig file in the %s configmap to have a single cluster, but it had %d", bootstrapapi.ConfigMapClusterInfo, len(insecureConfig.Clusters))
-		}
 		var clusterCABytes []byte
 		for _, cluster := range insecureConfig.Clusters {
 			clusterCABytes = cluster.CertificateAuthorityData
@@ -131,6 +103,8 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 			return nil, errors.Wrapf(err, "cluster CA found in %s configmap is invalid", bootstrapapi.ConfigMapClusterInfo)
 		}
 
+		klog.V(1).Infof("[discovery] Requesting info from %q again to validate TLS against the pinned public key\n", insecureBootstrapConfig.Clusters[clusterName].Server)
+
 		// Now that we know the proported cluster CA, connect back a second time validating with that CA
 		secureBootstrapConfig := buildSecureBootstrapKubeConfig(endpoint, clusterCABytes, clusterName)
 		secureClient, err := kubeconfigutil.ToClientSet(secureBootstrapConfig)
@@ -139,24 +113,8 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		}
 
 		klog.V(1).Infof("[discovery] Requesting info from %q again to validate TLS against the pinned public key\n", insecureBootstrapConfig.Clusters[clusterName].Server)
-		var secureClusterInfo *v1.ConfigMap
-		wait.PollImmediateInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
-			var err error
-			secureClusterInfo, err = secureClient.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
-			if err != nil {
-				klog.V(1).Infof("[discovery] Failed to request cluster info, will try again: [%s]\n", err)
-				return false, nil
-			}
-			return true, nil
-		})
 
-		// Pull the kubeconfig from the securely-obtained ConfigMap and validate that it's the same as what we found the first time
-		secureKubeconfigBytes := []byte(secureClusterInfo.Data[bootstrapapi.KubeConfigKey])
-		if !bytes.Equal(secureKubeconfigBytes, insecureKubeconfigBytes) {
-			return nil, errors.Errorf("the second kubeconfig from the %s configmap (using validated TLS) was different from the first", bootstrapapi.ConfigMapClusterInfo)
-		}
-
-		secureKubeconfig, err := clientcmd.Load(secureKubeconfigBytes)
+		secureKubeconfig, err := getSecureKubeconfig(secureClient, insecureKubeconfigBytes)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s configmap", bootstrapapi.ConfigMapClusterInfo)
 		}
@@ -169,6 +127,70 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 	}
 
 	return baseKubeConfig, nil
+}
+
+// getClusterInfoFromClient connects to the API Server and tries to fetch the cluster-info ConfigMap
+func getClusterInfoFromClient(client *clientset.Clientset) *v1.ConfigMap {
+	var clusterInfo *v1.ConfigMap
+	wait.PollImmediateInfinite(constants.DiscoveryRetryInterval, func() (bool, error) {
+		var err error
+		clusterInfo, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+		if err != nil {
+			klog.V(1).Infof("[discovery] Failed to request cluster info, will try again: [%s]\n", err)
+			return false, nil
+		}
+		return true, nil
+	})
+	return clusterInfo
+}
+
+// getInsecureConfig connects to the API Server and tries to fetch the cluster-info ConfigMap,
+// then it makes sure whether the API Server can be trusted or not by looking at the JWS-signed tokens,
+// if the API Server is credible, then covert the insecureKubeconfigString to insecureConfig and return, otherwise return error
+func getInsecureConfig(insecureClient *clientset.Clientset, token *kubeadmapi.BootstrapTokenString) ([]byte, *clientcmdapi.Config, error) {
+	insecureClusterInfo := getClusterInfoFromClient(insecureClient)
+
+	// Validate the MAC on the kubeconfig from the ConfigMap and load it
+	insecureKubeconfigString, ok := insecureClusterInfo.Data[bootstrapapi.KubeConfigKey]
+	if !ok || len(insecureKubeconfigString) == 0 {
+		return nil, nil, errors.Errorf("there is no %s key in the %s ConfigMap. This API Server isn't set up for token bootstrapping, can't connect",
+			bootstrapapi.KubeConfigKey, bootstrapapi.ConfigMapClusterInfo)
+	}
+	detachedJWSToken, ok := insecureClusterInfo.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]
+	if !ok || len(detachedJWSToken) == 0 {
+		return nil, nil, errors.Errorf("token id %q is invalid for this cluster or it has expired. Use \"kubeadm token create\" on the control-plane node to create a new valid token", token.ID)
+	}
+	if !bootstrap.DetachedTokenIsValid(detachedJWSToken, insecureKubeconfigString, token.ID, token.Secret) {
+		return nil, nil, errors.New("failed to verify JWS signature of received cluster info object, can't trust this API Server")
+	}
+	insecureKubeconfigBytes := []byte(insecureKubeconfigString)
+	insecureConfig, err := clientcmd.Load(insecureKubeconfigBytes)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s configmap", bootstrapapi.ConfigMapClusterInfo)
+	}
+	if len(insecureConfig.Clusters) != 1 {
+		return nil, nil, errors.Errorf("expected the kubeconfig file in the %s configmap to have a single cluster, but it had %d", bootstrapapi.ConfigMapClusterInfo, len(insecureConfig.Clusters))
+	}
+	return insecureKubeconfigBytes, insecureConfig, nil
+}
+
+// getSecureKubeconfig connects to the API Server and tries to fetch the cluster-info ConfigMap,
+// then validate whether the kubeconfig from the securely-obtained ConfigMap is the same as insecureKubeconfigBytes or not,
+// if they are the same, then Load secureKubeconfigBytes and return, otherwise return error
+func getSecureKubeconfig(secureClient *clientset.Clientset, insecureKubeconfigBytes []byte) (*clientcmdapi.Config, error) {
+	secureClusterInfo := getClusterInfoFromClient(secureClient)
+
+	// Pull the kubeconfig from the securely-obtained ConfigMap and validate that it's the same as what we found the first time
+	secureKubeconfigBytes := []byte(secureClusterInfo.Data[bootstrapapi.KubeConfigKey])
+	if !bytes.Equal(secureKubeconfigBytes, insecureKubeconfigBytes) {
+		return nil, errors.Errorf("the second kubeconfig from the %s configmap (using validated TLS) was different from the first", bootstrapapi.ConfigMapClusterInfo)
+	}
+
+	secureKubeconfig, err := clientcmd.Load(secureKubeconfigBytes)
+	if err != nil {
+		return nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s configmap", bootstrapapi.ConfigMapClusterInfo)
+	}
+	return secureKubeconfig, nil
 }
 
 // buildInsecureBootstrapKubeConfig makes a kubeconfig object that connects insecurely to the API Server for bootstrapping purposes
