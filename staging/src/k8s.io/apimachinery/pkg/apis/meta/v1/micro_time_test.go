@@ -140,73 +140,115 @@ func TestMicroTimeProto(t *testing.T) {
 
 func TestMicroTimeEqual(t *testing.T) {
 	t1 := NewMicroTime(time.Now())
-	t2 := NewMicroTime(time.Now().Add(time.Second))
-
-	if !t1.Equal(t1) {
-		t.Errorf("Failed equality test for '%v', '%v': t1 should equal t1", t1, t1)
+	cases := []struct {
+		name   string
+		x      *MicroTime
+		y      *MicroTime
+		result bool
+	}{
+		{"nil =? nil", nil, nil, true},
+		{"!nil =? !nil", &t1, &t1, true},
+		{"nil =? !nil", nil, &t1, false},
+		{"!nil =? nil", &t1, nil, false},
 	}
-	if t1.Equal(t2) {
-		t.Errorf("Failed equality test for '%v', '%v': t1 should not equal t2", t1, t2)
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.Equal(c.y)
+			if result != c.result {
+				t.Errorf("Failed equality test for '%v', '%v': expected %+v, got %+v", c.x, c.y, c.result, result)
+			}
+		})
 	}
 }
 
 func TestMicroTimeEqualTime(t *testing.T) {
 	t1 := NewMicroTime(time.Now())
 	t2 := NewTime(t1.Time)
-	t3 := NewTime(time.Now().Add(time.Second))
-
-	if !t1.EqualTime(t2) {
-		t.Errorf("Failed equality test for '%v', '%v': t1 should equal t2", t1, t1)
+	cases := []struct {
+		name   string
+		x      *MicroTime
+		y      *Time
+		result bool
+	}{
+		{"nil =? nil", nil, nil, true},
+		{"!nil =? !nil", &t1, &t2, true},
+		{"nil =? !nil", nil, &t2, false},
+		{"!nil =? nil", &t1, nil, false},
 	}
-	if t1.EqualTime(t3) {
-		t.Errorf("Failed equality test for '%v', '%v': t1 should not equal t3", t1, t2)
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.EqualTime(c.y)
+			if result != c.result {
+				t.Errorf("Failed equality test for '%v', '%v': expected %+v, got %+v", c.x, c.y, c.result, result)
+			}
+		})
 	}
 }
 
 func TestMicroTimeBefore(t *testing.T) {
-	tBefore := NewMicroTime(time.Now())
-	tAfter := NewMicroTime(tBefore.Time.Add(time.Second))
+	t1 := NewMicroTime(time.Now())
 	cases := []struct {
-		name   string
-		x      MicroTime
-		y      MicroTime
-		result bool
+		name string
+		x    *MicroTime
+		y    *MicroTime
 	}{
-		{"tBefore <? tBefore", tBefore, tBefore, false},
-		{"tBefore <? tAfter", tBefore, tAfter, true},
-		{"tAfter <? tBefore", tAfter, tBefore, false},
+		{"nil <? nil", nil, nil},
+		{"!nil <? !nil", &t1, &t1},
+		{"nil <? !nil", nil, &t1},
+		{"!nil <? nil", &t1, nil},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			result := c.x.Before(c.y)
-			if result != c.result {
-				t.Errorf("Failed before test for '%v', '%v': expected %+v, got %+v", c.x, c.y, c.result, result)
+			if result {
+				t.Errorf("Failed before test for '%v', '%v': expected false, got %+v", c.x, c.y, result)
 			}
 		})
 	}
 }
 func TestMicroTimeBeforeTime(t *testing.T) {
-	tNow := NewMicroTime(time.Now())
-	tAfter := NewTime(tNow.Time.Add(time.Second))
-	tBefore := NewTime(tNow.Time.Add(-time.Second))
-	tTimeNow := NewTime(tNow.Time)
+	t1 := NewMicroTime(time.Now())
+	t2 := NewTime(t1.Time)
 	cases := []struct {
-		name   string
-		x      MicroTime
-		y      Time
-		result bool
+		name string
+		x    *MicroTime
+		y    *Time
 	}{
-		{"tNow <? tAfter", tNow, tAfter, true},
-		{"tNow <? tBefore", tNow, tBefore, false},
-		{"tNow <? tTimeNow", tNow, tTimeNow, false},
+		{"nil <? nil", nil, nil},
+		{"!nil <? !nil", &t1, &t2},
+		{"nil <? !nil", nil, &t2},
+		{"!nil <? nil", &t1, nil},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			result := c.x.BeforeTime(c.y)
+			if result {
+				t.Errorf("Failed before test for '%v', '%v': expected false, got %+v", c.x, c.y, result)
+			}
+		})
+	}
+}
+
+func TestMicroTimeIsZero(t *testing.T) {
+	t1 := NewMicroTime(time.Now())
+	cases := []struct {
+		name   string
+		x      *MicroTime
+		result bool
+	}{
+		{"nil =? 0", nil, true},
+		{"!nil =? 0", &t1, false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.IsZero()
 			if result != c.result {
-				t.Errorf("Failed before test for '%v', '%v': expected %+v, got %+v", c.x, c.y, c.result, result)
+				t.Errorf("Failed equality test for '%v': expected %+v, got %+v", c.x, c.result, result)
 			}
 		})
 	}

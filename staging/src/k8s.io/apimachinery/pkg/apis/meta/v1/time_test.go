@@ -174,35 +174,67 @@ func TestTimeProto(t *testing.T) {
 
 func TestTimeEqual(t *testing.T) {
 	t1 := NewTime(time.Now())
-	t2 := NewTime(time.Now().Add(time.Second))
-
-	if !t1.Equal(t1) {
-		t.Errorf("Failed equality test for '%v', '%v': t1 should equal t1", t1, t1)
+	cases := []struct {
+		name   string
+		x      *Time
+		y      *Time
+		result bool
+	}{
+		{"nil =? nil", nil, nil, true},
+		{"!nil =? !nil", &t1, &t1, true},
+		{"nil =? !nil", nil, &t1, false},
+		{"!nil =? nil", &t1, nil, false},
 	}
-	if t1.Equal(t2) {
-		t.Errorf("Failed equality test for '%v', '%v': t1 should not equal t2", t1, t2)
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.Equal(c.y)
+			if result != c.result {
+				t.Errorf("Failed equality test for '%v', '%v': expected %+v, got %+v", c.x, c.y, c.result, result)
+			}
+		})
 	}
 }
 
 func TestTimeBefore(t *testing.T) {
-	tBefore := NewTime(time.Now())
-	tAfter := NewTime(tBefore.Time.Add(time.Second))
+	t1 := NewTime(time.Now())
 	cases := []struct {
-		name   string
-		x      Time
-		y      Time
-		result bool
+		name string
+		x    *Time
+		y    *Time
 	}{
-		{"tBefore <? tBefore", tBefore, tBefore, false},
-		{"tBefore <? tAfter", tBefore, tAfter, true},
-		{"tAfter <? tBefore", tAfter, tBefore, false},
+		{"nil <? nil", nil, nil},
+		{"!nil <? !nil", &t1, &t1},
+		{"nil <? !nil", nil, &t1},
+		{"!nil <? nil", &t1, nil},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			result := c.x.Before(c.y)
+			if result {
+				t.Errorf("Failed equality test for '%v', '%v': expected false, got %+v", c.x, c.y, result)
+			}
+		})
+	}
+}
+
+func TestTimeIsZero(t *testing.T) {
+	t1 := NewTime(time.Now())
+	cases := []struct {
+		name   string
+		x      *Time
+		result bool
+	}{
+		{"nil =? 0", nil, true},
+		{"!nil =? 0", &t1, false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.IsZero()
 			if result != c.result {
-				t.Errorf("Failed before test for '%v', '%v': expected %+v, got %+v", c.x, c.y, c.result, result)
+				t.Errorf("Failed equality test for '%v': expected %+v, got %+v", c.x, c.result, result)
 			}
 		})
 	}
