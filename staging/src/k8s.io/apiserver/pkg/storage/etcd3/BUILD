@@ -10,6 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "compact_test.go",
+        "event_test.go",
         "lease_manager_test.go",
         "store_test.go",
         "watcher_test.go",
@@ -36,7 +37,10 @@ go_test(
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/github.com/coreos/etcd/integration:go_default_library",
+        "//vendor/github.com/coreos/etcd/mvcc/mvccpb:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )
 
