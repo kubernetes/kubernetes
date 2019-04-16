@@ -32,7 +32,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 )
 
@@ -574,31 +573,6 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, err
 	return nic, nil
 }
 
-// getScaleSetWithRetry gets scale set with exponential backoff retry
-func (ss *scaleSet) getScaleSetWithRetry(service *v1.Service, name string) (compute.VirtualMachineScaleSet, bool, error) {
-	var result compute.VirtualMachineScaleSet
-	var exists bool
-
-	err := wait.ExponentialBackoff(ss.requestBackoff(), func() (bool, error) {
-		cached, retryErr := ss.vmssCache.Get(name)
-		if retryErr != nil {
-			ss.Event(service, v1.EventTypeWarning, "GetVirtualMachineScaleSet", retryErr.Error())
-			klog.Errorf("backoff: failure for scale set %q, will retry,err=%v", name, retryErr)
-			return false, nil
-		}
-		klog.V(4).Infof("backoff: success for scale set %q", name)
-
-		if cached != nil {
-			exists = true
-			result = *(cached.(*compute.VirtualMachineScaleSet))
-		}
-
-		return true, nil
-	})
-
-	return result, exists, err
-}
-
 // getPrimarynetworkInterfaceConfiguration gets primary network interface configuration for scale set virtual machine.
 func (ss *scaleSet) getPrimarynetworkInterfaceConfiguration(networkConfigurations []compute.VirtualMachineScaleSetNetworkConfiguration, nodeName string) (*compute.VirtualMachineScaleSetNetworkConfiguration, error) {
 	if len(networkConfigurations) == 1 {
@@ -629,17 +603,6 @@ func (ss *scaleSet) getPrimaryIPConfigForScaleSet(config *compute.VirtualMachine
 	}
 
 	return nil, fmt.Errorf("failed to find a primary IP configuration for the scale set VM %q", nodeName)
-}
-
-// updateVMSSInstancesWithRetry invokes ss.VirtualMachineScaleSetsClient.UpdateInstances with exponential backoff retry.
-func (ss *scaleSet) updateVMSSInstancesWithRetry(service *v1.Service, scaleSetName string, vmInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) error {
-	return wait.ExponentialBackoff(ss.requestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-		resp, err := ss.VirtualMachineScaleSetsClient.UpdateInstances(ctx, ss.ResourceGroup, scaleSetName, vmInstanceIDs)
-		klog.V(10).Infof("VirtualMachineScaleSetsClient.UpdateInstances(%s): end", scaleSetName)
-		return ss.processHTTPRetryResponse(service, "CreateOrUpdateVMSSInstance", resp, err)
-	})
 }
 
 // EnsureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
@@ -748,7 +711,7 @@ func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeNam
 	resp, err := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM)
 	if ss.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 		klog.V(2).Infof("EnsureHostInPool update backing off vmssVM(%s) with new backendPoolID %s, err: %v", vmName, backendPoolID, err)
-		retryErr := ss.UpdateVmssVMWithRetry(nodeResourceGroup, ssName, instanceID, newVM)
+		retryErr := ss.UpdateVmssVMWithRetry(ctx, nodeResourceGroup, ssName, instanceID, newVM)
 		if retryErr != nil {
 			err = retryErr
 			klog.Errorf("EnsureHostInPool update abort backoff vmssVM(%s) with new backendPoolID %s, err: %v", vmName, backendPoolID, err)
@@ -877,7 +840,7 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromNode(service *v1.Service, nodeNa
 	resp, err := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM)
 	if ss.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 		klog.V(2).Infof("ensureBackendPoolDeletedFromNode update backing off vmssVM(%s) with backendPoolID %s, err: %v", nodeName, backendPoolID, err)
-		retryErr := ss.UpdateVmssVMWithRetry(nodeResourceGroup, ssName, instanceID, newVM)
+		retryErr := ss.UpdateVmssVMWithRetry(ctx, nodeResourceGroup, ssName, instanceID, newVM)
 		if retryErr != nil {
 			err = retryErr
 			klog.Errorf("ensureBackendPoolDeletedFromNode update abort backoff vmssVM(%s) with backendPoolID %s, err: %v", nodeName, backendPoolID, err)
