@@ -193,8 +193,13 @@ while true; do sleep 1; done
 				matchTerminationMessage(container, v1.PodSucceeded, Equal("DONE"))
 			})
 
-			It("should report termination message [LinuxOnly] from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
-				// Cannot mount files in Windows Containers.
+			/*
+				Release: v1.15
+				Name: Container Runtime, TerminationMessage, from container's log output of failing container
+				Description: Create a pod with an container. Container's output is recorded in log and container exits with an error. When container is terminated, termination message MUST match the expected output recorded from container's log.
+				[LinuxOnly]: Cannot mount files in Windows Containers.
+			*/
+			framework.ConformanceIt("should report termination message [LinuxOnly] from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
 				container := v1.Container{
 					Image:                    framework.BusyBoxImage,
 					Command:                  []string{"/bin/sh", "-c"},
@@ -205,20 +210,30 @@ while true; do sleep 1; done
 				matchTerminationMessage(container, v1.PodFailed, Equal("DONE"))
 			})
 
-			It("should report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
-				// Cannot mount files in Windows Containers.
+			/*
+				Release: v1.15
+				Name: Container Runtime, TerminationMessage, from log output of succeeding container
+				Description: Create a pod with an container. Container's output is recorded in log and container exits successfully without an error. When container is terminated, terminationMessage MUST have no content as container succeed.
+				[LinuxOnly]: Cannot mount files in Windows Containers.
+			*/
+			framework.ConformanceIt("should report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
 				container := v1.Container{
 					Image:                    framework.BusyBoxImage,
 					Command:                  []string{"/bin/sh", "-c"},
-					Args:                     []string{"/bin/echo DONE; /bin/true"},
+					Args:                     []string{"/bin/echo -n DONE; /bin/true"},
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 				}
 				matchTerminationMessage(container, v1.PodSucceeded, Equal(""))
 			})
 
-			It("should report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
-				// Cannot mount files in Windows Containers.
+			/*
+				Release: v1.15
+				Name: Container Runtime, TerminationMessage, from file of succeeding container
+				Description: Create a pod with an container. Container's output is recorded in a file and the container exits successfully without an error. When container is terminated, terminationMessage MUST match with the content from file.
+				[LinuxOnly]: Cannot mount files in Windows Containers.
+			*/
+			framework.ConformanceIt("should report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func() {
 				container := v1.Container{
 					Image:                    framework.BusyBoxImage,
 					Command:                  []string{"/bin/sh", "-c"},
