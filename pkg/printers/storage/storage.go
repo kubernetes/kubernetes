@@ -26,7 +26,7 @@ import (
 )
 
 type TableConvertor struct {
-	printers.TablePrinter
+	printers.TableGenerator
 }
 
 func (c TableConvertor) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
@@ -41,5 +41,5 @@ func (c TableConvertor) ConvertToTable(ctx context.Context, obj runtime.Object, 
 			return nil, fmt.Errorf("unrecognized type %T for table options, can't display tabular output", tableOptions)
 		}
 	}
-	return c.TablePrinter.PrintTable(obj, printers.PrintOptions{Wide: true, NoHeaders: noHeaders})
+	return c.TableGenerator.GenerateTable(obj, printers.PrintOptions{Wide: true, NoHeaders: noHeaders})
 }

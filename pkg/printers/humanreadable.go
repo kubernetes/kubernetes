@@ -34,8 +34,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-type TablePrinter interface {
-	PrintTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
+type TableGenerator interface {
+	GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
 }
 
 type PrintHandler interface {
@@ -75,8 +75,8 @@ func NewHumanReadablePrinter(options PrintOptions) *HumanReadablePrinter {
 	return printer
 }
 
-// NewTablePrinter creates a HumanReadablePrinter suitable for calling PrintTable().
-func NewTablePrinter() *HumanReadablePrinter {
+// NewTableGenerator creates a HumanReadablePrinter suitable for calling GenerateTable().
+func NewTableGenerator() *HumanReadablePrinter {
 	return &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
 	}
@@ -445,10 +445,10 @@ func DecorateTable(table *metav1beta1.Table, options PrintOptions) error {
 	return nil
 }
 
-// PrintTable returns a table for the provided object, using the printer registered for that type. It returns
+// GenerateTable returns a table for the provided object, using the printer registered for that type. It returns
 // a table that includes all of the information requested by options, but will not remove rows or columns. The
 // caller is responsible for applying rules related to filtering rows or columns.
-func (h *HumanReadablePrinter) PrintTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error) {
+func (h *HumanReadablePrinter) GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error) {
 	t := reflect.TypeOf(obj)
 	handler, ok := h.handlerMap[t]
 	if !ok {
