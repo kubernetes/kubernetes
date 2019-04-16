@@ -29,7 +29,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -3240,6 +3240,154 @@ func TestPrintReplicaSet(t *testing.T) {
 		}
 		if buf.String() != test.wideExpect {
 			t.Fatalf("Expected: %s, got: %s", test.wideExpect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintPersistentVolume(t *testing.T) {
+	myScn := "my-scn"
+
+	claimRef := api.ObjectReference{
+		Name:      "test",
+		Namespace: "default",
+	}
+	tests := []struct {
+		pv     api.PersistentVolume
+		expect string
+	}{
+		{
+			// Test bound
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:    &claimRef,
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("4Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumeBound,
+				},
+			},
+			"test1\t4Gi\tROX\t\tBound\tdefault/test\t\t\t<unknown>\n",
+		},
+		{
+			// // Test failed
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test2",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:    &claimRef,
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("4Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumeFailed,
+				},
+			},
+			"test2\t4Gi\tROX\t\tFailed\tdefault/test\t\t\t<unknown>\n",
+		},
+		{
+			// Test pending
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test3",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:    &claimRef,
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteMany},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumePending,
+				},
+			},
+			"test3\t10Gi\tRWX\t\tPending\tdefault/test\t\t\t<unknown>\n",
+		},
+		{
+			// Test pending, storageClass
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test4",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:         &claimRef,
+					StorageClassName: myScn,
+					AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumePending,
+				},
+			},
+			"test4\t10Gi\tRWO\t\tPending\tdefault/test\tmy-scn\t\t<unknown>\n",
+		},
+		{
+			// Test available
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test5",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:         &claimRef,
+					StorageClassName: myScn,
+					AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumeAvailable,
+				},
+			},
+			"test5\t10Gi\tRWO\t\tAvailable\tdefault/test\tmy-scn\t\t<unknown>\n",
+		},
+		{
+			// Test released
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test6",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:         &claimRef,
+					StorageClassName: myScn,
+					AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumeReleased,
+				},
+			},
+			"test6\t10Gi\tRWO\t\tReleased\tdefault/test\tmy-scn\t\t<unknown>\n",
+		},
+	}
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pv, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		verifyTable(t, table)
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			fmt.Println(buf.String())
+			fmt.Println(test.expect)
+			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
