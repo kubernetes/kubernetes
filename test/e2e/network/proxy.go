@@ -20,6 +20,7 @@ package network
 
 import (
 	"fmt"
+	"k8s.io/api/extensions/v1beta1"
 	"math"
 	"net/http"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -253,6 +255,78 @@ var _ = SIGDescribe("Proxy", func() {
 
 				framework.Failf(strings.Join(errs, "\n"))
 			}
+		})
+
+		// Test layout:
+		// 1. Create a LoadBalancer service with no pods on port 9376
+		// 2. Create a Daemonset running serve_hostname on port 9376
+		//    Daemonset is used to guarantee that pod is running on all nodes, and would be reachable without kube-proxy fix
+		// 3. Make sure that traffic that hits the loadbalancer at port 9376 isn't successful
+		It("Should not expose service ports when there are no pods for a service", func() {
+			svcName := "kube-proxy-test"
+			svcPort := int32(9376)
+			jig := framework.NewServiceTestJig(f.ClientSet, svcName)
+
+			// Create service with no pods
+			svc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: svcName,
+				},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeLoadBalancer,
+					Ports: []v1.ServicePort{
+						v1.ServicePort{
+							Name:       "portname1",
+							Port:       svcPort,
+							TargetPort: intstr.FromInt(80),
+						},
+					},
+				},
+			})
+			Expect(err).NotTo(HaveOccurred(), "Error creating service %s: %v", svcName, err)
+			svc = jig.WaitForLoadBalancerOrFail(f.Namespace.Name, svcName, framework.LoadBalancerCreateTimeoutDefault)
+			nodeList := jig.GetNodes(framework.MaxNodesForEndpointsTests)
+			Expect(nodeList).NotTo(BeNil(), "Expected node list to not be nil, got 0 nodes")
+			nodesNames := jig.GetNodesNames(framework.MaxNodesForEndpointsTests)
+			if len(nodesNames) <= 0 {
+				framework.Failf("Expected at least 1 node, got: %v", nodesNames)
+			}
+
+			// Create daemonset serving hostname app on 9376
+			_, err = f.ClientSet.ExtensionsV1beta1().DaemonSets(f.Namespace.Name).Create(&v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "daemonset",
+					Labels: map[string]string{"run": "test-daemonset"},
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					MinReadySeconds: 10,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"run": "test-daemonset"},
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"run": "test-daemonset"},
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "web",
+									Image: imageutils.GetE2EImage(imageutils.ServeHostname),
+									Ports: []v1.ContainerPort{{ContainerPort: svcPort, Name: "web"}},
+								},
+							},
+							HostNetwork: true,
+						},
+					},
+				},
+			})
+			Expect(err).NotTo(HaveOccurred(), "Error creating daemonset: %v", err)
+
+			nodesSet := sets.NewString(nodesNames...)
+			svcExternalIP := svc.Status.LoadBalancer.Ingress[0].IP
+
+			// Make sure pod isn't reachable through the service with no pods
+			Expect(framework.TestHitNodesFromOutside(svcExternalIP, svcPort, 2*time.Minute, nodesSet)).To(HaveOccurred(), "Expected nodes to be unreachable, got no error")
 		})
 	})
 })

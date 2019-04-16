@@ -994,12 +994,12 @@ func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	return ret
 }
 
-// TestHitNodesFromOutside checkes HTTP connectivity from outside.
+// TestHitNodesFromOutside checks HTTP connectivity from outside.
 func TestHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String) error {
 	return TestHitNodesFromOutsideWithCount(externalIP, httpPort, timeout, expectedHosts, 1)
 }
 
-// TestHitNodesFromOutsideWithCount checkes HTTP connectivity from outside with count.
+// TestHitNodesFromOutsideWithCount checks HTTP connectivity from outside with count.
 func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String,
 	countToSucceed int) error {
 	Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
