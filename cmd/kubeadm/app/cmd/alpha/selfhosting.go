@@ -46,14 +46,14 @@ import (
 
 var (
 	selfhostingLongDesc = normalizer.LongDesc(`
-		Converts static Pod files for control plane components into self-hosted DaemonSets configured via the Kubernetes API.
+		Convert static Pod files for control plane components into self-hosted DaemonSets configured via the Kubernetes API.
 
 		See the documentation for self-hosting limitations.
 
 		` + cmdutil.AlphaDisclaimer)
 
 	selfhostingExample = normalizer.Examples(`
-		# Converts a static Pod-hosted control plane into a self-hosted one.
+		# Convert a static Pod-hosted control plane into a self-hosted one.
 
 		kubeadm alpha phase self-hosting convert-from-staticpods
 		`)
@@ -64,7 +64,7 @@ func NewCmdSelfhosting(in io.Reader) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "selfhosting",
 		Aliases: []string{"selfhosted", "self-hosting"},
-		Short:   "Makes a kubeadm cluster self-hosted",
+		Short:   "Make a kubeadm cluster self-hosted",
 		Long:    cmdutil.MacroCommandLongDescription,
 	}
 
@@ -86,7 +86,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "pivot",
 		Aliases: []string{"from-staticpods"},
-		Short:   "Converts a static Pod-hosted control plane into a self-hosted one",
+		Short:   "Convert a static Pod-hosted control plane into a self-hosted one",
 		Long:    selfhostingLongDesc,
 		Example: selfhostingExample,
 		Run: func(cmd *cobra.Command, args []string) {

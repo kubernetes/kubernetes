@@ -43,12 +43,12 @@ var controlPlanePrepareExample = normalizer.Examples(`
 func NewControlPlanePreparePhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "control-plane-prepare",
-		Short:   "Prepares the machine for serving a control plane.",
+		Short:   "Prepare the machine for serving a control plane",
 		Example: controlPlanePrepareExample,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all [api-server-endpoint]",
-				Short:          "Prepares the machine for serving a control plane.",
+				Short:          "Prepare the machine for serving a control plane",
 				InheritFlags:   getControlPlanePreparePhaseFlags("all"),
 				RunAllSiblings: true,
 			},
@@ -131,7 +131,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 func newControlPlanePrepareDownloadCertsSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "download-certs [api-server-endpoint]",
-		Short:        fmt.Sprintf("[EXPERIMENTAL] Downloads certificates shared among control-plane nodes from the %s Secret", kubeadmconstants.KubeadmCertsSecret),
+		Short:        fmt.Sprintf("[EXPERIMENTAL] Download certificates shared among control-plane nodes from the %s Secret", kubeadmconstants.KubeadmCertsSecret),
 		Run:          runControlPlanePrepareDownloadCertsPhaseLocal,
 		InheritFlags: getControlPlanePreparePhaseFlags("download-certs"),
 	}
@@ -140,7 +140,7 @@ func newControlPlanePrepareDownloadCertsSubphase() workflow.Phase {
 func newControlPlanePrepareCertsSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "certs [api-server-endpoint]",
-		Short:        "Generates the certificates for the new control plane components",
+		Short:        "Generate the certificates for the new control plane components",
 		Run:          runControlPlanePrepareCertsPhaseLocal, //NB. eventually in future we would like to break down this in sub phases for each cert or add the --csr option
 		InheritFlags: getControlPlanePreparePhaseFlags("certs"),
 	}
@@ -149,7 +149,7 @@ func newControlPlanePrepareCertsSubphase() workflow.Phase {
 func newControlPlanePrepareKubeconfigSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "kubeconfig [api-server-endpoint]",
-		Short:        "Generates the kubeconfig for the new control plane components",
+		Short:        "Generate the kubeconfig for the new control plane components",
 		Run:          runControlPlanePrepareKubeconfigPhaseLocal, //NB. eventually in future we would like to break down this in sub phases for each kubeconfig
 		InheritFlags: getControlPlanePreparePhaseFlags("kubeconfig"),
 	}
@@ -158,7 +158,7 @@ func newControlPlanePrepareKubeconfigSubphase() workflow.Phase {
 func newControlPlanePrepareControlPlaneSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "control-plane",
-		Short:        "Generates the manifests for the new control plane components",
+		Short:        "Generate the manifests for the new control plane components",
 		Run:          runControlPlanePrepareControlPlaneSubphase, //NB. eventually in future we would like to break down this in sub phases for each component
 		InheritFlags: getControlPlanePreparePhaseFlags("control-plane"),
 	}

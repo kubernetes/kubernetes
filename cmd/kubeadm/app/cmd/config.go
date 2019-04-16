@@ -64,7 +64,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "config",
-		Short: "Manage configuration for a kubeadm cluster persisted in a ConfigMap in the cluster.",
+		Short: "Manage configuration for a kubeadm cluster persisted in a ConfigMap in the cluster",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			There is a ConfigMap in the %s namespace called %q that kubeadm uses to store internal configuration about the
 			cluster. kubeadm CLI v1.8.0+ automatically creates this ConfigMap with the config used with 'kubeadm init', but if you
@@ -223,7 +223,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 	var oldCfgPath, newCfgPath string
 	cmd := &cobra.Command{
 		Use:   "migrate",
-		Short: "Read an older version of the kubeadm configuration API types from a file, and output the similar config object for the newer version.",
+		Short: "Read an older version of the kubeadm configuration API types from a file, and output the similar config object for the newer version",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			This command lets you convert configuration objects of older versions to the latest supported version,
 			locally in the CLI tool without ever touching anything in the cluster.
@@ -267,7 +267,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upload",
-		Short: "Upload configuration about the current state, so that 'kubeadm upgrade' can later know how to configure the upgraded cluster.",
+		Short: "Upload configuration about the current state, so that 'kubeadm upgrade' can later know how to configure the upgraded cluster",
 		RunE:  cmdutil.SubCmdRunE("upload"),
 	}
 
@@ -280,7 +280,7 @@ func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "view",
-		Short: "View the kubeadm configuration stored inside the cluster.",
+		Short: "View the kubeadm configuration stored inside the cluster",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using this command, you can view the ConfigMap in the cluster where the configuration for kubeadm is located.
 
@@ -303,7 +303,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 	var cfgPath string
 	cmd := &cobra.Command{
 		Use:   "from-file",
-		Short: "Upload a configuration file to the in-cluster ConfigMap for kubeadm configuration.",
+		Short: "Upload a configuration file to the in-cluster ConfigMap for kubeadm configuration",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using this command, you can upload configuration to the ConfigMap in the cluster using the same config file you gave to 'kubeadm init'.
 			If you initialized your cluster using a v1.7.x or lower kubeadm client and used the --config option, you need to run this command with the
@@ -343,7 +343,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 
 	cmd := &cobra.Command{
 		Use:   "from-flags",
-		Short: "Create the in-cluster configuration file for the first time from using flags.",
+		Short: "Create the in-cluster configuration file for the first time from using flags",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using this command, you can upload configuration to the ConfigMap in the cluster using the same flags you gave to 'kubeadm init'.
 			If you initialized your cluster using a v1.7.x or lower kubeadm client and set certain flags, you need to run this command with the
@@ -397,7 +397,7 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 func NewCmdConfigImages(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "images",
-		Short: "Interact with container images used by kubeadm.",
+		Short: "Interact with container images used by kubeadm",
 		RunE:  cmdutil.SubCmdRunE("images"),
 	}
 	cmd.AddCommand(NewCmdConfigImagesList(out, nil))
@@ -414,7 +414,7 @@ func NewCmdConfigImagesPull() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "pull",
-		Short: "Pull images used by kubeadm.",
+		Short: "Pull images used by kubeadm",
 		Run: func(_ *cobra.Command, _ []string) {
 			externalcfg.ClusterConfiguration.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
 			kubeadmutil.CheckErr(err)
@@ -472,7 +472,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "Print a list of images kubeadm will use. The configuration file is used in case any images or image repositories are customized.",
+		Short: "Print a list of images kubeadm will use. The configuration file is used in case any images or image repositories are customized",
 		Run: func(_ *cobra.Command, _ []string) {
 			externalcfg.ClusterConfiguration.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
 			kubeadmutil.CheckErr(err)

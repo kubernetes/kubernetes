@@ -55,7 +55,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	var dryRun bool
 	tokenCmd := &cobra.Command{
 		Use:   "token",
-		Short: "Manage bootstrap tokens.",
+		Short: "Manage bootstrap tokens",
 		Long: dedent.Dedent(`
 			This command manages bootstrap tokens. It is optional and needed only for advanced use cases.
 
@@ -99,7 +99,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:                   "create [token]",
 		DisableFlagsInUseLine: true,
-		Short:                 "Create bootstrap tokens on the server.",
+		Short:                 "Create bootstrap tokens on the server",
 		Long: dedent.Dedent(`
 			This command will create a bootstrap token for you.
 			You can specify the usages for this token, the "time to live" and an optional human friendly description.
@@ -142,7 +142,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List bootstrap tokens on the server.",
+		Short: "List bootstrap tokens on the server",
 		Long: dedent.Dedent(`
 			This command will list all bootstrap tokens for you.
 		`),
@@ -160,7 +160,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	deleteCmd := &cobra.Command{
 		Use:                   "delete [token-value] ...",
 		DisableFlagsInUseLine: true,
-		Short:                 "Delete bootstrap tokens on the server.",
+		Short:                 "Delete bootstrap tokens on the server",
 		Long: dedent.Dedent(`
 			This command will delete a list of bootstrap tokens for you.
 
@@ -188,7 +188,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:   "generate",
-		Short: "Generate and print a bootstrap token, but do not create it on the server.",
+		Short: "Generate and print a bootstrap token, but do not create it on the server",
 		Long: dedent.Dedent(`
 			This command will print out a randomly-generated bootstrap token that can be used with
 			the "init" and "join" commands.
