@@ -109,6 +109,12 @@ const (
 	//
 	// Allows kube-proxy to create DSR loadbalancers for Windows
 	WinDSR utilfeature.Feature = "WinDSR"
+
+	// owner: @wojtek-t
+	// alpha: v1.15
+	//
+	// Enables support for watch bookmark events.
+	WatchBookmark utilfeature.Feature = "WatchBookmark"
 )
 
 func init() {
@@ -130,4 +136,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	StorageVersionHash:      {Default: false, PreRelease: utilfeature.Alpha},
 	WinOverlay:              {Default: false, PreRelease: utilfeature.Alpha},
 	WinDSR:                  {Default: false, PreRelease: utilfeature.Alpha},
+	WatchBookmark:           {Default: false, PreRelease: utilfeature.Alpha},
 }

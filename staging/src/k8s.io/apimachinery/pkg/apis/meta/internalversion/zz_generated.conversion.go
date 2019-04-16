@@ -118,6 +118,7 @@ func autoConvert_internalversion_ListOptions_To_v1_ListOptions(in *ListOptions, 
 		return err
 	}
 	out.Watch = in.Watch
+	out.AllowWatchBookmarks = in.AllowWatchBookmarks
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = (*int64)(unsafe.Pointer(in.TimeoutSeconds))
 	out.Limit = in.Limit
@@ -133,6 +134,7 @@ func autoConvert_v1_ListOptions_To_internalversion_ListOptions(in *v1.ListOption
 		return err
 	}
 	out.Watch = in.Watch
+	out.AllowWatchBookmarks = in.AllowWatchBookmarks
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = (*int64)(unsafe.Pointer(in.TimeoutSeconds))
 	out.Limit = in.Limit
