@@ -23,6 +23,9 @@ import (
 
 	"k8s.io/client-go/tools/cache"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	_ "github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	schedulerapi "k8s.io/api/scheduling/v1"
@@ -32,13 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	_ "github.com/stretchr/testify/assert"
 )
 
 type priorityPair struct {
@@ -92,13 +92,20 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		// Create one pod per node that uses a lot of the node's resources.
 		By("Create pods that use 60% of node resources.")
 		pods := make([]*corev1.Pod, len(nodeList.Items))
+		allPods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 		for i, node := range nodeList.Items {
-			cpuAllocatable, found := node.Status.Allocatable["cpu"]
+			currentCpuUsage, currentMemUsage := getCurrentPodUsageOnTheNode(node.Name, allPods.Items, podRequestedResource)
+			framework.Logf("Current cpu and memory usage %v, %v", currentCpuUsage, currentMemUsage)
+			currentNode, err := cs.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			cpuAllocatable, found := currentNode.Status.Allocatable["cpu"]
 			Expect(found).To(Equal(true))
-			milliCPU := cpuAllocatable.MilliValue() * 40 / 100
-			memAllocatable, found := node.Status.Allocatable["memory"]
+			milliCPU := cpuAllocatable.MilliValue()
+			milliCPU = milliCPU * 40 / 100
+			memAllocatable, found := currentNode.Status.Allocatable["memory"]
 			Expect(found).To(Equal(true))
-			memory := memAllocatable.Value() * 60 / 100
+			memory := memAllocatable.Value()
+			memory = memory * 60 / 100
 			podRes = corev1.ResourceList{}
 			podRes[corev1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
 			podRes[corev1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
@@ -152,13 +159,20 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		// Create one pod per node that uses a lot of the node's resources.
 		By("Create pods that use 60% of node resources.")
 		pods := make([]*corev1.Pod, len(nodeList.Items))
+		allPods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 		for i, node := range nodeList.Items {
-			cpuAllocatable, found := node.Status.Allocatable["cpu"]
+			currentCpuUsage, currentMemUsage := getCurrentPodUsageOnTheNode(node.Name, allPods.Items, podRequestedResource)
+			framework.Logf("Current cpu usage and memory usage is %v, %v", currentCpuUsage, currentMemUsage)
+			currentNode, err := cs.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			cpuAllocatable, found := currentNode.Status.Allocatable["cpu"]
 			Expect(found).To(Equal(true))
-			milliCPU := cpuAllocatable.MilliValue() * 40 / 100
-			memAllocatable, found := node.Status.Allocatable["memory"]
+			milliCPU := cpuAllocatable.MilliValue()
+			milliCPU = milliCPU * 40 / 100
+			memAllocatable, found := currentNode.Status.Allocatable["memory"]
 			Expect(found).To(Equal(true))
-			memory := memAllocatable.Value() * 60 / 100
+			memory := memAllocatable.Value()
+			memory = memory * 60 / 100
 			podRes = corev1.ResourceList{}
 			podRes[corev1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
 			podRes[corev1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
@@ -224,14 +238,21 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			numPods = len(nodeList.Items)
 		}
 		pods := make([]*corev1.Pod, numPods)
+		allPods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 		for i := 0; i < numPods; i++ {
 			node := nodeList.Items[i]
-			cpuAllocatable, found := node.Status.Allocatable["cpu"]
+			currentCpuUsage, currentMemUsage := getCurrentPodUsageOnTheNode(node.Name, allPods.Items, podRequestedResource)
+			framework.Logf("Current cpu usage and memory usage is %v, %v", currentCpuUsage, currentMemUsage)
+			currentNode, err := cs.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			cpuAllocatable, found := currentNode.Status.Allocatable["cpu"]
+			Expect(found).To(Equal(true))
+			milliCPU := cpuAllocatable.MilliValue()
+			milliCPU = milliCPU * 10 / 100
+			memAllocatable, found := currentNode.Status.Allocatable["memory"]
 			Expect(found).To(BeTrue())
-			milliCPU := cpuAllocatable.MilliValue() * 10 / 100
-			memAllocatable, found := node.Status.Allocatable["memory"]
-			Expect(found).To(BeTrue())
-			memory := memAllocatable.Value() * 10 / 100
+			memory := memAllocatable.Value()
+			memory = memory * 10 / 100
 			podRes = corev1.ResourceList{}
 			podRes[corev1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
 			podRes[corev1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
@@ -623,4 +644,20 @@ func runPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSet {
 	rs := createPauseRS(f, conf)
 	framework.ExpectNoError(replicaset.WaitForReplicaSetTargetAvailableReplicas(f.ClientSet, rs, conf.Replicas))
 	return rs
+}
+
+func getCurrentPodUsageOnTheNode(nodeName string, pods []corev1.Pod, resource *corev1.ResourceRequirements) (int64, int64) {
+	totalRequestedCpuResource := resource.Requests.Cpu().MilliValue()
+	totalRequestedMemResource := resource.Requests.Memory().Value()
+	for _, pod := range pods {
+		if pod.Spec.NodeName == nodeName {
+			if v1qos.GetPodQOS(&pod) == corev1.PodQOSBestEffort {
+				continue
+			}
+		}
+		result := getNonZeroRequests(&pod)
+		totalRequestedCpuResource += result.MilliCPU
+		totalRequestedMemResource += result.Memory
+	}
+	return totalRequestedCpuResource, totalRequestedMemResource
 }
