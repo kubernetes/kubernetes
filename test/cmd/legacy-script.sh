@@ -761,6 +761,27 @@ runTests() {
 
     output_message=$(kubectl auth can-i get pods --subresource=log --quiet 2>&1 "${kube_flags[@]}"; echo $?)
     kube::test::if_has_string "${output_message}" '0'
+
+    # kubectl auth can-i get '*' does not warn about namespaced scope or print an error
+    output_message=$(kubectl auth can-i get '*' 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_not_string "${output_message}" "Warning"
+
+    # kubectl auth can-i get foo does not print a namespaced warning message, and only prints a single lookup error
+    output_message=$(kubectl auth can-i get foo 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "Warning: the server doesn't have a resource type 'foo'"
+    kube::test::if_has_not_string "${output_message}" "Warning: resource 'foo' is not namespace scoped"
+
+    # kubectl auth can-i get pods does not print a namespaced warning message or a lookup error
+    output_message=$(kubectl auth can-i get pods 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_not_string "${output_message}" "Warning"
+
+    # kubectl auth can-i get nodes prints a namespaced warning message
+    output_message=$(kubectl auth can-i get nodes 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "Warning: resource 'nodes' is not namespace scoped"
+
+    # kubectl auth can-i get nodes --all-namespaces does not print a namespaced warning message
+    output_message=$(kubectl auth can-i get nodes --all-namespaces 2>&1 "${kube_flags[@]}")
+    kube::test::if_has_not_string "${output_message}" "Warning: resource 'nodes' is not namespace scoped"
   fi
 
   # kubectl auth reconcile
