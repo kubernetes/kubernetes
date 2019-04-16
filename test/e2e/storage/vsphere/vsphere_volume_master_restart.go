@@ -60,7 +60,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 
 		nodes := framework.GetReadySchedulableNodesOrDie(client)
 		numNodes = len(nodes.Items)

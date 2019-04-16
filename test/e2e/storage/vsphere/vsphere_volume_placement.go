@@ -52,7 +52,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		Bootstrap(f)
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 		if !isNodeLabeled {
 			node1Name, node1KeyValueLabel, node2Name, node2KeyValueLabel = testSetupVolumePlacement(c, ns)
 			isNodeLabeled = true

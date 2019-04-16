@@ -83,7 +83,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
-	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/features"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -2727,8 +2726,15 @@ func GetReadyNodesIncludingTaintedOrDie(c clientset.Interface) (nodes *v1.NodeLi
 
 // WaitForAllNodesSchedulable waits up to timeout for all
 // (but TestContext.AllowedNotReadyNodes) to become scheduable.
-func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
+func WaitForAllNodesSchedulable(c clientset.Interface, labelSelector string, timeout time.Duration) error {
+	match := "all nodes"
+	if len(labelSelector) > 0 {
+		match += fmt.Sprintf(" matching %q", labelSelector)
+	}
+	if TestContext.AllowedNotReadyNodes > 0 {
+		match += fmt.Sprintf(" (but %d)", TestContext.AllowedNotReadyNodes)
+	}
+	Logf("Waiting up to %v for %s to be schedulable", timeout, match)
 
 	var notSchedulable []*v1.Node
 	attempt := 0
@@ -2737,6 +2743,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		notSchedulable = nil
 		opts := metav1.ListOptions{
 			ResourceVersion: "0",
+			LabelSelector:   labelSelector,
 			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
 		}
 		nodes, err := c.CoreV1().Nodes().List(opts)
@@ -2749,12 +2756,6 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if _, hasMasterRoleLabel := node.ObjectMeta.Labels[service.LabelNodeRoleMaster]; hasMasterRoleLabel {
-				// Kops clusters have masters with spec.unscheduable = false and
-				// node-role.kubernetes.io/master NoSchedule taint.
-				// Don't wait for them.
-				continue
-			}
 			if !isNodeSchedulable(node) || !isNodeUntainted(node) {
 				notSchedulable = append(notSchedulable, node)
 			}

@@ -443,7 +443,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 func countReadyNodes(c clientset.Interface, hostName types.NodeName) int {
 	framework.WaitForNodeToBeReady(c, string(hostName), nodeStatusTimeout)
-	framework.WaitForAllNodesSchedulable(c, nodeStatusTimeout)
+	framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableSelector, nodeStatusTimeout)
 	nodes := framework.GetReadySchedulableNodesOrDie(c)
 	return len(nodes.Items)
 }

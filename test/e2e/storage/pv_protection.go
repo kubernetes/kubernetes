@@ -50,7 +50,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	BeforeEach(func() {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 
 		// Enforce binding only within test space via selector labels
 		volLabel = labels.Set{framework.VolumeSelectorKey: nameSpace}

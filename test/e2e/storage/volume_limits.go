@@ -33,7 +33,7 @@ var _ = utils.SIGDescribe("Volume limits", func() {
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("aws", "gce", "gke")
 		c = f.ClientSet
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 	})
 
 	It("should verify that all nodes have volume limits", func() {

@@ -74,7 +74,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 
 		nodes := framework.GetReadySchedulableNodesOrDie(client)
 		numNodes := len(nodes.Items)

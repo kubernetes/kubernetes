@@ -54,7 +54,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		framework.SkipUnlessProviderIs("aws", "gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 		test := testsuites.StorageClassTest{
 			Name:                 "default",
 			ClaimSize:            "2Gi",

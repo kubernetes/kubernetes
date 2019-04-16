@@ -376,7 +376,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		// We wait for nodes to become schedulable to make sure the new nodes
 		// will be returned by getPoolNodes below.
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, resizeTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableSelector, resizeTimeout))
 		klog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
 
 		By("Getting memory available on new nodes, so we can account for it when creating RC")

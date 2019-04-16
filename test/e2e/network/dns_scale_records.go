@@ -43,7 +43,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 	f := framework.NewDefaultFramework("performancedns")
 
 	BeforeEach(func() {
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 		framework.WaitForAllNodesHealthy(f.ClientSet, time.Minute)
 
 		err := framework.CheckTestingNSDeletedExcept(f.ClientSet, f.Namespace.Name)

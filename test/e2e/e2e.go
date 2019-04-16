@@ -101,7 +101,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// In large clusters we may get to this point but still have a bunch
 	// of nodes without Routes created. Since this would make a node
 	// unschedulable, we need to wait until all of them are schedulable.
-	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 
 	// If NumNodes is not specified then auto-detect how many are scheduleable and not tainted
 	if framework.TestContext.CloudConfig.NumNodes == framework.DefaultNumNodes {

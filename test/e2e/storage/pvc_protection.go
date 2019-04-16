@@ -44,7 +44,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 	BeforeEach(func() {
 		client = f.ClientSet
 		nameSpace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 
 		By("Creating a PVC")
 		suffix := "pvc-protection"

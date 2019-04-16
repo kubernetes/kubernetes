@@ -44,7 +44,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 	})
 
 	utils.SIGDescribe("persistentvolumereclaim:vsphere", func() {

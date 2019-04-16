@@ -93,7 +93,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 
 			By("Restarting Kubelet and creating another pod")
 			restartKubelet()
-			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout)
 			Eventually(func() bool {
 				return gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
 			}, 5*time.Minute, framework.Poll).Should(BeTrue())

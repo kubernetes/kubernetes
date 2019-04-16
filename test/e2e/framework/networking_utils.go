@@ -572,7 +572,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	config.setupCore(selector)
 
 	ginkgo.By("Getting node addresses")
-	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
+	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, TestContext.NodeSchedulableSelector, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 	config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeExternalIP)
 
@@ -626,7 +626,7 @@ func shuffleNodes(nodes []v1.Node) []v1.Node {
 }
 
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*v1.Pod {
-	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
+	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, TestContext.NodeSchedulableSelector, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 
 	// To make this test work reasonably fast in large clusters,

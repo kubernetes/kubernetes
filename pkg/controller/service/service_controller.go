@@ -24,7 +24,7 @@ import (
 
 	"reflect"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -61,13 +61,13 @@ const (
 	clientRetryCount    = 5
 	clientRetryInterval = 5 * time.Second
 
-	// LabelNodeRoleMaster specifies that a node is a master
-	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
-	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+	// labelNodeRoleMaster specifies that a node is a master
+	// TODO: remove this special-case handling, see https://issue.k8s.io/65618
+	labelNodeRoleMaster = "node-role.kubernetes.io/master"
 
-	// LabelNodeRoleExcludeBalancer specifies that the node should be
+	// labelNodeRoleExcludeBalancer specifies that the node should be
 	// exclude from load balancers created by a cloud provider.
-	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
+	labelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
 )
 
 type cachedService struct {
@@ -595,12 +595,12 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 
 		// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
 		// Recognize nodes labeled as master, and filter them also, as we were doing previously.
-		if _, hasMasterRoleLabel := node.Labels[LabelNodeRoleMaster]; hasMasterRoleLabel {
+		if _, hasMasterRoleLabel := node.Labels[labelNodeRoleMaster]; hasMasterRoleLabel {
 			return false
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceNodeExclusion) {
-			if _, hasExcludeBalancerLabel := node.Labels[LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+			if _, hasExcludeBalancerLabel := node.Labels[labelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
 				return false
 			}
 		}

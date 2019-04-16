@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:LabelSelector]", func() {
 		ns = f.Namespace.Name
 		Bootstrap(f)
 		nodeInfo = GetReadySchedulableRandomNodeInfo()
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableSelector, framework.TestContext.NodeSchedulableTimeout))
 		ssdlabels = make(map[string]string)
 		ssdlabels["volume-type"] = "ssd"
 		vvollabels = make(map[string]string)
