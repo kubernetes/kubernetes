@@ -46,7 +46,7 @@ type KubeProxyUpgradeTest struct {
 // Name returns the tracking name of the test.
 func (KubeProxyUpgradeTest) Name() string { return "[sig-network] kube-proxy-upgrade" }
 
-// Setup verifies kube-proxy static pods is running before uprgade.
+// Setup verifies kube-proxy static pods is running before upgrade.
 func (t *KubeProxyUpgradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Waiting for kube-proxy static pods running and ready")
 	gomega.Expect(waitForKubeProxyStaticPodsRunning(f.ClientSet)).NotTo(gomega.HaveOccurred())
@@ -78,7 +78,7 @@ type KubeProxyDowngradeTest struct {
 // Name returns the tracking name of the test.
 func (KubeProxyDowngradeTest) Name() string { return "[sig-network] kube-proxy-downgrade" }
 
-// Setup verifies kube-proxy DaemonSet is running before uprgade.
+// Setup verifies kube-proxy DaemonSet is running before upgrade.
 func (t *KubeProxyDowngradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Waiting for kube-proxy DaemonSet running and ready")
 	gomega.Expect(waitForKubeProxyDaemonSetRunning(f.ClientSet)).NotTo(gomega.HaveOccurred())
