@@ -41,6 +41,7 @@ import (
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
@@ -845,10 +846,6 @@ func TestNodePortReject(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string {
-	return &s
-}
-
 func TestOnlyLocalLoadBalancing(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
@@ -895,7 +892,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 					NodeName: nil,
 				}, {
 					IP:       epIP2,
-					NodeName: strPtr(testHostname),
+					NodeName: utilpointer.StringPtr(testHostname),
 				}},
 				Ports: []v1.EndpointPort{{
 					Name: svcPortName.Port,
@@ -989,7 +986,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 					NodeName: nil,
 				}, {
 					IP:       epIP2,
-					NodeName: strPtr(testHostname),
+					NodeName: utilpointer.StringPtr(testHostname),
 				}},
 				Ports: []v1.EndpointPort{{
 					Name: svcPortName.Port,
