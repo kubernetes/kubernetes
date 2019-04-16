@@ -268,7 +268,7 @@ func newTestKubeletWithImageList(
 		MaxPerPodContainer: 1,
 		MaxContainers:      -1,
 	}
-	containerGC, err := kubecontainer.NewContainerGC(fakeRuntime, containerGCPolicy, kubelet.sourcesReady)
+	containerGC, err := kubecontainer.NewGC(fakeRuntime, containerGCPolicy, kubelet.sourcesReady)
 	assert.NoError(t, err)
 	kubelet.containerGC = containerGC
 

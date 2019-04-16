@@ -722,7 +722,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	// setup containerGC
-	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy, klet.sourcesReady)
+	containerGC, err := kubecontainer.NewGC(klet.containerRuntime, containerGCPolicy, klet.sourcesReady)
 	if err != nil {
 		return nil, err
 	}
@@ -973,7 +973,7 @@ type Kubelet struct {
 	recorder record.EventRecorder
 
 	// Policy for handling garbage collection of dead containers.
-	containerGC kubecontainer.ContainerGC
+	containerGC kubecontainer.GC
 
 	// Manager for image garbage collection.
 	imageManager images.ImageGCManager

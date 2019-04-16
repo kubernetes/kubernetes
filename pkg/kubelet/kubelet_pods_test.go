@@ -354,7 +354,7 @@ func TestRunInContainer(t *testing.T) {
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
 		fakeRuntime := testKubelet.fakeRuntime
-		fakeCommandRunner := containertest.FakeContainerCommandRunner{
+		fakeCommandRunner := containertest.FakeCommandRunner{
 			Err:    testError,
 			Stdout: "foo",
 		}

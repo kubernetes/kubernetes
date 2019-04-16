@@ -69,11 +69,6 @@ type FakeStreamingRuntime struct {
 	*FakeRuntime
 }
 
-var _ StreamingRuntime = &FakeStreamingRuntime{}
-
-// FakeRuntime should implement Runtime.
-var _ Runtime = &FakeRuntime{}
-
 // FakeVersion embeds Version for testing.
 type FakeVersion struct {
 	Version string
@@ -158,35 +153,40 @@ func (f *FakeRuntime) AssertCalls(calls []string) error {
 	return f.assertList(calls, f.CalledFunctions)
 }
 
-// AssertStartedPods tests if
+// AssertStartedPods tests if given Pods have been started.
 func (f *FakeRuntime) AssertStartedPods(pods []string) error {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(pods, f.StartedPods)
 }
 
+// AssertKilledPods tests if given Pods have been killed.
 func (f *FakeRuntime) AssertKilledPods(pods []string) error {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(pods, f.KilledPods)
 }
 
+// AssertStartedContainers tests if given containers have been started.
 func (f *FakeRuntime) AssertStartedContainers(containers []string) error {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(containers, f.StartedContainers)
 }
 
+// AssertKilledContainers tests if given containers have been killed.
 func (f *FakeRuntime) AssertKilledContainers(containers []string) error {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(containers, f.KilledContainers)
 }
 
+// Type fulfills the Runtime.Type() function.
 func (f *FakeRuntime) Type() string {
 	return f.RuntimeType
 }
 
+// Version fulfills the Runtime interface.
 func (f *FakeRuntime) Version() (container.Version, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -195,6 +195,7 @@ func (f *FakeRuntime) Version() (container.Version, error) {
 	return &FakeVersion{Version: f.VersionInfo}, f.Err
 }
 
+// APIVersion fulfills the Runtime interface.
 func (f *FakeRuntime) APIVersion() (container.Version, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -203,6 +204,7 @@ func (f *FakeRuntime) APIVersion() (container.Version, error) {
 	return &FakeVersion{Version: f.APIVersionInfo}, f.Err
 }
 
+// Status fulfills the Runtime interface.
 func (f *FakeRuntime) Status() (*container.RuntimeStatus, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -412,8 +414,6 @@ type FakeCommandRunner struct {
 	ContainerID container.ContainerID
 	Cmd         []string
 }
-
-var _ ContainerCommandRunner = &FakeCommandRunner{}
 
 func (f *FakeCommandRunner) RunInContainer(containerID container.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	// record invoked values
