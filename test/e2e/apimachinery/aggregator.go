@@ -44,7 +44,7 @@ import (
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/utils/pointer"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var serverAggregatorVersion = utilversion.MustParseSemantic("v1.10.0")
@@ -62,7 +62,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	// We want cleanTest to happen before the namespace cleanup AfterEach
 	// inserted by NewDefaultFramework, so we put this AfterEach in front
 	// of NewDefaultFramework.
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		cleanTest(c, aggrclient, ns)
 	})
 
@@ -71,7 +71,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	// We want namespace initialization BeforeEach inserted by
 	// NewDefaultFramework to happen before this, so we put this BeforeEach
 	// after NewDefaultFramework.
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		aggrclient = f.AggregatorClient
@@ -102,10 +102,10 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":sample-apiserver-reader", nil)
 }
 
-// A basic test if the sample-apiserver code from 1.10 and compiled against 1.10
+// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
 // will work on the current Aggregator/API-Server.
 func TestSampleAPIServer(f *framework.Framework, image string) {
-	By("Registering the sample API server.")
+	ginkgo.By("Registering the sample API server.")
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
 	aggrclient := f.AggregatorClient

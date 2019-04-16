@@ -23,7 +23,7 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var crdVersion = utilversion.MustParseSemantic("v1.7.0")
@@ -32,7 +32,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
 	f := framework.NewDefaultFramework("custom-resource-definition")
 
-	Context("Simple CustomResourceDefinition", func() {
+	ginkgo.Context("Simple CustomResourceDefinition", func() {
 		/*
 			Release : v1.9
 			Testname: Custom Resource Definition, create
