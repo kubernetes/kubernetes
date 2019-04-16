@@ -29,12 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	. "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+// FakePod is a fake Pod for testing.
 type FakePod struct {
-	Pod       *Pod
+	Pod       *container.Pod
 	NetnsPath string
 }
 
@@ -44,14 +45,14 @@ type FakeRuntime struct {
 	CalledFunctions   []string
 	PodList           []*FakePod
 	AllPodList        []*FakePod
-	ImageList         []Image
+	ImageList         []container.Image
 	APIPodStatus      v1.PodStatus
-	PodStatus         PodStatus
+	PodStatus         container.PodStatus
 	StartedPods       []string
 	KilledPods        []string
 	StartedContainers []string
 	KilledContainers  []string
-	RuntimeStatus     *RuntimeStatus
+	RuntimeStatus     *container.RuntimeStatus
 	VersionInfo       string
 	APIVersionInfo    string
 	RuntimeType       string
@@ -60,8 +61,10 @@ type FakeRuntime struct {
 	StatusErr         error
 }
 
+// FakeHost specifies a fake host address.
 const FakeHost = "localhost:12345"
 
+// FakeStreamingRuntime embeds FakeRuntime for testing.
 type FakeStreamingRuntime struct {
 	*FakeRuntime
 }
@@ -71,6 +74,7 @@ var _ StreamingRuntime = &FakeStreamingRuntime{}
 // FakeRuntime should implement Runtime.
 var _ Runtime = &FakeRuntime{}
 
+// FakeVersion embeds Version for testing.
 type FakeVersion struct {
 	Version string
 }
@@ -79,6 +83,7 @@ func (fv *FakeVersion) String() string {
 	return fv.Version
 }
 
+// Compare compares two FakeVersions for testing.
 func (fv *FakeVersion) Compare(other string) (int, error) {
 	result := 0
 	if fv.Version > other {
@@ -90,21 +95,25 @@ func (fv *FakeVersion) Compare(other string) (int, error) {
 }
 
 type podsGetter interface {
-	GetPods(bool) ([]*Pod, error)
+	GetPods(bool) ([]*container.Pod, error)
 }
 
+// FakeRuntimeCache simulates a runtimeCache for testing.
 type FakeRuntimeCache struct {
 	getter podsGetter
 }
 
-func NewFakeRuntimeCache(getter podsGetter) RuntimeCache {
+// NewFakeRuntimeCache returns a FakeRuntimeCache.
+func NewFakeRuntimeCache(getter podsGetter) container.RuntimeCache {
 	return &FakeRuntimeCache{getter}
 }
 
-func (f *FakeRuntimeCache) GetPods() ([]*Pod, error) {
+// GetPods fulfills the RuntimeCache interface.
+func (f *FakeRuntimeCache) GetPods() ([]*container.Pod, error) {
 	return f.getter.GetPods(false)
 }
 
+// ForceUpdateIfOlder fulfills the RuntimeCache interface.
 func (f *FakeRuntimeCache) ForceUpdateIfOlder(time.Time) error {
 	return nil
 }
@@ -142,13 +151,14 @@ func (f *FakeRuntime) assertList(expect []string, test []string) error {
 	return nil
 }
 
-// AssertCalls test if the invoked functions are as expected.
+// AssertCalls tests if the invoked functions are as expected.
 func (f *FakeRuntime) AssertCalls(calls []string) error {
 	f.Lock()
 	defer f.Unlock()
 	return f.assertList(calls, f.CalledFunctions)
 }
 
+// AssertStartedPods tests if
 func (f *FakeRuntime) AssertStartedPods(pods []string) error {
 	f.Lock()
 	defer f.Unlock()
@@ -177,7 +187,7 @@ func (f *FakeRuntime) Type() string {
 	return f.RuntimeType
 }
 
-func (f *FakeRuntime) Version() (Version, error) {
+func (f *FakeRuntime) Version() (container.Version, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -185,7 +195,7 @@ func (f *FakeRuntime) Version() (Version, error) {
 	return &FakeVersion{Version: f.VersionInfo}, f.Err
 }
 
-func (f *FakeRuntime) APIVersion() (Version, error) {
+func (f *FakeRuntime) APIVersion() (container.Version, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -193,7 +203,7 @@ func (f *FakeRuntime) APIVersion() (Version, error) {
 	return &FakeVersion{Version: f.APIVersionInfo}, f.Err
 }
 
-func (f *FakeRuntime) Status() (*RuntimeStatus, error) {
+func (f *FakeRuntime) Status() (*container.RuntimeStatus, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -201,11 +211,11 @@ func (f *FakeRuntime) Status() (*RuntimeStatus, error) {
 	return f.RuntimeStatus, f.StatusErr
 }
 
-func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
+func (f *FakeRuntime) GetPods(all bool) ([]*container.Pod, error) {
 	f.Lock()
 	defer f.Unlock()
 
-	var pods []*Pod
+	var pods []*container.Pod
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetPods")
 	if all {
@@ -220,7 +230,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return pods, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result PodSyncResult) {
+func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *container.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result container.PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -236,7 +246,7 @@ func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *PodStatus, _ []v1.Secret, backOff 
 	return
 }
 
-func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error {
+func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod container.Pod, gracePeriodOverride *int64) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -282,7 +292,7 @@ func (f *FakeRuntime) KillContainerInPod(container v1.Container, pod *v1.Pod) er
 	return f.Err
 }
 
-func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error) {
+func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*container.PodStatus, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -291,7 +301,7 @@ func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*PodS
 	return &status, f.Err
 }
 
-func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
+func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID container.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -299,7 +309,7 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (f *FakeRuntime) PullImage(image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -307,7 +317,7 @@ func (f *FakeRuntime) PullImage(image ImageSpec, pullSecrets []v1.Secret, podSan
 	return image.Image, f.Err
 }
 
-func (f *FakeRuntime) GetImageRef(image ImageSpec) (string, error) {
+func (f *FakeRuntime) GetImageRef(image container.ImageSpec) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -320,7 +330,7 @@ func (f *FakeRuntime) GetImageRef(image ImageSpec) (string, error) {
 	return "", f.InspectErr
 }
 
-func (f *FakeRuntime) ListImages() ([]Image, error) {
+func (f *FakeRuntime) ListImages() ([]container.Image, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -328,7 +338,7 @@ func (f *FakeRuntime) ListImages() ([]Image, error) {
 	return f.ImageList, f.Err
 }
 
-func (f *FakeRuntime) RemoveImage(image ImageSpec) error {
+func (f *FakeRuntime) RemoveImage(image container.ImageSpec) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -345,7 +355,7 @@ func (f *FakeRuntime) RemoveImage(image ImageSpec) error {
 	return f.Err
 }
 
-func (f *FakeRuntime) GarbageCollect(gcPolicy GCPolicy, ready bool, evictNonDeletedPods bool) error {
+func (f *FakeRuntime) GarbageCollect(gcPolicy container.GCPolicy, ready bool, evictNonDeletedPods bool) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -353,7 +363,7 @@ func (f *FakeRuntime) GarbageCollect(gcPolicy GCPolicy, ready bool, evictNonDele
 	return f.Err
 }
 
-func (f *FakeRuntime) DeleteContainer(containerID ContainerID) error {
+func (f *FakeRuntime) DeleteContainer(containerID container.ContainerID) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -361,7 +371,7 @@ func (f *FakeRuntime) DeleteContainer(containerID ContainerID) error {
 	return f.Err
 }
 
-func (f *FakeRuntime) ImageStats() (*ImageStats, error) {
+func (f *FakeRuntime) ImageStats() (*container.ImageStats, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -369,7 +379,7 @@ func (f *FakeRuntime) ImageStats() (*ImageStats, error) {
 	return nil, f.Err
 }
 
-func (f *FakeStreamingRuntime) GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (f *FakeStreamingRuntime) GetExec(id container.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -377,7 +387,7 @@ func (f *FakeStreamingRuntime) GetExec(id ContainerID, cmd []string, stdin, stdo
 	return &url.URL{Host: FakeHost}, f.Err
 }
 
-func (f *FakeStreamingRuntime) GetAttach(id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (f *FakeStreamingRuntime) GetAttach(id container.ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -399,13 +409,13 @@ type FakeCommandRunner struct {
 	Err    error
 
 	// actual values when invoked
-	ContainerID ContainerID
+	ContainerID container.ContainerID
 	Cmd         []string
 }
 
 var _ ContainerCommandRunner = &FakeCommandRunner{}
 
-func (f *FakeCommandRunner) RunInContainer(containerID ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+func (f *FakeCommandRunner) RunInContainer(containerID container.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	// record invoked values
 	f.ContainerID = containerID
 	f.Cmd = cmd
