@@ -46,7 +46,6 @@
 ./hack/update-generated-kms-dockerized.sh
 ./hack/update-generated-protobuf-dockerized.sh
 ./hack/update-generated-runtime-dockerized.sh
-./hack/update-openapi-spec.sh
 ./hack/update-vendor.sh
 ./hack/verify-api-groups.sh
 ./hack/verify-boilerplate.sh
