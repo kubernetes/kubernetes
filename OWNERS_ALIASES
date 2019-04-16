@@ -371,9 +371,9 @@ aliases:
   #   - 
   #   - 
   
-  # sig-scheduling-api-reviewers:
-  #   - 
-  #   - 
+  sig-scheduling-api-reviewers:
+      - bsalamat
+      - k82cn
   
   # sig-storage-api-reviewers:
   #   - 
