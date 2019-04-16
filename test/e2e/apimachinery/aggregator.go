@@ -25,7 +25,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,7 +74,17 @@ var _ = SIGDescribe("Aggregator", func() {
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		aggrclient = f.AggregatorClient
+
+		if aggrclient == nil {
+			config, err := framework.LoadConfig()
+			if err != nil {
+				framework.Failf("could not load config: %v", err)
+			}
+			aggrclient, err = aggregatorclient.NewForConfig(config)
+			if err != nil {
+				framework.Failf("could not create aggregator client: %v", err)
+			}
+		}
 	})
 
 	/*
@@ -84,7 +94,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	*/
 	framework.ConformanceIt("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
 		// Testing a 1.10 version of the sample-apiserver
-		TestSampleAPIServer(f, imageutils.GetE2EImage(imageutils.APIServer))
+		TestSampleAPIServer(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
 	})
 })
 
@@ -104,11 +114,10 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 
 // TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
 // will work on the current Aggregator/API-Server.
-func TestSampleAPIServer(f *framework.Framework, image string) {
+func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Clientset, image string) {
 	ginkgo.By("Registering the sample API server.")
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
-	aggrclient := f.AggregatorClient
 
 	namespace := f.Namespace.Name
 	context := setupServerCert(namespace, "sample-api")
