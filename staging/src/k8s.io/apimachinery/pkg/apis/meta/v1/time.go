@@ -57,31 +57,14 @@ func Now() Time {
 	return Time{time.Now()}
 }
 
-// IsZero returns true if the value is nil or time is zero.
-func (t *Time) IsZero() bool {
-	if t == nil {
-		return true
-	}
-	return t.Time.IsZero()
-}
-
 // Before reports whether the time instant t is before u.
-func (t *Time) Before(u *Time) bool {
-	if t != nil && u != nil {
-		return t.Time.Before(u.Time)
-	}
-	return false
+func (t Time) Before(u Time) bool {
+	return t.Time.Before(u.Time)
 }
 
 // Equal reports whether the time instant t is equal to u.
-func (t *Time) Equal(u *Time) bool {
-	if t == nil && u == nil {
-		return true
-	}
-	if t != nil && u != nil {
-		return t.Time.Equal(u.Time)
-	}
-	return false
+func (t Time) Equal(u Time) bool {
+	return t.Time.Equal(u.Time)
 }
 
 // Unix returns the local time corresponding to the given Unix time
