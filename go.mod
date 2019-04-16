@@ -67,7 +67,7 @@ require (
 	github.com/go-openapi/validate v0.18.0
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
 	github.com/godbus/dbus v0.0.0-20151105175453-c7fdd8b5cd55
-	github.com/gogo/protobuf v1.1.1
+	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock v0.0.0-20160127222235-bd3c8e81be01
 	github.com/golang/protobuf v1.2.0
