@@ -1059,7 +1059,7 @@ function Create-DockerRegistryKey {
 # TODO(pjh): move the Stackdriver logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
-$STACKDRIVER_VERSION = 'v1-8'
+$STACKDRIVER_VERSION = 'v1-9'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 
 # Install and start the Stackdriver logging agent according to
