@@ -100,13 +100,10 @@ var _ PredicateMetadata = &predicateMetadata{}
 // and used to modify the return values of PredicateMetadataProducer
 type predicateMetadataProducer func(pm *predicateMetadata)
 
-var predicateMetaProducerRegisterLock sync.Mutex
 var predicateMetadataProducers = make(map[string]predicateMetadataProducer)
 
 // RegisterPredicateMetadataProducer registers a PredicateMetadataProducer.
 func RegisterPredicateMetadataProducer(predicateName string, precomp predicateMetadataProducer) {
-	predicateMetaProducerRegisterLock.Lock()
-	defer predicateMetaProducerRegisterLock.Unlock()
 	predicateMetadataProducers[predicateName] = precomp
 }
 
