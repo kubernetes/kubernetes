@@ -47,7 +47,9 @@ package azure
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -178,8 +180,13 @@ func performTokenExchange(
 	}
 
 	var content []byte
-	if content, err = ioutil.ReadAll(exchange.Body); err != nil {
+	limitedReader := &io.LimitedReader{R: exchange.Body, N: maxReadLength}
+	if content, err = ioutil.ReadAll(limitedReader); err != nil {
 		return "", fmt.Errorf("Www-Authenticate: error reading response from %s", authEndpoint)
+	}
+
+	if limitedReader.N <= 0 {
+		return "", errors.New("the read limit is reached")
 	}
 
 	var authResp acrAuthResponse
