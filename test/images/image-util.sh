@@ -84,7 +84,7 @@ build() {
     TAG=$(<VERSION)
 
     if [[ -f BASEIMAGE ]]; then
-      BASEIMAGE=$(getBaseImage "${os_name}" "${arch}")
+      BASEIMAGE=$(getBaseImage "${os_name}" "${arch}" | ${SED} "s|REGISTRY|${REGISTRY}|g")
       ${SED} -i "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
       ${SED} -i "s|BASEARCH|${arch}|g" Dockerfile
     fi
