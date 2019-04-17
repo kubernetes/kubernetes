@@ -483,11 +483,10 @@ func filterByNamespaceAndName(objs []runtime.Object, ns, name string) ([]runtime
 	return res, nil
 }
 
-// filterList returns all objects in the collection matched by the namespace and the provided selectors
-// All labels will be match, assuming the labels.Selector is non empty
-// Only metadata.name/metadata.namespace are available field.Selector for all CRD:
+// filterList returns all objects in the collection matched by the namespace and the provided ListRestrictions/Selectors
+// Only metadata.name/metadata.namespace are valid field.Selector for all CRD:
 // https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/
-// Namespace is checked independent of the field.Selector, in case not provided
+// metadata.namespace is checked independent of the field.Selector, in case not provided
 func filterList(objs []runtime.Object, ns string, lr ListRestrictions) ([]runtime.Object, error) {
 	var res []runtime.Object
 
