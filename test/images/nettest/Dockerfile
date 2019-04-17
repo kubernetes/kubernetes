@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM scratch
+FROM gcr.io/distroless/static:latest
 COPY nettest /
 EXPOSE 8080
 ENTRYPOINT ["/nettest"]
