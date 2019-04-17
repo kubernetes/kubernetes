@@ -90,7 +90,7 @@ var _ = KubeadmDescribe("proxy addon", func() {
 		})
 	})
 
-	Context("kube-proxy DeamonSet", func() {
+	Context("kube-proxy DaemonSet", func() {
 		It("should exist and be properly configured", func() {
 			ds := GetDaemonSet(f.ClientSet, kubeSystemNamespace, kubeProxyDaemonSetName)
 
