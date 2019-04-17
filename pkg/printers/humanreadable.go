@@ -61,7 +61,6 @@ type HumanReadablePrinter struct {
 	options        PrintOptions
 	lastType       interface{}
 	lastColumns    []metav1beta1.TableColumnDefinition
-	skipTabWriter  bool
 }
 
 var _ PrintHandler = &HumanReadablePrinter{}
@@ -80,13 +79,6 @@ func NewTablePrinter() *HumanReadablePrinter {
 	return &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
 	}
-}
-
-// AddTabWriter sets whether the PrintObj function will format with tabwriter (true
-// by default).
-func (a *HumanReadablePrinter) AddTabWriter(t bool) *HumanReadablePrinter {
-	a.skipTabWriter = !t
-	return a
 }
 
 func (a *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePrinter {
@@ -226,7 +218,7 @@ func printHeader(columnNames []string, w io.Writer) error {
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
 	w, found := output.(*tabwriter.Writer)
-	if !found && !h.skipTabWriter {
+	if !found {
 		w = GetNewTabWriter(output)
 		output = w
 		defer w.Flush()
