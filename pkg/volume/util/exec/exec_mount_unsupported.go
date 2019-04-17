@@ -16,18 +16,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package exec
 
 import (
 	"errors"
 	"os"
+
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type execMounter struct{}
 
-// ExecMounter is a mounter that uses provided Exec interface to mount and
+// NewExecMounter returns a mounter that uses provided Exec interface to mount and
 // unmount a filesystem. For all other calls it uses a wrapped mounter.
-func NewExecMounter(exec Exec, wrapped Interface) Interface {
+func NewExecMounter(exec mount.Exec, wrapped mount.Interface) mount.Interface {
 	return &execMounter{}
 }
 
@@ -39,11 +41,11 @@ func (mounter *execMounter) Unmount(target string) error {
 	return nil
 }
 
-func (mounter *execMounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, nil
+func (mounter *execMounter) List() ([]mount.MountPoint, error) {
+	return []mount.MountPoint{}, nil
 }
 
-func (mounter *execMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+func (mounter *execMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
 	return (mp.Path == dir)
 }
 
@@ -67,8 +69,8 @@ func (mounter *execMounter) MakeRShared(path string) error {
 	return nil
 }
 
-func (mounter *execMounter) GetFileType(pathname string) (FileType, error) {
-	return FileType("fake"), errors.New("not implemented")
+func (mounter *execMounter) GetFileType(pathname string) (mount.FileType, error) {
+	return mount.FileType("fake"), errors.New("not implemented")
 }
 
 func (mounter *execMounter) MakeDir(pathname string) error {
@@ -83,7 +85,7 @@ func (mounter *execMounter) ExistsPath(pathname string) (bool, error) {
 	return true, errors.New("not implemented")
 }
 
-func (m *execMounter) EvalHostSymlinks(pathname string) (string, error) {
+func (mounter *execMounter) EvalHostSymlinks(pathname string) (string, error) {
 	return "", errors.New("not implemented")
 }
 

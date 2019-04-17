@@ -16,23 +16,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package exec
 
 import (
 	"fmt"
 	"os"
 
 	"k8s.io/klog"
+
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // ExecMounter is a mounter that uses provided Exec interface to mount and
 // unmount a filesystem. For all other calls it uses a wrapped mounter.
 type execMounter struct {
-	wrappedMounter Interface
-	exec           Exec
+	wrappedMounter mount.Interface
+	exec           mount.Exec
 }
 
-func NewExecMounter(exec Exec, wrapped Interface) Interface {
+// NewExecMounter returns a mounter that uses provided Exec interface to mount and
+// unmount a filesystem. For all other calls it uses a wrapped mounter.
+func NewExecMounter(exec mount.Exec, wrapped mount.Interface) mount.Interface {
 	return &execMounter{
 		wrappedMounter: wrapped,
 		exec:           exec,
@@ -40,11 +44,11 @@ func NewExecMounter(exec Exec, wrapped Interface) Interface {
 }
 
 // execMounter implements mount.Interface
-var _ Interface = &execMounter{}
+var _ mount.Interface = &execMounter{}
 
 // Mount runs mount(8) using given exec interface.
 func (m *execMounter) Mount(source string, target string, fstype string, options []string) error {
-	bind, bindOpts, bindRemountOpts := IsBind(options)
+	bind, bindOpts, bindRemountOpts := mount.IsBind(options)
 
 	if bind {
 		err := m.doExecMount(source, target, fstype, bindOpts)
@@ -60,11 +64,11 @@ func (m *execMounter) Mount(source string, target string, fstype string, options
 // doExecMount calls exec(mount <what> <where>) using given exec interface.
 func (m *execMounter) doExecMount(source, target, fstype string, options []string) error {
 	klog.V(5).Infof("Exec Mounting %s %s %s %v", source, target, fstype, options)
-	mountArgs := MakeMountArgs(source, target, fstype, options)
+	mountArgs := mount.MakeMountArgs(source, target, fstype, options)
 	output, err := m.exec.Run("mount", mountArgs...)
 	klog.V(5).Infof("Exec mounted %v: %v: %s", mountArgs, err, string(output))
 	if err != nil {
-		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n",
+		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s",
 			err, "mount", source, target, fstype, options, string(output))
 	}
 
@@ -84,7 +88,7 @@ func (m *execMounter) Unmount(target string) error {
 }
 
 // List returns a list of all mounted filesystems.
-func (m *execMounter) List() ([]MountPoint, error) {
+func (m *execMounter) List() ([]mount.MountPoint, error) {
 	return m.wrappedMounter.List()
 }
 
@@ -112,7 +116,7 @@ func (m *execMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (strin
 	return m.wrappedMounter.GetDeviceNameFromMount(mountPath, pluginDir)
 }
 
-func (m *execMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+func (m *execMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
 	return m.wrappedMounter.IsMountPointMatch(mp, dir)
 }
 
@@ -120,7 +124,7 @@ func (m *execMounter) MakeRShared(path string) error {
 	return m.wrappedMounter.MakeRShared(path)
 }
 
-func (m *execMounter) GetFileType(pathname string) (FileType, error) {
+func (m *execMounter) GetFileType(pathname string) (mount.FileType, error) {
 	return m.wrappedMounter.GetFileType(pathname)
 }
 
