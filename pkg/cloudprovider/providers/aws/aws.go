@@ -539,6 +539,10 @@ type CloudConfig struct {
 		// RouteTableID enables using a specific RouteTable
 		RouteTableID string
 
+		// Override the reported node name. This is most useful when running the master
+		// components in a different AWS account or cloud provider.
+		NodeName string
+
 		// RoleARN is the IAM role to assume when interaction with AWS APIs.
 		RoleARN string
 
@@ -1245,6 +1249,11 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 		}
 		awsCloud.selfAWSInstance = selfAWSInstance
 		awsCloud.vpcID = selfAWSInstance.vpcID
+	}
+
+	if nodeName := cfg.Global.NodeName; nodeName != "" {
+		klog.Infof("Using configured node name %q", nodeName)
+		awsCloud.selfAWSInstance.nodeName = types.NodeName(nodeName)
 	}
 
 	if cfg.Global.KubernetesClusterTag != "" || cfg.Global.KubernetesClusterID != "" {
