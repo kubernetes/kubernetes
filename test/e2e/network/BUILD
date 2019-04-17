@@ -36,7 +36,6 @@ go_library(
         "//pkg/controller/endpoint:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/networking/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
