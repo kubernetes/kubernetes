@@ -57,7 +57,6 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 			CacheCapacity:               capacity,
 			Storage:                     s,
 			Versioner:                   etcdstorage.APIObjectVersioner{},
-			Type:                        objectType,
 			ResourcePrefix:              resourcePrefix,
 			KeyFunc:                     keyFunc,
 			NewFunc:                     newFunc,

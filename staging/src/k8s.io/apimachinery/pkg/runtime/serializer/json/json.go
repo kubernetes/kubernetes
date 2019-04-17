@@ -281,7 +281,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	if cvo, ok := obj.(*runtime.CachingVersionedObject); ok {
-		if s.yaml || s.pretty {
+		if s.Yaml || s.Pretty {
 			// Yaml and pretty modes are not supported.
 			return s.Encode(cvo.Object.DeepCopyObject(), w)
 		}
