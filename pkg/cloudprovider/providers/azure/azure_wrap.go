@@ -336,3 +336,29 @@ func convertResourceGroupNameToLower(resourceID string) (string, error) {
 	resourceGroup := matches[1]
 	return strings.Replace(resourceID, resourceGroup, strings.ToLower(resourceGroup), 1), nil
 }
+
+// isBackendPoolOnSameLB checks whether newBackendPoolID is on the same load balancer as existingBackendPools.
+// Since both public and internal LBs are supported, lbName and lbName-internal are treated as same.
+// If not same, the lbName for existingBackendPools would also be returned.
+func isBackendPoolOnSameLB(newBackendPoolID string, existingBackendPools []string) (bool, string, error) {
+	matches := backendPoolIDRE.FindStringSubmatch(newBackendPoolID)
+	if len(matches) != 2 {
+		return false, "", fmt.Errorf("new backendPoolID %q is in wrong format", newBackendPoolID)
+	}
+
+	newLBName := matches[1]
+	newLBNameTrimmed := strings.TrimRight(newLBName, InternalLoadBalancerNameSuffix)
+	for _, backendPool := range existingBackendPools {
+		matches := backendPoolIDRE.FindStringSubmatch(backendPool)
+		if len(matches) != 2 {
+			return false, "", fmt.Errorf("existing backendPoolID %q is in wrong format", backendPool)
+		}
+
+		lbName := matches[1]
+		if !strings.EqualFold(strings.TrimRight(lbName, InternalLoadBalancerNameSuffix), newLBNameTrimmed) {
+			return false, lbName, nil
+		}
+	}
+
+	return true, "", nil
+}
