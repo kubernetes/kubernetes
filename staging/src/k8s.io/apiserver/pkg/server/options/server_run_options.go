@@ -18,9 +18,10 @@ package options
 
 import (
 	"fmt"
-	"k8s.io/apiserver/pkg/features"
 	"net"
 	"time"
+
+	"k8s.io/apiserver/pkg/features"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -50,9 +51,9 @@ type ServerRunOptions struct {
 	// decoded in a write request. 0 means no limit.
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
-	MaxRequestBodyBytes       int64
-	TargetRAMMB               int
-	EnableInfightQuotaHandler bool
+	MaxRequestBodyBytes        int64
+	TargetRAMMB                int
+	EnableInflightQuotaHandler bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -107,10 +108,11 @@ func (s *ServerRunOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--target-ram-mb can not be negative value"))
 	}
 
-	if s.EnableInfightQuotaHandler {
+	if s.EnableInflightQuotaHandler {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.RequestManagement) {
-			errors = append(errors, fmt.Errorf("--enable-inflight-quota-handler can not be set if feature "+
-				"gate RequestManagement is disabled"))
+			errors = append(errors, fmt.Errorf(
+				"--enable-inflight-quota-handler can not be set if feature gate RequestManagement is disabled. "+
+					"WARNING: This flag is a placeholder and the feature is not implemented"))
 		}
 		if s.MaxMutatingRequestsInFlight != 0 {
 			errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight=%v "+
@@ -192,8 +194,9 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
 
-	fs.BoolVar(&s.EnableInfightQuotaHandler, "enable-inflight-quota-handler", s.EnableInfightQuotaHandler, ""+
-		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
+	fs.BoolVar(&s.EnableInflightQuotaHandler, "enable-inflight-quota-handler", s.EnableInflightQuotaHandler, ""+
+		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness. "+
+		"WARNING: This flag is a placeholder and the feature is not implemented.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }
