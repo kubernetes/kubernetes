@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	goflag "flag"
 	"fmt"
 	"math/rand"
@@ -185,7 +186,9 @@ func run(config *hollowNodeConfig) {
 		}
 		iptInterface := fakeiptables.NewFake()
 		sysctl := fakesysctl.NewFake()
-		execer := &fakeexec.FakeExec{}
+		execer := &fakeexec.FakeExec{
+			LookPathFunc: func(_ string) (string, error) { return "", errors.New("fake execer") },
+		}
 		eventBroadcaster := record.NewBroadcaster()
 		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: config.NodeName})
 
