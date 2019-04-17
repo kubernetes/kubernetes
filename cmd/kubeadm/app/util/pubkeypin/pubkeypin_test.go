@@ -23,9 +23,10 @@ import (
 	"testing"
 )
 
-// testCertPEM is a simple self-signed test certificate issued with the openssl CLI:
-// openssl req -new -newkey rsa:2048 -days 36500 -nodes -x509 -keyout /dev/null -out test.crt
-const testCertPEM = `
+const (
+	// testCertPEM is a simple self-signed test certificate issued with the openssl CLI:
+	// openssl req -new -newkey rsa:2048 -days 36500 -nodes -x509 -keyout /dev/null -out test.crt
+	testCertPEM = `
 -----BEGIN CERTIFICATE-----
 MIIDRDCCAiygAwIBAgIJAJgVaCXvC6HkMA0GCSqGSIb3DQEBBQUAMB8xHTAbBgNV
 BAMTFGt1YmVhZG0ta2V5cGlucy10ZXN0MCAXDTE3MDcwNTE3NDMxMFoYDzIxMTcw
@@ -47,12 +48,12 @@ c1vuFqTnJBPcb7W//R/GI2Paicm1cmns9NLnPR35exHxFTy+D1yxmGokpoPMdife
 aH+sfuxT8xeTPb3kjzF9eJTlnEquUDLM
 -----END CERTIFICATE-----`
 
-// expectedHash can be verified using the openssl CLI:
-// openssl x509 -pubkey -in test.crt openssl rsa -pubin -outform der 2>&/dev/null | openssl dgst -sha256 -hex
-const expectedHash = `sha256:345959acb2c3b2feb87d281961c893f62a314207ef02599f1cc4a5fb255480b3`
+	// expectedHash can be verified using the openssl CLI:
+	// openssl x509 -pubkey -in test.crt openssl rsa -pubin -outform der 2>&/dev/null | openssl dgst -sha256 -hex
+	expectedHash = `sha256:345959acb2c3b2feb87d281961c893f62a314207ef02599f1cc4a5fb255480b3`
 
-// testCert2PEM is a second test cert generated the same way as testCertPEM
-const testCert2PEM = `
+	// testCert2PEM is a second test cert generated the same way as testCertPEM
+	testCert2PEM = `
 -----BEGIN CERTIFICATE-----
 MIID9jCCAt6gAwIBAgIJAN5MXZDic7qYMA0GCSqGSIb3DQEBBQUAMFkxCzAJBgNV
 BAYTAkFVMRMwEQYDVQQIEwpTb21lLVN0YXRlMSEwHwYDVQQKExhJbnRlcm5ldCBX
@@ -78,6 +79,7 @@ jEQMEQpG8Ss7HGJLGLBw/xAmG0e//XS/o2dDonbGbvzToFByz8OGxjMhk6yV6hdd
 +iyvsLAw/MYMSA==
 -----END CERTIFICATE-----
 `
+)
 
 // testCert is a small helper to get a test x509.Certificate from the PEM constants
 func testCert(t *testing.T, pemString string) *x509.Certificate {

@@ -33,6 +33,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
+const (
+	mediaType = runtime.ContentTypeYAML
+)
+
 // MarshalToYaml marshals an object into yaml.
 func MarshalToYaml(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
 	return MarshalToYamlForCodecs(obj, gv, clientsetscheme.Codecs)
@@ -42,7 +46,6 @@ func MarshalToYaml(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
 // TODO: Is specifying the gv really needed here?
 // TODO: Can we support json out of the box easily here?
 func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs serializer.CodecFactory) ([]byte, error) {
-	const mediaType = runtime.ContentTypeYAML
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return []byte{}, errors.Errorf("unsupported media type %q", mediaType)
@@ -61,7 +64,6 @@ func UnmarshalFromYaml(buffer []byte, gv schema.GroupVersion) (runtime.Object, e
 // TODO: Is specifying the gv really needed here?
 // TODO: Can we support json out of the box easily here?
 func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs serializer.CodecFactory) (runtime.Object, error) {
-	const mediaType = runtime.ContentTypeYAML
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return nil, errors.Errorf("unsupported media type %q", mediaType)
