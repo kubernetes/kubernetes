@@ -245,16 +245,19 @@ func (lb *LoadBalancerRR) updateAffinityMap(svcPort proxy.ServicePortName, newEn
 
 // buildPortsToEndpointsMap builds a map of portname -> all ip:ports for that
 // portname. Expode Endpoints.Subsets[*] into this structure.
-func buildPortsToEndpointsMap(endpoints *v1.Endpoints) map[string][]hostPortPair {
-	portsToEndpoints := map[string][]hostPortPair{}
+func buildPortsToEndpointsMap(endpoints *v1.Endpoints) map[string][]string {
+	portsToEndpoints := map[string][]string{}
 	for i := range endpoints.Subsets {
 		ss := &endpoints.Subsets[i]
 		for i := range ss.Ports {
 			port := &ss.Ports[i]
 			for i := range ss.Addresses {
 				addr := &ss.Addresses[i]
-				portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], hostPortPair{addr.IP, int(port.Port)})
-				// Ignore the protocol field - we'll get that from the Service objects.
+				hpp := &hostPortPair{addr.IP, int(port.Port)}
+				if isValidEndpoint(hpp) {
+					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], net.JoinHostPort(hpp.host, strconv.Itoa(hpp.port)))
+					// Ignore the protocol field - we'll get that from the Service objects.
+				}
 			}
 		}
 	}
@@ -269,7 +272,7 @@ func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *v1.Endpoints) {
 
 	for portname := range portsToEndpoints {
 		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
-		newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
+		newEndpoints := portsToEndpoints[portname]
 		state, exists := lb.services[svcPort]
 
 		if !exists || state == nil || len(newEndpoints) > 0 {
@@ -298,7 +301,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 
 	for portname := range portsToEndpoints {
 		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
-		newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
+		newEndpoints := portsToEndpoints[portname]
 		state, exists := lb.services[svcPort]
 
 		curEndpoints := []string{}
