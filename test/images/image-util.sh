@@ -29,15 +29,16 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["ppc64le"]="ppc64le" ["s390x"]="s390x" )
 
 # Returns list of all supported architectures from BASEIMAGE file
-listArchs() {
+listOsArchs() {
   image=$1
   cut -d "=" -f 1 "${image}"/BASEIMAGE
 }
 
 # Returns baseimage need to used in Dockerfile for any given architecture
 getBaseImage() {
-  arch=$1
-  grep "${arch}=" BASEIMAGE | cut -d= -f2
+  os_name=$1
+  arch=$2
+  grep "${os_name}/${arch}=" BASEIMAGE | cut -d= -f2
 }
 
 # This function will build test image for all the architectures
@@ -47,15 +48,24 @@ getBaseImage() {
 build() {
   image=$1
   if [[ -f ${image}/BASEIMAGE ]]; then
-    archs=$(listArchs "$image")
+    os_archs=$(listOsArchs "$image")
   else
-    archs=${!QEMUARCHS[*]}
+    # prepend linux/ to the QEMUARCHS items.
+    os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[*]}")
   fi
 
   kube::util::ensure-gnu-sed
 
-  for arch in ${archs}; do
-    echo "Building image for ${image} ARCH: ${arch}..."
+  for os_arch in ${os_archs}; do
+    if [[ $os_arch =~ .*/.* ]]; then
+      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
+      arch=$(echo "$os_arch" | cut -d "/" -f 2)
+    else
+      echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
+      exit 1
+    fi
+
+    echo "Building image for ${image} OS/ARCH: ${os_arch}..."
 
     # Create a temporary directory for every architecture and copy the image content
     # and build the image from temporary directory
@@ -74,7 +84,7 @@ build() {
     TAG=$(<VERSION)
 
     if [[ -f BASEIMAGE ]]; then
-      BASEIMAGE=$(getBaseImage "${arch}")
+      BASEIMAGE=$(getBaseImage "${os_name}" "${arch}")
       ${SED} -i "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
       ${SED} -i "s|BASEARCH|${arch}|g" Dockerfile
     fi
@@ -121,11 +131,20 @@ push() {
   docker_version_check
   TAG=$(<"${image}"/VERSION)
   if [[ -f ${image}/BASEIMAGE ]]; then
-    archs=$(listArchs "$image")
+    os_archs=$(listOsArchs "$image")
   else
-    archs=${!QEMUARCHS[*]}
+    # prepend linux/ to the QEMUARCHS items.
+    os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[*]}")
   fi
-  for arch in ${archs}; do
+  for os_arch in ${os_archs}; do
+    if [[ $os_arch =~ .*/.* ]]; then
+      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
+      arch=$(echo "$os_arch" | cut -d "/" -f 2)
+    else
+      echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
+      exit 1
+    fi
+
     docker push "${REGISTRY}/${image}-${arch}:${TAG}"
   done
 
@@ -135,10 +154,17 @@ push() {
   export DOCKER_CLI_EXPERIMENTAL="enabled"
   # reset manifest list; needed in case multiple images are being built / pushed.
   manifest=()
-  # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${image}-amd64:${TAG} ${REGISTRY}/${image}-ppc64le:${TAG}'
-  while IFS='' read -r line; do manifest+=("$line"); done < <(echo "$archs" | ${SED} -e "s~[^ ]*~$REGISTRY\/$image\-&:$TAG~g")
+  # Make os_archs list into image manifest. Eg: 'linux/amd64 linux/ppc64le' to '${REGISTRY}/${image}-amd64:${TAG} ${REGISTRY}/${image}-ppc64le:${TAG}'
+  while IFS='' read -r line; do manifest+=("$line"); done < <(echo "$os_archs" | ${SED} "s~linux\/~~" | ${SED} -e "s~[^ ]*~$REGISTRY\/$image\-&:$TAG~g")
   docker manifest create --amend "${REGISTRY}/${image}:${TAG}" "${manifest[@]}"
-  for arch in ${archs}; do
+  for os_arch in ${os_archs}; do
+    if [[ $os_arch =~ .*/.* ]]; then
+      os_name=$(echo "$os_arch" | cut -d "/" -f 1)
+      arch=$(echo "$os_arch" | cut -d "/" -f 2)
+    else
+      echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
+      exit 1
+    fi
     docker manifest annotate --arch "${arch}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}-${arch}:${TAG}"
   done
   docker manifest push --purge "${REGISTRY}/${image}:${TAG}"
