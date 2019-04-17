@@ -3683,6 +3683,7 @@ func ParseKVLines(output, key string) string {
 	return ""
 }
 
+// RestartKubeProxy restarts kube-proxy on the given host.
 func RestartKubeProxy(host string) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
@@ -3719,6 +3720,7 @@ func RestartKubeProxy(host string) error {
 	return nil
 }
 
+// RestartKubelet restarts kubelet on the given host.
 func RestartKubelet(host string) error {
 	// TODO: Make it work for all providers and distros.
 	supportedProviders := []string{"gce", "aws", "vsphere"}
@@ -3762,6 +3764,7 @@ func RestartKubelet(host string) error {
 	return nil
 }
 
+// WaitForKubeletUp waits for the kubelet on the given host to be up.
 func WaitForKubeletUp(host string) error {
 	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
@@ -3776,6 +3779,7 @@ func WaitForKubeletUp(host string) error {
 	return fmt.Errorf("waiting for kubelet timed out")
 }
 
+// RestartApiserver restarts the kube-apiserver.
 func RestartApiserver(cs clientset.Interface) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
@@ -3819,6 +3823,7 @@ func sshRestartMaster() error {
 	return nil
 }
 
+// WaitForApiserverUp waits for the kube-apiserver to be up.
 func WaitForApiserverUp(c clientset.Interface) error {
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 		body, err := c.CoreV1().RESTClient().Get().AbsPath("/healthz").Do().Raw()
@@ -3865,6 +3870,7 @@ func getApiserverRestartCount(c clientset.Interface) (int32, error) {
 	return -1, fmt.Errorf("Failed to find kube-apiserver container in pod")
 }
 
+// RestartControllerManager restarts the kube-controller-manager.
 func RestartControllerManager() error {
 	// TODO: Make it work for all providers and distros.
 	if !ProviderIs("gce", "aws") {
@@ -3883,6 +3889,7 @@ func RestartControllerManager() error {
 	return nil
 }
 
+// WaitForControllerManagerUp waits for the kube-controller-manager to be up.
 func WaitForControllerManagerUp() error {
 	cmd := "curl http://localhost:" + strconv.Itoa(ports.InsecureKubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
@@ -3986,11 +3993,12 @@ func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) e
 	return err
 }
 
+// GenerateMasterRegexp returns a regex for matching master node name.
 func GenerateMasterRegexp(prefix string) string {
 	return prefix + "(-...)?"
 }
 
-// waitForMasters waits until the cluster has the desired number of ready masters in it.
+// WaitForMasters waits until the cluster has the desired number of ready masters in it.
 func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeout time.Duration) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -4099,21 +4107,21 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 	return websocket.DialConfig(cfg)
 }
 
-// Looks for the given string in the log of a specific pod container
+// LookForStringInLog looks for the given string in the log of a specific pod container
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return LookForString(expectedString, timeout, func() string {
 		return RunKubectlOrDie("logs", podName, container, fmt.Sprintf("--namespace=%v", ns))
 	})
 }
 
-// Looks for the given string in a file in a specific pod container
+// LookForStringInFile looks for the given string in a file in a specific pod container
 func LookForStringInFile(ns, podName, container, file, expectedString string, timeout time.Duration) (result string, err error) {
 	return LookForString(expectedString, timeout, func() string {
 		return RunKubectlOrDie("exec", podName, "-c", container, fmt.Sprintf("--namespace=%v", ns), "--", "cat", file)
 	})
 }
 
-// Looks for the given string in the output of a command executed in a specific pod container
+// LookForStringInPodExec looks for the given string in the output of a command executed in a specific pod container
 func LookForStringInPodExec(ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
 	return LookForString(expectedString, timeout, func() string {
 		// use the first container
@@ -4123,7 +4131,7 @@ func LookForStringInPodExec(ns, podName string, command []string, expectedString
 	})
 }
 
-// Looks for the given string in the output of fn, repeatedly calling fn until
+// LookForString looks for the given string in the output of fn, repeatedly calling fn until
 // the timeout is reached or the string is found. Returns last log and possibly
 // error if the string was not found.
 func LookForString(expectedString string, timeout time.Duration, fn func() string) (result string, err error) {
@@ -4179,7 +4187,7 @@ func GetNodePortURL(client clientset.Interface, ns, name string, svcPort int) (s
 		return "", err
 	}
 	if len(nodes.Items) == 0 {
-		return "", fmt.Errorf("Unable to list nodes in cluster.")
+		return "", fmt.Errorf("Unable to list nodes in cluster")
 	}
 	for _, node := range nodes.Items {
 		for _, address := range node.Status.Addresses {
@@ -4193,6 +4201,7 @@ func GetNodePortURL(client clientset.Interface, ns, name string, svcPort int) (s
 	return "", fmt.Errorf("Failed to find external address for service %v", name)
 }
 
+// GetPodLogs returns the logs of the specified container (namespace/pod/container).
 // TODO(random-liu): Change this to be a member function of the framework.
 func GetPodLogs(c clientset.Interface, namespace, podName, containerName string) (string, error) {
 	return getPodLogsInternal(c, namespace, podName, containerName, false)
@@ -4216,7 +4225,7 @@ func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName
 		return "", err
 	}
 	if err == nil && strings.Contains(string(logs), "Internal Error") {
-		return "", fmt.Errorf("Fetched log contains \"Internal Error\": %q.", string(logs))
+		return "", fmt.Errorf("Fetched log contains \"Internal Error\": %q", string(logs))
 	}
 	return string(logs), err
 }
@@ -4227,6 +4236,7 @@ func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 	return TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
 }
 
+// BlockNetwork blocks network between the given from value and the given to value.
 // The following helper functions can block/unblock network from source
 // host to destination host by manipulating iptable rules.
 // This function assumes it can ssh to the source host.
@@ -4254,6 +4264,7 @@ func BlockNetwork(from string, to string) {
 	}
 }
 
+// UnblockNetwork unblocks network between the given from value and the given to value.
 func UnblockNetwork(from string, to string) {
 	Logf("Unblock network traffic from %s to %s", from, to)
 	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
@@ -4341,10 +4352,13 @@ func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, 
 	return result, nil
 }
 
+// PingCommand is the type to hold ping command.
 type PingCommand string
 
 const (
+	// IPv4PingCommand is a ping command for IPv4.
 	IPv4PingCommand PingCommand = "ping"
+	// IPv6PingCommand is a ping command for IPv6.
 	IPv6PingCommand PingCommand = "ping6"
 )
 
@@ -4428,6 +4442,7 @@ func parseSystemdServices(services string) string {
 	return strings.TrimSpace(strings.Replace(services, ",", " ", -1))
 }
 
+// GetPodsInNamespace returns the pods in the given namespace.
 func GetPodsInNamespace(c clientset.Interface, ns string, ignoreLabels map[string]string) ([]*v1.Pod, error) {
 	pods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
 	if err != nil {
@@ -4561,6 +4576,7 @@ func GetMasterAndWorkerNodesOrDie(c clientset.Interface) (sets.String, *v1.NodeL
 	return masters, nodes
 }
 
+// ListNamespaceEvents lists the events in the given namespace.
 func ListNamespaceEvents(c clientset.Interface, ns string) error {
 	ls, err := c.CoreV1().Events(ns).List(metav1.ListOptions{})
 	if err != nil {
@@ -4583,6 +4599,7 @@ type E2ETestNodePreparer struct {
 	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
 }
 
+// NewE2ETestNodePreparer returns a new instance of E2ETestNodePreparer.
 func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy) testutils.TestNodePreparer {
 	return &E2ETestNodePreparer{
 		client:                client,
@@ -4591,6 +4608,7 @@ func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testut
 	}
 }
 
+// PrepareNodes prepares nodes in the cluster.
 func (p *E2ETestNodePreparer) PrepareNodes() error {
 	nodes := GetReadySchedulableNodesOrDie(p.client)
 	numTemplates := 0
@@ -4598,7 +4616,7 @@ func (p *E2ETestNodePreparer) PrepareNodes() error {
 		numTemplates += v.Count
 	}
 	if numTemplates > len(nodes.Items) {
-		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes.")
+		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes")
 	}
 	index := 0
 	sum := 0
@@ -4615,6 +4633,7 @@ func (p *E2ETestNodePreparer) PrepareNodes() error {
 	return nil
 }
 
+// CleanupNodes cleanups nodes in the cluster.
 func (p *E2ETestNodePreparer) CleanupNodes() error {
 	var encounteredError error
 	nodes := GetReadySchedulableNodesOrDie(p.client)
@@ -4758,12 +4777,13 @@ func PollURL(route, host string, timeout time.Duration, interval time.Duration, 
 		return !expectUnreachable, nil
 	})
 	if pollErr != nil {
-		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v\n",
+		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v",
 			timeout, route, host, lastBody, pollErr)
 	}
 	return nil
 }
 
+// DescribeIng describes information of ingress by running kubectl describe ing.
 func DescribeIng(ns string) {
 	Logf("\nOutput of kubectl describe ing:\n")
 	desc, _ := RunKubectl(
@@ -4792,12 +4812,13 @@ func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.
 	}
 }
 
-// create empty file at given path on the pod.
+// CreateEmptyFileOnPod creates empty file at given path on the pod.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
 	_, err := RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
 	return err
 }
 
+// PrintSummaries prints summaries of tests.
 func PrintSummaries(summaries []TestDataSummary, testBaseName string) {
 	now := time.Now()
 	for i := range summaries {
@@ -4834,6 +4855,7 @@ func PrintSummaries(summaries []TestDataSummary, testBaseName string) {
 	}
 }
 
+// DumpDebugInfo dumps debug info of tests.
 func DumpDebugInfo(c clientset.Interface, ns string) {
 	sl, _ := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	for _, s := range sl.Items {
@@ -4924,6 +4946,7 @@ func WaitForPersistentVolumeClaimDeleted(c clientset.Interface, ns string, pvcNa
 	return fmt.Errorf("PersistentVolumeClaim %s is not removed from the system within %v", pvcName, timeout)
 }
 
+// GetClusterZones returns the values of zone label collected from all nodes.
 func GetClusterZones(c clientset.Interface) (sets.String, error) {
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
