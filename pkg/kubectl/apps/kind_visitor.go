@@ -73,17 +73,3 @@ func (elem GroupKindElement) GroupMatch(groups ...string) bool {
 	}
 	return false
 }
-
-// NoOpKindVisitor implements KindVisitor with no-op functions.
-type NoOpKindVisitor struct{}
-
-var _ KindVisitor = &NoOpKindVisitor{}
-
-func (*NoOpKindVisitor) VisitDaemonSet(kind GroupKindElement)             {}
-func (*NoOpKindVisitor) VisitDeployment(kind GroupKindElement)            {}
-func (*NoOpKindVisitor) VisitJob(kind GroupKindElement)                   {}
-func (*NoOpKindVisitor) VisitPod(kind GroupKindElement)                   {}
-func (*NoOpKindVisitor) VisitReplicaSet(kind GroupKindElement)            {}
-func (*NoOpKindVisitor) VisitReplicationController(kind GroupKindElement) {}
-func (*NoOpKindVisitor) VisitStatefulSet(kind GroupKindElement)           {}
-func (*NoOpKindVisitor) VisitCronJob(kind GroupKindElement)               {}

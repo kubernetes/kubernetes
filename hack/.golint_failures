@@ -123,7 +123,6 @@ pkg/features
 pkg/kubeapiserver
 pkg/kubeapiserver/options
 pkg/kubectl
-pkg/kubectl/apps
 pkg/kubectl/cmd/annotate
 pkg/kubectl/cmd/apply
 pkg/kubectl/cmd/attach
