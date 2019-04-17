@@ -1477,32 +1477,32 @@ func TestPrintPodTable(t *testing.T) {
 	}{
 		{
 			obj: runningPod, opts: printers.PrintOptions{},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest1\t1/2\tRunning\t6\t<unknown>\n",
+			expect: "NAME    READY   STATUS    RESTARTS   AGE\ntest1   1/2     Running   6          <unknown>\n",
 		},
 		{
 			obj: runningPod, opts: printers.PrintOptions{WithKind: true, Kind: schema.GroupKind{Kind: "Pod"}},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\npod/test1\t1/2\tRunning\t6\t<unknown>\n",
+			expect: "NAME        READY   STATUS    RESTARTS   AGE\npod/test1   1/2     Running   6          <unknown>\n",
 		},
 		{
 			obj: runningPod, opts: printers.PrintOptions{ShowLabels: true},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\tLABELS\ntest1\t1/2\tRunning\t6\t<unknown>\ta=1,b=2\n",
+			expect: "NAME    READY   STATUS    RESTARTS   AGE         LABELS\ntest1   1/2     Running   6          <unknown>   a=1,b=2\n",
 		},
 		{
 			obj: &api.PodList{Items: []api.Pod{*runningPod, *failedPod}}, opts: printers.PrintOptions{ColumnLabels: []string{"a"}},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\tA\ntest1\t1/2\tRunning\t6\t<unknown>\t1\ntest2\t1/2\tFailed\t6\t<unknown>\t\n",
+			expect: "NAME    READY   STATUS    RESTARTS   AGE         A\ntest1   1/2     Running   6          <unknown>   1\ntest2   1/2     Failed    6          <unknown>   \n",
 		},
 		{
 			obj: runningPod, opts: printers.PrintOptions{NoHeaders: true},
-			expect: "test1\t1/2\tRunning\t6\t<unknown>\n",
+			expect: "test1   1/2   Running   6     <unknown>\n",
 		},
 		{
 			obj: failedPod, opts: printers.PrintOptions{},
-			expect:       "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest2\t1/2\tFailed\t6\t<unknown>\n",
+			expect:       "NAME    READY   STATUS   RESTARTS   AGE\ntest2   1/2     Failed   6          <unknown>\n",
 			ignoreLegacy: true, // filtering is not done by the printer in the legacy path
 		},
 		{
 			obj: failedPod, opts: printers.PrintOptions{},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest2\t1/2\tFailed\t6\t<unknown>\n",
+			expect: "NAME    READY   STATUS   RESTARTS   AGE\ntest2   1/2     Failed   6          <unknown>\n",
 		},
 	}
 
@@ -1513,7 +1513,7 @@ func TestPrintPodTable(t *testing.T) {
 		}
 		verifyTable(t, table)
 		buf := &bytes.Buffer{}
-		p := printers.NewHumanReadablePrinter(test.opts).With(AddHandlers).AddTabWriter(false)
+		p := printers.NewHumanReadablePrinter(test.opts).With(AddHandlers)
 		if err := p.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
