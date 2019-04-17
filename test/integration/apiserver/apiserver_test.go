@@ -452,7 +452,7 @@ func TestAPICRDProtobuf(t *testing.T) {
 		wantBody func(*testing.T, io.Reader)
 	}{
 		{
-			name:   "server returns 406 when asking for protobuf for CRDs",
+			name:   "server returns 406 when asking for protobuf for CRDs, which dynamic client does not support",
 			accept: "application/vnd.kubernetes.protobuf",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
@@ -468,9 +468,15 @@ func TestAPICRDProtobuf(t *testing.T) {
 				if !apierrors.IsNotAcceptable(err) {
 					t.Fatal(err)
 				}
-				// TODO: this should be a more specific error
-				if err.Error() != "only the following media types are accepted: application/json, application/yaml" {
-					t.Fatal(err)
+				status := err.(apierrors.APIStatus).Status()
+				data, _ := json.MarshalIndent(status, "", "  ")
+				// because the dynamic client only has a json serializer, the client processing of the error cannot
+				// turn the response into something meaningful, so we verify that fallback handling works correctly
+				if !apierrors.IsUnexpectedServerError(err) {
+					t.Fatal(string(data))
+				}
+				if status.Message != "the server was unable to respond with a content type that the client supports (get foos.cr.bar.com test-1)" {
+					t.Fatal(string(data))
 				}
 			},
 		},
@@ -658,7 +664,7 @@ func TestTransform(t *testing.T) {
 					t.Fatal(err)
 				}
 				// TODO: this should be a more specific error
-				if err.Error() != "only the following media types are accepted: application/json;stream=watch" {
+				if err.Error() != "only the following media types are accepted: application/json;stream=watch, application/vnd.kubernetes.protobuf;stream=watch" {
 					t.Fatal(err)
 				}
 			},
@@ -763,6 +769,23 @@ func TestTransform(t *testing.T) {
 			},
 		},
 		{
+			name:   "v1beta1 verify partial metadata object on CRDs in protobuf",
+			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-4", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectPartialObjectMetaEventsProtobuf(t, w, "0", "1")
+			},
+		},
+		{
 			name:   "v1beta1 verify error on unsupported mimetype protobuf for table conversion",
 			accept: "application/vnd.kubernetes.protobuf;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
@@ -854,23 +877,6 @@ func TestTransform(t *testing.T) {
 			name:   "v1 verify columns on CRDs in json",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
-				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-4"}}}, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatalf("unable to create cr: %v", err)
-				}
-				if _, err := crclient.Patch("test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
-					t.Fatalf("unable to patch cr: %v", err)
-				}
-				return cr, crdGVR.Group, "foos"
-			},
-			wantBody: func(t *testing.T, w io.Reader) {
-				expectTableV1WatchEvents(t, 2, 2, metav1.IncludeMetadata, json.NewDecoder(w))
-			},
-		},
-		{
-			name:   "v1 verify columns on CRDs in json;stream=watch",
-			accept: "application/json;stream=watch;as=Table;g=meta.k8s.io;v=v1",
-			object: func(t *testing.T) (metav1.Object, string, string) {
 				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-5"}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create cr: %v", err)
@@ -885,8 +891,8 @@ func TestTransform(t *testing.T) {
 			},
 		},
 		{
-			name:   "v1 verify columns on CRDs in yaml",
-			accept: "application/yaml;as=Table;g=meta.k8s.io;v=v1",
+			name:   "v1 verify columns on CRDs in json;stream=watch",
+			accept: "application/json;stream=watch;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-6"}}}, metav1.CreateOptions{})
 				if err != nil {
@@ -897,12 +903,29 @@ func TestTransform(t *testing.T) {
 				}
 				return cr, crdGVR.Group, "foos"
 			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectTableV1WatchEvents(t, 2, 2, metav1.IncludeMetadata, json.NewDecoder(w))
+			},
+		},
+		{
+			name:   "v1 verify columns on CRDs in yaml",
+			accept: "application/yaml;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-7"}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-7", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
 			wantErr: func(t *testing.T, err error) {
 				if !apierrors.IsNotAcceptable(err) {
 					t.Fatal(err)
 				}
 				// TODO: this should be a more specific error
-				if err.Error() != "only the following media types are accepted: application/json;stream=watch" {
+				if err.Error() != "only the following media types are accepted: application/json;stream=watch, application/vnd.kubernetes.protobuf;stream=watch" {
 					t.Fatal(err)
 				}
 			},
@@ -912,7 +935,7 @@ func TestTransform(t *testing.T) {
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				ns := "default"
-				svc, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-4"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				svc, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-5"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
 				}
@@ -931,7 +954,7 @@ func TestTransform(t *testing.T) {
 			includeObject: metav1.IncludeNone,
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				ns := "default"
-				obj, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-5"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				obj, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-6"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
@@ -950,7 +973,7 @@ func TestTransform(t *testing.T) {
 			includeObject: metav1.IncludeObject,
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				ns := "default"
-				obj, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-6"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				obj, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-7"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
 				if err != nil {
 					t.Fatalf("unable to create object: %v", err)
 				}
@@ -1007,6 +1030,23 @@ func TestTransform(t *testing.T) {
 			},
 		},
 		{
+			name:   "v1 verify partial metadata object on CRDs in protobuf",
+			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-8", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch(cr.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectPartialObjectMetaV1EventsProtobuf(t, w, "0", "1")
+			},
+		},
+		{
 			name:   "v1 verify error on unsupported mimetype protobuf for table conversion",
 			accept: "application/vnd.kubernetes.protobuf;as=Table;g=meta.k8s.io;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
@@ -1037,6 +1077,18 @@ func TestTransform(t *testing.T) {
 		{
 			name:   "v1 verify error on invalid mimetype - bad kind",
 			accept: "application/json;as=PartialObject;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
+			},
+			wantErr: func(t *testing.T, err error) {
+				if !apierrors.IsNotAcceptable(err) {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name:   "v1 verify error on invalid mimetype - only meta kinds accepted",
+			accept: "application/json;as=Service;g=;v=v1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
 			},
