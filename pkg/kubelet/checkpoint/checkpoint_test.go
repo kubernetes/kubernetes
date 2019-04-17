@@ -41,6 +41,9 @@ func TestWriteLoadDeletePods(t *testing.T) {
 					Annotations: map[string]string{core.BootstrapCheckpointAnnotationKey: "true"},
 					UID:         "1",
 				},
+				Spec: v1.PodSpec{
+					NodeSelector: map[string]string {"Name": "fake-name1", },
+				},
 			},
 			written: true,
 		},
@@ -51,6 +54,10 @@ func TestWriteLoadDeletePods(t *testing.T) {
 					Annotations: map[string]string{core.BootstrapCheckpointAnnotationKey: "true"},
 					UID:         "2",
 				},
+				Spec: v1.PodSpec{
+					NodeSelector: map[string]string {"Name": "fake-name2", },
+				},
+
 			},
 			written: true,
 		},
@@ -59,6 +66,9 @@ func TestWriteLoadDeletePods(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "Bar",
 					UID:  "3",
+				},
+				Spec: v1.PodSpec{
+					NodeSelector: map[string]string {"Name": "fake-name2", },
 				},
 			},
 			written: false,
@@ -98,6 +108,8 @@ func TestWriteLoadDeletePods(t *testing.T) {
 			}
 		}
 		if p.written {
+			// NodeSelector always reset when loaded
+			p.pod.Spec.NodeSelector = nil
 			if lpod != nil {
 				if !reflect.DeepEqual(p.pod, lpod) {
 					t.Errorf("expected %#v, \ngot %#v", p.pod, lpod)
