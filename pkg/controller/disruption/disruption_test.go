@@ -23,13 +23,19 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	autoscalingapi "k8s.io/api/autoscaling/v1"
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/informers"
+	scalefake "k8s.io/client-go/scale/fake"
+	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -90,12 +96,24 @@ type disruptionController struct {
 	rsStore  cache.Store
 	dStore   cache.Store
 	ssStore  cache.Store
+
+	scaleClient *scalefake.FakeScaleClient
+}
+
+var customGVK = schema.GroupVersionKind{
+	Group:   "custom.k8s.io",
+	Version: "v1",
+	Kind:    "customresource",
 }
 
 func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	ps := &pdbStates{}
 
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypeWithName(customGVK, &v1.Service{})
+	fakeScaleClient := &scalefake.FakeScaleClient{}
 
 	dc := NewDisruptionController(
 		informerFactory.Core().V1().Pods(),
@@ -105,6 +123,8 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 		informerFactory.Apps().V1().Deployments(),
 		informerFactory.Apps().V1().StatefulSets(),
 		nil,
+		testrestmapper.TestOnlyStaticRESTMapper(scheme),
+		fakeScaleClient,
 	)
 	dc.getUpdater = func() updater { return ps.Set }
 	dc.podListerSynced = alwaysReady
@@ -122,6 +142,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 		informerFactory.Apps().V1().ReplicaSets().Informer().GetStore(),
 		informerFactory.Apps().V1().Deployments().Informer().GetStore(),
 		informerFactory.Apps().V1().StatefulSets().Informer().GetStore(),
+		fakeScaleClient,
 	}, ps
 }
 
@@ -488,6 +509,52 @@ func TestReplicaSet(t *testing.T) {
 	add(t, dc.podStore, pod)
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 2, 10, map[string]metav1.Time{})
+}
+
+func TestScaleResource(t *testing.T) {
+	customResourceUID := uuid.NewUUID()
+	replicas := int32(10)
+	pods := int32(4)
+	maxUnavailable := int32(5)
+
+	dc, ps := newFakeDisruptionController()
+
+	dc.scaleClient.AddReactor("get", "customresources", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &autoscalingapi.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: metav1.NamespaceDefault,
+				UID:       customResourceUID,
+			},
+			Spec: autoscalingapi.ScaleSpec{
+				Replicas: replicas,
+			},
+		}
+		return true, obj, nil
+	})
+
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(int(maxUnavailable)))
+	add(t, dc.pdbStore, pdb)
+
+	trueVal := true
+	for i := 0; i < int(pods); i++ {
+		pod, _ := newPod(t, fmt.Sprintf("pod-%d", i))
+		pod.SetOwnerReferences([]metav1.OwnerReference{
+			{
+				Kind:       customGVK.Kind,
+				APIVersion: customGVK.GroupVersion().String(),
+				Controller: &trueVal,
+				UID:        customResourceUID,
+			},
+		})
+		add(t, dc.podStore, pod)
+	}
+
+	dc.sync(pdbName)
+	disruptionsAllowed := int32(0)
+	if replicas-pods < maxUnavailable {
+		disruptionsAllowed = maxUnavailable - (replicas - pods)
+	}
+	ps.VerifyPdbStatus(t, pdbName, disruptionsAllowed, pods, replicas-maxUnavailable, replicas, map[string]metav1.Time{})
 }
 
 // Verify that multiple controllers doesn't allow the PDB to be set true.

@@ -383,6 +383,12 @@ items:
     verbs:
     - update
   - apiGroups:
+    - '*'
+    resources:
+    - '*/scale'
+    verbs:
+    - get
+  - apiGroups:
     - ""
     resources:
     - events
