@@ -40,8 +40,6 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 		*/
 		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 
-			framework.SkipUnlessServerVersionGTE(crdVersion, f.ClientSet.Discovery())
-
 			config, err := framework.LoadConfig()
 			if err != nil {
 				framework.Failf("failed to load config: %v", err)
