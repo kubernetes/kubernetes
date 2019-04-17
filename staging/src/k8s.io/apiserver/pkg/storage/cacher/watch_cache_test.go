@@ -76,7 +76,8 @@ func newTestWatchCache(capacity int) *watchCache {
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	versioner := etcd.APIObjectVersioner{}
-	wc := newWatchCache(capacity, keyFunc, getAttrsFunc, versioner)
+	mockHandler := func(*watchCacheEvent) {}
+	wc := newWatchCache(capacity, keyFunc, mockHandler, getAttrsFunc, versioner)
 	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }

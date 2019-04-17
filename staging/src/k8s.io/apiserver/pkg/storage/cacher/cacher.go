@@ -291,11 +291,6 @@ type Cacher struct {
 // given configuration.
 func NewCacherFromConfig(config Config) *Cacher {
 	stopCh := make(chan struct{})
-
-	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc, config.Versioner)
-	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
-	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
-
 	obj := config.NewFunc()
 	// Give this error when it is constructed rather than when you get the
 	// first watch item, because it's much easier to track down that way.
@@ -303,18 +298,11 @@ func NewCacherFromConfig(config Config) *Cacher {
 		panic("storage codec doesn't seem to match given type: " + err.Error())
 	}
 
-	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
-	// Configure reflector's pager to for an appropriate pagination chunk size for fetching data from
-	// storage. The pager falls back to full list if paginated list calls fail due to an "Expired" error.
-	reflector.WatchListPageSize = storageWatchListPageSize
-
 	clock := clock.RealClock{}
 	cacher := &Cacher{
 		ready:       newReady(),
 		storage:     config.Storage,
 		objectType:  reflect.TypeOf(obj),
-		watchCache:  watchCache,
-		reflector:   reflector,
 		versioner:   config.Versioner,
 		newFunc:     config.NewFunc,
 		triggerFunc: config.TriggerPublisherFunc,
@@ -337,7 +325,27 @@ func NewCacherFromConfig(config Config) *Cacher {
 		bookmarkWatchers:     newTimeBucketWatchers(clock),
 		watchBookmarkEnabled: utilfeature.DefaultFeatureGate.Enabled(features.WatchBookmark),
 	}
-	watchCache.SetOnEvent(cacher.processEvent)
+
+	// Ensure that timer is stopped.
+	if !cacher.timer.Stop() {
+		// Consume triggered (but not yet received) timer event
+		// so that future reuse does not get a spurious timeout.
+		<-cacher.timer.C
+	}
+
+	watchCache := newWatchCache(
+		config.CacheCapacity, config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner)
+	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
+	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
+
+	reflector := cache.NewNamedReflector(reflectorName, listerWatcher, obj, watchCache, 0)
+	// Configure reflector's pager to for an appropriate pagination chunk size for fetching data from
+	// storage. The pager falls back to full list if paginated list calls fail due to an "Expired" error.
+	reflector.WatchListPageSize = storageWatchListPageSize
+
+	cacher.watchCache = watchCache
+	cacher.reflector = reflector
+
 	go cacher.dispatchEvents()
 
 	cacher.stopWg.Add(1)
@@ -351,13 +359,6 @@ func NewCacherFromConfig(config Config) *Cacher {
 			}, time.Second, stopCh,
 		)
 	}()
-
-	// Ensure that timer is stopped.
-	if !cacher.timer.Stop() {
-		// Consume triggered (but not yet received) timer event
-		// so that future reuse does not get a spurious timeout.
-		<-cacher.timer.C
-	}
 
 	return cacher
 }
