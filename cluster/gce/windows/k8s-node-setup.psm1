@@ -270,11 +270,13 @@ function Disable-WindowsDefender {
 # Creates directories where other functions in this module will read and write
 # data.
 # Note: C:\tmp is required for running certain kubernetes tests.
+#       C:\var\log is used by kubelet to stored container logs and also
+#       hard-coded in the fluentd/stackdriver config for log collection.
 function Create-Directories {
   Log-Output "Creating ${env:K8S_DIR} and its subdirectories."
   ForEach ($dir in ("${env:K8S_DIR}", "${env:NODE_DIR}", "${env:LOGS_DIR}",
     "${env:CNI_DIR}", "${env:CNI_CONFIG_DIR}", "${env:MANIFESTS_DIR}",
-    "${env:PKI_DIR}"), "C:\tmp") {
+    "${env:PKI_DIR}"), "C:\tmp", "C:\var\log") {
     mkdir -Force $dir
   }
 }
@@ -1059,7 +1061,7 @@ function Create-DockerRegistryKey {
 # TODO(pjh): move the Stackdriver logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
-$STACKDRIVER_VERSION = 'v1-8'
+$STACKDRIVER_VERSION = 'v1-9'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 
 # Install and start the Stackdriver logging agent according to
@@ -1123,9 +1125,6 @@ function InstallAndStart-LoggingAgent {
   Remove-Item -Force -Recurse $tmp_dir
 }
 
-# TODO(yujuhong):
-#   - Collect kubelet/kube-proxy logs.
-#   - Add tag for kubernetes node name.
 $FLUENTD_CONFIG = @'
 # This configuration file for Fluentd is used to watch changes to kubernetes
 # container logs in the directory /var/lib/docker/containers/ and submit the
@@ -1184,6 +1183,34 @@ $FLUENTD_CONFIG = @'
   read_from_head true
 </source>
 
+# Example:
+# I0204 07:32:30.020537    3368 server.go:1048] POST /stats/container/: (13.972191ms) 200 [[Go-http-client/1.1] 10.244.1.3:40537]
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^\w\d{4}/
+  format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+  time_format %m%d %H:%M:%S.%N
+  path /etc/kubernetes/logs/kubelet.log
+  pos_file /etc/kubernetes/logs/gcp-kubelet.log.pos
+  tag kubelet
+</source>
+
+# Example:
+# I1118 21:26:53.975789       6 proxier.go:1096] Port "nodePort for kube-system/default-http-backend:http" (:31429/tcp) was open before and is still needed
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^\w\d{4}/
+  format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+  time_format %m%d %H:%M:%S.%N
+  path /etc/kubernetes/logs/kube-proxy.log
+  pos_file /etc/kubernetes/logs/gcp-kube-proxy.log.pos
+  tag kube-proxy
+</source>
+
 <match reform.**>
   @type record_reformer
   enable_ruby true
@@ -1203,7 +1230,17 @@ $FLUENTD_CONFIG = @'
   tag ${if record['stream'] == 'stderr' then 'raw.stderr' else 'raw.stdout' end}
   remove_keys stream,log
 </match>
-'@
+
+# Attach local_resource_id for 'k8s_node' monitored resource.
+<filter **>
+  @type record_transformer
+  enable_ruby true
+  <record>
+    "logging.googleapis.com/local_resource_id" ${"k8s_node.NODE_NAME"}
+  </record>
+</filter>
+'@.replace('NODE_NAME', (hostname))
+
 
 # Export all public functions:
 Export-ModuleMember -Function *-*
