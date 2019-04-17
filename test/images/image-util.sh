@@ -77,7 +77,7 @@ build() {
     if [[ -f ${image}/Makefile ]]; then
       # make bin will take care of all the prerequisites needed
       # for building the docker image
-      make -C "${image}" bin ARCH="${arch}" TARGET="${temp_dir}"
+      make -C "${image}" bin OS="${os_name}" ARCH="${arch}" TARGET="${temp_dir}"
     fi
     pushd "${temp_dir}"
     # image tag
@@ -85,8 +85,16 @@ build() {
 
     if [[ -f BASEIMAGE ]]; then
       BASEIMAGE=$(getBaseImage "${os_name}" "${arch}" | ${SED} "s|REGISTRY|${REGISTRY}|g")
-      ${SED} -i "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
-      ${SED} -i "s|BASEARCH|${arch}|g" Dockerfile
+
+      # NOTE(claudiub): Some Windows images might require their own Dockerfile
+      # while simpler ones will not. If we're building for Windows, check if
+      # "Dockerfile_windows" exists or not.
+      dockerfile_name="Dockerfile"
+      if [[ "$os_name" = "windows" && -f "Dockerfile_windows" ]]; then
+        dockerfile_name="Dockerfile_windows"
+      fi
+
+      ${SED} -i "s|BASEARCH|${arch}|g" $dockerfile_name
     fi
 
     # copy the qemu-*-static binary to docker image to build the multi architecture image on x86 platform
@@ -109,8 +117,16 @@ build() {
       fi
     fi
 
-    docker build --pull -t "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}" .
-
+    if [[ "$os_name" = "linux" ]]; then
+      docker build --pull -t "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}" --build-arg BASEIMAGE="${BASEIMAGE}" .
+    elif [[ -n "${REMOTE_DOCKER_URL:-}" ]]; then
+      # NOTE(claudiub): We're using a remote Windows node to build the Windows Docker images.
+      # The node requires TLS authentication, and thus it is expected that the
+      # ca.pem, cert.pem, key.pem files can be found in the ~/.docker folder.
+      docker --tlsverify -H "${REMOTE_DOCKER_URL}" build --pull -t "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}" --build-arg BASEIMAGE="${BASEIMAGE}" -f $dockerfile_name .
+    else
+      echo "Cannot build the image '${image}' for ${os_arch}. REMOTE_DOCKER_URL should be set, containing the URL to a Windows docker daemon."
+    fi
     popd
   done
 }
@@ -132,6 +148,12 @@ push() {
   TAG=$(<"${image}"/VERSION)
   if [[ -f ${image}/BASEIMAGE ]]; then
     os_archs=$(listOsArchs "$image")
+    # NOTE(claudiub): if the REMOTE_DOCKER_URL var is not set, or it is an empty string, we must skip
+    # pushing the Windows image and including it into the manifest list.
+    if test -z "${REMOTE_DOCKER_URL:-}" && printf "%s\n" "$os_archs" | grep -q '^windows'; then
+      echo "Skipping pushing the image '${image}' for Windows. REMOTE_DOCKER_URL should be set, containing the URL to a Windows docker daemon."
+      os_archs=$(printf "%s\n" "$os_archs" | grep -v "^windows")
+    fi
   else
     # prepend linux/ to the QEMUARCHS items.
     os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[*]}")
@@ -145,7 +167,12 @@ push() {
       exit 1
     fi
 
-    docker push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}"
+    if [[ "$os_name" = "linux" ]]; then
+      docker push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}"
+    else
+      # NOTE(claudiub): We're pushing the image we built on the remote Windows node.
+      docker --tlsverify -H "${REMOTE_DOCKER_URL}" push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}"
+    fi
   done
 
   kube::util::ensure-gnu-sed
@@ -165,7 +192,7 @@ push() {
       echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
       exit 1
     fi
-    docker manifest annotate --arch "${arch}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}"
+    docker manifest annotate --os "${os_name}" --arch "${arch}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}"
   done
   docker manifest push --purge "${REGISTRY}/${image}:${TAG}"
 }
@@ -182,7 +209,7 @@ bin() {
         golang:"${GOLANG_VERSION}" \
         /bin/bash -c "\
                 cd /go/src/k8s.io/kubernetes/test/images/${SRC_DIR} && \
-                CGO_ENABLED=0 ${arch_prefix} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags '-w' -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
+                CGO_ENABLED=0 ${arch_prefix} GOOS=${OS} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags '-w' -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
   done
 }
 
@@ -195,7 +222,7 @@ if [[ "${WHAT}" == "all-conformance" ]]; then
   # Discussed during Conformance Office Hours Meeting (2019.12.17):
   # https://docs.google.com/document/d/1W31nXh9RYAb_VaYkwuPLd1hFxuRX3iU0DmaQ4lkCsX8/edit#heading=h.l87lu17xm9bh
   # echoserver image not included: https://github.com/kubernetes/kubernetes/issues/84158
-  conformance_images=("agnhost" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
+  conformance_images=("busybox" "agnhost" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
   for image in "${conformance_images[@]}"; do
     eval "${TASK}" "${image}"
   done

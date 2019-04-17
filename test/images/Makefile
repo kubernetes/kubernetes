@@ -14,6 +14,7 @@
 
 REGISTRY ?= gcr.io/kubernetes-e2e-test-images
 GOARM ?= 7
+REMOTE_DOCKER_URL ?=
 QEMUVERSION=v2.9.1
 GOLANG_VERSION=1.13.6
 export
