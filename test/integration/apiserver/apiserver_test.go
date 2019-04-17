@@ -659,7 +659,7 @@ func TestTransformOnWatch(t *testing.T) {
 					t.Fatal(err)
 				}
 				// TODO: this should be a more specific error
-				if err.Error() != "only the following media types are accepted: application/json;stream=watch" {
+				if err.Error() != "only the following media types are accepted: application/json;stream=watch, application/vnd.kubernetes.protobuf;stream=watch" {
 					t.Fatal(err)
 				}
 			},
@@ -758,6 +758,23 @@ func TestTransformOnWatch(t *testing.T) {
 					t.Fatalf("unable to update object: %v", err)
 				}
 				return obj, "", "configmaps"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectPartialObjectMetaEventsProtobuf(t, w, "0", "1")
+			},
+		},
+		{
+			name:   "verify partial metadata object on CRDs in protobuf",
+			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-4", "annotations": map[string]string{"test": "0"}}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
 			},
 			wantBody: func(t *testing.T, w io.Reader) {
 				expectPartialObjectMetaEventsProtobuf(t, w, "0", "1")
