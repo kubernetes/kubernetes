@@ -255,7 +255,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "liveness",
-						Image: imageutils.GetE2EImage(imageutils.Nginx),
+						Image: imageutils.GetE2EImage(imageutils.TestWebserver),
 						Ports: []v1.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &v1.Probe{
 							Handler: v1.Handler{
