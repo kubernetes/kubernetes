@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // ObjectTracker keeps track of objects. It is intended to be used to
@@ -52,7 +53,7 @@ type ObjectTracker interface {
 
 	// List retrieves all objects of a given kind in the given
 	// namespace. Only non-List kinds are accepted.
-	List(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string) (runtime.Object, error)
+	List(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string, lr ListRestrictions) (runtime.Object, error)
 
 	// Delete deletes an existing object from the tracker. If object
 	// didn't exist in the tracker prior to deletion, Delete returns
@@ -83,7 +84,7 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 		switch action := action.(type) {
 
 		case ListActionImpl:
-			obj, err := tracker.List(gvr, action.GetKind(), ns)
+			obj, err := tracker.List(gvr, action.GetKind(), ns, action.ListRestrictions)
 			return true, obj, err
 
 		case GetActionImpl:
@@ -211,7 +212,7 @@ func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracke
 	}
 }
 
-func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string) (runtime.Object, error) {
+func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string, lr ListRestrictions) (runtime.Object, error) {
 	// Heuristic for list kind: original kind + List suffix. Might
 	// not always be true but this tracker has a pretty limited
 	// understanding of the actual API model.
@@ -240,7 +241,7 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 		return list, nil
 	}
 
-	matchingObjs, err := filterByNamespaceAndName(objs, ns, "")
+	matchingObjs, err := filterList(objs, ns, lr)
 	if err != nil {
 		return nil, err
 	}
@@ -475,6 +476,36 @@ func filterByNamespaceAndName(objs []runtime.Object, ns, name string) ([]runtime
 		}
 		if name != "" && acc.GetName() != name {
 			continue
+		}
+		res = append(res, obj)
+	}
+
+	return res, nil
+}
+
+// filterList returns all objects in the collection matched by the namespace and the provided selectors
+// All labels will be match, assuming the labels.Selector is non empty
+// Only metadata.name/metadata.namespace are available field.Selector for all CRD:
+// https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors/
+// Namespace is checked independent of the field.Selector, in case not provided
+func filterList(objs []runtime.Object, ns string, lr ListRestrictions) ([]runtime.Object, error) {
+	var res []runtime.Object
+
+	for _, obj := range objs {
+		acc, err := meta.Accessor(obj)
+		if err != nil {
+			return nil, err
+		}
+		if ns != "" && acc.GetNamespace() != ns {
+			continue
+		}
+		if !lr.Labels.Empty() && lr.Labels.Matches(labels.Set(acc.GetLabels())) {
+			continue
+		}
+		if name, found := lr.Fields.RequiresExactMatch("metadata.name");found {
+			if name != acc.GetName() {
+				continue
+			}
 		}
 		res = append(res, obj)
 	}
