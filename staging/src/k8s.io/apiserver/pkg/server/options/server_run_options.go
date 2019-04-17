@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"k8s.io/apiserver/pkg/features"
 	"net"
 	"time"
 
@@ -49,8 +50,9 @@ type ServerRunOptions struct {
 	// decoded in a write request. 0 means no limit.
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
-	MaxRequestBodyBytes int64
-	TargetRAMMB         int
+	MaxRequestBodyBytes       int64
+	TargetRAMMB               int
+	EnableInfightQuotaHandler bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -104,11 +106,27 @@ func (s *ServerRunOptions) Validate() []error {
 	if s.TargetRAMMB < 0 {
 		errors = append(errors, fmt.Errorf("--target-ram-mb can not be negative value"))
 	}
-	if s.MaxRequestsInFlight < 0 {
-		errors = append(errors, fmt.Errorf("--max-requests-inflight can not be negative value"))
-	}
-	if s.MaxMutatingRequestsInFlight < 0 {
-		errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight can not be negative value"))
+
+	if s.EnableInfightQuotaHandler {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RequestManagement) {
+			errors = append(errors, fmt.Errorf("--enable-inflight-quota-handler can not be set if feature "+
+				"gate RequestManagement is disabled"))
+		}
+		if s.MaxMutatingRequestsInFlight != 0 {
+			errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight=%v "+
+				"can not be set if enabled inflight quota handler", s.MaxMutatingRequestsInFlight))
+		}
+		if s.MaxRequestsInFlight != 0 {
+			errors = append(errors, fmt.Errorf("--max-requests-inflight=%v "+
+				"can not be set if enabled inflight quota handler", s.MaxRequestsInFlight))
+		}
+	} else {
+		if s.MaxRequestsInFlight < 0 {
+			errors = append(errors, fmt.Errorf("--max-requests-inflight can not be negative value"))
+		}
+		if s.MaxMutatingRequestsInFlight < 0 {
+			errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight can not be negative value"))
+		}
 	}
 
 	if s.RequestTimeout.Nanoseconds() < 0 {
@@ -173,6 +191,9 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"a request open before timing it out. Currently only honored by the watch request "+
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
+
+	fs.BoolVar(&s.EnableInfightQuotaHandler, "enable-inflight-quota-handler", s.EnableInfightQuotaHandler, ""+
+		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }
