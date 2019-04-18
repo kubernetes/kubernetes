@@ -1593,6 +1593,10 @@ function start-kube-apiserver {
     params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
   fi
   params+=" --secure-port=443"
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-true}" != "true" ]]; then
+    # Default is :8080
+    params+=" --insecure-port=0"
+  fi
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
   params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
