@@ -88,7 +88,7 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
 	highestSupportedVersions, err := highestSupportedVersion(versions)
 	if err != nil {
-		t.Fatalf("unexpected error parsing versions (%v) for pluginName % q endpoint %q: %#v", versions, pluginName, endpoint, err)
+		t.Fatalf("unexpected error parsing versions (%v) for pluginName %q endpoint %q: %#v", versions, pluginName, endpoint, err)
 	}
 
 	csiDrivers.Clear()
