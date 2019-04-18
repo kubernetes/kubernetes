@@ -109,7 +109,7 @@ func timeoutPath(resource, namespace, name string) string {
 }
 
 // Bodies for requests used in subsequent tests.
-var aPod string = `
+var aPod = `
 {
   "kind": "Pod",
   "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
@@ -127,7 +127,7 @@ var aPod string = `
   }
 }
 `
-var aRC string = `
+var aRC = `
 {
   "kind": "ReplicationController",
   "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
@@ -160,7 +160,7 @@ var aRC string = `
   }
 }
 `
-var aService string = `
+var aService = `
 {
   "kind": "Service",
   "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
@@ -184,7 +184,7 @@ var aService string = `
   }
 }
 `
-var aNode string = `
+var aNode = `
 {
   "kind": "Node",
   "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
@@ -215,7 +215,7 @@ func aEvent(namespace string) string {
 `
 }
 
-var aBinding string = `
+var aBinding = `
 {
   "kind": "Binding",
   "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
@@ -238,7 +238,7 @@ var emptyEndpoints = `
 }
 `
 
-var aEndpoints string = `
+var aEndpoints = `
 {
   "kind": "Endpoints",
   "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
@@ -263,7 +263,7 @@ var aEndpoints string = `
 }
 `
 
-var deleteNow string = `
+var deleteNow = `
 {
   "kind": "DeleteOptions",
   "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
