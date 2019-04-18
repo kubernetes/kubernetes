@@ -113,7 +113,7 @@ dependencies:
     version: v1.15.2-1
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: test/images/sample-apiserver/Dockerfile
+    - path: test/images/sample-apiserver/Makefile
       match: k8s\.gcr\.io\/build-image\/kube-cross:v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   # Base images

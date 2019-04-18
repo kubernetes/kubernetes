@@ -1,4 +1,4 @@
-# Copyright 2018 The Kubernetes Authors.
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The e2e aggregator test is designed to test ability to run sample-apiserver as an aggregated server.
-# see e2e test named "Should be able to support the 1.17 Sample API Server using the current Aggregator"
-
 ARG BASEIMAGE
-FROM $BASEIMAGE
-ADD sample-apiserver /sample-apiserver
 
-ENTRYPOINT ["/sample-apiserver"]
+# We're using a Linux image to unpack the archive, then we're copying it over to Windows.
+FROM --platform=linux/amd64 alpine:3.6 as prep
+
+ADD https://github.com/MSOpenTech/redis/releases/download/win-3.2.100/Redis-x64-3.2.100.zip /redis.zip
+RUN mkdir /redis &&\
+    unzip /redis.zip -d /redis
+
+FROM $BASEIMAGE
+
+COPY --from=prep /redis /redis
+
+COPY redis.conf /redis/redis.windows.conf
+
+EXPOSE 6379
+VOLUME C:/data
+
+CMD ["/redis/redis-server.exe", "/redis/redis.windows.conf"]
