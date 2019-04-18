@@ -44,7 +44,6 @@
 ./hack/pin-dependency.sh
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
-./hack/update-generated-runtime-dockerized.sh
 ./hack/update-vendor.sh
 ./hack/verify-api-groups.sh
 ./hack/verify-boilerplate.sh
