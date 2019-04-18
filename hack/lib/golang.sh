@@ -693,7 +693,7 @@ kube::golang::build_binaries() {
     host_platform=$(kube::golang::host_platform)
 
     local goflags goldflags goasmflags gogcflags
-    goldflags="${GOLDFLAGS:-} -s -w $(kube::version::ldflags)"
+    goldflags="${GOLDFLAGS=-s -w} $(kube::version::ldflags)"
     goasmflags="-trimpath=${KUBE_ROOT}"
     gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 
