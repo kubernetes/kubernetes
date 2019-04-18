@@ -142,7 +142,7 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		"enable-admission-plugins":        "NodeRestriction",
 		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
 		"service-account-key-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
-		"client-ca-file":                  filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"client-ca-file":                  filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertBundleName),
 		"tls-cert-file":                   filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertName),
 		"tls-private-key-file":            filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName),
 		"kubelet-client-certificate":      filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName),
@@ -266,6 +266,7 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration, k8sVersio
 
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
 	caFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName)
+	caBundleFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertBundleName)
 
 	defaultArguments := map[string]string{
 		"bind-address":                     "127.0.0.1",
@@ -273,9 +274,9 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration, k8sVersio
 		"kubeconfig":                       kubeconfigFile,
 		"authentication-kubeconfig":        kubeconfigFile,
 		"authorization-kubeconfig":         kubeconfigFile,
-		"client-ca-file":                   caFile,
+		"client-ca-file":                   caBundleFile,
 		"requestheader-client-ca-file":     filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName),
-		"root-ca-file":                     caFile,
+		"root-ca-file":                     caBundleFile,
 		"service-account-private-key-file": filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName),
 		"cluster-signing-cert-file":        caFile,
 		"cluster-signing-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),

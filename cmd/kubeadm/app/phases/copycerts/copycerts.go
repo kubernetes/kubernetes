@@ -177,6 +177,7 @@ func certsToTransfer(cfg *kubeadmapi.InitConfiguration) map[string]string {
 	certsDir := cfg.CertificatesDir
 	certs := map[string]string{
 		kubeadmconstants.CACertName:                   path.Join(certsDir, kubeadmconstants.CACertName),
+		kubeadmconstants.CACertBundleName:             path.Join(certsDir, kubeadmconstants.CACertBundleName),
 		kubeadmconstants.CAKeyName:                    path.Join(certsDir, kubeadmconstants.CAKeyName),
 		kubeadmconstants.FrontProxyCACertName:         path.Join(certsDir, kubeadmconstants.FrontProxyCACertName),
 		kubeadmconstants.FrontProxyCAKeyName:          path.Join(certsDir, kubeadmconstants.FrontProxyCAKeyName),

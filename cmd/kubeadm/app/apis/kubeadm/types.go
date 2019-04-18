@@ -317,7 +317,7 @@ type JoinConfiguration struct {
 
 	// CACertPath is the path to the SSL certificate authority used to
 	// secure comunications between node and control-plane.
-	// Defaults to "/etc/kubernetes/pki/ca.crt".
+	// Defaults to "/etc/kubernetes/pki/ca-bundle.pem".
 	CACertPath string
 
 	// Discovery specifies the options for the kubelet to use during the TLS Bootstrap process

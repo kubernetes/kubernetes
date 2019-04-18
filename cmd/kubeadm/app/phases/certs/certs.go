@@ -95,32 +95,6 @@ func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string) error {
 	return pkiutil.WritePublicKey(certsDir, kubeadmconstants.ServiceAccountKeyBaseName, key.Public())
 }
 
-// CreateCACertAndKeyFiles generates and writes out a given certificate authority.
-// The certSpec should be one of the variables from this package.
-func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) error {
-	if certSpec.CAName != "" {
-		return errors.Errorf("this function should only be used for CAs, but cert %s has CA %s", certSpec.Name, certSpec.CAName)
-	}
-	klog.V(1).Infof("creating a new certificate authority for %s", certSpec.Name)
-
-	certConfig, err := certSpec.GetConfig(cfg)
-	if err != nil {
-		return err
-	}
-
-	caCert, caKey, err := pkiutil.NewCertificateAuthority(certConfig)
-	if err != nil {
-		return err
-	}
-
-	return writeCertificateAuthorithyFilesIfNotExist(
-		cfg.CertificatesDir,
-		certSpec.BaseName,
-		caCert,
-		caKey,
-	)
-}
-
 // NewCSR will generate a new CSR and accompanying key
 func NewCSR(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) (*x509.CertificateRequest, crypto.Signer, error) {
 	certConfig, err := certSpec.GetConfig(cfg)

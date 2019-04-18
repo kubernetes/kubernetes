@@ -18,10 +18,13 @@ package phases
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/certificate"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -215,12 +218,20 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 			return errors.New("certs phase invoked with an invalid data struct")
 		}
 
-		if _, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
-			if _, err := pkiutil.TryLoadKeyFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
-				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
-				return nil
-			}
-			fmt.Printf("[certs] Using existing %s keyless certificate authority\n", ca.BaseName)
+		caStore, err := certificate.NewFileStore(ca.BaseName, data.CertificateDir(), data.CertificateDir(), "", "")
+		if err != nil {
+			return errors.Wrapf(err, "failed to instantiate certificate store for %q", ca.BaseName)
+		}
+
+		if _, err := caStore.Current(); err == nil {
+			fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
+			return nil
+		}
+
+		bundlePath := filepath.Join(data.CertificateDir(), fmt.Sprintf("%s-bundle.pem", ca.BaseName))
+
+		if _, err := certutil.CertsFromFile(bundlePath); err == nil {
+			fmt.Printf("[certs] Using existing %s keyless certificate authority bundle\n", ca.BaseName)
 			return nil
 		}
 
@@ -235,8 +246,24 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 		cfg.CertificatesDir = data.CertificateWriteDir()
 		defer func() { cfg.CertificatesDir = data.CertificateDir() }()
 
-		// create the new certificate authority (or use existing)
-		return certsphase.CreateCACertAndKeyFiles(ca, cfg)
+		fmt.Printf("[certs] creating a new certificate authority for %s\n", ca.Name)
+
+		certConfig, err := ca.GetConfig(cfg)
+		if err != nil {
+			return err
+		}
+
+		caCert, caKey, err := pkiutil.NewCertificateAuthority(certConfig)
+		if err != nil {
+			return err
+		}
+
+		if err := certutil.WriteCert(bundlePath, pkiutil.EncodeCertPEM(caCert)); err != nil {
+			return errors.Wrapf(err, "failed to create %q trust bundle", ca.BaseName)
+		}
+
+		// create the new certificate authority (we know already there're no certificates in the directory)
+		return pkiutil.WriteCertAndKey(cfg.CertificatesDir, ca.BaseName, caCert, caKey)
 	}
 }
 

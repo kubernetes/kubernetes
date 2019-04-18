@@ -20,7 +20,7 @@ package v1beta1
 
 const (
 	// DefaultCACertPath defines default location of CA certificate on Linux
-	DefaultCACertPath = "/etc/kubernetes/pki/ca.crt"
+	DefaultCACertPath = "/etc/kubernetes/pki/ca-bundle.pem"
 	// DefaultUrlScheme defines default socket url prefix
 	DefaultUrlScheme = "unix"
 )

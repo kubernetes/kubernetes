@@ -50,6 +50,8 @@ const (
 	CACertName = "ca.crt"
 	// CAKeyName defines certificate name
 	CAKeyName = "ca.key"
+	// CACertBundleName defines certificate trust bundle name
+	CACertBundleName = "ca-bundle.pem"
 
 	// APIServerCertAndKeyBaseName defines API's server certificate and key base name
 	APIServerCertAndKeyBaseName = "apiserver"

@@ -80,8 +80,8 @@ func ValidateJoinConfiguration(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
 	allErrs = append(allErrs, ValidateJoinControlPlane(c.ControlPlane, field.NewPath("controlPlane"))...)
 
-	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate path must be an absolute path"))
+	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".pem") {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate bundle path must be an absolute path"))
 	}
 	return allErrs
 }

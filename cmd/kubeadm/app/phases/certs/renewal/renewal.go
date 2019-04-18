@@ -17,7 +17,13 @@ limitations under the License.
 package renewal
 
 import (
+	"bytes"
 	"crypto/x509"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/pkg/errors"
 	certutil "k8s.io/client-go/util/cert"
@@ -46,7 +52,24 @@ func RenewExistingCert(certsDir, baseName string, impl Interface) error {
 	if err := pkiutil.WriteCertAndKey(certsDir, baseName, newCert, newKey); err != nil {
 		return errors.Wrapf(err, "failed to write new certificate %s", baseName)
 	}
-	return nil
+
+	bundlePath := filepath.Join(certsDir, fmt.Sprintf("%s-bundle.pem", baseName))
+	newBundle := bytes.NewBuffer(pkiutil.EncodeCertPEM(newCert))
+	oldBundleCerts, err := certutil.CertsFromFile(bundlePath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to read old %q trust bundle", baseName)
+	}
+
+	now := time.Now()
+	for _, cert := range oldBundleCerts {
+		// filter out expired certificates
+		if !now.After(cert.NotAfter) {
+			newBundle.WriteByte('\n')
+			newBundle.Write(pkiutil.EncodeCertPEM(cert))
+		}
+	}
+
+	return ioutil.WriteFile(bundlePath, newBundle.Bytes(), os.FileMode(0644))
 }
 
 func certToConfig(cert *x509.Certificate) *certutil.Config {
