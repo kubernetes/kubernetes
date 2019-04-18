@@ -38,6 +38,8 @@ type kubeletFlagsOpts struct {
 	nodeRegOpts              *kubeadmapi.NodeRegistrationOptions
 	featureGates             map[string]bool
 	pauseImage               string
+	tlsPrivateKey string
+	tlsCert string
 	registerTaintsUsingFlags bool
 	execer                   utilsexec.Interface
 	pidOfFunc                func(string) ([]int, error)
@@ -60,6 +62,8 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 		execer:                   utilsexec.New(),
 		pidOfFunc:                procfs.PidOf,
 		defaultHostname:          hostName,
+		tlsPrivateKey: cfg.ComponentConfigs.Kubelet.TLSPrivateKeyFile,
+		tlsCert: cfg.ComponentConfigs.Kubelet.TLSCertFile,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeReg.KubeletExtraArgs)
@@ -110,6 +114,8 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["hostname-override"] = opts.nodeRegOpts.Name
 	}
 
+	kubeletFlags["tls-private-key-file"] = opts.tlsPrivateKey
+	kubeletFlags["tls-cert-file"] = opts.tlsCert
 	// TODO: Conditionally set `--cgroup-driver` to either `systemd` or `cgroupfs` for CRI other than Docker
 
 	return kubeletFlags

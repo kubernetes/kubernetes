@@ -138,6 +138,9 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta1.DefaultProxyBindAddressv6
 	}
 
+	cfg.ComponentConfigs.Kubelet.TLSCertFile = kubeadmapiv1beta1.DefaultKubeletServerCertFileName
+	cfg.ComponentConfigs.Kubelet.TLSPrivateKeyFile = kubeadmapiv1beta1.DefaultKubeletServerKeyFileName
+
 	// Resolve possible version labels and validate version string
 	if err := NormalizeKubernetesVersion(cfg); err != nil {
 		return err

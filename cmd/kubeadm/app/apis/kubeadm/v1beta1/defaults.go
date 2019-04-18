@@ -45,6 +45,11 @@ const (
 	// DefaultClusterName defines the default cluster name
 	DefaultClusterName = "kubernetes"
 
+	// DefaultKubeletServerCertFileName defines file name for kubelet server cert
+	DefaultKubeletServerCertFileName = "kubelet-server.crt"
+	// DefaultKubeletServerCertFileName defines file name for kubelet server key
+	DefaultKubeletServerKeyFileName = "kubelet-server.key"
+
 	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
 	DefaultEtcdDataDir = "/var/lib/etcd"
 	// DefaultProxyBindAddressv4 is the default bind address when the advertise address is v4
