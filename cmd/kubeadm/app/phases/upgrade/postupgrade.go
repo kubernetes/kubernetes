@@ -231,7 +231,7 @@ func GetKubeletDir(dryRun bool) (string, error) {
 // backupAPIServerCertAndKey backups the old cert and key of kube-apiserver to a specified directory.
 func backupAPIServerCertAndKey(certAndKeyDir string) error {
 	subDir := filepath.Join(certAndKeyDir, "expired")
-	if err := os.Mkdir(subDir, 0766); err != nil {
+	if err := os.Mkdir(subDir, 0700); err != nil {
 		return errors.Wrapf(err, "failed to created backup directory %s", subDir)
 	}
 
