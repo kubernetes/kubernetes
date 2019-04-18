@@ -356,39 +356,36 @@ func NewProxier(ipt utiliptables.Interface,
 }
 
 type iptablesJumpChain struct {
-	table       utiliptables.Table
-	chain       utiliptables.Chain
-	sourceChain utiliptables.Chain
-	comment     string
-	extraArgs   []string
+	table     utiliptables.Table
+	dstChain  utiliptables.Chain
+	srcChain  utiliptables.Chain
+	comment   string
+	extraArgs []string
 }
 
 var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeExternalServicesChain, utiliptables.ChainInput, "kubernetes externally-visible service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
+	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainForward, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
+	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainInput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
+	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
-	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules", nil},
 }
 
-var iptablesCleanupOnlyChains = []iptablesJumpChain{
-	// Present in kube 1.6 - 1.9. Removed by #56164 in favor of kubeExternalServicesChain
-	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainInput, "kubernetes service portals", nil},
-	// Present in kube <= 1.9. Removed by #60306 in favor of rule with extraArgs
-	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
-}
+var iptablesCleanupOnlyChains = []iptablesJumpChain{}
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
 func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	// Unlink our chains
-	for _, chain := range append(iptablesJumpChains, iptablesCleanupOnlyChains...) {
-		args := append(chain.extraArgs,
-			"-m", "comment", "--comment", chain.comment,
-			"-j", string(chain.chain),
+	for _, jump := range append(iptablesJumpChains, iptablesCleanupOnlyChains...) {
+		args := append(jump.extraArgs,
+			"-m", "comment", "--comment", jump.comment,
+			"-j", string(jump.dstChain),
 		)
-		if err := ipt.DeleteRule(chain.table, chain.sourceChain, args...); err != nil {
+		if err := ipt.DeleteRule(jump.table, jump.srcChain, args...); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
 				encounteredError = true
@@ -662,17 +659,17 @@ func (proxier *Proxier) syncProxyRules() {
 	glog.V(3).Infof("Syncing iptables rules")
 
 	// Create and link the kube chains.
-	for _, chain := range iptablesJumpChains {
-		if _, err := proxier.iptables.EnsureChain(chain.table, chain.chain); err != nil {
-			glog.Errorf("Failed to ensure that %s chain %s exists: %v", chain.table, kubeServicesChain, err)
+	for _, jump := range iptablesJumpChains {
+		if _, err := proxier.iptables.EnsureChain(jump.table, jump.dstChain); err != nil {
+			glog.Errorf("Failed to ensure that %s chain %s exists: %v", jump.table, jump.dstChain, err)
 			return
 		}
-		args := append(chain.extraArgs,
-			"-m", "comment", "--comment", chain.comment,
-			"-j", string(chain.chain),
+		args := append(jump.extraArgs,
+			"-m", "comment", "--comment", jump.comment,
+			"-j", string(jump.dstChain),
 		)
-		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, chain.table, chain.sourceChain, args...); err != nil {
-			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", chain.table, chain.sourceChain, chain.chain, err)
+		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, jump.table, jump.srcChain, args...); err != nil {
+			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", jump.table, jump.srcChain, jump.dstChain, err)
 			return
 		}
 	}
@@ -830,6 +827,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
 		} else {
+			// No endpoints.
 			writeLine(proxier.filterRules,
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
@@ -900,6 +898,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// This covers cases like GCE load-balancers which get added to the local routing table.
 				writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(svcChain))...)
 			} else {
+				// No endpoints.
 				writeLine(proxier.filterRules,
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
@@ -912,10 +911,10 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		if hasEndpoints {
-			fwChain := svcInfo.serviceFirewallChainName
-			for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
-				if ingress.IP != "" {
+		fwChain := svcInfo.serviceFirewallChainName
+		for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
+			if ingress.IP != "" {
+				if hasEndpoints {
 					// create service firewall chain
 					if chain, ok := existingNATChains[fwChain]; ok {
 						writeBytesLine(proxier.natChains, chain)
@@ -976,10 +975,19 @@ func (proxier *Proxier) syncProxyRules() {
 					// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
 					// It means the packet cannot go thru the firewall, then mark it for DROP
 					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkDropChain))...)
+				} else {
+					// No endpoints.
+					writeLine(proxier.filterRules,
+						"-A", string(kubeServicesChain),
+						"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
+						"-m", protocol, "-p", protocol,
+						"-d", utilproxy.ToCIDR(net.ParseIP(ingress.IP)),
+						"--dport", strconv.Itoa(svcInfo.Port),
+						"-j", "REJECT",
+					)
 				}
 			}
 		}
-		// FIXME: do we need REJECT rules for load-balancer ingress if !hasEndpoints?
 
 		// Capture nodeports.  If we had more than 2 rules it might be
 		// worthwhile to make a new per-service chain for nodeport rules, but
@@ -1061,6 +1069,7 @@ func (proxier *Proxier) syncProxyRules() {
 					writeLine(proxier.natRules, append(args, "-j", string(svcXlbChain))...)
 				}
 			} else {
+				// No endpoints.
 				writeLine(proxier.filterRules,
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
