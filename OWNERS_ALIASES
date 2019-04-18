@@ -345,9 +345,11 @@ aliases:
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
   
-  # sig-api-machinery-api-reviewers:
-  #   - 
-  #   - 
+  sig-api-machinery-api-reviewers:
+    - caesarxuchao
+    - deads2k
+    - jpbetz
+    - sttts
   
   # sig-apps-api-reviewers:
   #   - 
