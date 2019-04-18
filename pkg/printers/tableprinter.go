@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,140 +23,26 @@ import (
 	"strings"
 
 	"github.com/liggitt/tabwriter"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-type TableGenerator interface {
-	GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
-}
-
-type PrintHandler interface {
-	TableHandler(columns []metav1beta1.TableColumnDefinition, printFunc interface{}) error
-	DefaultTableHandler(columns []metav1beta1.TableColumnDefinition, printFunc interface{}) error
-}
+var _ ResourcePrinter = &HumanReadablePrinter{}
 
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 
-type handlerEntry struct {
-	columnDefinitions []metav1beta1.TableColumnDefinition
-	printFunc         reflect.Value
-	args              []reflect.Value
-}
-
-// HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide
-// more elegant output. It is not threadsafe, but you may call PrintObj repeatedly; headers
-// will only be printed if the object type changes. This makes it useful for printing items
-// received from watches.
-type HumanReadablePrinter struct {
-	handlerMap     map[reflect.Type]*handlerEntry
-	defaultHandler *handlerEntry
-	options        PrintOptions
-	lastType       interface{}
-	lastColumns    []metav1beta1.TableColumnDefinition
-}
-
-var _ PrintHandler = &HumanReadablePrinter{}
-
-// NewHumanReadablePrinter creates a HumanReadablePrinter.
+// NewHumanReadablePrinter creates a printer suitable for calling PrintObj().
+// TODO(seans3): Change return type to ResourcePrinter interface once we no longer need
+// to constuct the "handlerMap".
 func NewHumanReadablePrinter(options PrintOptions) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
 		options:    options,
 	}
 	return printer
-}
-
-// NewTableGenerator creates a HumanReadablePrinter suitable for calling GenerateTable().
-func NewTableGenerator() *HumanReadablePrinter {
-	return &HumanReadablePrinter{
-		handlerMap: make(map[reflect.Type]*handlerEntry),
-	}
-}
-
-func (a *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePrinter {
-	for _, fn := range fns {
-		fn(a)
-	}
-	return a
-}
-
-// TableHandler adds a print handler with a given set of columns to HumanReadablePrinter instance.
-// See ValidateRowPrintHandlerFunc for required method signature.
-func (h *HumanReadablePrinter) TableHandler(columnDefinitions []metav1beta1.TableColumnDefinition, printFunc interface{}) error {
-	printFuncValue := reflect.ValueOf(printFunc)
-	if err := ValidateRowPrintHandlerFunc(printFuncValue); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))
-		return err
-	}
-	entry := &handlerEntry{
-		columnDefinitions: columnDefinitions,
-		printFunc:         printFuncValue,
-	}
-
-	objType := printFuncValue.Type().In(0)
-	if _, ok := h.handlerMap[objType]; ok {
-		err := fmt.Errorf("registered duplicate printer for %v", objType)
-		utilruntime.HandleError(err)
-		return err
-	}
-	h.handlerMap[objType] = entry
-	return nil
-}
-
-// DefaultTableHandler registers a set of columns and a print func that is given a chance to process
-// any object without an explicit handler. Only the most recently set print handler is used.
-// See ValidateRowPrintHandlerFunc for required method signature.
-func (h *HumanReadablePrinter) DefaultTableHandler(columnDefinitions []metav1beta1.TableColumnDefinition, printFunc interface{}) error {
-	printFuncValue := reflect.ValueOf(printFunc)
-	if err := ValidateRowPrintHandlerFunc(printFuncValue); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))
-		return err
-	}
-	entry := &handlerEntry{
-		columnDefinitions: columnDefinitions,
-		printFunc:         printFuncValue,
-	}
-
-	h.defaultHandler = entry
-	return nil
-}
-
-// ValidateRowPrintHandlerFunc validates print handler signature.
-// printFunc is the function that will be called to print an object.
-// It must be of the following type:
-//  func printFunc(object ObjectType, options PrintOptions) ([]metav1beta1.TableRow, error)
-// where ObjectType is the type of the object that will be printed, and the first
-// return value is an array of rows, with each row containing a number of cells that
-// match the number of columns defined for that printer function.
-func ValidateRowPrintHandlerFunc(printFunc reflect.Value) error {
-	if printFunc.Kind() != reflect.Func {
-		return fmt.Errorf("invalid print handler. %#v is not a function", printFunc)
-	}
-	funcType := printFunc.Type()
-	if funcType.NumIn() != 2 || funcType.NumOut() != 2 {
-		return fmt.Errorf("invalid print handler." +
-			"Must accept 2 parameters and return 2 value.")
-	}
-	if funcType.In(1) != reflect.TypeOf((*PrintOptions)(nil)).Elem() ||
-		funcType.Out(0) != reflect.TypeOf((*[]metav1beta1.TableRow)(nil)).Elem() ||
-		funcType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
-		return fmt.Errorf("invalid print handler. The expected signature is: "+
-			"func handler(obj %v, options PrintOptions) ([]metav1beta1.TableRow, error)", funcType.In(0))
-	}
-	return nil
-}
-
-func printHeader(columnNames []string, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t")); err != nil {
-		return err
-	}
-	return nil
 }
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
@@ -168,6 +54,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		defer w.Flush()
 	}
 
+	// Case 1: Parameter "obj" is a table from server; print it.
 	// display tables following the rules of options
 	if table, ok := obj.(*metav1beta1.Table); ok {
 		// Do not print headers if this table has no column definitions, or they are the same as the last ones we printed
@@ -186,12 +73,14 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 			h.lastColumns = table.ColumnDefinitions
 		}
 
-		if err := DecorateTable(table, localOptions); err != nil {
+		if err := decorateTable(table, localOptions); err != nil {
 			return err
 		}
 		return PrintTable(table, output, localOptions)
 	}
 
+	// Case 2: Parameter "obj" is not a table; search for a handler to print it.
+	// TODO(seans3): Remove this case in 1.16, since table should be returned from server-side printing.
 	// print with a registered handler
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {
@@ -208,6 +97,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		return nil
 	}
 
+	// Case 3: Could not find print handler for "obj"; use the default print handler.
 	// print with the default handler if set, and use the columns from the last time
 	if h.defaultHandler != nil {
 		includeHeaders := h.lastType != h.defaultHandler && !h.options.NoHeaders
@@ -229,7 +119,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 // PrintTable prints a table to the provided output respecting the filtering rules for options
 // for wide columns and filtered rows. It filters out rows that are Completed. You should call
-// DecorateTable if you receive a table from a remote server before calling PrintTable.
+// decorateTable if you receive a table from a remote server before calling PrintTable.
 func PrintTable(table *metav1beta1.Table, output io.Writer, options PrintOptions) error {
 	if !options.NoHeaders {
 		// avoid printing headers if we have no rows to display
@@ -277,11 +167,11 @@ func PrintTable(table *metav1beta1.Table, output io.Writer, options PrintOptions
 	return nil
 }
 
-// DecorateTable takes a table and attempts to add label columns and the
+// decorateTable takes a table and attempts to add label columns and the
 // namespace column. It will fill empty columns with nil (if the object
 // does not expose metadata). It returns an error if the table cannot
 // be decorated.
-func DecorateTable(table *metav1beta1.Table, options PrintOptions) error {
+func decorateTable(table *metav1beta1.Table, options PrintOptions) error {
 	width := len(table.ColumnDefinitions) + len(options.ColumnLabels)
 	if options.WithNamespace {
 		width++
@@ -372,58 +262,6 @@ func DecorateTable(table *metav1beta1.Table, options PrintOptions) error {
 	return nil
 }
 
-// GenerateTable returns a table for the provided object, using the printer registered for that type. It returns
-// a table that includes all of the information requested by options, but will not remove rows or columns. The
-// caller is responsible for applying rules related to filtering rows or columns.
-func (h *HumanReadablePrinter) GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error) {
-	t := reflect.TypeOf(obj)
-	handler, ok := h.handlerMap[t]
-	if !ok {
-		return nil, fmt.Errorf("no table handler registered for this type %v", t)
-	}
-
-	args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(options)}
-	results := handler.printFunc.Call(args)
-	if !results[1].IsNil() {
-		return nil, results[1].Interface().(error)
-	}
-
-	var columns []metav1beta1.TableColumnDefinition
-	if !options.NoHeaders {
-		columns = handler.columnDefinitions
-		if !options.Wide {
-			columns = make([]metav1beta1.TableColumnDefinition, 0, len(handler.columnDefinitions))
-			for i := range handler.columnDefinitions {
-				if handler.columnDefinitions[i].Priority != 0 {
-					continue
-				}
-				columns = append(columns, handler.columnDefinitions[i])
-			}
-		}
-	}
-	table := &metav1beta1.Table{
-		ListMeta: metav1.ListMeta{
-			ResourceVersion: "",
-		},
-		ColumnDefinitions: columns,
-		Rows:              results[0].Interface().([]metav1beta1.TableRow),
-	}
-	if m, err := meta.ListAccessor(obj); err == nil {
-		table.ResourceVersion = m.GetResourceVersion()
-		table.SelfLink = m.GetSelfLink()
-		table.Continue = m.GetContinue()
-	} else {
-		if m, err := meta.CommonAccessor(obj); err == nil {
-			table.ResourceVersion = m.GetResourceVersion()
-			table.SelfLink = m.GetSelfLink()
-		}
-	}
-	if err := DecorateTable(table, options); err != nil {
-		return nil, err
-	}
-	return table, nil
-}
-
 // printRowsForHandlerEntry prints the incremental table output (headers if the current type is
 // different from lastType) including all the rows in the object. It returns the current type
 // or an error, if any.
@@ -459,6 +297,13 @@ func printRowsForHandlerEntry(output io.Writer, handler *handlerEntry, obj runti
 		return nil
 	}
 	return results[1].Interface().(error)
+}
+
+func printHeader(columnNames []string, w io.Writer) error {
+	if _, err := fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t")); err != nil {
+		return err
+	}
+	return nil
 }
 
 // printRows writes the provided rows to output.
