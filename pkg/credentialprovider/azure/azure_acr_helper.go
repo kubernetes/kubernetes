@@ -63,16 +63,6 @@ type authDirective struct {
 	realm   string
 }
 
-type accessTokenPayload struct {
-	TenantID string `json:"tid"`
-}
-
-type acrTokenPayload struct {
-	Expiration int64  `json:"exp"`
-	TenantID   string `json:"tenant"`
-	Credential string `json:"credential"`
-}
-
 type acrAuthResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }

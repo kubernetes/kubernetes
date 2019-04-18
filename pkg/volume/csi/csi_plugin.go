@@ -894,12 +894,3 @@ func isV0Version(version string) bool {
 
 	return parsedVersion.Major() == 0
 }
-
-func isV1Version(version string) bool {
-	parsedVersion, err := utilversion.ParseGeneric(version)
-	if err != nil {
-		return false
-	}
-
-	return parsedVersion.Major() == 1
-}

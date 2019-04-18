@@ -81,11 +81,6 @@ const (
 	gceComputeAPIEndpointBeta = "https://www.googleapis.com/compute/beta/"
 )
 
-// gceObject is an abstraction of all GCE API object in go client
-type gceObject interface {
-	MarshalJSON() ([]byte, error)
-}
-
 var _ cloudprovider.Interface = (*Cloud)(nil)
 var _ cloudprovider.Instances = (*Cloud)(nil)
 var _ cloudprovider.LoadBalancer = (*Cloud)(nil)

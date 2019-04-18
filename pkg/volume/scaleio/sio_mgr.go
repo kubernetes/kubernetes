@@ -27,14 +27,6 @@ import (
 	siotypes "github.com/codedellemc/goscaleio/types/v1"
 )
 
-type storageInterface interface {
-	CreateVolume(string, int64) (*siotypes.Volume, error)
-	AttachVolume(string, bool) (string, error)
-	IsAttached(string) (bool, error)
-	DetachVolume(string) error
-	DeleteVolume(string) error
-}
-
 type sioMgr struct {
 	client     sioInterface
 	configData map[string]string

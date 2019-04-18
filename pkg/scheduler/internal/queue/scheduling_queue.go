@@ -39,7 +39,6 @@ import (
 	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -351,11 +350,6 @@ func (p *PriorityQueue) AddIfNotPresent(pod *v1.Pod) error {
 		p.cond.Broadcast()
 	}
 	return err
-}
-
-func isPodUnschedulable(pod *v1.Pod) bool {
-	_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-	return cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable
 }
 
 // nsNameForPod returns a namespacedname for a pod

@@ -858,29 +858,6 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJ
 	Expect(err).NotTo(HaveOccurred(), "Failed to verify backside re-encryption ingress")
 }
 
-func detectHTTPVersionAndSchemeTest(f *framework.Framework, jig *ingress.TestJig, address, version, scheme string) {
-	timeoutClient := &http.Client{Timeout: ingress.IngressReqTimeout}
-	resp := ""
-	err := wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
-		var err error
-		resp, err = framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", address), "")
-		if err != nil {
-			framework.Logf("SimpleGET failed: %v", err)
-			return false, nil
-		}
-		if !strings.Contains(resp, version) {
-			framework.Logf("Waiting for transition to HTTP/2")
-			return false, nil
-		}
-		if !strings.Contains(resp, scheme) {
-			return false, nil
-		}
-		framework.Logf("Poll succeeded, request was served by HTTP2")
-		return true, nil
-	})
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get %s or %s, response body: %s", version, scheme, resp))
-}
-
 func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceController *gce.IngressController, ns, name string, negs int) {
 	if err := wait.Poll(5*time.Second, negUpdateTimeout, func() (bool, error) {
 		svc, err := f.ClientSet.CoreV1().Services(ns).Get(name, metav1.GetOptions{})

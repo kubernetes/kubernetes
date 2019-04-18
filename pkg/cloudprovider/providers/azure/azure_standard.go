@@ -568,16 +568,6 @@ func extractResourceGroupByNicID(nicID string) (string, error) {
 	return matches[1], nil
 }
 
-// extractResourceGroupByPipID extracts the resource group name by publicIP ID.
-func extractResourceGroupByPipID(pipID string) (string, error) {
-	matches := publicIPResourceGroupRE.FindStringSubmatch(pipID)
-	if len(matches) != 2 {
-		return "", fmt.Errorf("error of extracting resourceGroup from pipID %q", pipID)
-	}
-
-	return matches[1], nil
-}
-
 // getPrimaryInterfaceWithVMSet gets machine primary network interface by node name and vmSet.
 func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName string) (network.Interface, error) {
 	var machine compute.VirtualMachine
