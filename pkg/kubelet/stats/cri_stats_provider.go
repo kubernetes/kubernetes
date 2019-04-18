@@ -355,6 +355,7 @@ func (p *criStatsProvider) makeContainerStats(
 	} else {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
 		result.CPU.UsageCoreNanoSeconds = Uint64Ptr(0)
+		result.CPU.UsageNanoCores = Uint64Ptr(0)
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
