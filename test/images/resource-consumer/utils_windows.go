@@ -1,4 +1,4 @@
-// +build !windows
+// +build windows
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -22,22 +22,31 @@ import (
 	"log"
 	"os/exec"
 	"strconv"
+	"time"
 )
 
 var (
-	consumeCPUBinary = "./consume-cpu/consume-cpu"
-	consumeMemBinary = "stress"
+	consumeCPUBinary = "./consume-cpu/consume-cpu.exe"
+	consumeMemBinary = "testlimit.exe"
 )
 
 // ConsumeMem consumes a given number of megabytes for the specified duration.
 func ConsumeMem(megabytes int, durationSec int) {
 	log.Printf("ConsumeMem megabytes: %v, durationSec: %v", megabytes, durationSec)
-	megabytesString := strconv.Itoa(megabytes) + "M"
+	megabytesString := strconv.Itoa(megabytes)
 	durationSecString := strconv.Itoa(durationSec)
 	// creating new consume memory process
-	consumeMem := exec.Command(consumeMemBinary, "-m", "1", "--vm-bytes", megabytesString, "--vm-hang", "0", "-t", durationSecString)
-	err := consumeMem.Run()
+	consumeMem := exec.Command(consumeMemBinary, "-accepteula", "-r", megabytesString, "-e", "0", durationSecString, "-c", "1")
+	err := consumeMem.Start()
 	if err != nil {
 		log.Printf("Error while consuming memory: %v", err)
+		return
 	}
+
+	// testlimit does not end after durationSec elapsed, so we'll stop it ourselves.
+	time.AfterFunc(time.Duration(durationSec)*time.Second, func() {
+		if err := consumeMem.Process.Kill(); err != nil {
+			log.Printf("Could not kill testlimit process! Error: %v", err)
+		}
+	})
 }

@@ -17,6 +17,8 @@ go_library(
         "resource_consumer.go",
         "resource_consumer_handler.go",
         "utils.go",
+        "utils_common.go",
+        "utils_windows.go",
     ],
     importpath = "k8s.io/kubernetes/test/images/resource-consumer",
     deps = ["//test/images/resource-consumer/common:go_default_library"],
