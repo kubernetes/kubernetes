@@ -194,7 +194,7 @@ type Proxier struct {
 	syncPeriod    time.Duration
 	minSyncPeriod time.Duration
 	// Values are CIDR's to exclude when cleaning up IPVS rules.
-	excludeCIDRs []string
+	excludeCIDRs []*net.IPNet
 	// Set to true to set sysctls arp_ignore and arp_announce
 	strictARP      bool
 	iptables       utiliptables.Interface
@@ -274,6 +274,19 @@ func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 // Proxier implements ProxyProvider
 var _ proxy.ProxyProvider = &Proxier{}
 
+// ParseExcludedCIDRs parses the input strings and returns net.IPNet
+// The validation has been done earlier so the error condition will never happen under normal conditions
+func ParseExcludedCIDRs(excludeCIDRStrs []string) []*net.IPNet {
+	var cidrExclusions []*net.IPNet
+	for _, excludedCIDR := range excludeCIDRStrs {
+		_, n, err := net.ParseCIDR(excludedCIDR)
+		if err == nil {
+			cidrExclusions = append(cidrExclusions, n)
+		}
+	}
+	return cidrExclusions
+}
+
 // NewProxier returns a new Proxier given an iptables and ipvs Interface instance.
 // Because of the iptables and ipvs logic, it is assumed that there is only a single Proxier active on a machine.
 // An error will be returned if it fails to update or acquire the initial lock.
@@ -286,7 +299,7 @@ func NewProxier(ipt utiliptables.Interface,
 	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
-	excludeCIDRs []string,
+	excludeCIDRStrs []string,
 	strictARP bool,
 	masqueradeAll bool,
 	masqueradeBit int,
@@ -397,7 +410,7 @@ func NewProxier(ipt utiliptables.Interface,
 		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, &isIPv6, recorder),
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
-		excludeCIDRs:          excludeCIDRs,
+		excludeCIDRs:          ParseExcludedCIDRs(excludeCIDRStrs),
 		iptables:              ipt,
 		masqueradeAll:         masqueradeAll,
 		masqueradeMark:        masqueradeMark,
@@ -1715,9 +1728,7 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 func (proxier *Proxier) isIPInExcludeCIDRs(ip net.IP) bool {
 	// make sure it does not fall within an excluded CIDR range.
 	for _, excludedCIDR := range proxier.excludeCIDRs {
-		// Any validation of this CIDR already should have occurred.
-		_, n, _ := net.ParseCIDR(excludedCIDR)
-		if n.Contains(ip) {
+		if excludedCIDR.Contains(ip) {
 			return true
 		}
 	}
