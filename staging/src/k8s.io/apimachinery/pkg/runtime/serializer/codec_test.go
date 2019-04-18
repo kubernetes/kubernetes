@@ -87,7 +87,7 @@ func GetTestScheme() (*runtime.Scheme, runtime.Codec) {
 
 	s.AddUnversionedTypes(externalGV, &metav1.Status{})
 
-	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}, CodecFactoryOptions{Pretty: true, Strict: false}))
 	codec := cf.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	return s, codec
 }
@@ -145,7 +145,7 @@ func TestTypes(t *testing.T) {
 
 func TestVersionedEncoding(t *testing.T) {
 	s, _ := GetTestScheme()
-	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}, CodecFactoryOptions{Pretty: true, Strict: false}))
 	info, _ := runtime.SerializerInfoForMediaType(cf.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	encoder := info.Serializer
 
@@ -218,7 +218,9 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	}
 	expect := &serializertesting.TestType1{A: "test"}
 
-	codec := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{})).LegacyCodec(schema.GroupVersion{Version: "v1"})
+	codec := newCodecFactory(
+		s, newSerializersForScheme(s, testMetaFactory{}, CodecFactoryOptions{Pretty: true, Strict: false}),
+	).LegacyCodec(schema.GroupVersion{Version: "v1"})
 
 	obj, err := runtime.Decode(codec, data)
 	if err != nil {
@@ -309,7 +311,7 @@ func GetDirectCodecTestScheme() *runtime.Scheme {
 
 func TestDirectCodec(t *testing.T) {
 	s := GetDirectCodecTestScheme()
-	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}, CodecFactoryOptions{Pretty: true, Strict: false}))
 	info, _ := runtime.SerializerInfoForMediaType(cf.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	serializer := info.Serializer
 	df := cf.WithoutConversion()

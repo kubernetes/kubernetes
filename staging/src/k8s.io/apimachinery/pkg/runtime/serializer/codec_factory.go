@@ -48,41 +48,57 @@ type serializerType struct {
 	StreamSerializer runtime.Serializer
 }
 
-func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []serializerType {
-	jsonSerializer := json.NewSerializer(mf, scheme, scheme, false)
-	jsonPrettySerializer := json.NewSerializer(mf, scheme, scheme, true)
-	yamlSerializer := json.NewYAMLSerializer(mf, scheme, scheme)
-	serializer := protobuf.NewSerializer(scheme, scheme)
-	raw := protobuf.NewRawSerializer(scheme, scheme)
+func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, options CodecFactoryOptions) []serializerType {
+	jsonSerializer := json.NewSerializerWithOptions(
+		mf, scheme, scheme,
+		json.SerializerOptions{Yaml: false, Pretty: false, Strict: options.Strict},
+	)
+	jsonSerializerType := serializerType{
+		AcceptContentTypes: []string{runtime.ContentTypeJSON},
+		ContentType:        runtime.ContentTypeJSON,
+		FileExtensions:     []string{"json"},
+		EncodesAsText:      true,
+		Serializer:         jsonSerializer,
+
+		Framer:           json.Framer,
+		StreamSerializer: jsonSerializer,
+	}
+	if options.Pretty {
+		jsonPrettySerializer := json.NewSerializerWithOptions(
+			mf, scheme, scheme,
+			json.SerializerOptions{Yaml: false, Pretty: true, Strict: options.Strict},
+		)
+		jsonSerializerType.PrettySerializer = jsonPrettySerializer
+	}
+
+	yamlSerializer := json.NewSerializerWithOptions(
+		mf, scheme, scheme,
+		json.SerializerOptions{Yaml: true, Pretty: false, Strict: options.Strict},
+	)
+	yamlSerializerType := serializerType{
+		AcceptContentTypes: []string{runtime.ContentTypeYAML},
+		ContentType:        runtime.ContentTypeYAML,
+		FileExtensions:     []string{"yaml"},
+		EncodesAsText:      true,
+		Serializer:         yamlSerializer,
+	}
+
+	protoSerializer := protobuf.NewSerializer(scheme, scheme)
+	protoRawSerializer := protobuf.NewRawSerializer(scheme, scheme)
+	protoSerializerType := serializerType{
+		AcceptContentTypes: []string{runtime.ContentTypeProtobuf},
+		ContentType:        runtime.ContentTypeProtobuf,
+		FileExtensions:     []string{"pb"},
+		Serializer:         protoSerializer,
+
+		Framer:           protobuf.LengthDelimitedFramer,
+		StreamSerializer: protoRawSerializer,
+	}
 
 	serializers := []serializerType{
-		{
-			AcceptContentTypes: []string{"application/json"},
-			ContentType:        "application/json",
-			FileExtensions:     []string{"json"},
-			EncodesAsText:      true,
-			Serializer:         jsonSerializer,
-			PrettySerializer:   jsonPrettySerializer,
-
-			Framer:           json.Framer,
-			StreamSerializer: jsonSerializer,
-		},
-		{
-			AcceptContentTypes: []string{"application/yaml"},
-			ContentType:        "application/yaml",
-			FileExtensions:     []string{"yaml"},
-			EncodesAsText:      true,
-			Serializer:         yamlSerializer,
-		},
-		{
-			AcceptContentTypes: []string{runtime.ContentTypeProtobuf},
-			ContentType:        runtime.ContentTypeProtobuf,
-			FileExtensions:     []string{"pb"},
-			Serializer:         serializer,
-
-			Framer:           protobuf.LengthDelimitedFramer,
-			StreamSerializer: raw,
-		},
+		jsonSerializerType,
+		yamlSerializerType,
+		protoSerializerType,
 	}
 
 	for _, fn := range serializerExtensions {
@@ -96,6 +112,8 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 // CodecFactory provides methods for retrieving codecs and serializers for specific
 // versions and content types.
 type CodecFactory struct {
+	options CodecFactoryOptions
+
 	scheme      *runtime.Scheme
 	serializers []serializerType
 	universal   runtime.Decoder
@@ -104,15 +122,34 @@ type CodecFactory struct {
 	legacySerializer runtime.Serializer
 }
 
+// CodecFactoryOptions holds the options for configuring CodecFactory behavior
+type CodecFactoryOptions struct {
+	// Strict: configures all serializers in strict mode
+	Strict bool
+	// Pretty: includes a pretty serializer along with the non-pretty one
+	Pretty bool
+}
+
+// NewCodecFactoryWithOptions provides methods for retrieving serializers for the supported wire formats
+// and conversion wrappers to define preferred internal and external versions. In the future,
+// as the internal version is used less, callers may instead use a defaulting serializer and
+// only convert objects which are shared internally (Status, common API machinery).
+// TODO: allow other codecs to be compiled in?
+// TODO: accept a scheme interface
+func NewCodecFactoryWithOptions(scheme *runtime.Scheme, options CodecFactoryOptions) CodecFactory {
+	serializers := newSerializersForScheme(scheme, json.DefaultMetaFactory, options)
+	return newCodecFactory(scheme, serializers)
+}
+
 // NewCodecFactory provides methods for retrieving serializers for the supported wire formats
 // and conversion wrappers to define preferred internal and external versions. In the future,
 // as the internal version is used less, callers may instead use a defaulting serializer and
 // only convert objects which are shared internally (Status, common API machinery).
 // TODO: allow other codecs to be compiled in?
 // TODO: accept a scheme interface
+// Deprecated: use NewCodecFactoryWithOptions() instead
 func NewCodecFactory(scheme *runtime.Scheme) CodecFactory {
-	serializers := newSerializersForScheme(scheme, json.DefaultMetaFactory)
-	return newCodecFactory(scheme, serializers)
+	return NewCodecFactoryWithOptions(scheme, CodecFactoryOptions{Strict: false, Pretty: true})
 }
 
 // newCodecFactory is a helper for testing that allows a different metafactory to be specified.
