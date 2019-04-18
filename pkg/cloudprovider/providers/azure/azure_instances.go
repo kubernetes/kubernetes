@@ -133,6 +133,15 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 
 	return addressGetter(name)
 }
+package main
+import "testing" 
+ func TestSum(t *testing.T)
+{ ctx := t.Context()  // Canceled when the test fails or the test function returns.
+ t.Go(func (az *Cloud) NodeAddresses(ctx, t))
+ if t != nil{
+	 t.Errorf("Error occured",t,nil)}
+}
+
 
 // NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
