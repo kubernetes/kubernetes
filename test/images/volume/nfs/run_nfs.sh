@@ -22,21 +22,22 @@ function start()
     while getopts "G:" opt; do
         case ${opt} in
             G) gid=${OPTARG};;
+            *):;;
         esac
     done
-    shift $(($OPTIND - 1))
+    shift $((OPTIND - 1))
 
     # prepare /etc/exports
     for i in "$@"; do
         # fsid=0: needed for NFSv4
         echo "$i *(rw,fsid=0,insecure,no_root_squash)" >> /etc/exports
         if [ -v gid ] ; then
-            chmod 070 $i
-            chgrp $gid $i
+            chmod 070 "$i"
+            chgrp "$gid" "$i"
         fi
         # move index.html to here
-        /bin/cp /tmp/index.html $i/
-        chmod 644 $i/index.html
+        /bin/cp /tmp/index.html "$i/"
+        chmod 644 "$i/index.html"
         echo "Serving $i"
     done
 
@@ -67,7 +68,7 @@ function stop()
     /usr/sbin/exportfs -au
     /usr/sbin/exportfs -f
 
-    kill $( pidof rpc.mountd )
+    kill "$( pidof rpc.mountd )"
     umount /proc/fs/nfsd
     echo > /etc/exports
     exit 0

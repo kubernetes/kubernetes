@@ -17,7 +17,6 @@ limitations under the License.
 package printers
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -30,12 +29,11 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-type TablePrinter interface {
-	PrintTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
+type TableGenerator interface {
+	GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
 }
 
 type PrintHandler interface {
@@ -61,7 +59,6 @@ type HumanReadablePrinter struct {
 	options        PrintOptions
 	lastType       interface{}
 	lastColumns    []metav1beta1.TableColumnDefinition
-	skipTabWriter  bool
 }
 
 var _ PrintHandler = &HumanReadablePrinter{}
@@ -75,18 +72,11 @@ func NewHumanReadablePrinter(options PrintOptions) *HumanReadablePrinter {
 	return printer
 }
 
-// NewTablePrinter creates a HumanReadablePrinter suitable for calling PrintTable().
-func NewTablePrinter() *HumanReadablePrinter {
+// NewTableGenerator creates a HumanReadablePrinter suitable for calling GenerateTable().
+func NewTableGenerator() *HumanReadablePrinter {
 	return &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
 	}
-}
-
-// AddTabWriter sets whether the PrintObj function will format with tabwriter (true
-// by default).
-func (a *HumanReadablePrinter) AddTabWriter(t bool) *HumanReadablePrinter {
-	a.skipTabWriter = !t
-	return a
 }
 
 func (a *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePrinter {
@@ -94,15 +84,6 @@ func (a *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePri
 		fn(a)
 	}
 	return a
-}
-
-// EnsurePrintHeaders sets the HumanReadablePrinter option "NoHeaders" to false
-// and removes the .lastType that was printed, which forces headers to be
-// printed in cases where multiple lists of the same resource are printed
-// consecutively, but are separated by non-printer related information.
-func (h *HumanReadablePrinter) EnsurePrintHeaders() {
-	h.options.NoHeaders = false
-	h.lastType = nil
 }
 
 // TableHandler adds a print handler with a given set of columns to HumanReadablePrinter instance.
@@ -171,51 +152,6 @@ func ValidateRowPrintHandlerFunc(printFunc reflect.Value) error {
 	return nil
 }
 
-// ValidatePrintHandlerFunc validates print handler signature.
-// printFunc is the function that will be called to print an object.
-// It must be of the following type:
-//  func printFunc(object ObjectType, w io.Writer, options PrintOptions) error
-// where ObjectType is the type of the object that will be printed.
-// DEPRECATED: will be replaced with ValidateRowPrintHandlerFunc
-func ValidatePrintHandlerFunc(printFunc reflect.Value) error {
-	if printFunc.Kind() != reflect.Func {
-		return fmt.Errorf("invalid print handler. %#v is not a function", printFunc)
-	}
-	funcType := printFunc.Type()
-	if funcType.NumIn() != 3 || funcType.NumOut() != 1 {
-		return fmt.Errorf("invalid print handler." +
-			"Must accept 3 parameters and return 1 value.")
-	}
-	if funcType.In(1) != reflect.TypeOf((*io.Writer)(nil)).Elem() ||
-		funcType.In(2) != reflect.TypeOf((*PrintOptions)(nil)).Elem() ||
-		funcType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
-		return fmt.Errorf("invalid print handler. The expected signature is: "+
-			"func handler(obj %v, w io.Writer, options PrintOptions) error", funcType.In(0))
-	}
-	return nil
-}
-
-func (h *HumanReadablePrinter) HandledResources() []string {
-	keys := make([]string, 0)
-
-	for k := range h.handlerMap {
-		// k.String looks like "*api.PodList" and we want just "pod"
-		api := strings.Split(k.String(), ".")
-		resource := api[len(api)-1]
-		if strings.HasSuffix(resource, "List") {
-			continue
-		}
-		resource = strings.ToLower(resource)
-		keys = append(keys, resource)
-	}
-	return keys
-}
-
-func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "Unknown object: %s", string(data))
-	return err
-}
-
 func printHeader(columnNames []string, w io.Writer) error {
 	if _, err := fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t")); err != nil {
 		return err
@@ -226,7 +162,7 @@ func printHeader(columnNames []string, w io.Writer) error {
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
 	w, found := output.(*tabwriter.Writer)
-	if !found && !h.skipTabWriter {
+	if !found {
 		w = GetNewTabWriter(output)
 		output = w
 		defer w.Flush()
@@ -289,15 +225,6 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 	// we failed all reasonable printing efforts, report failure
 	return fmt.Errorf("error: unknown type %#v", obj)
-}
-
-func hasCondition(conditions []metav1beta1.TableRowCondition, t metav1beta1.RowConditionType) bool {
-	for _, condition := range conditions {
-		if condition.Type == t {
-			return condition.Status == metav1beta1.ConditionTrue
-		}
-	}
-	return false
 }
 
 // PrintTable prints a table to the provided output respecting the filtering rules for options
@@ -445,10 +372,10 @@ func DecorateTable(table *metav1beta1.Table, options PrintOptions) error {
 	return nil
 }
 
-// PrintTable returns a table for the provided object, using the printer registered for that type. It returns
+// GenerateTable returns a table for the provided object, using the printer registered for that type. It returns
 // a table that includes all of the information requested by options, but will not remove rows or columns. The
 // caller is responsible for applying rules related to filtering rows or columns.
-func (h *HumanReadablePrinter) PrintTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error) {
+func (h *HumanReadablePrinter) GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error) {
 	t := reflect.TypeOf(obj)
 	handler, ok := h.handlerMap[t]
 	if !ok {
@@ -573,65 +500,6 @@ func printRows(output io.Writer, rows []metav1beta1.TableRow, options PrintOptio
 	}
 }
 
-// TODO: this method assumes the meta/v1 server API, so should be refactored out of this package
-func printUnstructured(unstructured runtime.Unstructured, w io.Writer, additionalFields []string, options PrintOptions) error {
-	metadata, err := meta.Accessor(unstructured)
-	if err != nil {
-		return err
-	}
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", metadata.GetNamespace()); err != nil {
-			return err
-		}
-	}
-
-	content := unstructured.UnstructuredContent()
-	kind := "<missing>"
-	if objKind, ok := content["kind"]; ok {
-		if str, ok := objKind.(string); ok {
-			kind = str
-		}
-	}
-	if objAPIVersion, ok := content["apiVersion"]; ok {
-		if str, ok := objAPIVersion.(string); ok {
-			version, err := schema.ParseGroupVersion(str)
-			if err != nil {
-				return err
-			}
-			kind = kind + "." + version.Version + "." + version.Group
-		}
-	}
-
-	name := FormatResourceName(options.Kind, metadata.GetName(), options.WithKind)
-
-	if _, err := fmt.Fprintf(w, "%s\t%s", name, kind); err != nil {
-		return err
-	}
-	for _, field := range additionalFields {
-		if value, ok := content[field]; ok {
-			var formattedValue string
-			switch typedValue := value.(type) {
-			case []interface{}:
-				formattedValue = fmt.Sprintf("%d item(s)", len(typedValue))
-			default:
-				formattedValue = fmt.Sprintf("%v", value)
-			}
-			if _, err := fmt.Fprintf(w, "\t%s", formattedValue); err != nil {
-				return err
-			}
-		}
-	}
-	if _, err := fmt.Fprint(w, AppendLabels(metadata.GetLabels(), options.ColumnLabels)); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, metadata.GetLabels())); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func formatLabelHeaders(columnLabels []string) []string {
 	formHead := make([]string, len(columnLabels))
 	for i, l := range columnLabels {
@@ -671,43 +539,4 @@ func appendLabelCells(values []interface{}, itemLabels map[string]string, opts P
 		values = append(values, labels.FormatLabels(itemLabels))
 	}
 	return values
-}
-
-// FormatResourceName receives a resource kind, name, and boolean specifying
-// whether or not to update the current name to "kind/name"
-func FormatResourceName(kind schema.GroupKind, name string, withKind bool) string {
-	if !withKind || kind.Empty() {
-		return name
-	}
-
-	return strings.ToLower(kind.String()) + "/" + name
-}
-
-func AppendLabels(itemLabels map[string]string, columnLabels []string) string {
-	var buffer bytes.Buffer
-
-	for _, cl := range columnLabels {
-		buffer.WriteString(fmt.Sprint("\t"))
-		if il, ok := itemLabels[cl]; ok {
-			buffer.WriteString(fmt.Sprint(il))
-		} else {
-			buffer.WriteString("<none>")
-		}
-	}
-
-	return buffer.String()
-}
-
-// Append all labels to a single column. We need this even when show-labels flag* is
-// false, since this adds newline delimiter to the end of each row.
-func AppendAllLabels(showLabels bool, itemLabels map[string]string) string {
-	var buffer bytes.Buffer
-
-	if showLabels {
-		buffer.WriteString(fmt.Sprint("\t"))
-		buffer.WriteString(labels.FormatLabels(itemLabels))
-	}
-	buffer.WriteString("\n")
-
-	return buffer.String()
 }

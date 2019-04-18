@@ -153,7 +153,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 
 			// We need to inspect the event and get ResourceVersion out of it
 			switch event.Type {
-			case watch.Added, watch.Modified, watch.Deleted:
+			case watch.Added, watch.Modified, watch.Deleted, watch.Bookmark:
 				metaObject, ok := event.Object.(resourceVersionGetter)
 				if !ok {
 					_ = rw.send(watch.Event{

@@ -50,12 +50,12 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 func NewControlPlaneJoinPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "control-plane-join",
-		Short:   "Joins a machine as a control plane instance",
+		Short:   "Join a machine as a control plane instance",
 		Example: controlPlaneJoinExample,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",
-				Short:          "Joins a machine as a control plane instance",
+				Short:          "Join a machine as a control plane instance",
 				InheritFlags:   getControlPlaneJoinPhaseFlags("all"),
 				RunAllSiblings: true,
 			},

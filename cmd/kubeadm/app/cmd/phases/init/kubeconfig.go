@@ -36,27 +36,27 @@ var (
 	}{
 		kubeadmconstants.AdminKubeConfigFileName: {
 			name:  "admin",
-			short: "Generates a kubeconfig file for the admin to use and for kubeadm itself",
-			long:  "Generates the kubeconfig file for the admin and for kubeadm itself, and saves it to %s file.",
+			short: "Generate a kubeconfig file for the admin to use and for kubeadm itself",
+			long:  "Generate the kubeconfig file for the admin and for kubeadm itself, and save it to %s file.",
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			name:  "kubelet",
-			short: "Generates a kubeconfig file for the kubelet to use *only* for cluster bootstrapping purposes",
+			short: "Generate a kubeconfig file for the kubelet to use *only* for cluster bootstrapping purposes",
 			long: normalizer.LongDesc(`
-					Generates the kubeconfig file for the kubelet to use and saves it to %s file.
+					Generate the kubeconfig file for the kubelet to use and save it to %s file.
 
 					Please note that this should *only* be used for cluster bootstrapping purposes. After your control plane is up,
 					you should request all kubelet credentials from the CSR API.`),
 		},
 		kubeadmconstants.ControllerManagerKubeConfigFileName: {
 			name:  "controller-manager",
-			short: "Generates a kubeconfig file for the controller manager to use",
-			long:  "Generates the kubeconfig file for the controller manager to use and saves it to %s file",
+			short: "Generate a kubeconfig file for the controller manager to use",
+			long:  "Generate the kubeconfig file for the controller manager to use and save it to %s file",
 		},
 		kubeadmconstants.SchedulerKubeConfigFileName: {
 			name:  "scheduler",
-			short: "Generates a kubeconfig file for the scheduler to use",
-			long:  "Generates the kubeconfig file for the scheduler to use and saves it to %s file.",
+			short: "Generate a kubeconfig file for the scheduler to use",
+			long:  "Generate the kubeconfig file for the scheduler to use and save it to %s file.",
 		},
 	}
 )
@@ -65,12 +65,12 @@ var (
 func NewKubeConfigPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "kubeconfig",
-		Short: "Generates all kubeconfig files necessary to establish the control plane and the admin kubeconfig file",
+		Short: "Generate all kubeconfig files necessary to establish the control plane and the admin kubeconfig file",
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",
-				Short:          "Generates all kubeconfig files",
+				Short:          "Generate all kubeconfig files",
 				InheritFlags:   getKubeConfigPhaseFlags("all"),
 				RunAllSiblings: true,
 			},

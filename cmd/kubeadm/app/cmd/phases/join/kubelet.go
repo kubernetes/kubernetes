@@ -57,8 +57,8 @@ var (
 func NewKubeletStartPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "kubelet-start [api-server-endpoint]",
-		Short: "Writes kubelet settings, certificates and (re)starts the kubelet",
-		Long:  "Writes a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)starts kubelet.",
+		Short: "Write kubelet settings, certificates and (re)start the kubelet",
+		Long:  "Write a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)start kubelet.",
 		Run:   runKubeletStartJoinPhase,
 		InheritFlags: []string{
 			options.CfgPath,

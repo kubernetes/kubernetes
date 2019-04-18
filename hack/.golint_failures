@@ -31,7 +31,6 @@ pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation
 pkg/apis/core
-pkg/apis/core/helper
 pkg/apis/core/helper/qos
 pkg/apis/core/v1
 pkg/apis/core/v1/helper
@@ -632,7 +631,6 @@ staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller
 staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1
 test/e2e
-test/e2e/apps
 test/e2e/auth
 test/e2e/autoscaling
 test/e2e/chaosmonkey

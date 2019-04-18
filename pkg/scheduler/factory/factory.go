@@ -707,24 +707,6 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *internalqueue.Pod
 	}
 }
 
-// nodeEnumerator allows a cache.Poller to enumerate items in a v1.NodeList
-type nodeEnumerator struct {
-	*v1.NodeList
-}
-
-// Len returns the number of items in the node list.
-func (ne *nodeEnumerator) Len() int {
-	if ne.NodeList == nil {
-		return 0
-	}
-	return len(ne.Items)
-}
-
-// Get returns the item (and ID) with the particular index.
-func (ne *nodeEnumerator) Get(index int) interface{} {
-	return &ne.Items[index]
-}
-
 type binder struct {
 	Client clientset.Interface
 }

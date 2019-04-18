@@ -36,8 +36,8 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 // This test primarily checks 2 things:
@@ -52,14 +52,17 @@ const (
 	restartTimeout      = 10 * time.Minute
 	numPods             = 10
 	sshPort             = 22
-	ADD                 = "ADD"
-	DEL                 = "DEL"
-	UPDATE              = "UPDATE"
+	// ADD represents the ADD event
+	ADD = "ADD"
+	// DEL represents the DEL event
+	DEL = "DEL"
+	// UPDATE represents the UPDATE event
+	UPDATE = "UPDATE"
 )
 
-// restartDaemonConfig is a config to restart a running daemon on a node, and wait till
+// RestartDaemonConfig is a config to restart a running daemon on a node, and wait till
 // it comes back up. It uses ssh to send a SIGTERM to the daemon.
-type restartDaemonConfig struct {
+type RestartDaemonConfig struct {
 	nodeName     string
 	daemonName   string
 	healthzPort  int
@@ -67,12 +70,12 @@ type restartDaemonConfig struct {
 	pollTimeout  time.Duration
 }
 
-// NewRestartConfig creates a restartDaemonConfig for the given node and daemon.
-func NewRestartConfig(nodeName, daemonName string, healthzPort int, pollInterval, pollTimeout time.Duration) *restartDaemonConfig {
+// NewRestartConfig creates a RestartDaemonConfig for the given node and daemon.
+func NewRestartConfig(nodeName, daemonName string, healthzPort int, pollInterval, pollTimeout time.Duration) *RestartDaemonConfig {
 	if !framework.ProviderIs("gce") {
 		framework.Logf("WARNING: SSH through the restart config might not work on %s", framework.TestContext.Provider)
 	}
-	return &restartDaemonConfig{
+	return &RestartDaemonConfig{
 		nodeName:     nodeName,
 		daemonName:   daemonName,
 		healthzPort:  healthzPort,
@@ -81,12 +84,12 @@ func NewRestartConfig(nodeName, daemonName string, healthzPort int, pollInterval
 	}
 }
 
-func (r *restartDaemonConfig) String() string {
+func (r *RestartDaemonConfig) String() string {
 	return fmt.Sprintf("Daemon %v on node %v", r.daemonName, r.nodeName)
 }
 
 // waitUp polls healthz of the daemon till it returns "ok" or the polling hits the pollTimeout
-func (r *restartDaemonConfig) waitUp() {
+func (r *RestartDaemonConfig) waitUp() {
 	framework.Logf("Checking if %v is up by polling for a 200 on its /healthz endpoint", r)
 	healthzCheck := fmt.Sprintf(
 		"curl -s -o /dev/null -I -w \"%%{http_code}\" http://localhost:%v/healthz", r.healthzPort)
@@ -110,14 +113,14 @@ func (r *restartDaemonConfig) waitUp() {
 }
 
 // kill sends a SIGTERM to the daemon
-func (r *restartDaemonConfig) kill() {
+func (r *RestartDaemonConfig) kill() {
 	framework.Logf("Killing %v", r)
 	_, err := framework.NodeExec(r.nodeName, fmt.Sprintf("pgrep %v | xargs -I {} sudo kill {}", r.daemonName))
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 }
 
 // Restart checks if the daemon is up, kills it, and waits till it comes back up
-func (r *restartDaemonConfig) restart() {
+func (r *RestartDaemonConfig) restart() {
 	r.waitUp()
 	r.kill()
 	r.waitUp()
@@ -191,7 +194,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 	var stopCh chan struct{}
 	var tracker *podTracker
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// These tests require SSH
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		ns = f.Namespace.Name
@@ -206,7 +209,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 			Replicas:    numPods,
 			CreatedPods: &[]*v1.Pod{},
 		}
-		Expect(framework.RunRC(config)).NotTo(HaveOccurred())
+		gomega.Expect(framework.RunRC(config)).NotTo(gomega.HaveOccurred())
 		replacePods(*config.CreatedPods, existingPods)
 
 		stopCh = make(chan struct{})
@@ -240,11 +243,11 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		go controller.Run(stopCh)
 	})
 
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		close(stopCh)
 	})
 
-	It("Controller Manager should not create/delete replicas across restart", func() {
+	ginkgo.It("Controller Manager should not create/delete replicas across restart", func() {
 
 		// Requires master ssh access.
 		framework.SkipUnlessProviderIs("gce", "aws")
@@ -275,7 +278,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 	})
 
-	It("Scheduler should continue assigning pods to nodes across restart", func() {
+	ginkgo.It("Scheduler should continue assigning pods to nodes across restart", func() {
 
 		// Requires master ssh access.
 		framework.SkipUnlessProviderIs("gce", "aws")
@@ -293,7 +296,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true))
 	})
 
-	It("Kubelet should not restart containers across restart", func() {
+	ginkgo.It("Kubelet should not restart containers across restart", func() {
 
 		nodeIPs, err := framework.GetNodePublicIps(f.ClientSet)
 		framework.ExpectNoError(err)

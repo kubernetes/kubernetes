@@ -43,10 +43,7 @@
 ./hack/pin-dependency.sh
 ./hack/test-integration.sh
 ./hack/test-update-storage-objects.sh
-./hack/update-generated-kms-dockerized.sh
-./hack/update-generated-protobuf-dockerized.sh
 ./hack/update-generated-runtime-dockerized.sh
-./hack/update-openapi-spec.sh
 ./hack/update-vendor.sh
 ./hack/verify-api-groups.sh
 ./hack/verify-boilerplate.sh
@@ -86,6 +83,3 @@
 ./test/e2e_node/environment/setup_host.sh
 ./test/e2e_node/gubernator.sh
 ./test/images/image-util.sh
-./test/images/volume/gluster/run_gluster.sh
-./test/images/volume/iscsi/create_block.sh
-./test/images/volume/nfs/run_nfs.sh

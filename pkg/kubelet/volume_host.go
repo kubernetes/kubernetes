@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	execmnt "k8s.io/kubernetes/pkg/volume/util/exec"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
@@ -230,7 +231,7 @@ func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
 	if exec == nil {
 		return kvh.kubelet.mounter
 	}
-	return mount.NewExecMounter(exec, kvh.kubelet.mounter)
+	return execmnt.NewExecMounter(exec, kvh.kubelet.mounter)
 }
 
 func (kvh *kubeletVolumeHost) GetHostName() string {

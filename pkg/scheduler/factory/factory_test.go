@@ -296,32 +296,6 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 }
 
-func TestNodeEnumerator(t *testing.T) {
-	testList := &v1.NodeList{
-		Items: []v1.Node{
-			{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "baz"}},
-		},
-	}
-	me := nodeEnumerator{testList}
-
-	if e, a := 3, me.Len(); e != a {
-		t.Fatalf("expected %v, got %v", e, a)
-	}
-	for i := range testList.Items {
-		t.Run(fmt.Sprintf("node enumerator/%v", i), func(t *testing.T) {
-			gotObj := me.Get(i)
-			if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
-				t.Errorf("Expected %v, got %v", e, a)
-			}
-			if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
-				t.Errorf("Expected %#v, got %v#", e, a)
-			}
-		})
-	}
-}
-
 func TestBind(t *testing.T) {
 	table := []struct {
 		name    string

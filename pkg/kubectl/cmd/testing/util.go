@@ -139,8 +139,3 @@ func InitTestErrorHandler(t *testing.T) {
 		t.Errorf("Error running command (exit code %d): %s", code, str)
 	})
 }
-
-func Int32ptr(val int) *int32 {
-	t := int32(val)
-	return &t
-}

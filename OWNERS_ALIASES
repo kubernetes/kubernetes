@@ -223,14 +223,20 @@ aliases:
     - nicksardo
     - thockin
     - rramkumar1
+  sig-apps-approvers:
+    - kow3ns
+    - janetkuo
+    - soltysh
+    - tnozicka
+    - erictune
+    - smarterclayton
   sig-apps-reviewers:
     - enisoc
     - erictune
     - foxish
     - janetkuo
     - kow3ns
-    - lukaszo
-    - mfojtik
+    - mortent
     - smarterclayton
     - soltysh
     - tnozicka
@@ -371,13 +377,15 @@ aliases:
   #   - 
   #   - 
   
-  # sig-scheduling-api-reviewers:
-  #   - 
-  #   - 
+  sig-scheduling-api-reviewers:
+      - bsalamat
+      - k82cn
   
-  # sig-storage-api-reviewers:
-  #   - 
-  #   - 
+sig-storage-api-reviewers:
+    - saad-ali
+    - msau42
+    - jsafrane
+
   
   # sig-windows-api-reviewers:
   #   - 
