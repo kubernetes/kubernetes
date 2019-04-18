@@ -50,7 +50,7 @@ func init() {
 }
 
 func newInitializedFakeFsStore() (*fsStore, error) {
-	// Test with the default filesystem, the fake filesystem has an issue caused by afero: https://github.com/spf13/afero/issues/141
+	// Test with the default filesystem, the fake filesystem that was previously used has an issue caused by afero: https://github.com/spf13/afero/issues/141
 	// The default filesystem also behaves more like production, so we should probably not mock the filesystem for unit tests.
 	fs := utilfs.DefaultFs{}
 

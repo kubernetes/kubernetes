@@ -140,7 +140,7 @@ require (
 	github.com/shurcooL/sanitized_anchor_name v0.0.0-20151028001915-10ef21a441db // indirect
 	github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
-	github.com/spf13/afero v0.0.0-20160816080757-b28a7effac97
+	github.com/spf13/afero v0.0.0-20160816080757-b28a7effac97 // indirect
 	github.com/spf13/cast v0.0.0-20160730092037-e31f36ffc91a // indirect
 	github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937
 	github.com/spf13/jwalterweatherman v0.0.0-20160311093646-33c24e77fb80 // indirect
