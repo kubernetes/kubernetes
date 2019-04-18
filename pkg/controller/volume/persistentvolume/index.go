@@ -168,6 +168,11 @@ func findMatchingVolume(
 			continue
 		}
 
+		// filter out different StorageClasses
+		if volume.Spec.StorageClassName != requestedClass {
+			continue
+		}
+
 		// check if PV's DeletionTimeStamp is set, if so, skip this volume.
 		if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 			if volume.ObjectMeta.DeletionTimestamp != nil {

@@ -589,6 +589,16 @@ func TestSync(t *testing.T) {
 			newClaimArray("claim13-5", "uid13-5", "1Gi", "volume13-5", v1.ClaimBound, nil, annBoundByController, annBindCompleted),
 			noevents, noerrors, testSyncClaim,
 		},
+		{
+			// syncVolume does not bind claim requesting class to a prebound PV with no class.
+			// class = ""
+			"13-6 - prebound PV with class",
+			newVolumeArray("volume13-6", "1Gi", "", "claim13-6", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classGold),
+			newVolumeArray("volume13-6", "1Gi", "", "claim13-6", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classGold),
+			newClaimArray("claim13-6", "uid13-6", "1Gi", "", v1.ClaimPending, nil),
+			newClaimArray("claim13-6", "uid13-6", "1Gi", "", v1.ClaimPending, nil),
+			noevents, noerrors, testSyncClaim,
+		},
 	}
 
 	runSyncTests(t, tests, []*storage.StorageClass{
