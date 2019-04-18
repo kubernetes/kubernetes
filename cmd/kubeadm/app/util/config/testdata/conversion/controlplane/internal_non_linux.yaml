@@ -1,29 +1,30 @@
+---
 APIServer:
   CertSANs: null
   ExtraArgs:
     authorization-mode: Node,RBAC,Webhook
   ExtraVolumes:
-  - HostPath: /host/read-only
-    MountPath: /mount/read-only
-    Name: ReadOnlyVolume
-    PathType: ""
-    ReadOnly: true
-  - HostPath: /host/writable
-    MountPath: /mount/writable
-    Name: WritableVolume
-    PathType: ""
-    ReadOnly: false
+    - HostPath: /host/read-only
+      MountPath: /mount/read-only
+      Name: ReadOnlyVolume
+      PathType: ""
+      ReadOnly: true
+    - HostPath: /host/writable
+      MountPath: /mount/writable
+      Name: WritableVolume
+      PathType: ""
+      ReadOnly: false
   TimeoutForControlPlane: 4m0s
 BootstrapTokens:
-- Description: ""
-  Expires: null
-  Groups:
-  - system:bootstrappers:kubeadm:default-node-token
-  TTL: 24h0m0s
-  Token: s73ybu.6tw6wnqgp5z0wb77
-  Usages:
-  - signing
-  - authentication
+  - Description: ""
+    Expires: null
+    Groups:
+      - system:bootstrappers:kubeadm:default-node-token
+    TTL: 24h0m0s
+    Token: s73ybu.6tw6wnqgp5z0wb77
+    Usages:
+      - signing
+      - authentication
 CIImageRepository: ""
 CertificatesDir: /etc/kubernetes/pki
 ClusterName: kubernetes
@@ -94,7 +95,7 @@ ComponentConfigs:
     CgroupRoot: ""
     CgroupsPerQOS: true
     ClusterDNS:
-    - 10.96.0.10
+      - 10.96.0.10
     ClusterDomain: cluster.local
     ConfigMapAndSecretChangeDetectionStrategy: Watch
     ContainerLogMaxFiles: 5
@@ -104,7 +105,7 @@ ComponentConfigs:
     EnableControllerAttachDetach: true
     EnableDebuggingHandlers: true
     EnforceNodeAllocatable:
-    - pods
+      - pods
     EventBurst: 10
     EventRecordQPS: 5
     EvictionHard:
@@ -199,8 +200,8 @@ NodeRegistration:
   KubeletExtraArgs: null
   Name: control-plane-1
   Taints:
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/master
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/master
 Scheduler:
   ExtraArgs: null
   ExtraVolumes: null

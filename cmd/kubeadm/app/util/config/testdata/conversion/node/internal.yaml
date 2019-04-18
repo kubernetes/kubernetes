@@ -1,3 +1,4 @@
+---
 CACertPath: /etc/kubernetes/pki/ca.crt
 ControlPlane:
   LocalAPIEndpoint:
@@ -17,5 +18,5 @@ NodeRegistration:
   KubeletExtraArgs: null
   Name: control-plane-1
   Taints:
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/master
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/master
