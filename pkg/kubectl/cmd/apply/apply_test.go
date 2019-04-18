@@ -100,8 +100,10 @@ const (
 	dirName                   = "../../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
 	filenameRCJSON            = "../../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
 
-	filenameWidgetClientside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-clientside.yaml"
-	filenameWidgetServerside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
+	filenameWidgetClientside    = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-clientside.yaml"
+	filenameWidgetServerside    = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
+	filenameDeployObjServerside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-serverside.yaml"
+	filenameDeployObjClientside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-clientside.yaml"
 )
 
 func readConfigMapList(t *testing.T, filename string) [][]byte {
@@ -869,11 +871,6 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 		})
 	}
 }
-
-const (
-	filenameDeployObjServerside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-serverside.yaml"
-	filenameDeployObjClientside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-clientside.yaml"
-)
 
 func readDeploymentFromFile(t *testing.T, file string) []byte {
 	raw := readBytesFromFile(t, file)

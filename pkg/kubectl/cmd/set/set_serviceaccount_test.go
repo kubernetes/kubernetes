@@ -41,14 +41,16 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
-const serviceAccount = "serviceaccount1"
-const serviceAccountMissingErrString = "serviceaccount is required"
-const resourceMissingErrString = `You must provide one or more resources by argument or filename.
+const (
+	serviceAccount                 = "serviceaccount1"
+	serviceAccountMissingErrString = "serviceaccount is required"
+	resourceMissingErrString       = `You must provide one or more resources by argument or filename.
 Example resource specifications include:
    '-f rsrc.yaml'
    '--filename=rsrc.json'
    '<resource> <name>'
    '<resource>'`
+)
 
 func TestSetServiceAccountLocal(t *testing.T) {
 	inputs := []struct {
