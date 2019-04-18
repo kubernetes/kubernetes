@@ -1902,7 +1902,7 @@ func printControllerRevision(obj *apps.ControllerRevision, options printers.Prin
 			return nil, err
 		}
 		gvk := gv.WithKind(controllerRef.Kind)
-		controllerName = printers.FormatResourceName(gvk.GroupKind(), controllerRef.Name, withKind)
+		controllerName = formatResourceName(gvk.GroupKind(), controllerRef.Name, withKind)
 	}
 	revision := obj.Revision
 	age := translateTimestampSince(obj.CreationTimestamp)
@@ -1920,6 +1920,16 @@ func printControllerRevisionList(list *apps.ControllerRevisionList, options prin
 		rows = append(rows, r...)
 	}
 	return rows, nil
+}
+
+// formatResourceName receives a resource kind, name, and boolean specifying
+// whether or not to update the current name to "kind/name"
+func formatResourceName(kind schema.GroupKind, name string, withKind bool) string {
+	if !withKind || kind.Empty() {
+		return name
+	}
+
+	return strings.ToLower(kind.String()) + "/" + name
 }
 
 func printResourceQuota(resourceQuota *api.ResourceQuota, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
