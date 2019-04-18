@@ -51,7 +51,6 @@ const (
 	restartPollInterval = 5 * time.Second
 	restartTimeout      = 10 * time.Minute
 	numPods             = 10
-	sshPort             = 22
 	// ADD represents the ADD event
 	ADD = "ADD"
 	// DEL represents the DEL event
