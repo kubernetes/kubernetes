@@ -33,20 +33,17 @@ func TestNewCertificateAuthority(t *testing.T) {
 	cert, key, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
 
 	if cert == nil {
-		t.Errorf(
-			"failed NewCertificateAuthority, cert == nil",
-		)
+		t.Error("failed NewCertificateAuthority, cert == nil")
+	} else if !cert.IsCA {
+		t.Error("cert is not a valida CA")
 	}
+
 	if key == nil {
-		t.Errorf(
-			"failed NewCertificateAuthority, key == nil",
-		)
+		t.Error("failed NewCertificateAuthority, key == nil")
 	}
+
 	if err != nil {
-		t.Errorf(
-			"failed NewCertificateAuthority with an error: %v",
-			err,
-		)
+		t.Errorf("failed NewCertificateAuthority with an error: %+v", err)
 	}
 }
 

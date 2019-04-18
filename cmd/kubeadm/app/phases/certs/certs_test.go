@@ -370,16 +370,6 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 	}
 }
 
-func TestNewCACertAndKey(t *testing.T) {
-	certCfg := &certutil.Config{CommonName: "kubernetes"}
-	caCert, _, err := NewCACertAndKey(certCfg)
-	if err != nil {
-		t.Fatalf("failed call NewCACertAndKey: %v", err)
-	}
-
-	certstestutil.AssertCertificateIsCa(t, caCert)
-}
-
 func TestSharedCertificateExists(t *testing.T) {
 	caCert, caKey := certstestutil.CreateCACert(t)
 	_, key, _ := certstestutil.CreateTestCert(t, caCert, caKey, certutil.AltNames{})
