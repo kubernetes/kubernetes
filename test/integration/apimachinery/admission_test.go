@@ -395,6 +395,7 @@ func defaultPodDeletecollection(t *testing.T, client dynamic.Interface, gvr meta
 
 func getTestFunc(gvr metav1.GroupVersionResource, verb string) func(*testing.T, dynamic.Interface, metav1.GroupVersionResource) {
 	defaultFuncs := map[metav1.GroupVersionResource]map[string]func(t *testing.T, client dynamic.Interface, resource metav1.GroupVersionResource){
+		// Needs to be populated for other GVRs
 		{
 			Group:    "",
 			Version:  "v1",
@@ -425,7 +426,7 @@ func getResourceCustomTestFunc(gvr metav1.GroupVersionResource, verb string) (fu
 	// Initialize Custom functions map
 	resourceCustomTestFunc := make(map[metav1.GroupVersionResource]map[string]func(*testing.T, dynamic.Interface, metav1.GroupVersionResource))
 
-	// Populating map with custom functions per verb.
+	// Populating map with custom functions per GVR per verb.
 	resourceCustomTestFunc = map[metav1.GroupVersionResource]map[string]func(*testing.T, dynamic.Interface, metav1.GroupVersionResource){
 		{
 			Group:    "",
@@ -444,7 +445,7 @@ func createCustomPod(t *testing.T, client dynamic.Interface, gvr metav1.GroupVer
 	t.Logf("Custom pod create was called")
 	resource := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod",
+			Name:      "test-custom-create",
 			Namespace: testNamespace,
 		},
 		Spec: v1.PodSpec{
@@ -462,6 +463,9 @@ func createCustomPod(t *testing.T, client dynamic.Interface, gvr metav1.GroupVer
 		t.Errorf("Error creating object: %+v with error: %+v", gvr, err)
 	}
 	createObject(data, t, client, gvr, resource.Kind)
+
+	// Cleaning up after Create
+	deleteObject(obj, t, client, gvr)
 }
 
 func shouldResourceTest(gvr metav1.GroupVersionResource) bool {
@@ -482,11 +486,13 @@ func shouldResourceVerbTest(gvr metav1.GroupVersionResource, verb string) bool {
 
 func getExcludedResources() map[metav1.GroupVersionResource]bool {
 	excludedResources := make(map[metav1.GroupVersionResource]bool, 0)
+	// Populate with resources to be excluded from testing
 	return excludedResources
 }
 
 func getExcludedResourceVerbs() map[metav1.GroupVersionResource]map[string]bool {
 	exludedResourceVerbs := make(map[metav1.GroupVersionResource]map[string]bool, 0)
+	// Populate with verbs to for a specific GVR to be excluded from testing
 	return exludedResourceVerbs
 }
 
