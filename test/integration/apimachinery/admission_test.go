@@ -462,7 +462,10 @@ func createCustomPod(t *testing.T, client dynamic.Interface, gvr metav1.GroupVer
 	if err != nil {
 		t.Errorf("Error creating object: %+v with error: %+v", gvr, err)
 	}
-	createObject(data, t, client, gvr, resource.Kind)
+	obj, err := createObject(data, t, client, gvr, resource.Kind)
+	if err != nil {
+		t.Errorf("Error Create object: %+v with error: %+v", gvr, err)
+	}
 
 	// Cleaning up after Create
 	deleteObject(obj, t, client, gvr)
