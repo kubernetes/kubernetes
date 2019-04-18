@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	// "strings"
 	"testing"
 
 	"k8s.io/api/admission/v1beta1"
@@ -33,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	// "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	dynamic "k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -47,10 +46,15 @@ var (
 	codecs = serializer.NewCodecFactory(scheme)
 )
 
+type record struct {
+	request   *v1beta1.AdmissionRequest
+	operation v1beta1.Operation
+}
+
 // TestAdmission tests communication between API server and webhook process.
 func TestWebhook(t *testing.T) {
 	// holder is map of request key by type of Webhook, Admission or Mutation
-	holder := make(map[string]*v1beta1.AdmissionRequest)
+	holder := make(map[string]*record)
 
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(localhostCert) {
@@ -83,8 +87,6 @@ func TestWebhook(t *testing.T) {
 			// The AdmissionReview that was sent to the webhook
 			requestedAdmissionReview := v1beta1.AdmissionReview{}
 
-			holder[key] = &v1beta1.AdmissionRequest{}
-
 			// The AdmissionReview that will be returned
 			responseAdmissionReview := v1beta1.AdmissionReview{}
 			deserializer := codecs.UniversalDeserializer()
@@ -94,8 +96,10 @@ func TestWebhook(t *testing.T) {
 			} else {
 				responseAdmissionReview.Response = response(true, "Admitted by integration testing.")
 			}
-			holder[key] = requestedAdmissionReview.Request
-			t.Logf("%s webhook operation: %s", key, requestedAdmissionReview.Request.Operation)
+			// Check which operation's result needs to be recorded, if match then record request
+			if holder[key].operation == requestedAdmissionReview.Request.Operation {
+				holder[key].request = requestedAdmissionReview.Request
+			}
 			// Return the same UID
 			responseAdmissionReview.Response.UID = requestedAdmissionReview.Request.UID
 			respBytes, err := json.Marshal(responseAdmissionReview)
@@ -136,8 +140,6 @@ func TestWebhook(t *testing.T) {
 	}
 
 	dynamicClient := master.Dynamic
-	// testData := getAdmisssionTestData()
-
 	_, resources, err := master.Client.Discovery().ServerGroupsAndResources()
 	if err != nil {
 		t.Fatalf("Failed to get ServerGroupsAndResources with error: %+v", err)
@@ -156,72 +158,63 @@ func TestWebhook(t *testing.T) {
 				continue
 			}
 			t.Run(gvr.Group+"/"+gvr.Version+resource.Name, func(t *testing.T) {
+				// Running tests for meta v1 defined Vers
 				if shouldResourceVerbTest(gvr, "create") {
+					initializeHolder(holder, v1beta1.Create)
 					getTestFunc(gvr, "create")(t, dynamicClient, gvr)
+					for k, v := range holder {
+						t.Logf("%s webhook recorded %s operation, object: %+v old object: %+v", k, v.operation, v.request.Object, v.request.OldObject)
+					}
 				}
 				if shouldResourceVerbTest(gvr, "update") {
+					initializeHolder(holder, v1beta1.Update)
 					getTestFunc(gvr, "update")(t, dynamicClient, gvr)
+					for k, v := range holder {
+						t.Logf("%s webhook recorded %s operation, object: %+v old object: %+v", k, v.operation, v.request.Object, v.request.OldObject)
+					}
 				}
 				if shouldResourceVerbTest(gvr, "patch") {
+					initializeHolder(holder, v1beta1.Update)
 					getTestFunc(gvr, "patch")(t, dynamicClient, gvr)
+					for k, v := range holder {
+						t.Logf("%s webhook recorded %s operation, object: %+v old object: %+v", k, v.operation, v.request.Object, v.request.OldObject)
+					}
 				}
 				if shouldResourceVerbTest(gvr, "connect") {
+					initializeHolder(holder, v1beta1.Connect)
 					getTestFunc(gvr, "connect")(t, dynamicClient, gvr)
+					for k, v := range holder {
+						t.Logf("%s webhook recorded %s operation, object: %+v old object: %+v", k, v.operation, v.request.Object, v.request.OldObject)
+					}
 				}
 				if shouldResourceVerbTest(gvr, "delete") {
+					initializeHolder(holder, v1beta1.Delete)
 					getTestFunc(gvr, "delete")(t, dynamicClient, gvr)
+					for k, v := range holder {
+						t.Logf("%s webhook recorded %s operation, object: %+v old object: %+v", k, v.operation, v.request.Object, v.request.OldObject)
+					}
 				}
 				if shouldResourceVerbTest(gvr, "deletecollection") {
+					initializeHolder(holder, v1beta1.Delete)
 					getTestFunc(gvr, "deletecollection")(t, dynamicClient, gvr)
+					for k, v := range holder {
+						t.Logf("%s webhook recorded %s operation, object: %+v old object: %+v", k, v.operation, v.request.Object, v.request.OldObject)
+					}
 				}
-				/*				createObj, ok := testData[ae]
-								if !ok {
-									t.Logf("Object: %+v has no test data, skipping", ae)
-									t.Skip()
-								}
-								obj, err := createObj()
-								if err != nil {
-									t.Errorf("Failed to create Unstructured object with error: %+v", err)
-								}
-								for _, verb := range verbs {
-									t.Logf("Testing verb: %s", verb)
-									switch verb {
-									case "create":
-										_, err = client.Resource(schema.GroupVersionResource{Group: ae.gvk.Group, Version: ae.gvk.Version, Resource: ae.resource}).Namespace(testNamespace).Create(obj, metav1.CreateOptions{})
-										if err != nil {
-											t.Errorf("Failed to create API object: %+v with error: %+v", obj, err)
-										}
-									case "delete":
-										t.Log("Delayed until last")
-										continue
-									case "update":
-										client.Resource(schema.GroupVersionResource{Group: ae.gvk.Group, Version: ae.gvk.Version, Resource: ae.resource}).Namespace(testNamespace).Update(obj, metav1.UpdateOptions{})
-									case "patch":
-										data, err := obj.MarshalJSON()
-										if err != nil {
-											t.Errorf("Failer to Marshal unstructured object for Path operation with error: %+v", err)
-										}
-										client.Resource(schema.GroupVersionResource{Group: ae.gvk.Group, Version: ae.gvk.Version, Resource: ae.resource}).Namespace(testNamespace).Patch(obj.GetName(), types.StrategicMergePatchType, data, metav1.PatchOptions{})
-									case "deletecollection":
-										t.Log("Not implemented")
-										continue
-									default:
-										continue
-									}
-									t.Logf("Admission Webhook:")
-									t.Logf("Operation: %s", holder["admission"].Operation)
-									t.Logf("resource GVK: %+v GVR: %+v", holder["admission"].Kind, holder["admission"].Resource)
-									t.Logf("old object: %+v", holder["admission"].OldObject)
-									t.Logf("Mutation Webhook:")
-									t.Logf("Operation: %s", holder["mutation"].Operation)
-									t.Logf("resource GVK: %+v GVR: %+v", holder["mutation"].Kind, holder["mutation"].Resource)
-									t.Logf("old object: %+v", holder["mutation"].OldObject)
-								}
-								// Running last step to delete
-								client.Resource(schema.GroupVersionResource{Group: ae.gvk.Group, Version: ae.gvk.Version, Resource: ae.resource}).Namespace(testNamespace).Delete(obj.GetName(), &metav1.DeleteOptions{})
-				*/
 			})
 		}
+	}
+}
+
+func initializeHolder(holder map[string]*record, operation v1beta1.Operation) {
+	// Initializing recording and specify Operation to record
+	holder["admission"] = &record{
+		request:   &v1beta1.AdmissionRequest{},
+		operation: operation,
+	}
+	holder["mutation"] = &record{
+		request:   &v1beta1.AdmissionRequest{},
+		operation: operation,
 	}
 }
 
@@ -245,7 +238,7 @@ func defaultPodCreate(t *testing.T, client dynamic.Interface, gvr metav1.GroupVe
 	t.Logf("Default Create for resource: %v", gvr)
 	resource := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-pod",
+			Name:      "test-create",
 			Namespace: testNamespace,
 		},
 		Spec: v1.PodSpec{
@@ -260,33 +253,107 @@ func defaultPodCreate(t *testing.T, client dynamic.Interface, gvr metav1.GroupVe
 
 	data, err := json.Marshal(&resource)
 	if err != nil {
-		t.Errorf("Error creating object: %+v with error: %+v", gvr, err)
+		t.Errorf("Error Marshal object: %+v with error: %+v", gvr, err)
 	}
-	createObject(data, t, client, gvr, resource.Kind)
+	obj, err := createObject(data, t, client, gvr, resource.Kind)
+	if err != nil {
+		t.Errorf("Error Create object: %+v with error: %+v", gvr, err)
+	}
+	// Cleaning up after Create
+	deleteObject(obj, t, client, gvr)
 }
 
-func createObject(data []byte, t *testing.T, client dynamic.Interface, gvr metav1.GroupVersionResource, kind string) {
+func deleteObject(obj *unstructured.Unstructured, t *testing.T, client dynamic.Interface, gvr metav1.GroupVersionResource) {
+	delay := int64(0)
+	client.Resource(schema.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}).Namespace(testNamespace).Delete(obj.GetName(),
+		&metav1.DeleteOptions{
+			GracePeriodSeconds: &delay,
+		})
+}
+
+func createObject(data []byte, t *testing.T, client dynamic.Interface, gvr metav1.GroupVersionResource, kind string) (*unstructured.Unstructured, error) {
 	gvk := schema.GroupVersionKind{
 		Group:   gvr.Group,
 		Version: gvr.Version,
-		Kind:    "Pod",
+		Kind:    kind,
 	}
 	obj, err := JSONToUnstructured(data, gvk)
 	if err != nil {
 		t.Errorf("Error creating object: %+v with error: %+v", gvr, err)
 	}
-	_, err = client.Resource(schema.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}).Namespace(testNamespace).Create(obj, metav1.CreateOptions{})
-	if err != nil {
-		t.Errorf("Failed to create API object: %+v with error: %+v", obj, err)
-	}
+	return client.Resource(schema.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}).Namespace(testNamespace).Create(obj, metav1.CreateOptions{})
 }
 
 func defaultPodUpdate(t *testing.T, client dynamic.Interface, gvr metav1.GroupVersionResource) {
 	t.Logf("Default Update for resource: %v", gvr)
+	// Create pod for test
+	resource := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-update",
+			Namespace: testNamespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "test-container",
+					Image: "integration-tests:blah",
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(&resource)
+	if err != nil {
+		t.Errorf("Error Marshal object: %+v with error: %+v", gvr, err)
+	}
+	obj, err := createObject(data, t, client, gvr, resource.Kind)
+	if err != nil {
+		t.Errorf("Error Create object: %+v with error: %+v", gvr, err)
+	}
+
+	// Action under the test
+	client.Resource(schema.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}).Namespace(testNamespace).Update(obj, metav1.UpdateOptions{})
+
+	// Cleaning up after Create
+	deleteObject(obj, t, client, gvr)
 }
 
 func defaultPodPatch(t *testing.T, client dynamic.Interface, gvr metav1.GroupVersionResource) {
 	t.Logf("Default Patch for resource: %v", gvr)
+	// Create pod for test
+	resource := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-patch",
+			Namespace: testNamespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "test-container",
+					Image: "integration-tests:blah",
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(&resource)
+	if err != nil {
+		t.Errorf("Error Marshal object: %+v with error: %+v", gvr, err)
+	}
+	obj, err := createObject(data, t, client, gvr, resource.Kind)
+	if err != nil {
+		t.Errorf("Error Create object: %+v with error: %+v", gvr, err)
+	}
+
+	// Action under the test
+	data, err = obj.MarshalJSON()
+	if err != nil {
+		t.Errorf("Failer to Marshal unstructured object for Path operation with error: %+v", err)
+	}
+	client.Resource(schema.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}).Namespace(testNamespace).Patch(obj.GetName(), types.StrategicMergePatchType, data, metav1.PatchOptions{})
+
+	// Cleaning up after Create
+	deleteObject(obj, t, client, gvr)
 }
 
 func defaultPodConnect(t *testing.T, client dynamic.Interface, gvr metav1.GroupVersionResource) {
@@ -295,6 +362,31 @@ func defaultPodConnect(t *testing.T, client dynamic.Interface, gvr metav1.GroupV
 
 func defaultPodDelete(t *testing.T, client dynamic.Interface, gvr metav1.GroupVersionResource) {
 	t.Logf("Default Delete for resource: %v", gvr)
+	resource := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-delete",
+			Namespace: testNamespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "test-container",
+					Image: "integration-tests:blah",
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(&resource)
+	if err != nil {
+		t.Errorf("Error Marshal object: %+v with error: %+v", gvr, err)
+	}
+	obj, err := createObject(data, t, client, gvr, resource.Kind)
+	if err != nil {
+		t.Errorf("Error Create object: %+v with error: %+v", gvr, err)
+	}
+	// Action under the test
+	deleteObject(obj, t, client, gvr)
 }
 
 func defaultPodDeletecollection(t *testing.T, client dynamic.Interface, gvr metav1.GroupVersionResource) {
