@@ -1,6 +1,7 @@
 package phases
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -8,6 +9,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeletserver"
 	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/keyutil"
 
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -40,10 +42,14 @@ func NewKubeletServerCertAndKey() workflow.Phase {
 
 // runKubeletStart executes kubelet start logic.
 func kubeletServerCerts(c workflow.RunData) error {
+	fmt.Println("[kubelet-server] Generate kubelet server certificates")
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubelet-start phase invoked with an invalid data struct")
 	}
+
+	data.Cfg().ComponentConfigs.Kubelet.TLSCertFile = kubeadmapiv1beta1.DefaultKubeletServerCertFileName
+	data.Cfg().ComponentConfigs.Kubelet.TLSPrivateKeyFile = kubeadmapiv1beta1.DefaultKubeletServerKeyFileName
 
 	kubeClient, err := data.Client()
 
@@ -51,7 +57,7 @@ func kubeletServerCerts(c workflow.RunData) error {
 		return errors.Wrap(err, "error getting kubernets client")
 	}
 
-	certDataPem, keyDataPem, err := kubeletserver.KubeletServerCert(kubeClient, data.Cfg().NodeRegistration)
+	certDataPem, keyDataPem, err := kubeletserver.KubeletServerCert(kubeClient, data.Cfg().LocalAPIEndpoint, data.Cfg().NodeRegistration)
 
 	if err != nil {
 		return errors.Wrap(err, "init phase kubelet server cert")
