@@ -22,6 +22,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/cobra"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 )
 
@@ -239,6 +242,246 @@ func TestNewJoinData(t *testing.T) {
 			// exec additional validation on the returned value
 			if tc.validate != nil {
 				tc.validate(t, data)
+			}
+		})
+	}
+}
+
+func initJoinOptions(token string, discovery kubeadmapiv1beta2.Discovery, controlPlane bool) *joinOptions {
+	joinOptions := newJoinOptions()
+	joinOptions.token = token
+	joinOptions.externalcfg.Discovery = discovery
+	joinOptions.controlPlane = controlPlane
+	return joinOptions
+}
+
+func TestAmendExternalJoinConfiguration(t *testing.T) {
+	var tests = []struct {
+		description  string
+		args         []string
+		flags        map[string]string
+		token        string
+		controlPlane bool
+		discovery    kubeadmapiv1beta2.Discovery
+		expectedErr  bool
+		validate     func(*testing.T, *joinOptions)
+	}{
+		{
+			description: "len(opt.token) = 0",
+			args:        []string{"1.2.3.4:6443"},
+			flags:       map[string]string{options.FileDiscovery: "https://foo"},
+			token:       "",
+			discovery: kubeadmapiv1beta2.Discovery{
+				BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{
+					Token: "abcdef.0123456789abcdef",
+				},
+				File:              &kubeadmapiv1beta2.FileDiscovery{},
+				TLSBootstrapToken: "abcdef.0123456789",
+			},
+			expectedErr: false,
+			validate: func(t *testing.T, opt *joinOptions) {
+				if opt.externalcfg.Discovery.TLSBootstrapToken != "abcdef.0123456789" {
+					t.Errorf("opt.externalcfg.Discovery.TLSBootstrapToken shouldn't be set to %s", opt.externalcfg.Discovery.TLSBootstrapToken)
+				}
+				if opt.externalcfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" {
+					t.Errorf("opt.externalcfg.Discovery.BootstrapToken.Token shouldn't be set to %s", opt.externalcfg.Discovery.BootstrapToken.Token)
+				}
+			},
+		},
+		{
+			description: "len(opt.token) > 0",
+			args:        []string{"1.2.3.4:6443"},
+			flags:       map[string]string{options.FileDiscovery: "https://foo"},
+			token:       "abcdef.0123456789abcdef",
+			discovery: kubeadmapiv1beta2.Discovery{
+				BootstrapToken:    &kubeadmapiv1beta2.BootstrapTokenDiscovery{},
+				File:              &kubeadmapiv1beta2.FileDiscovery{},
+				TLSBootstrapToken: "",
+			},
+			expectedErr: false,
+			validate: func(t *testing.T, opt *joinOptions) {
+				if opt.externalcfg.Discovery.TLSBootstrapToken != opt.token {
+					t.Errorf("opt.externalcfg.Discovery.TLSBootstrapToken should be set to %s", opt.token)
+				}
+				if opt.externalcfg.Discovery.BootstrapToken.Token != opt.token {
+					t.Errorf("opt.externalcfg.Discovery.BootstrapToken.Token should be set to %s", opt.token)
+				}
+			},
+		},
+		{
+			description: "len(args) == 0",
+			args:        []string{},
+			flags:       map[string]string{options.FileDiscovery: "https://foo"},
+			token:       "abcdef.0123456789abcdef",
+			discovery: kubeadmapiv1beta2.Discovery{
+				BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{},
+				File:           &kubeadmapiv1beta2.FileDiscovery{},
+			},
+			expectedErr: false,
+			validate: func(t *testing.T, opt *joinOptions) {
+				if opt.externalcfg.Discovery.BootstrapToken != nil {
+					t.Errorf("opt.externalcfg.Discovery.BootstrapToken should be set nil when len(args) == 0")
+				}
+			},
+		},
+		{
+			description: "len(args) > 0",
+			args:        []string{"1.2.3.4:6443"},
+			flags:       map[string]string{options.FileDiscovery: "https://foo"},
+			token:       "abcdef.0123456789abcdef",
+			discovery: kubeadmapiv1beta2.Discovery{
+				BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{},
+				File:           &kubeadmapiv1beta2.FileDiscovery{},
+			},
+			expectedErr: false,
+			validate: func(t *testing.T, opt *joinOptions) {
+				if opt.externalcfg.Discovery.BootstrapToken.APIServerEndpoint != "1.2.3.4:6443" {
+					t.Errorf("opt.externalcfg.Discovery.BootstrapToken.APIServerEndpoint should be set args[0]")
+				}
+			},
+		},
+		{
+			description: "len(args) > 1",
+			args:        []string{"1.2.3.4:6443", "5.6.7.8:6443"},
+			flags:       map[string]string{options.FileDiscovery: "https://foo"},
+			token:       "abcdef.0123456789abcdef",
+			discovery: kubeadmapiv1beta2.Discovery{
+				BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{},
+				File:           &kubeadmapiv1beta2.FileDiscovery{},
+			},
+			expectedErr: false,
+			validate: func(t *testing.T, opt *joinOptions) {
+				if opt.externalcfg.Discovery.BootstrapToken.APIServerEndpoint != "1.2.3.4:6443" {
+					t.Errorf("opt.externalcfg.Discovery.BootstrapToken.APIServerEndpoint should be set args[0]")
+				}
+			},
+		},
+		{
+			description: "len(opt.externalcfg.Discovery.File.KubeConfigPath) == 0",
+			args:        []string{"1.2.3.4:6443"},
+			flags:       map[string]string{options.FileDiscovery: "https://foo"},
+			token:       "abcdef.0123456789abcdef",
+			discovery: kubeadmapiv1beta2.Discovery{
+				BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{},
+				File:           &kubeadmapiv1beta2.FileDiscovery{KubeConfigPath: ""},
+			},
+			expectedErr: false,
+			validate: func(t *testing.T, opt *joinOptions) {
+				if opt.externalcfg.Discovery.File != nil {
+					t.Errorf("opt.externalcfg.Discovery.File should be set nil when len(File.KubeConfigPath) == 0")
+				}
+			},
+		},
+		{
+			description: "opt.controlPlane is false",
+			args:        []string{"1.2.3.4:6443"},
+			flags:       map[string]string{options.FileDiscovery: "https://foo"},
+			token:       "abcdef.0123456789abcdef",
+			discovery: kubeadmapiv1beta2.Discovery{
+				BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{},
+				File:           &kubeadmapiv1beta2.FileDiscovery{},
+			},
+			controlPlane: false,
+			expectedErr:  false,
+			validate: func(t *testing.T, opt *joinOptions) {
+				if opt.externalcfg.ControlPlane != nil {
+					t.Errorf("opt.externalcfg.ControlPlane should be set nil when opt.controlPlane is false")
+				}
+			},
+		},
+		{
+			description: "cmd.Flags().Lookup(options.FileDiscovery) == nil",
+			args:        []string{"1.2.3.4:6443"},
+			flags:       map[string]string{},
+			token:       "abcdef.0123456789abcdef",
+			discovery: kubeadmapiv1beta2.Discovery{
+				BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{},
+				File:           &kubeadmapiv1beta2.FileDiscovery{},
+			},
+			expectedErr: false,
+			validate: func(t *testing.T, opt *joinOptions) {
+				if opt.externalcfg.Discovery.BootstrapToken != nil {
+					t.Errorf("opt.externalcfg.Discovery.BootstrapToken should be set nil")
+				}
+			},
+		},
+	}
+	for _, rt := range tests {
+		t.Run(rt.description, func(t *testing.T) {
+			joinOptions := initJoinOptions(rt.token, rt.discovery, rt.controlPlane)
+
+			cmd := &cobra.Command{}
+			for f, v := range rt.flags {
+				cmd.Flags().String(f, v, "")
+			}
+
+			adminKubeConfigPath, err := ioutil.TempDir("", "kubeadm-jointest")
+			if err != nil {
+				t.Errorf("couldn't create a temporary directory: %v", err)
+			}
+
+			actualErr := amendExternalJoinConfiguration(joinOptions, rt.args, cmd, adminKubeConfigPath)
+			if (actualErr != nil) != rt.expectedErr {
+				t.Errorf("%s failed, expectedErr: %v\n\t actualErr: %v", rt.description, rt.expectedErr, actualErr)
+			}
+
+			if rt.validate != nil {
+				rt.validate(t, joinOptions)
+			}
+		})
+	}
+}
+
+func TestLoadInternalJoinConfiguration(t *testing.T) {
+	var tests = []struct {
+		description string
+		opt         *joinOptions
+		validate    func(*testing.T, *kubeadmapi.JoinConfiguration)
+		expectedErr bool
+	}{
+		{
+			description: "configutil.LoadOrDefaultJoinConfiguration failed should return error",
+			opt: &joinOptions{
+				cfgPath: "/tmp/cfgPath",
+			},
+			expectedErr: true,
+		},
+		{
+			description: "set cfg.NodeRegistration name and CRISocket",
+			opt: &joinOptions{
+				externalcfg: &kubeadmapiv1beta2.JoinConfiguration{
+					NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+						Name:      "anotherName",
+						CRISocket: "/var/run/crio/crio.sock",
+					},
+					Discovery: kubeadmapiv1beta2.Discovery{
+						BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{
+							Token:                    "abcdef.0123456789abcdef",
+							APIServerEndpoint:        "1.2.3.4:6443",
+							UnsafeSkipCAVerification: true,
+						},
+					},
+				},
+			},
+			validate: func(t *testing.T, cfg *kubeadmapi.JoinConfiguration) {
+				if cfg.NodeRegistration.Name != "anotherName" {
+					t.Errorf("cfg.NodeRegistration.Name should be set 'anotherName'")
+				}
+				if cfg.NodeRegistration.CRISocket != "/var/run/crio/crio.sock" {
+					t.Errorf("cfg.NodeRegistration.CRISocket should be set '/var/run/crio/crio.sock'")
+				}
+			},
+			expectedErr: false,
+		},
+	}
+	for _, rt := range tests {
+		t.Run(rt.description, func(t *testing.T) {
+			cfg, actualErr := loadInternalJoinConfiguration(rt.opt)
+			if (actualErr != nil) != rt.expectedErr {
+				t.Errorf("%s failed, expectedErr: %v\n\t actualErr: %v", rt.description, rt.expectedErr, actualErr)
+			}
+			if cfg != nil && rt.validate != nil {
+				rt.validate(t, cfg)
 			}
 		})
 	}

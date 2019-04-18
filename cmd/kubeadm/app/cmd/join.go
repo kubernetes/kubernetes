@@ -300,6 +300,50 @@ func newJoinOptions() *joinOptions {
 // This func takes care of validating joinOptions passed to the command, and then it converts
 // options into the internal JoinConfiguration type that is used as input all the phases in the kubeadm join workflow
 func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Writer) (*joinData, error) {
+
+	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
+		return nil, err
+	}
+
+	var adminKubeConfigPath = kubeadmconstants.GetAdminKubeConfigPath()
+	// amend the values in joinOptions
+	if err := amendExternalJoinConfiguration(opt, args, cmd, adminKubeConfigPath); err != nil {
+		return nil, err
+	}
+
+	// if the admin.conf file already exists, use it for skipping the discovery process.
+	// NB. this case can happen when we are joining a control-plane node only (and phases are invoked atomically)
+	var tlsBootstrapCfg *clientcmdapi.Config
+	if _, err := os.Stat(adminKubeConfigPath); err == nil && opt.controlPlane {
+		// use the admin.conf as tlsBootstrapCfg, that is the kubeconfig file used for reading the kubeadm-config during discovery
+		klog.V(1).Infof("[preflight] found %s. Use it for skipping discovery", adminKubeConfigPath)
+		tlsBootstrapCfg, err = clientcmd.LoadFromFile(adminKubeConfigPath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Error loading %s", adminKubeConfigPath)
+		}
+	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(opt.ignorePreflightErrors)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := loadInternalJoinConfiguration(opt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &joinData{
+		cfg:                   cfg,
+		tlsBootstrapCfg:       tlsBootstrapCfg,
+		ignorePreflightErrors: ignorePreflightErrorsSet,
+		outputWriter:          out,
+	}, nil
+}
+
+// amendExternalJoinConfiguration defaults the external kubeadm join configuration,
+// that is used for command line passing, and applies modifications to it.
+func amendExternalJoinConfiguration(opt *joinOptions, args []string, cmd *cobra.Command, adminKubeConfigPath string) error {
 	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
 	kubeadmscheme.Scheme.Default(opt.externalcfg)
 
@@ -336,28 +380,6 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		opt.externalcfg.ControlPlane = nil
 	}
 
-	// if the admin.conf file already exists, use it for skipping the discovery process.
-	// NB. this case can happen when we are joining a control-plane node only (and phases are invoked atomically)
-	var adminKubeConfigPath = kubeadmconstants.GetAdminKubeConfigPath()
-	var tlsBootstrapCfg *clientcmdapi.Config
-	if _, err := os.Stat(adminKubeConfigPath); err == nil && opt.controlPlane {
-		// use the admin.conf as tlsBootstrapCfg, that is the kubeconfig file used for reading the kubeadm-config during discovery
-		klog.V(1).Infof("[preflight] found %s. Use it for skipping discovery", adminKubeConfigPath)
-		tlsBootstrapCfg, err = clientcmd.LoadFromFile(adminKubeConfigPath)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Error loading %s", adminKubeConfigPath)
-		}
-	}
-
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(opt.ignorePreflightErrors)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = validation.ValidateMixedArguments(cmd.Flags()); err != nil {
-		return nil, err
-	}
-
 	// Either use the config file if specified, or convert public kubeadm API to the internal JoinConfiguration
 	// and validates JoinConfiguration
 	if opt.externalcfg.NodeRegistration.Name == "" {
@@ -371,13 +393,18 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	// in case the command doesn't have flags for discovery, makes the join cfg validation pass checks on discovery
 	if cmd.Flags().Lookup(options.FileDiscovery) == nil {
 		if _, err := os.Stat(adminKubeConfigPath); os.IsNotExist(err) {
-			return nil, errors.Errorf("File %s does not exists. Please use 'kubeadm join phase control-plane-prepare' subcommands to generate it.", adminKubeConfigPath)
+			return errors.Errorf("File %s does not exists. Please use 'kubeadm join phase control-plane-prepare' subcommands to generate it.", adminKubeConfigPath)
 		}
 		klog.V(1).Infof("[preflight] found discovery flags missing for this command. using FileDiscovery: %s", adminKubeConfigPath)
 		opt.externalcfg.Discovery.File = &kubeadmapiv1beta2.FileDiscovery{KubeConfigPath: adminKubeConfigPath}
 		opt.externalcfg.Discovery.BootstrapToken = nil //NB. this could be removed when we get better control on args (e.g. phases without discovery should have NoArgs )
 	}
+	return nil
+}
 
+// loadInternalJoinConfiguration prepares an internal JoinConfiguration from the config file or command line supplied
+// external JoinConfiguration in joinOptions, applies some overrides and performs verification.
+func loadInternalJoinConfiguration(opt *joinOptions) (*kubeadmapi.JoinConfiguration, error) {
 	cfg, err := configutil.LoadOrDefaultJoinConfiguration(opt.cfgPath, opt.externalcfg)
 	if err != nil {
 		return nil, err
@@ -397,12 +424,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		}
 	}
 
-	return &joinData{
-		cfg:                   cfg,
-		tlsBootstrapCfg:       tlsBootstrapCfg,
-		ignorePreflightErrors: ignorePreflightErrorsSet,
-		outputWriter:          out,
-	}, nil
+	return cfg, nil
 }
 
 // CertificateKey returns the key used to encrypt the certs.
