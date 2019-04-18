@@ -275,6 +275,7 @@ func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 var _ proxy.ProxyProvider = &Proxier{}
 
 // ParseExcludedCIDRs parses the input strings and returns net.IPNet
+// The validation has been done earlier so the error condition will never happen under normal conditions
 func ParseExcludedCIDRs(excludeCIDRStrs []string) []*net.IPNet {
 	var cidrExclusions []*net.IPNet
 	for _, excludedCIDR := range excludeCIDRStrs {
