@@ -454,27 +454,6 @@ func makeGlobalPDPath(host volume.VolumeHost, volumeID aws.KubernetesVolumeID) s
 	return filepath.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath, name)
 }
 
-// Reverses the mapping done in makeGlobalPDPath
-func getVolumeIDFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
-	basePath := filepath.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath)
-	rel, err := filepath.Rel(basePath, globalPath)
-	if err != nil {
-		klog.Errorf("Failed to get volume id from global mount %s - %v", globalPath, err)
-		return "", err
-	}
-	if strings.Contains(rel, "../") {
-		klog.Errorf("Unexpected mount path: %s", globalPath)
-		return "", fmt.Errorf("unexpected mount path: " + globalPath)
-	}
-	// Reverse the :// replacement done in makeGlobalPDPath
-	volumeID := rel
-	if strings.HasPrefix(volumeID, "aws/") {
-		volumeID = strings.Replace(volumeID, "aws/", "aws://", 1)
-	}
-	klog.V(2).Info("Mapping mount dir ", globalPath, " to volumeID ", volumeID)
-	return volumeID, nil
-}
-
 func (ebs *awsElasticBlockStore) GetPath() string {
 	return getPath(ebs.podUID, ebs.volName, ebs.plugin.host)
 }
