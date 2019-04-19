@@ -35,8 +35,6 @@
 ./hack/make-rules/clean.sh
 ./hack/make-rules/helpers/cache_go_dirs.sh
 ./hack/make-rules/make-help.sh
-./hack/make-rules/test-e2e-node.sh
-./hack/make-rules/test-integration.sh
 ./hack/make-rules/test.sh
 ./hack/make-rules/update.sh
 ./hack/make-rules/verify.sh
