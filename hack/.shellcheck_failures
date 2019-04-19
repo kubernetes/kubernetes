@@ -27,7 +27,6 @@
 ./hack/cherry_pick_pull.sh
 ./hack/ginkgo-e2e.sh
 ./hack/grab-profiles.sh
-./hack/lib/golang.sh
 ./hack/lib/init.sh
 ./hack/lib/swagger.sh
 ./hack/lib/test.sh
