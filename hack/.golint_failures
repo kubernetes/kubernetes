@@ -169,7 +169,6 @@ pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/apis/deviceplugin/v1beta1
 pkg/kubelet/cadvisor
 pkg/kubelet/cadvisor/testing
-pkg/kubelet/checkpoint
 pkg/kubelet/checkpointmanager/checksum
 pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
 pkg/kubelet/client

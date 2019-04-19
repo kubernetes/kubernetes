@@ -34,6 +34,7 @@ const (
 	podPrefix = "Pod"
 )
 
+// PodCheckpoint defines the operations to retrieve pod
 type PodCheckpoint interface {
 	checkpointmanager.Checkpoint
 	GetPod() *v1.Pod
@@ -66,6 +67,7 @@ func (cp *Data) VerifyChecksum() error {
 	return cp.Checksum.Verify(*cp.Pod)
 }
 
+// GetPod retrieves the pod from the checkpoint
 func (cp *Data) GetPod() *v1.Pod {
 	return cp.Pod
 }
