@@ -201,20 +201,6 @@ func verifyDevicePath(devicePaths []string) (string, error) {
 	return "", nil
 }
 
-// Returns the first path that exists, or empty string if none exist.
-func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
-	allPathsRemoved := true
-	for _, path := range devicePaths {
-		exists, err := mount.PathExists(path)
-		if err != nil {
-			return false, fmt.Errorf("Error checking if path exists: %v", err)
-		}
-		allPathsRemoved = allPathsRemoved && !exists
-	}
-
-	return allPathsRemoved, nil
-}
-
 // Returns list of all paths for given EBS mount
 // This is more interesting on GCE (where we are able to identify volumes under /dev/disk-by-id)
 // Here it is mostly about applying the partition path

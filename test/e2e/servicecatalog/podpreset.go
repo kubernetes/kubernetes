@@ -287,18 +287,6 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 	})
 })
 
-func getPodPreset(c clientset.Interface, ns, name string) (*settings.PodPreset, error) {
-	return c.SettingsV1alpha1().PodPresets(ns).Get(name, metav1.GetOptions{})
-}
-
 func createPodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
 	return c.SettingsV1alpha1().PodPresets(ns).Create(job)
-}
-
-func updatePodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
-	return c.SettingsV1alpha1().PodPresets(ns).Update(job)
-}
-
-func deletePodPreset(c clientset.Interface, ns, name string) error {
-	return c.SettingsV1alpha1().PodPresets(ns).Delete(name, nil)
 }

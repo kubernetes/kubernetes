@@ -17,17 +17,13 @@ limitations under the License.
 package set
 
 import (
-	"fmt"
-	"io"
 	"strings"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/cli-runtime/pkg/resource"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 // selectContainers allows one or more containers to be matched against a string or wildcard
@@ -42,33 +38,6 @@ func selectContainers(containers []v1.Container, spec string) ([]*v1.Container, 
 		}
 	}
 	return out, skipped
-}
-
-// handlePodUpdateError prints a more useful error to the end user when mutating a pod.
-func handlePodUpdateError(out io.Writer, err error, resource string) {
-	if statusError, ok := err.(*errors.StatusError); ok && errors.IsInvalid(err) {
-		errorDetails := statusError.Status().Details
-		if errorDetails.Kind == "Pod" {
-			all, match := true, false
-			for _, cause := range errorDetails.Causes {
-				if cause.Field == "spec" && strings.Contains(cause.Message, "may not update fields other than") {
-					fmt.Fprintf(out, "error: may not update %s in pod %q directly\n", resource, errorDetails.Name)
-					match = true
-				} else {
-					all = false
-				}
-			}
-			if all && match {
-				return
-			}
-		} else {
-			if ok := cmdutil.PrintErrorWithCauses(err, out); ok {
-				return
-			}
-		}
-	}
-
-	fmt.Fprintf(out, "error: %v\n", err)
 }
 
 // selectString returns true if the provided string matches spec, where spec is a string with

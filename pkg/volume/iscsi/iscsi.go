@@ -594,15 +594,6 @@ func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (
 	return secret, err
 }
 
-func createVolumeFromISCSIVolumeSource(volumeName string, iscsi v1.ISCSIVolumeSource) *v1.Volume {
-	return &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			ISCSI: &iscsi,
-		},
-	}
-}
-
 func createPersistentVolumeFromISCSIPVSource(volumeName string, iscsi v1.ISCSIPersistentVolumeSource) *v1.PersistentVolume {
 	block := v1.PersistentVolumeBlock
 	return &v1.PersistentVolume{

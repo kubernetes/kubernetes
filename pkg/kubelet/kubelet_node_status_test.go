@@ -167,10 +167,6 @@ func (s sortableNodeAddress) Less(i, j int) bool {
 }
 func (s sortableNodeAddress) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
 
-func sortNodeAddresses(addrs sortableNodeAddress) {
-	sort.Sort(addrs)
-}
-
 func TestUpdateNewNodeStatus(t *testing.T) {
 	cases := []struct {
 		desc                string

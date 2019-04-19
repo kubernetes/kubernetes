@@ -257,19 +257,6 @@ func (kl *simpleFakeKubelet) syncPodWithWaitGroup(options syncPodOptions) error 
 	return nil
 }
 
-// byContainerName sort the containers in a running pod by their names.
-type byContainerName kubecontainer.Pod
-
-func (b byContainerName) Len() int { return len(b.Containers) }
-
-func (b byContainerName) Swap(i, j int) {
-	b.Containers[i], b.Containers[j] = b.Containers[j], b.Containers[i]
-}
-
-func (b byContainerName) Less(i, j int) bool {
-	return b.Containers[i].Name < b.Containers[j].Name
-}
-
 // TestFakePodWorkers verifies that the fakePodWorkers behaves the same way as the real podWorkers
 // for their invocation of the syncPodFn.
 func TestFakePodWorkers(t *testing.T) {

@@ -94,23 +94,6 @@ var metricsFactory = struct {
 	metricsProvider: noopMetricsProvider{},
 }
 
-func newReflectorMetrics(name string) *reflectorMetrics {
-	var ret *reflectorMetrics
-	if len(name) == 0 {
-		return ret
-	}
-	return &reflectorMetrics{
-		numberOfLists:        metricsFactory.metricsProvider.NewListsMetric(name),
-		listDuration:         metricsFactory.metricsProvider.NewListDurationMetric(name),
-		numberOfItemsInList:  metricsFactory.metricsProvider.NewItemsInListMetric(name),
-		numberOfWatches:      metricsFactory.metricsProvider.NewWatchesMetric(name),
-		numberOfShortWatches: metricsFactory.metricsProvider.NewShortWatchesMetric(name),
-		watchDuration:        metricsFactory.metricsProvider.NewWatchDurationMetric(name),
-		numberOfItemsInWatch: metricsFactory.metricsProvider.NewItemsInWatchMetric(name),
-		lastResourceVersion:  metricsFactory.metricsProvider.NewLastResourceVersionMetric(name),
-	}
-}
-
 // SetReflectorMetricsProvider sets the metrics provider
 func SetReflectorMetricsProvider(metricsProvider MetricsProvider) {
 	metricsFactory.setProviders.Do(func() {

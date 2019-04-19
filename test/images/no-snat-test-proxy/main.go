@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/spf13/pflag"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -64,16 +63,6 @@ func (m *masqTestProxy) Run() error {
 
 	// spin up the server
 	return http.ListenAndServe(":"+m.Port, nil)
-}
-
-type handler func(http.ResponseWriter, *http.Request)
-
-func joinErrors(errs []error, sep string) string {
-	strs := make([]string, len(errs))
-	for i, err := range errs {
-		strs[i] = err.Error()
-	}
-	return strings.Join(strs, sep)
 }
 
 func checknosnatURL(pip, ips string) string {
