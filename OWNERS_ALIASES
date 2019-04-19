@@ -359,10 +359,11 @@ aliases:
   #   - 
   #   - 
   
-  # sig-cli-api-reviewers:
-  #   - 
-  #   - 
   
+  sig-cli-api-reviewers:
+    - pwittrock
+    - soltysh
+
   sig-cloud-provider-api-reviewers:
     - andrewsykim
     - cheftako
