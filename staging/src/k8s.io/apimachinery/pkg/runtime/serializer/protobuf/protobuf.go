@@ -180,6 +180,10 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
+	if wrapper, ok := obj.(runtime.EncoderWrapper); ok {
+		return wrapper.Encode(runtime.WithVersionEncoder{Encoder: s}, w)
+	}
+
 	prefixSize := uint64(len(s.prefix))
 
 	var unk runtime.Unknown
@@ -416,6 +420,10 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 
 // Encode serializes the provided object to the given writer. Overrides is ignored.
 func (s *RawSerializer) Encode(obj runtime.Object, w io.Writer) error {
+	if wrapper, ok := obj.(runtime.EncoderWrapper); ok {
+		return wrapper.Encode(runtime.WithVersionEncoder{Encoder: s}, w)
+	}
+
 	switch t := obj.(type) {
 	case bufferedMarshaller:
 		// this path performs a single allocation during write but requires the caller to implement

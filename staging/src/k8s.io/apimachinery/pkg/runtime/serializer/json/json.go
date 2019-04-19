@@ -286,6 +286,10 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
+	if wrapper, ok := obj.(runtime.EncoderWrapper); ok {
+		return wrapper.Encode(runtime.WithVersionEncoder{Encoder: s}, w)
+	}
+
 	if s.options.Yaml {
 		json, err := caseSensitiveJsonIterator.Marshal(obj)
 		if err != nil {

@@ -194,15 +194,19 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 		}
 	}
 
-	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)
-	if err != nil {
-		return err
-	}
-
 	objectKind := obj.GetObjectKind()
 	old := objectKind.GroupVersionKind()
 	// restore the old GVK after encoding
 	defer objectKind.SetGroupVersionKind(old)
+
+	if wrapper, ok := obj.(runtime.EncoderWrapper); ok {
+		return wrapper.Encode(runtime.WithVersionEncoder{Version: c.encodeVersion, Encoder: c.encoder, ObjectConvertor: c.convertor, ObjectTyper: c.typer}, w)
+	}
+
+	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)
+	if err != nil {
+		return err
+	}
 
 	if c.encodeVersion == nil || isUnversioned {
 		if e, ok := obj.(runtime.NestedObjectEncoder); ok {

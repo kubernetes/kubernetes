@@ -215,6 +215,7 @@ func (defaultFramer) NewFrameWriter(w io.Writer) io.Writer         { return w }
 type WithVersionEncoder struct {
 	Version GroupVersioner
 	Encoder
+	ObjectConvertor
 	ObjectTyper
 }
 
@@ -256,4 +257,12 @@ func (d WithoutVersionDecoder) Decode(data []byte, defaults *schema.GroupVersion
 		kind.SetGroupVersionKind(schema.GroupVersionKind{})
 	}
 	return obj, gvk, err
+}
+
+
+// FIXME: Probably move it somewhere
+type EncoderWrapper interface {
+	// FIXME:
+	// Then different encoders may provide params that are needed.
+	Encode(encoder WithVersionEncoder, w io.Writer) error
 }
