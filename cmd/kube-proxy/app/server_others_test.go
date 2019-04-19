@@ -109,18 +109,18 @@ func Test_getProxyMode(t *testing.T) {
 			kernelCompat:    true,
 			expected:        proxyModeIPTables,
 		},
-		{ // flag says ipvs, required kernel modules are not installed, fallback on iptables mode
+		{ // flag says ipvs, required kernel modules are set by GetKernelVersionAndIPVSMods()
 			flag:            "ipvs",
 			kmods:           []string{"foo", "bar", "baz"},
 			ipsetVersion:    ipvs.MinIPSetCheckVersion,
 			iptablesVersion: iptables.MinCheckVersion,
 			kernelCompat:    true,
-			expected:        proxyModeIPTables,
+			expected:        proxyModeIPVS,
 		},
-		{ // flag says ipvs, required kernel modules are not installed, iptables version too old, fallback on userspace mode
+		{ // flag says ipvs, required kernel modules are set by GetKernelVersionAndIPVSMods(), ipset and iptables version too old, fallback on userspace mode
 			flag:            "ipvs",
 			kmods:           []string{"foo", "bar", "baz"},
-			ipsetVersion:    ipvs.MinIPSetCheckVersion,
+			ipsetVersion:    "0.0.0",
 			iptablesVersion: "0.0.0",
 			kernelCompat:    true,
 			expected:        proxyModeUserspace,
