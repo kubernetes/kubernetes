@@ -39,3 +39,32 @@ build:cross:linux_arm --config=repo_infra_crosstool --platforms=@io_bazel_rules_
 build:cross:linux_arm64 --config=repo_infra_crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_arm64 --cpu=arm64
 build:cross:linux_ppc64le --config=repo_infra_crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_ppc64le --cpu=ppc64le
 build:cross:linux_s390x --config=repo_infra_crosstool --platforms=@io_bazel_rules_go//go/toolchain:linux_s390x --cpu=s390x
+
+# --config=remote-cache enables a remote bazel cache
+# Note needs a --remote_instance_name=projects/PROJ/instances/default_instance flag
+build:remote-cache --remote_cache=remotebuildexecution.googleapis.com
+build:remote-cache --tls_enabled=true
+build:remote-cache --remote_timeout=3600
+build:remote-cache --auth_enabled=true
+
+# --config=remote adds remote execution to the --config=remote-cache
+# Note needs a --remote_instance_name=projects/PROJ/instances/default_instance flag
+build:remote --config=remote-cache
+build:remote --remote_executor=remotebuildexecution.googleapis.com
+build:remote --jobs=500
+build:remote --host_javabase=@rbe_default//java:jdk
+build:remote --javabase=@rbe_default//java:jdk
+build:remote --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
+build:remote --java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
+build:remote --crosstool_top=@rbe_default//cc:toolchain
+build:remote --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:remote --extra_toolchains=@rbe_default//config:cc-toolchain
+build:remote --extra_execution_platforms=:rbe_with_network
+build:remote --host_platform=:rbe_with_network
+build:remote --platforms=:rbe_with_network
+build:remote --spawn_strategy=remote
+build:remote --strategy=Javac=remote
+build:remote --strategy=Closure=remote
+build:remote --strategy=Genrule=remote
+build:remote --define=EXECUTOR=remote
+
