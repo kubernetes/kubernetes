@@ -52,8 +52,8 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 	jsonSerializer := json.NewSerializer(mf, scheme, scheme, false)
 	jsonPrettySerializer := json.NewSerializer(mf, scheme, scheme, true)
 	yamlSerializer := json.NewYAMLSerializer(mf, scheme, scheme)
-	serializer := protobuf.NewSerializer(scheme, scheme, runtime.ContentTypeProtobuf)
-	raw := protobuf.NewRawSerializer(scheme, scheme, runtime.ContentTypeProtobuf)
+	serializer := protobuf.NewSerializer(scheme, scheme)
+	raw := protobuf.NewRawSerializer(scheme, scheme)
 
 	serializers := []serializerType{
 		{
