@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Implement KEP 32: https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/0032-create-a-k8s-io-component-repo.md
+Implement KEP 32: https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/wgs/0032-create-a-k8s-io-component-repo.md
 
 The proposal is essentially about refactoring the Kubernetes core package structure in a way that all core components may share common code around:
  - ComponentConfig implementation
