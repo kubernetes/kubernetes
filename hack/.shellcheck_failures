@@ -47,9 +47,7 @@
 ./hack/verify-boilerplate.sh
 ./hack/verify-cli-conventions.sh
 ./hack/verify-codegen.sh
-./hack/verify-description.sh
 ./hack/verify-golint.sh
-./hack/verify-import-boss.sh
 ./hack/verify-no-vendor-cycles.sh
 ./hack/verify-openapi-spec.sh
 ./hack/verify-readonly-packages.sh
