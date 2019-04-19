@@ -25,19 +25,17 @@ import "gonum.org/v1/gonum/blas"
 //
 // Dorgtr is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dorgtr(uplo blas.Uplo, n int, a []float64, lda int, tau, work []float64, lwork int) {
-	checkMatrix(n, n, a, lda)
-	if len(tau) < n-1 {
-		panic(badTau)
-	}
-	if len(work) < lwork {
-		panic(badWork)
-	}
-	if lwork < n-1 && lwork != -1 {
-		panic(badWork)
-	}
-	upper := uplo == blas.Upper
-	if !upper && uplo != blas.Lower {
+	switch {
+	case uplo != blas.Upper && uplo != blas.Lower:
 		panic(badUplo)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case lwork < max(1, n-1) && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
 	}
 
 	if n == 0 {
@@ -46,7 +44,7 @@ func (impl Implementation) Dorgtr(uplo blas.Uplo, n int, a []float64, lda int, t
 	}
 
 	var nb int
-	if upper {
+	if uplo == blas.Upper {
 		nb = impl.Ilaenv(1, "DORGQL", " ", n-1, n-1, n-1, -1)
 	} else {
 		nb = impl.Ilaenv(1, "DORGQR", " ", n-1, n-1, n-1, -1)
@@ -57,7 +55,14 @@ func (impl Implementation) Dorgtr(uplo blas.Uplo, n int, a []float64, lda int, t
 		return
 	}
 
-	if upper {
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
+	case len(tau) < n-1:
+		panic(shortTau)
+	}
+
+	if uplo == blas.Upper {
 		// Q was determined by a call to Dsytrd with uplo == blas.Upper.
 		// Shift the vectors which define the elementary reflectors one column
 		// to the left, and set the last row and column of Q to those of the unit

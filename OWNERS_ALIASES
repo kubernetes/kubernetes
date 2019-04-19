@@ -223,26 +223,30 @@ aliases:
     - nicksardo
     - thockin
     - rramkumar1
+  sig-apps-approvers:
+    - kow3ns
+    - janetkuo
+    - soltysh
+    - tnozicka
+    - erictune
+    - smarterclayton
   sig-apps-reviewers:
     - enisoc
     - erictune
     - foxish
     - janetkuo
     - kow3ns
-    - lukaszo
-    - mfojtik
+    - mortent
     - smarterclayton
     - soltysh
     - tnozicka
-  sig-apps-api-approvers:
-    - erictune
-    - smarterclayton
   sig-autoscaling-maintainers:
     - aleksandra-malinowska
     - bskiba
     - DirectXMan12
     - MaciekPytel
     - mwielgus
+
   api-approvers:
     - erictune
     - lavalamp
@@ -250,6 +254,56 @@ aliases:
     - thockin
     - liggitt
     # - bgrant0607 # manual escalations only
+
+  # subsets of api-approvers by sig area to help focus approval requests to those with domain knowledge
+  sig-api-machinery-api-approvers:
+    - lavalamp
+    - liggitt
+    - smarterclayton
+
+  sig-apps-api-approvers:
+    - erictune
+    - lavalamp
+    - liggitt
+    - smarterclayton
+
+  sig-auth-api-approvers:
+    - liggitt
+    - smarterclayton
+
+  sig-cli-api-approvers:
+    - liggitt
+    - smarterclayton
+
+  sig-cloud-provider-api-approvers:
+    - liggitt
+    - thockin
+
+  sig-cluster-lifecycle-api-approvers:
+    - liggitt
+    - smarterclayton
+
+  sig-network-api-approvers:
+    - smarterclayton
+    - thockin
+
+  sig-node-api-approvers:
+    - smarterclayton
+    - thockin
+
+  sig-scheduling-api-approvers:
+    - lavalamp
+    - smarterclayton
+    - thockin
+
+  sig-storage-api-approvers:
+    - liggitt
+    - thockin
+
+  sig-windows-api-approvers:
+    - smarterclayton
+    - thockin
+
   api-reviewers:
     - erictune
     - lavalamp
@@ -287,6 +341,58 @@ aliases:
     - piosz
     - jsafrane
     - jbeda
+
+  # api-reviewers targeted by sig area
+  # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
+  
+  sig-api-machinery-api-reviewers:
+    - caesarxuchao
+    - deads2k
+    - jpbetz
+    - sttts
+  
+  # sig-apps-api-reviewers:
+  #   - 
+  #   - 
+  
+  # sig-auth-api-reviewers:
+  #   - 
+  #   - 
+  
+  # sig-cli-api-reviewers:
+  #   - 
+  #   - 
+  
+  sig-cloud-provider-api-reviewers:
+    - andrewsykim
+    - cheftako
+  
+  # sig-cluster-lifecycle-api-reviewers:
+  #   - 
+  #   - 
+  
+  # sig-network-api-reviewers:
+  #   - 
+  #   - 
+  
+  # sig-node-api-reviewers:
+  #   - 
+  #   - 
+  
+  sig-scheduling-api-reviewers:
+      - bsalamat
+      - k82cn
+  
+sig-storage-api-reviewers:
+    - saad-ali
+    - msau42
+    - jsafrane
+
+  
+  # sig-windows-api-reviewers:
+  #   - 
+  #   - 
+
   dep-approvers:
     - apelisse
     - BenTheElder

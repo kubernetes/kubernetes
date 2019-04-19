@@ -14,8 +14,10 @@ reviewers:
   - gmarek
   - vishh
   - spiffxp
+  - SataQiu
   - xichengliudui
 approvers:
+  - bentheelder
   - cblecker
   - deads2k
   - eparis

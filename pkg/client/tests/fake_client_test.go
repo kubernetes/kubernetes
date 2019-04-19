@@ -19,9 +19,9 @@ package tests
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
@@ -37,7 +37,7 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		testSA("nsB", "sa-3"),
 	)
 
-	saList1, err := tc.Core().ServiceAccounts("nsA").List(metav1.ListOptions{})
+	saList1, err := tc.CoreV1().ServiceAccounts("nsA").List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("ServiceAccounts.List: %s", err)
 	}
@@ -50,7 +50,7 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		}
 	}
 
-	saList2, err := tc.Core().ServiceAccounts("nsB").List(metav1.ListOptions{})
+	saList2, err := tc.CoreV1().ServiceAccounts("nsB").List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("ServiceAccounts.List: %s", err)
 	}
@@ -63,7 +63,7 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		}
 	}
 
-	pod1, err := tc.Core().Pods("nsA").Get("pod-1", metav1.GetOptions{})
+	pod1, err := tc.CoreV1().Pods("nsA").Get("pod-1", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Pods.Get: %s", err)
 	}
@@ -74,12 +74,12 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		t.Fatalf("Expected to find pod nsA/pod-1t, got %s/%s", pod1.Namespace, pod1.Name)
 	}
 
-	wrongPod, err := tc.Core().Pods("nsB").Get("pod-1", metav1.GetOptions{})
+	wrongPod, err := tc.CoreV1().Pods("nsB").Get("pod-1", metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("Pods.Get: expected nsB/pod-1 not to match, but it matched %s/%s", wrongPod.Namespace, wrongPod.Name)
 	}
 
-	allPods, err := tc.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+	allPods, err := tc.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Pods.List: %s", err)
 	}
@@ -87,7 +87,7 @@ func TestFakeClientSetFiltering(t *testing.T) {
 		t.Fatalf("Expected %d pods to match, got %d", expected, actual)
 	}
 
-	allSAs, err := tc.Core().ServiceAccounts(metav1.NamespaceAll).List(metav1.ListOptions{})
+	allSAs, err := tc.CoreV1().ServiceAccounts(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("ServiceAccounts.List: %s", err)
 	}
@@ -102,12 +102,12 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 		testPod("nsA", "pod-1"),
 	)
 
-	_, err := tc.Core().Namespaces().Create(testNamespace("nsB"))
+	_, err := tc.CoreV1().Namespaces().Create(testNamespace("nsB"))
 	if err != nil {
 		t.Fatalf("Namespaces.Create: %s", err)
 	}
 
-	allNS, err := tc.Core().Namespaces().List(metav1.ListOptions{})
+	allNS, err := tc.CoreV1().Namespaces().List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Namespaces.List: %s", err)
 	}
@@ -115,12 +115,12 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 		t.Fatalf("Expected %d namespaces to match, got %d", expected, actual)
 	}
 
-	_, err = tc.Core().Pods("nsB").Create(testPod("", "pod-1"))
+	_, err = tc.CoreV1().Pods("nsB").Create(testPod("", "pod-1"))
 	if err != nil {
 		t.Fatalf("Pods.Create nsB/pod-1: %s", err)
 	}
 
-	podB1, err := tc.Core().Pods("nsB").Get("pod-1", metav1.GetOptions{})
+	podB1, err := tc.CoreV1().Pods("nsB").Get("pod-1", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Pods.Get nsB/pod-1: %s", err)
 	}
@@ -131,17 +131,17 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 		t.Fatalf("Expected to find pod nsB/pod-1t, got %s/%s", podB1.Namespace, podB1.Name)
 	}
 
-	_, err = tc.Core().Pods("nsA").Create(testPod("", "pod-1"))
+	_, err = tc.CoreV1().Pods("nsA").Create(testPod("", "pod-1"))
 	if err == nil {
 		t.Fatalf("Expected Pods.Create to fail with already exists error")
 	}
 
-	_, err = tc.Core().Pods("nsA").Update(testPod("", "pod-1"))
+	_, err = tc.CoreV1().Pods("nsA").Update(testPod("", "pod-1"))
 	if err != nil {
 		t.Fatalf("Pods.Update nsA/pod-1: %s", err)
 	}
 
-	_, err = tc.Core().Pods("nsA").Create(testPod("nsB", "pod-2"))
+	_, err = tc.CoreV1().Pods("nsA").Create(testPod("nsB", "pod-2"))
 	if err == nil {
 		t.Fatalf("Expected Pods.Create to fail with bad request from namespace mismtach")
 	}
@@ -149,14 +149,14 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 		t.Fatalf("Expected Pods.Create error to provide object and request namespaces, got %q", err)
 	}
 
-	_, err = tc.Core().Pods("nsA").Update(testPod("", "pod-3"))
+	_, err = tc.CoreV1().Pods("nsA").Update(testPod("", "pod-3"))
 	if err == nil {
 		t.Fatalf("Expected Pods.Update nsA/pod-3 to fail with not found error")
 	}
 }
 
-func testSA(ns, name string) *api.ServiceAccount {
-	return &api.ServiceAccount{
+func testSA(ns, name string) *corev1.ServiceAccount {
+	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
@@ -164,8 +164,8 @@ func testSA(ns, name string) *api.ServiceAccount {
 	}
 }
 
-func testPod(ns, name string) *api.Pod {
-	return &api.Pod{
+func testPod(ns, name string) *corev1.Pod {
+	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
@@ -173,8 +173,8 @@ func testPod(ns, name string) *api.Pod {
 	}
 }
 
-func testNamespace(ns string) *api.Namespace {
-	return &api.Namespace{
+func testNamespace(ns string) *corev1.Namespace {
+	return &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ns,
 		},

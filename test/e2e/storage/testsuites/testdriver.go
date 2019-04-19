@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -167,7 +168,7 @@ type PerTestConfig struct {
 	// Some test drivers initialize a storage server. This is
 	// the configuration that then has to be used to run tests.
 	// The values above are ignored for such tests.
-	ServerConfig *framework.VolumeTestConfig
+	ServerConfig *volume.TestConfig
 }
 
 // GetUniqueDriverName returns unique driver name that can be used parallelly in tests

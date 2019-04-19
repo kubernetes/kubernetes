@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -38,6 +39,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog"
 	"k8s.io/utils/trace"
 )
@@ -68,6 +70,9 @@ type Reflector struct {
 	lastSyncResourceVersion string
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
 	lastSyncResourceVersionMutex sync.RWMutex
+	// WatchListPageSize is the requested chunk size of initial and resync watch lists.
+	// Defaults to pager.PageSize.
+	WatchListPageSize int64
 }
 
 var (
@@ -179,7 +184,16 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 					panicCh <- r
 				}
 			}()
-			list, err = r.listerWatcher.List(options)
+			// Attempt to gather list in chunks, if supported by listerWatcher, if not, the first
+			// list request will return the full response.
+			pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
+				return r.listerWatcher.List(opts)
+			}))
+			if r.WatchListPageSize != 0 {
+				pager.PageSize = r.WatchListPageSize
+			}
+			// Pager falls back to full list if paginated list calls fail due to an "Expired" error.
+			list, err = pager.List(context.Background(), options)
 			close(listCh)
 		}()
 		select {
@@ -257,6 +271,11 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			// We want to avoid situations of hanging watchers. Stop any wachers that do not
 			// receive any events within the timeout window.
 			TimeoutSeconds: &timeoutSeconds,
+			// To reduce load on kube-apiserver on watch restarts, you may enable watch bookmarks.
+			// Reflector doesn't assume bookmarks are returned at all (if the server do not support
+			// watch bookmarks, it will ignore this field).
+			// Disabled in Alpha release of watch bookmarks feature.
+			AllowWatchBookmarks: false,
 		}
 
 		w, err := r.listerWatcher.Watch(options)
@@ -354,6 +373,8 @@ loop:
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("%s: unable to delete watch event object (%#v) from store: %v", r.name, event.Object, err))
 				}
+			case watch.Bookmark:
+				// A `Bookmark` means watch has synced here, just update the resourceVersion
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
 			}

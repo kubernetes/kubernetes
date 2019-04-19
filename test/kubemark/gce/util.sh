@@ -102,6 +102,13 @@ function create-master-instance-with-resources {
     --target-tags "${MASTER_TAG}" \
     --allow "tcp:443" &
 
+  run-gcloud-compute-with-retries firewall-rules create "${MASTER_NAME}-internal" \
+    --project "${PROJECT}" \
+    --network "${NETWORK}" \
+    --source-ranges "10.0.0.0/8" \
+    --target-tags "${MASTER_TAG}" \
+    --allow "tcp:1-2379,tcp:2382-65535,udp:1-65535,icmp" &
+
   wait
 }
 
@@ -133,6 +140,10 @@ function delete-master-instance-and-resources {
       --quiet || true
 
   gcloud compute firewall-rules delete "${MASTER_NAME}-https" \
+	  --project "${PROJECT}" \
+	  --quiet || true
+
+  gcloud compute firewall-rules delete "${MASTER_NAME}-internal" \
 	  --project "${PROJECT}" \
 	  --quiet || true
 

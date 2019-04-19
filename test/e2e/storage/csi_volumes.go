@@ -22,6 +22,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
@@ -69,6 +70,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			testCleanup func()
 		)
 		BeforeEach(func() {
+			driver.SkipUnsupportedTest(testpatterns.TestPattern{})
 			config, testCleanup = driver.PrepareTest(f)
 		})
 
@@ -134,7 +136,7 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 
 	// Use different zones for pod and PV
 	zones, err := framework.GetClusterZones(cs)
-	Expect(err).ToNot(HaveOccurred())
+	framework.ExpectNoError(err)
 	Expect(zones.Len()).To(BeNumerically(">=", 2))
 	zonesList := zones.UnsortedList()
 	podZoneIndex := rand.Intn(zones.Len())

@@ -1,6 +1,0 @@
-apiVersion: v1
-data:
-  body-size: 1024m
-kind: ConfigMap
-metadata:
-  name: nginx-load-balancer-conf

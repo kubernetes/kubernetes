@@ -34,6 +34,11 @@ type ServiceReference struct {
 	Namespace string
 	// Name is the name of the service
 	Name string
+	// If specified, the port on the service that hosting the service.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port int32
 }
 
 // APIServiceSpec contains information for locating and communicating with a server.

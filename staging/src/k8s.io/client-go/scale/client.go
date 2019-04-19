@@ -54,9 +54,7 @@ func NewForConfig(cfg *restclient.Config, mapper PreferredResourceMapper, resolv
 	// so that the RESTClientFor doesn't complain
 	cfg.GroupVersion = &schema.GroupVersion{}
 
-	cfg.NegotiatedSerializer = serializer.DirectCodecFactory{
-		CodecFactory: codecs,
-	}
+	cfg.NegotiatedSerializer = codecs.WithoutConversion()
 	if len(cfg.UserAgent) == 0 {
 		cfg.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}

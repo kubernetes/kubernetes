@@ -27,8 +27,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/github.com/cloudflare/cfssl/signer/local:all-srcs",
-        "//vendor/github.com/cloudflare/cfssl/signer/remote:all-srcs",
-        "//vendor/github.com/cloudflare/cfssl/signer/universal:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

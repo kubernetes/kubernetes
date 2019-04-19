@@ -25,7 +25,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,11 +42,16 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	"k8s.io/utils/pointer"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var serverAggregatorVersion = utilversion.MustParseSemantic("v1.10.0")
+
+const (
+	aggregatorServicePort = 7443
+)
 
 var _ = SIGDescribe("Aggregator", func() {
 	var ns string
@@ -57,7 +62,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	// We want cleanTest to happen before the namespace cleanup AfterEach
 	// inserted by NewDefaultFramework, so we put this AfterEach in front
 	// of NewDefaultFramework.
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		cleanTest(c, aggrclient, ns)
 	})
 
@@ -66,10 +71,20 @@ var _ = SIGDescribe("Aggregator", func() {
 	// We want namespace initialization BeforeEach inserted by
 	// NewDefaultFramework to happen before this, so we put this BeforeEach
 	// after NewDefaultFramework.
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		aggrclient = f.AggregatorClient
+
+		if aggrclient == nil {
+			config, err := framework.LoadConfig()
+			if err != nil {
+				framework.Failf("could not load config: %v", err)
+			}
+			aggrclient, err = aggregatorclient.NewForConfig(config)
+			if err != nil {
+				framework.Failf("could not create aggregator client: %v", err)
+			}
+		}
 	})
 
 	/*
@@ -79,7 +94,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	*/
 	framework.ConformanceIt("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
 		// Testing a 1.10 version of the sample-apiserver
-		TestSampleAPIServer(f, imageutils.GetE2EImage(imageutils.APIServer))
+		TestSampleAPIServer(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
 	})
 })
 
@@ -97,13 +112,12 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":sample-apiserver-reader", nil)
 }
 
-// A basic test if the sample-apiserver code from 1.10 and compiled against 1.10
+// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
 // will work on the current Aggregator/API-Server.
-func TestSampleAPIServer(f *framework.Framework, image string) {
-	By("Registering the sample API server.")
+func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Clientset, image string) {
+	ginkgo.By("Registering the sample API server.")
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
-	aggrclient := f.AggregatorClient
 
 	namespace := f.Namespace.Name
 	context := setupServerCert(namespace, "sample-api")
@@ -216,6 +230,9 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 		{
 			Name:  "etcd",
 			Image: etcdImage,
+			Command: []string{
+				"/usr/local/bin/etcd",
+			},
 		},
 	}
 	d := &apps.Deployment{
@@ -263,7 +280,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   "TCP",
-					Port:       443,
+					Port:       aggregatorServicePort,
 					TargetPort: intstr.FromInt(443),
 				},
 			},
@@ -314,6 +331,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			Service: &apiregistrationv1beta1.ServiceReference{
 				Namespace: namespace,
 				Name:      "sample-api",
+				Port:      pointer.Int32Ptr(aggregatorServicePort),
 			},
 			Group:                "wardle.k8s.io",
 			Version:              "v1alpha1",

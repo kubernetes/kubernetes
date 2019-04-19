@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -482,7 +483,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 			RCConfig: rcConfig,
 		}
 		By(fmt.Sprintf("creating replicaset %s in namespace %s", rsConfig.Name, rsConfig.Namespace))
-		framework.ExpectNoError(framework.RunReplicaSet(rsConfig))
+		framework.ExpectNoError(replicaset.RunReplicaSet(rsConfig))
 		break
 	default:
 		framework.Failf(invalidKind)

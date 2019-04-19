@@ -6,7 +6,7 @@
 // bytes passing through as well as various transformations. Example
 // transformations provided by other packages include normalization and
 // conversion between character sets.
-package transform
+package transform // import "golang.org/x/text/transform"
 
 import (
 	"bytes"
@@ -78,8 +78,8 @@ type SpanningTransformer interface {
 	// considering the error err.
 	//
 	// A nil error means that all input bytes are known to be identical to the
-	// output produced by the Transformer. A nil error can be be returned
-	// regardless of whether atEOF is true. If err is nil, then then n must
+	// output produced by the Transformer. A nil error can be returned
+	// regardless of whether atEOF is true. If err is nil, then n must
 	// equal len(src); the converse is not necessarily true.
 	//
 	// ErrEndOfSpan means that the Transformer output may differ from the

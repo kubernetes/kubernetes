@@ -14,15 +14,22 @@ import (
 // The diagonal elements of A are stored in d and the off-diagonal elements
 // are stored in e.
 func (impl Implementation) Dlanst(norm lapack.MatrixNorm, n int, d, e []float64) float64 {
-	if len(d) < n {
-		panic(badD)
+	switch {
+	case norm != lapack.MaxRowSum && norm != lapack.MaxColumnSum && norm != lapack.Frobenius && norm != lapack.MaxAbs:
+		panic(badNorm)
+	case n < 0:
+		panic(nLT0)
 	}
-	if len(e) < n-1 {
-		panic(badE)
-	}
-	if n <= 0 {
+	if n == 0 {
 		return 0
 	}
+	switch {
+	case len(d) < n:
+		panic(shortD)
+	case len(e) < n-1:
+		panic(shortE)
+	}
+
 	switch norm {
 	default:
 		panic(badNorm)
@@ -55,7 +62,7 @@ func (impl Implementation) Dlanst(norm lapack.MatrixNorm, n int, d, e []float64)
 			}
 		}
 		return anorm
-	case lapack.NormFrob:
+	case lapack.Frobenius:
 		var scale float64
 		sum := 1.0
 		if n > 1 {

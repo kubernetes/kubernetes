@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"
@@ -22,6 +22,6 @@ func (cli *Client) ContainerRemove(ctx context.Context, containerID string, opti
 	}
 
 	resp, err := cli.delete(ctx, "/containers/"+containerID, query, nil)
-	ensureReaderClosed(resp)
+	defer ensureReaderClosed(resp)
 	return wrapResponseError(err, resp, "container", containerID)
 }

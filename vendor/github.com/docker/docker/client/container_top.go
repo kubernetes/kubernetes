@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"
@@ -18,11 +18,11 @@ func (cli *Client) ContainerTop(ctx context.Context, containerID string, argumen
 	}
 
 	resp, err := cli.get(ctx, "/containers/"+containerID+"/top", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return response, err
 	}
 
 	err = json.NewDecoder(resp.body).Decode(&response)
-	ensureReaderClosed(resp)
 	return response, err
 }

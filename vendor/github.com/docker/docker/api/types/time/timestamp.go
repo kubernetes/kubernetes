@@ -1,4 +1,4 @@
-package time
+package time // import "github.com/docker/docker/api/types/time"
 
 import (
 	"fmt"

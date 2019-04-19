@@ -631,7 +631,7 @@ func TestGetSELinuxSupport(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		out, err := getSELinuxSupport(test.mountPoint, filename)
+		out, err := GetSELinux(test.mountPoint, filename)
 		if err != nil {
 			t.Errorf("Test %s failed with error: %s", test.name, err)
 		}
@@ -907,7 +907,7 @@ func TestSearchMountPoints(t *testing.T) {
 		tmpFile.Seek(0, 0)
 		tmpFile.WriteString(v.mountInfos)
 		tmpFile.Sync()
-		refs, err := searchMountPoints(v.source, tmpFile.Name())
+		refs, err := SearchMountPoints(v.source, tmpFile.Name())
 		if !reflect.DeepEqual(refs, v.expectedRefs) {
 			t.Errorf("test %q: expected Refs: %#v, got %#v", v.name, v.expectedRefs, refs)
 		}

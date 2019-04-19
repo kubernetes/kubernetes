@@ -328,7 +328,6 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 	if b.readOnly {
 		options = append(options, "ro")
-
 	}
 
 	// Check for log-file,log-level options existence in user supplied mount options, if provided, use those.
@@ -348,7 +347,6 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 	// If logfile has not been provided, create driver specific log file.
 	if !hasLogFile {
-		log = ""
 		p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
 		if err := os.MkdirAll(p, 0750); err != nil {
 			return fmt.Errorf("failed to create directory %v: %v", p, err)
@@ -361,7 +359,6 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 		// Use derived log file in gluster fuse mount
 		options = append(options, "log-file="+log)
-
 	}
 
 	if !hasLogLevel {
@@ -865,7 +862,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 		epServiceName = p.provisionerConfig.customEpNamePrefix + "-" + string(p.options.PVC.UID)
 	}
 	epNamespace := p.options.PVC.Namespace
-	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
+	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC)
 	if err != nil {
 		klog.Errorf("failed to create endpoint/service %v/%v: %v", epNamespace, epServiceName, err)
 		deleteErr := cli.VolumeDelete(volume.Id)
@@ -887,7 +884,13 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 // exist for the given namespace, PVC name, endpoint name, and
 // set of IPs. I.e. the endpoint or service is only created
 // if it does not exist yet.
-func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, hostips []string, pvcname string) (endpoint *v1.Endpoints, service *v1.Service, err error) {
+func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, hostips []string, pvc *v1.PersistentVolumeClaim) (endpoint *v1.Endpoints, service *v1.Service, err error) {
+	pvcNameOrID := ""
+	if len(pvc.Name) >= 63 {
+		pvcNameOrID = string(pvc.UID)
+	} else {
+		pvcNameOrID = pvc.Name
+	}
 
 	addrlist := make([]v1.EndpointAddress, len(hostips))
 	for i, v := range hostips {
@@ -898,7 +901,7 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 			Namespace: namespace,
 			Name:      epServiceName,
 			Labels: map[string]string{
-				"gluster.kubernetes.io/provisioned-for-pvc": pvcname,
+				"gluster.kubernetes.io/provisioned-for-pvc": pvcNameOrID,
 			},
 		},
 		Subsets: []v1.EndpointSubset{{
@@ -924,7 +927,7 @@ func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epS
 			Name:      epServiceName,
 			Namespace: namespace,
 			Labels: map[string]string{
-				"gluster.kubernetes.io/provisioned-for-pvc": pvcname,
+				"gluster.kubernetes.io/provisioned-for-pvc": pvcNameOrID,
 			},
 		},
 		Spec: v1.ServiceSpec{

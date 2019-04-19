@@ -21,9 +21,8 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -41,7 +40,7 @@ var _ TestSuite = &multiVolumeTestSuite{}
 func InitMultiVolumeTestSuite() TestSuite {
 	return &multiVolumeTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "multiVolume",
+			name: "multiVolume [Slow]",
 			testPatterns: []testpatterns.TestPattern{
 				testpatterns.FsVolModePreprovisionedPV,
 				testpatterns.FsVolModeDynamicPV,
@@ -326,7 +325,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 	defer func() {
 		framework.ExpectNoError(framework.DeletePodWithWait(f, cs, pod))
 	}()
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	byteLen := 64
 	for i, pvc := range pvcs {
@@ -349,7 +348,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 	}
 
 	pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred(), "get pod")
+	framework.ExpectNoError(err, "get pod")
 	return pod.Spec.NodeName
 }
 
@@ -400,10 +399,10 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		defer func() {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, cs, pod))
 		}()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
 		pods = append(pods, pod)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("get pod%d", index))
+		framework.ExpectNoError(err, fmt.Sprintf("get pod%d", index))
 		actualNodeName := pod.Spec.NodeName
 
 		// Set affinity depending on requiresSameNode

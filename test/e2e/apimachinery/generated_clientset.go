@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -150,21 +150,21 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
-	It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
+	ginkgo.It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-		By("constructing the pod")
+		ginkgo.By("constructing the pod")
 		name := "pod" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		podCopy := testingPod(name, value)
 		pod := &podCopy
-		By("setting up watch")
+		ginkgo.By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
 		options := metav1.ListOptions{LabelSelector: selector}
 		pods, err := podClient.List(options)
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
-		Expect(len(pods.Items)).To(Equal(0))
+		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: pods.ListMeta.ResourceVersion,
@@ -174,13 +174,13 @@ var _ = SIGDescribe("Generated clientset", func() {
 			framework.Failf("Failed to set up watch: %v", err)
 		}
 
-		By("creating the pod")
+		ginkgo.By("creating the pod")
 		pod, err = podClient.Create(pod)
 		if err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
 
-		By("verifying the pod is in kubernetes")
+		ginkgo.By("verifying the pod is in kubernetes")
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: pod.ResourceVersion,
@@ -189,22 +189,22 @@ var _ = SIGDescribe("Generated clientset", func() {
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
-		Expect(len(pods.Items)).To(Equal(1))
+		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
 
-		By("verifying pod creation was observed")
+		ginkgo.By("verifying pod creation was observed")
 		observeCreation(w)
 
 		// We need to wait for the pod to be scheduled, otherwise the deletion
 		// will be carried out immediately rather than gracefully.
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
-		By("deleting the pod gracefully")
+		ginkgo.By("deleting the pod gracefully")
 		gracePeriod := int64(31)
 		if err := podClient.Delete(pod.Name, metav1.NewDeleteOptions(gracePeriod)); err != nil {
 			framework.Failf("Failed to delete pod: %v", err)
 		}
 
-		By("verifying the deletionTimestamp and deletionGracePeriodSeconds of the pod is set")
+		ginkgo.By("verifying the deletionTimestamp and deletionGracePeriodSeconds of the pod is set")
 		observerUpdate(w, func(obj runtime.Object) bool {
 			pod := obj.(*v1.Pod)
 			return pod.ObjectMeta.DeletionTimestamp != nil && *pod.ObjectMeta.DeletionGracePeriodSeconds == gracePeriod
@@ -263,24 +263,24 @@ func newTestingCronJob(name string, value string) *batchv1beta1.CronJob {
 var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
 	})
 
-	It("should create v1beta1 cronJobs, delete cronJobs, watch cronJobs", func() {
+	ginkgo.It("should create v1beta1 cronJobs, delete cronJobs, watch cronJobs", func() {
 		cronJobClient := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name)
-		By("constructing the cronJob")
+		ginkgo.By("constructing the cronJob")
 		name := "cronjob" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		cronJob := newTestingCronJob(name, value)
-		By("setting up watch")
+		ginkgo.By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
 		options := metav1.ListOptions{LabelSelector: selector}
 		cronJobs, err := cronJobClient.List(options)
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
-		Expect(len(cronJobs.Items)).To(Equal(0))
+		gomega.Expect(len(cronJobs.Items)).To(gomega.Equal(0))
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: cronJobs.ListMeta.ResourceVersion,
@@ -290,13 +290,13 @@ var _ = SIGDescribe("Generated clientset", func() {
 			framework.Failf("Failed to set up watch: %v", err)
 		}
 
-		By("creating the cronJob")
+		ginkgo.By("creating the cronJob")
 		cronJob, err = cronJobClient.Create(cronJob)
 		if err != nil {
 			framework.Failf("Failed to create cronJob: %v", err)
 		}
 
-		By("verifying the cronJob is in kubernetes")
+		ginkgo.By("verifying the cronJob is in kubernetes")
 		options = metav1.ListOptions{
 			LabelSelector:   selector,
 			ResourceVersion: cronJob.ResourceVersion,
@@ -305,12 +305,12 @@ var _ = SIGDescribe("Generated clientset", func() {
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
-		Expect(len(cronJobs.Items)).To(Equal(1))
+		gomega.Expect(len(cronJobs.Items)).To(gomega.Equal(1))
 
-		By("verifying cronJob creation was observed")
+		ginkgo.By("verifying cronJob creation was observed")
 		observeCreation(w)
 
-		By("deleting the cronJob")
+		ginkgo.By("deleting the cronJob")
 		// Use DeletePropagationBackground so the CronJob is really gone when the call returns.
 		propagationPolicy := metav1.DeletePropagationBackground
 		if err := cronJobClient.Delete(cronJob.Name, &metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
@@ -322,6 +322,6 @@ var _ = SIGDescribe("Generated clientset", func() {
 		if err != nil {
 			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)
 		}
-		Expect(len(cronJobs.Items)).To(Equal(0))
+		gomega.Expect(len(cronJobs.Items)).To(gomega.Equal(0))
 	})
 })

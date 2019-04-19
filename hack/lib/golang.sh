@@ -437,7 +437,7 @@ kube::golang::setup_env() {
   # Unset GOBIN in case it already exists in the current session.
   unset GOBIN
 
-  # This seems to matter to some tools (godep, ginkgo...)
+  # This seems to matter to some tools
   export GO15VENDOREXPERIMENT=1
 }
 
@@ -693,7 +693,7 @@ kube::golang::build_binaries() {
     host_platform=$(kube::golang::host_platform)
 
     local goflags goldflags goasmflags gogcflags
-    goldflags="${GOLDFLAGS:-} -s -w $(kube::version::ldflags)"
+    goldflags="${GOLDFLAGS=-s -w} $(kube::version::ldflags)"
     goasmflags="-trimpath=${KUBE_ROOT}"
     gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 

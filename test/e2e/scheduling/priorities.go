@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -326,6 +327,10 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	for _, pod := range allpods.Items {
 		if pod.Spec.NodeName == node.Name {
 			framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
+			// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
+			if v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
+				continue
+			}
 			totalRequestedCpuResource += getNonZeroRequests(&pod).MilliCPU
 			totalRequestedMemResource += getNonZeroRequests(&pod).Memory
 		}
@@ -334,11 +339,18 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	Expect(found).To(Equal(true))
 	cpuAllocatableMil := cpuAllocatable.MilliValue()
 
+	floatOne := float64(1)
 	cpuFraction := float64(totalRequestedCpuResource) / float64(cpuAllocatableMil)
+	if cpuFraction > floatOne {
+		cpuFraction = floatOne
+	}
 	memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
 	Expect(found).To(Equal(true))
 	memAllocatableVal := memAllocatable.Value()
 	memFraction := float64(totalRequestedMemResource) / float64(memAllocatableVal)
+	if memFraction > floatOne {
+		memFraction = floatOne
+	}
 
 	framework.Logf("Node: %v, totalRequestedCpuResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCpuResource, cpuAllocatableMil, cpuFraction)
 	framework.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, totalRequestedMemResource, memAllocatableVal, memFraction)

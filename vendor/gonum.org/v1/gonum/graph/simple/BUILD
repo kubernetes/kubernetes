@@ -19,6 +19,7 @@ go_library(
         "//vendor/gonum.org/v1/gonum/graph:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/internal/ordered:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/internal/uid:go_default_library",
+        "//vendor/gonum.org/v1/gonum/graph/iterator:go_default_library",
         "//vendor/gonum.org/v1/gonum/mat:go_default_library",
     ],
 )

@@ -1,4 +1,4 @@
-package mount
+package mount // import "github.com/docker/docker/pkg/mount"
 
 // MakeShared ensures a mounted filesystem has the SHARED mount option enabled.
 // See the supported options in flags.go for further reference.
@@ -48,18 +48,22 @@ func MakeRUnbindable(mountPoint string) error {
 	return ensureMountedAs(mountPoint, "runbindable")
 }
 
-func ensureMountedAs(mountPoint, options string) error {
-	mounted, err := Mounted(mountPoint)
+// MakeMount ensures that the file or directory given is a mount point,
+// bind mounting it to itself it case it is not.
+func MakeMount(mnt string) error {
+	mounted, err := Mounted(mnt)
 	if err != nil {
 		return err
 	}
-
-	if !mounted {
-		if err := Mount(mountPoint, mountPoint, "none", "bind,rw"); err != nil {
-			return err
-		}
+	if mounted {
+		return nil
 	}
-	if _, err = Mounted(mountPoint); err != nil {
+
+	return Mount(mnt, mnt, "none", "bind")
+}
+
+func ensureMountedAs(mountPoint, options string) error {
+	if err := MakeMount(mountPoint); err != nil {
 		return err
 	}
 

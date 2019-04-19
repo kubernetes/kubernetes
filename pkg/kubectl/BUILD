@@ -89,6 +89,7 @@ go_library(
         "//staging/src/k8s.io/client-go/scale:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 
@@ -117,6 +118,7 @@ filegroup(
         "//pkg/kubectl/scheme:all-srcs",
         "//pkg/kubectl/util:all-srcs",
         "//pkg/kubectl/validation:all-srcs",
+        "//pkg/kubectl/version:all-srcs",
     ],
     tags = ["automanaged"],
 )

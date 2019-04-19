@@ -17,7 +17,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/util/term",
     deps = [
-        "//pkg/util/interrupt:go_default_library",
+        "//pkg/kubectl/util/interrupt:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/github.com/docker/docker/pkg/term:go_default_library",

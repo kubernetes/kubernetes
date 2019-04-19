@@ -62,25 +62,16 @@ func HandleCrash(additionalHandlers ...func(interface{})) {
 
 // logPanic logs the caller tree when a panic occurs.
 func logPanic(r interface{}) {
-	callers := getCallers(r)
+	// Same as stdlib http server code. Manually allocate stack trace buffer size
+	// to prevent excessively large logs
+	const size = 64 << 10
+	stacktrace := make([]byte, size)
+	stacktrace = stacktrace[:runtime.Stack(stacktrace, false)]
 	if _, ok := r.(string); ok {
-		klog.Errorf("Observed a panic: %s\n%v", r, callers)
+		klog.Errorf("Observed a panic: %s\n%s", r, stacktrace)
 	} else {
-		klog.Errorf("Observed a panic: %#v (%v)\n%v", r, r, callers)
+		klog.Errorf("Observed a panic: %#v (%v)\n%s", r, r, stacktrace)
 	}
-}
-
-func getCallers(r interface{}) string {
-	callers := ""
-	for i := 0; true; i++ {
-		_, file, line, ok := runtime.Caller(i)
-		if !ok {
-			break
-		}
-		callers = callers + fmt.Sprintf("%v:%v\n", file, line)
-	}
-
-	return callers
 }
 
 // ErrorHandlers is a list of functions which will be invoked when an unreturnable
@@ -155,13 +146,17 @@ func GetCaller() string {
 // handlers to handle errors and panics the same way.
 func RecoverFromPanic(err *error) {
 	if r := recover(); r != nil {
-		callers := getCallers(r)
+		// Same as stdlib http server code. Manually allocate stack trace buffer size
+		// to prevent excessively large logs
+		const size = 64 << 10
+		stacktrace := make([]byte, size)
+		stacktrace = stacktrace[:runtime.Stack(stacktrace, false)]
 
 		*err = fmt.Errorf(
-			"recovered from panic %q. (err=%v) Call stack:\n%v",
+			"recovered from panic %q. (err=%v) Call stack:\n%s",
 			r,
 			*err,
-			callers)
+			stacktrace)
 	}
 }
 

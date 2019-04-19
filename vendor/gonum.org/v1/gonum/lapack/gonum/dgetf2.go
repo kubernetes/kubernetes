@@ -29,14 +29,29 @@ import (
 // Dgetf2 is an internal routine. It is exported for testing purposes.
 func (Implementation) Dgetf2(m, n int, a []float64, lda int, ipiv []int) (ok bool) {
 	mn := min(m, n)
-	checkMatrix(m, n, a, lda)
-	if len(ipiv) < mn {
-		panic(badIpiv)
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	if m == 0 || n == 0 {
+
+	// Quick return if possible.
+	if mn == 0 {
 		return true
 	}
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(ipiv) != mn:
+		panic(badLenIpiv)
+	}
+
 	bi := blas64.Implementation()
+
 	sfmin := dlamchS
 	ok = true
 	for j := 0; j < mn; j++ {

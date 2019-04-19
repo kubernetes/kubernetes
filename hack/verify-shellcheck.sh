@@ -66,8 +66,13 @@ remove_container () {
 # ensure we're linting the k8s source tree
 cd "${KUBE_ROOT}"
 
-# find all shell scripts excluding ./_*, ./.git/*, ./vendor*,
-# and anything git-ignored
+# Find all shell scripts excluding:
+# - Anything git-ignored - No need to lint untracked files.
+# - ./_* - No need to lint output directories.
+# - ./.git/* - Ignore anything in the git object store.
+# - ./vendor* - Vendored code should be fixed upstream instead.
+# - ./third_party/*, but re-include ./third_party/forked/*  - only code we
+#    forked should be linted and fixed.
 all_shell_scripts=()
 while IFS=$'\n' read -r script;
   do git check-ignore -q "$script" || all_shell_scripts+=("$script");
@@ -75,7 +80,8 @@ done < <(find . -name "*.sh" \
   -not \( \
     -path ./_\*      -o \
     -path ./.git\*   -o \
-    -path ./vendor\*    \
+    -path ./vendor\* -o \
+    \( -path ./third_party\* -a -not -path ./third_party/forked\* \) \
   \))
 
 # make sure known failures are sorted
@@ -117,16 +123,26 @@ else
   fi
 fi
 
+# common arguments we'll pass to shellcheck
+SHELLCHECK_OPTIONS=(
+  # allow following sourced files that are not specified in the command,
+  # we need this because we specify one file at at time in order to trivially
+  # detect which files are failing
+  "--external-sources"
+  # include our disabled lints
+  "--exclude=${SHELLCHECK_DISABLED}"
+)
+
 # lint each script, tracking failures
 errors=()
 not_failing=()
 for f in "${all_shell_scripts[@]}"; do
   set +o errexit
   if ${HAVE_SHELLCHECK}; then
-    failedLint=$(shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
+    failedLint=$(shellcheck "${SHELLCHECK_OPTIONS[@]}" "${f}")
   else
     failedLint=$(docker exec -t ${SHELLCHECK_CONTAINER} \
-                 shellcheck --exclude="${SHELLCHECK_DISABLED}" "${f}")
+                 shellcheck "${SHELLCHECK_OPTIONS[@]}" "${f}")
   fi
   set -o errexit
   kube::util::array_contains "${f}" "${failing_files[@]}" && in_failing=$? || in_failing=$?
@@ -153,7 +169,7 @@ else
     echo 'checking by adding it to hack/.shellcheck_failures (if your reviewer is okay with it).'
     echo
   } >&2
-  false
+  exit 1
 fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
@@ -165,7 +181,7 @@ if [[ ${#not_failing[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi
 
 # Check that all failing_packages actually still exist
@@ -183,5 +199,5 @@ if [[ ${#gone[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi

@@ -34,12 +34,12 @@ import (
 
 var (
 	genericLongDesc = normalizer.LongDesc(`
-		Renews the %[1]s, and saves them into %[2]s.cert and %[2]s.key files.
+		Renew the %[1]s, and save them into %[2]s.cert and %[2]s.key files.
 
     Extra attributes such as SANs will be based on the existing certificates, there is no need to resupply them.
 `)
 	allLongDesc = normalizer.LongDesc(`
-    Renews all known certificates necessary to run the control plane. Renewals are run unconditionally, regardless
+    Renew all known certificates necessary to run the control plane. Renewals are run unconditionally, regardless
     of expiration date. Renewals can also be run individually for more control.
 `)
 )
@@ -60,7 +60,7 @@ func newCmdCertsUtility() *cobra.Command {
 func newCmdCertsRenewal() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "renew",
-		Short: "Renews certificates for a Kubernetes cluster",
+		Short: "Renew certificates for a Kubernetes cluster",
 		Long:  cmdutil.MacroCommandLongDescription,
 		RunE:  cmdutil.SubCmdRunE("renew"),
 	}
@@ -107,7 +107,7 @@ func getRenewSubCommands() []*cobra.Command {
 
 	allCmd := &cobra.Command{
 		Use:   "all",
-		Short: "renew all available certificates",
+		Short: "Renew all available certificates",
 		Long:  allLongDesc,
 		Run: func(*cobra.Command, []string) {
 			for _, f := range funcList {
@@ -156,7 +156,7 @@ func generateRenewalFunction(cert *certsphase.KubeadmCert, caCert *certsphase.Ku
 func generateRenewalCommand(cert *certsphase.KubeadmCert, cfg *renewConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   cert.Name,
-		Short: fmt.Sprintf("Generates the %s", cert.LongName),
+		Short: fmt.Sprintf("Generate the %s", cert.LongName),
 		Long:  fmt.Sprintf(genericLongDesc, cert.LongName, cert.BaseName),
 	}
 	addFlags(cmd, cfg)

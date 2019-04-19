@@ -1,7 +1,6 @@
 cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
-cmd/kube-proxy/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 pkg/apis/abac/latest
 pkg/apis/admission
@@ -32,7 +31,6 @@ pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation
 pkg/apis/core
-pkg/apis/core/helper
 pkg/apis/core/helper/qos
 pkg/apis/core/v1
 pkg/apis/core/v1/helper
@@ -607,6 +605,8 @@ staging/src/k8s.io/code-generator/cmd/lister-gen/generators
 staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
 staging/src/k8s.io/cri-api/pkg/apis/testing
+staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
+staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
 staging/src/k8s.io/kube-proxy/config/v1alpha1
 staging/src/k8s.io/kubelet/config/v1beta1
@@ -631,13 +631,12 @@ staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller
 staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1
 test/e2e
-test/e2e/apimachinery
-test/e2e/apps
 test/e2e/auth
 test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common
 test/e2e/framework
+test/e2e/framework/providers/gce
 test/e2e/lifecycle
 test/e2e/lifecycle/bootstrap
 test/e2e/network
@@ -651,7 +650,6 @@ test/e2e/storage/utils
 test/e2e/storage/vsphere
 test/e2e_kubeadm
 test/e2e_node
-test/e2e_node/builder
 test/e2e_node/remote
 test/e2e_node/runner/remote
 test/e2e_node/services

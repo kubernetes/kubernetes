@@ -9,6 +9,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/metrics/hack:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/external_metrics:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics:all-srcs",

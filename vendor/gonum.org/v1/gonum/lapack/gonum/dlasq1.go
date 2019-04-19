@@ -19,30 +19,33 @@ import (
 //
 // Dlasq1 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlasq1(n int, d, e, work []float64) (info int) {
-	// TODO(btracey): replace info with an error.
 	if n < 0 {
 		panic(nLT0)
 	}
-	if len(work) < 4*n {
-		panic(badWork)
-	}
-	if len(d) < n {
-		panic("lapack: length of d less than n")
-	}
-	if len(e) < n-1 {
-		panic("lapack: length of e less than n-1")
-	}
+
 	if n == 0 {
 		return info
 	}
+
+	switch {
+	case len(d) < n:
+		panic(shortD)
+	case len(e) < n-1:
+		panic(shortE)
+	case len(work) < 4*n:
+		panic(shortWork)
+	}
+
 	if n == 1 {
 		d[0] = math.Abs(d[0])
 		return info
 	}
+
 	if n == 2 {
 		d[1], d[0] = impl.Dlas2(d[0], e[0], d[1])
 		return info
 	}
+
 	// Estimate the largest singular value.
 	var sigmx float64
 	for i := 0; i < n-1; i++ {

@@ -25,12 +25,12 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -48,11 +48,19 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	if client == nil {
 		client = fakeclient.NewSimpleClientset()
 	}
+
+	// Start informer for CSIDrivers.
+	factory := informers.NewSharedInformerFactory(client, csiResyncPeriod)
+	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
+	csiDriverLister := csiDriverInformer.Lister()
+	go factory.Start(wait.NeverStop)
+
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		client,
 		nil,
 		"fakeNode",
+		csiDriverLister,
 	)
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
@@ -70,47 +78,11 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		// Wait until the informer in CSI volume plugin has all CSIDrivers.
 		wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
-			return csiPlug.csiDriverInformer.Informer().HasSynced(), nil
+			return csiDriverInformer.Informer().HasSynced(), nil
 		})
 	}
 
 	return csiPlug, tmpDir
-}
-
-func makeTestPV(name string, sizeGig int, driverName, volID string) *api.PersistentVolume {
-	return &api.PersistentVolume{
-		ObjectMeta: meta.ObjectMeta{
-			Name: name,
-		},
-		Spec: api.PersistentVolumeSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse(
-					fmt.Sprintf("%dGi", sizeGig),
-				),
-			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				CSI: &api.CSIPersistentVolumeSource{
-					Driver:       driverName,
-					VolumeHandle: volID,
-					ReadOnly:     false,
-				},
-			},
-		},
-	}
-}
-
-func makeTestVol(name string, driverName string) *api.Volume {
-	ro := false
-	return &api.Volume{
-		Name: name,
-		VolumeSource: api.VolumeSource{
-			CSI: &api.CSIVolumeSource{
-				Driver:   driverName,
-				ReadOnly: &ro,
-			},
-		},
-	}
 }
 
 func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
@@ -871,6 +843,7 @@ func TestPluginCanAttach(t *testing.T) {
 		driverName string
 		spec       *volume.Spec
 		canAttach  bool
+		shouldFail bool
 	}{
 		{
 			name:       "non-attachable inline",
@@ -884,19 +857,102 @@ func TestPluginCanAttach(t *testing.T) {
 			spec:       volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "attachable-pv", testVol), true),
 			canAttach:  true,
 		},
+		{
+			name:       "incomplete spec",
+			driverName: "attachable-pv",
+			spec:       &volume.Spec{ReadOnly: true},
+			canAttach:  false,
+			shouldFail: true,
+		},
+		{
+			name:       "nil spec",
+			driverName: "attachable-pv",
+			canAttach:  false,
+			shouldFail: true,
+		},
 	}
 
 	for _, test := range tests {
-		csiDriver := getCSIDriver(test.driverName, nil, &test.canAttach)
+		csiDriver := getTestCSIDriver(test.driverName, nil, &test.canAttach)
 		t.Run(test.name, func(t *testing.T) {
 			fakeCSIClient := fakeclient.NewSimpleClientset(csiDriver)
 			plug, tmpDir := newTestPlugin(t, fakeCSIClient)
 			defer os.RemoveAll(tmpDir)
 
-			pluginCanAttach := plug.CanAttach(test.spec)
+			pluginCanAttach, err := plug.CanAttach(test.spec)
+			if err != nil && !test.shouldFail {
+				t.Fatalf("unexected plugin.CanAttach error: %s", err)
+			}
 			if pluginCanAttach != test.canAttach {
 				t.Fatalf("expecting plugin.CanAttach %t got %t", test.canAttach, pluginCanAttach)
-				return
+			}
+		})
+	}
+}
+
+func TestPluginFindAttachablePlugin(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	tests := []struct {
+		name       string
+		driverName string
+		spec       *volume.Spec
+		canAttach  bool
+		shouldFail bool
+	}{
+		{
+			name:       "non-attachable inline",
+			driverName: "attachable-inline",
+			spec:       volume.NewSpecFromVolume(makeTestVol("test-vol", "attachable-inline")),
+			canAttach:  false,
+		},
+		{
+			name:       "attachable PV",
+			driverName: "attachable-pv",
+			spec:       volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "attachable-pv", testVol), true),
+			canAttach:  true,
+		},
+		{
+			name:       "incomplete spec",
+			driverName: "attachable-pv",
+			spec:       &volume.Spec{ReadOnly: true},
+			canAttach:  false,
+			shouldFail: true,
+		},
+		{
+			name:       "nil spec",
+			driverName: "attachable-pv",
+			canAttach:  false,
+			shouldFail: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tmpDir, err := utiltesting.MkTmpdir("csi-test")
+			if err != nil {
+				t.Fatalf("can't create temp dir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			client := fakeclient.NewSimpleClientset(getTestCSIDriver(test.driverName, nil, &test.canAttach))
+			factory := informers.NewSharedInformerFactory(client, csiResyncPeriod)
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(
+				tmpDir,
+				client,
+				nil,
+				"fakeNode",
+				factory.Storage().V1beta1().CSIDrivers().Lister(),
+			)
+
+			plugMgr := &volume.VolumePluginMgr{}
+			plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+
+			plugin, err := plugMgr.FindAttachablePluginBySpec(test.spec)
+			if err != nil && !test.shouldFail {
+				t.Fatalf("unexected error calling pluginMgr.FindAttachablePluginBySpec: %s", err)
+			}
+			if (plugin != nil) != test.canAttach {
+				t.Fatal("expecting attachable plugin, but got nil")
 			}
 		})
 	}

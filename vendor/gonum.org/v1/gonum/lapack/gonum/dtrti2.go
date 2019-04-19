@@ -14,13 +14,25 @@ import (
 //
 // Dtrti2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dtrti2(uplo blas.Uplo, diag blas.Diag, n int, a []float64, lda int) {
-	checkMatrix(n, n, a, lda)
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch {
+	case uplo != blas.Upper && uplo != blas.Lower:
 		panic(badUplo)
-	}
-	if diag != blas.NonUnit && diag != blas.Unit {
+	case diag != blas.NonUnit && diag != blas.Unit:
 		panic(badDiag)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
+
+	if n == 0 {
+		return
+	}
+
+	if len(a) < (n-1)*lda+n {
+		panic(shortA)
+	}
+
 	bi := blas64.Implementation()
 
 	nonUnit := diag == blas.NonUnit

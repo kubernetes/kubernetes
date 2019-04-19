@@ -20,7 +20,7 @@
 //  + combined operations such as AddRound/MulAdd etc
 //  + exchanging data in decimal32/64/128 formats
 //
-package inf
+package inf // import "gopkg.in/inf.v0"
 
 // TODO:
 //  - avoid excessive deep copying (quo and rounders)

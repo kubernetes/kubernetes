@@ -26,9 +26,9 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -44,7 +44,7 @@ func PodFromManifest(filename string) (*v1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &pod); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &pod); err != nil {
 		return nil, err
 	}
 	return &pod, nil
@@ -62,7 +62,7 @@ func RcFromManifest(fileName string) (*v1.ReplicationController, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &controller); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &controller); err != nil {
 		return nil, err
 	}
 	return &controller, nil
@@ -80,7 +80,7 @@ func SvcFromManifest(fileName string) (*v1.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &svc); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &svc); err != nil {
 		return nil, err
 	}
 	return &svc, nil
@@ -98,7 +98,7 @@ func IngressFromManifest(fileName string) (*extensions.Ingress, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &ing); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &ing); err != nil {
 		return nil, err
 	}
 	return &ing, nil
@@ -107,7 +107,7 @@ func IngressFromManifest(fileName string) (*extensions.Ingress, error) {
 // IngressToManifest generates a yaml file in the given path with the given ingress.
 // Assumes that a directory exists at the given path.
 func IngressToManifest(ing *extensions.Ingress, path string) error {
-	serialized, err := util.MarshalToYaml(ing, extensions.SchemeGroupVersion)
+	serialized, err := marshalToYaml(ing, extensions.SchemeGroupVersion)
 	if err != nil {
 		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
 	}
@@ -130,7 +130,7 @@ func StatefulSetFromManifest(fileName, ns string) (*apps.StatefulSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &ss); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &ss); err != nil {
 		return nil, err
 	}
 	ss.Namespace = ns
@@ -154,7 +154,7 @@ func DaemonSetFromManifest(fileName, ns string) (*apps.DaemonSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &ds)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &ds)
 	if err != nil {
 		return nil, err
 	}
@@ -171,10 +171,22 @@ func RoleFromManifest(fileName, ns string) (*rbac.Role, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &role)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), json, &role)
 	if err != nil {
 		return nil, err
 	}
 	role.Namespace = ns
 	return &role, nil
+}
+
+// marshalToYaml marshals an object into YAML for a given GroupVersion.
+// The object must be known in SupportedMediaTypes() for the Codecs under "client-go/kubernetes/scheme".
+func marshalToYaml(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
+	mediaType := "application/yaml"
+	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return []byte{}, fmt.Errorf("unsupported media type %q", mediaType)
+	}
+	encoder := scheme.Codecs.EncoderForVersion(info.Serializer, gv)
+	return runtime.Encode(encoder, obj)
 }

@@ -37,7 +37,9 @@ run_kubectl_version_tests() {
 
   kube::log::status "Testing kubectl version: check client only output matches expected output"
   kube::test::version::object_to_file "Client" "--client" "${TEMP}/client_only_version_test"
-  kube::test::version::object_to_file "Client" "--client" "${TEMP}/server_client_only_version_test"
+  set +e pipefail   # Turn off bash options, since this command pipes empty text.
+  kube::test::version::object_to_file "Server" "--client" "${TEMP}/server_client_only_version_test"
+  set -e pipefail   # Reset bash options
   kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_only_version_test" "the flag '--client' shows correct client info"
   kube::test::version::diff_assert "${TEMP}/server_version_test" "ne" "${TEMP}/server_client_only_version_test" "the flag '--client' correctly has no server version info"
 

@@ -3,13 +3,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "common.go",
         "coverage.go",
+        "doc.go",
         "go1_1.go",
         "go1_2.go",
-        "index.go",
         "language.go",
-        "lookup.go",
         "match.go",
         "parse.go",
         "tables.go",
@@ -18,7 +16,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/text/language",
     importpath = "golang.org/x/text/language",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/golang.org/x/text/internal/tag:go_default_library"],
+    deps = [
+        "//vendor/golang.org/x/text/internal/language:go_default_library",
+        "//vendor/golang.org/x/text/internal/language/compact:go_default_library",
+    ],
 )
 
 filegroup(

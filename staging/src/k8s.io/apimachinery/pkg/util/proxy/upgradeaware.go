@@ -230,7 +230,34 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
 	proxy.Transport = h.Transport
 	proxy.FlushInterval = h.FlushInterval
-	proxy.ServeHTTP(w, newReq)
+	proxy.ServeHTTP(maybeWrapFlushHeadersWriter(w), newReq)
+}
+
+// maybeWrapFlushHeadersWriter wraps the given writer to force flushing headers prior to writing the response body.
+// if the given writer does not support http.Flusher, http.Hijacker, and http.CloseNotifier, the original writer is returned.
+// TODO(liggitt): drop this once https://github.com/golang/go/issues/31125 is fixed
+func maybeWrapFlushHeadersWriter(w http.ResponseWriter) http.ResponseWriter {
+	flusher, isFlusher := w.(http.Flusher)
+	hijacker, isHijacker := w.(http.Hijacker)
+	closeNotifier, isCloseNotifier := w.(http.CloseNotifier)
+	// flusher, hijacker, and closeNotifier are all used by the ReverseProxy implementation.
+	// if the given writer can't support all three, return the original writer.
+	if !isFlusher || !isHijacker || !isCloseNotifier {
+		return w
+	}
+	return &flushHeadersWriter{w, flusher, hijacker, closeNotifier}
+}
+
+type flushHeadersWriter struct {
+	http.ResponseWriter
+	http.Flusher
+	http.Hijacker
+	http.CloseNotifier
+}
+
+func (w *flushHeadersWriter) WriteHeader(code int) {
+	w.ResponseWriter.WriteHeader(code)
+	w.Flusher.Flush()
 }
 
 // tryUpgrade returns true if the request was handled.

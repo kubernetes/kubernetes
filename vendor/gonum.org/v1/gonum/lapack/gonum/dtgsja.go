@@ -159,45 +159,61 @@ import (
 func (impl Implementation) Dtgsja(jobU, jobV, jobQ lapack.GSVDJob, m, p, n, k, l int, a []float64, lda int, b []float64, ldb int, tola, tolb float64, alpha, beta, u []float64, ldu int, v []float64, ldv int, q []float64, ldq int, work []float64) (cycles int, ok bool) {
 	const maxit = 40
 
-	checkMatrix(m, n, a, lda)
-	checkMatrix(p, n, b, ldb)
-
-	if len(alpha) != n {
-		panic(badAlpha)
-	}
-	if len(beta) != n {
-		panic(badBeta)
-	}
-
 	initu := jobU == lapack.GSVDUnit
 	wantu := initu || jobU == lapack.GSVDU
-	if !initu && !wantu && jobU != lapack.GSVDNone {
-		panic(badGSVDJob + "U")
-	}
-	if jobU != lapack.GSVDNone {
-		checkMatrix(m, m, u, ldu)
-	}
 
 	initv := jobV == lapack.GSVDUnit
 	wantv := initv || jobV == lapack.GSVDV
-	if !initv && !wantv && jobV != lapack.GSVDNone {
-		panic(badGSVDJob + "V")
-	}
-	if jobV != lapack.GSVDNone {
-		checkMatrix(p, p, v, ldv)
-	}
 
 	initq := jobQ == lapack.GSVDUnit
 	wantq := initq || jobQ == lapack.GSVDQ
-	if !initq && !wantq && jobQ != lapack.GSVDNone {
-		panic(badGSVDJob + "Q")
-	}
-	if jobQ != lapack.GSVDNone {
-		checkMatrix(n, n, q, ldq)
-	}
 
-	if len(work) < 2*n {
-		panic(badWork)
+	switch {
+	case !initu && !wantu && jobU != lapack.GSVDNone:
+		panic(badGSVDJob + "U")
+	case !initv && !wantv && jobV != lapack.GSVDNone:
+		panic(badGSVDJob + "V")
+	case !initq && !wantq && jobQ != lapack.GSVDNone:
+		panic(badGSVDJob + "Q")
+	case m < 0:
+		panic(mLT0)
+	case p < 0:
+		panic(pLT0)
+	case n < 0:
+		panic(nLT0)
+
+	case lda < max(1, n):
+		panic(badLdA)
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+
+	case ldb < max(1, n):
+		panic(badLdB)
+	case len(b) < (p-1)*ldb+n:
+		panic(shortB)
+
+	case len(alpha) != n:
+		panic(badLenAlpha)
+	case len(beta) != n:
+		panic(badLenBeta)
+
+	case ldu < 1, wantu && ldu < m:
+		panic(badLdU)
+	case wantu && len(u) < (m-1)*ldu+m:
+		panic(shortU)
+
+	case ldv < 1, wantv && ldv < p:
+		panic(badLdV)
+	case wantv && len(v) < (p-1)*ldv+p:
+		panic(shortV)
+
+	case ldq < 1, wantq && ldq < n:
+		panic(badLdQ)
+	case wantq && len(q) < (n-1)*ldq+n:
+		panic(shortQ)
+
+	case len(work) < 2*n:
+		panic(shortWork)
 	}
 
 	// Initialize U, V and Q, if necessary

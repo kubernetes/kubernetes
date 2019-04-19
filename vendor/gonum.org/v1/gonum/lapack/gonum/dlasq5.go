@@ -13,9 +13,22 @@ import "math"
 func (impl Implementation) Dlasq5(i0, n0 int, z []float64, pp int, tau, sigma float64) (i0Out, n0Out, ppOut int, tauOut, sigmaOut, dmin, dmin1, dmin2, dn, dnm1, dnm2 float64) {
 	// The lapack function has inputs for ieee and eps, but Go requires ieee so
 	// these are unnecessary.
+
+	switch {
+	case i0 < 0:
+		panic(i0LT0)
+	case n0 < 0:
+		panic(n0LT0)
+	case len(z) < 4*n0:
+		panic(shortZ)
+	case pp != 0 && pp != 1:
+		panic(badPp)
+	}
+
 	if n0-i0-1 <= 0 {
 		return i0, n0, pp, tau, sigma, dmin, dmin1, dmin2, dn, dnm1, dnm2
 	}
+
 	eps := dlamchP
 	dthresh := eps * (sigma + tau)
 	if tau < dthresh*0.5 {

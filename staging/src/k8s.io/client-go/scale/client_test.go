@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	fakedisco "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/dynamic"
 	fakerest "k8s.io/client-go/rest/fake"
@@ -204,12 +203,10 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 	}
 
 	fakeClient := &fakerest.RESTClient{
-		Client: fakerest.CreateHTTPClient(fakeReqHandler),
-		NegotiatedSerializer: serializer.DirectCodecFactory{
-			CodecFactory: codecs,
-		},
-		GroupVersion:     schema.GroupVersion{},
-		VersionedAPIPath: "/not/a/real/path",
+		Client:               fakerest.CreateHTTPClient(fakeReqHandler),
+		NegotiatedSerializer: codecs.WithoutConversion(),
+		GroupVersion:         schema.GroupVersion{},
+		VersionedAPIPath:     "/not/a/real/path",
 	}
 
 	resolver := NewDiscoveryScaleKindResolver(fakeDiscoveryClient)

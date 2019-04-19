@@ -34,6 +34,11 @@ type ServiceReference struct {
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
 	// Name is the name of the service
 	Name string `json:"name,omitempty" protobuf:"bytes,2,opt,name=name"`
+	// If specified, the port on the service that hosting webhook.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port *int32 `json:"port,omitempty" protobuf:"varint,3,opt,name=port"`
 }
 
 // APIServiceSpec contains information for locating and communicating with a server.

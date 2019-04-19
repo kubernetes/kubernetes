@@ -34,6 +34,11 @@ func HookClientConfigForWebhook(w *v1beta1.Webhook) webhook.ClientConfig {
 			Name:      w.ClientConfig.Service.Name,
 			Namespace: w.ClientConfig.Service.Namespace,
 		}
+		if w.ClientConfig.Service.Port != nil {
+			ret.Service.Port = *w.ClientConfig.Service.Port
+		} else {
+			ret.Service.Port = 443
+		}
 		if w.ClientConfig.Service.Path != nil {
 			ret.Service.Path = *w.ClientConfig.Service.Path
 		}

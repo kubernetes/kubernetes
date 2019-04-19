@@ -245,7 +245,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 	Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
-		if a.Type == v1.NodeExternalIP {
+		if a.Type == v1.NodeExternalIP && a.Address != "" {
 			host = net.JoinHostPort(a.Address, sshPort)
 			break
 		}
@@ -254,7 +254,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 	if host == "" {
 		// No external IPs were found, let's try to use internal as plan B
 		for _, a := range node.Status.Addresses {
-			if a.Type == v1.NodeInternalIP {
+			if a.Type == v1.NodeInternalIP && a.Address != "" {
 				host = net.JoinHostPort(a.Address, sshPort)
 				break
 			}

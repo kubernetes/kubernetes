@@ -35,7 +35,7 @@ export PATH=${PATH}:/usr/local/go/bin
 # Skip gcloud update checking
 export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
 
-: ${KUBE_RELEASE_RUN_TESTS:="n"}
+: "${KUBE_RELEASE_RUN_TESTS:="n"}"
 export KUBE_RELEASE_RUN_TESTS
 
 # Clean stuff out. Assume the last build left the tree in an odd
@@ -58,8 +58,8 @@ if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
   echo "Not pushed to GCS..."
 else
   readonly release_infra_clone="${WORKSPACE}/_tmp/release.git"
-  mkdir -p ${WORKSPACE}/_tmp
-  git clone https://github.com/kubernetes/release ${release_infra_clone}
+  mkdir -p "${WORKSPACE}/_tmp"
+  git clone https://github.com/kubernetes/release "${release_infra_clone}"
 
   push_build=${release_infra_clone}/push-build.sh
 
@@ -67,7 +67,7 @@ else
     && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
   [[ -n "${KUBE_GCS_RELEASE_SUFFIX-}" ]] \
     && gcs_suffix_flag="--gcs-suffix=${KUBE_GCS_RELEASE_SUFFIX-}"
-  ${push_build} ${bucket_flag-} ${gcs_suffix_flag-} \
+  "${push_build}" "${bucket_flag-}" "${gcs_suffix_flag-}" \
     --nomock --verbose --ci
 fi
 

@@ -94,16 +94,18 @@ func TarjanSCC(g graph.Directed) [][]graph.Node {
 }
 
 func tarjanSCCstabilized(g graph.Directed, order func([]graph.Node)) [][]graph.Node {
-	nodes := g.Nodes()
+	nodes := graph.NodesOf(g.Nodes())
 	var succ func(id int64) []graph.Node
 	if order == nil {
-		succ = g.From
+		succ = func(id int64) []graph.Node {
+			return graph.NodesOf(g.From(id))
+		}
 	} else {
 		order(nodes)
 		ordered.Reverse(nodes)
 
 		succ = func(id int64) []graph.Node {
-			to := g.From(id)
+			to := graph.NodesOf(g.From(id))
 			order(to)
 			ordered.Reverse(to)
 			return to

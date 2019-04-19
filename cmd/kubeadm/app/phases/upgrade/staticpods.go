@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -147,22 +148,23 @@ func (spm *KubeStaticPodPathManager) BackupEtcdDir() string {
 
 // CleanupDirs cleans up all temporary directories except those the user has requested to keep around
 func (spm *KubeStaticPodPathManager) CleanupDirs() error {
+	var errlist []error
 	if err := os.RemoveAll(spm.TempManifestDir()); err != nil {
-		return err
+		errlist = append(errlist, err)
 	}
 	if !spm.keepManifestDir {
 		if err := os.RemoveAll(spm.BackupManifestDir()); err != nil {
-			return err
+			errlist = append(errlist, err)
 		}
 	}
 
 	if !spm.keepEtcdDir {
 		if err := os.RemoveAll(spm.BackupEtcdDir()); err != nil {
-			return err
+			errlist = append(errlist, err)
 		}
 	}
 
-	return nil
+	return utilerrors.NewAggregate(errlist)
 }
 
 func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, beforePodHash string, recoverManifests map[string]string) error {
@@ -195,7 +197,7 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 		return err
 	}
 	if equal {
-		fmt.Printf("[upgrade/staticpods] current and new manifests of %s are equal, skipping upgrade\n", component)
+		fmt.Printf("[upgrade/staticpods] Current and new manifests of %s are equal, skipping upgrade\n", component)
 		return nil
 	}
 
@@ -425,7 +427,7 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 			if fatal {
 				return err
 			}
-			fmt.Printf("[upgrade/etcd] non fatal issue encountered during upgrade: %v\n", err)
+			fmt.Printf("[upgrade/etcd] Non fatal issue encountered during upgrade: %v\n", err)
 		}
 	}
 
@@ -467,7 +469,8 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 		}
 	}
 	// Let the user know there were problems, but we tried to recover
-	return errors.New("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced")
+	return errors.Wrap(utilerrors.NewAggregate(errs),
+		"couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced")
 }
 
 // rollbackEtcdData rolls back the content of etcd folder if something went wrong.

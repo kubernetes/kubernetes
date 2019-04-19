@@ -17,7 +17,7 @@
 //
 // This package is a wrapper around the GCE metadata service,
 // as documented at https://developers.google.com/compute/docs/metadata.
-package metadata
+package metadata // import "cloud.google.com/go/compute/metadata"
 
 import (
 	"encoding/json"

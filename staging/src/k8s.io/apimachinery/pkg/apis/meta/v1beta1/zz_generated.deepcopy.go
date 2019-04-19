@@ -54,6 +54,7 @@ func (in *PartialObjectMetadata) DeepCopyObject() runtime.Object {
 func (in *PartialObjectMetadataList) DeepCopyInto(out *PartialObjectMetadataList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]*PartialObjectMetadata, len(*in))

@@ -174,7 +174,7 @@ func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool)
 	// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key, just continue rotating the cert
 	// TODO: We might want to reconsider this choice.
 	if err := backupAPIServerCertAndKey(certAndKeyDir); err != nil {
-		fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v", err)
+		fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v\n", err)
 	}
 	return certsphase.CreateCertAndKeyFilesWithCA(
 		&certsphase.KubeadmCertAPIServer,
@@ -231,7 +231,7 @@ func GetKubeletDir(dryRun bool) (string, error) {
 // backupAPIServerCertAndKey backups the old cert and key of kube-apiserver to a specified directory.
 func backupAPIServerCertAndKey(certAndKeyDir string) error {
 	subDir := filepath.Join(certAndKeyDir, "expired")
-	if err := os.Mkdir(subDir, 0766); err != nil {
+	if err := os.Mkdir(subDir, 0700); err != nil {
 		return errors.Wrapf(err, "failed to created backup directory %s", subDir)
 	}
 
