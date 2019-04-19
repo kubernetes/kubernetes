@@ -17,6 +17,8 @@ limitations under the License.
 package azure
 
 import (
+	"net/http"
+
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 
@@ -60,8 +62,8 @@ type VMSet interface {
 
 	// AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI, and lun.
 	AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error
-	// DetachDiskByName detaches a vhd from host. The vhd can be identified by diskName or diskURI.
-	DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error
+	// DetachDisk detaches a vhd from host. The vhd can be identified by diskName or diskURI.
+	DetachDisk(diskName, diskURI string, nodeName types.NodeName) (*http.Response, error)
 	// GetDataDisks gets a list of data disks attached to the node.
 	GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error)
 

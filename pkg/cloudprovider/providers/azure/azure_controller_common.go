@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/utils/keymutex"
 )
 
 const (
@@ -49,6 +51,9 @@ var defaultBackOff = kwait.Backoff{
 	Factor:   1.5,
 	Jitter:   0.0,
 }
+
+// acquire lock to attach/detach disk in one node
+var diskOpMutex = keymutex.NewHashed(0)
 
 type controllerCommon struct {
 	subscriptionID        string
@@ -85,24 +90,72 @@ func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName) (VMSet, error) 
 	return ss, nil
 }
 
-// AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI, and lun.
-func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
+// AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI.
+func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, cachingMode compute.CachingTypes) error {
 	vmset, err := c.getNodeVMSet(nodeName)
 	if err != nil {
 		return err
 	}
 
+	instanceid, err := c.cloud.InstanceID(context.TODO(), nodeName)
+	if err != nil {
+		klog.Warningf("failed to get azure instance id (%v)", err)
+		return fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
+	}
+
+	diskOpMutex.LockKey(instanceid)
+	defer diskOpMutex.UnlockKey(instanceid)
+
+	lun, err := c.GetNextDiskLun(nodeName)
+	if err != nil {
+		klog.Warningf("no LUN available for instance %q (%v)", nodeName, err)
+		return fmt.Errorf("all LUNs are used, cannot attach volume (%s, %s) to instance %q (%v)", diskName, diskURI, instanceid, err)
+	}
+
+	klog.V(2).Infof("Trying to attach volume %q lun %d to node %q.", diskURI, lun, nodeName)
 	return vmset.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
 }
 
-// DetachDiskByName detaches a vhd from host. The vhd can be identified by diskName or diskURI.
-func (c *controllerCommon) DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error {
+// DetachDisk detaches a disk from host. The vhd can be identified by diskName or diskURI.
+func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.NodeName) error {
 	vmset, err := c.getNodeVMSet(nodeName)
 	if err != nil {
 		return err
 	}
 
-	return vmset.DetachDiskByName(diskName, diskURI, nodeName)
+	instanceid, err := c.cloud.InstanceID(context.TODO(), nodeName)
+	if err != nil {
+		klog.Warningf("failed to get azure instance id (%v)", err)
+		return fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
+	}
+
+	klog.V(2).Infof("detach %v from node %q", diskURI, nodeName)
+
+	// make the lock here as small as possible
+	diskOpMutex.LockKey(instanceid)
+	resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
+	diskOpMutex.UnlockKey(instanceid)
+
+	if c.cloud.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
+		klog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
+		retryErr := kwait.ExponentialBackoff(c.cloud.requestBackoff(), func() (bool, error) {
+			diskOpMutex.LockKey(instanceid)
+			resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
+			diskOpMutex.UnlockKey(instanceid)
+			return c.cloud.processHTTPRetryResponse(nil, "", resp, err)
+		})
+		if retryErr != nil {
+			err = retryErr
+			klog.V(2).Infof("azureDisk - update abort backoff: detach disk(%s, %s), err: %v", diskName, diskURI, err)
+		}
+	}
+	if err != nil {
+		klog.Errorf("azureDisk - detach disk(%s, %s) failed, err: %v", diskName, diskURI, err)
+	} else {
+		klog.V(2).Infof("azureDisk - detach disk(%s, %s) succeeded", diskName, diskURI)
+	}
+
+	return err
 }
 
 // getNodeDataDisks invokes vmSet interfaces to get data disks for the node.

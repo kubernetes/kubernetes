@@ -910,8 +910,8 @@ func (f *fakeVMSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error {
-	return fmt.Errorf("unimplemented")
+func (f *fakeVMSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName) (*http.Response, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
 
 func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
