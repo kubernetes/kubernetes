@@ -41,7 +41,6 @@
 ./hack/pin-dependency.sh
 ./hack/test-integration.sh
 ./hack/update-vendor.sh
-./hack/verify-api-groups.sh
 ./hack/verify-boilerplate.sh
 ./hack/verify-cli-conventions.sh
 ./hack/verify-codegen.sh
