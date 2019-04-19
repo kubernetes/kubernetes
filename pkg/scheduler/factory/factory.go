@@ -22,8 +22,9 @@ import (
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,11 +36,13 @@ import (
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
+	priorityinformers "k8s.io/client-go/informers/scheduling/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
+	prioritylisters "k8s.io/client-go/listers/scheduling/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -83,9 +86,10 @@ type Config struct {
 	// by NodeLister and Algorithm.
 	SchedulerCache internalcache.Cache
 
-	NodeLister algorithm.NodeLister
-	Algorithm  core.ScheduleAlgorithm
-	GetBinder  func(pod *v1.Pod) Binder
+	NodeLister          algorithm.NodeLister
+	PriorityClassLister algorithm.PrioritClassLister
+	Algorithm           core.ScheduleAlgorithm
+	GetBinder           func(pod *v1.Pod) Binder
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
@@ -184,6 +188,8 @@ type configFactory struct {
 	pdbLister policylisters.PodDisruptionBudgetLister
 	// a means to list all StorageClasses
 	storageClassLister storagelisters.StorageClassLister
+	// a means to list all PriorityClasses
+	priorityClassLister prioritylisters.PriorityClassLister
 	// pluginRunner has a set of plugins and the context used for running them.
 	pluginSet pluginsv1alpha1.PluginSet
 
@@ -234,6 +240,7 @@ type ConfigFactoryArgs struct {
 	ServiceInformer                coreinformers.ServiceInformer
 	PdbInformer                    policyinformers.PodDisruptionBudgetInformer
 	StorageClassInformer           storageinformers.StorageClassInformer
+	PriorityClassInformer          priorityinformers.PriorityClassInformer
 	HardPodAffinitySymmetricWeight int32
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
@@ -268,6 +275,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		statefulSetLister:              args.StatefulSetInformer.Lister(),
 		pdbLister:                      args.PdbInformer.Lister(),
 		storageClassLister:             storageClassLister,
+		priorityClassLister:            args.PriorityClassInformer.Lister(),
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  args.SchedulerName,
@@ -461,6 +469,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		SchedulerCache: c.schedulerCache,
 		// The scheduler only needs to consider schedulable nodes.
 		NodeLister:          &nodeLister{c.nodeLister},
+		PriorityClassLister: &priorityClassLister{c.priorityClassLister},
 		Algorithm:           algo,
 		GetBinder:           getBinderFunc(c.client, extenders),
 		PodConditionUpdater: &podConditionUpdater{c.client},
@@ -501,6 +510,14 @@ type nodeLister struct {
 
 func (n *nodeLister) List() ([]*v1.Node, error) {
 	return n.NodeLister.List(labels.Everything())
+}
+
+type priorityClassLister struct {
+	prioritylisters.PriorityClassLister
+}
+
+func (n *priorityClassLister) List() ([]*schedulingv1.PriorityClass, error) {
+	return n.PriorityClassLister.List(labels.Everything())
 }
 
 func (c *configFactory) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, error) {

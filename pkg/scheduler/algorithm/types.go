@@ -20,6 +20,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
@@ -35,6 +36,13 @@ type NodeLister interface {
 	// We explicitly return []*v1.Node, instead of v1.NodeList, to avoid
 	// performing expensive copies that are unneeded.
 	List() ([]*v1.Node, error)
+}
+
+// PriorityClassLister interface represents anything that can list nodes for a scheduler.
+type PrioritClassLister interface {
+	// We explicitly return []*v1.Node, instead of v1.NodeList, to avoid
+	// performing expensive copies that are unneeded.
+	List() ([]*schedulingv1.PriorityClass, error)
 }
 
 // PodFilter is a function to filter a pod. If pod passed return true else return false.

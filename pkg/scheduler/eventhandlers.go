@@ -26,6 +26,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
+	priorityinformers "k8s.io/client-go/informers/scheduling/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -71,6 +72,10 @@ func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
 	if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
 		sched.config.SchedulingQueue.MoveAllToActiveQueue()
 	}
+}
+
+func (sched *Scheduler) onPriorityClassAdd(obj interface{}) {
+	sched.config.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onServiceAdd(obj interface{}) {
@@ -198,6 +203,22 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 		return
 	}
 
+	if len(pod.Spec.PriorityClassName) > 0 {
+		pcs, err := sched.config.PriorityClassLister.List()
+		if err != nil {
+			klog.Errorf("cannot get priorityClass list")
+			return
+		}
+		var priority int32
+		for _, pc := range pcs {
+			if pc.Namespace == pod.Namespace && pc.Name == pod.Name {
+				priority = pc.Value
+				pod.Spec.Priority = &priority
+				break
+			}
+		}
+	}
+
 	if err := sched.config.SchedulerCache.AddPod(pod); err != nil {
 		klog.Errorf("scheduler cache AddPod failed: %v", err)
 	}
@@ -215,6 +236,22 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	if !ok {
 		klog.Errorf("cannot convert newObj to *v1.Pod: %v", newObj)
 		return
+	}
+
+	if len(newPod.Spec.PriorityClassName) > 0 {
+		pcs, err := sched.config.PriorityClassLister.List()
+		if err != nil {
+			klog.Errorf("cannot get priorityClass list: %v", newPod)
+			return
+		}
+		var priority int32
+		for _, pc := range pcs {
+			if pc.Namespace == newPod.Namespace && pc.Name == newPod.Name {
+				priority = pc.Value
+				newPod.Spec.Priority = &priority
+				break
+			}
+		}
 	}
 
 	// NOTE: Updates must be written to scheduler cache before invalidating
@@ -325,6 +362,7 @@ func AddAllEventHandlers(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
+	priorityClassInformer priorityinformers.PriorityClassInformer,
 ) {
 	// scheduled pod cache
 	podInformer.Informer().AddEventHandler(
@@ -417,6 +455,12 @@ func AddAllEventHandlers(
 	storageClassInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: sched.onStorageClassAdd,
+		},
+	)
+
+	priorityClassInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: sched.onPriorityClassAdd,
 		},
 	)
 }

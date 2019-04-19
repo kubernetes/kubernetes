@@ -32,6 +32,7 @@ import (
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
+	priorityinformers "k8s.io/client-go/informers/scheduling/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -129,6 +130,7 @@ func New(client clientset.Interface,
 	serviceInformer coreinformers.ServiceInformer,
 	pdbInformer policyinformers.PodDisruptionBudgetInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
+	priorityClassInformer priorityinformers.PriorityClassInformer,
 	recorder record.EventRecorder,
 	schedulerAlgorithmSource kubeschedulerconfig.SchedulerAlgorithmSource,
 	stopCh <-chan struct{},
@@ -152,6 +154,7 @@ func New(client clientset.Interface,
 		ServiceInformer:                serviceInformer,
 		PdbInformer:                    pdbInformer,
 		StorageClassInformer:           storageClassInformer,
+		PriorityClassInformer:          priorityClassInformer,
 		HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
 		DisablePreemption:              options.disablePreemption,
 		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
@@ -196,7 +199,7 @@ func New(client clientset.Interface,
 	// Create the scheduler.
 	sched := NewFromConfig(config)
 
-	AddAllEventHandlers(sched, options.schedulerName, nodeInformer, podInformer, pvInformer, pvcInformer, serviceInformer, storageClassInformer)
+	AddAllEventHandlers(sched, options.schedulerName, nodeInformer, podInformer, pvInformer, pvcInformer, serviceInformer, storageClassInformer, priorityClassInformer)
 	return sched, nil
 }
 
@@ -450,7 +453,6 @@ func (sched *Scheduler) scheduleOne() {
 		klog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
 		return
 	}
-
 	klog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 
 	// Synchronously attempt to find a fit for the pod.
