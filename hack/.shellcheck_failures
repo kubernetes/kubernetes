@@ -30,8 +30,6 @@
 ./hack/lib/swagger.sh
 ./hack/lib/test.sh
 ./hack/lib/version.sh
-./hack/make-rules/clean.sh
-./hack/make-rules/helpers/cache_go_dirs.sh
 ./hack/make-rules/make-help.sh
 ./hack/make-rules/test.sh
 ./hack/make-rules/update.sh

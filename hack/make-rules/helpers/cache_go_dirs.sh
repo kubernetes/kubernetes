@@ -28,7 +28,7 @@ if [[ -z "${1:-}" ]]; then
 fi
 CACHE="$1"; shift
 
-trap "rm -f '${CACHE}'" HUP INT TERM ERR
+trap 'rm -f "${CACHE}"' HUP INT TERM ERR
 
 # This is a partial 'find' command.  The caller is expected to pass the
 # remaining arguments.
@@ -62,8 +62,8 @@ if [[ -f "${CACHE}" ]]; then
     N=$(kfind -type d -newer "${CACHE}" -print -quit | wc -l)
     [[ "${N}" == 0 ]] && NEED_FIND=false
 fi
-mkdir -p $(dirname "${CACHE}")
-if $("${NEED_FIND}"); then
+mkdir -p "$(dirname "${CACHE}")"
+if ${NEED_FIND}; then
     kfind -type f -name \*.go  \
         | sed 's|/[^/]*$||'    \
         | sed 's|^./||'        \
