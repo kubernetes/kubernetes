@@ -34,6 +34,7 @@ func Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.RuntimeClas
 	out.ObjectMeta = in.ObjectMeta
 	out.Handler = in.Spec.RuntimeHandler
 	if in.Spec.Topology != nil {
+		out.Topology = new(node.Topology)
 		autoConvert_v1alpha1_Topology_To_node_Topology(in.Spec.Topology,out.Topology,s)
 	}
 	return nil
@@ -43,6 +44,7 @@ func Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass(in *node.RuntimeClass, o
 	out.ObjectMeta = in.ObjectMeta
 	out.Spec.RuntimeHandler = in.Handler
 	if in.Topology != nil {
+		out.Spec.Topology = new(v1alpha1.Topology)
 		autoConvert_node_Topology_To_v1alpha1_Topology(in.Topology,out.Spec.Topology,s)
 	}
 	return nil

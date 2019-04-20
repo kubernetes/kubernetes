@@ -73,11 +73,11 @@ type Topology struct {
 	// this selector. The nodeSelector is intersected (AND) with a pod's other
 	// node affinity or node selector requirements.
 	// +optional
-	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,1,rep,name=nodeSelector"`
+	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
 
 	// tolerations adds tolerations to pods running with this RuntimeClass.
 	// +optional
-	Tolerations []v1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,2,opt,name=tolerations"`
+	Tolerations []v1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,2,rep,name=tolerations"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
