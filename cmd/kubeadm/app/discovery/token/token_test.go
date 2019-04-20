@@ -17,9 +17,10 @@ limitations under the License.
 package token
 
 import (
-	"fmt"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -71,7 +72,7 @@ func TestFetchKubeConfigWithTimeout(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			cfg, err := fetchKubeConfigWithTimeout(testAPIEndpoint, test.discoveryTimeout, func(apiEndpoint string) (*clientcmdapi.Config, error) {
 				if apiEndpoint != testAPIEndpoint {
-					return nil, fmt.Errorf("unexpected API server endpoint:\n\texpected: %q\n\tgot: %q", testAPIEndpoint, apiEndpoint)
+					return nil, errors.Errorf("unexpected API server endpoint:\n\texpected: %q\n\tgot: %q", testAPIEndpoint, apiEndpoint)
 				}
 
 				time.Sleep(3 * time.Second)

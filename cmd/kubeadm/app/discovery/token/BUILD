@@ -45,5 +45,8 @@ go_test(
     name = "go_default_test",
     srcs = ["token_test.go"],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
+    ],
 )
