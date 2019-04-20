@@ -45,9 +45,9 @@ func SetupTempDir(t *testing.T) string {
 	return tmpdir
 }
 
-// SetupInitConfigurationFile is a utility function for kubeadm testing that writes a master configuration file
+// SetupInitConfigurationFile is a utility function for kubeadm testing that writes a InitConfiguration file
 // into /config subfolder of a given temporary directory.
-// The function returns the path of the created master configuration file.
+// The function returns the path of the created InitConfiguration file.
 func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.InitConfiguration) string {
 
 	cfgPath := filepath.Join(tmpdir, "config/masterconfig.yaml")
