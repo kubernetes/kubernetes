@@ -90,6 +90,11 @@ func runBootstrapToken(c workflow.RunData) error {
 	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client); err != nil {
 		return errors.Wrap(err, "error allowing bootstrap tokens to post CSRs")
 	}
+
+	if err := nodebootstraptokenphase.AllowBootstrapTokensApproveCertificates(client); err != nil {
+		return errors.Wrap(err, "error allowing bootstrap tokens to post CSRs")
+	}
+
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
 	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
 		return errors.Wrap(err, "error auto-approving node bootstrap tokens")

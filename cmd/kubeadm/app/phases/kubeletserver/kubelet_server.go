@@ -6,6 +6,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net"
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -112,4 +113,27 @@ func getAltNames(endpoint kubeadmapi.APIEndpoint, nodeRegistration kubeadmapi.No
 	}
 
 	return altNames, nil
+}
+
+
+func WriteKeyToFile(pkiPath, fileName string, data []byte) error {
+	path := filepath.Join(pkiPath, fileName)
+	fmt.Printf("Write key to file %s", path)
+
+	if err := keyutil.WriteKey(path, data); err != nil {
+		return errors.Wrapf(err, "unable to write private key to file %s", path)
+	}
+
+	return nil
+}
+
+func WriteCertToFile(pkiPath, fileName string, data []byte) error {
+	path := filepath.Join(pkiPath, fileName)
+	fmt.Printf("Write cert to file %s", path)
+
+	if err := certutil.WriteCert(path, data); err != nil {
+		return errors.Wrapf(err, "unable to write certificate to file %s", path)
+	}
+
+	return nil
 }

@@ -33,6 +33,10 @@ const (
 	// NodeKubeletBootstrap defines the name of the ClusterRoleBinding that lets kubelets post CSRs
 	NodeKubeletBootstrap = "kubeadm:kubelet-bootstrap"
 
+	// NodeKubeletBootstrap defines the name of the ClusterRoleBinding that lets kubelets post CSRs
+	NodeApproveCertificate = "kubeadm:node-certificate-approve"
+	ClusterAdmin           = "cluster-admin"
+
 	// CSRAutoApprovalClusterRoleName defines the name of the auto-bootstrapped ClusterRole for making the csrapprover controller auto-approve the CSR
 	// TODO: This value should be defined in an other, generic authz package instead of here
 	// Starting from v1.8, CSRAutoApprovalClusterRoleName is automatically created by the API server on startup
@@ -66,6 +70,29 @@ func AllowBootstrapTokensToPostCSRs(client clientset.Interface) error {
 		},
 	})
 }
+
+// AllowBootstrapTokensToPostCSRs creates RBAC rules in a way the makes Node Bootstrap Tokens able to post CSRs
+func AllowBootstrapTokensApproveCertificates(client clientset.Interface) error {
+	fmt.Println("[bootstrap-token] configured RBAC rules to allow Node Bootstrap tokens to approve certificate signing requests")
+
+	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: NodeApproveCertificate,
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "ClusterRole",
+			Name:     ClusterAdmin,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind: rbac.GroupKind,
+				Name: constants.NodeBootstrapTokenAuthGroup,
+			},
+		},
+	})
+}
+
 
 // AutoApproveNodeBootstrapTokens creates RBAC rules in a way that makes Node Bootstrap Tokens' CSR auto-approved by the csrapprover controller
 func AutoApproveNodeBootstrapTokens(client clientset.Interface) error {

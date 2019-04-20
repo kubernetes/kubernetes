@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"fmt"
-
 	"k8s.io/kubernetes/pkg/util/initsystem"
 )
 

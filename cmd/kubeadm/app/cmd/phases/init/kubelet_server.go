@@ -2,16 +2,13 @@ package phases
 
 import (
 	"fmt"
-	"path/filepath"
-
 	"github.com/pkg/errors"
-	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeletserver"
-	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/keyutil"
 
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeletserver"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
@@ -54,7 +51,7 @@ func kubeletServerCerts(c workflow.RunData) error {
 	kubeClient, err := data.Client()
 
 	if err != nil {
-		return errors.Wrap(err, "error getting kubernets client")
+		return errors.Wrap(err, "error getting kubernetes client")
 	}
 
 	certDataPem, keyDataPem, err := kubeletserver.KubeletServerCert(kubeClient, data.Cfg().LocalAPIEndpoint, data.Cfg().NodeRegistration)
@@ -63,36 +60,16 @@ func kubeletServerCerts(c workflow.RunData) error {
 		return errors.Wrap(err, "init phase kubelet server cert")
 	}
 
-	err = writeKeyToFile(data.Cfg().CertificatesDir, data.Cfg().ComponentConfigs.Kubelet.TLSPrivateKeyFile, keyDataPem)
+	err = kubeletserver.WriteKeyToFile(data.Cfg().CertificatesDir, data.Cfg().ComponentConfigs.Kubelet.TLSPrivateKeyFile, keyDataPem)
 
 	if err != nil {
 		return errors.Wrap(err, "init phase kubelet server cert")
 	}
 
-	err = writeCertToFile(data.Cfg().CertificatesDir, data.Cfg().ComponentConfigs.Kubelet.TLSCertFile, certDataPem)
+	err = kubeletserver.WriteCertToFile(data.Cfg().CertificatesDir, data.Cfg().ComponentConfigs.Kubelet.TLSCertFile, certDataPem)
 
 	if err != nil {
 		return errors.Wrap(err, "init phase kubelet server cert")
-	}
-
-	return nil
-}
-
-func writeKeyToFile(pkiPath, fileName string, data []byte) error {
-	path := filepath.Join(pkiPath, fileName)
-
-	if err := keyutil.WriteKey(path, data); err != nil {
-		return errors.Wrapf(err, "unable to write private key to file %s", path)
-	}
-
-	return nil
-}
-
-func writeCertToFile(pkiPath, fileName string, data []byte) error {
-	path := filepath.Join(pkiPath, fileName)
-
-	if err := certutil.WriteCert(path, data); err != nil {
-		return errors.Wrapf(err, "unable to write certificate to file %s", path)
 	}
 
 	return nil
