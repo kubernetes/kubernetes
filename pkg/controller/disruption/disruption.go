@@ -582,6 +582,7 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 
 	// 1. Find the controller for each pod.  If any pod has 0 controllers,
 	// that's an error. With ControllerRef, a pod can only have 1 controller.
+	expectedCount = 0
 	for _, pod := range pods {
 		foundController := false
 		for _, finder := range dc.finders() {
@@ -591,7 +592,9 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 				return
 			}
 			if controllerNScale != nil {
+				orig := controllerScale[controllerNScale.UID]
 				controllerScale[controllerNScale.UID] = controllerNScale.scale
+				expectedCount += (controllerNScale.scale - orig)
 				foundController = true
 				break
 			}
@@ -601,12 +604,6 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllers", err.Error())
 			return
 		}
-	}
-
-	// 2. Add up all the controllers.
-	expectedCount = 0
-	for _, count := range controllerScale {
-		expectedCount += count
 	}
 
 	return
