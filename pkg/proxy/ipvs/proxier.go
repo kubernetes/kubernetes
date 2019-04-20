@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -523,6 +523,9 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 	loadModules := sets.NewString()
 	linuxKernelHandler := NewLinuxKernelHandler()
 	_, ipvsModules, _ := utilipvs.GetKernelVersionAndIPVSMods(linuxKernelHandler.executor)
+	if len(ipvsModules) == 0 {
+		return false, fmt.Errorf("error getting installed ipvs required kernel modules with linux kernel handler")
+	}
 	wantModules.Insert(ipvsModules...)
 	loadModules.Insert(mods...)
 	modules := wantModules.Difference(loadModules).UnsortedList()
