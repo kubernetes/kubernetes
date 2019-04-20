@@ -37,10 +37,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
-        "//staging/src/k8s.io/component-base/logs:go_default_library",
+        "//staging/src/k8s.io/component-base/cli/globalflag:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/google/cadvisor/container/common:go_default_library",
