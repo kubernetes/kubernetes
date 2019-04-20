@@ -6,6 +6,10 @@ go_test(
         "main_test.go",
         "watch_restart_test.go",
     ],
+    tags = [
+        "etcd",
+        "integration",
+    ],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
