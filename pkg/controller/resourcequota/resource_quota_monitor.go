@@ -69,7 +69,7 @@ type event struct {
 type QuotaMonitor struct {
 	// each monitor list/watches a resource and determines if we should replenish quota
 	monitors    monitors
-	monitorLock sync.Mutex
+	monitorLock sync.RWMutex
 	// informersStarted is closed after after all of the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
@@ -280,8 +280,8 @@ func (qm *QuotaMonitor) StartMonitors() {
 // true at one time, and then later return false if all monitors were
 // reconstructed.
 func (qm *QuotaMonitor) IsSynced() bool {
-	qm.monitorLock.Lock()
-	defer qm.monitorLock.Unlock()
+	qm.monitorLock.RLock()
+	defer qm.monitorLock.RUnlock()
 
 	if len(qm.monitors) == 0 {
 		klog.V(4).Info("quota monitor not synced: no monitors")
