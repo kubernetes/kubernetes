@@ -131,7 +131,7 @@ type DaemonSetsController struct {
 
 	// The DaemonSet that has suspended pods on nodes; the key is node name, the value
 	// is DaemonSet set that want to run pods but can't schedule in latest syncup cycle.
-	suspendedDaemonPodsMutex sync.Mutex
+	suspendedDaemonPodsMutex sync.RWMutex
 	suspendedDaemonPods      map[string]sets.String
 
 	failedPodsBackoff *flowcontrol.Backoff
@@ -581,8 +581,8 @@ func (dsc *DaemonSetsController) updatePod(old, cur interface{}) {
 // listSuspendedDaemonPods lists the Daemon pods that 'want to run, but should not schedule'
 // for the node.
 func (dsc *DaemonSetsController) listSuspendedDaemonPods(node string) (dss []string) {
-	dsc.suspendedDaemonPodsMutex.Lock()
-	defer dsc.suspendedDaemonPodsMutex.Unlock()
+	dsc.suspendedDaemonPodsMutex.RLock()
+	defer dsc.suspendedDaemonPodsMutex.RUnlock()
 
 	if _, found := dsc.suspendedDaemonPods[node]; !found {
 		return nil
