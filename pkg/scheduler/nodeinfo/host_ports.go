@@ -17,7 +17,7 @@ limitations under the License.
 package nodeinfo
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // DefaultBindAllHostIP defines the default ip address used to bind to all host.

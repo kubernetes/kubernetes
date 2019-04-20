@@ -19,7 +19,7 @@ package scheme
 import (
 	"testing"
 
-	"k8s.io/api/batch/v1"
+	v1 "k8s.io/api/batch/v1"
 	"k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

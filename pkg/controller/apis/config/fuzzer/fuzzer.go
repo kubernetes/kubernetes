@@ -19,7 +19,7 @@ package fuzzer
 import (
 	"fmt"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"

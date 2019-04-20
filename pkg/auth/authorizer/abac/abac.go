@@ -32,7 +32,7 @@ import (
 
 	// Import latest API for init/side-effects
 	_ "k8s.io/kubernetes/pkg/apis/abac/latest"
-	"k8s.io/kubernetes/pkg/apis/abac/v0"
+	v0 "k8s.io/kubernetes/pkg/apis/abac/v0"
 )
 
 type policyLoadError struct {

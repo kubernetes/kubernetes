@@ -19,11 +19,12 @@ package cpuset
 import (
 	"bytes"
 	"fmt"
-	"k8s.io/klog"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+
+	"k8s.io/klog"
 )
 
 // Builder is a mutable builder for CPUSet. Functions that mutate instances

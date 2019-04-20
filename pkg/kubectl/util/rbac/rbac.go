@@ -17,9 +17,10 @@ limitations under the License.
 package rbac
 
 import (
-	rbacv1 "k8s.io/api/rbac/v1"
 	"reflect"
 	"strings"
+
+	rbacv1 "k8s.io/api/rbac/v1"
 )
 
 type simpleResource struct {

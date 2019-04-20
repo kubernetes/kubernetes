@@ -17,7 +17,7 @@ limitations under the License.
 package helpers
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // AddToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,

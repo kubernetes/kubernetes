@@ -16,7 +16,7 @@ limitations under the License.
 
 package lifecycle
 
-import "k8s.io/api/core/v1"
+import v1 "k8s.io/api/core/v1"
 
 // PodAdmitAttributes is the context for a pod admission decision.
 // The member fields of this struct should never be mutated.

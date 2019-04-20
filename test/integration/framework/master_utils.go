@@ -31,7 +31,7 @@ import (
 	auditreg "k8s.io/api/auditregistration/v1alpha1"
 	autoscaling "k8s.io/api/autoscaling/v1"
 	certificates "k8s.io/api/certificates/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbac "k8s.io/api/rbac/v1alpha1"

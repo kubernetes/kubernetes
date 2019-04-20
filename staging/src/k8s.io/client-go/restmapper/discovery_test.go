@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,7 +31,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/stretchr/testify/assert"
 )
 

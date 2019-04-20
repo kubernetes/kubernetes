@@ -19,7 +19,7 @@ package persistentvolume
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // podBindingCache stores PV binding decisions per pod per node.

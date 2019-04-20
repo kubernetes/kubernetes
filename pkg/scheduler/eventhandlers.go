@@ -18,10 +18,11 @@ package scheduler
 
 import (
 	"fmt"
-	"k8s.io/klog"
 	"reflect"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"

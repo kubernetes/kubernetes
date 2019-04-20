@@ -20,10 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"os"
 	"sync"
+
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 type stateFileData struct {

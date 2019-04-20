@@ -28,7 +28,7 @@ import (
 
 	units "github.com/docker/go-units"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"

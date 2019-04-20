@@ -18,12 +18,13 @@ package services
 
 import (
 	"fmt"
-	"k8s.io/klog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"k8s.io/klog"
 )
 
 // terminationSignals are signals that cause the program to exit in the

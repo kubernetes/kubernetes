@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/google/gofuzz"
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	fuzz "github.com/google/gofuzz"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/googleapis/gnostic/compiler"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"

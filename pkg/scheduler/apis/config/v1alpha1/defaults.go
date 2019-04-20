@@ -20,7 +20,7 @@ import (
 	"net"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	kubescedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"

@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"

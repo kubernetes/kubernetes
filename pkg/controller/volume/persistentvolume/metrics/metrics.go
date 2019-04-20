@@ -19,7 +19,7 @@ package metrics
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/klog"

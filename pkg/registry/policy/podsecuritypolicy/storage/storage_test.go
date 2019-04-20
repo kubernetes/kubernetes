@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/policy"
+
 	// Ensure that policy/v1beta1 package is initialized.
 	_ "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"

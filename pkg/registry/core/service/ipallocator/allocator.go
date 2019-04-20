@@ -19,10 +19,11 @@ package ipallocator
 import (
 	"errors"
 	"fmt"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	"math/big"
 	"net"
+
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 )
 
 // Interface manages the allocation of IP addresses out of a range. Interface

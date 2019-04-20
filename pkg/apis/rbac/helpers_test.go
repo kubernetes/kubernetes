@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/rbac/v1"
 
 	// install RBAC types
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"

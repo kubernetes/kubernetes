@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 
 	quobyteapi "github.com/quobyte/api"

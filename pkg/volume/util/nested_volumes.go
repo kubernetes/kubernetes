@@ -18,12 +18,13 @@ package util
 
 import (
 	"fmt"
-	"k8s.io/api/core/v1"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 // getNestedMountpoints returns a list of mountpoint directories that should be created

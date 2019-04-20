@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storageetcd "k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 

@@ -18,17 +18,18 @@ package benchmark
 
 import (
 	"fmt"
-	"k8s.io/api/core/v1"
+	"math"
+	"strconv"
+	"testing"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	testutils "k8s.io/kubernetes/test/utils"
-	"math"
-	"strconv"
-	"testing"
-	"time"
 )
 
 const (

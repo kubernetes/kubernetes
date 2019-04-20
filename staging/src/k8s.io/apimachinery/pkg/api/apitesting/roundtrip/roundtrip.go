@@ -26,7 +26,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"

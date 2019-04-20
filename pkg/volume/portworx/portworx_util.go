@@ -24,7 +24,7 @@ import (
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
 	osdspec "github.com/libopenstorage/openstorage/api/spec"
 	volumeapi "github.com/libopenstorage/openstorage/volume"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"

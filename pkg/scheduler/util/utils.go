@@ -19,14 +19,15 @@ package util
 import (
 	"sort"
 
-	"k8s.io/api/core/v1"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/api"
-	"time"
 )
 
 // GetContainerPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair

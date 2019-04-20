@@ -23,7 +23,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/authentication"
-	"k8s.io/kubernetes/pkg/apis/authentication/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	"k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 )
 

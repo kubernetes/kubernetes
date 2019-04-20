@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"

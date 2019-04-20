@@ -23,7 +23,7 @@ import (
 	"hash"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )

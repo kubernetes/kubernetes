@@ -27,7 +27,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni/testing"
+	mock_cni "k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni/testing"
 	hostporttest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport/testing"
 	nettest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/testing"
 	"k8s.io/kubernetes/pkg/util/bandwidth"

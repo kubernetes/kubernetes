@@ -17,9 +17,10 @@ limitations under the License.
 package app
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	goruntime "runtime"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"

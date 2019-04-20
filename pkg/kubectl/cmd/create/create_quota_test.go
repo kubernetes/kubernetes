@@ -19,7 +19,7 @@ package create
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )

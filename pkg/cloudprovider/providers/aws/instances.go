@@ -26,9 +26,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
-
-	"k8s.io/api/core/v1"
 )
 
 // awsInstanceRegMatch represents Regex Match for AWS instance.

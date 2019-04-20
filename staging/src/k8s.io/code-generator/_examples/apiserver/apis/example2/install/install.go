@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/code-generator/_examples/apiserver/apis/example2"
-	"k8s.io/code-generator/_examples/apiserver/apis/example2/v1"
+	v1 "k8s.io/code-generator/_examples/apiserver/apis/example2/v1"
 )
 
 // Install registers the API group and adds types to a scheme

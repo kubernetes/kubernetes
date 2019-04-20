@@ -19,7 +19,7 @@ package examples
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 )
 

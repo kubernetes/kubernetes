@@ -17,7 +17,7 @@ limitations under the License.
 package eventratelimit
 
 import (
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 
 	"k8s.io/client-go/util/flowcontrol"
 )

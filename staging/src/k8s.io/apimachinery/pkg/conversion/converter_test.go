@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/diff"

@@ -24,10 +24,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+
 	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"

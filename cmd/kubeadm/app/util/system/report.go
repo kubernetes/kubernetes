@@ -18,9 +18,10 @@ package system
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 // ValidationResultType is type of the validation result. Different validation results

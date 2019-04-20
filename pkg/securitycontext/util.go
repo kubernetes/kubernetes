@@ -17,7 +17,7 @@ limitations under the License.
 package securitycontext
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // HasPrivilegedRequest returns the value of SecurityContext.Privileged, taking into account

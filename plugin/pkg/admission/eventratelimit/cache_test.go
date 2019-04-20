@@ -19,7 +19,7 @@ package eventratelimit
 import (
 	"testing"
 
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 
 	"k8s.io/client-go/util/flowcontrol"
 )

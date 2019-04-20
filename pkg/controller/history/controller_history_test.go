@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -39,8 +39,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
-	core "k8s.io/client-go/testing"
 	"time"
+
+	core "k8s.io/client-go/testing"
 )
 
 func TestRealHistory_ListControllerRevisions(t *testing.T) {

@@ -29,7 +29,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/spf13/cobra"
 
 	appsv1 "k8s.io/api/apps/v1"

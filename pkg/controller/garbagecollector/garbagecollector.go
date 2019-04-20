@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
+
 	// import known versions
 	_ "k8s.io/client-go/kubernetes"
 )

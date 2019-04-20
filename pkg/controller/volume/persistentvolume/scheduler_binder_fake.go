@@ -16,7 +16,7 @@ limitations under the License.
 
 package persistentvolume
 
-import "k8s.io/api/core/v1"
+import v1 "k8s.io/api/core/v1"
 
 type FakeVolumeBinderConfig struct {
 	AllBound             bool

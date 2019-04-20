@@ -19,8 +19,9 @@ package viperconfig
 import (
 	"flag"
 	"fmt"
-	"github.com/pkg/errors"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 
 	"github.com/spf13/viper"
 )

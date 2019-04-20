@@ -19,7 +19,7 @@ package testing
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cp "k8s.io/kubernetes/pkg/kubelet/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"

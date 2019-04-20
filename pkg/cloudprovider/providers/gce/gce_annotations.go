@@ -22,7 +22,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // LoadBalancerType defines a specific type for holding load balancer types (eg. Internal)

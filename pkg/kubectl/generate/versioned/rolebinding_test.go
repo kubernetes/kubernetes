@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	rbac "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestRoleBindingGenerate(t *testing.T) {

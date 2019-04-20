@@ -16,7 +16,7 @@ limitations under the License.
 
 package plugins
 
-import "k8s.io/api/core/v1"
+import v1 "k8s.io/api/core/v1"
 
 // InTreePlugin handles translations between CSI and in-tree sources in a PV
 type InTreePlugin interface {

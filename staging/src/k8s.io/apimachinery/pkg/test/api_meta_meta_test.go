@@ -20,8 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/gofuzz"
-
+	fuzz "github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

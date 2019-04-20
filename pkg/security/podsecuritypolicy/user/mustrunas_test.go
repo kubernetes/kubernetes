@@ -17,10 +17,11 @@ limitations under the License.
 package user
 
 import (
-	policy "k8s.io/api/policy/v1beta1"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"strings"
 	"testing"
+
+	policy "k8s.io/api/policy/v1beta1"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestNewMustRunAs(t *testing.T) {

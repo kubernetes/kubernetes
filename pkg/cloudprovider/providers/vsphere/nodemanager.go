@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	"github.com/vmware/govmomi/object"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"

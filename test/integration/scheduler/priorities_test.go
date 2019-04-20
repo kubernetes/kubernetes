@@ -19,10 +19,11 @@ package scheduler
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"strings"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testutils "k8s.io/kubernetes/test/utils"
-	"strings"
 )
 
 // This file tests the scheduler priority functions.
