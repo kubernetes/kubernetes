@@ -188,7 +188,15 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 	ss.Spec.Replicas = scale.Spec.Replicas
 	ss.ResourceVersion = scale.ResourceVersion
-	obj, _, err = r.store.Update(ctx, ss.Name, rest.DefaultUpdatedObjectInfo(ss), createValidation, updateValidation, false, options)
+	obj, _, err = r.store.Update(
+		ctx,
+		ss.Name,
+		rest.DefaultUpdatedObjectInfo(ss),
+		toScaleCreateValidation(createValidation),
+		toScaleUpdateValidation(updateValidation),
+		false,
+		options,
+	)
 	if err != nil {
 		return nil, false, err
 	}
@@ -198,6 +206,30 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
 	}
 	return newScale, false, err
+}
+
+func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
+	return func(obj runtime.Object) error {
+		scale, err := scaleFromStatefulSet(obj.(*apps.StatefulSet))
+		if err != nil {
+			return err
+		}
+		return f(scale)
+	}
+}
+
+func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
+	return func(obj, old runtime.Object) error {
+		newScale, err := scaleFromStatefulSet(obj.(*apps.StatefulSet))
+		if err != nil {
+			return err
+		}
+		oldScale, err := scaleFromStatefulSet(old.(*apps.StatefulSet))
+		if err != nil {
+			return err
+		}
+		return f(newScale, oldScale)
+	}
 }
 
 // scaleFromStatefulSet returns a scale subresource for a statefulset.

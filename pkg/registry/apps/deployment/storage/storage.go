@@ -293,7 +293,15 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 	deployment.Spec.Replicas = scale.Spec.Replicas
 	deployment.ResourceVersion = scale.ResourceVersion
-	obj, _, err = r.store.Update(ctx, deployment.Name, rest.DefaultUpdatedObjectInfo(deployment), createValidation, updateValidation, false, options)
+	obj, _, err = r.store.Update(
+		ctx,
+		deployment.Name,
+		rest.DefaultUpdatedObjectInfo(deployment),
+		toScaleCreateValidation(createValidation),
+		toScaleUpdateValidation(updateValidation),
+		false,
+		options,
+	)
 	if err != nil {
 		return nil, false, err
 	}
@@ -303,6 +311,30 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
 	}
 	return newScale, false, nil
+}
+
+func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
+	return func(obj runtime.Object) error {
+		scale, err := scaleFromDeployment(obj.(*apps.Deployment))
+		if err != nil {
+			return err
+		}
+		return f(scale)
+	}
+}
+
+func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
+	return func(obj, old runtime.Object) error {
+		newScale, err := scaleFromDeployment(obj.(*apps.Deployment))
+		if err != nil {
+			return err
+		}
+		oldScale, err := scaleFromDeployment(old.(*apps.Deployment))
+		if err != nil {
+			return err
+		}
+		return f(newScale, oldScale)
+	}
 }
 
 // scaleFromDeployment returns a scale subresource for a deployment.
