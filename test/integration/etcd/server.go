@@ -139,13 +139,19 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 	}()
 
 	lastHealth := ""
+	attempt := 0
 	if err := wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
 		// wait for the server to be healthy
 		result := kubeClient.RESTClient().Get().AbsPath("/healthz").Do()
 		content, _ := result.Raw()
 		lastHealth = string(content)
 		if errResult := result.Error(); errResult != nil {
-			t.Log(errResult)
+			attempt++
+			if attempt < 10 {
+				t.Log("waiting for server to be healthy")
+			} else {
+				t.Log(errResult)
+			}
 			return false, nil
 		}
 		var status int
