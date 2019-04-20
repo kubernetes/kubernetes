@@ -32,6 +32,13 @@ staging_repos_pattern=$(IFS="|"; echo "${staging_repos[*]}")
 failed=false
 while IFS= read -r -d '' i; do
   deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ./"$i" 2> /dev/null || echo "")
+  staging_repos+=("$line") 
+done < <(ls "${KUBE_ROOT}/staging/src/k8s.io/")
+staging_repos_pattern=$(IFS="|"; echo "${staging_repos[*]}")
+
+failed=false
+while IFS= read -r -d $'\n' i; do
+  deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' "./$i" 2> /dev/null || echo "")
   deps_on_main=$(echo "${deps}" | grep -v "k8s.io/kubernetes/vendor/" | grep "k8s.io/kubernetes" || echo "")
   if [ -n "${deps_on_main}" ]; then
     echo "Package ${i} has a cyclic dependency on the main repository."
