@@ -349,7 +349,6 @@ pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/host_path
 pkg/volume/iscsi
-pkg/volume/local
 pkg/volume/nfs
 pkg/volume/photon_pd
 pkg/volume/portworx
