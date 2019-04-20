@@ -158,22 +158,25 @@ func (r *RollbackREST) New() runtime.Object {
 	return &apps.DeploymentRollback{}
 }
 
-var _ = rest.Creater(&RollbackREST{})
+var _ = rest.NamedCreater(&RollbackREST{})
 
-func (r *RollbackREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+func (r *RollbackREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	rollback, ok := obj.(*apps.DeploymentRollback)
 	if !ok {
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a DeploymentRollback: %#v", obj))
+	}
+
+	if errs := appsvalidation.ValidateDeploymentRollback(rollback); len(errs) != 0 {
+		return nil, errors.NewInvalid(apps.Kind("DeploymentRollback"), rollback.Name, errs)
+	}
+	if name != rollback.Name {
+		return nil, errors.NewBadRequest("name in URL does not match name in DeploymentRollback object")
 	}
 
 	if createValidation != nil {
 		if err := createValidation(obj.DeepCopyObject()); err != nil {
 			return nil, err
 		}
-	}
-
-	if errs := appsvalidation.ValidateDeploymentRollback(rollback); len(errs) != 0 {
-		return nil, errors.NewInvalid(apps.Kind("DeploymentRollback"), rollback.Name, errs)
 	}
 
 	// Update the Deployment with information in DeploymentRollback to trigger rollback
