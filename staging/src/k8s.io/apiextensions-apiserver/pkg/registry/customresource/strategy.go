@@ -166,11 +166,13 @@ func objectMetaFieldsSet(objectMeta metav1.Object, namespaceScoped bool) fields.
 	if namespaceScoped {
 		return fields.Set{
 			"metadata.name":      objectMeta.GetName(),
+			"metadata.uid":       string(objectMeta.GetUID()),
 			"metadata.namespace": objectMeta.GetNamespace(),
 		}
 	}
 	return fields.Set{
 		"metadata.name": objectMeta.GetName(),
+		"metadata":      string(objectMeta.GetUID()),
 	}
 }
 

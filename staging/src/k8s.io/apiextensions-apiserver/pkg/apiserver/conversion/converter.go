@@ -104,7 +104,7 @@ type crConverter struct {
 func (c *crConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
 	// We currently only support metadata.namespace and metadata.name.
 	switch {
-	case label == "metadata.name":
+	case label == "metadata.name" || label == "metadata.uid":
 		return label, value, nil
 	case !c.clusterScoped && label == "metadata.namespace":
 		return label, value, nil

@@ -59,6 +59,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
+				"metadata.uid",
 				"metadata.namespace",
 				"spec.nodeName",
 				"spec.restartPolicy",
@@ -501,7 +502,8 @@ func AddFieldLabelConversionsForSecret(scheme *runtime.Scheme) error {
 			switch label {
 			case "type",
 				"metadata.namespace",
-				"metadata.name":
+				"metadata.name",
+				"metadata.uid":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)

@@ -34,6 +34,8 @@ func DefaultMetaV1FieldSelectorConversion(label, value string) (string, string, 
 	switch label {
 	case "metadata.name":
 		return label, value, nil
+	case "metadata.uid":
+		return label, value, nil
 	case "metadata.namespace":
 		return label, value, nil
 	default:

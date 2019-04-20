@@ -26,10 +26,12 @@ func ObjectMetaFieldsSet(objectMeta *metav1.ObjectMeta, hasNamespaceField bool) 
 	if !hasNamespaceField {
 		return fields.Set{
 			"metadata.name": objectMeta.Name,
+			"metadata.uid":  objectMeta.UID,
 		}
 	}
 	return fields.Set{
 		"metadata.name":      objectMeta.Name,
+		"metadata.uid":       objectMeta.UID,
 		"metadata.namespace": objectMeta.Namespace,
 	}
 }
@@ -37,6 +39,7 @@ func ObjectMetaFieldsSet(objectMeta *metav1.ObjectMeta, hasNamespaceField bool) 
 // AdObjectMetaField add fields that represent the ObjectMeta to source.
 func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, hasNamespaceField bool) fields.Set {
 	source["metadata.name"] = objectMeta.Name
+	source["metadata.uid"] = objectMeta.UID
 	if hasNamespaceField {
 		source["metadata.namespace"] = objectMeta.Namespace
 	}

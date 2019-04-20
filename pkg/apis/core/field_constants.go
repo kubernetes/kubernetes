@@ -21,6 +21,7 @@ package core
 const (
 	NodeUnschedulableField = "spec.unschedulable"
 	ObjectNameField        = "metadata.name"
+	ObjectUidField         = "metadata.uid"
 	PodHostField           = "spec.nodeName"
 	PodStatusField         = "status.phase"
 	SecretTypeField        = "type"
