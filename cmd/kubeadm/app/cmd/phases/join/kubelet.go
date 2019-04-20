@@ -100,11 +100,6 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 		return err
 	}
 
-	fmt.Printf("tls cert file %s", initCfg.ComponentConfigs.Kubelet.TLSCertFile)
-	fmt.Printf("tls key file %s", initCfg.ComponentConfigs.Kubelet.TLSPrivateKeyFile)
-	initCfg.ComponentConfigs.Kubelet.TLSCertFile = ""
-	initCfg.ComponentConfigs.Kubelet.TLSPrivateKeyFile = ""
-
 	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
 
 	// Write the bootstrap kubelet config file or the TLS-Bootstrapped kubelet config file down to disk

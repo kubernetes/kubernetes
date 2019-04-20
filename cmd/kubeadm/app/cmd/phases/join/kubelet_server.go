@@ -3,11 +3,13 @@ package phases
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeletserver"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/util/normalizer"
@@ -78,8 +80,19 @@ func kubeletServerCerts(c workflow.RunData) error {
 		return errors.Wrap(err, "join phase kubelet server cert")
 	}
 
-	initCfg.ComponentConfigs.Kubelet.TLSCertFile = ""
-	initCfg.ComponentConfigs.Kubelet.TLSPrivateKeyFile = ""
+	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
+	// Try to stop the kubelet service so no race conditions occur when configuring it
+	klog.V(1).Infoln("[kubelet-start] Stopping the kubelet")
+	kubeletphase.TryStopKubelet()
+
+	registerTaintsUsingFlags := data.Cfg().ControlPlane == nil
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&initCfg.ClusterConfiguration, &initCfg.NodeRegistration, registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory); err != nil {
+		return err
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	klog.V(1).Infoln("[kubelet-start] Starting the kubelet")
+	kubeletphase.TryStartKubelet()
 
 	return nil
 }
