@@ -34,8 +34,8 @@ const (
 	NodeKubeletBootstrap = "kubeadm:kubelet-bootstrap"
 
 	// NodeKubeletBootstrap defines the name of the ClusterRoleBinding that lets kubelets post CSRs
-	NodeApproveCertificate = "kubeadm:node-certificate-approve"
-	ClusterAdmin           = "cluster-admin"
+	NodeApproveCertificate     = "kubeadm:node-certificate-approve"
+	CertificateRControllerRole = "system:controller:certificate-controller"
 
 	// CSRAutoApprovalClusterRoleName defines the name of the auto-bootstrapped ClusterRole for making the csrapprover controller auto-approve the CSR
 	// TODO: This value should be defined in an other, generic authz package instead of here
@@ -82,7 +82,7 @@ func AllowBootstrapTokensApproveCertificates(client clientset.Interface) error {
 		RoleRef: rbac.RoleRef{
 			APIGroup: rbac.GroupName,
 			Kind:     "ClusterRole",
-			Name:     ClusterAdmin,
+			Name:     CertificateRControllerRole,
 		},
 		Subjects: []rbac.Subject{
 			{
