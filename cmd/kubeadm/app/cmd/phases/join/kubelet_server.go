@@ -3,7 +3,6 @@ package phases
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
 
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -82,7 +81,7 @@ func kubeletServerCerts(c workflow.RunData) error {
 
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
-	klog.V(1).Infoln("[kubelet-start] Stopping the kubelet")
+	fmt.Println("[kubelet-server] Stopping the kubelet")
 	kubeletphase.TryStopKubelet()
 
 	registerTaintsUsingFlags := data.Cfg().ControlPlane == nil
@@ -91,7 +90,7 @@ func kubeletServerCerts(c workflow.RunData) error {
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	klog.V(1).Infoln("[kubelet-start] Starting the kubelet")
+	fmt.Println("[kubelet-server] Starting the kubelet")
 	kubeletphase.TryStartKubelet()
 
 	return nil
