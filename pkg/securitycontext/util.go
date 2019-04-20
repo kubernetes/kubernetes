@@ -44,6 +44,9 @@ func HasCapabilitiesRequest(container *v1.Container) bool {
 	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
 }
 
+// DetermineEffectiveSecurityContext returns a synthesized SecurityContext for reading effective configurations
+// from the provided pod's and container's security context. Container's fields take precedence in cases where both
+// are set
 func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {
 	effectiveSc := securityContextFromPodSecurityContext(pod)
 	containerSc := container.SecurityContext
