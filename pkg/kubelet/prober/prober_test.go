@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -312,14 +312,14 @@ func TestProbe(t *testing.T) {
 
 			if len(test.expectCommand) > 0 {
 				prober.exec = execprobe.New()
-				prober.runner = &containertest.FakeContainerCommandRunner{}
+				prober.runner = &containertest.FakeCommandRunner{}
 				_, err := prober.probe(probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
 				if err != nil {
 					t.Errorf("[%s] Didn't expect probe error but got: %v", testID, err)
 					continue
 				}
-				if !reflect.DeepEqual(test.expectCommand, prober.runner.(*containertest.FakeContainerCommandRunner).Cmd) {
-					t.Errorf("[%s] unexpected probe arguments: %v", testID, prober.runner.(*containertest.FakeContainerCommandRunner).Cmd)
+				if !reflect.DeepEqual(test.expectCommand, prober.runner.(*containertest.FakeCommandRunner).Cmd) {
+					t.Errorf("[%s] unexpected probe arguments: %v", testID, prober.runner.(*containertest.FakeCommandRunner).Cmd)
 				}
 			}
 		}
@@ -342,7 +342,7 @@ func TestNewExecInContainer(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		runner := &containertest.FakeContainerCommandRunner{
+		runner := &containertest.FakeCommandRunner{
 			Stdout: "foo",
 			Err:    test.err,
 		}
