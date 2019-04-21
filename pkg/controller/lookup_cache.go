@@ -48,7 +48,7 @@ type equivalenceLabelObj struct {
 
 // MatchingCache save label and selector matching relationship
 type MatchingCache struct {
-	mutex sync.RWMutex
+	mutex sync.Mutex
 	cache *lru.Cache
 }
 
