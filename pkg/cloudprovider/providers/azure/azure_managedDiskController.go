@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/golang/glog"
 
@@ -88,7 +88,7 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 		Tags:     newTags,
 		Zones:    createZones,
 		Sku: &compute.DiskSku{
-			Name: compute.StorageAccountTypes(options.StorageAccountType),
+			Name: compute.DiskStorageAccountTypes(options.StorageAccountType),
 		},
 		DiskProperties: &compute.DiskProperties{
 			DiskSizeGB:   &diskSizeGB,
