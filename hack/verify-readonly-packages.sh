@@ -43,19 +43,13 @@ find_files() {
     \) -name '.readonly'
 }
 
-IFS=$'\n'
-
 conflicts=()
-while IFS=$'\n' read -r line; do
-  conflicts+=( "$line" )
-done < <(find_files | sed 's|/.readonly||' | while read -r dir; do
+while IFS=$'\n' read -r dir; do
     dir=${dir#./}
     if kube::util::has_changes "${branch}" "^${dir}/[^/]*\$" '/\.readonly$|/BUILD$|/zz_generated|/\.generated\.|\.proto$|\.pb\.go$' >/dev/null; then
-        echo "${dir}"
+        conflicts+=("${dir}")
     fi
-done)
-
-unset IFS
+done < <(find_files | sed 's|/.readonly||')
 
 if [ ${#conflicts[@]} -gt 0 ]; then
     exec 1>&2
