@@ -27,83 +27,97 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
-// Mock of FileInfo interface
+// MockFileInfo is a Mock of the FileInfo interface
 type MockFileInfo struct {
 	ctrl     *gomock.Controller
-	recorder *_MockFileInfoRecorder
+	recorder *MockFileInfoRecorder
 }
 
-// Recorder for MockFileInfo (not exported)
-type _MockFileInfoRecorder struct {
+// MockFileInfoRecorder is a Recorder for MockFileInfo
+type MockFileInfoRecorder struct {
 	mock *MockFileInfo
 }
 
+// NewMockFileInfo creates a MockFileInfo.
 func NewMockFileInfo(ctrl *gomock.Controller) *MockFileInfo {
 	mock := &MockFileInfo{ctrl: ctrl}
-	mock.recorder = &_MockFileInfoRecorder{mock}
+	mock.recorder = &MockFileInfoRecorder{mock}
 	return mock
 }
 
-func (_m *MockFileInfo) EXPECT() *_MockFileInfoRecorder {
+// EXPECT returns a mocked FileInfoRecorder of the MockFileInfo object.
+func (_m *MockFileInfo) EXPECT() *MockFileInfoRecorder {
 	return _m.recorder
 }
 
+// IsDir checks for directory existence on MockFileInfo.
 func (_m *MockFileInfo) IsDir() bool {
 	ret := _m.ctrl.Call(_m, "IsDir")
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
-func (_mr *_MockFileInfoRecorder) IsDir() *gomock.Call {
+// IsDir checks for directory existence on MockFileInfoRecorder.
+func (_mr *MockFileInfoRecorder) IsDir() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "IsDir")
 }
 
+// ModTime returns ModTime from MockFileInfo.
 func (_m *MockFileInfo) ModTime() time.Time {
 	ret := _m.ctrl.Call(_m, "ModTime")
 	ret0, _ := ret[0].(time.Time)
 	return ret0
 }
 
-func (_mr *_MockFileInfoRecorder) ModTime() *gomock.Call {
+// ModTime returns ModTime from MockFileInfoRecroder.
+func (_mr *MockFileInfoRecorder) ModTime() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ModTime")
 }
 
+// Mode returns the FileMode from MockFileInfo.
 func (_m *MockFileInfo) Mode() os.FileMode {
 	ret := _m.ctrl.Call(_m, "Mode")
 	ret0, _ := ret[0].(os.FileMode)
 	return ret0
 }
 
-func (_mr *_MockFileInfoRecorder) Mode() *gomock.Call {
+// Mode returns the FileMode from MockFileInfoRecorder.
+func (_mr *MockFileInfoRecorder) Mode() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Mode")
 }
 
+// Name returns the Name from MockFileInfo.
 func (_m *MockFileInfo) Name() string {
 	ret := _m.ctrl.Call(_m, "Name")
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
-func (_mr *_MockFileInfoRecorder) Name() *gomock.Call {
+// Name returns the Name from MockFileInfoRecorder.
+func (_mr *MockFileInfoRecorder) Name() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Name")
 }
 
+// Size returns the Size from MockFileInfo.
 func (_m *MockFileInfo) Size() int64 {
 	ret := _m.ctrl.Call(_m, "Size")
 	ret0, _ := ret[0].(int64)
 	return ret0
 }
 
-func (_mr *_MockFileInfoRecorder) Size() *gomock.Call {
+// Size returns the Size from MockFileInfoRecorder.
+func (_mr *MockFileInfoRecorder) Size() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Size")
 }
 
+// Sys returns an empty interface from MockFileInfo.
 func (_m *MockFileInfo) Sys() interface{} {
 	ret := _m.ctrl.Call(_m, "Sys")
 	ret0, _ := ret[0].(interface{})
 	return ret0
 }
 
-func (_mr *_MockFileInfoRecorder) Sys() *gomock.Call {
+// Sys returns an empty interface from MockFileInfoRecorder.
+func (_mr *MockFileInfoRecorder) Sys() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Sys")
 }

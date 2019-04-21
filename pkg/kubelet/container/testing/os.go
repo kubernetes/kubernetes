@@ -35,6 +35,7 @@ type FakeOS struct {
 	Files      map[string][]*os.FileInfo
 }
 
+// NewFakeOS creates a FakeOS.
 func NewFakeOS() *FakeOS {
 	return &FakeOS{
 		Removes: []string{},
@@ -42,7 +43,7 @@ func NewFakeOS() *FakeOS {
 	}
 }
 
-// Mkdir is a fake call that just returns nil.
+// MkdirAll is a fake call that just returns nil.
 func (f *FakeOS) MkdirAll(path string, perm os.FileMode) error {
 	if f.MkdirAllFn != nil {
 		return f.MkdirAllFn(path, perm)

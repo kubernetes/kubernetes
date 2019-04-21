@@ -22,129 +22,152 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	. "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+// Mock is type for Mocking.
 type Mock struct {
 	mock.Mock
 }
 
-var _ Runtime = new(Mock)
+var _ container.Runtime = new(Mock)
 
+// Start mocks starting the runtime.
 func (r *Mock) Start() error {
 	args := r.Called()
 	return args.Error(0)
 }
 
+// Type mocks returning the runtime type.
 func (r *Mock) Type() string {
 	args := r.Called()
 	return args.Get(0).(string)
 }
 
-func (r *Mock) Version() (Version, error) {
+// Version mocks returning the runtime version.
+func (r *Mock) Version() (container.Version, error) {
 	args := r.Called()
-	return args.Get(0).(Version), args.Error(1)
+	return args.Get(0).(container.Version), args.Error(1)
 }
 
-func (r *Mock) APIVersion() (Version, error) {
+// APIVersion mocks returning the runtime API version.
+func (r *Mock) APIVersion() (container.Version, error) {
 	args := r.Called()
-	return args.Get(0).(Version), args.Error(1)
+	return args.Get(0).(container.Version), args.Error(1)
 }
 
-func (r *Mock) Status() (*RuntimeStatus, error) {
+// Status mocks returning the runtime status.
+func (r *Mock) Status() (*container.RuntimeStatus, error) {
 	args := r.Called()
-	return args.Get(0).(*RuntimeStatus), args.Error(0)
+	return args.Get(0).(*container.RuntimeStatus), args.Error(0)
 }
 
-func (r *Mock) GetPods(all bool) ([]*Pod, error) {
+// GetPods mocks returning pods from the runtime.
+func (r *Mock) GetPods(all bool) ([]*container.Pod, error) {
 	args := r.Called(all)
-	return args.Get(0).([]*Pod), args.Error(1)
+	return args.Get(0).([]*container.Pod), args.Error(1)
 }
 
-func (r *Mock) SyncPod(pod *v1.Pod, status *PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult {
+// SyncPod mocks syncing Pods with the runtime.
+func (r *Mock) SyncPod(pod *v1.Pod, status *container.PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) container.PodSyncResult {
 	args := r.Called(pod, status, secrets, backOff)
-	return args.Get(0).(PodSyncResult)
+	return args.Get(0).(container.PodSyncResult)
 }
 
-func (r *Mock) KillPod(pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error {
+// KillPod mocks killing pods.
+func (r *Mock) KillPod(pod *v1.Pod, runningPod container.Pod, gracePeriodOverride *int64) error {
 	args := r.Called(pod, runningPod, gracePeriodOverride)
 	return args.Error(0)
 }
 
+// RunContainerInPod mocks starting a contaienr in a pod.
 func (r *Mock) RunContainerInPod(container v1.Container, pod *v1.Pod, volumeMap map[string]volume.VolumePlugin) error {
 	args := r.Called(pod, pod, volumeMap)
 	return args.Error(0)
 }
 
+// KillContainerInPod mocks killing a container in a pod.
 func (r *Mock) KillContainerInPod(container v1.Container, pod *v1.Pod) error {
 	args := r.Called(pod, pod)
 	return args.Error(0)
 }
 
-func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, error) {
+// GetPodStatus mocks retrieving the PodStatus from the runtime.
+func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*container.PodStatus, error) {
 	args := r.Called(uid, name, namespace)
-	return args.Get(0).(*PodStatus), args.Error(1)
+	return args.Get(0).(*container.PodStatus), args.Error(1)
 }
 
-func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+// ExecInContainer mockings running a command inside a container.
+func (r *Mock) ExecInContainer(containerID container.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	args := r.Called(containerID, cmd, stdin, stdout, stderr, tty)
 	return args.Error(0)
 }
 
-func (r *Mock) AttachContainer(containerID ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+// AttachContainer mocks attaching to a container.
+func (r *Mock) AttachContainer(containerID container.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	args := r.Called(containerID, stdin, stdout, stderr, tty)
 	return args.Error(0)
 }
 
-func (r *Mock) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
+// GetContainerLogs mocks retrieving container logs from the runtime.
+func (r *Mock) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID container.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	args := r.Called(pod, containerID, logOptions, stdout, stderr)
 	return args.Error(0)
 }
 
-func (r *Mock) PullImage(image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+// PullImage mocks pulling an image from the runtime.
+func (r *Mock) PullImage(image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	args := r.Called(image, pullSecrets)
 	return image.Image, args.Error(0)
 }
 
-func (r *Mock) GetImageRef(image ImageSpec) (string, error) {
+// GetImageRef mocks getting an imag ref from the runtime.
+func (r *Mock) GetImageRef(image container.ImageSpec) (string, error) {
 	args := r.Called(image)
 	return args.Get(0).(string), args.Error(1)
 }
 
-func (r *Mock) ListImages() ([]Image, error) {
+// ListImages mocks listing images with the runtime.
+func (r *Mock) ListImages() ([]container.Image, error) {
 	args := r.Called()
-	return args.Get(0).([]Image), args.Error(1)
+	return args.Get(0).([]container.Image), args.Error(1)
 }
 
-func (r *Mock) RemoveImage(image ImageSpec) error {
+// RemoveImage mocks removing an image with the runtime.
+func (r *Mock) RemoveImage(image container.ImageSpec) error {
 	args := r.Called(image)
 	return args.Error(0)
 }
 
-func (r *Mock) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error {
+// PortForward mocks port forwarding with a pod.
+func (r *Mock) PortForward(pod *container.Pod, port uint16, stream io.ReadWriteCloser) error {
 	args := r.Called(pod, port, stream)
 	return args.Error(0)
 }
 
-func (r *Mock) GarbageCollect(gcPolicy GCPolicy, ready bool, evictNonDeletedPods bool) error {
+// GarbageCollect mocks pod garbage collection.
+func (r *Mock) GarbageCollect(gcPolicy container.GCPolicy, ready bool, evictNonDeletedPods bool) error {
 	args := r.Called(gcPolicy, ready, evictNonDeletedPods)
 	return args.Error(0)
 }
 
-func (r *Mock) DeleteContainer(containerID ContainerID) error {
+// DeleteContainer mocks deleting a container.
+func (r *Mock) DeleteContainer(containerID container.ContainerID) error {
 	args := r.Called(containerID)
 	return args.Error(0)
 }
 
-func (r *Mock) ImageStats() (*ImageStats, error) {
+// ImageStats mocks retrieving image stats fr mthe runtime.
+func (r *Mock) ImageStats() (*container.ImageStats, error) {
 	args := r.Called()
-	return args.Get(0).(*ImageStats), args.Error(1)
+	return args.Get(0).(*container.ImageStats), args.Error(1)
 }
 
 // UpdatePodCIDR fulfills the cri interface.
