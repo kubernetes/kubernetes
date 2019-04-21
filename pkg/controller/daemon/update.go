@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -88,6 +89,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 	if err != nil {
 		return nil, nil, err
 	}
+	max := int64(0)
 	for _, history := range histories {
 		// Add the unique label if it's not already added to the history
 		// We use history name instead of computing hash, so that we don't need to worry about hash collision
@@ -109,10 +111,13 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 			currentHistories = append(currentHistories, history)
 		} else {
 			old = append(old, history)
+			if history.Revision > max {
+				max = history.Revision
+			}
 		}
 	}
 
-	currRevision := maxRevision(old) + 1
+	currRevision := max + 1
 	switch len(currentHistories) {
 	case 0:
 		// Create a new history if the current one isn't found
@@ -170,6 +175,7 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 
 	// Clean up old history from smallest to highest revision (from oldest to newest)
 	sort.Sort(historiesByRevision(old))
+	errors := []error{}
 	for _, history := range old {
 		if toKill <= 0 {
 			break
@@ -180,22 +186,12 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 		// Clean up
 		err := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(history.Name, nil)
 		if err != nil {
-			return err
+			errors = append(errors, err)
+			continue
 		}
 		toKill--
 	}
-	return nil
-}
-
-// maxRevision returns the max revision number of the given list of histories
-func maxRevision(histories []*apps.ControllerRevision) int64 {
-	max := int64(0)
-	for _, history := range histories {
-		if history.Revision > max {
-			max = history.Revision
-		}
-	}
-	return max
+	return utilerrors.NewAggregate(errors)
 }
 
 func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
