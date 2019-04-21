@@ -95,7 +95,7 @@ const (
 	// All cloudprovider specific predicates are deprecated in favour of MaxCSIVolumeCountPred.
 	MaxCinderVolumeCountPred = "MaxCinderVolumeCount"
 	// MaxCSIVolumeCountPred defines the predicate that decides how many CSI volumes should be attached
-	MaxCSIVolumeCountPred = "MaxCSIVolumeCountPred"
+	MaxCSIVolumeCountPred = "MaxCSIVolumeCount"
 	// NoVolumeZoneConflictPred defines the name of predicate NoVolumeZoneConflict.
 	NoVolumeZoneConflictPred = "NoVolumeZoneConflict"
 	// CheckNodeMemoryPressurePred defines the name of predicate CheckNodeMemoryPressure.
