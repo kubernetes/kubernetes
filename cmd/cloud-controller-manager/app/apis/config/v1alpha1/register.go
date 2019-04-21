@@ -24,10 +24,9 @@ import (
 // GroupName is the group name use in this package
 const GroupName = "cloudcontrollermanager.config.k8s.io"
 
-// SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
-
 var (
+	// GroupName is the group name use in this package
+	SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	// localSchemeBuilder ïs a pointer to SchemeBuilder instance. Using localSchemeBuilder
