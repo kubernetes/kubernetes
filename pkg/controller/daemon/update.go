@@ -88,6 +88,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 	if err != nil {
 		return nil, nil, err
 	}
+	max := int64(0)
 	for _, history := range histories {
 		// Add the unique label if it's not already added to the history
 		// We use history name instead of computing hash, so that we don't need to worry about hash collision
@@ -109,10 +110,13 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 			currentHistories = append(currentHistories, history)
 		} else {
 			old = append(old, history)
+			if history.Revision > max {
+				max = history.Revision
+			}
 		}
 	}
 
-	currRevision := maxRevision(old) + 1
+	currRevision := max + 1
 	switch len(currentHistories) {
 	case 0:
 		// Create a new history if the current one isn't found
@@ -185,17 +189,6 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 		toKill--
 	}
 	return nil
-}
-
-// maxRevision returns the max revision number of the given list of histories
-func maxRevision(histories []*apps.ControllerRevision) int64 {
-	max := int64(0)
-	for _, history := range histories {
-		if history.Revision > max {
-			max = history.Revision
-		}
-	}
-	return max
 }
 
 func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
