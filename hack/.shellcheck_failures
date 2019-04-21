@@ -21,7 +21,6 @@
 ./cluster/restore-from-backup.sh
 ./cluster/test-e2e.sh
 ./cluster/validate-cluster.sh
-./hack/cherry_pick_pull.sh
 ./hack/ginkgo-e2e.sh
 ./hack/grab-profiles.sh
 ./hack/lib/init.sh
