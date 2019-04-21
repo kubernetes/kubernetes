@@ -12,7 +12,7 @@ filegroup(
         "//vendor/bitbucket.org/bertimus9/systemstat:all-srcs",
         "//vendor/cloud.google.com/go/compute/metadata:all-srcs",
         "//vendor/cloud.google.com/go/internal:all-srcs",
-        "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute:all-srcs",
+        "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute:all-srcs",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry:all-srcs",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network:all-srcs",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage:all-srcs",
