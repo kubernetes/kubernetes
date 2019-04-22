@@ -184,6 +184,7 @@ type JobStatus struct {
 	Failed int32
 }
 
+// JobConditionType is a valid value for JobCondition.Type
 type JobConditionType string
 
 // These are valid conditions of a job.

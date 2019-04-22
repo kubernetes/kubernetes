@@ -22,7 +22,6 @@ pkg/apis/autoscaling/v1
 pkg/apis/autoscaling/v2beta1
 pkg/apis/autoscaling/v2beta2
 pkg/apis/autoscaling/validation
-pkg/apis/batch
 pkg/apis/batch/v1
 pkg/apis/batch/v1beta1
 pkg/apis/batch/v2alpha1
