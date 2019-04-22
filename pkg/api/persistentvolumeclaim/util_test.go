@@ -118,7 +118,7 @@ func TestDropAlphaPVCVolumeMode(t *testing.T) {
 	}
 }
 
-func TestDropDisabledDataSource(t *testing.T) {
+func TestDropDisabledSnapshotDataSource(t *testing.T) {
 	pvcWithoutDataSource := func() *core.PersistentVolumeClaim {
 		return &core.PersistentVolumeClaim{
 			Spec: core.PersistentVolumeClaimSpec{
@@ -208,5 +208,141 @@ func TestDropDisabledDataSource(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestDropDisabledPVCDataSource(t *testing.T) {
+	pvcWithoutDataSource := func() *core.PersistentVolumeClaim {
+		return &core.PersistentVolumeClaim{
+			Spec: core.PersistentVolumeClaimSpec{
+				DataSource: nil,
+			},
+		}
+	}
+	apiGroup := ""
+	pvcWithDataSource := func() *core.PersistentVolumeClaim {
+		return &core.PersistentVolumeClaim{
+			Spec: core.PersistentVolumeClaimSpec{
+				DataSource: &core.TypedLocalObjectReference{
+					APIGroup: &apiGroup,
+					Kind:     "PersistentVolumeClaim",
+					Name:     "test_clone",
+				},
+			},
+		}
+	}
+
+	pvcInfo := []struct {
+		description   string
+		hasDataSource bool
+		pvc           func() *core.PersistentVolumeClaim
+	}{
+		{
+			description:   "pvc without DataSource",
+			hasDataSource: false,
+			pvc:           pvcWithoutDataSource,
+		},
+		{
+			description:   "pvc with DataSource",
+			hasDataSource: true,
+			pvc:           pvcWithDataSource,
+		},
+		{
+			description:   "is nil",
+			hasDataSource: false,
+			pvc:           func() *core.PersistentVolumeClaim { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldpvcInfo := range pvcInfo {
+			for _, newpvcInfo := range pvcInfo {
+				oldPvcHasDataSource, oldpvc := oldpvcInfo.hasDataSource, oldpvcInfo.pvc()
+				newPvcHasDataSource, newpvc := newpvcInfo.hasDataSource, newpvcInfo.pvc()
+				if newpvc == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pvc %v, new pvc %v", enabled, oldpvcInfo.description, newpvcInfo.description), func(t *testing.T) {
+					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumePVCDataSource, enabled)()
+
+					var oldpvcSpec *core.PersistentVolumeClaimSpec
+					if oldpvc != nil {
+						oldpvcSpec = &oldpvc.Spec
+					}
+					DropDisabledFields(&newpvc.Spec, oldpvcSpec)
+
+					// old pvc should never be changed
+					if !reflect.DeepEqual(oldpvc, oldpvcInfo.pvc()) {
+						t.Errorf("old pvc changed: %v", diff.ObjectReflectDiff(oldpvc, oldpvcInfo.pvc()))
+					}
+
+					switch {
+					case enabled || oldPvcHasDataSource:
+						// new pvc should not be changed if the feature is enabled, or if the old pvc had DataSource
+						if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
+							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
+						}
+					case newPvcHasDataSource:
+						// new pvc should be changed
+						if reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
+							t.Errorf("new pvc was not changed")
+						}
+						// new pvc should not have DataSource
+						if !reflect.DeepEqual(newpvc, pvcWithoutDataSource()) {
+							t.Errorf("new pvc had DataSource: %v", diff.ObjectReflectDiff(newpvc, pvcWithoutDataSource()))
+						}
+					default:
+						// new pvc should not need to be changed
+						if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
+							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestDropInvalidPVCDataSource checks specifically for invalid APIGroup settings for PVCDataSource
+func TestDropInvalidPVCDataSource(t *testing.T) {
+	apiGroup := ""
+	pvcWithDataSource := func() *core.PersistentVolumeClaim {
+		return &core.PersistentVolumeClaim{
+			Spec: core.PersistentVolumeClaimSpec{
+				DataSource: &core.TypedLocalObjectReference{
+					APIGroup: &apiGroup,
+					Kind:     "PersistentVolumeClaim",
+					Name:     "test_clone",
+				},
+			},
+		}
+	}
+
+	invalidAPIGroup := "invalid.pvc.api.group"
+	pvcWithInvalidDataSource := func() *core.PersistentVolumeClaim {
+		return &core.PersistentVolumeClaim{
+			Spec: core.PersistentVolumeClaimSpec{
+				DataSource: &core.TypedLocalObjectReference{
+					APIGroup: &invalidAPIGroup,
+					Kind:     "PersistentVolumeClaim",
+					Name:     "test_clone_invalid",
+				},
+			},
+		}
+	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumePVCDataSource, true)()
+	validPvc := pvcWithDataSource()
+	originalDS := validPvc.Spec.DataSource
+	DropDisabledFields(&validPvc.Spec, nil)
+	if validPvc.Spec.DataSource == nil {
+		t.Errorf("valid PVC DataSource was dropped: Kind: %s, APIGroup: %s, Name: %s\n", originalDS.Kind, *originalDS.APIGroup, originalDS.Name)
+	}
+
+	invalidPvc := pvcWithInvalidDataSource()
+	originalDS = invalidPvc.Spec.DataSource
+	DropDisabledFields(&invalidPvc.Spec, nil)
+	if invalidPvc.Spec.DataSource != nil {
+		t.Errorf("invalid PVC DataSource was not dropped: Kind: %s, APIGroup: %s, Name: %s\n", originalDS.Kind, *originalDS.APIGroup, originalDS.Name)
 	}
 }
