@@ -42,7 +42,6 @@
 ./hack/verify-codegen.sh
 ./hack/verify-golint.sh
 ./hack/verify-no-vendor-cycles.sh
-./hack/verify-openapi-spec.sh
 ./hack/verify-test-featuregates.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
