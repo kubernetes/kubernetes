@@ -11,7 +11,6 @@
 ./cluster/gce/gci/flexvolume_node_setup.sh
 ./cluster/gce/gci/health-monitor.sh
 ./cluster/gce/gci/master-helper.sh
-./cluster/gce/gci/mounter/stage-upload.sh
 ./cluster/gce/gci/shutdown.sh
 ./cluster/gce/list-resources.sh
 ./cluster/gce/upgrade-aliases.sh
@@ -21,10 +20,7 @@
 ./cluster/pre-existing/util.sh
 ./cluster/restore-from-backup.sh
 ./cluster/test-e2e.sh
-./cluster/test-network.sh
-./cluster/test-smoke.sh
 ./cluster/validate-cluster.sh
-./hack/cherry_pick_pull.sh
 ./hack/ginkgo-e2e.sh
 ./hack/grab-profiles.sh
 ./hack/lib/init.sh
@@ -47,7 +43,6 @@
 ./hack/verify-codegen.sh
 ./hack/verify-golint.sh
 ./hack/verify-no-vendor-cycles.sh
-./hack/verify-readonly-packages.sh
 ./hack/verify-test-featuregates.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh

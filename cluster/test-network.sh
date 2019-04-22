@@ -24,7 +24,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-KUBE_CONFIG_FILE="config-default.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-${KUBE_ROOT}/hack/ginkgo-e2e.sh --ginkgo.focus=Networking
+"${KUBE_ROOT}/hack/ginkgo-e2e.sh" --ginkgo.focus=Networking

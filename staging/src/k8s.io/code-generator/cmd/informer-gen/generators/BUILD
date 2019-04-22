@@ -14,7 +14,6 @@ go_library(
         "groupinterface.go",
         "informer.go",
         "packages.go",
-        "tags.go",
         "types.go",
         "versioninterface.go",
     ],

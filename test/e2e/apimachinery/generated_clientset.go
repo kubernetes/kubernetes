@@ -36,27 +36,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-func stagingClientPod(name, value string) v1.Pod {
-	return v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"name": "foo",
-				"time": value,
-			},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "nginx",
-					Image: imageutils.GetE2EImage(imageutils.Nginx),
-					Ports: []v1.ContainerPort{{ContainerPort: 80}},
-				},
-			},
-		},
-	}
-}
-
 func testingPod(name, value string) v1.Pod {
 	return v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -96,34 +75,6 @@ func observeCreation(w watch.Interface) {
 	case <-time.After(30 * time.Second):
 		framework.Failf("Timeout while waiting for observing the creation")
 	}
-}
-
-func observeObjectDeletion(w watch.Interface) (obj runtime.Object) {
-	// output to give us a duration to failure.  Maybe we aren't getting the
-	// full timeout for some reason.  My guess would be watch failure
-	framework.Logf("Starting to observe pod deletion")
-	deleted := false
-	timeout := false
-	timer := time.After(framework.DefaultPodDeletionTimeout)
-	for !deleted && !timeout {
-		select {
-		case event, normal := <-w.ResultChan():
-			if !normal {
-				framework.Failf("The channel was closed unexpectedly")
-				return
-			}
-			if event.Type == watch.Deleted {
-				obj = event.Object
-				deleted = true
-			}
-		case <-timer:
-			timeout = true
-		}
-	}
-	if !deleted {
-		framework.Failf("Failed to observe pod deletion")
-	}
-	return
 }
 
 func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool) {

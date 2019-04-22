@@ -151,8 +151,6 @@ func (mk MergeKeys) GetMergeKeyValue(i interface{}) (MergeKeyValue, error) {
 	return result, nil
 }
 
-type source int
-
 // CombinedPrimitiveSlice implements a slice of primitives
 type CombinedPrimitiveSlice struct {
 	Items []*PrimitiveListItem

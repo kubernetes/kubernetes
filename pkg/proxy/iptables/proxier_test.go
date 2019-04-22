@@ -327,15 +327,6 @@ func TestDeleteEndpointConnections(t *testing.T) {
 	}
 }
 
-type fakeClosable struct {
-	closed bool
-}
-
-func (c *fakeClosable) Close() error {
-	c.closed = true
-	return nil
-}
-
 // fakePortOpener implements portOpener.
 type fakePortOpener struct {
 	openPorts []*utilproxy.LocalPort

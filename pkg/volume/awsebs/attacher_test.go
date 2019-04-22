@@ -205,13 +205,6 @@ type detachCall struct {
 	ret           error
 }
 
-type diskIsAttachedCall struct {
-	diskName   aws.KubernetesVolumeID
-	nodeName   types.NodeName
-	isAttached bool
-	ret        error
-}
-
 func (testcase *testcase) AttachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName) (string, error) {
 	expected := &testcase.attach
 
