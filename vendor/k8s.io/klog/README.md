@@ -1,7 +1,27 @@
 klog
 ====
 
-klog is a permanant fork of https://github.com/golang/glog. original README from glog is below
+klog is a permanent fork of https://github.com/golang/glog.
+
+## Why was klog created?
+
+The decision to create klog was one that wasn't made lightly, but it was necessary due to some
+drawbacks that are present in [glog](https://github.com/golang/glog). Ultimately, the fork was created due to glog not being under active development; this can be seen in the glog README:
+
+> The code in this repo [...] is not itself under development
+
+This makes us unable to solve many use cases without a fork. The factors that contributed to needing feature development are listed below:
+
+ * `glog` [presents a lot "gotchas"](https://github.com/kubernetes/kubernetes/issues/61006) and introduces challenges in containerized environments, all of which aren't well documented.
+ * `glog` doesn't provide an easy way to test logs, which detracts from the stability of software using it
+ * A long term goal is to implement a logging interface that allows us to add context, change output format, etc.
+ 
+Historical context is available here:
+
+ * https://github.com/kubernetes/kubernetes/issues/61006
+ * https://github.com/kubernetes/kubernetes/issues/70264
+ * https://groups.google.com/forum/#!msg/kubernetes-sig-architecture/wCWiWf3Juzs/hXRVBH90CgAJ
+ * https://groups.google.com/forum/#!msg/kubernetes-dev/7vnijOMhLS0/1oRiNtigBgAJ
 
 ----
 

@@ -198,11 +198,7 @@ func initTestSchedulerWithOptions(
 		podInformer,
 		context.informerFactory.Core().V1().PersistentVolumes(),
 		context.informerFactory.Core().V1().PersistentVolumeClaims(),
-		context.informerFactory.Core().V1().ReplicationControllers(),
-		context.informerFactory.Apps().V1().ReplicaSets(),
-		context.informerFactory.Apps().V1().StatefulSets(),
 		context.informerFactory.Core().V1().Services(),
-		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		context.informerFactory.Storage().V1().StorageClasses(),
 	)
 
@@ -591,17 +587,6 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 		}
 		return true, nil
 	}
-}
-
-// podUnschedulable returns a condition function that returns true if the given pod
-// gets unschedulable status.
-func podSchedulableCondition(c clientset.Interface, podNamespace, podName string) (*v1.PodCondition, error) {
-	pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-	return cond, nil
 }
 
 // podUnschedulable returns a condition function that returns true if the given pod

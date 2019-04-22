@@ -38,7 +38,7 @@ import (
 
 // UpdateDeploymentWithRetries updates the specified deployment with retries.
 func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*apps.Deployment, error) {
-	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, Logf, Poll, pollShortTimeout)
+	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, Logf, Poll, PollShortTimeout)
 }
 
 // WaitForDeploymentOldRSsNum waits for the deployment to clean up old rcs.
@@ -77,14 +77,14 @@ func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string,
 
 // WaitForDeploymentWithCondition waits for the specified deployment condition.
 func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType apps.DeploymentConditionType) error {
-	return testutils.WaitForDeploymentWithCondition(c, ns, deploymentName, reason, condType, Logf, Poll, pollLongTimeout)
+	return testutils.WaitForDeploymentWithCondition(c, ns, deploymentName, reason, condType, Logf, Poll, PollLongTimeout)
 }
 
 // WaitForDeploymentRevisionAndImage waits for the deployment's and its new RS's revision and container image to match the given revision and image.
 // Note that deployment revision and its new RS revision should be updated shortly most of the time, but an overwhelmed RS controller
 // may result in taking longer to relabel a RS.
 func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName string, revision, image string) error {
-	return testutils.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, revision, image, Logf, Poll, pollLongTimeout)
+	return testutils.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, revision, image, Logf, Poll, PollLongTimeout)
 }
 
 // NewDeployment returns a deployment spec with the specified argument.
@@ -123,24 +123,24 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 // Rolling update strategy is used only during a rolling update, and can be violated in other situations,
 // such as shortly after a scaling event or the deployment is just created.
 func WaitForDeploymentComplete(c clientset.Interface, d *apps.Deployment) error {
-	return testutils.WaitForDeploymentComplete(c, d, Logf, Poll, pollLongTimeout)
+	return testutils.WaitForDeploymentComplete(c, d, Logf, Poll, PollLongTimeout)
 }
 
 // WaitForDeploymentCompleteAndCheckRolling waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
 // Rolling update strategy should not be broken during a rolling update.
 func WaitForDeploymentCompleteAndCheckRolling(c clientset.Interface, d *apps.Deployment) error {
-	return testutils.WaitForDeploymentCompleteAndCheckRolling(c, d, Logf, Poll, pollLongTimeout)
+	return testutils.WaitForDeploymentCompleteAndCheckRolling(c, d, Logf, Poll, PollLongTimeout)
 }
 
 // WaitForDeploymentUpdatedReplicasGTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
 func WaitForDeploymentUpdatedReplicasGTE(c clientset.Interface, ns, deploymentName string, minUpdatedReplicas int32, desiredGeneration int64) error {
-	return testutils.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, minUpdatedReplicas, desiredGeneration, Poll, pollLongTimeout)
+	return testutils.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, minUpdatedReplicas, desiredGeneration, Poll, PollLongTimeout)
 }
 
 // WaitForDeploymentRollbackCleared waits for given deployment either started rolling back or doesn't need to rollback.
 // Note that rollback should be cleared shortly, so we only wait for 1 minute here to fail early.
 func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName string) error {
-	return testutils.WaitForDeploymentRollbackCleared(c, ns, deploymentName, Poll, pollShortTimeout)
+	return testutils.WaitForDeploymentRollbackCleared(c, ns, deploymentName, Poll, PollShortTimeout)
 }
 
 // WatchRecreateDeployment watches Recreate deployments and ensures no new pods will run at the same time with
@@ -200,7 +200,7 @@ func logPodsOfDeployment(c clientset.Interface, deployment *apps.Deployment, rsL
 
 // WaitForDeploymentRevision waits for becoming the target revision of a delopyment.
 func WaitForDeploymentRevision(c clientset.Interface, d *apps.Deployment, targetRevision string) error {
-	err := wait.PollImmediate(Poll, pollLongTimeout, func() (bool, error) {
+	err := wait.PollImmediate(Poll, PollLongTimeout, func() (bool, error) {
 		deployment, err := c.AppsV1().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

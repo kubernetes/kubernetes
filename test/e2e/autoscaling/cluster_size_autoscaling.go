@@ -17,7 +17,6 @@ limitations under the License.
 package autoscaling
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -1187,30 +1186,6 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 	return fmt.Errorf("autoscaler still enabled, last error: %v", finalErr)
 }
 
-func executeHTTPRequest(method string, url string, body string) (string, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest(method, url, strings.NewReader(body))
-	if err != nil {
-		By(fmt.Sprintf("Can't create request: %s", err.Error()))
-		return "", err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("error: %s %s", resp.Status, string(respBody))
-	}
-
-	return string(respBody), nil
-}
-
 func addNodePool(name string, machineType string, numNodes int) {
 	args := []string{"container", "node-pools", "create", name, "--quiet",
 		"--machine-type=" + machineType,
@@ -1295,26 +1270,6 @@ func getPoolSize(f *framework.Framework, poolName string) int {
 		}
 	}
 	return size
-}
-
-func doPut(url, content string) (string, error) {
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte(content)))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	strBody := string(body)
-	return strBody, nil
 }
 
 func reserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string, tolerations []v1.Toleration, priorityClassName string) func() error {
@@ -1748,14 +1703,6 @@ func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, namespa
 		}
 	}
 	return nil
-}
-
-// wrap runReplicatedPodOnEachNode to return cleanup
-func runReplicatedPodOnEachNodeWithCleanup(f *framework.Framework, nodes []v1.Node, namespace string, podsPerNode int, id string, labels map[string]string, memRequest int64) (func(), error) {
-	err := runReplicatedPodOnEachNode(f, nodes, namespace, podsPerNode, id, labels, memRequest)
-	return func() {
-		framework.DeleteRCAndWaitForGC(f.ClientSet, namespace, id)
-	}, err
 }
 
 // Increase cluster size by newNodesForScaledownTests to create some unused nodes

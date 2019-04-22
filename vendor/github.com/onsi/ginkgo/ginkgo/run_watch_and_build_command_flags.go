@@ -4,6 +4,8 @@ import (
 	"flag"
 	"runtime"
 
+	"time"
+
 	"github.com/onsi/ginkgo/config"
 )
 
@@ -19,6 +21,7 @@ type RunWatchAndBuildCommandFlags struct {
 	Notify         bool
 	AfterSuiteHook string
 	AutoNodes      bool
+	Timeout        time.Duration
 
 	//only for run command
 	KeepGoing       bool
@@ -26,7 +29,8 @@ type RunWatchAndBuildCommandFlags struct {
 	RandomizeSuites bool
 
 	//only for watch command
-	Depth int
+	Depth       int
+	WatchRegExp string
 
 	FlagSet *flag.FlagSet
 }
@@ -135,6 +139,7 @@ func (c *RunWatchAndBuildCommandFlags) flags(mode int) {
 	c.FlagSet.StringVar(c.stringSlot("memprofile"), "memprofile", "", "Write a memory profile to the specified file after all tests have passed.")
 	c.FlagSet.IntVar(c.intSlot("memprofilerate"), "memprofilerate", 0, "Enable more precise (and expensive) memory profiles by setting runtime.MemProfileRate.")
 	c.FlagSet.StringVar(c.stringSlot("outputdir"), "outputdir", "", "Place output files from profiling in the specified directory.")
+	c.FlagSet.BoolVar(c.boolSlot("requireSuite"), "requireSuite", false, "Fail if there are ginkgo tests in a directory but no test suite (missing RunSpecs)")
 
 	if mode == runMode || mode == watchMode {
 		config.Flags(c.FlagSet, "", false)
@@ -146,6 +151,7 @@ func (c *RunWatchAndBuildCommandFlags) flags(mode int) {
 			c.FlagSet.BoolVar(&(c.Notify), "notify", false, "Send desktop notifications when a test run completes")
 		}
 		c.FlagSet.StringVar(&(c.AfterSuiteHook), "afterSuiteHook", "", "Run a command when a suite test run completes")
+		c.FlagSet.DurationVar(&(c.Timeout), "timeout", 24*time.Hour, "Suite fails if it does not complete within the specified timeout")
 	}
 
 	if mode == runMode {
@@ -156,5 +162,6 @@ func (c *RunWatchAndBuildCommandFlags) flags(mode int) {
 
 	if mode == watchMode {
 		c.FlagSet.IntVar(&(c.Depth), "depth", 1, "Ginkgo will watch dependencies down to this depth in the dependency tree")
+		c.FlagSet.StringVar(&(c.WatchRegExp), "watchRegExp", `\.go$`, "Files matching this regular expression will be watched for changes")
 	}
 }

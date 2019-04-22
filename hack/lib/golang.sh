@@ -372,7 +372,7 @@ EOF
 
 # Ensure the go tool exists and is a viable version.
 kube::golang::verify_go_version() {
-  if [[ -z "$(which go)" ]]; then
+  if [[ -z "$(command -v go)" ]]; then
     kube::log::usage_from_stdin <<EOF
 Can't find 'go' in PATH, please fix and retry.
 See http://golang.org/doc/install for installation instructions.
@@ -693,7 +693,11 @@ kube::golang::build_binaries() {
     host_platform=$(kube::golang::host_platform)
 
     local goflags goldflags goasmflags gogcflags
-    goldflags="${GOLDFLAGS:-} -s -w $(kube::version::ldflags)"
+    # If GOLDFLAGS is unset, then set it to the a default of "-s -w".
+    # Disable SC2153 for this, as it will throw a warning that the local
+    # variable goldflags will exist, and it suggest changing it to this.
+    # shellcheck disable=SC2153
+    goldflags="${GOLDFLAGS=-s -w} $(kube::version::ldflags)"
     goasmflags="-trimpath=${KUBE_ROOT}"
     gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 

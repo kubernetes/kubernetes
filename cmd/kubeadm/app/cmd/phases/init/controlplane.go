@@ -66,12 +66,12 @@ func getPhaseDescription(component string) string {
 func NewControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:  "control-plane",
-		Short: "Generates all static Pod manifest files necessary to establish the control plane",
+		Short: "Generate all static Pod manifest files necessary to establish the control plane",
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{
 				Name:           "all",
-				Short:          "Generates all static Pod manifest files",
+				Short:          "Generate all static Pod manifest files",
 				InheritFlags:   getControlPlanePhaseFlags("all"),
 				Example:        controlPlaneExample,
 				RunAllSiblings: true,

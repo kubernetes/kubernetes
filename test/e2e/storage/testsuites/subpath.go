@@ -641,14 +641,6 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 	}
 }
 
-func clearSubpathPodCommands(pod *v1.Pod) {
-	pod.Spec.InitContainers[0].Command = nil
-	pod.Spec.InitContainers[1].Args = nil
-	pod.Spec.InitContainers[2].Args = nil
-	pod.Spec.Containers[0].Args = nil
-	pod.Spec.Containers[1].Args = nil
-}
-
 func setInitCommand(pod *v1.Pod, command string) {
 	pod.Spec.InitContainers[0].Command = []string{"/bin/sh", "-ec", command}
 }

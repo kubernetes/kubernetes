@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	"github.com/prometheus/common/model"
 
@@ -74,7 +75,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 					"": boundedSample(1, 1E6),
 				}),
 				"node_memory_working_set_bytes": gstruct.MatchAllElements(nodeId, gstruct.Elements{
-					"": boundedSample(10*framework.Mb, memoryLimit),
+					"": boundedSample(10*volume.Mb, memoryLimit),
 				}),
 
 				"container_cpu_usage_seconds_total": gstruct.MatchElements(containerId, gstruct.IgnoreExtras, gstruct.Elements{
@@ -83,8 +84,8 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 				}),
 
 				"container_memory_working_set_bytes": gstruct.MatchAllElements(containerId, gstruct.Elements{
-					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(10*framework.Kb, 80*framework.Mb),
-					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*framework.Kb, 80*framework.Mb),
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(10*volume.Kb, 80*volume.Mb),
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*volume.Kb, 80*volume.Mb),
 				}),
 			})
 			By("Giving pods a minute to start up and produce metrics")

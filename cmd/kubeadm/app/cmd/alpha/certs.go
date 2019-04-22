@@ -24,6 +24,7 @@ import (
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -34,12 +35,12 @@ import (
 
 var (
 	genericLongDesc = normalizer.LongDesc(`
-		Renews the %[1]s, and saves them into %[2]s.cert and %[2]s.key files.
+		Renew the %[1]s, and save them into %[2]s.cert and %[2]s.key files.
 
     Extra attributes such as SANs will be based on the existing certificates, there is no need to resupply them.
 `)
 	allLongDesc = normalizer.LongDesc(`
-    Renews all known certificates necessary to run the control plane. Renewals are run unconditionally, regardless
+    Renew all known certificates necessary to run the control plane. Renewals are run unconditionally, regardless
     of expiration date. Renewals can also be run individually for more control.
 `)
 )
@@ -60,7 +61,7 @@ func newCmdCertsUtility() *cobra.Command {
 func newCmdCertsRenewal() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "renew",
-		Short: "Renews certificates for a Kubernetes cluster",
+		Short: "Renew certificates for a Kubernetes cluster",
 		Long:  cmdutil.MacroCommandLongDescription,
 		RunE:  cmdutil.SubCmdRunE("renew"),
 	}
@@ -107,7 +108,7 @@ func getRenewSubCommands() []*cobra.Command {
 
 	allCmd := &cobra.Command{
 		Use:   "all",
-		Short: "renew all available certificates",
+		Short: "Renew all available certificates",
 		Long:  allLongDesc,
 		Run: func(*cobra.Command, []string) {
 			for _, f := range funcList {
@@ -145,18 +146,37 @@ func generateRenewalFunction(cert *certsphase.KubeadmCert, caCert *certsphase.Ku
 			return
 		}
 
-		renewer, err := getRenewer(cfg, caCert.BaseName)
-		kubeadmutil.CheckErr(err)
+		var externalCA bool
+		switch caCert.BaseName {
+		case kubeadmconstants.CACertAndKeyBaseName:
+			// Check if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
+			externalCA, _ = certsphase.UsingExternalCA(&internalcfg.ClusterConfiguration)
+		case kubeadmconstants.FrontProxyCACertAndKeyBaseName:
+			// Check if an external Front-Proxy CA is provided by the user (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
+			externalCA, _ = certsphase.UsingExternalFrontProxyCA(&internalcfg.ClusterConfiguration)
+		default:
+			externalCA = false
+		}
 
-		err = renewal.RenewExistingCert(internalcfg.CertificatesDir, cert.BaseName, renewer)
-		kubeadmutil.CheckErr(err)
+		if !externalCA {
+			renewer, err := getRenewer(cfg, caCert.BaseName)
+			kubeadmutil.CheckErr(err)
+
+			err = renewal.RenewExistingCert(internalcfg.CertificatesDir, cert.BaseName, renewer)
+			kubeadmutil.CheckErr(err)
+
+			fmt.Printf("Certificate %s renewed\n", cert.Name)
+			return
+		}
+
+		fmt.Printf("Detected external %s, certificate %s can't be renewed\n", cert.CAName, cert.Name)
 	}
 }
 
 func generateRenewalCommand(cert *certsphase.KubeadmCert, cfg *renewConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   cert.Name,
-		Short: fmt.Sprintf("Generates the %s", cert.LongName),
+		Short: fmt.Sprintf("Generate the %s", cert.LongName),
 		Long:  fmt.Sprintf(genericLongDesc, cert.LongName, cert.BaseName),
 	}
 	addFlags(cmd, cfg)

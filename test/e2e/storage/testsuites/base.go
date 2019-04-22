@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/podlogs"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -388,15 +389,15 @@ func deleteStorageClass(cs clientset.Interface, className string) {
 // dynamically created config for the volume server.
 //
 // This is done because TestConfig is the public API for
-// the testsuites package whereas framework.VolumeTestConfig is merely
+// the testsuites package whereas volume.TestConfig is merely
 // an implementation detail. It contains fields that have no effect,
 // which makes it unsuitable for use in the testsuits public API.
-func convertTestConfig(in *PerTestConfig) framework.VolumeTestConfig {
+func convertTestConfig(in *PerTestConfig) volume.TestConfig {
 	if in.ServerConfig != nil {
 		return *in.ServerConfig
 	}
 
-	return framework.VolumeTestConfig{
+	return volume.TestConfig{
 		Namespace:      in.Framework.Namespace.Name,
 		Prefix:         in.Prefix,
 		ClientNodeName: in.ClientNodeName,

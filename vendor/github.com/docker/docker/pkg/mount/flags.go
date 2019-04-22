@@ -135,15 +135,3 @@ func parseOptions(options string) (int, string) {
 	}
 	return flag, strings.Join(data, ",")
 }
-
-// ParseTmpfsOptions parse fstab type mount options into flags and data
-func ParseTmpfsOptions(options string) (int, string, error) {
-	flags, data := parseOptions(options)
-	for _, o := range strings.Split(data, ",") {
-		opt := strings.SplitN(o, "=", 2)
-		if !validFlags[opt[0]] {
-			return 0, "", fmt.Errorf("Invalid tmpfs option %q", opt)
-		}
-	}
-	return flags, data, nil
-}

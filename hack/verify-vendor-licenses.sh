@@ -21,15 +21,6 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
-if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
-  ! kube::util::has_changes "${branch}" 'Godeps/' && \
-  ! kube::util::has_changes "${branch}" 'go.mod' && \
-  ! kube::util::has_changes "${branch}" 'go.sum' && \
-  ! kube::util::has_changes "${branch}" 'vendor/'; then
-  exit 0
-fi
-
 # create a nice clean place to put our new licenses
 # must be in the user dir (e.g. KUBE_ROOT) in order for the docker volume mount
 # to work with docker-machine on macs
@@ -40,7 +31,7 @@ function cleanup {
   #echo "Removing workspace: ${_tmpdir}"
   rm -rf "${_tmpdir}"
 }
-trap cleanup EXIT
+kube::util::trap_add cleanup EXIT
 
 cp -r "${KUBE_ROOT}/Godeps" "${_tmpdir}/Godeps"
 ln -s "${KUBE_ROOT}/LICENSE" "${_tmpdir}"

@@ -21,12 +21,12 @@ import (
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 func TestFileRenew(t *testing.T) {
 	caCertCfg := &certutil.Config{CommonName: "kubernetes"}
-	caCert, caKey, err := certs.NewCACertAndKey(caCertCfg)
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(caCertCfg)
 	if err != nil {
 		t.Fatalf("couldn't create CA: %v", err)
 	}

@@ -268,9 +268,3 @@ func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.
 
 	return secretPaths
 }
-
-func newHostPathType(pathType string) *corev1.HostPathType {
-	hostPathType := new(corev1.HostPathType)
-	*hostPathType = corev1.HostPathType(pathType)
-	return hostPathType
-}

@@ -7,7 +7,7 @@ library install, don't mind getting HEAD (which may be less stable than a
 particular release), then simply:
 
 ```sh
-$ go get k8s.io/client-go@master
+go get k8s.io/client-go@master
 ```
 
 This will record a dependency on `k8s.io/client-go` in your go module.
@@ -24,12 +24,12 @@ If you are using a version of go prior to 1.11, or do not wish to use
 go modules, you can download `k8s.io/client-go` to your `$GOPATH` instead:
 
 ```sh
-$ go get -u k8s.io/client-go/...
-$ go get -u k8s.io/apimachinery/...
-$ cd $GOPATH/src/k8s.io/client-go
-$ git checkout v11.0.0
-$ cd $GOPATH/src/k8s.io/apimachinery
-$ git checkout kubernetes-1.14.0
+go get -u k8s.io/client-go/...
+go get -u k8s.io/apimachinery/...
+cd $GOPATH/src/k8s.io/client-go
+git checkout v11.0.0
+cd $GOPATH/src/k8s.io/apimachinery
+git checkout kubernetes-1.14.0
 ```
 
 This downloads a version of `k8s.io/client-go` prior to v1.12.0,

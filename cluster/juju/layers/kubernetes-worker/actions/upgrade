@@ -1,5 +1,0 @@
-#!/bin/sh
-set -eux
-
-charms.reactive set_state kubernetes-worker.snaps.upgrade-specified
-exec hooks/config-changed

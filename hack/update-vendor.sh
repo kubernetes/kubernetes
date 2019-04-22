@@ -23,8 +23,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
-# Explicitly clear GOPATH, to ensure nothing this script calls makes use of that path info
-export GOPATH=
 # Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
 export GOFLAGS=
 # Ensure sort order doesn't depend on locale
@@ -72,10 +70,19 @@ function ensure_require_replace_directives_for_all_dependencies() {
   cat "${require_json}" | jq -r '"-replace \(.Path)=\(.Path)@\(.Version)"'            | xargs -L 100 go mod edit -fmt
   cat "${replace_json}" | jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"'| xargs -L 100 go mod edit -fmt
 
-  # 2. Add explicit require directives for indirect dependencies
+  # 2. Propagate root replace/require directives into staging modules, in case we are downgrading, so they don't bump the root required version back up
+  for repo in $(ls staging/src/k8s.io); do
+    pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
+      cat "${require_json}" | jq -r '"-require \(.Path)@\(.Version)"'                     | xargs -L 100 go mod edit -fmt
+      cat "${require_json}" | jq -r '"-replace \(.Path)=\(.Path)@\(.Version)"'            | xargs -L 100 go mod edit -fmt
+      cat "${replace_json}" | jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"'| xargs -L 100 go mod edit -fmt
+    popd >/dev/null 2>&1
+  done
+
+  # 3. Add explicit require directives for indirect dependencies
   go list -m -json all | jq -r 'select(.Main != true) | select(.Indirect == true) | "-require \(.Path)@\(.Version)"'          | xargs -L 100 go mod edit -fmt
 
-  # 3. Add explicit replace directives pinning dependencies that aren't pinned yet
+  # 4. Add explicit replace directives pinning dependencies that aren't pinned yet
   go list -m -json all | jq -r 'select(.Main != true) | select(.Replace == null)  | "-replace \(.Path)=\(.Path)@\(.Version)"' | xargs -L 100 go mod edit -fmt
 }
 
@@ -243,9 +250,17 @@ $(go mod why ${loopback_deps})"
 
     # prune unused pinned replace directives
     comm -23 \
-      <(go mod edit -json | jq -r '.Replace[] | select(.Old.Path == .New.Path) | select(.New.Version != null) | .Old.Path' | sort) \
+      <(go mod edit -json | jq -r '.Replace[] | .Old.Path' | sort) \
       <(go list -m -json all | jq -r .Path | sort) |
     xargs -L 1 -I {} echo "-dropreplace={}" |
+    xargs -L 100 go mod edit -fmt
+
+    # prune replace directives that pin to the naturally selected version
+    go list -m -json all |
+      jq -r 'select(.Replace != null) | 
+             select(.Path == .Replace.Path) | 
+             select(.Version == .Replace.Version) | 
+             "-dropreplace \(.Replace.Path)"' |
     xargs -L 100 go mod edit -fmt
 
   popd >/dev/null 2>&1

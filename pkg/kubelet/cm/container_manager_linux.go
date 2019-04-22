@@ -256,7 +256,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		// the input is provided in that format.
 		// this is important because we do not want any name conversion to occur.
 		if !cgroupManager.Exists(cgroupRoot) {
-			return nil, fmt.Errorf("invalid configuration: cgroup-root %q doesn't exist: %v", cgroupRoot, err)
+			return nil, fmt.Errorf("invalid configuration: cgroup-root %q doesn't exist", cgroupRoot)
 		}
 		klog.Infof("container manager verified user specified cgroup-root exists: %v", cgroupRoot)
 		// Include the top level cgroup for enforcing node allocatable into cgroup-root.

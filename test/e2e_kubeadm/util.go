@@ -25,12 +25,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 )
 
 // ServiceAccounts utils
 
+// ExpectServiceAccount expects to be able to get the ServiceAccount with specific name from the namespace
 func ExpectServiceAccount(c clientset.Interface, namespace, name string) {
 	_, err := c.CoreV1().
 		ServiceAccounts(namespace).
@@ -40,6 +41,7 @@ func ExpectServiceAccount(c clientset.Interface, namespace, name string) {
 
 // Secret utils
 
+// GetSecret gets Secret with specific name from the namespace
 func GetSecret(c clientset.Interface, namespace, name string) *corev1.Secret {
 	r, err := c.CoreV1().
 		Secrets(namespace).
@@ -50,6 +52,7 @@ func GetSecret(c clientset.Interface, namespace, name string) *corev1.Secret {
 
 // ConfigMaps utils
 
+// GetConfigMap gets ConfigMap with specific name from the namespace
 func GetConfigMap(c clientset.Interface, namespace, name string) *corev1.ConfigMap {
 	r, err := c.CoreV1().
 		ConfigMaps(namespace).
@@ -60,6 +63,7 @@ func GetConfigMap(c clientset.Interface, namespace, name string) *corev1.ConfigM
 
 // Service utils
 
+// ExpectService expects to be able to get the Service with specific name from the namespace
 func ExpectService(c clientset.Interface, namespace, name string) {
 	_, err := c.CoreV1().
 		Services(namespace).
@@ -69,6 +73,7 @@ func ExpectService(c clientset.Interface, namespace, name string) {
 
 // Deployments utils
 
+// GetDeployment gets Deployment with specific name from the namespace
 func GetDeployment(c clientset.Interface, namespace, name string) *appsv1.Deployment {
 	r, err := c.AppsV1().
 		Deployments(namespace).
@@ -79,6 +84,7 @@ func GetDeployment(c clientset.Interface, namespace, name string) *appsv1.Deploy
 
 // DaemonSets utils
 
+// GetDaemonSet gets DaemonSet with specific name from the namespace
 func GetDaemonSet(c clientset.Interface, namespace, name string) *appsv1.DaemonSet {
 	r, err := c.AppsV1().
 		DaemonSets(namespace).
@@ -89,6 +95,7 @@ func GetDaemonSet(c clientset.Interface, namespace, name string) *appsv1.DaemonS
 
 // RBAC utils
 
+// ExpectRole expects to be able to get the Role with specific name from the namespace
 func ExpectRole(c clientset.Interface, namespace, name string) {
 	_, err := c.RbacV1().
 		Roles(namespace).
@@ -96,6 +103,7 @@ func ExpectRole(c clientset.Interface, namespace, name string) {
 	framework.ExpectNoError(err, "error getting Role %q from namespace %q", name, namespace)
 }
 
+// ExpectRoleBinding expects to be able to get the RoleBinding with specific name from the namespace
 func ExpectRoleBinding(c clientset.Interface, namespace, name string) {
 	_, err := c.RbacV1().
 		RoleBindings(namespace).
@@ -103,6 +111,7 @@ func ExpectRoleBinding(c clientset.Interface, namespace, name string) {
 	framework.ExpectNoError(err, "error getting RoleBinding %q from namespace %q", name, namespace)
 }
 
+// ExpectClusterRole expects to be able to get the ClusterRole with specific name
 func ExpectClusterRole(c clientset.Interface, name string) {
 	_, err := c.RbacV1().
 		ClusterRoles().
@@ -110,6 +119,7 @@ func ExpectClusterRole(c clientset.Interface, name string) {
 	framework.ExpectNoError(err, "error getting ClusterRole %q", name)
 }
 
+// ExpectClusterRoleBinding expects to be able to get the ClusterRoleBinding with specific name
 func ExpectClusterRoleBinding(c clientset.Interface, name string) {
 	_, err := c.RbacV1().
 		ClusterRoleBindings().
@@ -117,24 +127,26 @@ func ExpectClusterRoleBinding(c clientset.Interface, name string) {
 	framework.ExpectNoError(err, "error getting ClusterRoleBindings %q", name)
 }
 
+// ExpectClusterRoleBindingWithSubjectAndRole expects to be able to get the ClusterRoleBinding with specific name, subject and role
 func ExpectClusterRoleBindingWithSubjectAndRole(c clientset.Interface, name, subjectKind, subject, role string) {
 	binding, err := c.RbacV1().
 		ClusterRoleBindings().
 		Get(name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "error getting ClusterRoleBindings %q", name)
-	Expect(binding.Subjects).To(
-		ContainElement(subjectMatcher(
+	gomega.Expect(binding.Subjects).To(
+		gomega.ContainElement(subjectMatcher(
 			subject,
 			subjectKind,
 		)),
 		"ClusterRole %q does not have %s %q as subject", name, subjectKind, subject,
 	)
-	Expect(binding.RoleRef.Name).To(
-		Equal(role),
+	gomega.Expect(binding.RoleRef.Name).To(
+		gomega.Equal(role),
 		"ClusterRole %q does not have %q as role", name, role,
 	)
 }
 
+// ExpectSubjectHasAccessToResource expects that the subject has access to the target resource
 func ExpectSubjectHasAccessToResource(c clientset.Interface, subjectKind, subject string, resource *authv1.ResourceAttributes) {
 	var sar *authv1.SubjectAccessReview
 	switch subjectKind {
@@ -161,14 +173,14 @@ func ExpectSubjectHasAccessToResource(c clientset.Interface, subjectKind, subjec
 	s, err := c.AuthorizationV1().SubjectAccessReviews().Create(sar)
 	framework.ExpectNoError(err, "error getting SubjectAccessReview for %s %s to resource %+v", subjectKind, subject, *sar.Spec.ResourceAttributes)
 
-	Expect(s.Status.Allowed).Should(BeTrue(), "%s %s has no access to resource %+v", subjectKind, subject, *sar.Spec.ResourceAttributes)
+	gomega.Expect(s.Status.Allowed).Should(gomega.BeTrue(), "%s %s has no access to resource %+v", subjectKind, subject, *sar.Spec.ResourceAttributes)
 }
 
 // matchers
 
-func subjectMatcher(name, kind string) OmegaMatcher {
+func subjectMatcher(name, kind string) gomega.OmegaMatcher {
 	return gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-		"Name": Equal(name),
-		"Kind": Equal(kind),
+		"Name": gomega.Equal(name),
+		"Kind": gomega.Equal(kind),
 	})
 }

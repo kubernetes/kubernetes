@@ -364,20 +364,10 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 		}
 
 		//TODO: check if there is a better method to compare keys
-		if resultingKey.D == key.D {
+		if resultingKey.D == test.expectedKey.D {
 			t.Error("created key does not match expected key")
 		}
 	}
-}
-
-func TestNewCACertAndKey(t *testing.T) {
-	certCfg := &certutil.Config{CommonName: "kubernetes"}
-	caCert, _, err := NewCACertAndKey(certCfg)
-	if err != nil {
-		t.Fatalf("failed call NewCACertAndKey: %v", err)
-	}
-
-	certstestutil.AssertCertificateIsCa(t, caCert)
 }
 
 func TestSharedCertificateExists(t *testing.T) {

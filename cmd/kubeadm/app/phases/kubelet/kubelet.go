@@ -39,7 +39,7 @@ func TryStartKubelet() {
 	// This runs "systemctl daemon-reload && systemctl restart kubelet"
 	if err := initSystem.ServiceRestart("kubelet"); err != nil {
 		fmt.Printf("[kubelet-start] WARNING: unable to start the kubelet service: [%v]\n", err)
-		fmt.Printf("[kubelet-start] please ensure kubelet is reloaded and running manually.\n")
+		fmt.Printf("[kubelet-start] Please ensure kubelet is reloaded and running manually.\n")
 	}
 }
 

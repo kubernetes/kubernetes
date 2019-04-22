@@ -28,8 +28,8 @@ DEFAULT_CNI_VERSION="v0.7.5"
 DEFAULT_CNI_SHA1="52e9d2de8a5f927307d9397308735658ee44ab8d"
 DEFAULT_NPD_VERSION="v0.6.3"
 DEFAULT_NPD_SHA1="3a6ac56be6c121f1b94450bfd1a81ad28d532369"
-DEFAULT_CRICTL_VERSION="v1.12.0"
-DEFAULT_CRICTL_SHA1="82ef8b44849f9da0589c87e9865d4716573eec7f"
+DEFAULT_CRICTL_VERSION="v1.14.0"
+DEFAULT_CRICTL_SHA1="1f93c6183d0a4e186708efe7899da7a7bce9c736"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
@@ -235,8 +235,13 @@ function install-node-problem-detector {
 }
 
 function install-cni-binaries {
-  local -r cni_tar="cni-plugins-amd64-${DEFAULT_CNI_VERSION}.tgz"
-  local -r cni_sha1="${DEFAULT_CNI_SHA1}"
+  if [[ -n "${CNI_VERSION:-}" ]]; then
+      local -r cni_tar="cni-plugins-amd64-${CNI_VERSION}.tgz"
+      local -r cni_sha1="${CNI_SHA1}"
+  else
+      local -r cni_tar="cni-plugins-amd64-${DEFAULT_CNI_VERSION}.tgz"
+      local -r cni_sha1="${DEFAULT_CNI_SHA1}"
+  fi
   if is-preloaded "${cni_tar}" "${cni_sha1}"; then
     echo "${cni_tar} is preloaded."
     return

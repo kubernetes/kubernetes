@@ -54,7 +54,7 @@ func (NullValue) XXX_WellKnownType() string { return "NullValue" }
 // The JSON representation for `Struct` is JSON object.
 type Struct struct {
 	// Unordered map of dynamically typed values.
-	Fields               map[string]*Value `protobuf:"bytes,1,rep,name=fields" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Fields               map[string]*Value `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
 	XXX_sizecache        int32             `json:"-"`
@@ -144,30 +144,40 @@ type isValue_Kind interface {
 }
 
 type Value_NullValue struct {
-	NullValue NullValue `protobuf:"varint,1,opt,name=null_value,json=nullValue,enum=google.protobuf.NullValue,oneof"`
-}
-type Value_NumberValue struct {
-	NumberValue float64 `protobuf:"fixed64,2,opt,name=number_value,json=numberValue,oneof"`
-}
-type Value_StringValue struct {
-	StringValue string `protobuf:"bytes,3,opt,name=string_value,json=stringValue,oneof"`
-}
-type Value_BoolValue struct {
-	BoolValue bool `protobuf:"varint,4,opt,name=bool_value,json=boolValue,oneof"`
-}
-type Value_StructValue struct {
-	StructValue *Struct `protobuf:"bytes,5,opt,name=struct_value,json=structValue,oneof"`
-}
-type Value_ListValue struct {
-	ListValue *ListValue `protobuf:"bytes,6,opt,name=list_value,json=listValue,oneof"`
+	NullValue NullValue `protobuf:"varint,1,opt,name=null_value,json=nullValue,proto3,enum=google.protobuf.NullValue,oneof"`
 }
 
-func (*Value_NullValue) isValue_Kind()   {}
+type Value_NumberValue struct {
+	NumberValue float64 `protobuf:"fixed64,2,opt,name=number_value,json=numberValue,proto3,oneof"`
+}
+
+type Value_StringValue struct {
+	StringValue string `protobuf:"bytes,3,opt,name=string_value,json=stringValue,proto3,oneof"`
+}
+
+type Value_BoolValue struct {
+	BoolValue bool `protobuf:"varint,4,opt,name=bool_value,json=boolValue,proto3,oneof"`
+}
+
+type Value_StructValue struct {
+	StructValue *Struct `protobuf:"bytes,5,opt,name=struct_value,json=structValue,proto3,oneof"`
+}
+
+type Value_ListValue struct {
+	ListValue *ListValue `protobuf:"bytes,6,opt,name=list_value,json=listValue,proto3,oneof"`
+}
+
+func (*Value_NullValue) isValue_Kind() {}
+
 func (*Value_NumberValue) isValue_Kind() {}
+
 func (*Value_StringValue) isValue_Kind() {}
-func (*Value_BoolValue) isValue_Kind()   {}
+
+func (*Value_BoolValue) isValue_Kind() {}
+
 func (*Value_StructValue) isValue_Kind() {}
-func (*Value_ListValue) isValue_Kind()   {}
+
+func (*Value_ListValue) isValue_Kind() {}
 
 func (m *Value) GetKind() isValue_Kind {
 	if m != nil {
@@ -358,7 +368,7 @@ func _Value_OneofSizer(msg proto.Message) (n int) {
 // The JSON representation for `ListValue` is JSON array.
 type ListValue struct {
 	// Repeated field of dynamically typed values.
-	Values               []*Value `protobuf:"bytes,1,rep,name=values" json:"values,omitempty"`
+	Values               []*Value `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`

@@ -29,6 +29,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -121,7 +122,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		)
 
 		BeforeEach(func() {
-			_, nfsServerPod, serverIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+			_, nfsServerPod, serverIP = volume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "nfs-",
 				Labels:     volLabel,

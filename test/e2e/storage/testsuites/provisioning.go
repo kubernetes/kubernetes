@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -373,6 +374,9 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 	}
 	command += " || (mount | grep 'on /mnt/test'; false)"
 
+	if framework.NodeOSDistroIs("windows") {
+		command = "select-string 'hello world' /mnt/test/data"
+	}
 	RunInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, framework.NodeSelection{Name: actualNodeName})
 
 	return volume
@@ -546,8 +550,8 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   framework.GetTestImage(framework.BusyBoxImage),
-					Command: framework.GenerateScriptCmd(command),
+					Image:   volume.GetTestImage(framework.BusyBoxImage),
+					Command: volume.GenerateScriptCmd(command),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",

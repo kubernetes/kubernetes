@@ -55,7 +55,7 @@ func (d *decoratedWatcher) run(ctx context.Context) {
 				return
 			}
 			switch recv.Type {
-			case watch.Added, watch.Modified, watch.Deleted:
+			case watch.Added, watch.Modified, watch.Deleted, watch.Bookmark:
 				err := d.decorator(recv.Object)
 				if err != nil {
 					send = makeStatusErrorEvent(err)

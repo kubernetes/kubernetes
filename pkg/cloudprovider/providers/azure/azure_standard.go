@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
@@ -568,16 +568,6 @@ func extractResourceGroupByNicID(nicID string) (string, error) {
 	return matches[1], nil
 }
 
-// extractResourceGroupByPipID extracts the resource group name by publicIP ID.
-func extractResourceGroupByPipID(pipID string) (string, error) {
-	matches := publicIPResourceGroupRE.FindStringSubmatch(pipID)
-	if len(matches) != 2 {
-		return "", fmt.Errorf("error of extracting resourceGroup from pipID %q", pipID)
-	}
-
-	return matches[1], nil
-}
-
 // getPrimaryInterfaceWithVMSet gets machine primary network interface by node name and vmSet.
 func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName string) (network.Interface, error) {
 	var machine compute.VirtualMachine
@@ -632,24 +622,24 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 	return nic, nil
 }
 
-// ensureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
+// EnsureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
 // participating in the specified LoadBalancer Backend Pool.
-func (as *availabilitySet) ensureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) error {
+func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) error {
 	vmName := mapNodeNameToVMName(nodeName)
 	serviceName := getServiceName(service)
 	nic, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
 	if err != nil {
 		if err == errNotInVMSet {
-			klog.V(3).Infof("ensureHostInPool skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
+			klog.V(3).Infof("EnsureHostInPool skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
 			return nil
 		}
 
-		klog.Errorf("error: az.ensureHostInPool(%s), az.vmSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
+		klog.Errorf("error: az.EnsureHostInPool(%s), az.vmSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
 		return err
 	}
 
 	if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
-		klog.V(3).Infof("ensureHostInPool skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
+		klog.Warningf("EnsureHostInPool skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
 		return nil
 	}
 
@@ -676,16 +666,19 @@ func (as *availabilitySet) ensureHostInPool(service *v1.Service, nodeName types.
 			// sets, the same network interface couldn't be added to more than one load balancer of
 			// the same type. Omit those nodes (e.g. masters) so Azure ARM won't complain
 			// about this.
+			newBackendPoolsIDs := make([]string, 0, len(newBackendPools))
 			for _, pool := range newBackendPools {
-				backendPool := *pool.ID
-				matches := backendPoolIDRE.FindStringSubmatch(backendPool)
-				if len(matches) == 2 {
-					lbName := matches[1]
-					if strings.HasSuffix(lbName, InternalLoadBalancerNameSuffix) == isInternal {
-						klog.V(4).Infof("Node %q has already been added to LB %q, omit adding it to a new one", nodeName, lbName)
-						return nil
-					}
+				if pool.ID != nil {
+					newBackendPoolsIDs = append(newBackendPoolsIDs, *pool.ID)
 				}
+			}
+			isSameLB, oldLBName, err := isBackendPoolOnSameLB(backendPoolID, newBackendPoolsIDs)
+			if err != nil {
+				return err
+			}
+			if !isSameLB {
+				klog.V(4).Infof("Node %q has already been added to LB %q, omit adding it to a new one", nodeName, oldLBName)
+				return nil
 			}
 		}
 
@@ -723,7 +716,7 @@ func (as *availabilitySet) EnsureHostsInPool(service *v1.Service, nodes []*v1.No
 		}
 
 		f := func() error {
-			err := as.ensureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
+			err := as.EnsureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
 			if err != nil {
 				return fmt.Errorf("ensure(%s): backendPoolID(%s) - failed to ensure host in pool: %q", getServiceName(service), backendPoolID, err)
 			}
@@ -740,8 +733,8 @@ func (as *availabilitySet) EnsureHostsInPool(service *v1.Service, nodes []*v1.No
 	return nil
 }
 
-// EnsureBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified vmSet.
-func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, poolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
+// EnsureBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified nodes.
+func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
 	// Do nothing for availability set.
 	return nil
 }

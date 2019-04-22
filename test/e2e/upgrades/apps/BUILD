@@ -27,6 +27,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/job:go_default_library",
+        "//test/e2e/framework/replicaset:go_default_library",
         "//test/e2e/upgrades:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

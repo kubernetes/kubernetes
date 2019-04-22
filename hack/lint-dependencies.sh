@@ -23,8 +23,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
-# Explicitly clear GOPATH, to ensure nothing this script calls makes use of that path info
-export GOPATH=
 # Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
 export GOFLAGS=
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
@@ -58,7 +56,7 @@ unused=$(comm -23 \
 if [[ -n "${unused}" ]]; then
   echo ""
   echo "Pinned module versions that aren't actually used:"
-  echo "${unused}"
+  echo "${unused}" | xargs -L 1 echo 'GO111MODULE=on go mod edit -dropreplace'
 fi
 
 if [[ -n "${unused}${outdated}" ]]; then

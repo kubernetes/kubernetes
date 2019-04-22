@@ -21,29 +21,16 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
-if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
-  ! kube::util::has_changes "${branch}" 'Godeps/' && \
-  ! kube::util::has_changes "${branch}" 'go.mod' && \
-  ! kube::util::has_changes "${branch}" 'go.sum' && \
-  ! kube::util::has_changes "${branch}" 'vendor/' && \
-  ! kube::util::has_changes "${branch}" 'staging/' && \
-  ! kube::util::has_changes "${branch}" 'hack/lib/' && \
-  ! kube::util::has_changes "${branch}" 'hack/.*vendor'; then
-  exit 0
-fi
-
-if [[ -z ${TMP_GOPATH:-} ]]; then
-  # Create a nice clean place to put our new vendor
-  _tmpdir="$(kube::realpath "$(mktemp -d -t verifyvendor.XXXXXX)")"
-else
-  # reuse what we might have saved previously
-  _tmpdir="${TMP_GOPATH}"
-fi
+# create a nice clean place to put our new licenses
+# must be in the user dir (e.g. KUBE_ROOT) in order for the docker volume mount
+# to work with docker-machine on macs
+mkdir -p "${KUBE_ROOT}/_tmp"
+_tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-vendor.XXXXXX")"
 
 if [[ -z ${KEEP_TMP:-} ]]; then
     KEEP_TMP=false
 fi
+
 function cleanup {
   # make go module dirs writeable
   chmod -R +w "${_tmpdir}"
@@ -54,7 +41,7 @@ function cleanup {
     rm -rf "${_tmpdir}"
   fi
 }
-trap cleanup EXIT
+kube::util::trap_add cleanup EXIT
 
 # Copy the contents of the kube directory into the nice clean place (which is NOT shaped like a GOPATH)
 _kubetmp="${_tmpdir}"
@@ -63,8 +50,8 @@ mkdir -p "${_kubetmp}"
 git archive --format=tar --prefix=kubernetes/ "$(git write-tree)" | (cd "${_kubetmp}" && tar xf -)
 _kubetmp="${_kubetmp}/kubernetes"
 
-# Do all our work with an unset GOPATH
-export GOPATH=
+# Do all our work in module mode
+export GO111MODULE=on
 
 pushd "${_kubetmp}" > /dev/null 2>&1
   # Destroy deps in the copy of the kube tree

@@ -109,7 +109,6 @@ func rsListFromClient(c appsclient.AppsV1Interface) rsListFunc {
 
 // TODO: switch this to full namespacers
 type rsListFunc func(string, metav1.ListOptions) ([]*appsv1.ReplicaSet, error)
-type podListFunc func(string, metav1.ListOptions) (*corev1.PodList, error)
 
 // listReplicaSets returns a slice of RSes the given deployment targets.
 // Note that this does NOT attempt to reconcile ControllerRef (adopt/orphan),

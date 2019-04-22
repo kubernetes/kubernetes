@@ -47,17 +47,6 @@ var (
 	}
 )
 
-func csiContainerImage(image string) string {
-	var fullName string
-	fullName += *csiImageRegistry + "/" + image + ":"
-	if *csiImageVersion != "" {
-		fullName += *csiImageVersion
-	} else {
-		fullName += csiImageVersions[image]
-	}
-	return fullName
-}
-
 func shredFile(filePath string) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		framework.Logf("File %v was not found, skipping shredding", filePath)

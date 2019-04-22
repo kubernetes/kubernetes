@@ -18,11 +18,15 @@ package apiserver
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
@@ -99,10 +103,12 @@ func TestSync(t *testing.T) {
 	tests := []struct {
 		name string
 
-		apiServiceName       string
-		apiServices          []*apiregistration.APIService
-		services             []*v1.Service
-		endpoints            []*v1.Endpoints
+		apiServiceName     string
+		apiServices        []*apiregistration.APIService
+		services           []*v1.Service
+		endpoints          []*v1.Endpoints
+		forceDiscoveryFail bool
+
 		expectedAvailability apiregistration.APIServiceCondition
 	}{
 		{
@@ -200,64 +206,95 @@ func TestSync(t *testing.T) {
 				Message: `all checks passed`,
 			},
 		},
+		{
+			name:               "remote-bad-return",
+			apiServiceName:     "remote.group",
+			apiServices:        []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services:           []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:          []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			forceDiscoveryFail: true,
+			expectedAvailability: apiregistration.APIServiceCondition{
+				Type:    apiregistration.Available,
+				Status:  apiregistration.ConditionFalse,
+				Reason:  "FailedDiscoveryCheck",
+				Message: `failing or missing response from`,
+			},
+		},
 	}
 
 	for _, tc := range tests {
-		fakeClient := fake.NewSimpleClientset()
-		apiServiceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-		serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-		endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-		for _, obj := range tc.apiServices {
-			apiServiceIndexer.Add(obj)
-		}
-		for _, obj := range tc.services {
-			serviceIndexer.Add(obj)
-		}
-		for _, obj := range tc.endpoints {
-			endpointsIndexer.Add(obj)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset()
+			apiServiceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			for _, obj := range tc.apiServices {
+				apiServiceIndexer.Add(obj)
+			}
+			for _, obj := range tc.services {
+				serviceIndexer.Add(obj)
+			}
+			for _, obj := range tc.endpoints {
+				endpointsIndexer.Add(obj)
+			}
 
-		c := AvailableConditionController{
-			apiServiceClient: fakeClient.Apiregistration(),
-			apiServiceLister: listers.NewAPIServiceLister(apiServiceIndexer),
-			serviceLister:    v1listers.NewServiceLister(serviceIndexer),
-			endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
-		}
-		c.sync(tc.apiServiceName)
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !tc.forceDiscoveryFail {
+					w.WriteHeader(http.StatusOK)
+				}
+				w.WriteHeader(http.StatusForbidden)
+			}))
+			defer testServer.Close()
 
-		// ought to have one action writing status
-		if e, a := 1, len(fakeClient.Actions()); e != a {
-			t.Errorf("%v expected %v, got %v", tc.name, e, fakeClient.Actions())
-			continue
-		}
+			c := AvailableConditionController{
+				apiServiceClient: fakeClient.Apiregistration(),
+				apiServiceLister: listers.NewAPIServiceLister(apiServiceIndexer),
+				serviceLister:    v1listers.NewServiceLister(serviceIndexer),
+				endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
+				discoveryClient:  testServer.Client(),
+				serviceResolver:  &fakeServiceResolver{url: testServer.URL},
+			}
+			c.sync(tc.apiServiceName)
 
-		action, ok := fakeClient.Actions()[0].(clienttesting.UpdateAction)
-		if !ok {
-			t.Errorf("%v got %v", tc.name, ok)
-			continue
-		}
+			// ought to have one action writing status
+			if e, a := 1, len(fakeClient.Actions()); e != a {
+				t.Fatalf("%v expected %v, got %v", tc.name, e, fakeClient.Actions())
+			}
 
-		if e, a := 1, len(action.GetObject().(*apiregistration.APIService).Status.Conditions); e != a {
-			t.Errorf("%v expected %v, got %v", tc.name, e, action.GetObject())
-			continue
-		}
-		condition := action.GetObject().(*apiregistration.APIService).Status.Conditions[0]
-		if e, a := tc.expectedAvailability.Type, condition.Type; e != a {
-			t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
-		}
-		if e, a := tc.expectedAvailability.Status, condition.Status; e != a {
-			t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
-		}
-		if e, a := tc.expectedAvailability.Reason, condition.Reason; e != a {
-			t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
-		}
-		if e, a := tc.expectedAvailability.Message, condition.Message; e != a {
-			t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
-		}
-		if condition.LastTransitionTime.IsZero() {
-			t.Error("expected lastTransitionTime to be non-zero")
-		}
+			action, ok := fakeClient.Actions()[0].(clienttesting.UpdateAction)
+			if !ok {
+				t.Fatalf("%v got %v", tc.name, ok)
+			}
+
+			if e, a := 1, len(action.GetObject().(*apiregistration.APIService).Status.Conditions); e != a {
+				t.Fatalf("%v expected %v, got %v", tc.name, e, action.GetObject())
+			}
+			condition := action.GetObject().(*apiregistration.APIService).Status.Conditions[0]
+			if e, a := tc.expectedAvailability.Type, condition.Type; e != a {
+				t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
+			}
+			if e, a := tc.expectedAvailability.Status, condition.Status; e != a {
+				t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
+			}
+			if e, a := tc.expectedAvailability.Reason, condition.Reason; e != a {
+				t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
+			}
+			if e, a := tc.expectedAvailability.Message, condition.Message; !strings.HasPrefix(a, e) {
+				t.Errorf("%v expected %v, got %#v", tc.name, e, condition)
+			}
+			if condition.LastTransitionTime.IsZero() {
+				t.Error("expected lastTransitionTime to be non-zero")
+			}
+		})
 	}
+}
+
+type fakeServiceResolver struct {
+	url string
+}
+
+func (f *fakeServiceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	return url.Parse(f.url)
 }
 
 func TestUpdateAPIServiceStatus(t *testing.T) {

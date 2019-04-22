@@ -94,7 +94,7 @@ else
     echo 'checking by adding it to hack/.golint_failures (if your reviewer is okay with it).'
     echo
   } >&2
-  false
+  exit 1
 fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
@@ -106,7 +106,7 @@ if [[ ${#not_failing[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi
 
 if [[ ${#gone[@]} -gt 0 ]]; then
@@ -118,5 +118,5 @@ if [[ ${#gone[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi

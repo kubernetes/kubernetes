@@ -10,9 +10,13 @@ The pods are created individually (i.e. not with a replication controller).
 * The program verifies that every pod (and thus every node) responded to at least one query (the average should be about *Q*).
 * The time taken to perform various operations is reported and some operations are re-tried if they failed.
 
-Here is some representative output.
+Run the following command:
+```sh
+./serve_hostnames
 ```
-$ ./serve_hostnames
+
+Here is some representative output:
+```
 I0326 14:21:04.179893   11434 serve_hostnames.go:60] Starting serve_hostnames soak test with queries=10 and podsPerNode=1 upTo=1
 I0326 14:21:04.507252   11434 serve_hostnames.go:85] Nodes found on this cluster:
 I0326 14:21:04.507282   11434 serve_hostnames.go:87] 0: kubernetes-node-5h4m.c.kubernetes-satnam.internal
@@ -41,8 +45,12 @@ Notice that in this run the pod (number 0) running on node 3 did not respond to 
 
 The number of iterations to perform for issuing queries can be changed from the default of 1 to some higher value e.g. `--up_to=3` and the number of pods per node can also be changed e.g. `--pods_per_node=2`:
 
+```sh
+./serve_hostnames --up_to=3 --pods_per_node=2
 ```
-$ ./serve_hostnames --up_to=3 --pods_per_node=2
+
+The output is similar to this:
+```
 I0326 14:27:27.584378   11808 serve_hostnames.go:60] Starting serve_hostnames soak test with queries=10 and podsPerNode=2 upTo=3
 I0326 14:27:27.913713   11808 serve_hostnames.go:85] Nodes found on this cluster:
 I0326 14:27:27.913774   11808 serve_hostnames.go:87] 0: kubernetes-node-5h4m.c.kubernetes-satnam.internal
@@ -94,8 +102,13 @@ A more detailed report can be produced with `--v=4` which measures the time take
 and it also reports the distribution of responses received from the pods. In the example below
 we see that the pod on node 0 returned 18 responses, the pod on node 1 returned 10 responses and the
 pod on node 3 returned 12 responses and the pod on node 2 did not respond at all.
+
+```sh
+./serve_hostnames --v=4
 ```
-$ ./serve_hostnames --v=4
+
+The output is similar to this:
+```
 I0326 14:33:26.020917   12099 serve_hostnames.go:60] Starting serve_hostnames soak test with queries=10 and podsPerNode=1 upTo=1
 I0326 14:33:26.365201   12099 serve_hostnames.go:85] Nodes found on this cluster:
 I0326 14:33:26.365260   12099 serve_hostnames.go:87] 0: kubernetes-node-5h4m.c.kubernetes-satnam.internal

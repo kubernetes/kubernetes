@@ -494,7 +494,7 @@ func genBinDataFromSeed(len int, seed int64) []byte {
 
 	len, err := rand.Read(binData)
 	if err != nil {
-		fmt.Printf("Error: %v", err)
+		fmt.Printf("Error: %v\n", err)
 	}
 
 	return binData

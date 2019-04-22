@@ -671,7 +671,7 @@ function start_cloud_controller_manager {
     ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/hyperkube" cloud-controller-manager}" \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
-      "${node_cidr_args[@]}" \
+      "${node_cidr_args[@]:-}" \
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \

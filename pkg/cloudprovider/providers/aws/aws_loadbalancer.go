@@ -1098,59 +1098,14 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 		}
 
 		{
-			// Sync listeners
-			listenerDescriptions := loadBalancer.ListenerDescriptions
-
-			foundSet := make(map[int]bool)
-			removals := []*int64{}
-			for _, listenerDescription := range listenerDescriptions {
-				actual := listenerDescription.Listener
-				if actual == nil {
-					klog.Warning("Ignoring empty listener in AWS loadbalancer: ", loadBalancerName)
-					continue
-				}
-
-				found := -1
-				for i, expected := range listeners {
-					if !elbProtocolsAreEqual(actual.Protocol, expected.Protocol) {
-						continue
-					}
-					if !elbProtocolsAreEqual(actual.InstanceProtocol, expected.InstanceProtocol) {
-						continue
-					}
-					if aws.Int64Value(actual.InstancePort) != aws.Int64Value(expected.InstancePort) {
-						continue
-					}
-					if aws.Int64Value(actual.LoadBalancerPort) != aws.Int64Value(expected.LoadBalancerPort) {
-						continue
-					}
-					if !awsArnEquals(actual.SSLCertificateId, expected.SSLCertificateId) {
-						continue
-					}
-					found = i
-				}
-				if found != -1 {
-					foundSet[found] = true
-				} else {
-					removals = append(removals, actual.LoadBalancerPort)
-				}
-			}
-
-			additions := []*elb.Listener{}
-			for i := range listeners {
-				if foundSet[i] {
-					continue
-				}
-				additions = append(additions, listeners[i])
-			}
+			additions, removals := syncElbListeners(loadBalancerName, listeners, loadBalancer.ListenerDescriptions)
 
 			if len(removals) != 0 {
 				request := &elb.DeleteLoadBalancerListenersInput{}
 				request.LoadBalancerName = aws.String(loadBalancerName)
 				request.LoadBalancerPorts = removals
 				klog.V(2).Info("Deleting removed load balancer listeners")
-				_, err := c.elb.DeleteLoadBalancerListeners(request)
-				if err != nil {
+				if _, err := c.elb.DeleteLoadBalancerListeners(request); err != nil {
 					return nil, fmt.Errorf("error deleting AWS loadbalancer listeners: %q", err)
 				}
 				dirty = true
@@ -1161,8 +1116,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				request.LoadBalancerName = aws.String(loadBalancerName)
 				request.Listeners = additions
 				klog.V(2).Info("Creating added load balancer listeners")
-				_, err := c.elb.CreateLoadBalancerListeners(request)
-				if err != nil {
+				if _, err := c.elb.CreateLoadBalancerListeners(request); err != nil {
 					return nil, fmt.Errorf("error creating AWS loadbalancer listeners: %q", err)
 				}
 				dirty = true
@@ -1287,6 +1241,68 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 	}
 
 	return loadBalancer, nil
+}
+
+// syncElbListeners computes a plan to reconcile the desired vs actual state of the listeners on an ELB
+// NOTE: there exists an O(nlgn) implementation for this function. However, as the default limit of
+//       listeners per elb is 100, this implementation is reduced from O(m*n) => O(n).
+func syncElbListeners(loadBalancerName string, listeners []*elb.Listener, listenerDescriptions []*elb.ListenerDescription) ([]*elb.Listener, []*int64) {
+	foundSet := make(map[int]bool)
+	removals := []*int64{}
+	additions := []*elb.Listener{}
+
+	for _, listenerDescription := range listenerDescriptions {
+		actual := listenerDescription.Listener
+		if actual == nil {
+			klog.Warning("Ignoring empty listener in AWS loadbalancer: ", loadBalancerName)
+			continue
+		}
+
+		found := false
+		for i, expected := range listeners {
+			if expected == nil {
+				klog.Warning("Ignoring empty desired listener for loadbalancer: ", loadBalancerName)
+				continue
+			}
+			if elbListenersAreEqual(actual, expected) {
+				// The current listener on the actual
+				// elb is in the set of desired listeners.
+				foundSet[i] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			removals = append(removals, actual.LoadBalancerPort)
+		}
+	}
+
+	for i := range listeners {
+		if !foundSet[i] {
+			additions = append(additions, listeners[i])
+		}
+	}
+
+	return additions, removals
+}
+
+func elbListenersAreEqual(actual, expected *elb.Listener) bool {
+	if !elbProtocolsAreEqual(actual.Protocol, expected.Protocol) {
+		return false
+	}
+	if !elbProtocolsAreEqual(actual.InstanceProtocol, expected.InstanceProtocol) {
+		return false
+	}
+	if aws.Int64Value(actual.InstancePort) != aws.Int64Value(expected.InstancePort) {
+		return false
+	}
+	if aws.Int64Value(actual.LoadBalancerPort) != aws.Int64Value(expected.LoadBalancerPort) {
+		return false
+	}
+	if !awsArnEquals(actual.SSLCertificateId, expected.SSLCertificateId) {
+		return false
+	}
+	return true
 }
 
 func createSubnetMappings(subnetIDs []string) []*elbv2.SubnetMapping {

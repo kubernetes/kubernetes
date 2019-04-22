@@ -17,15 +17,12 @@ limitations under the License.
 package apiserver
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
-	"k8s.io/klog"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,9 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
-
+	"k8s.io/klog"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
@@ -81,8 +80,10 @@ func NewAvailableConditionController(
 	endpointsInformer v1informers.EndpointsInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
 	proxyTransport *http.Transport,
+	proxyClientCert []byte,
+	proxyClientKey []byte,
 	serviceResolver ServiceResolver,
-) *AvailableConditionController {
+) (*AvailableConditionController, error) {
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
 		apiServiceLister: apiServiceInformer.Lister(),
@@ -100,19 +101,28 @@ func NewAvailableConditionController(
 			"AvailableConditionController"),
 	}
 
+	// if a particular transport was specified, use that otherwise build one
 	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
-	// that's not so bad) and sets a very short timeout.
-	discoveryClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
+	restConfig := &rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: true,
+			CertData: proxyClientCert,
+			KeyData:  proxyClientKey,
 		},
+	}
+	if proxyTransport != nil && proxyTransport.DialContext != nil {
+		restConfig.Dial = proxyTransport.DialContext
+	}
+	transport, err := rest.TransportFor(restConfig)
+	if err != nil {
+		return nil, err
+	}
+	c.discoveryClient = &http.Client{
+		Transport: transport,
 		// the request should happen quickly.
 		Timeout: 5 * time.Second,
 	}
-	if proxyTransport != nil {
-		discoveryClient.Transport = proxyTransport
-	}
-	c.discoveryClient = discoveryClient
 
 	// resync on this one because it is low cardinality and rechecking the actual discovery
 	// allows us to detect health in a more timely fashion when network connectivity to
@@ -140,7 +150,7 @@ func NewAvailableConditionController(
 
 	c.syncFn = c.sync
 
-	return c
+	return c, nil
 }
 
 func (c *AvailableConditionController) sync(key string) error {
@@ -254,17 +264,31 @@ func (c *AvailableConditionController) sync(key string) error {
 
 				errCh := make(chan error)
 				go func() {
-					resp, err := c.discoveryClient.Get(discoveryURL.String())
+					newReq, err := http.NewRequest("GET", discoveryURL.String(), nil)
+					if err != nil {
+						errCh <- err
+						return
+					}
+
+					// setting the system-masters identity ensures that we will always have access rights
+					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", []string{"system:masters"}, nil)
+					resp, err := c.discoveryClient.Do(newReq)
 					if resp != nil {
 						resp.Body.Close()
+						// we should always been in the 200s or 300s
+						if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+							errCh <- fmt.Errorf("bad status from %v: %v", discoveryURL, resp.StatusCode)
+							return
+						}
 					}
+
 					errCh <- err
 				}()
 
 				select {
 				case err = <-errCh:
 					if err != nil {
-						results <- fmt.Errorf("no response from %v: %v", discoveryURL, err)
+						results <- fmt.Errorf("failing or missing response from %v: %v", discoveryURL, err)
 						return
 					}
 

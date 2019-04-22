@@ -196,6 +196,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 }
 
+// NewOptions returns initialized Options
 func NewOptions() *Options {
 	return &Options{
 		config:      new(kubeproxyconfig.KubeProxyConfiguration),
@@ -218,11 +219,11 @@ func (o *Options) Complete() error {
 
 	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
 	if len(o.ConfigFile) > 0 {
-		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
+		c, err := o.loadConfigFromFile(o.ConfigFile)
+		if err != nil {
 			return err
-		} else {
-			o.config = c
 		}
+		o.config = c
 
 		if err := o.initWatcher(); err != nil {
 			return err
@@ -295,6 +296,7 @@ func (o *Options) Validate(args []string) error {
 	return nil
 }
 
+// Run runs the specified ProxyServer.
 func (o *Options) Run() error {
 	defer close(o.errCh)
 	if len(o.WriteConfigTo) > 0 {
@@ -415,6 +417,7 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 	return proxyConfig, nil
 }
 
+// ApplyDefaults applies the default values to Options.
 func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
@@ -501,8 +504,6 @@ type ProxyServer struct {
 	OOMScoreAdj            *int32
 	ResourceContainer      string
 	ConfigSyncPeriod       time.Duration
-	ServiceEventHandler    config.ServiceHandler
-	EndpointsEventHandler  config.EndpointsHandler
 	HealthzServer          *healthcheck.HealthzServer
 }
 
@@ -657,11 +658,11 @@ func (s *ProxyServer) Run() error {
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
 	serviceConfig := config.NewServiceConfig(informerFactory.Core().V1().Services(), s.ConfigSyncPeriod)
-	serviceConfig.RegisterEventHandler(s.ServiceEventHandler)
+	serviceConfig.RegisterEventHandler(s.Proxier)
 	go serviceConfig.Run(wait.NeverStop)
 
 	endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().V1().Endpoints(), s.ConfigSyncPeriod)
-	endpointsConfig.RegisterEventHandler(s.EndpointsEventHandler)
+	endpointsConfig.RegisterEventHandler(s.Proxier)
 	go endpointsConfig.Run(wait.NeverStop)
 
 	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those

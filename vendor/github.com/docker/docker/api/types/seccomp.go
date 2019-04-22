@@ -77,8 +77,9 @@ type Arg struct {
 
 // Filter is used to conditionally apply Seccomp rules
 type Filter struct {
-	Caps   []string `json:"caps,omitempty"`
-	Arches []string `json:"arches,omitempty"`
+	Caps      []string `json:"caps,omitempty"`
+	Arches    []string `json:"arches,omitempty"`
+	MinKernel string   `json:"minKernel,omitempty"`
 }
 
 // Syscall is used to match a group of syscalls in Seccomp

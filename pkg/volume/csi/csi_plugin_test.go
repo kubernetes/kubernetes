@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -84,42 +83,6 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	}
 
 	return csiPlug, tmpDir
-}
-
-func makeTestPV(name string, sizeGig int, driverName, volID string) *api.PersistentVolume {
-	return &api.PersistentVolume{
-		ObjectMeta: meta.ObjectMeta{
-			Name: name,
-		},
-		Spec: api.PersistentVolumeSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse(
-					fmt.Sprintf("%dGi", sizeGig),
-				),
-			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				CSI: &api.CSIPersistentVolumeSource{
-					Driver:       driverName,
-					VolumeHandle: volID,
-					ReadOnly:     false,
-				},
-			},
-		},
-	}
-}
-
-func makeTestVol(name string, driverName string) *api.Volume {
-	ro := false
-	return &api.Volume{
-		Name: name,
-		VolumeSource: api.VolumeSource{
-			CSI: &api.CSIVolumeSource{
-				Driver:   driverName,
-				ReadOnly: &ro,
-			},
-		},
-	}
 }
 
 func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
@@ -910,7 +873,7 @@ func TestPluginCanAttach(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		csiDriver := getCSIDriver(test.driverName, nil, &test.canAttach)
+		csiDriver := getTestCSIDriver(test.driverName, nil, &test.canAttach)
 		t.Run(test.name, func(t *testing.T) {
 			fakeCSIClient := fakeclient.NewSimpleClientset(csiDriver)
 			plug, tmpDir := newTestPlugin(t, fakeCSIClient)
@@ -971,7 +934,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			client := fakeclient.NewSimpleClientset(getCSIDriver(test.driverName, nil, &test.canAttach))
+			client := fakeclient.NewSimpleClientset(getTestCSIDriver(test.driverName, nil, &test.canAttach))
 			factory := informers.NewSharedInformerFactory(client, csiResyncPeriod)
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(
 				tmpDir,
@@ -990,6 +953,118 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 			}
 			if (plugin != nil) != test.canAttach {
 				t.Fatal("expecting attachable plugin, but got nil")
+			}
+		})
+	}
+}
+
+func TestPluginCanDeviceMount(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	tests := []struct {
+		name           string
+		driverName     string
+		spec           *volume.Spec
+		canDeviceMount bool
+		shouldFail     bool
+	}{
+		{
+			name:           "non device mountable inline",
+			driverName:     "inline-driver",
+			spec:           volume.NewSpecFromVolume(makeTestVol("test-vol", "inline-driver")),
+			canDeviceMount: false,
+		},
+		{
+			name:           "device mountable PV",
+			driverName:     "device-mountable-pv",
+			spec:           volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "device-mountable-pv", testVol), true),
+			canDeviceMount: true,
+		},
+		{
+			name:           "incomplete spec",
+			driverName:     "device-unmountable",
+			spec:           &volume.Spec{ReadOnly: true},
+			canDeviceMount: false,
+			shouldFail:     true,
+		},
+		{
+			name:           "missing spec",
+			driverName:     "device-unmountable",
+			canDeviceMount: false,
+			shouldFail:     true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plug, tmpDir := newTestPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+
+			pluginCanDeviceMount, err := plug.CanDeviceMount(test.spec)
+			if err != nil && !test.shouldFail {
+				t.Fatalf("unexpected error in plug.CanDeviceMount: %s", err)
+			}
+			if pluginCanDeviceMount != test.canDeviceMount {
+				t.Fatalf("expecting plugin.CanAttach %t got %t", test.canDeviceMount, pluginCanDeviceMount)
+			}
+		})
+	}
+}
+
+func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	tests := []struct {
+		name           string
+		driverName     string
+		spec           *volume.Spec
+		canDeviceMount bool
+		shouldFail     bool
+	}{
+		{
+			name:           "non device mountable inline",
+			driverName:     "inline-driver",
+			spec:           volume.NewSpecFromVolume(makeTestVol("test-vol", "inline-driver")),
+			canDeviceMount: false,
+		},
+		{
+			name:           "device mountable PV",
+			driverName:     "device-mountable-pv",
+			spec:           volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "device-mountable-pv", testVol), true),
+			canDeviceMount: true,
+		},
+		{
+			name:           "incomplete spec",
+			driverName:     "device-unmountable",
+			spec:           &volume.Spec{ReadOnly: true},
+			canDeviceMount: false,
+			shouldFail:     true,
+		},
+		{
+			name:           "missing spec",
+			driverName:     "device-unmountable",
+			canDeviceMount: false,
+			shouldFail:     true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tmpDir, err := utiltesting.MkTmpdir("csi-test")
+			if err != nil {
+				t.Fatalf("can't create temp dir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			client := fakeclient.NewSimpleClientset()
+			host := volumetest.NewFakeVolumeHost(tmpDir, client, nil)
+			plugMgr := &volume.VolumePluginMgr{}
+			plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+
+			plug, err := plugMgr.FindDeviceMountablePluginBySpec(test.spec)
+			if err != nil && !test.shouldFail {
+				t.Fatalf("unexpected error in plugMgr.FindDeviceMountablePluginBySpec: %s", err)
+			}
+			if (plug != nil) != test.canDeviceMount {
+				t.Fatalf("expecting deviceMountablePlugin, but got nil")
 			}
 		})
 	}

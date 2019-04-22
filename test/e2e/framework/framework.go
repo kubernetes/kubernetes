@@ -46,7 +46,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -75,8 +74,7 @@ type Framework struct {
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
 
-	AggregatorClient *aggregatorclient.Clientset
-	DynamicClient    dynamic.Interface
+	DynamicClient dynamic.Interface
 
 	ScalesGetter scaleclient.ScalesGetter
 
@@ -181,8 +179,6 @@ func (f *Framework) BeforeEach() {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
 		f.ClientSet, err = clientset.NewForConfig(config)
-		ExpectNoError(err)
-		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
 		ExpectNoError(err)
 		f.DynamicClient, err = dynamic.NewForConfig(config)
 		ExpectNoError(err)

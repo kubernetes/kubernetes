@@ -17,7 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -66,12 +65,6 @@ func getValidPodTemplateSpecForGenerated(selector *metav1.LabelSelector) api.Pod
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 		},
 	}
-}
-
-func featureToggle(feature utilfeature.Feature) []string {
-	enabled := fmt.Sprintf("%s=%t", feature, true)
-	disabled := fmt.Sprintf("%s=%t", feature, false)
-	return []string{enabled, disabled}
 }
 
 func TestValidateJob(t *testing.T) {

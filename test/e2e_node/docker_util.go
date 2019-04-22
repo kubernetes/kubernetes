@@ -53,16 +53,6 @@ func isSharedPIDNamespaceSupported() (bool, error) {
 	return version.GTE(semver.MustParse("1.26.0")), nil
 }
 
-// isDockerNoNewPrivilegesSupported returns true if Docker version is 1.11+
-// (API version 1.23+), and false otherwise.
-func isDockerNoNewPrivilegesSupported() (bool, error) {
-	version, err := getDockerAPIVersion()
-	if err != nil {
-		return false, err
-	}
-	return version.GTE(semver.MustParse("1.23.0")), nil
-}
-
 // isDockerLiveRestoreSupported returns true if live-restore is supported in
 // the current Docker version.
 func isDockerLiveRestoreSupported() (bool, error) {

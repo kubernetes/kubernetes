@@ -318,7 +318,7 @@ func translateStubDomainOfKubeDNSToForwardCoreDNS(dataField string, kubeDNSConfi
 				return "", errors.Wrap(err, "invalid format to parse for proxy")
 			}
 			if len(proxyIP) == 0 {
-				break
+				continue
 			}
 
 			pStanza := map[string]interface{}{}
