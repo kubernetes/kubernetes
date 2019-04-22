@@ -99,7 +99,6 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-
 	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
 
 	// Write the bootstrap kubelet config file or the TLS-Bootstrapped kubelet config file down to disk

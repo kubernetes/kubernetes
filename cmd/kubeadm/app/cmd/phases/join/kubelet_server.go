@@ -39,7 +39,8 @@ func NewKubeletServerCertAndKey() workflow.Phase {
 	}
 }
 
-// runKubeletStart executes kubelet start logic.
+// kubeletServerCerts generates kubelet server certs, update kubelet addtional flags file
+// and restart kubelet with new params
 func kubeletServerCerts(c workflow.RunData) error {
 	fmt.Println("[kubelet-server] Generate kubelet server certificates")
 	data, ok := c.(JoinData)
@@ -84,6 +85,7 @@ func kubeletServerCerts(c workflow.RunData) error {
 	fmt.Println("[kubelet-server] Stopping the kubelet")
 	kubeletphase.TryStopKubelet()
 
+	// New config will have kubelet server key and cert
 	registerTaintsUsingFlags := data.Cfg().ControlPlane == nil
 	if err := kubeletphase.WriteKubeletDynamicEnvFile(&initCfg.ClusterConfiguration, &initCfg.NodeRegistration, registerTaintsUsingFlags, kubeadmconstants.KubeletRunDirectory); err != nil {
 		return err
