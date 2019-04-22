@@ -670,7 +670,9 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pod.Namespace)
 		if pod.Spec.Priority != nil {
 			w.Write(LEVEL_0, "Priority:\t%d\n", *pod.Spec.Priority)
-			w.Write(LEVEL_0, "PriorityClassName:\t%s\n", stringOrNone(pod.Spec.PriorityClassName))
+		}
+		if len(pod.Spec.PriorityClassName) > 0 {
+			w.Write(LEVEL_0, "Priority Class Name:\t%s\n", stringOrNone(pod.Spec.PriorityClassName))
 		}
 		if pod.Spec.NodeName == "" {
 			w.Write(LEVEL_0, "Node:\t<none>\n")
@@ -734,9 +736,6 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "QoS Class:\t%s\n", pod.Status.QOSClass)
 		} else {
 			w.Write(LEVEL_0, "QoS Class:\t%s\n", qos.GetPodQOS(pod))
-		}
-		if len(pod.Spec.PriorityClassName) > 0 {
-			w.Write(LEVEL_0, "Priority Class Name:\t%s\n", pod.Spec.PriorityClassName)
 		}
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
