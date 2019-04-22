@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -707,127 +708,88 @@ func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 	Expect(err).NotTo(HaveOccurred())
 }
 
-type HTTPPokeParams struct {
-	Timeout        time.Duration
-	ExpectCode     int // default = 200
-	BodyContains   string
-	RetriableCodes []int
+// Does an HTTP GET, but does not reuse TCP connections
+// This masks problems where the iptables rule has changed, but we don't see it
+// This is intended for relatively quick requests (status checks), so we set a short (5 seconds) timeout
+func httpGetNoConnectionPool(url string) (*http.Response, error) {
+	return httpGetNoConnectionPoolTimeout(url, 5*time.Second)
 }
 
-type HTTPPokeResult struct {
-	Status HTTPPokeStatus
-	Code   int    // HTTP code: 0 if the connection was not made
-	Error  error  // if there was any error
-	Body   []byte // if code != 0
+func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Response, error) {
+	tr := utilnet.SetTransportDefaults(&http.Transport{
+		DisableKeepAlives: true,
+	})
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   timeout,
+	}
+
+	return client.Get(url)
 }
 
-type HTTPPokeStatus string
+func TestReachableHTTP(ip string, port int, request string, expect string) (bool, error) {
+	return TestReachableHTTPWithContent(ip, port, request, expect, nil)
+}
 
-const (
-	HTTPSuccess HTTPPokeStatus = "Success"
-	HTTPError   HTTPPokeStatus = "UnknownError"
-	// Any time we add new errors, we should audit all callers of this.
-	HTTPTimeout     HTTPPokeStatus = "TimedOut"
-	HTTPRefused     HTTPPokeStatus = "ConnectionRefused"
-	HTTPRetryCode   HTTPPokeStatus = "RetryCode"
-	HTTPWrongCode   HTTPPokeStatus = "WrongCode"
-	HTTPBadResponse HTTPPokeStatus = "BadResponse"
-)
+func TestReachableHTTPWithRetriableErrorCodes(ip string, port int, request string, expect string, retriableErrCodes []int) (bool, error) {
+	return TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip, port, request, expect, nil, retriableErrCodes, time.Second*5)
+}
 
-// PokeHTTP tries to connect to a host on a port for a given URL path.  Callers
-// can specify additional success parameters, if desired.
-//
-// The result status will be characterized as precisely as possible, given the
-// known users of this.
-//
-// The result code will be zero in case of any failure to connect, or non-zero
-// if the HTTP transaction completed (even if the other test params make this a
-// failure).
-//
-// The result error will be populated for any status other than Success.
-//
-// The result body will be populated if the HTTP transaction was completed, even
-// if the other test params make this a failure).
-func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPokeResult {
-	hostPort := net.JoinHostPort(host, strconv.Itoa(port))
-	url := fmt.Sprintf("http://%s%s", hostPort, path)
+func TestReachableHTTPWithContent(ip string, port int, request string, expect string, content *bytes.Buffer) (bool, error) {
+	return TestReachableHTTPWithContentTimeout(ip, port, request, expect, content, 5*time.Second)
+}
 
-	ret := HTTPPokeResult{}
+func TestReachableHTTPWithContentTimeout(ip string, port int, request string, expect string, content *bytes.Buffer, timeout time.Duration) (bool, error) {
+	return TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip, port, request, expect, content, []int{}, timeout)
+}
 
-	// Sanity check inputs, because it has happened.  These are the only things
-	// that should hard fail the test - they are basically ASSERT()s.
-	if host == "" {
-		Failf("Got empty host for HTTP poke (%s)", url)
-		return ret
+func TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip string, port int, request string, expect string, content *bytes.Buffer, retriableErrCodes []int, timeout time.Duration) (bool, error) {
+
+	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
+	url := fmt.Sprintf("http://%s%s", ipPort, request)
+	if ip == "" {
+		Failf("Got empty IP for reachability check (%s)", url)
+		return false, nil
 	}
 	if port == 0 {
-		Failf("Got port==0 for HTTP poke (%s)", url)
-		return ret
+		Failf("Got port==0 for reachability check (%s)", url)
+		return false, nil
 	}
 
-	// Set default params.
-	if params == nil {
-		params = &HTTPPokeParams{}
-	}
-	if params.ExpectCode == 0 {
-		params.ExpectCode = http.StatusOK
-	}
+	Logf("Testing HTTP reachability of %v", url)
 
-	Logf("Poking %q", url)
-
-	resp, err := httpGetNoConnectionPoolTimeout(url, params.Timeout)
+	resp, err := httpGetNoConnectionPoolTimeout(url, timeout)
 	if err != nil {
-		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
-			ret.Status = HTTPTimeout
-		} else if strings.Contains(err.Error(), "connection refused") {
-			ret.Status = HTTPRefused
-		} else {
-			ret.Status = HTTPError
-		}
-		Logf("Poke(%q): %v", url, err)
-		return ret
+		Logf("Got error testing for reachability of %s: %v", url, err)
+		return false, nil
 	}
-
-	ret.Code = resp.StatusCode
-
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		ret.Status = HTTPError
-		ret.Error = fmt.Errorf("error reading HTTP body: %v", err)
-		Logf("Poke(%q): %v", url, ret.Error)
-		return ret
+		Logf("Got error reading response from %s: %v", url, err)
+		return false, nil
 	}
-	ret.Body = make([]byte, len(body))
-	copy(ret.Body, body)
-
-	if resp.StatusCode != params.ExpectCode {
-		for _, code := range params.RetriableCodes {
+	if resp.StatusCode != 200 {
+		for _, code := range retriableErrCodes {
 			if resp.StatusCode == code {
-				ret.Error = fmt.Errorf("retriable status code: %d", resp.StatusCode)
-				ret.Status = HTTPRetryCode
-				Logf("Poke(%q): %v", url, ret.Error)
-				return ret
+				Logf("Got non-success status %q when trying to access %s, but the error code is retriable", resp.Status, url)
+				return false, nil
 			}
 		}
-		ret.Status = HTTPWrongCode
-		ret.Error = fmt.Errorf("bad status code: %d", resp.StatusCode)
-		Logf("Poke(%q): %v", url, ret.Error)
-		return ret
+		return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s",
+			resp.Status, url, string(body))
 	}
-
-	if params.BodyContains != "" && !strings.Contains(string(body), params.BodyContains) {
-		ret.Status = HTTPBadResponse
-		ret.Error = fmt.Errorf("response does not contain expected substring: %q", string(body))
-		Logf("Poke(%q): %v", url, ret.Error)
-		return ret
+	if !strings.Contains(string(body), expect) {
+		return false, fmt.Errorf("received response body without expected substring %q: %s", expect, string(body))
 	}
+	if content != nil {
+		content.Write(body)
+	}
+	return true, nil
+}
 
-	ret.Status = HTTPSuccess
-	Logf("Poke(%q): success", url)
-	return ret
+func TestNotReachableHTTP(ip string, port int) (bool, error) {
+	return TestNotReachableHTTPTimeout(ip, port, 5*time.Second)
 }
 
 func TestNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) (bool, error) {
@@ -853,140 +815,90 @@ func TestNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) (bo
 	return false, nil
 }
 
-// Does an HTTP GET, but does not reuse TCP connections
-// This masks problems where the iptables rule has changed, but we don't see it
-func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Response, error) {
-	tr := utilnet.SetTransportDefaults(&http.Transport{
-		DisableKeepAlives: true,
-	})
-	client := &http.Client{
-		Transport: tr,
-		Timeout:   timeout,
-	}
-
-	return client.Get(url)
-}
-
-type UDPPokeParams struct {
-	Timeout  time.Duration
-	Response string
-}
-
-type UDPPokeResult struct {
-	Status   UDPPokeStatus
-	Error    error  // if there was any error
-	Response []byte // if code != 0
-}
-
-type UDPPokeStatus string
-
-const (
-	UDPSuccess UDPPokeStatus = "Success"
-	UDPError   UDPPokeStatus = "UnknownError"
-	// Any time we add new errors, we should audit all callers of this.
-	UDPTimeout     UDPPokeStatus = "TimedOut"
-	UDPRefused     UDPPokeStatus = "ConnectionRefused"
-	UDPBadResponse UDPPokeStatus = "BadResponse"
-)
-
-// PokeUDP tries to connect to a host on a port and send the given request. Callers
-// can specify additional success parameters, if desired.
-//
-// The result status will be characterized as precisely as possible, given the
-// known users of this.
-//
-// The result error will be populated for any status other than Success.
-//
-// The result response will be populated if the UDP transaction was completed, even
-// if the other test params make this a failure).
-func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPokeResult {
-	hostPort := net.JoinHostPort(host, strconv.Itoa(port))
-	url := fmt.Sprintf("udp://%s", hostPort)
-
-	ret := UDPPokeResult{}
-
-	// Sanity check inputs, because it has happened.  These are the only things
-	// that should hard fail the test - they are basically ASSERT()s.
-	if host == "" {
-		Failf("Got empty host for UDP poke (%s)", url)
-		return ret
+func TestReachableUDP(ip string, port int, request string, expect string) (bool, error) {
+	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
+	uri := fmt.Sprintf("udp://%s", ipPort)
+	if ip == "" {
+		Failf("Got empty IP for reachability check (%s)", uri)
+		return false, nil
 	}
 	if port == 0 {
-		Failf("Got port==0 for UDP poke (%s)", url)
-		return ret
+		Failf("Got port==0 for reachability check (%s)", uri)
+		return false, nil
 	}
 
-	// Set default params.
-	if params == nil {
-		params = &UDPPokeParams{}
-	}
+	Logf("Testing UDP reachability of %v", uri)
 
-	Logf("Poking %v", url)
-
-	con, err := net.Dial("udp", hostPort)
+	con, err := net.Dial("udp", ipPort)
 	if err != nil {
-		ret.Status = UDPError
-		ret.Error = err
-		Logf("Poke(%q): %v", url, err)
-		return ret
+		return false, fmt.Errorf("Failed to dial %s: %v", ipPort, err)
 	}
 
 	_, err = con.Write([]byte(fmt.Sprintf("%s\n", request)))
 	if err != nil {
-		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
-			ret.Status = UDPTimeout
-		} else if strings.Contains(err.Error(), "connection refused") {
-			ret.Status = UDPRefused
-		} else {
-			ret.Status = UDPError
-		}
-		Logf("Poke(%q): %v", url, err)
-		return ret
+		return false, fmt.Errorf("Failed to send request: %v", err)
 	}
 
-	if params.Timeout != 0 {
-		err = con.SetDeadline(time.Now().Add(params.Timeout))
-		if err != nil {
-			ret.Status = UDPError
-			ret.Error = err
-			Logf("Poke(%q): %v", url, err)
-			return ret
-		}
-	}
+	var buf []byte = make([]byte, len(expect)+1)
 
-	bufsize := len(params.Response) + 1
-	if bufsize == 0 {
-		bufsize = 4096
-	}
-	var buf []byte = make([]byte, bufsize)
-	n, err := con.Read(buf)
+	err = con.SetDeadline(time.Now().Add(3 * time.Second))
 	if err != nil {
-		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
-			ret.Status = UDPTimeout
-		} else if strings.Contains(err.Error(), "connection refused") {
-			ret.Status = UDPRefused
-		} else {
-			ret.Status = UDPError
-		}
-		Logf("Poke(%q): %v", url, err)
-		return ret
-	}
-	ret.Response = buf[0:n]
-
-	if params.Response != "" && string(ret.Response) != params.Response {
-		ret.Status = UDPBadResponse
-		ret.Error = fmt.Errorf("response does not match expected string: %q", string(ret.Response))
-		Logf("Poke(%q): %v", url, ret.Error)
-		return ret
+		return false, fmt.Errorf("Failed to set deadline: %v", err)
 	}
 
-	ret.Status = UDPSuccess
-	Logf("Poke(%q): success", url)
-	return ret
+	_, err = con.Read(buf)
+	if err != nil {
+		return false, nil
+	}
+
+	if !strings.Contains(string(buf), expect) {
+		return false, fmt.Errorf("Failed to retrieve %q, got %q", expect, string(buf))
+	}
+
+	Logf("Successfully reached %v", uri)
+	return true, nil
+}
+
+func TestNotReachableUDP(ip string, port int, request string) (bool, error) {
+	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
+	uri := fmt.Sprintf("udp://%s", ipPort)
+	if ip == "" {
+		Failf("Got empty IP for reachability check (%s)", uri)
+		return false, nil
+	}
+	if port == 0 {
+		Failf("Got port==0 for reachability check (%s)", uri)
+		return false, nil
+	}
+
+	Logf("Testing UDP non-reachability of %v", uri)
+
+	con, err := net.Dial("udp", ipPort)
+	if err != nil {
+		Logf("Confirmed that %s is not reachable", uri)
+		return true, nil
+	}
+
+	_, err = con.Write([]byte(fmt.Sprintf("%s\n", request)))
+	if err != nil {
+		Logf("Confirmed that %s is not reachable", uri)
+		return true, nil
+	}
+
+	var buf []byte = make([]byte, 1)
+
+	err = con.SetDeadline(time.Now().Add(3 * time.Second))
+	if err != nil {
+		return false, fmt.Errorf("Failed to set deadline: %v", err)
+	}
+
+	_, err = con.Read(buf)
+	if err != nil {
+		Logf("Confirmed that %s is not reachable", uri)
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func TestHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String) error {
@@ -999,12 +911,13 @@ func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 	hittedHosts := sets.NewString()
 	count := 0
 	condition := func() (bool, error) {
-		result := PokeHTTP(externalIP, int(httpPort), "/hostname", &HTTPPokeParams{Timeout: 1 * time.Second})
-		if result.Status != HTTPSuccess {
+		var respBody bytes.Buffer
+		reached, err := TestReachableHTTPWithContentTimeout(externalIP, int(httpPort), "/hostname", "", &respBody,
+			1*time.Second)
+		if err != nil || !reached {
 			return false, nil
 		}
-
-		hittedHost := strings.TrimSpace(string(result.Body))
+		hittedHost := strings.TrimSpace(respBody.String())
 		if !expectedHosts.Has(hittedHost) {
 			Logf("Error hitting unexpected host: %v, reset counter: %v", hittedHost, count)
 			count = 0
