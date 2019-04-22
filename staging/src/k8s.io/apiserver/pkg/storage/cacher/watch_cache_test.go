@@ -158,6 +158,17 @@ func TestWatchCacheBasic(t *testing.T) {
 	}
 }
 
+func getCacheEvents(iter WatchCacheEventsIterator) (result []*watchCacheEvent) {
+	for {
+		event, ok := iter.Next()
+		if !ok {
+			break
+		}
+		result = append(result, event)
+	}
+	return
+}
+
 func TestEvents(t *testing.T) {
 	store := newTestWatchCache(5)
 
@@ -174,10 +185,11 @@ func TestEvents(t *testing.T) {
 		}
 	}
 	{
-		result, err := store.GetAllEventsSince(2)
+		iter, err := store.GetAllEventsSince(2)
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
+		result := getCacheEvents(iter)
 		if len(result) != 1 {
 			t.Fatalf("unexpected events: %v", result)
 		}
@@ -204,10 +216,11 @@ func TestEvents(t *testing.T) {
 		}
 	}
 	{
-		result, err := store.GetAllEventsSince(3)
+		iter, err := store.GetAllEventsSince(3)
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
+		result := getCacheEvents(iter)
 		if len(result) != 2 {
 			t.Fatalf("unexpected events: %v", result)
 		}
@@ -226,27 +239,58 @@ func TestEvents(t *testing.T) {
 		}
 	}
 
-	for i := 6; i < 10; i++ {
+	// 3-7, 8-12, 20
+	for i := 6; i < 13; i++ {
 		store.Update(makeTestPod("pod", uint64(i)))
 	}
+	store.Update(makeTestPod("pod", uint64(20)))
 
-	// Test with full cache - there should be elements from 5 to 9.
-	{
-		_, err := store.GetAllEventsSince(3)
-		if err == nil {
-			t.Errorf("expected error too old")
-		}
+	// Test with full events - there should be elements from 8-12, 20.
+	testCases := []struct {
+		expectedErr bool
+		version     uint64
+		events      []int
+	}{
+		{
+			expectedErr: true,
+			version:     6,
+			events:      nil,
+		},
+		{
+			expectedErr: false,
+			version:     12,
+			events:      []int{20},
+		},
+		{
+			expectedErr: false,
+			version:     15,
+			events:      []int{20},
+		},
+		{
+			expectedErr: false,
+			version:     7,
+			events:      []int{8, 9, 10, 11, 12, 20},
+		},
 	}
-	{
-		result, err := store.GetAllEventsSince(4)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+
+	for _, tc := range testCases {
+		iter, err := store.GetAllEventsSince(tc.version)
+
+		if err != nil && !tc.expectedErr {
+			t.Fatalf("unexpected error: %v", err)
 		}
-		if len(result) != 5 {
-			t.Fatalf("unexpected events: %v", result)
+		if err == nil && tc.expectedErr {
+			t.Fatalf("expected too old version error")
 		}
-		for i := 0; i < 5; i++ {
-			pod := makeTestPod("pod", uint64(i+5))
+		if tc.expectedErr {
+			continue
+		}
+		result := getCacheEvents(iter)
+		if len(result) != len(tc.events) {
+			t.Fatalf("unexpected events: %v", len(result))
+		}
+		for i := 0; i < len(result); i++ {
+			pod := makeTestPod("pod", uint64(tc.events[i]))
 			if !apiequality.Semantic.DeepEqual(pod, result[i].Object) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
 			}
@@ -254,24 +298,25 @@ func TestEvents(t *testing.T) {
 	}
 
 	// Test for delete event.
-	store.Delete(makeTestPod("pod", uint64(10)))
+	store.Delete(makeTestPod("pod", uint64(30)))
 
 	{
-		result, err := store.GetAllEventsSince(9)
+		iter, err := store.GetAllEventsSince(25)
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
+		result := getCacheEvents(iter)
 		if len(result) != 1 {
 			t.Fatalf("unexpected events: %v", result)
 		}
 		if result[0].Type != watch.Deleted {
 			t.Errorf("unexpected event type: %v", result[0].Type)
 		}
-		pod := makeTestPod("pod", uint64(10))
+		pod := makeTestPod("pod", uint64(30))
 		if !apiequality.Semantic.DeepEqual(pod, result[0].Object) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
 		}
-		prevPod := makeTestPod("pod", uint64(9))
+		prevPod := makeTestPod("pod", uint64(20))
 		if !apiequality.Semantic.DeepEqual(prevPod, result[0].PrevObject) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].PrevObject, prevPod)
 		}
@@ -293,10 +338,11 @@ func TestMarker(t *testing.T) {
 	}
 	// Getting events from 8 should return no events,
 	// even though there is a marker there.
-	result, err := store.GetAllEventsSince(9)
+	iter, err := store.GetAllEventsSince(9)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	result := getCacheEvents(iter)
 	if len(result) != 0 {
 		t.Errorf("unexpected result: %#v, expected no events", result)
 	}
@@ -304,10 +350,11 @@ func TestMarker(t *testing.T) {
 	pod := makeTestPod("pods", 12)
 	store.Add(pod)
 	// Getting events from 8 should still work and return one event.
-	result, err = store.GetAllEventsSince(9)
+	iter, err = store.GetAllEventsSince(9)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	result = getCacheEvents(iter)
 	if len(result) != 1 || !apiequality.Semantic.DeepEqual(result[0].Object, pod) {
 		t.Errorf("unexpected result: %#v, expected %v", result, pod)
 	}

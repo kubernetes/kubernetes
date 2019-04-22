@@ -443,7 +443,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
-	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks)
+	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks, c.objectType)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
@@ -452,19 +452,12 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	// underlying watchCache is calling processEvent under its lock.
 	c.watchCache.RLock()
 	defer c.watchCache.RUnlock()
-	initEvents, err := c.watchCache.GetAllEventsSinceThreadUnsafe(watchRV)
+	initEventsIter, err := c.watchCache.GetAllEventsSinceThreadUnsafe(watchRV)
 	if err != nil {
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
 		// rather than a directly returned error.
 		return newErrWatcher(err), nil
-	}
-
-	// With some events already sent, update resourceVersion so that
-	// events that were buffered and not yet processed won't be delivered
-	// to this watcher second time causing going back in time.
-	if len(initEvents) > 0 {
-		watchRV = initEvents[len(initEvents)-1].ResourceVersion
 	}
 
 	func() {
@@ -481,7 +474,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		c.watcherIdx++
 	}()
 
-	go watcher.process(ctx, initEvents, watchRV)
+	go watcher.process(ctx, initEventsIter, watchRV)
 	return watcher, nil
 }
 
@@ -808,7 +801,7 @@ func (c *Cacher) startDispatchingBookmarkEvents() {
 				continue
 			}
 			c.watchersBuffer = append(c.watchersBuffer, watcher)
-			// Given that we send bookmark event once at deadline-2s, never push again
+			// Given that we send bookmark event once at deadline-2s, never add again
 			// after the watcher pops up from the buckets. Once we decide to change the
 			// strategy to more sophisticated, we may need it here.
 		}
@@ -1033,9 +1026,11 @@ type cacheWatcher struct {
 	// save it here to send bookmark events before that.
 	deadline            time.Time
 	allowWatchBookmarks bool
+	objectType          reflect.Type
 }
 
-func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), versioner storage.Versioner, deadline time.Time, allowWatchBookmarks bool) *cacheWatcher {
+func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), versioner storage.Versioner,
+	deadline time.Time, allowWatchBookmarks bool, objectType reflect.Type) *cacheWatcher {
 	return &cacheWatcher{
 		input:               make(chan *watchCacheEvent, chanSize),
 		result:              make(chan watch.Event, chanSize),
@@ -1046,6 +1041,7 @@ func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), ve
 		versioner:           versioner,
 		deadline:            deadline,
 		allowWatchBookmarks: allowWatchBookmarks,
+		objectType:          objectType,
 	}
 }
 
@@ -1187,7 +1183,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	}
 }
 
-func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEvent, resourceVersion uint64) {
+func (c *cacheWatcher) process(ctx context.Context, initEventsIter WatchCacheEventsIterator, resourceVersion uint64) {
 	defer utilruntime.HandleCrash()
 
 	// Check how long we are processing initEvents.
@@ -1205,20 +1201,27 @@ func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEven
 	// consider increase size of result buffer in those cases.
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
-	for _, event := range initEvents {
+	initEventsCount := 0
+	for {
+		event, ok := initEventsIter.Next()
+		if !ok {
+			break
+		}
 		c.sendWatchCacheEvent(event)
+		initEventsCount++
+		// With some events already sent, update resourceVersion so that
+		// events that were buffered and not yet processed won't be delivered
+		// to this watcher second time causing going back in time.
+		resourceVersion = event.ResourceVersion
 	}
-	if len(initEvents) > 0 {
-		objType := reflect.TypeOf(initEvents[0].Object).String()
-		initCounter.WithLabelValues(objType).Add(float64(len(initEvents)))
+
+	objType := c.objectType.String()
+	if initEventsCount > 0 {
+		initCounter.WithLabelValues(objType).Add(float64(initEventsCount))
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
-		objType := "<null>"
-		if len(initEvents) > 0 {
-			objType = reflect.TypeOf(initEvents[0].Object).String()
-		}
-		klog.V(2).Infof("processing %d initEvents of %s took %v", len(initEvents), objType, processingTime)
+		klog.V(2).Infof("processing %d initEvents of %s took %v", initEventsCount, objType, processingTime)
 	}
 
 	defer close(c.result)
