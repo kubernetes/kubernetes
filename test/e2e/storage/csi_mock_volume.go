@@ -412,7 +412,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 			_, _, pod3 := createPod(false)
 			gomega.Expect(pod3).NotTo(gomega.BeNil(), "while creating third pod")
-			err = waitForMaxVolumeCondition(pod3, m.cs)
+			pod3, err = waitForMaxVolumeCondition(pod3, m.cs)
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod3)
 		})
 	})
@@ -592,13 +592,13 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 })
 
-func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
-	var err error
+func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) (*v1.Pod, error) {
 	waitErr := wait.PollImmediate(10*time.Second, csiPodUnschedulableTimeout, func() (bool, error) {
-		pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+		tPod, err := cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
+		pod = tPod
 		conditions := pod.Status.Conditions
 		for _, condition := range conditions {
 			matched, _ := regexp.MatchString("max.+volume.+count", condition.Message)
@@ -609,7 +609,7 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 		}
 		return false, nil
 	})
-	return waitErr
+	return pod, waitErr
 }
 
 func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Interface) (int32, error) {
