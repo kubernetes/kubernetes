@@ -445,6 +445,9 @@ github.com/google/cadvisor/storage
 github.com/google/cadvisor/summary
 github.com/google/cadvisor/utils
 github.com/google/cadvisor/utils/cloudinfo
+github.com/google/cadvisor/utils/cloudinfo/aws
+github.com/google/cadvisor/utils/cloudinfo/azure
+github.com/google/cadvisor/utils/cloudinfo/gce
 github.com/google/cadvisor/utils/cpuload
 github.com/google/cadvisor/utils/cpuload/netlink
 github.com/google/cadvisor/utils/docker
