@@ -52,17 +52,19 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
+		var err error
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
-		defaultScName = getDefaultStorageClassName(c)
-		verifyDefaultStorageClass(c, defaultScName, true)
-
+		defaultScName, err = framework.GetDefaultStorageClassName(c)
+		if err != nil {
+			framework.Failf(err.Error())
+		}
 		test := testsuites.StorageClassTest{
 			Name:      "default",
 			ClaimSize: "2Gi",
 		}
 
 		pvc = newClaim(test, ns, "default")
-		var err error
+
 		metricsGrabber, err = metrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
 
 		if err != nil {
