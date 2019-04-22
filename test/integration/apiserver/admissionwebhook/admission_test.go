@@ -65,6 +65,7 @@ type testContext struct {
 
 	client    dynamic.Interface
 	clientset kubernetes.Interface
+	verb      string
 	gvr       schema.GroupVersionResource
 	resource  metav1.APIResource
 	resources map[schema.GroupVersionResource]metav1.APIResource
@@ -100,6 +101,10 @@ var (
 		gvr("", "v1", "pods/attach"):      {"create": testPodConnectSubresource},
 		gvr("", "v1", "pods/exec"):        {"create": testPodConnectSubresource},
 		gvr("", "v1", "pods/portforward"): {"create": testPodConnectSubresource},
+
+		gvr("", "v1", "nodes/proxy"):    {"*": testSubresourceProxy},
+		gvr("", "v1", "pods/proxy"):     {"*": testSubresourceProxy},
+		gvr("", "v1", "services/proxy"): {"*": testSubresourceProxy},
 	}
 
 	// excludedResources lists resources / verb combinations that are not yet tested. this set should trend to zero.
@@ -121,12 +126,9 @@ var (
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): sets.NewString("*"),
 
 		// TODO: implement custom subresource tests (requires special states or requests)
-		gvr("", "v1", "bindings"):       sets.NewString("create"),
-		gvr("", "v1", "nodes/proxy"):    sets.NewString("*"),
-		gvr("", "v1", "pods/binding"):   sets.NewString("create"),
-		gvr("", "v1", "pods/eviction"):  sets.NewString("create"),
-		gvr("", "v1", "pods/proxy"):     sets.NewString("*"),
-		gvr("", "v1", "services/proxy"): sets.NewString("*"),
+		gvr("", "v1", "bindings"):      sets.NewString("create"),
+		gvr("", "v1", "pods/binding"):  sets.NewString("create"),
+		gvr("", "v1", "pods/eviction"): sets.NewString("create"),
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{
@@ -398,6 +400,7 @@ func TestWebhookV1beta1(t *testing.T) {
 							admissionHolder: holder,
 							client:          dynamicClient,
 							clientset:       master.Client,
+							verb:            verb,
 							gvr:             gvr,
 							resource:        resource,
 							resources:       resourcesByGVR,
@@ -775,6 +778,54 @@ func testPodConnectSubresource(c *testContext) {
 	}
 }
 
+// testSubresourceProxy verifies proxy subresources
+func testSubresourceProxy(c *testContext) {
+	parentGVR := getParentGVR(c.gvr)
+	parentResource := c.resources[parentGVR]
+	obj, err := createOrGetResource(c.client, parentGVR, parentResource)
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	gvrWithoutSubresources := c.gvr
+	gvrWithoutSubresources.Resource = strings.Split(gvrWithoutSubresources.Resource, "/")[0]
+	subresources := strings.Split(c.gvr.Resource, "/")[1:]
+
+	verbToHTTPMethods := map[string][]string{
+		"create": {"POST", "GET", "HEAD", "OPTIONS"}, // also test read-only verbs map to Connect admission
+		"update": {"PUT"},
+		"patch":  {"PATCH"},
+		"delete": {"DELETE"},
+	}
+	httpMethodsToTest, ok := verbToHTTPMethods[c.verb]
+	if !ok {
+		c.t.Errorf("unknown verb %v", c.verb)
+		return
+	}
+
+	for _, httpMethod := range httpMethodsToTest {
+		c.t.Logf("testing %v", httpMethod)
+		request := c.clientset.CoreV1().RESTClient().Verb(httpMethod)
+
+		// add the namespace if required
+		if len(obj.GetNamespace()) > 0 {
+			request = request.Namespace(obj.GetNamespace())
+		}
+
+		// set expectations
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), v1beta1.Connect, obj.GetName(), obj.GetNamespace(), true, false)
+		// run the request. we don't actually care if the request is successful, just that admission gets called as expected
+		err = request.Resource(gvrWithoutSubresources.Resource).Name(obj.GetName()).SubResource(subresources...).Do().Error()
+		if err != nil {
+			c.t.Logf("debug: result of subresource proxy (error expected): %v", err)
+		}
+		// verify the result
+		c.admissionHolder.verify(c.t)
+	}
+
+}
+
 //
 // utility methods
 //
@@ -846,6 +897,9 @@ func newWebhookHandler(t *testing.T, holder *holder, phase string) http.Handler 
 
 func getTestFunc(gvr schema.GroupVersionResource, verb string) testFunc {
 	if f, found := customTestFuncs[gvr][verb]; found {
+		return f
+	}
+	if f, found := customTestFuncs[gvr]["*"]; found {
 		return f
 	}
 	if strings.Contains(gvr.Resource, "/") {
