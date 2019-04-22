@@ -13172,7 +13172,7 @@ func testDataSourceInSpec(name string, kind string, apiGroup string) *core.Persi
 	return &dataSourceInSpec
 }
 
-func TestAlphaVolumeDataSource(t *testing.T) {
+func TestAlphaVolumePVCDataSource(t *testing.T) {
 	successTestCases := []core.PersistentVolumeClaimSpec{
 		*testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io"),
 		*testDataSourceInSpec("test_pvc", "PersistentVolumeClaim", ""),

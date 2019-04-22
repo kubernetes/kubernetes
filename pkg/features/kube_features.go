@@ -436,10 +436,10 @@ const (
 	CSIMigrationOpenStack utilfeature.Feature = "CSIMigrationOpenStack"
 
 	// owner: @j-griffith
-	// alpha: v1.14
+	// alpha: v1.15
 	//
-	// Enable data source support (applies to all supported types, snapshots, populators and PVCs).
-	VolumeDataSource utilfeature.Feature = "VolumeDataSource"
+	// Enable support for specifying an existing PVC as a DataSource
+	VolumePVCDataSource utilfeature.Feature = "VolumePVCDataSource"
 )
 
 func init() {
@@ -510,7 +510,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	NodeLease:                                   {Default: true, PreRelease: utilfeature.Beta},
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
-	VolumeDataSource:                            {Default: false, PreRelease: utilfeature.Alpha},
+	VolumePVCDataSource:                         {Default: false, PreRelease: utilfeature.Alpha},
 	ProcMountType:                               {Default: false, PreRelease: utilfeature.Alpha},
 	TTLAfterFinished:                            {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPodResources:                         {Default: false, PreRelease: utilfeature.Alpha},
