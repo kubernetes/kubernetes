@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	dynamic "k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -63,6 +64,7 @@ type testContext struct {
 	admissionHolder *holder
 
 	client    dynamic.Interface
+	clientset kubernetes.Interface
 	gvr       schema.GroupVersionResource
 	resource  metav1.APIResource
 	resources map[schema.GroupVersionResource]metav1.APIResource
@@ -90,9 +92,14 @@ var (
 
 	// customTestFuncs holds custom test functions by resource and verb.
 	customTestFuncs = map[schema.GroupVersionResource]map[string]testFunc{
-		gvr("", "v1", "namespaces"):                          {"delete": testNamespaceDelete},
+		gvr("", "v1", "namespaces"): {"delete": testNamespaceDelete},
+
 		gvr("apps", "v1beta1", "deployments/rollback"):       {"create": testDeploymentRollback},
 		gvr("extensions", "v1beta1", "deployments/rollback"): {"create": testDeploymentRollback},
+
+		gvr("", "v1", "pods/attach"):      {"create": testPodConnectSubresource},
+		gvr("", "v1", "pods/exec"):        {"create": testPodConnectSubresource},
+		gvr("", "v1", "pods/portforward"): {"create": testPodConnectSubresource},
 	}
 
 	// excludedResources lists resources / verb combinations that are not yet tested. this set should trend to zero.
@@ -114,15 +121,12 @@ var (
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): sets.NewString("*"),
 
 		// TODO: implement custom subresource tests (requires special states or requests)
-		gvr("", "v1", "bindings"):         sets.NewString("create"),
-		gvr("", "v1", "nodes/proxy"):      sets.NewString("*"),
-		gvr("", "v1", "pods/attach"):      sets.NewString("create"),
-		gvr("", "v1", "pods/binding"):     sets.NewString("create"),
-		gvr("", "v1", "pods/eviction"):    sets.NewString("create"),
-		gvr("", "v1", "pods/exec"):        sets.NewString("create"),
-		gvr("", "v1", "pods/portforward"): sets.NewString("create"),
-		gvr("", "v1", "pods/proxy"):       sets.NewString("*"),
-		gvr("", "v1", "services/proxy"):   sets.NewString("*"),
+		gvr("", "v1", "bindings"):       sets.NewString("create"),
+		gvr("", "v1", "nodes/proxy"):    sets.NewString("*"),
+		gvr("", "v1", "pods/binding"):   sets.NewString("create"),
+		gvr("", "v1", "pods/eviction"):  sets.NewString("create"),
+		gvr("", "v1", "pods/proxy"):     sets.NewString("*"),
+		gvr("", "v1", "services/proxy"): sets.NewString("*"),
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{
@@ -393,6 +397,7 @@ func TestWebhookV1beta1(t *testing.T) {
 							t:               t,
 							admissionHolder: holder,
 							client:          dynamicClient,
+							clientset:       master.Client,
 							gvr:             gvr,
 							resource:        resource,
 							resources:       resourcesByGVR,
@@ -732,6 +737,41 @@ func testDeploymentRollback(c *testContext) {
 	if err != nil {
 		c.t.Error(err)
 		return
+	}
+}
+
+// testPodConnectSubresource verifies connect subresources
+func testPodConnectSubresource(c *testContext) {
+	podGVR := gvr("", "v1", "pods")
+	pod, err := createOrGetResource(c.client, podGVR, c.resources[podGVR])
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	// check all upgradeable verbs
+	for _, httpMethod := range []string{"GET", "POST"} {
+		c.t.Logf("verifying %v", httpMethod)
+
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), v1beta1.Connect, pod.GetName(), pod.GetNamespace(), true, false)
+		var err error
+		switch c.gvr {
+		case gvr("", "v1", "pods/exec"):
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("exec").Do().Error()
+		case gvr("", "v1", "pods/attach"):
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("attach").Do().Error()
+		case gvr("", "v1", "pods/portforward"):
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("portforward").Do().Error()
+		default:
+			c.t.Errorf("unknown subresource %#v", c.gvr)
+			return
+		}
+
+		if err != nil {
+			c.t.Logf("debug: result of subresource connect: %v", err)
+		}
+		c.admissionHolder.verify(c.t)
+
 	}
 }
 
