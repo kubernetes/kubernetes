@@ -120,6 +120,8 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 		return err
 	}
 
+	// Erase these keys form component config, kubelets on workers must start without
+	// these keys because they will appear only after approving and downloading csr
 	cfg.ComponentConfigs.Kubelet.TLSCertFile = ""
 	cfg.ComponentConfigs.Kubelet.TLSPrivateKeyFile = ""
 

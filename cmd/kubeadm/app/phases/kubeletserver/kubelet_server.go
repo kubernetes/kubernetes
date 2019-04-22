@@ -29,6 +29,7 @@ var (
 	approveTimeout = time.Second * 30
 )
 
+// KubeletServerCert generates serving certificate and key for kubelet
 func KubeletServerCert(kubeClient kubernetes.Interface, localEndpoint kubeadmapi.APIEndpoint, nodeRegistration kubeadm.NodeRegistrationOptions) ([]byte, []byte, error) {
 	altNames, err := getAltNames(localEndpoint, nodeRegistration)
 
@@ -115,7 +116,7 @@ func getAltNames(endpoint kubeadmapi.APIEndpoint, nodeRegistration kubeadmapi.No
 	return altNames, nil
 }
 
-
+// WriteKeyToFile writes newly creates kubelet server key to disk
 func WriteKeyToFile(pkiPath, fileName string, data []byte) error {
 	path := filepath.Join(pkiPath, fileName)
 	fmt.Printf("Write key to file %s", path)
@@ -127,6 +128,7 @@ func WriteKeyToFile(pkiPath, fileName string, data []byte) error {
 	return nil
 }
 
+// WriteCertToFile writes newly creates kubelet server cert to disk
 func WriteCertToFile(pkiPath, fileName string, data []byte) error {
 	path := filepath.Join(pkiPath, fileName)
 	fmt.Printf("Write cert to file %s", path)

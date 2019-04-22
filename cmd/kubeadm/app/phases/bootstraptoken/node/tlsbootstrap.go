@@ -33,7 +33,7 @@ const (
 	// NodeKubeletBootstrap defines the name of the ClusterRoleBinding that lets kubelets post CSRs
 	NodeKubeletBootstrap = "kubeadm:kubelet-bootstrap"
 
-	// NodeKubeletBootstrap defines the name of the ClusterRoleBinding that lets kubelets post CSRs
+	// NodeKubeletBootstrap defines the name of the ClusterRoleBinding that lets kubelets approve CSRs
 	NodeApproveCertificate     = "kubeadm:node-certificate-approve"
 	CertificateRControllerRole = "system:controller:certificate-controller"
 
