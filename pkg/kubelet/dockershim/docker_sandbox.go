@@ -276,7 +276,29 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 		return resp, nil
 	}
 
-	// TODO: Stop all running containers in the sandbox.
+	go func() {
+		opts := dockertypes.ContainerListOptions{All: true}
+
+		opts.Filters = dockerfilters.NewArgs()
+		f := newDockerFilter(&opts.Filters)
+		f.AddLabel(sandboxIDLabelKey, podSandboxID)
+
+		containers, err := ds.client.ListContainers(opts)
+		if err != nil {
+			klog.Errorf("Failed to list all container: %v", err)
+			return
+		}
+
+		for _, v := range containers {
+			if v.State != runtimeapi.ContainerState_CONTAINER_RUNNING.String() {
+				continue
+			}
+			err := ds.client.StopContainer(v.ID, defaultSandboxGracePeriod)
+			if err != nil {
+				klog.Errorf("Failed to stop running container in sandbox %q, container ID:%s, error:%v", podSandboxID, v.ID, err)
+			}
+		}
+	}()
 	return nil, utilerrors.NewAggregate(errList)
 }
 
