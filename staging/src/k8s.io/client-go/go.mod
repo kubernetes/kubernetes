@@ -5,7 +5,6 @@ module k8s.io/client-go
 go 1.12
 
 require (
-	cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2 // indirect
 	github.com/Azure/go-autorest v11.1.0+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda // indirect
@@ -24,7 +23,7 @@ require (
 	github.com/stretchr/testify v1.2.2
 	golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
-	golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181
+	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
 	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
 	google.golang.org/appengine v1.5.0 // indirect
 	k8s.io/api v0.0.0
@@ -35,6 +34,7 @@ require (
 )
 
 replace (
+	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 	k8s.io/api => ../api
