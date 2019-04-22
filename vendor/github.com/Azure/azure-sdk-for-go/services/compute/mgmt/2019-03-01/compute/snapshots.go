@@ -54,16 +54,8 @@ func (client SnapshotsClient) CreateOrUpdate(ctx context.Context, resourceGroupN
 					Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.CreationData.ImageReference", Name: validation.Null, Rule: false,
 						Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.CreationData.ImageReference.ID", Name: validation.Null, Rule: true, Chain: nil}}},
 					}},
-					{Target: "snapshot.SnapshotProperties.EncryptionSettings", Name: validation.Null, Rule: false,
-						Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.EncryptionSettings.DiskEncryptionKey", Name: validation.Null, Rule: false,
-							Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.EncryptionSettings.DiskEncryptionKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
-								{Target: "snapshot.SnapshotProperties.EncryptionSettings.DiskEncryptionKey.SecretURL", Name: validation.Null, Rule: true, Chain: nil},
-							}},
-							{Target: "snapshot.SnapshotProperties.EncryptionSettings.KeyEncryptionKey", Name: validation.Null, Rule: false,
-								Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.EncryptionSettings.KeyEncryptionKey.SourceVault", Name: validation.Null, Rule: true, Chain: nil},
-									{Target: "snapshot.SnapshotProperties.EncryptionSettings.KeyEncryptionKey.KeyURL", Name: validation.Null, Rule: true, Chain: nil},
-								}},
-						}},
+					{Target: "snapshot.SnapshotProperties.EncryptionSettingsCollection", Name: validation.Null, Rule: false,
+						Chain: []validation.Constraint{{Target: "snapshot.SnapshotProperties.EncryptionSettingsCollection.Enabled", Name: validation.Null, Rule: true, Chain: nil}}},
 				}}}}}); err != nil {
 		return result, validation.NewError("compute.SnapshotsClient", "CreateOrUpdate", err.Error())
 	}
@@ -91,7 +83,7 @@ func (client SnapshotsClient) CreateOrUpdatePreparer(ctx context.Context, resour
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2018-06-01"
+	const APIVersion = "2018-09-30"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -112,10 +104,6 @@ func (client SnapshotsClient) CreateOrUpdateSender(req *http.Request) (future Sn
 	var resp *http.Response
 	resp, err = autorest.SendWithSender(client, req,
 		azure.DoRetryWithRegistration(client.Client))
-	if err != nil {
-		return
-	}
-	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
 	if err != nil {
 		return
 	}
@@ -165,7 +153,7 @@ func (client SnapshotsClient) DeletePreparer(ctx context.Context, resourceGroupN
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2018-06-01"
+	const APIVersion = "2018-09-30"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -184,10 +172,6 @@ func (client SnapshotsClient) DeleteSender(req *http.Request) (future SnapshotsD
 	var resp *http.Response
 	resp, err = autorest.SendWithSender(client, req,
 		azure.DoRetryWithRegistration(client.Client))
-	if err != nil {
-		return
-	}
-	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
 	if err != nil {
 		return
 	}
@@ -242,7 +226,7 @@ func (client SnapshotsClient) GetPreparer(ctx context.Context, resourceGroupName
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2018-06-01"
+	const APIVersion = "2018-09-30"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -311,7 +295,7 @@ func (client SnapshotsClient) GrantAccessPreparer(ctx context.Context, resourceG
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2018-06-01"
+	const APIVersion = "2018-09-30"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -332,10 +316,6 @@ func (client SnapshotsClient) GrantAccessSender(req *http.Request) (future Snaps
 	var resp *http.Response
 	resp, err = autorest.SendWithSender(client, req,
 		azure.DoRetryWithRegistration(client.Client))
-	if err != nil {
-		return
-	}
-	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
 	if err != nil {
 		return
 	}
@@ -386,7 +366,7 @@ func (client SnapshotsClient) ListPreparer(ctx context.Context) (*http.Request, 
 		"subscriptionId": autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2018-06-01"
+	const APIVersion = "2018-09-30"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -479,7 +459,7 @@ func (client SnapshotsClient) ListByResourceGroupPreparer(ctx context.Context, r
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2018-06-01"
+	const APIVersion = "2018-09-30"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -568,7 +548,7 @@ func (client SnapshotsClient) RevokeAccessPreparer(ctx context.Context, resource
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2018-06-01"
+	const APIVersion = "2018-09-30"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -587,10 +567,6 @@ func (client SnapshotsClient) RevokeAccessSender(req *http.Request) (future Snap
 	var resp *http.Response
 	resp, err = autorest.SendWithSender(client, req,
 		azure.DoRetryWithRegistration(client.Client))
-	if err != nil {
-		return
-	}
-	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
 	if err != nil {
 		return
 	}
@@ -640,7 +616,7 @@ func (client SnapshotsClient) UpdatePreparer(ctx context.Context, resourceGroupN
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2018-06-01"
+	const APIVersion = "2018-09-30"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -661,10 +637,6 @@ func (client SnapshotsClient) UpdateSender(req *http.Request) (future SnapshotsU
 	var resp *http.Response
 	resp, err = autorest.SendWithSender(client, req,
 		azure.DoRetryWithRegistration(client.Client))
-	if err != nil {
-		return
-	}
-	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
 	if err != nil {
 		return
 	}

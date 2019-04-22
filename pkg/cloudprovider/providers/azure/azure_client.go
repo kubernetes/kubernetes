@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/Azure/go-autorest/autorest"
@@ -89,10 +89,8 @@ type SecurityGroupsClient interface {
 
 // VirtualMachineScaleSetsClient defines needed functions for azure compute.VirtualMachineScaleSetsClient
 type VirtualMachineScaleSetsClient interface {
-	CreateOrUpdate(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) (resp *http.Response, err error)
 	Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error)
 	List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachineScaleSet, err error)
-	UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (resp *http.Response, err error)
 }
 
 // VirtualMachineScaleSetVMsClient defines needed functions for azure compute.VirtualMachineScaleSetVMsClient
@@ -835,30 +833,6 @@ func newAzVirtualMachineScaleSetsClient(config *azClientConfig) *azVirtualMachin
 	}
 }
 
-func (az *azVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) (resp *http.Response, err error) {
-	/* Write rate limiting */
-	if !az.rateLimiterWriter.TryAccept() {
-		err = createRateLimitErr(true, "VMSSCreateOrUpdate")
-		return
-	}
-
-	klog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): start", resourceGroupName, VMScaleSetName)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, VMScaleSetName)
-	}()
-
-	mc := newMetricContext("vmss", "create_or_update", resourceGroupName, az.client.SubscriptionID)
-	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, VMScaleSetName, parameters)
-	mc.Observe(err)
-	if err != nil {
-		return future.Response(), err
-	}
-
-	err = future.WaitForCompletionRef(ctx, az.client.Client)
-	mc.Observe(err)
-	return future.Response(), err
-}
-
 func (az *azVirtualMachineScaleSetsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error) {
 	if !az.rateLimiterReader.TryAccept() {
 		err = createRateLimitErr(false, "VMSSGet")
@@ -904,30 +878,6 @@ func (az *azVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGro
 	}
 
 	return result, nil
-}
-
-func (az *azVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs) (resp *http.Response, err error) {
-	/* Write rate limiting */
-	if !az.rateLimiterWriter.TryAccept() {
-		err = createRateLimitErr(true, "VMSSUpdateInstances")
-		return
-	}
-
-	klog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%v): start", resourceGroupName, VMScaleSetName, VMInstanceIDs)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%v): end", resourceGroupName, VMScaleSetName, VMInstanceIDs)
-	}()
-
-	mc := newMetricContext("vmss", "update_instances", resourceGroupName, az.client.SubscriptionID)
-	future, err := az.client.UpdateInstances(ctx, resourceGroupName, VMScaleSetName, VMInstanceIDs)
-	mc.Observe(err)
-	if err != nil {
-		return future.Response(), err
-	}
-
-	err = future.WaitForCompletionRef(ctx, az.client.Client)
-	mc.Observe(err)
-	return future.Response(), err
 }
 
 // azVirtualMachineScaleSetVMsClient implements VirtualMachineScaleSetVMsClient.

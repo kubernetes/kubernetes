@@ -3,8 +3,8 @@ bitbucket.org/bertimus9/systemstat
 # cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2 => cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2
 cloud.google.com/go/compute/metadata
 cloud.google.com/go/internal
-# github.com/Azure/azure-sdk-for-go v21.3.0+incompatible => github.com/Azure/azure-sdk-for-go v21.3.0+incompatible
-github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute
+# github.com/Azure/azure-sdk-for-go v21.4.0+incompatible => github.com/Azure/azure-sdk-for-go v21.4.0+incompatible
+github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute
 github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry
 github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network
 github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage

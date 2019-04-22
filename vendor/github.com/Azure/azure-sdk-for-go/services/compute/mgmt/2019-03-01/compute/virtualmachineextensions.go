@@ -70,7 +70,7 @@ func (client VirtualMachineExtensionsClient) CreateOrUpdatePreparer(ctx context.
 		"vmName":            autorest.Encode("path", VMName),
 	}
 
-	const APIVersion = "2018-10-01"
+	const APIVersion = "2019-03-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -91,10 +91,6 @@ func (client VirtualMachineExtensionsClient) CreateOrUpdateSender(req *http.Requ
 	var resp *http.Response
 	resp, err = autorest.SendWithSender(client, req,
 		azure.DoRetryWithRegistration(client.Client))
-	if err != nil {
-		return
-	}
-	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
 	if err != nil {
 		return
 	}
@@ -145,7 +141,7 @@ func (client VirtualMachineExtensionsClient) DeletePreparer(ctx context.Context,
 		"vmName":            autorest.Encode("path", VMName),
 	}
 
-	const APIVersion = "2018-10-01"
+	const APIVersion = "2019-03-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -164,10 +160,6 @@ func (client VirtualMachineExtensionsClient) DeleteSender(req *http.Request) (fu
 	var resp *http.Response
 	resp, err = autorest.SendWithSender(client, req,
 		azure.DoRetryWithRegistration(client.Client))
-	if err != nil {
-		return
-	}
-	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
 	if err != nil {
 		return
 	}
@@ -224,7 +216,7 @@ func (client VirtualMachineExtensionsClient) GetPreparer(ctx context.Context, re
 		"vmName":            autorest.Encode("path", VMName),
 	}
 
-	const APIVersion = "2018-10-01"
+	const APIVersion = "2019-03-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -295,7 +287,7 @@ func (client VirtualMachineExtensionsClient) ListPreparer(ctx context.Context, r
 		"vmName":            autorest.Encode("path", VMName),
 	}
 
-	const APIVersion = "2018-10-01"
+	const APIVersion = "2019-03-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -362,7 +354,7 @@ func (client VirtualMachineExtensionsClient) UpdatePreparer(ctx context.Context,
 		"vmName":            autorest.Encode("path", VMName),
 	}
 
-	const APIVersion = "2018-10-01"
+	const APIVersion = "2019-03-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -383,10 +375,6 @@ func (client VirtualMachineExtensionsClient) UpdateSender(req *http.Request) (fu
 	var resp *http.Response
 	resp, err = autorest.SendWithSender(client, req,
 		azure.DoRetryWithRegistration(client.Client))
-	if err != nil {
-		return
-	}
-	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK))
 	if err != nil {
 		return
 	}
