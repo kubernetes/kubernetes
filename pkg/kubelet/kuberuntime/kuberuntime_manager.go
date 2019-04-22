@@ -417,12 +417,27 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 		}
 	}
 
-	// Needs to create a new sandbox when readySandboxCount > 1 or the ready sandbox is not the latest one.
+	// Needs to create a new sandbox when readySandboxCount > 1.
 	sandboxStatus := podStatus.SandboxStatuses[0]
 	if readySandboxCount > 1 {
 		klog.V(2).Infof("More than 1 sandboxes for pod %q are ready. Need to reconcile them", format.Pod(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
 	}
+
+	//check the pod is succeeded
+	succeededContainerCount := 0
+	for _, container := range pod.Spec.Containers {
+		if containerSucceeded(&container, podStatus) {
+			succeededContainerCount++
+		}
+	}
+
+	//When all containers succeeded and RestartPolicy is not Always
+	if len(pod.Spec.Containers) == succeededContainerCount && pod.Spec.RestartPolicy != v1.RestartPolicyAlways {
+		return false, sandboxStatus.Metadata.Attempt, sandboxStatus.Id
+	}
+
+	//Needs to create a new sandbox when the ready sandbox is not the latest one
 	if sandboxStatus.State != runtimeapi.PodSandboxState_SANDBOX_READY {
 		klog.V(2).Infof("No ready sandbox for pod %q can be found. Need to start a new one", format.Pod(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id

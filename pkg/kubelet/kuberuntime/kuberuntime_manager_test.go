@@ -845,7 +845,7 @@ func TestComputePodActions(t *testing.T) {
 			},
 			actions: podActions{
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				Attempt:           uint32(2),
+				Attempt:           uint32(1),
 				CreateSandbox:     false,
 				KillPod:           true,
 				ContainersToStart: []int{},
