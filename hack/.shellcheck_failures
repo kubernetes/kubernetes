@@ -11,7 +11,6 @@
 ./cluster/gce/gci/flexvolume_node_setup.sh
 ./cluster/gce/gci/health-monitor.sh
 ./cluster/gce/gci/master-helper.sh
-./cluster/gce/gci/shutdown.sh
 ./cluster/gce/list-resources.sh
 ./cluster/gce/upgrade-aliases.sh
 ./cluster/gce/upgrade.sh
