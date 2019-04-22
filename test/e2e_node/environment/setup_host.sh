@@ -42,38 +42,35 @@ EOF
 fi
 
 # For coreos, disable updates
-if $(sudo systemctl status update-engine &>/dev/null); then
+if sudo systemctl status update-engine &>/dev/null; then
   sudo systemctl mask update-engine locksmithd
 fi
 
 # Fixup sudoers require tty
-sudo grep -q "# Defaults    requiretty" /etc/sudoers
-if [ $? -ne 0 ] ; then
+if ! sudo grep -q "# Defaults    requiretty" /etc/sudoers; then
   sudo sed -i 's/Defaults    requiretty/# Defaults    requiretty/' /etc/sudoers
 fi
 
 # Install nsenter for ubuntu images
-cat /etc/*-release | grep "ID=ubuntu"
-if [ $? -eq 0 ]; then
+if cat /etc/*-release | grep "ID=ubuntu"; then
   if ! which nsenter > /dev/null; then
      echo "Do not find nsenter. Install it."
      NSENTER_BUILD_DIR=$(mktemp -d /tmp/nsenter-build-XXXXXX)
-     cd $NSENTER_BUILD_DIR
+     cd "$NSENTER_BUILD_DIR" || exit 1
      curl https://www.kernel.org/pub/linux/utils/util-linux/v2.31/util-linux-2.31.tar.gz | tar -zxf-
      sudo apt-get update
      sudo apt-get --yes install make
      sudo apt-get --yes install gcc
-     cd util-linux-2.31
+     cd util-linux-2.31 || exit 1
      ./configure --without-ncurses
      make nsenter
      sudo cp nsenter /usr/local/bin
-     rm -rf $NSENTER_BUILD_DIR
+     rm -rf "$NSENTER_BUILD_DIR"
    fi
 fi
 
 # Install docker
-hash docker 2>/dev/null
-if [ $? -ne 0 ]; then
+if ! hash docker 2>/dev/null; then
   # RHEL platforms should always install from RHEL repository
   # This will install the latest supported stable docker platform on RHEL
   if [ $OS_RHEL -eq 0 ]; then
@@ -93,8 +90,7 @@ id jenkins || sudo useradd jenkins -m
 sudo usermod -a -G docker jenkins
 
 # install lxc
-cat /etc/*-release | grep "ID=debian"
-if [ $? -ne 0 ]; then
+if ! cat /etc/*-release | grep "ID=debian"; then
   hash apt-get 2>/dev/null
   if [ $? -ne 1 ]; then
     sudo apt-get install lxc -y
