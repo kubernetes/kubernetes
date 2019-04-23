@@ -115,6 +115,7 @@ try {
   InstallAndStart-LoggingAgent
 
   Create-DockerRegistryKey
+  Configure-Dockerd
   DownloadAndInstall-KubernetesBinaries
   Create-NodePki
   Create-KubeletKubeconfig
