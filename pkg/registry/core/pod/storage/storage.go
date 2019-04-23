@@ -149,6 +149,12 @@ func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createVali
 		return nil, errs.ToAggregate()
 	}
 
+	if createValidation != nil {
+		if err := createValidation(binding); err != nil {
+			return nil, err
+		}
+	}
+
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations, dryrun.IsDryRun(options.DryRun))
 	out = &metav1.Status{Status: metav1.StatusSuccess}
 	return

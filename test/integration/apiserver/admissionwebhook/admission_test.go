@@ -33,8 +33,10 @@ import (
 	"k8s.io/api/admission/v1beta1"
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -102,6 +104,10 @@ var (
 		gvr("", "v1", "pods/exec"):        {"create": testPodConnectSubresource},
 		gvr("", "v1", "pods/portforward"): {"create": testPodConnectSubresource},
 
+		gvr("", "v1", "bindings"):      {"create": testPodBindingEviction},
+		gvr("", "v1", "pods/binding"):  {"create": testPodBindingEviction},
+		gvr("", "v1", "pods/eviction"): {"create": testPodBindingEviction},
+
 		gvr("", "v1", "nodes/proxy"):    {"*": testSubresourceProxy},
 		gvr("", "v1", "pods/proxy"):     {"*": testSubresourceProxy},
 		gvr("", "v1", "services/proxy"): {"*": testSubresourceProxy},
@@ -124,11 +130,6 @@ var (
 		// TODO: webhook config objects are not subject to admission, verify CRUD works and webhooks do not observe them
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):   sets.NewString("*"),
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): sets.NewString("*"),
-
-		// TODO: implement custom subresource tests (requires special states or requests)
-		gvr("", "v1", "bindings"):      sets.NewString("create"),
-		gvr("", "v1", "pods/binding"):  sets.NewString("create"),
-		gvr("", "v1", "pods/eviction"): sets.NewString("create"),
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{
@@ -775,6 +776,58 @@ func testPodConnectSubresource(c *testContext) {
 		}
 		c.admissionHolder.verify(c.t)
 
+	}
+}
+
+// testPodBindingEviction verifies pod binding and eviction admission
+func testPodBindingEviction(c *testContext) {
+	podGVR := gvr("", "v1", "pods")
+	pod, err := createOrGetResource(c.client, podGVR, c.resources[podGVR])
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	background := metav1.DeletePropagationBackground
+	zero := int64(0)
+	forceDelete := &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}
+	defer func() {
+		err := c.clientset.CoreV1().Pods(pod.GetNamespace()).Delete(pod.GetName(), forceDelete)
+		if err != nil && !errors.IsNotFound(err) {
+			c.t.Error(err)
+			return
+		}
+	}()
+
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), v1beta1.Create, pod.GetName(), pod.GetNamespace(), true, false)
+
+	switch c.gvr {
+	case gvr("", "v1", "bindings"):
+		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("bindings").Body(&corev1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Name: pod.GetName()},
+			Target:     corev1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
+		}).Do().Error()
+
+	case gvr("", "v1", "pods/binding"):
+		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("binding").Body(&corev1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Name: pod.GetName()},
+			Target:     corev1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
+		}).Do().Error()
+
+	case gvr("", "v1", "pods/eviction"):
+		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("eviction").Body(&policyv1beta1.Eviction{
+			ObjectMeta:    metav1.ObjectMeta{Name: pod.GetName()},
+			DeleteOptions: forceDelete,
+		}).Do().Error()
+
+	default:
+		c.t.Errorf("unhandled resource %#v", c.gvr)
+		return
+	}
+
+	if err != nil {
+		c.t.Error(err)
+		return
 	}
 }
 
