@@ -4,6 +4,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "admission_test.go",
+        "broken_webhook_test.go",
         "main_test.go",
     ],
     tags = [
@@ -12,8 +13,10 @@ go_test(
     ],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
+        "//cmd/kube-apiserver/app/testing:go_default_library",
         "//staging/src/k8s.io/api/admission/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
