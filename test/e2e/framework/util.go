@@ -1392,7 +1392,7 @@ func CheckInvariants(events []watch.Event, fns ...InvariantFunc) error {
 	return nil
 }
 
-// Waits default amount of time (PodStartTimeout) for the specified pod to become running.
+// WaitForPodRunningInNamespace waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
 	if pod.Status.Phase == v1.PodRunning {
@@ -1401,19 +1401,20 @@ func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
 	return WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, PodStartTimeout)
 }
 
-// Waits default amount of time (PodStartTimeout) for the specified pod to become running.
+// WaitForPodNameRunningInNamespace waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodNameRunningInNamespace(c clientset.Interface, podName, namespace string) error {
 	return WaitTimeoutForPodRunningInNamespace(c, podName, namespace, PodStartTimeout)
 }
 
-// Waits an extended amount of time (slowPodStartTimeout) for the specified pod to become running.
+// waitForPodRunningInNamespaceSlow waits an extended amount of time (slowPodStartTimeout) for the specified pod to become running.
 // The resourceVersion is used when Watching object changes, it tells since when we care
 // about changes to the pod. Returns an error if timeout occurs first, or pod goes in to failed state.
 func waitForPodRunningInNamespaceSlow(c clientset.Interface, podName, namespace string) error {
 	return WaitTimeoutForPodRunningInNamespace(c, podName, namespace, slowPodStartTimeout)
 }
 
+// WaitTimeoutForPodRunningInNamespace waits the given timeout duration for the specified pod to become running.
 func WaitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return wait.PollImmediate(Poll, timeout, podRunning(c, podName, namespace))
 }
@@ -1434,7 +1435,7 @@ func podRunning(c clientset.Interface, podName, namespace string) wait.Condition
 	}
 }
 
-// WaitTimeoutForPodEvent waits for an event to occur for a pod
+// WaitTimeoutForPodEvent waits the given timeout duration for a pod event to occur.
 func WaitTimeoutForPodEvent(c clientset.Interface, podName, namespace, eventSelector, msg string, timeout time.Duration) error {
 	return wait.PollImmediate(Poll, timeout, eventOccurred(c, podName, namespace, eventSelector, msg))
 }
@@ -1455,12 +1456,13 @@ func eventOccurred(c clientset.Interface, podName, namespace, eventSelector, msg
 	}
 }
 
-// Waits default amount of time (DefaultPodDeletionTimeout) for the specified pod to stop running.
+// WaitForPodNoLongerRunningInNamespace waits default amount of time (DefaultPodDeletionTimeout) for the specified pod to stop running.
 // Returns an error if timeout occurs first.
 func WaitForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace string) error {
 	return WaitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, DefaultPodDeletionTimeout)
 }
 
+// WaitTimeoutForPodNoLongerRunningInNamespace waits the given timeout duration for the specified pod to stop.
 func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return wait.PollImmediate(Poll, timeout, podCompleted(c, podName, namespace))
 }
@@ -1533,9 +1535,8 @@ func waitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 		if pod.Status.Phase == v1.PodFailed {
 			if pod.Status.Reason == reason { // short-circuit waitForPodCondition's loop
 				return true, nil
-			} else {
-				return true, fmt.Errorf("Expected pod %q in namespace %q to be terminated with reason %q, got reason: %q", podName, namespace, reason, pod.Status.Reason)
 			}
+			return true, fmt.Errorf("Expected pod %q in namespace %q to be terminated with reason %q, got reason: %q", podName, namespace, reason, pod.Status.Reason)
 		}
 		return false, nil
 	})
@@ -1618,6 +1619,7 @@ func WaitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.D
 	return err
 }
 
+// WaitForPodToDisappear waits the given timeout duration for the specified pod to disappear.
 func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		Logf("Waiting for pod %s to disappear", podName)
@@ -1746,6 +1748,7 @@ func countEndpointsNum(e *v1.Endpoints) int {
 	return num
 }
 
+// WaitForEndpoint waits for the specified endpoint to be ready.
 func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 	for t := time.Now(); time.Since(t) < EndpointRegisterTimeout; time.Sleep(Poll) {
 		endpoint, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
@@ -1764,9 +1767,9 @@ func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 	return fmt.Errorf("Failed to get endpoints for %s/%s", ns, name)
 }
 
-// Context for checking pods responses by issuing GETs to them (via the API
+// PodProxyResponseChecker is a context for checking pods responses by issuing GETs to them (via the API
 // proxy) and verifying that they answer with their own pod name.
-type podProxyResponseChecker struct {
+type PodProxyResponseChecker struct {
 	c              clientset.Interface
 	ns             string
 	label          labels.Selector
@@ -1775,13 +1778,14 @@ type podProxyResponseChecker struct {
 	pods           *v1.PodList
 }
 
-func PodProxyResponseChecker(c clientset.Interface, ns string, label labels.Selector, controllerName string, respondName bool, pods *v1.PodList) podProxyResponseChecker {
-	return podProxyResponseChecker{c, ns, label, controllerName, respondName, pods}
+// NewPodProxyResponseChecker returns a context for checking pods responses.
+func NewPodProxyResponseChecker(c clientset.Interface, ns string, label labels.Selector, controllerName string, respondName bool, pods *v1.PodList) PodProxyResponseChecker {
+	return PodProxyResponseChecker{c, ns, label, controllerName, respondName, pods}
 }
 
 // CheckAllResponses issues GETs to all pods in the context and verify they
 // reply with their own pod name.
-func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
+func (r PodProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 	successes := 0
 	options := metav1.ListOptions{LabelSelector: r.label.String()}
 	currentPods, err := r.c.CoreV1().Pods(r.ns).List(options)
@@ -1873,17 +1877,20 @@ func KubectlVersion() (*utilversion.Version, error) {
 	return utilversion.ParseSemantic(matches[1])
 }
 
+// PodsResponding waits for the pods to response.
 func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods *v1.PodList) error {
 	ginkgo.By("trying to dial each unique pod")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	return wait.PollImmediate(Poll, podRespondingTimeout, PodProxyResponseChecker(c, ns, label, name, wantName, pods).CheckAllResponses)
+	return wait.PollImmediate(Poll, podRespondingTimeout, NewPodProxyResponseChecker(c, ns, label, name, wantName, pods).CheckAllResponses)
 }
 
+// PodsCreated returns a pod list matched by the given name.
 func PodsCreated(c clientset.Interface, ns, name string, replicas int32) (*v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	return PodsCreatedByLabel(c, ns, name, replicas, label)
 }
 
+// PodsCreatedByLabel returns a created pod list matched by the given label.
 func PodsCreatedByLabel(c clientset.Interface, ns, name string, replicas int32, label labels.Selector) (*v1.PodList, error) {
 	timeout := 2 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
@@ -1917,16 +1924,16 @@ func podsRunning(c clientset.Interface, pods *v1.PodList) []error {
 	// are running so non-running pods cause a timeout for this test.
 	ginkgo.By("ensuring each pod is running")
 	e := []error{}
-	error_chan := make(chan error)
+	errorChan := make(chan error)
 
 	for _, pod := range pods.Items {
 		go func(p v1.Pod) {
-			error_chan <- WaitForPodRunningInNamespace(c, &p)
+			errorChan <- WaitForPodRunningInNamespace(c, &p)
 		}(pod)
 	}
 
 	for range pods.Items {
-		err := <-error_chan
+		err := <-errorChan
 		if err != nil {
 			e = append(e, err)
 		}
@@ -1935,10 +1942,12 @@ func podsRunning(c clientset.Interface, pods *v1.PodList) []error {
 	return e
 }
 
+// VerifyPods checks if the specified pod is responding.
 func VerifyPods(c clientset.Interface, ns, name string, wantName bool, replicas int32) error {
 	return podRunningMaybeResponding(c, ns, name, wantName, replicas, true)
 }
 
+// VerifyPodsRunning checks if the specified pod is running.
 func VerifyPodsRunning(c clientset.Interface, ns, name string, wantName bool, replicas int32) error {
 	return podRunningMaybeResponding(c, ns, name, wantName, replicas, false)
 }
@@ -1961,6 +1970,7 @@ func podRunningMaybeResponding(c clientset.Interface, ns, name string, wantName 
 	return nil
 }
 
+// ServiceResponding waits for the service to be responding.
 func ServiceResponding(c clientset.Interface, ns, name string) error {
 	ginkgo.By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
 
@@ -1997,6 +2007,7 @@ func ServiceResponding(c clientset.Interface, ns, name string) error {
 	})
 }
 
+// RestclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
 func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
 	if TestContext.KubeConfig == "" {
@@ -2013,8 +2024,10 @@ func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	return c, nil
 }
 
+// ClientConfigGetter is a func that returns getter to return a config.
 type ClientConfigGetter func() (*restclient.Config, error)
 
+// LoadConfig returns a config for a rest client.
 func LoadConfig() (*restclient.Config, error) {
 	if TestContext.NodeE2E {
 		// This is a node e2e test, apply the node e2e configuration
@@ -2024,14 +2037,14 @@ func LoadConfig() (*restclient.Config, error) {
 	if err != nil {
 		if TestContext.KubeConfig == "" {
 			return restclient.InClusterConfig()
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 
 	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
 }
 
+// LoadClientset returns clientset for connecting to kubernetes clusters.
 func LoadClientset() (*clientset.Clientset, error) {
 	config, err := LoadConfig()
 	if err != nil {
@@ -2040,7 +2053,7 @@ func LoadClientset() (*clientset.Clientset, error) {
 	return clientset.NewForConfig(config)
 }
 
-// randomSuffix provides a random string to append to pods,services,rcs.
+// RandomSuffix provides a random string to append to pods,services,rcs.
 // TODO: Allow service names to have the same form as names
 //       for pods and replication controllers so we don't
 //       need to use such a function and can instead
@@ -2050,6 +2063,7 @@ func RandomSuffix() string {
 	return strconv.Itoa(r.Int() % 10000)
 }
 
+// ExpectNoError checks if "err" is set, and if so, fails assertion while logging the error.
 func ExpectNoError(err error, explain ...interface{}) {
 	ExpectNoErrorWithOffset(1, err, explain...)
 }
@@ -2063,6 +2077,7 @@ func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
+// ExpectNoErrorWithRetries checks if an error occurs with the given retry count.
 func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
 	var err error
 	for i := 0; i < maxRetries; i++ {
@@ -2075,7 +2090,7 @@ func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
-// Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
+// Cleanup stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
 func Cleanup(filePath, ns string, selectors ...string) {
 	ginkgo.By("using delete to clean up resources")
 	var nsArg string
@@ -2086,7 +2101,7 @@ func Cleanup(filePath, ns string, selectors ...string) {
 	AssertCleanup(ns, selectors...)
 }
 
-// Asserts that cleanup of a namespace wrt selectors occurred.
+// AssertCleanup asserts that cleanup of a namespace wrt selectors occurred.
 func AssertCleanup(ns string, selectors ...string) {
 	var nsArg string
 	if ns != "" {
@@ -2150,40 +2165,46 @@ func KubectlCmd(args ...string) *exec.Cmd {
 	return cmd
 }
 
-// kubectlBuilder is used to build, customize and execute a kubectl Command.
+// KubectlBuilder is used to build, customize and execute a kubectl Command.
 // Add more functions to customize the builder as needed.
-type kubectlBuilder struct {
+type KubectlBuilder struct {
 	cmd     *exec.Cmd
 	timeout <-chan time.Time
 }
 
-func NewKubectlCommand(args ...string) *kubectlBuilder {
-	b := new(kubectlBuilder)
+// NewKubectlCommand returns a KubectlBuilder for running kubectl.
+func NewKubectlCommand(args ...string) *KubectlBuilder {
+	b := new(KubectlBuilder)
 	b.cmd = KubectlCmd(args...)
 	return b
 }
 
-func (b *kubectlBuilder) WithEnv(env []string) *kubectlBuilder {
+// WithEnv sets the given environment and returns itself.
+func (b *KubectlBuilder) WithEnv(env []string) *KubectlBuilder {
 	b.cmd.Env = env
 	return b
 }
 
-func (b *kubectlBuilder) WithTimeout(t <-chan time.Time) *kubectlBuilder {
+// WithTimeout sets the given timeout and returns itself.
+func (b *KubectlBuilder) WithTimeout(t <-chan time.Time) *KubectlBuilder {
 	b.timeout = t
 	return b
 }
 
-func (b kubectlBuilder) WithStdinData(data string) *kubectlBuilder {
+// WithStdinData sets the given data to stdin and returns itself.
+func (b KubectlBuilder) WithStdinData(data string) *KubectlBuilder {
 	b.cmd.Stdin = strings.NewReader(data)
 	return &b
 }
 
-func (b kubectlBuilder) WithStdinReader(reader io.Reader) *kubectlBuilder {
+// WithStdinReader sets the given reader and returns itself.
+func (b KubectlBuilder) WithStdinReader(reader io.Reader) *KubectlBuilder {
 	b.cmd.Stdin = reader
 	return &b
 }
 
-func (b kubectlBuilder) ExecOrDie() string {
+// ExecOrDie runs the kubectl executable or dies if error occurs.
+func (b KubectlBuilder) ExecOrDie() string {
 	str, err := b.Exec()
 	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
 	// Note that we're still dying after retrying so that we can get visibility to triage it further.
@@ -2212,14 +2233,15 @@ func isTimeout(err error) bool {
 	return false
 }
 
-func (b kubectlBuilder) Exec() (string, error) {
+// Exec runs the kubectl executable.
+func (b KubectlBuilder) Exec() (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := b.cmd
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err)
+		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
 	}
 	errCh := make(chan error, 1)
 	go func() {
@@ -2228,19 +2250,19 @@ func (b kubectlBuilder) Exec() (string, error) {
 	select {
 	case err := <-errCh:
 		if err != nil {
-			var rc int = 127
+			var rc = 127
 			if ee, ok := err.(*exec.ExitError); ok {
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
 				Logf("rc: %d", rc)
 			}
 			return "", uexec.CodeExitError{
-				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err),
+				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err),
 				Code: rc,
 			}
 		}
 	case <-b.timeout:
 		b.cmd.Process.Kill()
-		return "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
+		return "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
 	}
 	Logf("stderr: %q", stderr.String())
 	Logf("stdout: %q", stdout.String())
@@ -2280,13 +2302,14 @@ func RunKubemciWithKubeconfig(args ...string) (string, error) {
 func RunKubemciCmd(args ...string) (string, error) {
 	// kubemci is assumed to be in PATH.
 	kubemci := "kubemci"
-	b := new(kubectlBuilder)
+	b := new(KubectlBuilder)
 	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
 
 	b.cmd = exec.Command(kubemci, args...)
 	return b.Exec()
 }
 
+// StartCmdAndStreamOutput returns stdout and stderr after starting the given cmd.
 func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
 	stdout, err = cmd.StdoutPipe()
 	if err != nil {
@@ -2301,7 +2324,7 @@ func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err e
 	return
 }
 
-// Rough equivalent of ctrl+c for cleaning up processes. Intended to be run in defer.
+// TryKill is rough equivalent of ctrl+c for cleaning up processes. Intended to be run in defer.
 func TryKill(cmd *exec.Cmd) {
 	if err := cmd.Process.Kill(); err != nil {
 		Logf("ERROR failed to kill command %v! The process may leak", cmd)
