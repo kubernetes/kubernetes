@@ -32,8 +32,9 @@
     {{container_env}}
     "livenessProbe": {
       "httpGet": {
+        "scheme": "HTTPS",
         "host": "127.0.0.1",
-        "port": 8080,
+        "port": {{secure_port}},
         "path": "/healthz?exclude=etcd"
       },
       "initialDelaySeconds": {{liveness_probe_initial_delay}},
@@ -41,8 +42,9 @@
     },
     "readinessProbe": {
       "httpGet": {
+        "scheme": "HTTPS",
         "host": "127.0.0.1",
-        "port": 8080,
+        "port": {{secure_port}},
         "path": "/healthz"
       },
       "periodSeconds": 1,
