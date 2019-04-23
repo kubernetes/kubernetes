@@ -259,7 +259,10 @@ func (runner *runner) DeleteChain(table Table, chain Chain) error {
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	// TODO: we could call iptables -S first, ignore the output and check for non-zero return (more like DeleteRule)
+	_, err := runner.listRules(fullArgs)
+	if err != nil {
+		return fmt.Errorf("listing chain %q before delete failed : %v", chain, err)
+	}
 	out, err := runner.run(opDeleteChain, fullArgs)
 	if err != nil {
 		return fmt.Errorf("error deleting chain %q: %v: %s", chain, err, out)
@@ -438,6 +441,25 @@ func (runner *runner) runContext(ctx context.Context, op operation, args []strin
 	// Don't log err here - callers might not think it is an error.
 }
 
+func (runner *runner) listRules(args []string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	out, err := runner.runContext(ctx, opListRules, args)
+	if ctx.Err() == context.DeadlineExceeded {
+		return nil, fmt.Errorf("timed out while listing rules")
+	}
+	if err == nil {
+		return out, nil
+	}
+	if ee, ok := err.(utilexec.ExitError); ok {
+		if ee.Exited() && ee.ExitStatus() == 1 {
+			return nil, ee
+		}
+	}
+	return nil, fmt.Errorf("error listing rule: %v: %s", err, out)
+}
+
 // Returns (bool, nil) if it was able to check the existence of the rule, or
 // (<undefined>, error) if the process of checking failed.
 func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
@@ -534,6 +556,7 @@ const (
 	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"
+	opListRules   operation = "-S"
 )
 
 func makeFullArgs(table Table, chain Chain, args ...string) []string {
