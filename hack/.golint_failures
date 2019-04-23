@@ -178,7 +178,6 @@ pkg/kubelet/container
 pkg/kubelet/container/testing
 pkg/kubelet/custommetrics
 pkg/kubelet/dockershim
-pkg/kubelet/dockershim/cm
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network
 pkg/kubelet/dockershim/network/cni
