@@ -144,6 +144,11 @@ func TestValidateCertSANs(t *testing.T) {
 		{[]string{"my-hostname2", "my.other.subdomain", "10.0.0.10"}, true},    // supported
 		{[]string{"my-hostname", "my.subdomain", "2001:db8::4"}, true},         // supported
 		{[]string{"my-hostname2", "my.other.subdomain", "2001:db8::10"}, true}, // supported
+		{[]string{"*.my-hostname2", "*.my.other.subdomain"}, true},             // supported Wildcard DNS label
+		{[]string{"**.my-hostname2", "my.other.subdomain"}, false},             // not a Wildcard DNS label
+		{[]string{"*.*.my-hostname2", "my.other.subdomain"}, false},            // not a Wildcard DNS label
+		{[]string{"a.*.my-hostname2", "my.other.subdomain"}, false},            // not a Wildcard DNS label
+		{[]string{"*", "my.other.subdomain", "2001:db8::10"}, false},           // not a Wildcard DNS label
 	}
 	for _, rt := range tests {
 		actual := ValidateCertSANs(rt.sans, nil)
