@@ -79,6 +79,7 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 	return nil
 }
 
+// TODO: drop it?
 // CreateAsCA creates a certificate authority, writing the files to disk and also returning the created CA so it can be used to sign child certs.
 func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certificate, crypto.Signer, error) {
 	cfg, err := k.GetConfig(ic)
