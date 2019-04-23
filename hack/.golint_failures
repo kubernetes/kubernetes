@@ -1,4 +1,3 @@
-cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
