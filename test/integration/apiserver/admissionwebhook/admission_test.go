@@ -33,8 +33,10 @@ import (
 	"k8s.io/api/admission/v1beta1"
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -44,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	dynamic "k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -63,6 +66,8 @@ type testContext struct {
 	admissionHolder *holder
 
 	client    dynamic.Interface
+	clientset kubernetes.Interface
+	verb      string
 	gvr       schema.GroupVersionResource
 	resource  metav1.APIResource
 	resources map[schema.GroupVersionResource]metav1.APIResource
@@ -90,9 +95,22 @@ var (
 
 	// customTestFuncs holds custom test functions by resource and verb.
 	customTestFuncs = map[schema.GroupVersionResource]map[string]testFunc{
-		gvr("", "v1", "namespaces"):                          {"delete": testNamespaceDelete},
+		gvr("", "v1", "namespaces"): {"delete": testNamespaceDelete},
+
 		gvr("apps", "v1beta1", "deployments/rollback"):       {"create": testDeploymentRollback},
 		gvr("extensions", "v1beta1", "deployments/rollback"): {"create": testDeploymentRollback},
+
+		gvr("", "v1", "pods/attach"):      {"create": testPodConnectSubresource},
+		gvr("", "v1", "pods/exec"):        {"create": testPodConnectSubresource},
+		gvr("", "v1", "pods/portforward"): {"create": testPodConnectSubresource},
+
+		gvr("", "v1", "bindings"):      {"create": testPodBindingEviction},
+		gvr("", "v1", "pods/binding"):  {"create": testPodBindingEviction},
+		gvr("", "v1", "pods/eviction"): {"create": testPodBindingEviction},
+
+		gvr("", "v1", "nodes/proxy"):    {"*": testSubresourceProxy},
+		gvr("", "v1", "pods/proxy"):     {"*": testSubresourceProxy},
+		gvr("", "v1", "services/proxy"): {"*": testSubresourceProxy},
 	}
 
 	// excludedResources lists resources / verb combinations that are not yet tested. this set should trend to zero.
@@ -112,17 +130,6 @@ var (
 		// TODO: webhook config objects are not subject to admission, verify CRUD works and webhooks do not observe them
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):   sets.NewString("*"),
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): sets.NewString("*"),
-
-		// TODO: implement custom subresource tests (requires special states or requests)
-		gvr("", "v1", "bindings"):         sets.NewString("create"),
-		gvr("", "v1", "nodes/proxy"):      sets.NewString("*"),
-		gvr("", "v1", "pods/attach"):      sets.NewString("create"),
-		gvr("", "v1", "pods/binding"):     sets.NewString("create"),
-		gvr("", "v1", "pods/eviction"):    sets.NewString("create"),
-		gvr("", "v1", "pods/exec"):        sets.NewString("create"),
-		gvr("", "v1", "pods/portforward"): sets.NewString("create"),
-		gvr("", "v1", "pods/proxy"):       sets.NewString("*"),
-		gvr("", "v1", "services/proxy"):   sets.NewString("*"),
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{
@@ -393,6 +400,8 @@ func TestWebhookV1beta1(t *testing.T) {
 							t:               t,
 							admissionHolder: holder,
 							client:          dynamicClient,
+							clientset:       master.Client,
+							verb:            verb,
 							gvr:             gvr,
 							resource:        resource,
 							resources:       resourcesByGVR,
@@ -735,6 +744,141 @@ func testDeploymentRollback(c *testContext) {
 	}
 }
 
+// testPodConnectSubresource verifies connect subresources
+func testPodConnectSubresource(c *testContext) {
+	podGVR := gvr("", "v1", "pods")
+	pod, err := createOrGetResource(c.client, podGVR, c.resources[podGVR])
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	// check all upgradeable verbs
+	for _, httpMethod := range []string{"GET", "POST"} {
+		c.t.Logf("verifying %v", httpMethod)
+
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), v1beta1.Connect, pod.GetName(), pod.GetNamespace(), true, false)
+		var err error
+		switch c.gvr {
+		case gvr("", "v1", "pods/exec"):
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("exec").Do().Error()
+		case gvr("", "v1", "pods/attach"):
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("attach").Do().Error()
+		case gvr("", "v1", "pods/portforward"):
+			err = c.clientset.CoreV1().RESTClient().Verb(httpMethod).Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("portforward").Do().Error()
+		default:
+			c.t.Errorf("unknown subresource %#v", c.gvr)
+			return
+		}
+
+		if err != nil {
+			c.t.Logf("debug: result of subresource connect: %v", err)
+		}
+		c.admissionHolder.verify(c.t)
+
+	}
+}
+
+// testPodBindingEviction verifies pod binding and eviction admission
+func testPodBindingEviction(c *testContext) {
+	podGVR := gvr("", "v1", "pods")
+	pod, err := createOrGetResource(c.client, podGVR, c.resources[podGVR])
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	background := metav1.DeletePropagationBackground
+	zero := int64(0)
+	forceDelete := &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}
+	defer func() {
+		err := c.clientset.CoreV1().Pods(pod.GetNamespace()).Delete(pod.GetName(), forceDelete)
+		if err != nil && !errors.IsNotFound(err) {
+			c.t.Error(err)
+			return
+		}
+	}()
+
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), v1beta1.Create, pod.GetName(), pod.GetNamespace(), true, false)
+
+	switch c.gvr {
+	case gvr("", "v1", "bindings"):
+		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("bindings").Body(&corev1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Name: pod.GetName()},
+			Target:     corev1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
+		}).Do().Error()
+
+	case gvr("", "v1", "pods/binding"):
+		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("binding").Body(&corev1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Name: pod.GetName()},
+			Target:     corev1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
+		}).Do().Error()
+
+	case gvr("", "v1", "pods/eviction"):
+		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("eviction").Body(&policyv1beta1.Eviction{
+			ObjectMeta:    metav1.ObjectMeta{Name: pod.GetName()},
+			DeleteOptions: forceDelete,
+		}).Do().Error()
+
+	default:
+		c.t.Errorf("unhandled resource %#v", c.gvr)
+		return
+	}
+
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+}
+
+// testSubresourceProxy verifies proxy subresources
+func testSubresourceProxy(c *testContext) {
+	parentGVR := getParentGVR(c.gvr)
+	parentResource := c.resources[parentGVR]
+	obj, err := createOrGetResource(c.client, parentGVR, parentResource)
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	gvrWithoutSubresources := c.gvr
+	gvrWithoutSubresources.Resource = strings.Split(gvrWithoutSubresources.Resource, "/")[0]
+	subresources := strings.Split(c.gvr.Resource, "/")[1:]
+
+	verbToHTTPMethods := map[string][]string{
+		"create": {"POST", "GET", "HEAD", "OPTIONS"}, // also test read-only verbs map to Connect admission
+		"update": {"PUT"},
+		"patch":  {"PATCH"},
+		"delete": {"DELETE"},
+	}
+	httpMethodsToTest, ok := verbToHTTPMethods[c.verb]
+	if !ok {
+		c.t.Errorf("unknown verb %v", c.verb)
+		return
+	}
+
+	for _, httpMethod := range httpMethodsToTest {
+		c.t.Logf("testing %v", httpMethod)
+		request := c.clientset.CoreV1().RESTClient().Verb(httpMethod)
+
+		// add the namespace if required
+		if len(obj.GetNamespace()) > 0 {
+			request = request.Namespace(obj.GetNamespace())
+		}
+
+		// set expectations
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), v1beta1.Connect, obj.GetName(), obj.GetNamespace(), true, false)
+		// run the request. we don't actually care if the request is successful, just that admission gets called as expected
+		err = request.Resource(gvrWithoutSubresources.Resource).Name(obj.GetName()).SubResource(subresources...).Do().Error()
+		if err != nil {
+			c.t.Logf("debug: result of subresource proxy (error expected): %v", err)
+		}
+		// verify the result
+		c.admissionHolder.verify(c.t)
+	}
+
+}
+
 //
 // utility methods
 //
@@ -806,6 +950,9 @@ func newWebhookHandler(t *testing.T, holder *holder, phase string) http.Handler 
 
 func getTestFunc(gvr schema.GroupVersionResource, verb string) testFunc {
 	if f, found := customTestFuncs[gvr][verb]; found {
+		return f
+	}
+	if f, found := customTestFuncs[gvr]["*"]; found {
 		return f
 	}
 	if strings.Contains(gvr.Resource, "/") {
