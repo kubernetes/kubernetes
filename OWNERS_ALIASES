@@ -391,8 +391,8 @@ sig-storage-api-reviewers:
 
   
   # sig-windows-api-reviewers:
-  #   - 
-  #   - 
+    - patricklang
+    - michmike
 
   dep-approvers:
     - apelisse
