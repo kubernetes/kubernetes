@@ -103,23 +103,24 @@ func TestParsePEMCert(t *testing.T) {
 	}{
 		{"invalid certificate data", []byte{0}, false},
 		{"certificate with junk appended", []byte(testCertPEM + "\nABC"), false},
-		{"multiple certificates", []byte(testCertPEM + "\n" + testCertPEM), false},
+		{"multiple certificates", []byte(testCertPEM + "\n" + testCertPEM), true},
 		{"valid", []byte(testCertPEM), true},
+		{"empty input", []byte{}, false},
 	} {
-		cert, err := parsePEMCert(testCase.input)
+		certs, err := parsePEMCerts(testCase.input)
 		if testCase.expectValid {
 			if err != nil {
 				t.Errorf("failed TestParsePEMCert(%s): unexpected error %v", testCase.name, err)
 			}
-			if cert == nil {
+			if certs == nil {
 				t.Errorf("failed TestParsePEMCert(%s): returned nil", testCase.name)
 			}
 		} else {
 			if err == nil {
 				t.Errorf("failed TestParsePEMCert(%s): expected an error", testCase.name)
 			}
-			if cert != nil {
-				t.Errorf("failed TestParsePEMCert(%s): expected not to get a certificate back, but got one", testCase.name)
+			if certs != nil {
+				t.Errorf("failed TestParsePEMCert(%s): expected not to get a certificate back, but got some", testCase.name)
 			}
 		}
 	}
