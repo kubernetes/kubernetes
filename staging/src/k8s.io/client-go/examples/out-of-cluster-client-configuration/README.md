@@ -22,7 +22,7 @@ Run this application with:
 Running this application will use the kubeconfig file and then authenticate to the
 cluster, and print the number of pods in the cluster every 10 seconds:
 
-    $ ./app
+    ./app
     There are 3 pods in the cluster
     There are 3 pods in the cluster
     There are 3 pods in the cluster

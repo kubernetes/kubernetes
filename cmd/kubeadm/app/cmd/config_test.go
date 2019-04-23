@@ -244,11 +244,11 @@ func TestImagesPull(t *testing.T) {
 	}
 
 	images := []string{"a", "b", "c", "d", "a"}
-	ip := NewImagesPull(containerRuntime, images)
-
-	err = ip.PullAll()
-	if err != nil {
-		t.Fatalf("expected nil but found %v", err)
+	for _, image := range images {
+		if err := containerRuntime.PullImage(image); err != nil {
+			t.Fatalf("expected nil but found %v", err)
+		}
+		fmt.Printf("[config/images] Pulled %s\n", image)
 	}
 
 	if fcmd.CombinedOutputCalls != len(images) {

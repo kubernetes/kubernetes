@@ -34,6 +34,7 @@ go_library(
         "projected_downwardapi.go",
         "projected_secret.go",
         "runtime.go",
+        "runtimeclass.go",
         "secrets.go",
         "secrets_volume.go",
         "security_context.go",
@@ -45,11 +46,11 @@ go_library(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/images:go_default_library",
+        "//pkg/kubelet/runtimeclass/testing:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
@@ -76,6 +77,8 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/replicaset:go_default_library",
+        "//test/e2e/framework/volume:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
@@ -83,6 +86,7 @@ go_library(
         "//vendor/github.com/onsi/gomega/types:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

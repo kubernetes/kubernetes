@@ -55,80 +55,91 @@ func TestGetStaticPodSpecs(t *testing.T) {
 
 	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, k8sVersion)
 
-	var assertions = []struct {
+	var tests = []struct {
+		name          string
 		staticPodName string
 	}{
 		{
+			name:          "KubeAPIServer",
 			staticPodName: kubeadmconstants.KubeAPIServer,
 		},
 		{
+			name:          "KubeControllerManager",
 			staticPodName: kubeadmconstants.KubeControllerManager,
 		},
 		{
+			name:          "KubeScheduler",
 			staticPodName: kubeadmconstants.KubeScheduler,
 		},
 	}
 
-	for _, assertion := range assertions {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// assert the spec for the staticPodName exists
+			if spec, ok := specs[tc.staticPodName]; ok {
 
-		// assert the spec for the staticPodName exists
-		if spec, ok := specs[assertion.staticPodName]; ok {
+				// Assert each specs refers to the right pod
+				if spec.Spec.Containers[0].Name != tc.staticPodName {
+					t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expects %s", tc.staticPodName, spec.Spec.Containers[0].Name, tc.staticPodName)
+				}
 
-			// Assert each specs refers to the right pod
-			if spec.Spec.Containers[0].Name != assertion.staticPodName {
-				t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expects %s", assertion.staticPodName, spec.Spec.Containers[0].Name, assertion.staticPodName)
+			} else {
+				t.Errorf("getStaticPodSpecs didn't create spec for %s ", tc.staticPodName)
 			}
-
-		} else {
-			t.Errorf("getStaticPodSpecs didn't create spec for %s ", assertion.staticPodName)
-		}
+		})
 	}
 }
 
 func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 	var tests = []struct {
+		name       string
 		components []string
 	}{
 		{
+			name:       "KubeAPIServer KubeAPIServer KubeScheduler",
 			components: []string{kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler},
 		},
 		{
+			name:       "KubeAPIServer",
 			components: []string{kubeadmconstants.KubeAPIServer},
 		},
 		{
+			name:       "KubeControllerManager",
 			components: []string{kubeadmconstants.KubeControllerManager},
 		},
 		{
+			name:       "KubeScheduler",
 			components: []string{kubeadmconstants.KubeScheduler},
 		},
 	}
 
 	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create temp folder for the test case
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
 
-		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
+			// Creates a Cluster Configuration
+			cfg := &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: "v1.9.0",
+			}
 
-		// Creates a Cluster Configuration
-		cfg := &kubeadmapi.ClusterConfiguration{
-			KubernetesVersion: "v1.9.0",
-		}
+			// Execute createStaticPodFunction
+			manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
+			err := CreateStaticPodFiles(manifestPath, cfg, &kubeadmapi.APIEndpoint{}, test.components...)
+			if err != nil {
+				t.Errorf("Error executing createStaticPodFunction: %v", err)
+				return
+			}
 
-		// Execute createStaticPodFunction
-		manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-		err := CreateStaticPodFiles(manifestPath, cfg, &kubeadmapi.APIEndpoint{}, test.components...)
-		if err != nil {
-			t.Errorf("Error executing createStaticPodFunction: %v", err)
-			continue
-		}
+			// Assert expected files are there
+			testutil.AssertFilesCount(t, manifestPath, len(test.components))
 
-		// Assert expected files are there
-		testutil.AssertFilesCount(t, manifestPath, len(test.components))
-
-		for _, fileName := range test.components {
-			testutil.AssertFileExists(t, manifestPath, fileName+".yaml")
-		}
+			for _, fileName := range test.components {
+				testutil.AssertFileExists(t, manifestPath, fileName+".yaml")
+			}
+		})
 	}
 }
 
@@ -626,12 +637,14 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getControllerManagerCommand(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion))
-		sort.Strings(actual)
-		sort.Strings(rt.expected)
-		if !reflect.DeepEqual(actual, rt.expected) {
-			errorDiffArguments(t, rt.name, actual, rt.expected)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := getControllerManagerCommand(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion))
+			sort.Strings(actual)
+			sort.Strings(rt.expected)
+			if !reflect.DeepEqual(actual, rt.expected) {
+				errorDiffArguments(t, rt.name, actual, rt.expected)
+			}
+		})
 	}
 }
 
@@ -703,16 +716,17 @@ func TestCalcNodeCidrSize(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		actualPrefix := calcNodeCidrSize(test.podSubnet)
-		if actualPrefix != test.expectedPrefix {
-			t.Errorf("Case [%s]\nCalc of node CIDR size for pod subnet %q failed: Expected %q, saw %q",
-				test.name, test.podSubnet, test.expectedPrefix, actualPrefix)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			actualPrefix := calcNodeCidrSize(test.podSubnet)
+			if actualPrefix != test.expectedPrefix {
+				t.Errorf("Case [%s]\nCalc of node CIDR size for pod subnet %q failed: Expected %q, saw %q",
+					test.name, test.podSubnet, test.expectedPrefix, actualPrefix)
+			}
+		})
 	}
 
 }
 func TestGetControllerManagerCommandExternalCA(t *testing.T) {
-
 	tests := []struct {
 		name            string
 		cfg             *kubeadmapi.InitConfiguration
@@ -780,32 +794,34 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
-		test.cfg.CertificatesDir = tmpdir
+		t.Run(test.name, func(t *testing.T) {
+			// Create temp folder for the test case
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
+			test.cfg.CertificatesDir = tmpdir
 
-		if err := certs.CreatePKIAssets(test.cfg); err != nil {
-			t.Errorf("failed creating pki assets: %v", err)
-		}
-
-		// delete ca.key and front-proxy-ca.key if test.caKeyPresent is false
-		if !test.caKeyPresent {
-			if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
-				t.Errorf("failed removing %s: %v", kubeadmconstants.CAKeyName, err)
+			if err := certs.CreatePKIAssets(test.cfg); err != nil {
+				t.Errorf("failed creating pki assets: %v", err)
 			}
-			if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
-				t.Errorf("failed removing %s: %v", kubeadmconstants.FrontProxyCAKeyName, err)
-			}
-		}
 
-		actual := getControllerManagerCommand(&test.cfg.ClusterConfiguration, version.MustParseSemantic(test.cfg.KubernetesVersion))
-		expected := test.expectedArgFunc(tmpdir)
-		sort.Strings(actual)
-		sort.Strings(expected)
-		if !reflect.DeepEqual(actual, expected) {
-			errorDiffArguments(t, test.name, actual, expected)
-		}
+			// delete ca.key and front-proxy-ca.key if test.caKeyPresent is false
+			if !test.caKeyPresent {
+				if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
+					t.Errorf("failed removing %s: %v", kubeadmconstants.CAKeyName, err)
+				}
+				if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
+					t.Errorf("failed removing %s: %v", kubeadmconstants.FrontProxyCAKeyName, err)
+				}
+			}
+
+			actual := getControllerManagerCommand(&test.cfg.ClusterConfiguration, version.MustParseSemantic(test.cfg.KubernetesVersion))
+			expected := test.expectedArgFunc(tmpdir)
+			sort.Strings(actual)
+			sort.Strings(expected)
+			if !reflect.DeepEqual(actual, expected) {
+				errorDiffArguments(t, test.name, actual, expected)
+			}
+		})
 	}
 }
 
@@ -828,12 +844,14 @@ func TestGetSchedulerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getSchedulerCommand(rt.cfg)
-		sort.Strings(actual)
-		sort.Strings(rt.expected)
-		if !reflect.DeepEqual(actual, rt.expected) {
-			errorDiffArguments(t, rt.name, actual, rt.expected)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := getSchedulerCommand(rt.cfg)
+			sort.Strings(actual)
+			sort.Strings(rt.expected)
+			if !reflect.DeepEqual(actual, rt.expected) {
+				errorDiffArguments(t, rt.name, actual, rt.expected)
+			}
+		})
 	}
 }
 
@@ -901,7 +919,6 @@ func TestGetAuthzModes(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-
 		t.Run(rt.name, func(t *testing.T) {
 			actual := getAuthzModes(strings.Join(rt.authMode, ","))
 			if actual != rt.expected {

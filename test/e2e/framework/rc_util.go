@@ -21,11 +21,10 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -82,48 +81,12 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 	}
 }
 
-// ScaleRCByLabels scales an RC via ns/label lookup. If replicas == 0 it waits till
-// none are running, otherwise it does what a synchronous scale operation would do.
-func ScaleRCByLabels(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns string, l map[string]string, replicas uint) error {
-	listOpts := metav1.ListOptions{LabelSelector: labels.SelectorFromSet(labels.Set(l)).String()}
-	rcs, err := clientset.CoreV1().ReplicationControllers(ns).List(listOpts)
-	if err != nil {
-		return err
-	}
-	if len(rcs.Items) == 0 {
-		return fmt.Errorf("RC with labels %v not found in ns %v", l, ns)
-	}
-	Logf("Scaling %v RCs with labels %v in ns %v to %v replicas.", len(rcs.Items), l, ns, replicas)
-	for _, labelRC := range rcs.Items {
-		name := labelRC.Name
-		if err := ScaleRC(clientset, scalesGetter, ns, name, replicas, false); err != nil {
-			return err
-		}
-		rc, err := clientset.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if replicas == 0 {
-			ps, err := testutils.NewPodStore(clientset, rc.Namespace, labels.SelectorFromSet(rc.Spec.Selector), fields.Everything())
-			if err != nil {
-				return err
-			}
-			defer ps.Stop()
-			if err = waitForPodsGone(ps, 10*time.Second, 10*time.Minute); err != nil {
-				return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
-			}
-		} else {
-			if err := testutils.WaitForPodsWithLabelRunning(
-				clientset, ns, labels.SelectorFromSet(labels.Set(rc.Spec.Selector))); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 type updateRcFunc func(d *v1.ReplicationController)
 
+// UpdateReplicationControllerWithRetries retries updating the given rc on conflict with the following steps:
+// 1. Get latest resource
+// 2. applyUpdate
+// 3. Update the resource
 func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRcFunc) (*v1.ReplicationController, error) {
 	var rc *v1.ReplicationController
 	var updateErr error
@@ -152,12 +115,15 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 	return DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
 }
 
+// ScaleRC scales Replication Controller to be desired size.
 func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
 	return ScaleResource(clientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.Resource("replicationcontrollers"))
 }
 
+// RunRC Launches (and verifies correctness) of a Replication Controller
+// and will wait for all pods it spawns to become "Running".
 func RunRC(config testutils.RCConfig) error {
-	By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
+	ginkgo.By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
 	config.NodeDumpFunc = DumpNodeDebugInfo
 	config.ContainerDumpFunc = LogFailedContainers
 	return testutils.RunRC(config)
@@ -180,10 +146,9 @@ func WaitForReplicationController(c clientset.Interface, namespace, name string,
 		if err != nil {
 			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
 			return !exist, nil
-		} else {
-			Logf("ReplicationController %s in namespace %s found.", name, namespace)
-			return exist, nil
 		}
+		Logf("ReplicationController %s in namespace %s found.", name, namespace)
+		return exist, nil
 	})
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
@@ -249,13 +214,13 @@ func ValidateController(c clientset.Interface, containerImage string, replicas i
 
 	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "spec" "containers")}}{{range .spec.containers}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
 
-	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
+	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 waitLoop:
 	for start := time.Now(); time.Since(start) < PodStartTimeout; time.Sleep(5 * time.Second) {
 		getPodsOutput := RunKubectlOrDie("get", "pods", "-o", "template", getPodsTemplate, "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
-			By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
+			ginkgo.By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
 			continue
 		}
 		var runningPods []string

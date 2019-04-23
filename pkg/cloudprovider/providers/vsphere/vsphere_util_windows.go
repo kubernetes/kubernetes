@@ -24,14 +24,21 @@ import (
 	"strings"
 )
 
-func GetVMUUID() (string, error) {
-	result, err := exec.Command("wmic", "csproduct", "get", "UUID").Output()
+func getRawUUID() (string, error) {
+	result, err := exec.Command("wmic", "bios", "get", "serialnumber").Output()
 	if err != nil {
-		return "", fmt.Errorf("error retrieving vm uuid: %s", err)
+		return "", err
 	}
-	fields := strings.Fields(string(result))
-	if len(fields) != 2 {
+	lines := strings.FieldsFunc(string(result), func(r rune) bool {
+		switch r {
+		case '\n', '\r':
+			return true
+		default:
+			return false
+		}
+	})
+	if len(lines) != 2 {
 		return "", fmt.Errorf("received unexpected value retrieving vm uuid: %q", string(result))
 	}
-	return fields[1], nil
+	return lines[1], nil
 }

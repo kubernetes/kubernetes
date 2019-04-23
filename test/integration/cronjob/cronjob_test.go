@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.CronJobController, *job.JobController, informers.SharedInformerFactory, clientset.Interface, rest.Config) {
+func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.Controller, *job.JobController, informers.SharedInformerFactory, clientset.Interface, rest.Config) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, server, closeFn := framework.RunAMaster(masterConfig)
 
@@ -49,7 +49,7 @@ func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.CronJo
 	}
 	resyncPeriod := 12 * time.Hour
 	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "cronjob-informers")), resyncPeriod)
-	cjc, err := cronjob.NewCronJobController(clientSet)
+	cjc, err := cronjob.NewController(clientSet)
 	if err != nil {
 		t.Fatalf("Error creating CronJob controller: %v", err)
 	}

@@ -23,11 +23,13 @@ import (
 	"testing"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -647,7 +649,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			upm := newUnschedulablePodsMap()
+			upm := newUnschedulablePodsMap(nil)
 			for _, p := range test.podsToAdd {
 				upm.addOrUpdate(newPodInfoNoTimestamp(p))
 			}
@@ -987,6 +989,48 @@ func TestHighProirotyFlushUnschedulableQLeftover(t *testing.T) {
 	}
 }
 
+type operation func(queue *PriorityQueue, pInfo *podInfo)
+
+var (
+	addPodActiveQ = func(queue *PriorityQueue, pInfo *podInfo) {
+		queue.lock.Lock()
+		queue.activeQ.Add(pInfo)
+		queue.lock.Unlock()
+	}
+	updatePodActiveQ = func(queue *PriorityQueue, pInfo *podInfo) {
+		queue.lock.Lock()
+		queue.activeQ.Update(pInfo)
+		queue.lock.Unlock()
+	}
+	addPodUnschedulableQ = func(queue *PriorityQueue, pInfo *podInfo) {
+		queue.lock.Lock()
+		// Update pod condition to unschedulable.
+		podutil.UpdatePodCondition(&pInfo.pod.Status, &v1.PodCondition{
+			Type:    v1.PodScheduled,
+			Status:  v1.ConditionFalse,
+			Reason:  v1.PodReasonUnschedulable,
+			Message: "fake scheduling failure",
+		})
+		queue.unschedulableQ.addOrUpdate(pInfo)
+		queue.lock.Unlock()
+	}
+	addPodBackoffQ = func(queue *PriorityQueue, pInfo *podInfo) {
+		queue.lock.Lock()
+		queue.podBackoffQ.Add(pInfo)
+		queue.lock.Unlock()
+	}
+	moveAllToActiveQ = func(queue *PriorityQueue, _ *podInfo) {
+		queue.MoveAllToActiveQueue()
+	}
+	backoffPod = func(queue *PriorityQueue, pInfo *podInfo) {
+		queue.backoffPod(pInfo.pod)
+	}
+	flushBackoffQ = func(queue *PriorityQueue, _ *podInfo) {
+		queue.clock.(*clock.FakeClock).Step(2 * time.Second)
+		queue.flushBackoffQCompleted()
+	}
+)
+
 // TestPodTimestamp tests the operations related to podInfo.
 func TestPodTimestamp(t *testing.T) {
 	pod1 := &v1.Pod{
@@ -1021,101 +1065,61 @@ func TestPodTimestamp(t *testing.T) {
 		timestamp: timestamp.Add(time.Second),
 	}
 
-	var queue *PriorityQueue
-	type operation = func()
-	addPodActiveQ := func(pInfo *podInfo) operation {
-		return func() {
-			queue.lock.Lock()
-			defer queue.lock.Unlock()
-			queue.activeQ.Add(pInfo)
-		}
-	}
-	updatePodActiveQ := func(pInfo *podInfo) operation {
-		return func() {
-			queue.lock.Lock()
-			defer queue.lock.Unlock()
-			queue.activeQ.Update(pInfo)
-		}
-	}
-	addPodUnschedulableQ := func(pInfo *podInfo) operation {
-		return func() {
-			queue.lock.Lock()
-			defer queue.lock.Unlock()
-			// Update pod condition to unschedulable.
-			podutil.UpdatePodCondition(&pInfo.pod.Status, &v1.PodCondition{
-				Type:    v1.PodScheduled,
-				Status:  v1.ConditionFalse,
-				Reason:  v1.PodReasonUnschedulable,
-				Message: "fake scheduling failure",
-			})
-			queue.unschedulableQ.addOrUpdate(pInfo)
-		}
-	}
-	addPodBackoffQ := func(pInfo *podInfo) operation {
-		return func() {
-			queue.lock.Lock()
-			defer queue.lock.Unlock()
-			queue.podBackoffQ.Add(pInfo)
-		}
-	}
-	moveAllToActiveQ := func() operation {
-		return func() {
-			queue.MoveAllToActiveQueue()
-		}
-	}
-	backoffPod := func(pInfo *podInfo) operation {
-		return func() {
-			queue.backoffPod(pInfo.pod)
-		}
-	}
-	flushBackoffQ := func() operation {
-		return func() {
-			queue.clock.(*clock.FakeClock).Step(2 * time.Second)
-			queue.flushBackoffQCompleted()
-		}
-	}
 	tests := []struct {
 		name       string
 		operations []operation
+		operands   []*podInfo
 		expected   []*podInfo
 	}{
 		{
 			name: "add two pod to activeQ and sort them by the timestamp",
 			operations: []operation{
-				addPodActiveQ(pInfo2), addPodActiveQ(pInfo1),
+				addPodActiveQ,
+				addPodActiveQ,
 			},
+			operands: []*podInfo{pInfo2, pInfo1},
 			expected: []*podInfo{pInfo1, pInfo2},
 		},
 		{
 			name: "update two pod to activeQ and sort them by the timestamp",
 			operations: []operation{
-				updatePodActiveQ(pInfo2), updatePodActiveQ(pInfo1),
+				updatePodActiveQ,
+				updatePodActiveQ,
 			},
+			operands: []*podInfo{pInfo2, pInfo1},
 			expected: []*podInfo{pInfo1, pInfo2},
 		},
 		{
 			name: "add two pod to unschedulableQ then move them to activeQ and sort them by the timestamp",
 			operations: []operation{
-				addPodUnschedulableQ(pInfo2), addPodUnschedulableQ(pInfo1), moveAllToActiveQ(),
+				addPodUnschedulableQ,
+				addPodUnschedulableQ,
+				moveAllToActiveQ,
 			},
+			operands: []*podInfo{pInfo2, pInfo1, nil},
 			expected: []*podInfo{pInfo1, pInfo2},
 		},
 		{
 			name: "add one pod to BackoffQ and move it to activeQ",
 			operations: []operation{
-				addPodActiveQ(pInfo2), addPodBackoffQ(pInfo1), backoffPod(pInfo1), flushBackoffQ(), moveAllToActiveQ(),
+				addPodActiveQ,
+				addPodBackoffQ,
+				backoffPod,
+				flushBackoffQ,
+				moveAllToActiveQ,
 			},
+			operands: []*podInfo{pInfo2, pInfo1, pInfo1, nil, nil},
 			expected: []*podInfo{pInfo1, pInfo2},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			queue = NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp))
+			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp))
 			var podInfoList []*podInfo
 
-			for _, op := range test.operations {
-				op()
+			for i, op := range test.operations {
+				op(queue, test.operands[i])
 			}
 
 			for i := 0; i < len(test.expected); i++ {
@@ -1129,6 +1133,149 @@ func TestPodTimestamp(t *testing.T) {
 			if !reflect.DeepEqual(test.expected, podInfoList) {
 				t.Errorf("Unexpected podInfo list. Expected: %v, got: %v",
 					test.expected, podInfoList)
+			}
+		})
+	}
+}
+
+// TestPendingPodsMetric tests Prometheus metrics related with pending pods
+func TestPendingPodsMetric(t *testing.T) {
+	total := 50
+	timestamp := time.Now()
+	var pInfos = make([]*podInfo, 0, total)
+	for i := 1; i <= total; i++ {
+		p := &podInfo{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("test-pod-%d", i),
+					Namespace: fmt.Sprintf("ns%d", i),
+					UID:       types.UID(fmt.Sprintf("tp-%d", i)),
+				},
+			},
+			timestamp: timestamp,
+		}
+		pInfos = append(pInfos, p)
+	}
+	tests := []struct {
+		name       string
+		operations []operation
+		operands   [][]*podInfo
+		expected   []int64
+	}{
+		{
+			name: "add pods to activeQ and unschedulableQ",
+			operations: []operation{
+				addPodActiveQ,
+				addPodUnschedulableQ,
+			},
+			operands: [][]*podInfo{
+				pInfos[:30],
+				pInfos[30:],
+			},
+			expected: []int64{30, 0, 20},
+		},
+		{
+			name: "add pods to all kinds of queues",
+			operations: []operation{
+				addPodActiveQ,
+				backoffPod,
+				addPodBackoffQ,
+				addPodUnschedulableQ,
+			},
+			operands: [][]*podInfo{
+				pInfos[:15],
+				pInfos[15:40],
+				pInfos[15:40],
+				pInfos[40:],
+			},
+			expected: []int64{15, 25, 10},
+		},
+		{
+			name: "add pods to unschedulableQ and then move all to activeQ",
+			operations: []operation{
+				addPodUnschedulableQ,
+				moveAllToActiveQ,
+			},
+			operands: [][]*podInfo{
+				pInfos[:total],
+				{nil},
+			},
+			expected: []int64{int64(total), 0, 0},
+		},
+		{
+			name: "make some pods subject to backoff, add pods to unschedulableQ, and then move all to activeQ",
+			operations: []operation{
+				backoffPod,
+				addPodUnschedulableQ,
+				moveAllToActiveQ,
+			},
+			operands: [][]*podInfo{
+				pInfos[:20],
+				pInfos[:total],
+				{nil},
+			},
+			expected: []int64{int64(total - 20), 20, 0},
+		},
+		{
+			name: "make some pods subject to backoff, add pods to unschedulableQ/activeQ, move all to activeQ, and finally flush backoffQ",
+			operations: []operation{
+				backoffPod,
+				addPodUnschedulableQ,
+				addPodActiveQ,
+				moveAllToActiveQ,
+				flushBackoffQ,
+			},
+			operands: [][]*podInfo{
+				pInfos[:20],
+				pInfos[:40],
+				pInfos[40:],
+				{nil},
+				{nil},
+			},
+			expected: []int64{int64(total), 0, 0},
+		},
+	}
+
+	resetMetrics := func() {
+		metrics.ActivePods.Set(0)
+		metrics.BackoffPods.Set(0)
+		metrics.UnschedulablePods.Set(0)
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resetMetrics()
+			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp))
+			for i, op := range test.operations {
+				for _, pInfo := range test.operands[i] {
+					op(queue, pInfo)
+				}
+			}
+
+			var activeNum, backoffNum, unschedulableNum float64
+			metricProto := &dto.Metric{}
+			if err := metrics.ActivePods.Write(metricProto); err != nil {
+				t.Errorf("error writing ActivePods metric: %v", err)
+			}
+			activeNum = metricProto.Gauge.GetValue()
+			if int64(activeNum) != test.expected[0] {
+				t.Errorf("ActivePods: Expected %v, got %v", test.expected[0], activeNum)
+			}
+
+			if err := metrics.BackoffPods.Write(metricProto); err != nil {
+				t.Errorf("error writing BackoffPods metric: %v", err)
+			}
+			backoffNum = metricProto.Gauge.GetValue()
+			if int64(backoffNum) != test.expected[1] {
+				t.Errorf("BackoffPods: Expected %v, got %v", test.expected[1], backoffNum)
+			}
+
+			if err := metrics.UnschedulablePods.Write(metricProto); err != nil {
+				t.Errorf("error writing UnschedulablePods metric: %v", err)
+			}
+			unschedulableNum = metricProto.Gauge.GetValue()
+			if int64(unschedulableNum) != test.expected[2] {
+				t.Errorf("UnschedulablePods: Expected %v, got %v", test.expected[2], unschedulableNum)
 			}
 		})
 	}

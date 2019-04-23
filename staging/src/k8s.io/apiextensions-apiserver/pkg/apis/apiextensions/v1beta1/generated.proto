@@ -140,7 +140,7 @@ message CustomResourceDefinition {
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 message CustomResourceDefinitionCondition {
-  // Type is the type of the condition.
+  // Type is the type of the condition. Types include Established, NamesAccepted and Terminating.
   optional string type = 1;
 
   // Status is the status of the condition.
@@ -482,6 +482,12 @@ message ServiceReference {
   // this service.
   // +optional
   optional string path = 3;
+
+  // If specified, the port on the service that hosting webhook.
+  // Default to 443 for backward compatibility.
+  // `port` should be a valid port number (1-65535, inclusive).
+  // +optional
+  optional int32 port = 4;
 }
 
 // WebhookClientConfig contains the information to make a TLS
@@ -520,8 +526,6 @@ message WebhookClientConfig {
   // `service` or `url` must be specified.
   //
   // If the webhook is running within the cluster, then you should use `service`.
-  //
-  // Port 443 will be used if it is open, otherwise it is an error.
   //
   // +optional
   optional ServiceReference service = 1;

@@ -2925,6 +2925,61 @@ func TestCleanLegacyService(t *testing.T) {
 
 }
 
+func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	gtm := NewGracefulTerminationManager(ipvs)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, []string{"4.4.4.4/32"})
+	fp.gracefuldeleteManager = gtm
+
+	vs := &utilipvs.VirtualServer{
+		Address:   net.ParseIP("4.4.4.4"),
+		Protocol:  string(v1.ProtocolUDP),
+		Port:      56,
+		Scheduler: "rr",
+		Flags:     utilipvs.FlagHashed,
+	}
+
+	fp.ipvs.AddVirtualServer(vs)
+
+	rss := []*utilipvs.RealServer{
+		{
+			Address:      net.ParseIP("10.10.10.10"),
+			Port:         56,
+			ActiveConn:   0,
+			InactiveConn: 0,
+		},
+		{
+			Address:      net.ParseIP("11.11.11.11"),
+			Port:         56,
+			ActiveConn:   0,
+			InactiveConn: 0,
+		},
+	}
+	for _, rs := range rss {
+		fp.ipvs.AddRealServer(vs, rs)
+	}
+
+	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+
+	fp.netlinkHandle.EnsureAddressBind("4.4.4.4", DefaultDummyDevice)
+
+	fp.cleanLegacyService(
+		map[string]bool{},
+		map[string]*utilipvs.VirtualServer{"ipvs0": vs},
+		map[string]bool{"4.4.4.4": true},
+	)
+
+	fp.gracefuldeleteManager.tryDeleteRs()
+
+	remainingRealServers, _ := fp.ipvs.GetRealServers(vs)
+
+	if len(remainingRealServers) != 2 {
+		t.Errorf("Expected number of remaining IPVS real servers after cleanup should be %v. Got %v", 2, len(remainingRealServers))
+	}
+}
+
 func TestCleanLegacyService6(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()

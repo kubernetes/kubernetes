@@ -62,6 +62,27 @@ const (
 	minFeasibleNodesPercentageToFind = 5
 )
 
+var unresolvablePredicateFailureErrors = map[predicates.PredicateFailureReason]struct{}{
+	predicates.ErrNodeSelectorNotMatch:      {},
+	predicates.ErrPodAffinityRulesNotMatch:  {},
+	predicates.ErrPodNotMatchHostName:       {},
+	predicates.ErrTaintsTolerationsNotMatch: {},
+	predicates.ErrNodeLabelPresenceViolated: {},
+	// Node conditions won't change when scheduler simulates removal of preemption victims.
+	// So, it is pointless to try nodes that have not been able to host the pod due to node
+	// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
+	predicates.ErrNodeNotReady:            {},
+	predicates.ErrNodeNetworkUnavailable:  {},
+	predicates.ErrNodeUnderDiskPressure:   {},
+	predicates.ErrNodeUnderPIDPressure:    {},
+	predicates.ErrNodeUnderMemoryPressure: {},
+	predicates.ErrNodeUnschedulable:       {},
+	predicates.ErrNodeUnknownCondition:    {},
+	predicates.ErrVolumeZoneConflict:      {},
+	predicates.ErrVolumeNodeConflict:      {},
+	predicates.ErrVolumeBindConflict:      {},
+}
+
 // FailedPredicateMap declares a map[string][]algorithm.PredicateFailureReason type.
 type FailedPredicateMap map[string][]predicates.PredicateFailureReason
 
@@ -916,8 +937,8 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 		klog.Errorf("earliestStartTime is nil for node %s. Should not reach here.", minNodes2[0])
 		return minNodes2[0]
 	}
-	lenNodes1 = 0
-	for i := 0; i < lenNodes2; i++ {
+	nodeToReturn := minNodes2[0]
+	for i := 1; i < lenNodes2; i++ {
 		node := minNodes2[i]
 		// Get earliest start time of all pods on the current node.
 		earliestStartTimeOnNode := util.GetEarliestPodStartTime(nodesToVictims[node])
@@ -927,22 +948,11 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 		}
 		if earliestStartTimeOnNode.After(latestStartTime.Time) {
 			latestStartTime = earliestStartTimeOnNode
-			lenNodes1 = 0
-		}
-		if earliestStartTimeOnNode.Equal(latestStartTime) {
-			minNodes1[lenNodes1] = node
-			lenNodes1++
+			nodeToReturn = node
 		}
 	}
 
-	// At this point, even if there are more than one node with the same score,
-	// return the first one.
-	if lenNodes1 > 0 {
-		return minNodes1[0]
-	}
-
-	klog.Errorf("Error in logic of node scoring for preemption. We should never reach here!")
-	return nil
+	return nodeToReturn
 }
 
 // selectNodesForPreemption finds all the nodes with possible victims for
@@ -1046,7 +1056,7 @@ func selectVictimsOnNode(
 	if nodeInfo == nil {
 		return nil, 0, false
 	}
-	potentialVictims := util.SortableList{CompFunc: util.HigherPriorityPod}
+	potentialVictims := util.SortableList{CompFunc: util.MoreImportantPod}
 	nodeInfoCopy := nodeInfo.Clone()
 
 	removePod := func(rp *v1.Pod) {
@@ -1111,44 +1121,28 @@ func selectVictimsOnNode(
 	return victims, numViolatingVictim, true
 }
 
+// unresolvablePredicateExists checks whether failedPredicates has unresolvable predicate.
+func unresolvablePredicateExists(failedPredicates []predicates.PredicateFailureReason) bool {
+	for _, failedPredicate := range failedPredicates {
+		if _, ok := unresolvablePredicateFailureErrors[failedPredicate]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
 func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedPredicateMap) []*v1.Node {
 	potentialNodes := []*v1.Node{}
 	for _, node := range nodes {
-		unresolvableReasonExist := false
 		failedPredicates, _ := failedPredicatesMap[node.Name]
 		// If we assume that scheduler looks at all nodes and populates the failedPredicateMap
 		// (which is the case today), the !found case should never happen, but we'd prefer
 		// to rely less on such assumptions in the code when checking does not impose
 		// significant overhead.
 		// Also, we currently assume all failures returned by extender as resolvable.
-		for _, failedPredicate := range failedPredicates {
-			switch failedPredicate {
-			case
-				predicates.ErrNodeSelectorNotMatch,
-				predicates.ErrPodAffinityRulesNotMatch,
-				predicates.ErrPodNotMatchHostName,
-				predicates.ErrTaintsTolerationsNotMatch,
-				predicates.ErrNodeLabelPresenceViolated,
-				// Node conditions won't change when scheduler simulates removal of preemption victims.
-				// So, it is pointless to try nodes that have not been able to host the pod due to node
-				// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
-				predicates.ErrNodeNotReady,
-				predicates.ErrNodeNetworkUnavailable,
-				predicates.ErrNodeUnderDiskPressure,
-				predicates.ErrNodeUnderPIDPressure,
-				predicates.ErrNodeUnderMemoryPressure,
-				predicates.ErrNodeUnschedulable,
-				predicates.ErrNodeUnknownCondition,
-				predicates.ErrVolumeZoneConflict,
-				predicates.ErrVolumeNodeConflict,
-				predicates.ErrVolumeBindConflict:
-				unresolvableReasonExist = true
-				break
-			}
-		}
-		if !unresolvableReasonExist {
+		if !unresolvablePredicateExists(failedPredicates) {
 			klog.V(3).Infof("Node %v is a potential node for preemption.", node.Name)
 			potentialNodes = append(potentialNodes, node)
 		}
@@ -1166,8 +1160,9 @@ func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedule
 	nomNodeName := pod.Status.NominatedNodeName
 	if len(nomNodeName) > 0 {
 		if nodeInfo, found := nodeNameToInfo[nomNodeName]; found {
+			podPriority := util.GetPodPriority(pod)
 			for _, p := range nodeInfo.Pods() {
-				if p.DeletionTimestamp != nil && util.GetPodPriority(p) < util.GetPodPriority(pod) {
+				if p.DeletionTimestamp != nil && util.GetPodPriority(p) < podPriority {
 					// There is a terminating pod on the nominated node.
 					return false
 				}

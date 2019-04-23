@@ -460,8 +460,8 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		if err := evaluator.Constraints(restrictedResources, inputObject); err != nil {
 			return nil, admission.NewForbidden(a, fmt.Errorf("failed quota: %s: %v", resourceQuota.Name, err))
 		}
-		if !hasUsageStats(&resourceQuota) {
-			return nil, admission.NewForbidden(a, fmt.Errorf("status unknown for quota: %s", resourceQuota.Name))
+		if !hasUsageStats(&resourceQuota, restrictedResources) {
+			return nil, admission.NewForbidden(a, fmt.Errorf("status unknown for quota: %s, resources: %s", resourceQuota.Name, prettyPrintResourceNames(restrictedResources)))
 		}
 		interestingQuotaIndexes = append(interestingQuotaIndexes, i)
 		localRestrictedResourcesSet := quota.ToSet(restrictedResources)
@@ -702,9 +702,13 @@ func prettyPrintResourceNames(a []corev1.ResourceName) string {
 	return strings.Join(values, ",")
 }
 
-// hasUsageStats returns true if for each hard constraint there is a value for its current usage
-func hasUsageStats(resourceQuota *corev1.ResourceQuota) bool {
+// hasUsageStats returns true if for each hard constraint in interestingResources there is a value for its current usage
+func hasUsageStats(resourceQuota *corev1.ResourceQuota, interestingResources []corev1.ResourceName) bool {
+	interestingSet := quota.ToSet(interestingResources)
 	for resourceName := range resourceQuota.Status.Hard {
+		if !interestingSet.Has(string(resourceName)) {
+			continue
+		}
 		if _, found := resourceQuota.Status.Used[resourceName]; !found {
 			return false
 		}

@@ -15,6 +15,7 @@ go_library(
         "extensions_client.go",
         "generated_expansion.go",
         "ingress.go",
+        "networkpolicy.go",
         "podsecuritypolicy.go",
         "replicaset.go",
     ],
@@ -23,7 +24,6 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",

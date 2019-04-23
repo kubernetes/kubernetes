@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -41,7 +41,9 @@ fi
 
 gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 
-APIROOTS=( ${1} )
+while IFS=$'\n' read -r line; do
+  APIROOTS+=( "$line" );
+done <<< "${1}"
 shift
 
 # requires the 'proto' tag to build (will remove when ready)
@@ -52,6 +54,6 @@ PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
   "${gotoprotobuf}" \
   --proto-import="${KUBE_ROOT}/vendor" \
   --proto-import="${KUBE_ROOT}/third_party/protobuf" \
-  --packages=$(IFS=, ; echo "${APIROOTS[*]}") \
-  --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt \
+  --packages="$(IFS=, ; echo "${APIROOTS[*]}")" \
+  --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" \
   "$@"

@@ -39,6 +39,12 @@ var scheme = runtime.NewScheme()
 var ParameterCodec = runtime.NewParameterCodec(scheme)
 
 func init() {
+	if err := AddToScheme(scheme); err != nil {
+		panic(err)
+	}
+}
+
+func AddToScheme(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Table{},
 		&TableOptions{},
@@ -46,11 +52,9 @@ func init() {
 		&PartialObjectMetadataList{},
 	)
 
-	if err := scheme.AddConversionFuncs(
+	return scheme.AddConversionFuncs(
 		Convert_Slice_string_To_v1beta1_IncludeObjectPolicy,
-	); err != nil {
-		panic(err)
-	}
+	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
 	//scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)

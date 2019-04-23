@@ -21,7 +21,10 @@ package preflight
 import (
 	"github.com/pkg/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/utils/exec"
+
+	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 )
 
 // Check validates if Docker is setup to use systemd as the cgroup driver.
@@ -41,4 +44,14 @@ func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
 		warnings = append(warnings, err)
 	}
 	return warnings, nil
+}
+
+// Check determines if IPVS proxier can be used or not
+func (ipvspc IPVSProxierCheck) Check() (warnings, errors []error) {
+	ipsetInterface := utilipset.New(ipvspc.exec)
+	kernelHandler := ipvs.NewLinuxKernelHandler()
+	if _, err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface); err != nil {
+		return nil, append(errors, err)
+	}
+	return nil, nil
 }

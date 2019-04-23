@@ -381,8 +381,9 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerT
 	if fsType != "" {
 		parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
+	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
 func (g *gcePDCSIDriver) GetClaimSize() string {

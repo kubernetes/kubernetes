@@ -209,7 +209,12 @@ func (o *ScaleOptions) RunScale() error {
 		return fmt.Errorf("cannot use --resource-version with multiple resources")
 	}
 
-	precondition := &kubectl.ScalePrecondition{Size: o.CurrentReplicas, ResourceVersion: o.ResourceVersion}
+	// only set a precondition if the user has requested one.  A nil precondition means we can do a blind update, so
+	// we avoid a Scale GET that may or may not succeed
+	var precondition *kubectl.ScalePrecondition
+	if o.CurrentReplicas != -1 || len(o.ResourceVersion) > 0 {
+		precondition = &kubectl.ScalePrecondition{Size: o.CurrentReplicas, ResourceVersion: o.ResourceVersion}
+	}
 	retry := kubectl.NewRetryParams(1*time.Second, 5*time.Minute)
 
 	var waitForReplicas *kubectl.RetryParams

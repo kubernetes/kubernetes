@@ -127,6 +127,7 @@ func (nt *NodeTree) removeZone(zone string) {
 	for i, z := range nt.zones {
 		if z == zone {
 			nt.zones = append(nt.zones[:i], nt.zones[i+1:]...)
+			return
 		}
 	}
 }

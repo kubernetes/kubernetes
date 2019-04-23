@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -198,7 +199,7 @@ func TestAttacherAttach(t *testing.T) {
 
 		csiAttacher := attacher.(*csiAttacher)
 
-		go func(spec *volume.Spec, id, nodename string, fail bool) {
+		go func(spec *volume.Spec, nodename string, fail bool) {
 			attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
 			if !fail && err != nil {
 				t.Errorf("expecting no failure, but got err: %v", err)
@@ -206,10 +207,10 @@ func TestAttacherAttach(t *testing.T) {
 			if fail && err == nil {
 				t.Errorf("expecting failure, but got no err")
 			}
-			if attachID != id && !fail {
-				t.Errorf("expecting attachID %v, got %v", id, attachID)
+			if attachID != "" {
+				t.Errorf("expecting empty attachID, got %v", attachID)
 			}
-		}(tc.spec, tc.attachID, tc.nodeName, tc.shouldFail)
+		}(tc.spec, tc.nodeName, tc.shouldFail)
 
 		var status storage.VolumeAttachmentStatus
 		if tc.injectAttacherError {
@@ -277,15 +278,15 @@ func TestAttacherAttachWithInline(t *testing.T) {
 		}
 		csiAttacher := attacher.(*csiAttacher)
 
-		go func(spec *volume.Spec, id, nodename string, fail bool) {
+		go func(spec *volume.Spec, nodename string, fail bool) {
 			attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
 			if fail != (err != nil) {
 				t.Errorf("expecting no failure, but got err: %v", err)
 			}
-			if attachID != id && !fail {
-				t.Errorf("expecting attachID %v, got %v", id, attachID)
+			if attachID != "" {
+				t.Errorf("expecting empty attachID, got %v", attachID)
 			}
-		}(tc.spec, tc.attachID, tc.nodeName, tc.shouldFail)
+		}(tc.spec, tc.nodeName, tc.shouldFail)
 
 		var status storage.VolumeAttachmentStatus
 		if tc.injectAttacherError {
@@ -333,9 +334,9 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fakeclient.NewSimpleClientset(
-				getCSIDriver("not-attachable", nil, &bFalse),
-				getCSIDriver("attachable", nil, &bTrue),
-				getCSIDriver("nil", nil, nil),
+				getTestCSIDriver("not-attachable", nil, &bFalse),
+				getTestCSIDriver("attachable", nil, &bTrue),
+				getTestCSIDriver("nil", nil, nil),
 			)
 			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -347,7 +348,10 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			csiAttacher := attacher.(*csiAttacher)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
-			pluginCanAttach := plug.CanAttach(spec)
+			pluginCanAttach, err := plug.CanAttach(spec)
+			if err != nil {
+				t.Fatalf("attacher.CanAttach failed: %s", err)
+			}
 			if pluginCanAttach != test.expectVolumeAttachment {
 				t.Errorf("attacher.CanAttach does not match expected attachment status %t", test.expectVolumeAttachment)
 			}
@@ -362,10 +366,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				if err != nil {
 					t.Errorf("Attach() failed: %s", err)
 				}
-				if expectAttach && attachID == "" {
-					t.Errorf("Expected attachID, got nothing")
-				}
-				if !expectAttach && attachID != "" {
+				if attachID != "" {
 					t.Errorf("Expected empty attachID, got %q", attachID)
 				}
 			}(spec, test.expectVolumeAttachment)
@@ -417,9 +418,9 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fakeclient.NewSimpleClientset(
-				getCSIDriver("not-attachable", nil, &bFalse),
-				getCSIDriver("attachable", nil, &bTrue),
-				getCSIDriver("nil", nil, nil),
+				getTestCSIDriver("not-attachable", nil, &bFalse),
+				getTestCSIDriver("attachable", nil, &bTrue),
+				getTestCSIDriver("nil", nil, nil),
 			)
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -431,7 +432,10 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 			csiAttacher := attacher.(*csiAttacher)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
-			pluginCanAttach := plug.CanAttach(spec)
+			pluginCanAttach, err := plug.CanAttach(spec)
+			if err != nil {
+				t.Fatalf("plugin.CanAttach test failed: %s", err)
+			}
 			if !pluginCanAttach {
 				t.Log("plugin is not attachable")
 				return
@@ -1436,11 +1440,19 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	}
 	fakeWatcher := watch.NewRaceFreeFake()
 	fakeClient.Fake.PrependWatchReactor("volumeattachments", core.DefaultWatchReactor(fakeWatcher, nil))
+
+	// Start informer for CSIDrivers.
+	factory := informers.NewSharedInformerFactory(fakeClient, csiResyncPeriod)
+	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
+	csiDriverLister := csiDriverInformer.Lister()
+	go factory.Start(wait.NeverStop)
+
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
 		nil,
 		"node",
+		csiDriverLister,
 	)
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
@@ -1458,7 +1470,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		// Wait until the informer in CSI volume plugin has all CSIDrivers.
 		wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
-			return csiPlug.csiDriverInformer.Informer().HasSynced(), nil
+			return csiDriverInformer.Informer().HasSynced(), nil
 		})
 	}
 

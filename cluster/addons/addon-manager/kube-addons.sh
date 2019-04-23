@@ -210,9 +210,6 @@ function is_leader() {
 # managed result of that. Start everything below that directory.
 log INFO "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC} =="
 
-# Create the namespace that will be used to host the cluster-level add-ons.
-start_addon /opt/namespace.yaml 100 10 "" &
-
 # Wait for the default service account to be created in the kube-system namespace.
 token_found=""
 while [ -z "${token_found}" ]; do

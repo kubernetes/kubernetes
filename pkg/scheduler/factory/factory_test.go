@@ -41,7 +41,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -255,7 +254,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	defer close(stopCh)
 	queue := &internalqueue.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
-	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
+	podBackoff := internalqueue.NewPodBackoffMap(1*time.Second, 60*time.Second)
 	errFunc := MakeDefaultErrorFunc(client, podBackoff, queue, schedulerCache, stopCh)
 
 	errFunc(testPod, nil)
@@ -294,32 +293,6 @@ func TestDefaultErrorFunc(t *testing.T) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 		break
-	}
-}
-
-func TestNodeEnumerator(t *testing.T) {
-	testList := &v1.NodeList{
-		Items: []v1.Node{
-			{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "baz"}},
-		},
-	}
-	me := nodeEnumerator{testList}
-
-	if e, a := 3, me.Len(); e != a {
-		t.Fatalf("expected %v, got %v", e, a)
-	}
-	for i := range testList.Items {
-		t.Run(fmt.Sprintf("node enumerator/%v", i), func(t *testing.T) {
-			gotObj := me.Get(i)
-			if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
-				t.Errorf("Expected %v, got %v", e, a)
-			}
-			if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
-				t.Errorf("Expected %#v, got %v#", e, a)
-			}
-		})
 	}
 }
 

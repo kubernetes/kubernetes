@@ -280,15 +280,9 @@ func TestAnonymousConfig(t *testing.T) {
 		expected.TLSClientConfig.CertFile = ""
 		expected.TLSClientConfig.KeyData = nil
 		expected.TLSClientConfig.KeyFile = ""
+		expected.Transport = nil
+		expected.WrapTransport = nil
 
-		// The DeepEqual cannot handle the func comparison, so we just verify if the
-		// function return the expected object.
-		if actual.WrapTransport == nil || !reflect.DeepEqual(expected.WrapTransport(nil), &fakeRoundTripper{}) {
-			t.Fatalf("AnonymousClientConfig dropped the WrapTransport field")
-		} else {
-			actual.WrapTransport = nil
-			expected.WrapTransport = nil
-		}
 		if actual.Dial != nil {
 			_, actualError := actual.Dial(context.Background(), "", "")
 			_, expectedError := expected.Dial(context.Background(), "", "")

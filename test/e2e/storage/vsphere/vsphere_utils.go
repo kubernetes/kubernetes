@@ -383,14 +383,14 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths ...string) {
 	for _, filePath := range filePaths {
 		_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
+		framework.ExpectNoError(err, fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
 	}
 }
 
 func createEmptyFilesOnVSphereVolume(namespace string, podName string, filePaths []string) {
 	for _, filePath := range filePaths {
 		err := framework.CreateEmptyFileOnPod(namespace, podName, filePath)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 }
 
@@ -401,12 +401,12 @@ func verifyVSphereVolumesAccessible(c clientset.Interface, pod *v1.Pod, persiste
 	for index, pv := range persistentvolumes {
 		// Verify disks are attached to the node
 		isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
 		// Verify Volumes are accessible
 		filepath := filepath.Join("/mnt/", fmt.Sprintf("volume%v", index+1), "/emptyFile.txt")
 		_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/touch", filepath}, "", time.Minute)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 }
 
@@ -424,7 +424,7 @@ func verifyVolumeCreationOnRightZone(persistentvolumes []*v1.PersistentVolume, n
 		// Get the datastore object reference from the datastore name
 		datastoreRef, err := nodeInfo.VSphere.GetDatastoreRefFromName(ctx, nodeInfo.DataCenterRef, datastoreName)
 		if err != nil {
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 		}
 		// Find common datastores among the specified zones
 		var datastoreCountMap = make(map[string]int)
@@ -446,9 +446,9 @@ func verifyVolumeCreationOnRightZone(persistentvolumes []*v1.PersistentVolume, n
 // Get vSphere Volume Path from PVC
 func getvSphereVolumePathFromClaim(client clientset.Interface, namespace string, claimName string) string {
 	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	pv, err := client.CoreV1().PersistentVolumes().Get(pvclaim.Spec.VolumeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return pv.Spec.VsphereVolume.VolumePath
 }
 
@@ -628,7 +628,7 @@ func getVMXFilePath(vmObject *object.VirtualMachine) (vmxPath string) {
 
 	var nodeVM mo.VirtualMachine
 	err := vmObject.Properties(ctx, vmObject.Reference(), []string{"config.files"}, &nodeVM)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	Expect(nodeVM.Config).NotTo(BeNil())
 
 	vmxPath = nodeVM.Config.Files.VmPathName
@@ -660,9 +660,9 @@ func poweroffNodeVM(nodeName string, vm *object.VirtualMachine) {
 	framework.Logf("Powering off node VM %s", nodeName)
 
 	_, err := vm.PowerOff(ctx)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	err = vm.WaitForPowerState(ctx, vim25types.VirtualMachinePowerStatePoweredOff)
-	Expect(err).NotTo(HaveOccurred(), "Unable to power off the node")
+	framework.ExpectNoError(err, "Unable to power off the node")
 }
 
 // poweron nodeVM and confirm the poweron state
@@ -674,7 +674,7 @@ func poweronNodeVM(nodeName string, vm *object.VirtualMachine) {
 
 	vm.PowerOn(ctx)
 	err := vm.WaitForPowerState(ctx, vim25types.VirtualMachinePowerStatePoweredOn)
-	Expect(err).NotTo(HaveOccurred(), "Unable to power on the node")
+	framework.ExpectNoError(err, "Unable to power on the node")
 }
 
 // unregister a nodeVM from VC
@@ -686,7 +686,7 @@ func unregisterNodeVM(nodeName string, vm *object.VirtualMachine) {
 
 	framework.Logf("Unregistering node VM %s", nodeName)
 	err := vm.Unregister(ctx)
-	Expect(err).NotTo(HaveOccurred(), "Unable to unregister the node")
+	framework.ExpectNoError(err, "Unable to unregister the node")
 }
 
 // register a nodeVM into a VC
@@ -700,16 +700,16 @@ func registerNodeVM(nodeName, workingDir, vmxFilePath string, rpool *object.Reso
 	finder := find.NewFinder(nodeInfo.VSphere.Client.Client, false)
 
 	vmFolder, err := finder.FolderOrDefault(ctx, workingDir)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	registerTask, err := vmFolder.RegisterVM(ctx, vmxFilePath, nodeName, false, rpool, host)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	err = registerTask.Wait(ctx)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	vmPath := filepath.Join(workingDir, nodeName)
 	vm, err := finder.VirtualMachine(ctx, vmPath)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	poweronNodeVM(nodeName, vm)
 }
@@ -812,7 +812,7 @@ func invokeVCenterServiceControl(command, service, host string) error {
 // Node, else fails.
 func expectVolumeToBeAttached(nodeName, volumePath string) {
 	isAttached, err := diskIsAttached(volumePath, nodeName)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
 }
 
@@ -850,7 +850,7 @@ func writeContentToPodFile(namespace, podName, filePath, content string) error {
 func expectFileContentToMatch(namespace, podName, filePath, content string) {
 	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("grep '%s' %s", content, filePath))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to match content of file: %q on the pod: %q", filePath, podName))
+	framework.ExpectNoError(err, fmt.Sprintf("failed to match content of file: %q on the pod: %q", filePath, podName))
 }
 
 // expectFileContentsToMatch checks if the given contents match the ones present

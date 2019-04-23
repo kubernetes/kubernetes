@@ -31,7 +31,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/kubectl/version"
 )
 
 // Version is a struct for version information
@@ -88,6 +88,9 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 // Complete completes all the required options
 func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
+	if o.ClientOnly {
+		return nil
+	}
 	o.discoveryClient, err = f.ToDiscoveryClient()
 	// if we had an empty rest.Config, continue and just print out client information.
 	// if we had an error other than being unable to build a rest.Config, fail.

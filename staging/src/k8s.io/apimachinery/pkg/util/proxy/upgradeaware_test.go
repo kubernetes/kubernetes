@@ -865,6 +865,46 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 	}
 }
 
+func TestFlushIntervalHeaders(t *testing.T) {
+	const expected = "hi"
+	stopCh := make(chan struct{})
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("MyHeader", expected)
+		w.WriteHeader(200)
+		w.(http.Flusher).Flush()
+		<-stopCh
+	}))
+	defer backend.Close()
+	defer close(stopCh)
+
+	backendURL, err := url.Parse(backend.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	proxyHandler := NewUpgradeAwareHandler(backendURL, nil, false, false, nil)
+
+	frontend := httptest.NewServer(proxyHandler)
+	defer frontend.Close()
+
+	req, _ := http.NewRequest("GET", frontend.URL, nil)
+	req.Close = true
+
+	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
+	defer cancel()
+	req = req.WithContext(ctx)
+
+	res, err := frontend.Client().Do(req)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.Header.Get("MyHeader") != expected {
+		t.Errorf("got header %q; expected %q", res.Header.Get("MyHeader"), expected)
+	}
+}
+
 // exampleCert was generated from crypto/tls/generate_cert.go with the following command:
 //    go run generate_cert.go  --rsa-bits 512 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var exampleCert = []byte(`-----BEGIN CERTIFICATE-----

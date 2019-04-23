@@ -372,7 +372,7 @@ EOF
 
 # Ensure the go tool exists and is a viable version.
 kube::golang::verify_go_version() {
-  if [[ -z "$(which go)" ]]; then
+  if [[ -z "$(command -v go)" ]]; then
     kube::log::usage_from_stdin <<EOF
 Can't find 'go' in PATH, please fix and retry.
 See http://golang.org/doc/install for installation instructions.
@@ -437,7 +437,7 @@ kube::golang::setup_env() {
   # Unset GOBIN in case it already exists in the current session.
   unset GOBIN
 
-  # This seems to matter to some tools (godep, ginkgo...)
+  # This seems to matter to some tools
   export GO15VENDOREXPERIMENT=1
 }
 
@@ -496,7 +496,8 @@ kube::golang::outfile_for_binary() {
 # Returns 0 if the binary can be built with coverage, 1 otherwise.
 # NB: this ignores whether coverage is globally enabled or not.
 kube::golang::is_instrumented_package() {
-  return "$(kube::util::array_contains "$1" "${KUBE_COVERAGE_INSTRUMENTED_PACKAGES[@]}")"
+  kube::util::array_contains "$1" "${KUBE_COVERAGE_INSTRUMENTED_PACKAGES[@]}"
+  return $?
 }
 
 # Argument: the name of a Kubernetes package (e.g. k8s.io/kubernetes/cmd/kube-scheduler)
@@ -692,7 +693,11 @@ kube::golang::build_binaries() {
     host_platform=$(kube::golang::host_platform)
 
     local goflags goldflags goasmflags gogcflags
-    goldflags="${GOLDFLAGS:-} -s -w $(kube::version::ldflags)"
+    # If GOLDFLAGS is unset, then set it to the a default of "-s -w".
+    # Disable SC2153 for this, as it will throw a warning that the local
+    # variable goldflags will exist, and it suggest changing it to this.
+    # shellcheck disable=SC2153
+    goldflags="${GOLDFLAGS=-s -w} $(kube::version::ldflags)"
     goasmflags="-trimpath=${KUBE_ROOT}"
     gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 
@@ -718,7 +723,7 @@ kube::golang::build_binaries() {
       platforms=("${host_platform}")
     fi
 
-    local binaries
+    local -a binaries
     while IFS="" read -r binary; do binaries+=("$binary"); done < <(kube::golang::binaries_from_targets "${targets[@]}")
 
     local parallel=false

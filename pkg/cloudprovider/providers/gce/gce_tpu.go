@@ -158,7 +158,7 @@ func (g *Cloud) waitForTPUOp(ctx context.Context, op *tpuapi.Operation) (*tpuapi
 
 		start := time.Now()
 		g.operationPollRateLimiter.Accept()
-		duration := time.Now().Sub(start)
+		duration := time.Since(start)
 		if duration > 5*time.Second {
 			klog.V(2).Infof("Getting operation %q throttled for %v", op.Name, duration)
 		}

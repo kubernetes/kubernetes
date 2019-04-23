@@ -29,6 +29,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode"
 
 	"github.com/fatih/camelcase"
 
@@ -44,7 +45,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -190,7 +191,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: rbacv1.GroupName, Kind: "RoleBinding"}:                            &RoleBindingDescriber{c},
 		{Group: rbacv1.GroupName, Kind: "ClusterRoleBinding"}:                     &ClusterRoleBindingDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "NetworkPolicy"}:                    &NetworkPolicyDescriber{c},
-		{Group: schedulingv1beta1.GroupName, Kind: "PriorityClass"}:               &PriorityClassDescriber{c},
+		{Group: schedulingv1.GroupName, Kind: "PriorityClass"}:                    &PriorityClassDescriber{c},
 	}
 
 	return m, nil
@@ -303,8 +304,15 @@ func printUnstructuredContent(w PrefixWriter, level int, content map[string]inte
 }
 
 func smartLabelFor(field string) string {
-	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID"}
+	// skip creating smart label if field name contains
+	// special characters other than '-'
+	if strings.IndexFunc(field, func(r rune) bool {
+		return !unicode.IsLetter(r) && r != '-'
+	}) != -1 {
+		return field
+	}
 
+	commonAcronyms := []string{"API", "URL", "UID", "OSB", "GUID"}
 	parts := camelcase.Split(field)
 	result := make([]string, 0, len(parts))
 	for _, part := range parts {
@@ -662,7 +670,9 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pod.Namespace)
 		if pod.Spec.Priority != nil {
 			w.Write(LEVEL_0, "Priority:\t%d\n", *pod.Spec.Priority)
-			w.Write(LEVEL_0, "PriorityClassName:\t%s\n", stringOrNone(pod.Spec.PriorityClassName))
+		}
+		if len(pod.Spec.PriorityClassName) > 0 {
+			w.Write(LEVEL_0, "Priority Class Name:\t%s\n", stringOrNone(pod.Spec.PriorityClassName))
 		}
 		if pod.Spec.NodeName == "" {
 			w.Write(LEVEL_0, "Node:\t<none>\n")
@@ -810,6 +820,8 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 			printFlockerVolumeSource(volume.VolumeSource.Flocker, w)
 		case volume.VolumeSource.Projected != nil:
 			printProjectedVolumeSource(volume.VolumeSource.Projected, w)
+		case volume.VolumeSource.CSI != nil:
+			printCSIVolumeSource(volume.VolumeSource.CSI, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -1209,6 +1221,23 @@ func printFlockerVolumeSource(flocker *corev1.FlockerVolumeSource, w PrefixWrite
 		flocker.DatasetName, flocker.DatasetUUID)
 }
 
+func printCSIVolumeSource(csi *corev1.CSIVolumeSource, w PrefixWriter) {
+	var readOnly bool
+	var fsType string
+	if csi.ReadOnly != nil && *csi.ReadOnly {
+		readOnly = true
+	}
+	if csi.FSType != nil {
+		fsType = *csi.FSType
+	}
+	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
+		"    Driver:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		csi.Driver, fsType, readOnly)
+	printCSIPersistentVolumeAttributesMultiline(w, "VolumeAttributes", csi.VolumeAttributes)
+}
+
 func printCSIPersistentVolumeSource(csi *corev1.CSIPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
 		"    Driver:\t%v\n"+
@@ -1492,6 +1521,8 @@ func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *co
 		if pvc.Spec.VolumeMode != nil {
 			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pvc.Spec.VolumeMode)
 		}
+		printPodsMultiline(w, "Mounted By", mountPods)
+
 		if len(pvc.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n")
 			w.Write(LEVEL_1, "Type\tStatus\tLastProbeTime\tLastTransitionTime\tReason\tMessage\n")
@@ -1509,8 +1540,6 @@ func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *co
 		if events != nil {
 			DescribeEvents(events, w)
 		}
-
-		printPodsMultiline(w, "Mounted By", mountPods)
 
 		return nil
 	})
@@ -1937,6 +1966,9 @@ func DescribePodTemplate(template *corev1.PodTemplateSpec, w PrefixWriter) {
 	}
 	describeContainers("Containers", template.Spec.Containers, nil, nil, w, "  ")
 	describeVolumes(template.Spec.Volumes, w, "  ")
+	if len(template.Spec.PriorityClassName) > 0 {
+		w.Write(LEVEL_1, "Priority Class Name:\t%s\n", template.Spec.PriorityClassName)
+	}
 }
 
 // ReplicaSetDescriber generates information about a ReplicaSet and the pods it has created.
@@ -3763,7 +3795,7 @@ type PriorityClassDescriber struct {
 }
 
 func (s *PriorityClassDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
-	pc, err := s.SchedulingV1beta1().PriorityClasses().Get(name, metav1.GetOptions{})
+	pc, err := s.SchedulingV1().PriorityClasses().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3776,7 +3808,7 @@ func (s *PriorityClassDescriber) Describe(namespace, name string, describerSetti
 	return describePriorityClass(pc, events)
 }
 
-func describePriorityClass(pc *schedulingv1beta1.PriorityClass, events *corev1.EventList) (string, error) {
+func describePriorityClass(pc *schedulingv1.PriorityClass, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pc.Name)
@@ -4364,16 +4396,6 @@ func shorten(s string, maxLength int) string {
 		return s[:maxLength] + "..."
 	}
 	return s
-}
-
-// translateTimestampUntil returns the elapsed time until timestamp in
-// human-readable approximation.
-func translateTimestampUntil(timestamp metav1.Time) string {
-	if timestamp.IsZero() {
-		return "<unknown>"
-	}
-
-	return duration.HumanDuration(time.Until(timestamp.Time))
 }
 
 // translateTimestampSince returns the elapsed time since timestamp in

@@ -21,6 +21,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -54,11 +55,11 @@ var _ = SIGDescribe("Metadata Concealment", func() {
 				},
 			},
 		}
-		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred(), "failed to create job (%s:%s)", f.Namespace.Name, job.Name)
 
 		By("Ensuring job reaches completions")
-		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, int32(1))
+		err = jobutil.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, int32(1))
 		Expect(err).NotTo(HaveOccurred(), "failed to ensure job completion (%s:%s)", f.Namespace.Name, job.Name)
 	})
 })

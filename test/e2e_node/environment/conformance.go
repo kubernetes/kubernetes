@@ -81,7 +81,7 @@ func check(options ...string) []error {
 		case "kernel":
 			errs = appendNotNil(errs, kernel())
 		default:
-			fmt.Printf("Unrecognized option %s", c)
+			fmt.Printf("Unrecognized option %s\n", c)
 			errs = append(errs, fmt.Errorf("Unrecognized option %s", c))
 		}
 	}

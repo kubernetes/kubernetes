@@ -212,13 +212,6 @@ func NewInternalNamespacedType(kind, apiversion, name, namespace string) *Intern
 
 var errInvalidVersion = errors.New("not a version")
 
-func versionErrIfFalse(b bool) error {
-	if b {
-		return nil
-	}
-	return errInvalidVersion
-}
-
 // ValidVersion of API
 var ValidVersion = "v1"
 

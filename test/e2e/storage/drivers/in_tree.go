@@ -54,6 +54,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/auth"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -95,6 +97,7 @@ func InitNFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -151,10 +154,11 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
-	framework.BindClusterRole(cs.RbacV1beta1(), "cluster-admin", ns.Name,
+	err := auth.BindClusterRole(cs.RbacV1beta1(), "cluster-admin", ns.Name,
 		rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
+	framework.ExpectNoError(err)
 
-	err := framework.WaitForAuthorizationUpdate(cs.AuthorizationV1beta1(),
+	err = auth.WaitForAuthorizationUpdate(cs.AuthorizationV1beta1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),
 		"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
 	framework.ExpectNoError(err, "Failed to update authorization: %v", err)
@@ -185,7 +189,7 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	case testpatterns.InlineVolume:
 		fallthrough
 	case testpatterns.PreprovisionedPV:
-		c, serverPod, serverIP := framework.NewNFSServer(cs, ns.Name, []string{})
+		c, serverPod, serverIP := volume.NewNFSServer(cs, ns.Name, []string{})
 		config.ServerConfig = &c
 		return &nfsVolume{
 			serverIP:  serverIP,
@@ -201,7 +205,7 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 }
 
 func (v *nfsVolume) DeleteVolume() {
-	framework.CleanUpVolumeServer(v.f, v.serverPod)
+	volume.CleanUpVolumeServer(v.f, v.serverPod)
 }
 
 // Gluster
@@ -232,6 +236,7 @@ func InitGlusterFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -288,7 +293,7 @@ func (g *glusterFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, _ := framework.NewGlusterfsServer(cs, ns.Name)
+	c, serverPod, _ := volume.NewGlusterfsServer(cs, ns.Name)
 	config.ServerConfig = &c
 	return &glusterVolume{
 		prefix:    config.Prefix,
@@ -328,6 +333,7 @@ type iSCSIVolume struct {
 	serverPod *v1.Pod
 	serverIP  string
 	f         *framework.Framework
+	iqn       string
 }
 
 var _ testsuites.TestDriver = &iSCSIDriver{}
@@ -372,11 +378,10 @@ func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 
 	volSource := v1.VolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
-			TargetPortal: iv.serverIP + ":3260",
-			// from test/images/volume/iscsi/initiatorname.iscsi
-			IQN:      "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
-			Lun:      0,
-			ReadOnly: readOnly,
+			TargetPortal: "127.0.0.1:3260",
+			IQN:          iv.iqn,
+			Lun:          0,
+			ReadOnly:     readOnly,
 		},
 	}
 	if fsType != "" {
@@ -391,8 +396,8 @@ func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, vo
 
 	pvSource := v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIPersistentVolumeSource{
-			TargetPortal: iv.serverIP + ":3260",
-			IQN:          "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
+			TargetPortal: "127.0.0.1:3260",
+			IQN:          iv.iqn,
 			Lun:          0,
 			ReadOnly:     readOnly,
 		},
@@ -416,17 +421,19 @@ func (i *iSCSIDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, serverIP := framework.NewISCSIServer(cs, ns.Name)
+	c, serverPod, serverIP, iqn := volume.NewISCSIServer(cs, ns.Name)
 	config.ServerConfig = &c
+	config.ClientNodeName = c.ClientNodeName
 	return &iSCSIVolume{
 		serverPod: serverPod,
 		serverIP:  serverIP,
+		iqn:       iqn,
 		f:         f,
 	}
 }
 
 func (v *iSCSIVolume) DeleteVolume() {
-	framework.CleanUpVolumeServer(v.f, v.serverPod)
+	volume.CleanUpVolumeServer(v.f, v.serverPod)
 }
 
 // Ceph RBD
@@ -538,7 +545,7 @@ func (r *rbdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, secret, serverIP := framework.NewRBDServer(cs, ns.Name)
+	c, serverPod, secret, serverIP := volume.NewRBDServer(cs, ns.Name)
 	config.ServerConfig = &c
 	return &rbdVolume{
 		serverPod: serverPod,
@@ -549,7 +556,7 @@ func (r *rbdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 }
 
 func (v *rbdVolume) DeleteVolume() {
-	framework.CleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
+	volume.CleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
 }
 
 // Ceph
@@ -586,6 +593,7 @@ func InitCephFSDriver() testsuites.TestDriver {
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapExec:        true,
+				testsuites.CapRWX:         true,
 			},
 		},
 	}
@@ -646,7 +654,7 @@ func (c *cephFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	cfg, serverPod, secret, serverIP := framework.NewRBDServer(cs, ns.Name)
+	cfg, serverPod, secret, serverIP := volume.NewRBDServer(cs, ns.Name)
 	config.ServerConfig = &cfg
 	return &cephVolume{
 		serverPod: serverPod,
@@ -657,7 +665,7 @@ func (c *cephFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 }
 
 func (v *cephVolume) DeleteVolume() {
-	framework.CleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
+	volume.CleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
 }
 
 // Hostpath
@@ -1041,7 +1049,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 	output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
 	outputString := string(output[:])
 	framework.Logf("cinder output:\n%s", outputString)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Parse 'id'' from stdout. Expected format:
 	// |     attachments     |                  []                  |
@@ -1183,8 +1191,9 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTest
 	}
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
+	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
 func (h *gcePdDriver) GetClaimSize() string {
@@ -1216,7 +1225,7 @@ func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 	}
 	By("creating a test gce pd volume")
 	vname, err := framework.CreatePDWithRetry()
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return &gcePdVolume{
 		volumeName: vname,
 	}
@@ -1337,7 +1346,7 @@ func (v *vSphereDriver) CreateVolume(config *testsuites.PerTestConfig, volType t
 	vspheretest.Bootstrap(f)
 	nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
 	volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return &vSphereVolume{
 		volumePath: volumePath,
 		nodeInfo:   nodeInfo,
@@ -1456,7 +1465,7 @@ func (a *azureDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 func (a *azureDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	By("creating a test azure disk volume")
 	volumeName, err := framework.CreatePDWithRetry()
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return &azureVolume{
 		volumeName: volumeName,
 	}
@@ -1569,7 +1578,7 @@ func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	By("creating a test aws volume")
 	var err error
 	a.volumeName, err = framework.CreatePDWithRetry()
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err))
 }
 
 DeleteVolume() {
@@ -1683,9 +1692,9 @@ func (l *localDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 		filesystemType := "fs"
 		ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
 		res, err := l.hostExec.IssueCommandWithResult(ssdCmd, l.node)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		num, err := strconv.Atoi(strings.TrimSpace(res))
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		if num < 1 {
 			framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
 		}

@@ -62,6 +62,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",

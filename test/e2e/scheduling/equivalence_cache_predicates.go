@@ -272,15 +272,14 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 	By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
 
 	config := &testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Name:           id,
-		Namespace:      f.Namespace.Name,
-		Timeout:        defaultTimeout,
-		Image:          imageutils.GetPauseImageName(),
-		Replicas:       replicas,
-		HostPorts:      map[string]int{"port1": 4321},
-		NodeSelector:   nodeSelector,
+		Client:       f.ClientSet,
+		Name:         id,
+		Namespace:    f.Namespace.Name,
+		Timeout:      defaultTimeout,
+		Image:        imageutils.GetPauseImageName(),
+		Replicas:     replicas,
+		HostPorts:    map[string]int{"port1": 4321},
+		NodeSelector: nodeSelector,
 	}
 	err := framework.RunRC(*config)
 	if expectRunning {

@@ -408,14 +408,13 @@ func simpleScaleUpTest(f *framework.Framework, config *scaleUpTestConfig) func()
 
 func reserveMemoryRCConfig(f *framework.Framework, id string, replicas, megabytes int, timeout time.Duration) *testutils.RCConfig {
 	return &testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Name:           id,
-		Namespace:      f.Namespace.Name,
-		Timeout:        timeout,
-		Image:          imageutils.GetPauseImageName(),
-		Replicas:       replicas,
-		MemRequest:     int64(1024 * 1024 * megabytes / replicas),
+		Client:     f.ClientSet,
+		Name:       id,
+		Namespace:  f.Namespace.Name,
+		Timeout:    timeout,
+		Image:      imageutils.GetPauseImageName(),
+		Replicas:   replicas,
+		MemRequest: int64(1024 * 1024 * megabytes / replicas),
 	}
 }
 
@@ -468,15 +467,14 @@ func createHostPortPodsWithMemory(f *framework.Framework, id string, replicas, p
 	By(fmt.Sprintf("Running RC which reserves host port and memory"))
 	request := int64(1024 * 1024 * megabytes / replicas)
 	config := &testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Name:           id,
-		Namespace:      f.Namespace.Name,
-		Timeout:        timeout,
-		Image:          imageutils.GetPauseImageName(),
-		Replicas:       replicas,
-		HostPorts:      map[string]int{"port1": port},
-		MemRequest:     request,
+		Client:     f.ClientSet,
+		Name:       id,
+		Namespace:  f.Namespace.Name,
+		Timeout:    timeout,
+		Image:      imageutils.GetPauseImageName(),
+		Replicas:   replicas,
+		HostPorts:  map[string]int{"port1": port},
+		MemRequest: request,
 	}
 	err := framework.RunRC(*config)
 	framework.ExpectNoError(err)

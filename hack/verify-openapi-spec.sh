@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -32,10 +32,10 @@ _tmp="${KUBE_ROOT}/_tmp"
 
 mkdir -p "${_tmp}"
 cp -a "${SPECROOT}" "${TMP_SPECROOT}"
-trap "cp -a ${TMP_SPECROOT} ${SPECROOT}/..; rm -rf ${_tmp}" EXIT SIGINT
-rm ${SPECROOT}/*
-cp ${TMP_SPECROOT}/BUILD ${SPECROOT}/BUILD
-cp ${TMP_SPECROOT}/README.md ${SPECROOT}/README.md
+trap 'cp -a ${TMP_SPECROOT} ${SPECROOT}/..; rm -rf ${_tmp}' EXIT SIGINT
+rm "${SPECROOT}"/*
+cp "${TMP_SPECROOT}/BUILD" "${SPECROOT}/BUILD"
+cp "${TMP_SPECROOT}/README.md" "${SPECROOT}/README.md"
 
 "${KUBE_ROOT}/hack/update-openapi-spec.sh"
 echo "diffing ${SPECROOT} against freshly generated openapi spec"

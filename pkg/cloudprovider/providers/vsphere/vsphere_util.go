@@ -48,6 +48,7 @@ const (
 	DummyDiskName         = "kube-dummyDisk.vmdk"
 	ProviderPrefix        = "vsphere://"
 	vSphereConfFileEnvVar = "VSPHERE_CONF_FILE"
+	UUIDPrefix            = "VMware-"
 )
 
 // GetVSphere reads vSphere configuration from system environment and construct vSphere object
@@ -674,4 +675,26 @@ func GetNodeUUID(node *v1.Node) (string, error) {
 		return node.Status.NodeInfo.SystemUUID, nil
 	}
 	return GetUUIDFromProviderID(node.Spec.ProviderID), nil
+}
+
+func GetVMUUID() (string, error) {
+	uuidFromFile, err := getRawUUID()
+	if err != nil {
+		return "", fmt.Errorf("error retrieving vm uuid: %s", err)
+	}
+	//strip leading and trailing white space and new line char
+	uuid := strings.TrimSpace(uuidFromFile)
+	// check the uuid starts with "VMware-"
+	if !strings.HasPrefix(uuid, UUIDPrefix) {
+		return "", fmt.Errorf("Failed to match Prefix, UUID read from the file is %v", uuidFromFile)
+	}
+	// Strip the prefix and white spaces and -
+	uuid = strings.Replace(uuid[len(UUIDPrefix):(len(uuid))], " ", "", -1)
+	uuid = strings.Replace(uuid, "-", "", -1)
+	if len(uuid) != 32 {
+		return "", fmt.Errorf("Length check failed, UUID read from the file is %v", uuidFromFile)
+	}
+	// need to add dashes, e.g. "564d395e-d807-e18a-cb25-b79f65eb2b9f"
+	uuid = fmt.Sprintf("%s-%s-%s-%s-%s", uuid[0:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:32])
+	return uuid, nil
 }

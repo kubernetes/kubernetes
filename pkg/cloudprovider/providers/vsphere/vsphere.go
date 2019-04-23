@@ -38,7 +38,7 @@ import (
 	"github.com/vmware/govmomi/vapi/tags"
 	"github.com/vmware/govmomi/vim25/mo"
 	vmwaretypes "github.com/vmware/govmomi/vim25/types"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -1432,10 +1432,20 @@ func (vs *VSphere) NodeManager() (nodeManager *NodeManager) {
 
 func withTagsClient(ctx context.Context, connection *vclib.VSphereConnection, f func(c *rest.Client) error) error {
 	c := rest.NewClient(connection.Client)
-	user := url.UserPassword(connection.Username, connection.Password)
-	if err := c.Login(ctx, user); err != nil {
+	signer, err := connection.Signer(ctx, connection.Client)
+	if err != nil {
 		return err
 	}
+	if signer == nil {
+		user := url.UserPassword(connection.Username, connection.Password)
+		err = c.Login(ctx, user)
+	} else {
+		err = c.LoginByToken(c.WithSigner(ctx, signer))
+	}
+	if err != nil {
+		return err
+	}
+
 	defer func() {
 		if err := c.Logout(ctx); err != nil {
 			klog.Errorf("failed to logout: %v", err)

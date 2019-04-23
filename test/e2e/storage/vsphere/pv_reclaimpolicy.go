@@ -76,14 +76,14 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 		It("should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted", func() {
 			var err error
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			deletePVCAfterBind(c, ns, pvc, pv)
 			pvc = nil
 
 			By("verify pv is deleted")
 			err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 3*time.Second, 300*time.Second)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			pv = nil
 			volumePath = ""
@@ -105,13 +105,13 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			var err error
 
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			// Wait for PV and PVC to Bind
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
 			By("Creating the Pod")
 			pod, err := framework.CreateClientPod(c, ns, pvc)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			By("Deleting the Claim")
 			framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
@@ -119,7 +119,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 
 			// Verify PV is Present, after PVC is deleted and PV status should be Failed.
 			pv, err := c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			Expect(framework.WaitForPersistentVolumePhase(v1.VolumeFailed, c, pv.Name, 1*time.Second, 60*time.Second)).NotTo(HaveOccurred())
 
 			By("Verify the volume is attached to the node")
@@ -166,7 +166,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			var volumeFileContent = "hello from vsphere cloud provider, Random Content is :" + strconv.FormatInt(time.Now().UnixNano(), 10)
 
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimRetain)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			writeContentToVSpherePV(c, pvc, volumeFileContent)
 
@@ -177,18 +177,18 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			By("Verify PV is retained")
 			framework.Logf("Waiting for PV %v to become Released", pv.Name)
 			err = framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 3*time.Second, 300*time.Second)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
 
 			By("Creating the PV for same volume path")
 			pv = getVSpherePersistentVolumeSpec(volumePath, v1.PersistentVolumeReclaimRetain, nil)
 			pv, err = c.CoreV1().PersistentVolumes().Create(pv)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			By("creating the pvc")
 			pvc = getVSpherePersistentVolumeClaimSpec(ns, nil)
 			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			By("wait for the pv and pvc to bind")
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
@@ -223,7 +223,7 @@ func testCleanupVSpherePersistentVolumeReclaim(c clientset.Interface, nodeInfo *
 	By("running testCleanupVSpherePersistentVolumeReclaim")
 	if len(volumePath) > 0 {
 		err := nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 	if pv != nil {
 		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
@@ -244,6 +244,6 @@ func deletePVCAfterBind(c clientset.Interface, ns string, pvc *v1.PersistentVolu
 	framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 	if !apierrs.IsNotFound(err) {
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 }

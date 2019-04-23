@@ -53,7 +53,6 @@ filegroup(
         "//pkg/auth/authorizer/abac:all-srcs",
         "//pkg/auth/nodeidentifier:all-srcs",
         "//pkg/capabilities:all-srcs",
-        "//pkg/client/clientset_generated/internalclientset:all-srcs",
         "//pkg/client/conditions:all-srcs",
         "//pkg/client/leaderelectionconfig:all-srcs",
         "//pkg/client/metrics/prometheus:all-srcs",

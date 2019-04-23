@@ -83,7 +83,7 @@
 // 	} else {
 // 		errors = []error{err}
 // 	}
-package multierr
+package multierr // import "go.uber.org/multierr"
 
 import (
 	"bytes"

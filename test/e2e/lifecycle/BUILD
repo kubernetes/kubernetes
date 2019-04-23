@@ -21,7 +21,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/lifecycle",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/kubelet/pod:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -29,7 +28,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/chaosmonkey:go_default_library",

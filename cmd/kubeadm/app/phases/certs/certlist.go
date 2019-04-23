@@ -85,7 +85,7 @@ func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certif
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "couldn't get configuration for %q CA certificate", k.Name)
 	}
-	caCert, caKey, err := NewCACertAndKey(cfg)
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(cfg)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "couldn't generate %q CA certificate", k.Name)
 	}
@@ -141,7 +141,7 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 			// CA key exists; just use that to create new certificates.
 		} else {
 			// CACert doesn't already exist, create a new cert and key.
-			caCert, caKey, err = NewCACertAndKey(cfg)
+			caCert, caKey, err = pkiutil.NewCertificateAuthority(cfg)
 			if err != nil {
 				return err
 			}

@@ -127,8 +127,8 @@ var ipsetInfo = []struct {
 	{kubeNodePortLocalSetTCP, utilipset.BitmapPort, kubeNodePortLocalSetTCPComment},
 	{kubeNodePortSetUDP, utilipset.BitmapPort, kubeNodePortSetUDPComment},
 	{kubeNodePortLocalSetUDP, utilipset.BitmapPort, kubeNodePortLocalSetUDPComment},
-	{kubeNodePortSetSCTP, utilipset.BitmapPort, kubeNodePortSetSCTPComment},
-	{kubeNodePortLocalSetSCTP, utilipset.BitmapPort, kubeNodePortLocalSetSCTPComment},
+	{kubeNodePortSetSCTP, utilipset.HashIPPort, kubeNodePortSetSCTPComment},
+	{kubeNodePortLocalSetSCTP, utilipset.HashIPPort, kubeNodePortLocalSetSCTPComment},
 }
 
 // ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
@@ -153,8 +153,8 @@ var ipsetWithIptablesChain = []struct {
 	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "tcp"},
 	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", "udp"},
 	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "udp"},
-	{kubeNodePortSetSCTP, string(kubeServicesChain), string(KubeNodePortChain), "dst", "sctp"},
-	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst", "sctp"},
+	{kubeNodePortSetSCTP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst,dst", "sctp"},
+	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst,dst", "sctp"},
 }
 
 // In IPVS proxy mode, the following flags need to be set
@@ -1096,20 +1096,32 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// Nodeports need SNAT, unless they're local.
 			// ipset call
-			entry = &utilipset.Entry{
-				// No need to provide ip info
-				Port:     svcInfo.NodePort,
-				Protocol: protocol,
-				SetType:  utilipset.BitmapPort,
-			}
 			var nodePortSet *IPSet
 			switch protocol {
 			case "tcp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetTCP]
+				entry = &utilipset.Entry{
+					// No need to provide ip info
+					Port:     svcInfo.NodePort,
+					Protocol: protocol,
+					SetType:  utilipset.BitmapPort,
+				}
 			case "udp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetUDP]
+				entry = &utilipset.Entry{
+					// No need to provide ip info
+					Port:     svcInfo.NodePort,
+					Protocol: protocol,
+					SetType:  utilipset.BitmapPort,
+				}
 			case "sctp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetSCTP]
+				entry = &utilipset.Entry{
+					IP:       proxier.nodeIP.String(),
+					Port:     svcInfo.NodePort,
+					Protocol: protocol,
+					SetType:  utilipset.HashIPPort,
+				}
 			default:
 				// It should never hit
 				klog.Errorf("Unsupported protocol type: %s", protocol)
@@ -1203,7 +1215,7 @@ func (proxier *Proxier) syncProxyRules() {
 	klog.V(5).Infof("Restoring iptables rules: %s", proxier.iptablesData.Bytes())
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		klog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, proxier.iptablesData.Bytes())
+		klog.Errorf("Failed to execute iptables-restore: %v\nfailed payload:\n%s", err, proxier.iptablesData.String())
 		// Revert new local ports.
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
@@ -1659,15 +1671,17 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer, legacyBindAddrs map[string]bool) {
 	for cs := range currentServices {
 		svc := currentServices[cs]
+		if proxier.isIPInExcludeCIDRs(svc.Address) {
+			continue
+		}
 		if _, ok := activeServices[cs]; !ok {
-			// This service was not processed in the latest sync loop so before deleting it,
-			okayToDelete := true
 			rsList, _ := proxier.ipvs.GetRealServers(svc)
 
 			// If we still have real servers graceful termination is not done
 			if len(rsList) > 0 {
-				okayToDelete = false
+				continue
 			}
+
 			// Applying graceful termination to all real servers
 			for _, rs := range rsList {
 				uniqueRS := GetUniqueRSName(svc, rs)
@@ -1680,33 +1694,34 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 					klog.Errorf("Failed to delete destination: %v, error: %v", uniqueRS, err)
 				}
 			}
-			// make sure it does not fall within an excluded CIDR range.
-			for _, excludedCIDR := range proxier.excludeCIDRs {
-				// Any validation of this CIDR already should have occurred.
-				_, n, _ := net.ParseCIDR(excludedCIDR)
-				if n.Contains(svc.Address) {
-					okayToDelete = false
-					break
-				}
+			klog.V(4).Infof("Delete service %s", svc.String())
+			if err := proxier.ipvs.DeleteVirtualServer(svc); err != nil {
+				klog.Errorf("Failed to delete service %s, error: %v", svc.String(), err)
 			}
-			if okayToDelete {
-				klog.V(4).Infof("Delete service %s", svc.String())
-				if err := proxier.ipvs.DeleteVirtualServer(svc); err != nil {
-					klog.Errorf("Failed to delete service %s, error: %v", svc.String(), err)
-				}
-				addr := svc.Address.String()
-				if _, ok := legacyBindAddrs[addr]; ok {
-					klog.V(4).Infof("Unbinding address %s", addr)
-					if err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice); err != nil {
-						klog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
-					} else {
-						// In case we delete a multi-port service, avoid trying to unbind multiple times
-						delete(legacyBindAddrs, addr)
-					}
+			addr := svc.Address.String()
+			if _, ok := legacyBindAddrs[addr]; ok {
+				klog.V(4).Infof("Unbinding address %s", addr)
+				if err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice); err != nil {
+					klog.Errorf("Failed to unbind service addr %s from dummy interface %s: %v", addr, DefaultDummyDevice, err)
+				} else {
+					// In case we delete a multi-port service, avoid trying to unbind multiple times
+					delete(legacyBindAddrs, addr)
 				}
 			}
 		}
 	}
+}
+
+func (proxier *Proxier) isIPInExcludeCIDRs(ip net.IP) bool {
+	// make sure it does not fall within an excluded CIDR range.
+	for _, excludedCIDR := range proxier.excludeCIDRs {
+		// Any validation of this CIDR already should have occurred.
+		_, n, _ := net.ParseCIDR(excludedCIDR)
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) map[string]bool {

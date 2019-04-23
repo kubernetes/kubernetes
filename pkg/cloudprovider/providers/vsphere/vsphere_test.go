@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"reflect"
 	"sort"
@@ -40,7 +41,7 @@ import (
 	"github.com/vmware/govmomi/vapi/tags"
 	"github.com/vmware/govmomi/vim25/mo"
 	vmwaretypes "github.com/vmware/govmomi/vim25/types"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	cloudprovider "k8s.io/cloud-provider"
@@ -343,6 +344,10 @@ func TestZones(t *testing.T) {
 	cfg, cleanup := configFromSim()
 	defer cleanup()
 
+	// Configure for SAML token auth
+	cfg.Global.User = localhostCert
+	cfg.Global.Password = localhostKey
+
 	// Create vSphere configuration object
 	vs, err := newControllerNode(cfg)
 	if err != nil {
@@ -381,6 +386,13 @@ func TestZones(t *testing.T) {
 
 	// Tag manager instance
 	m := tags.NewManager(rest.NewClient(vsi.conn.Client))
+	signer, err := vsi.conn.Signer(ctx, vsi.conn.Client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = m.LoginByToken(m.WithSigner(ctx, signer)); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a region category
 	regionID, err := m.CreateCategory(ctx, &tags.Category{Name: vs.cfg.Labels.Region})
@@ -560,6 +572,10 @@ func TestGetZoneToHosts(t *testing.T) {
 
 	// Tag manager instance
 	m := tags.NewManager(rest.NewClient(vsi.conn.Client))
+	user := url.UserPassword(vsi.conn.Username, vsi.conn.Password)
+	if err = m.Login(ctx, user); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a region category
 	regionCat, err := m.CreateCategory(ctx, &tags.Category{Name: vs.cfg.Labels.Region})

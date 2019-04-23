@@ -134,9 +134,15 @@ func (l *SortableList) Sort() {
 	sort.Sort(l)
 }
 
-// HigherPriorityPod return true when priority of the first pod is higher than
-// the second one. It takes arguments of the type "interface{}" to be used with
-// SortableList, but expects those arguments to be *v1.Pod.
-func HigherPriorityPod(pod1, pod2 interface{}) bool {
-	return GetPodPriority(pod1.(*v1.Pod)) > GetPodPriority(pod2.(*v1.Pod))
+// MoreImportantPod return true when priority of the first pod is higher than
+// the second one. If two pods' priorities are equal, compare their StartTime.
+// It takes arguments of the type "interface{}" to be used with SortableList,
+// but expects those arguments to be *v1.Pod.
+func MoreImportantPod(pod1, pod2 interface{}) bool {
+	p1 := GetPodPriority(pod1.(*v1.Pod))
+	p2 := GetPodPriority(pod2.(*v1.Pod))
+	if p1 != p2 {
+		return p1 > p2
+	}
+	return GetPodStartTime(pod1.(*v1.Pod)).Before(GetPodStartTime(pod2.(*v1.Pod)))
 }

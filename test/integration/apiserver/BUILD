@@ -36,7 +36,7 @@ go_test(
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/node/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/api/scheduling/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
         "//staging/src/k8s.io/api/settings/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
@@ -83,6 +83,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/integration/apiserver/admissionwebhook:all-srcs",
         "//test/integration/apiserver/apply:all-srcs",
     ],
     tags = ["automanaged"],

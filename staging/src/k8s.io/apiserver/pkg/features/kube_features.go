@@ -17,6 +17,8 @@ limitations under the License.
 package features
 
 import (
+	"k8s.io/apimachinery/pkg/util/runtime"
+
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -107,10 +109,23 @@ const (
 	//
 	// Allows kube-proxy to create DSR loadbalancers for Windows
 	WinDSR utilfeature.Feature = "WinDSR"
+
+	// owner: @wojtek-t
+	// alpha: v1.15
+	//
+	// Enables support for watch bookmark events.
+	WatchBookmark utilfeature.Feature = "WatchBookmark"
+
+	// owner: @MikeSpreitzer @yue9944882
+	// alpha: v1.15
+	//
+	//
+	// Enables managing request concurrency with prioritization and fairness at each server
+	RequestManagement utilfeature.Feature = "RequestManagement"
 )
 
 func init() {
-	utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates)
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -128,4 +143,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	StorageVersionHash:      {Default: false, PreRelease: utilfeature.Alpha},
 	WinOverlay:              {Default: false, PreRelease: utilfeature.Alpha},
 	WinDSR:                  {Default: false, PreRelease: utilfeature.Alpha},
+	WatchBookmark:           {Default: false, PreRelease: utilfeature.Alpha},
+	RequestManagement:       {Default: false, PreRelease: utilfeature.Alpha},
 }

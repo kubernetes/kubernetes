@@ -28,6 +28,7 @@
   - k8s.io/cli-runtime/pkg/printers
   - k8s.io/cli-runtime/pkg/resource
   - k8s.io/cli-runtime/pkg/kustomize
+  - k8s.io/utils/pointer
 
 - baseImportPath: "./vendor/k8s.io/apimachinery/"
   allowedImports:
@@ -104,6 +105,7 @@
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/client-go
+  - k8s.io/code-generator
   - k8s.io/metrics
   - k8s.io/klog
 
@@ -113,10 +115,12 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/code-generator
   - k8s.io/component-base
   - k8s.io/kube-aggregator
   - k8s.io/kube-openapi
   - k8s.io/klog
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/sample-apiserver/"
   allowedImports:
@@ -124,6 +128,7 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/code-generator
   - k8s.io/component-base
   - k8s.io/sample-apiserver
   - k8s.io/klog
@@ -135,9 +140,11 @@
   - k8s.io/apimachinery
   - k8s.io/apiserver
   - k8s.io/client-go
+  - k8s.io/code-generator
   - k8s.io/component-base
   - k8s.io/klog
   - k8s.io/kube-openapi
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/kube-openapi/"
   allowedImports:
@@ -200,16 +207,8 @@
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/client-go
+  - k8s.io/code-generator
   - k8s.io/node-api
-
-- baseImportPath: "./vendor/k8s.io/csi-api/"
-  allowedImports:
-  - k8s.io/api
-  - k8s.io/apimachinery
-  - k8s.io/apiextensions-apiserver
-  - k8s.io/client-go
-  - k8s.io/csi-api
-  - k8s.io/klog
 
 - baseImportPath: "./vendor/k8s.io/csi-translation-lib/"
   allowedImports:

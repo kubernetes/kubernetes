@@ -17,6 +17,8 @@ limitations under the License.
 package common
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -38,7 +40,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 		preStopWaitTimeout   = 30 * time.Second
 	)
 	Context("when create a pod with lifecycle hook", func() {
-		var targetIP string
+		var targetIP, targetURL string
 		podHandleHookRequest := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pod-handle-http-request",
@@ -63,6 +65,10 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			By("create the container to handle the HTTPGet hook request.")
 			newPod := podClient.CreateSync(podHandleHookRequest)
 			targetIP = newPod.Status.PodIP
+			targetURL = targetIP
+			if strings.Contains(targetIP, ":") {
+				targetURL = fmt.Sprintf("[%s]", targetIP)
+			}
 		})
 		testPodWithHook := func(podWithHook *v1.Pod) {
 			By("create the pod with lifecycle hook")
@@ -93,7 +99,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			lifecycle := &v1.Lifecycle{
 				PostStart: &v1.Handler{
 					Exec: &v1.ExecAction{
-						Command: []string{"sh", "-c", "curl http://" + targetIP + ":8080/echo?msg=poststart"},
+						Command: []string{"sh", "-c", "curl http://" + targetURL + ":8080/echo?msg=poststart"},
 					},
 				},
 			}
@@ -109,7 +115,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.Handler{
 					Exec: &v1.ExecAction{
-						Command: []string{"sh", "-c", "curl http://" + targetIP + ":8080/echo?msg=prestop"},
+						Command: []string{"sh", "-c", "curl http://" + targetURL + ":8080/echo?msg=prestop"},
 					},
 				},
 			}

@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/auditregistration"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestValidateAuditSink(t *testing.T) {
@@ -133,8 +134,6 @@ func TestValidatePolicy(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string { return &s }
-
 func TestValidateWebhookConfiguration(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -155,8 +154,9 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 					Service: &auditregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
+						Port:      443,
 					},
-					URL: strPtr("example.com/k8s/webhook"),
+					URL: utilpointer.StringPtr("example.com/k8s/webhook"),
 				},
 			},
 			expectedError: `webhook.clientConfig: Required value: exactly one of url or service is required`,
@@ -165,7 +165,7 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 			name: "blank URL",
 			config: auditregistration.Webhook{
 				ClientConfig: auditregistration.WebhookClientConfig{
-					URL: strPtr(""),
+					URL: utilpointer.StringPtr(""),
 				},
 			},
 			expectedError: `webhook.clientConfig.url: Invalid value: "": host must be provided`,
@@ -174,7 +174,7 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 			name: "missing host",
 			config: auditregistration.Webhook{
 				ClientConfig: auditregistration.WebhookClientConfig{
-					URL: strPtr("https:///fancy/webhook"),
+					URL: utilpointer.StringPtr("https:///fancy/webhook"),
 				},
 			},
 			expectedError: `host must be provided`,
@@ -183,7 +183,7 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 			name: "fragment",
 			config: auditregistration.Webhook{
 				ClientConfig: auditregistration.WebhookClientConfig{
-					URL: strPtr("https://example.com/#bookmark"),
+					URL: utilpointer.StringPtr("https://example.com/#bookmark"),
 				},
 			},
 			expectedError: `"bookmark": fragments are not permitted`,
@@ -192,7 +192,7 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 			name: "query",
 			config: auditregistration.Webhook{
 				ClientConfig: auditregistration.WebhookClientConfig{
-					URL: strPtr("https://example.com?arg=value"),
+					URL: utilpointer.StringPtr("https://example.com?arg=value"),
 				},
 			},
 			expectedError: `"arg=value": query parameters are not permitted`,
@@ -201,7 +201,7 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 			name: "user",
 			config: auditregistration.Webhook{
 				ClientConfig: auditregistration.WebhookClientConfig{
-					URL: strPtr("https://harry.potter@example.com/"),
+					URL: utilpointer.StringPtr("https://harry.potter@example.com/"),
 				},
 			},
 			expectedError: `"harry.potter": user information is not permitted`,
@@ -210,7 +210,7 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 			name: "just totally wrong",
 			config: auditregistration.Webhook{
 				ClientConfig: auditregistration.WebhookClientConfig{
-					URL: strPtr("arg#backwards=thisis?html.index/port:host//:https"),
+					URL: utilpointer.StringPtr("arg#backwards=thisis?html.index/port:host//:https"),
 				},
 			},
 			expectedError: `host must be provided`,
@@ -222,11 +222,40 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 					Service: &auditregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("foo/"),
+						Path:      utilpointer.StringPtr("foo/"),
+						Port:      443,
 					},
 				},
 			},
 			expectedError: `clientConfig.service.path: Invalid value: "foo/": must start with a '/'`,
+		},
+		{
+			name: "invalid port >65535",
+			config: auditregistration.Webhook{
+				ClientConfig: auditregistration.WebhookClientConfig{
+					Service: &auditregistration.ServiceReference{
+						Namespace: "ns",
+						Name:      "n",
+						Path:      utilpointer.StringPtr("foo/"),
+						Port:      65536,
+					},
+				},
+			},
+			expectedError: `Invalid value: 65536: port is not valid: must be between 1 and 65535, inclusive`,
+		},
+		{
+			name: "invalid port 0",
+			config: auditregistration.Webhook{
+				ClientConfig: auditregistration.WebhookClientConfig{
+					Service: &auditregistration.ServiceReference{
+						Namespace: "ns",
+						Name:      "n",
+						Path:      utilpointer.StringPtr("foo/"),
+						Port:      0,
+					},
+				},
+			},
+			expectedError: `Invalid value: 0: port is not valid: must be between 1 and 65535, inclusive`,
 		},
 		{
 			name: "path accepts slash",
@@ -235,7 +264,8 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 					Service: &auditregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("/"),
+						Path:      utilpointer.StringPtr("/"),
+						Port:      443,
 					},
 				},
 			},
@@ -248,7 +278,8 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 					Service: &auditregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("/foo"),
+						Path:      utilpointer.StringPtr("/foo"),
+						Port:      443,
 					},
 				},
 			},
@@ -261,7 +292,8 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 					Service: &auditregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("//"),
+						Path:      utilpointer.StringPtr("//"),
+						Port:      443,
 					},
 				},
 			},
@@ -274,7 +306,8 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 					Service: &auditregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("/foo//bar/"),
+						Path:      utilpointer.StringPtr("/foo//bar/"),
+						Port:      443,
 					},
 				},
 			},
@@ -286,7 +319,8 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 					Service: &auditregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("/foo/bar//"),
+						Path:      utilpointer.StringPtr("/foo/bar//"),
+						Port:      443,
 					},
 				},
 			},
@@ -299,7 +333,8 @@ func TestValidateWebhookConfiguration(t *testing.T) {
 					Service: &auditregistration.ServiceReference{
 						Namespace: "ns",
 						Name:      "n",
-						Path:      strPtr("/apis/foo.bar/v1alpha1/--bad"),
+						Path:      utilpointer.StringPtr("/apis/foo.bar/v1alpha1/--bad"),
+						Port:      443,
 					},
 				},
 			},

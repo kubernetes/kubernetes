@@ -23,9 +23,8 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -35,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/podlogs"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -188,7 +188,7 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
 			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, fsType, r.volume)
 			if pvSource != nil {
-				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, false)
+				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, false, pattern.VolMode)
 			}
 			r.volType = fmt.Sprintf("%s-preprovisionedPV", dInfo.Name)
 		}
@@ -201,11 +201,11 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			By("creating a StorageClass " + r.sc.Name)
 			var err error
 			r.sc, err = cs.StorageV1().StorageClasses().Create(r.sc)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			if r.sc != nil {
 				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPVFromDynamicProvisionSC(
-					f, dInfo.Name, claimSize, r.sc, false, nil)
+					f, dInfo.Name, claimSize, r.sc, false, pattern.VolMode)
 			}
 			r.volType = fmt.Sprintf("%s-dynamicPV", dInfo.Name)
 		}
@@ -269,6 +269,7 @@ func createVolumeSourceWithPVCPV(
 	pvSource *v1.PersistentVolumeSource,
 	volumeNodeAffinity *v1.VolumeNodeAffinity,
 	readOnly bool,
+	volMode v1.PersistentVolumeMode,
 ) (*v1.VolumeSource, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	pvConfig := framework.PersistentVolumeConfig{
 		NamePrefix:       fmt.Sprintf("%s-", name),
@@ -276,16 +277,22 @@ func createVolumeSourceWithPVCPV(
 		PVSource:         *pvSource,
 		NodeAffinity:     volumeNodeAffinity,
 	}
+
 	pvcConfig := framework.PersistentVolumeClaimConfig{
 		StorageClassName: &f.Namespace.Name,
 	}
 
+	if volMode != "" {
+		pvConfig.VolumeMode = &volMode
+		pvcConfig.VolumeMode = &volMode
+	}
+
 	framework.Logf("Creating PVC and PV")
 	pv, pvc, err := framework.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
-	Expect(err).NotTo(HaveOccurred(), "PVC, PV creation failed")
+	framework.ExpectNoError(err, "PVC, PV creation failed")
 
 	err = framework.WaitOnPVandPVC(f.ClientSet, f.Namespace.Name, pv, pvc)
-	Expect(err).NotTo(HaveOccurred(), "PVC, PV failed to bind")
+	framework.ExpectNoError(err, "PVC, PV failed to bind")
 
 	volSource := &v1.VolumeSource{
 		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
@@ -302,7 +309,7 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 	claimSize string,
 	sc *storagev1.StorageClass,
 	readOnly bool,
-	volMode *v1.PersistentVolumeMode,
+	volMode v1.PersistentVolumeMode,
 ) (*v1.VolumeSource, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	cs := f.ClientSet
 	ns := f.Namespace.Name
@@ -310,22 +317,27 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 	By("creating a claim")
 	pvc := getClaim(claimSize, ns)
 	pvc.Spec.StorageClassName = &sc.Name
-	if volMode != nil {
-		pvc.Spec.VolumeMode = volMode
+	if volMode != "" {
+		pvc.Spec.VolumeMode = &volMode
 	}
 
 	var err error
 	pvc, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	if !isDelayedBinding(sc) {
+		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		framework.ExpectNoError(err)
+	}
 
 	pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
-	pv, err := cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	var pv *v1.PersistentVolume
+	if !isDelayedBinding(sc) {
+		pv, err = cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+	}
 
 	volSource := &v1.VolumeSource{
 		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
@@ -334,6 +346,13 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 		},
 	}
 	return volSource, pv, pvc
+}
+
+func isDelayedBinding(sc *storagev1.StorageClass) bool {
+	if sc.VolumeBindingMode != nil {
+		return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
+	}
+	return false
 }
 
 func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
@@ -361,7 +380,7 @@ func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
 func deleteStorageClass(cs clientset.Interface, className string) {
 	err := cs.StorageV1().StorageClasses().Delete(className, nil)
 	if err != nil && !apierrs.IsNotFound(err) {
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 }
 
@@ -370,15 +389,15 @@ func deleteStorageClass(cs clientset.Interface, className string) {
 // dynamically created config for the volume server.
 //
 // This is done because TestConfig is the public API for
-// the testsuites package whereas framework.VolumeTestConfig is merely
+// the testsuites package whereas volume.TestConfig is merely
 // an implementation detail. It contains fields that have no effect,
 // which makes it unsuitable for use in the testsuits public API.
-func convertTestConfig(in *PerTestConfig) framework.VolumeTestConfig {
+func convertTestConfig(in *PerTestConfig) volume.TestConfig {
 	if in.ServerConfig != nil {
 		return *in.ServerConfig
 	}
 
-	return framework.VolumeTestConfig{
+	return volume.TestConfig{
 		Namespace:      in.Framework.Namespace.Name,
 		Prefix:         in.Prefix,
 		ClientNodeName: in.ClientNodeName,

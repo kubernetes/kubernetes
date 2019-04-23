@@ -255,7 +255,13 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	It("should provide DNS for ExternalName services", func() {
+	/*
+		Release: v1.15
+		Testname: DNS, for ExternalName Services
+		Description: Create a service with externalName. Pod MUST be able to resolve the address for this service via CNAME. When externalName of this service is changed, Pod MUST resolve to new DNS entry for the service.
+		Change the service type from externalName to ClusterIP, Pod MUST resolve DNS to the service by serving A records.
+	*/
+	framework.ConformanceIt("should provide DNS for ExternalName services", func() {
 		// Create a test ExternalName service.
 		By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"

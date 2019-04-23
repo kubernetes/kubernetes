@@ -1098,10 +1098,12 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 func TestHasUsageStats(t *testing.T) {
 	testCases := map[string]struct {
 		a        corev1.ResourceQuota
+		relevant []corev1.ResourceName
 		expected bool
 	}{
 		"empty": {
 			a:        corev1.ResourceQuota{Status: corev1.ResourceQuotaStatus{Hard: corev1.ResourceList{}}},
+			relevant: []corev1.ResourceName{corev1.ResourceMemory},
 			expected: true,
 		},
 		"hard-only": {
@@ -1113,6 +1115,7 @@ func TestHasUsageStats(t *testing.T) {
 					Used: corev1.ResourceList{},
 				},
 			},
+			relevant: []corev1.ResourceName{corev1.ResourceMemory},
 			expected: false,
 		},
 		"hard-used": {
@@ -1126,11 +1129,27 @@ func TestHasUsageStats(t *testing.T) {
 					},
 				},
 			},
+			relevant: []corev1.ResourceName{corev1.ResourceMemory},
+			expected: true,
+		},
+		"hard-used-relevant": {
+			a: corev1.ResourceQuota{
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+						corev1.ResourcePods:   resource.MustParse("1"),
+					},
+					Used: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("500Mi"),
+					},
+				},
+			},
+			relevant: []corev1.ResourceName{corev1.ResourceMemory},
 			expected: true,
 		},
 	}
 	for testName, testCase := range testCases {
-		if result := hasUsageStats(&testCase.a); result != testCase.expected {
+		if result := hasUsageStats(&testCase.a, testCase.relevant); result != testCase.expected {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, result)
 		}
 	}

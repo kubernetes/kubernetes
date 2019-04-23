@@ -58,7 +58,12 @@ const (
 	// GCE only allows names < 64 characters, and the loadbalancer controller inserts
 	// a single character of padding.
 	nameLenLimit = 62
+
+	negBackend = backendType("networkEndpointGroup")
+	igBackend  = backendType("instanceGroup")
 )
+
+type backendType string
 
 // IngressController manages implementation details of Ingress on GCE/GKE.
 type IngressController struct {
@@ -610,28 +615,53 @@ func (cont *IngressController) isHTTPErrorCode(err error, code int) bool {
 	return ok && apiErr.Code == code
 }
 
-// BackendServiceUsingNEG returns true only if all global backend service with matching nodeports pointing to NEG as backend
-func (cont *IngressController) BackendServiceUsingNEG(svcPorts map[string]v1.ServicePort) (bool, error) {
-	return cont.backendMode(svcPorts, "networkEndpointGroups")
+// WaitForNegBackendService waits for the expected backend service to become
+func (cont *IngressController) WaitForNegBackendService(svcPorts map[string]v1.ServicePort) error {
+	return wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
+		err := cont.verifyBackendMode(svcPorts, negBackend)
+		if err != nil {
+			framework.Logf("Err while checking if backend service is using NEG: %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
+// WaitForIgBackendService returns true only if all global backend service with matching svcPorts pointing to IG as backend
+func (cont *IngressController) WaitForIgBackendService(svcPorts map[string]v1.ServicePort) error {
+	return wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
+		err := cont.verifyBackendMode(svcPorts, igBackend)
+		if err != nil {
+			framework.Logf("Err while checking if backend service is using IG: %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
+// BackendServiceUsingNEG returns true only if all global backend service with matching svcPorts pointing to NEG as backend
+func (cont *IngressController) BackendServiceUsingNEG(svcPorts map[string]v1.ServicePort) error {
+	return cont.verifyBackendMode(svcPorts, negBackend)
 }
 
 // BackendServiceUsingIG returns true only if all global backend service with matching svcPorts pointing to IG as backend
-func (cont *IngressController) BackendServiceUsingIG(svcPorts map[string]v1.ServicePort) (bool, error) {
-	return cont.backendMode(svcPorts, "instanceGroups")
+func (cont *IngressController) BackendServiceUsingIG(svcPorts map[string]v1.ServicePort) error {
+	return cont.verifyBackendMode(svcPorts, igBackend)
 }
 
-func (cont *IngressController) backendMode(svcPorts map[string]v1.ServicePort, keyword string) (bool, error) {
+func (cont *IngressController) verifyBackendMode(svcPorts map[string]v1.ServicePort, backendType backendType) error {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	beList, err := gceCloud.ListGlobalBackendServices()
 	if err != nil {
-		return false, fmt.Errorf("failed to list backend services: %v", err)
+		return fmt.Errorf("failed to list backend services: %v", err)
 	}
 
 	hcList, err := gceCloud.ListHealthChecks()
 	if err != nil {
-		return false, fmt.Errorf("failed to list health checks: %v", err)
+		return fmt.Errorf("failed to list health checks: %v", err)
 	}
 
+	// Generate short UID
 	uid := cont.UID
 	if len(uid) > 8 {
 		uid = uid[:8]
@@ -641,13 +671,22 @@ func (cont *IngressController) backendMode(svcPorts map[string]v1.ServicePort, k
 	for svcName, sp := range svcPorts {
 		match := false
 		bsMatch := &compute.BackendService{}
-		// Non-NEG BackendServices are named with the Nodeport in the name.
 		// NEG BackendServices' names contain the a sha256 hash of a string.
+		// This logic is copied from the ingress-gce namer.
+		// WARNING: This needs to adapt if the naming convention changed.
 		negString := strings.Join([]string{uid, cont.Ns, svcName, fmt.Sprintf("%v", sp.Port)}, ";")
 		negHash := fmt.Sprintf("%x", sha256.Sum256([]byte(negString)))[:8]
 		for _, bs := range beList {
-			if strings.Contains(bs.Name, strconv.Itoa(int(sp.NodePort))) ||
-				strings.Contains(bs.Name, negHash) {
+			// Non-NEG BackendServices are named with the Nodeport in the name.
+			if backendType == igBackend && strings.Contains(bs.Name, strconv.Itoa(int(sp.NodePort))) {
+				match = true
+				bsMatch = bs
+				matchingBackendService++
+				break
+			}
+
+			// NEG BackendServices' names contain the a sha256 hash of a string.
+			if backendType == negBackend && strings.Contains(bs.Name, negHash) {
 				match = true
 				bsMatch = bs
 				matchingBackendService++
@@ -657,8 +696,8 @@ func (cont *IngressController) backendMode(svcPorts map[string]v1.ServicePort, k
 
 		if match {
 			for _, be := range bsMatch.Backends {
-				if !strings.Contains(be.Group, keyword) {
-					return false, nil
+				if !strings.Contains(be.Group, string(backendType)) {
+					return fmt.Errorf("expect to find backends with type %q, but got backend group: %v", backendType, be.Group)
 				}
 			}
 
@@ -672,11 +711,20 @@ func (cont *IngressController) backendMode(svcPorts map[string]v1.ServicePort, k
 			}
 
 			if !hcMatch {
-				return false, fmt.Errorf("missing healthcheck for backendservice: %v", bsMatch.Name)
+				return fmt.Errorf("missing healthcheck for backendservice: %v", bsMatch.Name)
 			}
 		}
 	}
-	return matchingBackendService == len(svcPorts), nil
+
+	if matchingBackendService != len(svcPorts) {
+		beNames := []string{}
+		for _, be := range beList {
+			beNames = append(beNames, be.Name)
+		}
+		return fmt.Errorf("expect %d backend service with backend type: %v, but got %d matching backend service. Expect backend services for service ports: %v, but got backend services: %v", len(svcPorts), backendType, matchingBackendService, svcPorts, beNames)
+	}
+
+	return nil
 }
 
 // Cleanup cleans up cloud resources.

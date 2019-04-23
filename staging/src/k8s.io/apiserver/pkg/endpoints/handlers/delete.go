@@ -40,7 +40,7 @@ import (
 
 // DeleteResource returns a function that will handle a resource deletion
 // TODO admission here becomes solely validating admission
-func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
+func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Delete " + req.URL.Path)
@@ -64,7 +64,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		ae := request.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 
-		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -119,13 +119,13 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			userInfo, _ := request.UserFrom(ctx)
 			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, dryrun.IsDryRun(options.DryRun), userInfo)
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				if err := mutatingAdmission.Admit(attrs, &scope); err != nil {
+				if err := mutatingAdmission.Admit(attrs, scope); err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				if err := validatingAdmission.Validate(attrs, &scope); err != nil {
+				if err := validatingAdmission.Validate(attrs, scope); err != nil {
 					scope.err(err, w, req)
 					return
 				}
@@ -168,13 +168,12 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		}
 
-		scope.Trace = trace
-		transformResponseObject(ctx, scope, req, w, status, outputMediaType, result)
+		transformResponseObject(ctx, scope, trace, req, w, status, outputMediaType, result)
 	}
 }
 
 // DeleteCollection returns a function that will handle a collection deletion
-func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
+func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		trace := utiltrace.New("Delete " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
@@ -197,7 +196,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		ctx = request.WithNamespace(ctx, namespace)
 		ae := request.AuditEventFrom(ctx)
 
-		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -269,7 +268,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			userInfo, _ := request.UserFrom(ctx)
 			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, dryrun.IsDryRun(options.DryRun), userInfo)
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(attrs, &scope)
+				err = mutatingAdmission.Admit(attrs, scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -277,7 +276,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(attrs, &scope)
+				err = validatingAdmission.Validate(attrs, scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
@@ -305,7 +304,6 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
-		scope.Trace = trace
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, outputMediaType, result)
+		transformResponseObject(ctx, scope, trace, req, w, http.StatusOK, outputMediaType, result)
 	}
 }

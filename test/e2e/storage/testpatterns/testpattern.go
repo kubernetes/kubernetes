@@ -18,19 +18,19 @@ package testpatterns
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 )
 
 const (
 	// MinFileSize represents minimum file size (1 MiB) for testing
-	MinFileSize = 1 * framework.MiB
+	MinFileSize = 1 * volume.MiB
 
 	// FileSizeSmall represents small file size (1 MiB) for testing
-	FileSizeSmall = 1 * framework.MiB
+	FileSizeSmall = 1 * volume.MiB
 	// FileSizeMedium represents medium file size (100 MiB) for testing
-	FileSizeMedium = 100 * framework.MiB
+	FileSizeMedium = 100 * volume.MiB
 	// FileSizeLarge represents large file size (1 GiB) for testing
-	FileSizeLarge = 1 * framework.GiB
+	FileSizeLarge = 1 * volume.GiB
 )
 
 // TestVolType represents a volume type to be tested in a TestSuite

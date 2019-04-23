@@ -32,9 +32,9 @@ type FakeNodeMetricses struct {
 	Fake *FakeMetricsV1beta1
 }
 
-var nodemetricsesResource = schema.GroupVersionResource{Group: "metrics", Version: "v1beta1", Resource: "nodes"}
+var nodemetricsesResource = schema.GroupVersionResource{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}
 
-var nodemetricsesKind = schema.GroupVersionKind{Group: "metrics", Version: "v1beta1", Kind: "NodeMetrics"}
+var nodemetricsesKind = schema.GroupVersionKind{Group: "metrics.k8s.io", Version: "v1beta1", Kind: "NodeMetrics"}
 
 // Get takes name of the nodeMetrics, and returns the corresponding nodeMetrics object, and an error if there is any.
 func (c *FakeNodeMetricses) Get(name string, options v1.GetOptions) (result *v1beta1.NodeMetrics, err error) {

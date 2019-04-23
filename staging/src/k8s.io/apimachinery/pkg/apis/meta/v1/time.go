@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 )
 
 // Time is a wrapper around time.Time which supports correct
@@ -39,11 +39,6 @@ type Time struct {
 // copy-by-assign, despite the presence of (unexported) Pointer fields.
 func (t *Time) DeepCopyInto(out *Time) {
 	*out = *t
-}
-
-// String returns the representation of the time.
-func (t Time) String() string {
-	return t.Time.String()
 }
 
 // NewTime returns a wrapped instance of the provided time
@@ -72,7 +67,10 @@ func (t *Time) IsZero() bool {
 
 // Before reports whether the time instant t is before u.
 func (t *Time) Before(u *Time) bool {
-	return t.Time.Before(u.Time)
+	if t != nil && u != nil {
+		return t.Time.Before(u.Time)
+	}
+	return false
 }
 
 // Equal reports whether the time instant t is equal to u.
@@ -147,8 +145,12 @@ func (t Time) MarshalJSON() ([]byte, error) {
 		// Encode unset/nil objects as JSON's "null".
 		return []byte("null"), nil
 	}
-
-	return json.Marshal(t.UTC().Format(time.RFC3339))
+	buf := make([]byte, 0, len(time.RFC3339)+2)
+	buf = append(buf, '"')
+	// time cannot contain non escapable JSON characters
+	buf = t.UTC().AppendFormat(buf, time.RFC3339)
+	buf = append(buf, '"')
+	return buf, nil
 }
 
 // OpenAPISchemaType is used by the kube-openapi generator when constructing

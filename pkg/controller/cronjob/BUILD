@@ -9,7 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "cronjob_controller.go",
+        "controller.go",
         "doc.go",
         "injection.go",
         "utils.go",
@@ -41,7 +41,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "cronjob_controller_test.go",
+        "controller_test.go",
         "utils_test.go",
     ],
     embed = [":go_default_library"],
@@ -55,6 +55,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

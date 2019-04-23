@@ -59,7 +59,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "reset",
-		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
+		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'",
 		Run: func(cmd *cobra.Command, args []string) {
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
@@ -178,7 +178,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.I
 	}
 
 	// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
-	fmt.Printf("[reset] unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
+	fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
 	umountDirsCmd := fmt.Sprintf("awk '$2 ~ path {print $2}' path=%s/ /proc/mounts | xargs -r umount", kubeadmconstants.KubeletRunDirectory)
 
 	klog.V(1).Infof("[reset] Executing command %q", umountDirsCmd)
@@ -217,7 +217,9 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.I
 
 		If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
 		to reset your system's IPVS tables.
-
+		
+		The reset process does not clean your kubeconfig files and you must remove them manually.
+		Please, check the contents of the $HOME/.kube/config file.
 	`)
 	fmt.Print(msg)
 

@@ -39,7 +39,7 @@ const (
 	dnsReadyTimeout = time.Minute
 )
 
-const queryDnsPythonTemplate string = `
+const queryDNSPythonTemplate string = `
 import socket
 try:
 	socket.gethostbyname('%s')
@@ -131,8 +131,8 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		}
 		podName := pods.Items[0].Name
 
-		queryDns := fmt.Sprintf(queryDnsPythonTemplate, backendSvcName+"."+namespaces[0].Name)
-		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDns}, "ok", dnsReadyTimeout)
+		queryDNS := fmt.Sprintf(queryDNSPythonTemplate, backendSvcName+"."+namespaces[0].Name)
+		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
 		Expect(err).NotTo(HaveOccurred(), "waiting for output from pod exec")
 
 		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain))

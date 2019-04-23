@@ -43,6 +43,11 @@ const (
 
 	SC_STATUS_PROCESS_INFO = 0
 
+	SC_ACTION_NONE        = 0
+	SC_ACTION_RESTART     = 1
+	SC_ACTION_REBOOT      = 2
+	SC_ACTION_RUN_COMMAND = 3
+
 	SERVICE_STOPPED          = 1
 	SERVICE_START_PENDING    = 2
 	SERVICE_STOP_PENDING     = 3
@@ -148,6 +153,19 @@ type ENUM_SERVICE_STATUS_PROCESS struct {
 	ServiceStatusProcess SERVICE_STATUS_PROCESS
 }
 
+type SERVICE_FAILURE_ACTIONS struct {
+	ResetPeriod  uint32
+	RebootMsg    *uint16
+	Command      *uint16
+	ActionsCount uint32
+	Actions      *SC_ACTION
+}
+
+type SC_ACTION struct {
+	Type  uint32
+	Delay uint32
+}
+
 //sys	CloseServiceHandle(handle Handle) (err error) = advapi32.CloseServiceHandle
 //sys	CreateService(mgr Handle, serviceName *uint16, displayName *uint16, access uint32, srvType uint32, startType uint32, errCtl uint32, pathName *uint16, loadOrderGroup *uint16, tagId *uint32, dependencies *uint16, serviceStartName *uint16, password *uint16) (handle Handle, err error) [failretval==0] = advapi32.CreateServiceW
 //sys	OpenService(mgr Handle, serviceName *uint16, access uint32) (handle Handle, err error) [failretval==0] = advapi32.OpenServiceW
@@ -162,3 +180,4 @@ type ENUM_SERVICE_STATUS_PROCESS struct {
 //sys	ChangeServiceConfig2(service Handle, infoLevel uint32, info *byte) (err error) = advapi32.ChangeServiceConfig2W
 //sys	QueryServiceConfig2(service Handle, infoLevel uint32, buff *byte, buffSize uint32, bytesNeeded *uint32) (err error) = advapi32.QueryServiceConfig2W
 //sys	EnumServicesStatusEx(mgr Handle, infoLevel uint32, serviceType uint32, serviceState uint32, services *byte, bufSize uint32, bytesNeeded *uint32, servicesReturned *uint32, resumeHandle *uint32, groupName *uint16) (err error) = advapi32.EnumServicesStatusExW
+//sys   QueryServiceStatusEx(service Handle, infoLevel uint32, buff *byte, buffSize uint32, bytesNeeded *uint32) (err error) = advapi32.QueryServiceStatusEx

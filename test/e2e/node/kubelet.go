@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -315,13 +316,12 @@ var _ = SIGDescribe("kubelet", func() {
 				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
 				Expect(framework.RunRC(testutils.RCConfig{
-					Client:         f.ClientSet,
-					InternalClient: f.InternalClientset,
-					Name:           rcName,
-					Namespace:      f.Namespace.Name,
-					Image:          imageutils.GetPauseImageName(),
-					Replicas:       totalPods,
-					NodeSelector:   nodeLabels,
+					Client:       f.ClientSet,
+					Name:         rcName,
+					Namespace:    f.Namespace.Name,
+					Image:        imageutils.GetPauseImageName(),
+					Replicas:     totalPods,
+					NodeSelector: nodeLabels,
 				})).NotTo(HaveOccurred())
 				// Perform a sanity check so that we know all desired pods are
 				// running on the nodes according to kubelet. The timeout is set to
@@ -389,7 +389,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 			BeforeEach(func() {
 				framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-				_, nfsServerPod, nfsIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+				_, nfsServerPod, nfsIP = volume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			})
 
 			AfterEach(func() {

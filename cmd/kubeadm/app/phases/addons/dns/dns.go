@@ -19,6 +19,7 @@ package dns
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/mholt/caddy/caddyfile"
@@ -32,6 +33,7 @@ import (
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -45,6 +47,7 @@ const (
 	kubeDNSStubDomain          = "stubDomains"
 	kubeDNSUpstreamNameservers = "upstreamNameservers"
 	kubeDNSFederation          = "federations"
+	unableToDecodeCoreDNS      = "unable to decode CoreDNS"
 )
 
 // DeployedDNSAddon returns the type of DNS addon currently deployed
@@ -177,7 +180,7 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 		return err
 	}
 
-	upstreamNameserver, err := translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(kubeDNSUpstreamNameservers, kubeDNSConfigMap)
+	upstreamNameserver, err := translateUpstreamNameServerOfKubeDNSToUpstreamForwardCoreDNS(kubeDNSUpstreamNameservers, kubeDNSConfigMap)
 	if err != nil {
 		return err
 	}
@@ -221,7 +224,7 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, client clientset.Interface) error {
 	coreDNSConfigMap := &v1.ConfigMap{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configBytes, coreDNSConfigMap); err != nil {
-		return errors.Wrap(err, "unable to decode CoreDNS configmap")
+		return errors.Wrapf(err, "%s ConfigMap", unableToDecodeCoreDNS)
 	}
 
 	// Create the ConfigMap for CoreDNS or retain it in case it already exists
@@ -231,7 +234,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	coreDNSClusterRoles := &rbac.ClusterRole{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), []byte(CoreDNSClusterRole), coreDNSClusterRoles); err != nil {
-		return errors.Wrap(err, "unable to decode CoreDNS clusterroles")
+		return errors.Wrapf(err, "%s ClusterRole", unableToDecodeCoreDNS)
 	}
 
 	// Create the Clusterroles for CoreDNS or update it in case it already exists
@@ -241,7 +244,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	coreDNSClusterRolesBinding := &rbac.ClusterRoleBinding{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), []byte(CoreDNSClusterRoleBinding), coreDNSClusterRolesBinding); err != nil {
-		return errors.Wrap(err, "unable to decode CoreDNS clusterrolebindings")
+		return errors.Wrapf(err, "%s ClusterRoleBinding", unableToDecodeCoreDNS)
 	}
 
 	// Create the Clusterrolebindings for CoreDNS or update it in case it already exists
@@ -251,7 +254,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	coreDNSServiceAccount := &v1.ServiceAccount{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), []byte(CoreDNSServiceAccount), coreDNSServiceAccount); err != nil {
-		return errors.Wrap(err, "unable to decode CoreDNS serviceaccount")
+		return errors.Wrapf(err, "%s ServiceAccount", unableToDecodeCoreDNS)
 	}
 
 	// Create the ConfigMap for CoreDNS or update it in case it already exists
@@ -261,7 +264,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	coreDNSDeployment := &apps.Deployment{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), deploymentBytes, coreDNSDeployment); err != nil {
-		return errors.Wrap(err, "unable to decode CoreDNS deployment")
+		return errors.Wrapf(err, "%s Deployment", unableToDecodeCoreDNS)
 	}
 
 	// Create the Deployment for CoreDNS or update it in case it already exists
@@ -309,7 +312,15 @@ func translateStubDomainOfKubeDNSToForwardCoreDNS(dataField string, kubeDNSConfi
 		}
 
 		var proxyStanza []interface{}
-		for domain, proxyIP := range stubDomainData {
+		for domain, proxyHosts := range stubDomainData {
+			proxyIP, err := omitHostnameInTranslation(proxyHosts)
+			if err != nil {
+				return "", errors.Wrap(err, "invalid format to parse for proxy")
+			}
+			if len(proxyIP) == 0 {
+				continue
+			}
+
 			pStanza := map[string]interface{}{}
 			pStanza["keys"] = []string{domain + ":53"}
 			pStanza["body"] = [][]string{
@@ -335,22 +346,27 @@ func translateStubDomainOfKubeDNSToForwardCoreDNS(dataField string, kubeDNSConfi
 	return "", nil
 }
 
-// translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS translates UpstreamNameServer Data in kube-dns ConfigMap
+// translateUpstreamNameServerOfKubeDNSToUpstreamForwardCoreDNS translates UpstreamNameServer Data in kube-dns ConfigMap
 // in the form of Proxy for the CoreDNS Corefile.
-func translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
+func translateUpstreamNameServerOfKubeDNSToUpstreamForwardCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
 	if kubeDNSConfigMap == nil {
 		return "", nil
 	}
 
 	if upstreamValues, ok := kubeDNSConfigMap.Data[dataField]; ok {
-		var upstreamProxyIP []string
+		var upstreamProxyValues []string
 
-		err := json.Unmarshal([]byte(upstreamValues), &upstreamProxyIP)
+		err := json.Unmarshal([]byte(upstreamValues), &upstreamProxyValues)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to parse JSON from 'kube-dns ConfigMap")
 		}
 
-		coreDNSProxyStanzaList := strings.Join(upstreamProxyIP, " ")
+		upstreamProxyValues, err = omitHostnameInTranslation(upstreamProxyValues)
+		if err != nil {
+			return "", errors.Wrap(err, "invalid format to parse for proxy")
+		}
+
+		coreDNSProxyStanzaList := strings.Join(upstreamProxyValues, " ")
 		return coreDNSProxyStanzaList, nil
 	}
 	return "/etc/resolv.conf", nil
@@ -400,11 +416,37 @@ func translateFederationsofKubeDNSToCoreDNS(dataField, coreDNSDomain string, kub
 // prepCorefileFormat indents the output of the Corefile caddytext and replaces tabs with spaces
 // to neatly format the configmap, making it readable.
 func prepCorefileFormat(s string, indentation int) string {
-	r := []string{}
+	var r []string
+	if s == "" {
+		return ""
+	}
 	for _, line := range strings.Split(s, "\n") {
 		indented := strings.Repeat(" ", indentation) + line
 		r = append(r, indented)
 	}
 	corefile := strings.Join(r, "\n")
 	return "\n" + strings.Replace(corefile, "\t", "   ", -1)
+}
+
+// omitHostnameInTranslation checks if the data extracted from the kube-dns ConfigMap contains a valid
+// IP address. Hostname to nameservers is not supported on CoreDNS and will
+// skip that particular instance, if there is any hostname present.
+func omitHostnameInTranslation(forwardIPs []string) ([]string, error) {
+	index := 0
+	for _, value := range forwardIPs {
+		proxyHost, _, err := kubeadmutil.ParseHostPort(value)
+		if err != nil {
+			return nil, err
+		}
+		parseIP := net.ParseIP(proxyHost)
+		if parseIP == nil {
+			klog.Warningf("your kube-dns configuration contains a hostname %v. It will be omitted in the translation to CoreDNS as hostnames are unsupported", proxyHost)
+		} else {
+			forwardIPs[index] = value
+			index++
+		}
+	}
+	forwardIPs = forwardIPs[:index]
+
+	return forwardIPs, nil
 }

@@ -2018,20 +2018,6 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 	}
 }
 
-type fakeReadWriteCloser struct{}
-
-func (f *fakeReadWriteCloser) Write(data []byte) (int, error) {
-	return 0, nil
-}
-
-func (f *fakeReadWriteCloser) Read(data []byte) (int, error) {
-	return 0, nil
-}
-
-func (f *fakeReadWriteCloser) Close() error {
-	return nil
-}
-
 func TestGetExec(t *testing.T) {
 	const (
 		podName                = "podFoo"

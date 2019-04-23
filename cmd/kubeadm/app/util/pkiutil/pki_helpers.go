@@ -61,12 +61,12 @@ const (
 func NewCertificateAuthority(config *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := NewPrivateKey()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to create private key")
+		return nil, nil, errors.Wrap(err, "unable to create private key while generating CA certificate")
 	}
 
 	cert, err := certutil.NewSelfSignedCACert(*config, key)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to create self-signed certificate")
+		return nil, nil, errors.Wrap(err, "unable to create self-signed CA certificate")
 	}
 
 	return cert, key, nil
@@ -404,29 +404,18 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 // `advertise address` and localhost are included in the SAN since this is the interfaces the etcd static pod listens on.
 // The user can override the listen address with `Etcd.ExtraArgs` and add SANs with `Etcd.ServerCertSANs`.
 func GetEtcdAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, error) {
-	// advertise address
-	advertiseAddress := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress)
-	if advertiseAddress == nil {
-		return nil, errors.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %q: is not a valid textual representation of an IP address", cfg.LocalAPIEndpoint.AdvertiseAddress)
-	}
-
-	// create AltNames with defaults DNSNames/IPs
-	altNames := &certutil.AltNames{
-		DNSNames: []string{cfg.NodeRegistration.Name, "localhost"},
-		IPs:      []net.IP{advertiseAddress, net.IPv4(127, 0, 0, 1), net.IPv6loopback},
-	}
-
-	if cfg.Etcd.Local != nil {
-		appendSANsToAltNames(altNames, cfg.Etcd.Local.ServerCertSANs, kubeadmconstants.EtcdServerCertName)
-	}
-
-	return altNames, nil
+	return getAltNames(cfg, kubeadmconstants.EtcdServerCertName)
 }
 
 // GetEtcdPeerAltNames builds an AltNames object for generating the etcd peer certificate.
 // Hostname and `API.AdvertiseAddress` are included if the user chooses to promote the single node etcd cluster into a multi-node one (stacked etcd).
 // The user can override the listen address with `Etcd.ExtraArgs` and add SANs with `Etcd.PeerCertSANs`.
 func GetEtcdPeerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, error) {
+	return getAltNames(cfg, kubeadmconstants.EtcdPeerCertName)
+}
+
+// getAltNames builds an AltNames object with the cfg and certName.
+func getAltNames(cfg *kubeadmapi.InitConfiguration, certName string) (*certutil.AltNames, error) {
 	// advertise address
 	advertiseAddress := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
@@ -441,9 +430,12 @@ func GetEtcdPeerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames,
 	}
 
 	if cfg.Etcd.Local != nil {
-		appendSANsToAltNames(altNames, cfg.Etcd.Local.PeerCertSANs, kubeadmconstants.EtcdPeerCertName)
+		if certName == kubeadmconstants.EtcdServerCertName {
+			appendSANsToAltNames(altNames, cfg.Etcd.Local.ServerCertSANs, kubeadmconstants.EtcdServerCertName)
+		} else if certName == kubeadmconstants.EtcdPeerCertName {
+			appendSANsToAltNames(altNames, cfg.Etcd.Local.PeerCertSANs, kubeadmconstants.EtcdPeerCertName)
+		}
 	}
-
 	return altNames, nil
 }
 

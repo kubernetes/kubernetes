@@ -55,13 +55,6 @@ type topologyPair struct {
 	value string
 }
 
-//  Note that predicateMetadata and matchingPodAntiAffinityTerm need to be declared in the same file
-//  due to the way declarations are processed in predicate declaration unit tests.
-type matchingPodAntiAffinityTerm struct {
-	term *v1.PodAffinityTerm
-	node *v1.Node
-}
-
 type podSet map[*v1.Pod]struct{}
 
 type topologyPairSet map[topologyPair]struct{}
@@ -107,13 +100,10 @@ var _ PredicateMetadata = &predicateMetadata{}
 // and used to modify the return values of PredicateMetadataProducer
 type predicateMetadataProducer func(pm *predicateMetadata)
 
-var predicateMetaProducerRegisterLock sync.Mutex
 var predicateMetadataProducers = make(map[string]predicateMetadataProducer)
 
 // RegisterPredicateMetadataProducer registers a PredicateMetadataProducer.
 func RegisterPredicateMetadataProducer(predicateName string, precomp predicateMetadataProducer) {
-	predicateMetaProducerRegisterLock.Lock()
-	defer predicateMetaProducerRegisterLock.Unlock()
 	predicateMetadataProducers[predicateName] = precomp
 }
 

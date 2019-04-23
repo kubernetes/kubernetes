@@ -25,9 +25,11 @@ export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
 # Install tools we need, but only from vendor/...
-go install k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/cmd/gazelle
-go install k8s.io/kubernetes/vendor/github.com/bazelbuild/buildtools/buildozer
-go install k8s.io/kubernetes/vendor/k8s.io/repo-infra/kazel
+pushd "${KUBE_ROOT}/vendor"
+  go install ./github.com/bazelbuild/bazel-gazelle/cmd/gazelle
+  go install ./github.com/bazelbuild/buildtools/buildozer
+  go install ./k8s.io/repo-infra/kazel
+popd
 
 # Find all of the staging repos.
 while IFS='' read -r repo; do staging_repos+=("${repo}"); done <\

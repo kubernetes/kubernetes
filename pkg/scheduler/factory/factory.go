@@ -90,7 +90,8 @@ type Config struct {
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
 	PodConditionUpdater PodConditionUpdater
-	// PodPreemptor is used to evict pods and update pod annotations.
+	// PodPreemptor is used to evict pods and update 'NominatedNode' field of
+	// the preemptor pod.
 	PodPreemptor PodPreemptor
 	// PlugingSet has a set of plugins and data used to run them.
 	PluginSet pluginsv1alpha1.PluginSet
@@ -125,8 +126,8 @@ type Config struct {
 	SchedulingQueue internalqueue.SchedulingQueue
 }
 
-// PodPreemptor has methods needed to delete a pod and to update
-// annotations of the preemptor pod.
+// PodPreemptor has methods needed to delete a pod and to update 'NominatedPod'
+// field of the preemptor pod.
 type PodPreemptor interface {
 	GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error)
 	DeletePod(pod *v1.Pod) error
@@ -455,7 +456,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.percentageOfNodesToScore,
 	)
 
-	podBackoff := util.CreateDefaultPodBackoff()
+	podBackoff := internalqueue.NewPodBackoffMap(1*time.Second, 60*time.Second)
 	return &Config{
 		SchedulerCache: c.schedulerCache,
 		// The scheduler only needs to consider schedulable nodes.
@@ -638,7 +639,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
+func MakeDefaultErrorFunc(client clientset.Interface, backoff *internalqueue.PodBackoffMap, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			klog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
@@ -661,7 +662,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, 
 			}
 		}
 
-		backoff.Gc()
+		backoff.CleanupPodsCompletesBackingoff()
 		podSchedulingCycle := podQueue.SchedulingCycle()
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
@@ -704,24 +705,6 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, 
 			}
 		}()
 	}
-}
-
-// nodeEnumerator allows a cache.Poller to enumerate items in a v1.NodeList
-type nodeEnumerator struct {
-	*v1.NodeList
-}
-
-// Len returns the number of items in the node list.
-func (ne *nodeEnumerator) Len() int {
-	if ne.NodeList == nil {
-		return 0
-	}
-	return len(ne.Items)
-}
-
-// Get returns the item (and ID) with the particular index.
-func (ne *nodeEnumerator) Get(index int) interface{} {
-	return &ne.Items[index]
 }
 
 type binder struct {

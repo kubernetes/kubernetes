@@ -8,13 +8,13 @@ Run the following three commands in separate terminals. Each terminal needs a un
 
 ```bash
 # first terminal 
-$ go run *.go -kubeconfig=/my/config -logtostderr=true -id=1
+go run *.go -kubeconfig=/my/config -logtostderr=true -id=1
 
 # second terminal 
-$ go run *.go -kubeconfig=/my/config -logtostderr=true -id=2
+go run *.go -kubeconfig=/my/config -logtostderr=true -id=2
 
 # third terminal
-$ go run *.go -kubeconfig=/my/config -logtostderr=true -id=3
+go run *.go -kubeconfig=/my/config -logtostderr=true -id=3
 ```
 > You can ignore the `-kubeconfig` flag if you are running these commands in the Kubernetes cluster.
 

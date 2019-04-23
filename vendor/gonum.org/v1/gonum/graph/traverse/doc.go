@@ -3,4 +3,4 @@
 // license that can be found in the LICENSE file.
 
 // Package traverse provides basic graph traversal primitives.
-package traverse
+package traverse // import "gonum.org/v1/gonum/graph/traverse"

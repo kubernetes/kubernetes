@@ -65,8 +65,16 @@ func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server
 	return setupWithResources(t, groupVersions, nil)
 }
 
+func setupWithOptions(t *testing.T, opts *framework.MasterConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+	return setupWithResourcesWithOptions(t, opts, groupVersions, nil)
+}
+
 func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	return setupWithResourcesWithOptions(t, &framework.MasterConfigOptions{}, groupVersions, resources)
+}
+
+func setupWithResourcesWithOptions(t *testing.T, opts *framework.MasterConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(opts)
 	if len(groupVersions) > 0 || len(resources) > 0 {
 		resourceConfig := master.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
@@ -187,6 +195,62 @@ func Test202StatusCode(t *testing.T) {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
 	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 202)
+}
+
+func TestListResourceVersion0(t *testing.T) {
+	var testcases = []struct {
+		name              string
+		watchCacheEnabled bool
+	}{
+		{
+			name:              "watchCacheOn",
+			watchCacheEnabled: true,
+		},
+		{
+			name:              "watchCacheOff",
+			watchCacheEnabled: false,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
+			etcdOptions := framework.DefaultEtcdOptions()
+			etcdOptions.EnableWatchCache = tc.watchCacheEnabled
+			s, clientSet, closeFn := setupWithOptions(t, &framework.MasterConfigOptions{EtcdOptions: etcdOptions})
+			defer closeFn()
+
+			ns := framework.CreateTestingNamespace("list-paging", s, t)
+			defer framework.DeleteTestingNamespace(ns, s, t)
+
+			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
+
+			for i := 0; i < 10; i++ {
+				rs := newRS(ns.Name)
+				rs.Name = fmt.Sprintf("test-%d", i)
+				if _, err := rsClient.Create(rs); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			pagerFn := func(opts metav1.ListOptions) (runtime.Object, error) {
+				return rsClient.List(opts)
+			}
+
+			p := pager.New(pager.SimplePageFunc(pagerFn))
+			p.PageSize = 3
+			listObj, err := p.List(context.Background(), metav1.ListOptions{ResourceVersion: "0"})
+			if err != nil {
+				t.Fatalf("Unexpected list error: %v", err)
+			}
+			items, err := meta.ExtractList(listObj)
+			if err != nil {
+				t.Fatalf("Failed to extract list from %v", listObj)
+			}
+			if len(items) != 10 {
+				t.Errorf("Expected list size of 10 but got %d", len(items))
+			}
+		})
+	}
 }
 
 func TestAPIListChunking(t *testing.T) {
@@ -337,6 +401,150 @@ func TestNameInFieldSelector(t *testing.T) {
 		if len(secrets.Items) != tc.expectedSecrets {
 			t.Errorf("%s: Unexpected number of secrets: %d, expected: %d", tc.selector, len(secrets.Items), tc.expectedSecrets)
 		}
+	}
+}
+
+func TestAPICRDProtobuf(t *testing.T) {
+	tearDown, config, _, err := fixtures.StartDefaultServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	s, _, closeFn := setup(t)
+	defer closeFn()
+
+	apiExtensionClient, err := apiextensionsclient.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fooCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foos.cr.bar.com",
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "cr.bar.com",
+			Version: "v1",
+			Scope:   apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural: "foos",
+				Kind:   "Foo",
+			},
+		},
+	}
+	fooCRD, err = fixtures.CreateNewCustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Version, Resource: "foos"}
+	crclient := dynamicClient.Resource(crdGVR).Namespace("default")
+
+	testcases := []struct {
+		name     string
+		accept   string
+		object   func(*testing.T) (metav1.Object, string, string)
+		wantErr  func(*testing.T, error)
+		wantBody func(*testing.T, io.Reader)
+	}{
+		{
+			name:   "server returns 406 when asking for protobuf for CRDs",
+			accept: "application/vnd.kubernetes.protobuf",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-1", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantErr: func(t *testing.T, err error) {
+				if !apierrors.IsNotAcceptable(err) {
+					t.Fatal(err)
+				}
+				// TODO: this should be a more specific error
+				if err.Error() != "only the following media types are accepted: application/json, application/yaml" {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name:   "server returns JSON when asking for protobuf and json for CRDs",
+			accept: "application/vnd.kubernetes.protobuf,application/json",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-2", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				obj := &unstructured.Unstructured{}
+				if err := json.NewDecoder(w).Decode(obj); err != nil {
+					t.Fatal(err)
+				}
+				v, ok, err := unstructured.NestedInt64(obj.UnstructuredContent(), "spec", "field")
+				if !ok || err != nil {
+					data, _ := json.MarshalIndent(obj.UnstructuredContent(), "", "  ")
+					t.Fatalf("err=%v ok=%t json=%s", err, ok, string(data))
+				}
+				if v != 1 {
+					t.Fatalf("unexpected body: %#v", obj.UnstructuredContent())
+				}
+			},
+		},
+	}
+
+	for i := range testcases {
+		tc := testcases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			obj, group, resource := tc.object(t)
+
+			cfg := dynamic.ConfigFor(config)
+			if len(group) == 0 {
+				cfg = dynamic.ConfigFor(&restclient.Config{Host: s.URL})
+				cfg.APIPath = "/api"
+			} else {
+				cfg.APIPath = "/apis"
+			}
+			cfg.GroupVersion = &schema.GroupVersion{Group: group, Version: "v1"}
+			client, err := restclient.RESTClientFor(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rv, _ := strconv.Atoi(obj.GetResourceVersion())
+			if rv < 1 {
+				rv = 1
+			}
+
+			w, err := client.Get().
+				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).Name(obj.GetName()).
+				SetHeader("Accept", tc.accept).
+				Stream()
+			if (tc.wantErr != nil) != (err != nil) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantErr != nil {
+				tc.wantErr(t, err)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer w.Close()
+			tc.wantBody(t, w)
+		})
 	}
 }
 

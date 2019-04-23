@@ -104,7 +104,7 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 	// Create Pod and verify the persistent volume is accessible
 	pod := createPodAndVerifyVolumeAccessible(client, namespace, pvclaim, persistentvolumes)
 	_, err := framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/cat", "/mnt/volume1/fstype"}, expectedContent, time.Minute)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
@@ -147,18 +147,18 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 
 func createVolume(client clientset.Interface, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("fstype", scParameters, nil))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
 	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	By("Waiting for claim to be in bound phase")
 	persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return pvclaim, persistentvolumes
 }
 
@@ -168,7 +168,7 @@ func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace st
 	By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
 	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, ExecCommand)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Asserts: Right disk is attached to the pod
 	By("Verify the volume is accessible and available in the pod")

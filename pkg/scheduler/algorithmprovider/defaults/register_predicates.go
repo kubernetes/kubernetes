@@ -81,7 +81,7 @@ func init() {
 	factory.RegisterFitPredicateFactory(
 		predicates.MaxCSIVolumeCountPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewCSIMaxVolumeLimitPredicate(args.PVInfo, args.PVCInfo)
+			return predicates.NewCSIMaxVolumeLimitPredicate(args.PVInfo, args.PVCInfo, args.StorageClassInfo)
 		},
 	)
 	factory.RegisterFitPredicateFactory(

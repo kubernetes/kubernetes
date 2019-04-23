@@ -34,7 +34,7 @@ func RealVersion(s string) (string, error) {
 	Logf("Getting real version for %q", s)
 	v, _, err := RunCmd(path.Join(TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
 	if err != nil {
-		return v, err
+		return v, fmt.Errorf("error getting real version for %q: %v", s, err)
 	}
 	Logf("Version for %q is %q", s, v)
 	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil
@@ -46,17 +46,17 @@ func traceRouteToMaster() {
 		Logf("Could not find traceroute program")
 		return
 	}
-
 	cmd := exec.Command(path, "-I", GetMasterHost())
 	out, err := cmd.Output()
 	if len(out) != 0 {
 		Logf(string(out))
 	}
 	if exiterr, ok := err.(*exec.ExitError); err != nil && ok {
-		Logf("error while running traceroute: %s", exiterr.Stderr)
+		Logf("Error while running traceroute: %s", exiterr.Stderr)
 	}
 }
 
+// CheckMasterVersion validates the master version
 func CheckMasterVersion(c clientset.Interface, want string) error {
 	Logf("Checking master version")
 	var err error
@@ -77,13 +77,13 @@ func CheckMasterVersion(c clientset.Interface, want string) error {
 	// got  looks like: v0.19.3-815-g50e67d4034e858-dirty
 	got := strings.TrimPrefix(v.GitVersion, "v")
 	if !strings.HasPrefix(got, want) {
-		return fmt.Errorf("master had kube-apiserver version %s which does not start with %s",
-			got, want)
+		return fmt.Errorf("master had kube-apiserver version %s which does not start with %s", got, want)
 	}
 	Logf("Master is at version %s", want)
 	return nil
 }
 
+// CheckNodesVersions validates the nodes versions
 func CheckNodesVersions(cs clientset.Interface, want string) error {
 	l := GetReadySchedulableNodesOrDie(cs)
 	for _, n := range l.Items {

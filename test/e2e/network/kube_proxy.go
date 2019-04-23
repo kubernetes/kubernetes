@@ -39,8 +39,8 @@ var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Net)
 
 var _ = SIGDescribe("Network", func() {
 	const (
-		testDaemonHttpPort    = 11301
-		testDaemonTcpPort     = 11302
+		testDaemonHTTPPort    = 11301
+		testDaemonTCPPort     = 11302
 		timeoutSeconds        = 10
 		postFinTimeoutSeconds = 5
 	)
@@ -60,19 +60,19 @@ var _ = SIGDescribe("Network", func() {
 		type NodeInfo struct {
 			node   *v1.Node
 			name   string
-			nodeIp string
+			nodeIP string
 		}
 
 		clientNodeInfo := NodeInfo{
 			node:   &nodes.Items[0],
 			name:   nodes.Items[0].Name,
-			nodeIp: ips[0],
+			nodeIP: ips[0],
 		}
 
 		serverNodeInfo := NodeInfo{
 			node:   &nodes.Items[1],
 			name:   nodes.Items[1].Name,
-			nodeIp: ips[1],
+			nodeIP: ips[1],
 		}
 
 		zero := int64(0)
@@ -101,7 +101,7 @@ var _ = SIGDescribe("Network", func() {
 						Image:           kubeProxyE2eImage,
 						ImagePullPolicy: "Always",
 						Command: []string{
-							"/net", "-serve", fmt.Sprintf("0.0.0.0:%d", testDaemonHttpPort),
+							"/net", "-serve", fmt.Sprintf("0.0.0.0:%d", testDaemonHTTPPort),
 						},
 					},
 				},
@@ -127,14 +127,14 @@ var _ = SIGDescribe("Network", func() {
 							"-runner", "nat-closewait-server",
 							"-options",
 							fmt.Sprintf(`{"LocalAddr":"0.0.0.0:%v", "PostFindTimeoutSeconds":%v}`,
-								testDaemonTcpPort,
+								testDaemonTCPPort,
 								postFinTimeoutSeconds),
 						},
 						Ports: []v1.ContainerPort{
 							{
 								Name:          "tcp",
-								ContainerPort: testDaemonTcpPort,
-								HostPort:      testDaemonTcpPort,
+								ContainerPort: testDaemonTCPPort,
+								HostPort:      testDaemonTCPPort,
 							},
 						},
 					},
@@ -146,14 +146,14 @@ var _ = SIGDescribe("Network", func() {
 		By(fmt.Sprintf(
 			"Launching a server daemon on node %v (node ip: %v, image: %v)",
 			serverNodeInfo.name,
-			serverNodeInfo.nodeIp,
+			serverNodeInfo.nodeIP,
 			kubeProxyE2eImage))
 		fr.PodClient().CreateSync(serverPodSpec)
 
 		By(fmt.Sprintf(
 			"Launching a client daemon on node %v (node ip: %v, image: %v)",
 			clientNodeInfo.name,
-			clientNodeInfo.nodeIp,
+			clientNodeInfo.nodeIP,
 			kubeProxyE2eImage))
 		fr.PodClient().CreateSync(clientPodSpec)
 
@@ -161,7 +161,7 @@ var _ = SIGDescribe("Network", func() {
 
 		options := nat.CloseWaitClientOptions{
 			RemoteAddr: fmt.Sprintf("%v:%v",
-				serverNodeInfo.nodeIp, testDaemonTcpPort),
+				serverNodeInfo.nodeIP, testDaemonTCPPort),
 			TimeoutSeconds:        timeoutSeconds,
 			PostFinTimeoutSeconds: 0,
 			LeakConnection:        true,
@@ -171,7 +171,7 @@ var _ = SIGDescribe("Network", func() {
 		cmd := fmt.Sprintf(
 			`curl -X POST http://localhost:%v/run/nat-closewait-client -d `+
 				`'%v' 2>/dev/null`,
-			testDaemonHttpPort,
+			testDaemonHTTPPort,
 			string(jsonBytes))
 		framework.RunHostCmdOrDie(fr.Namespace.Name, "e2e-net-client", cmd)
 
@@ -182,7 +182,7 @@ var _ = SIGDescribe("Network", func() {
 		// in a loop as there may be a race with the client connecting.
 		framework.IssueSSHCommandWithResult(
 			fmt.Sprintf("sudo cat /proc/net/nf_conntrack | grep 'dport=%v'",
-				testDaemonTcpPort),
+				testDaemonTCPPort),
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
 
@@ -194,8 +194,8 @@ var _ = SIGDescribe("Network", func() {
 					"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' "+
 					"| tail -n 1"+
 					"| awk '{print $5}' ",
-				serverNodeInfo.nodeIp,
-				testDaemonTcpPort),
+				serverNodeInfo.nodeIP,
+				testDaemonTCPPort),
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
 		framework.ExpectNoError(err)

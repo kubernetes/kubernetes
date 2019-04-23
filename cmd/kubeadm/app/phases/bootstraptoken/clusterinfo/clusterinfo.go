@@ -41,7 +41,7 @@ const (
 // CreateBootstrapConfigMapIfNotExists creates the kube-public ConfigMap if it doesn't exist already
 func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string) error {
 
-	fmt.Printf("[bootstrap-token] creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
+	fmt.Printf("[bootstrap-token] Creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
 
 	klog.V(1).Infoln("[bootstrap-token] loading admin kubeconfig")
 	adminConfig, err := clientcmd.LoadFromFile(file)

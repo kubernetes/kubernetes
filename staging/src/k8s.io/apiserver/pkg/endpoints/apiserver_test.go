@@ -2269,6 +2269,10 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			list:   true,
 			accept: runtime.ContentTypeJSON + ";as=PartialObjectMetadataList;v=v1beta1;g=meta.k8s.io",
 			expected: &metav1beta1.PartialObjectMetadataList{
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "10",
+					SelfLink:        "/test/link",
+				},
 				Items: []*metav1beta1.PartialObjectMetadata{
 					{
 						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1beta1", Kind: "PartialObjectMetadata"},
