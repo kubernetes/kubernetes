@@ -348,7 +348,6 @@ filegroup(
         "//vendor/github.com/stretchr/testify/require:all-srcs",
         "//vendor/github.com/syndtr/gocapability/capability:all-srcs",
         "//vendor/github.com/tmc/grpc-websocket-proxy/wsproxy:all-srcs",
-        "//vendor/github.com/ugorji/go/codec:all-srcs",
         "//vendor/github.com/vishvananda/netlink:all-srcs",
         "//vendor/github.com/vishvananda/netns:all-srcs",
         "//vendor/github.com/vmware/govmomi:all-srcs",
