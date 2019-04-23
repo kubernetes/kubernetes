@@ -115,7 +115,6 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 //   - Applying new kube-dns and kube-proxy manifests
 //   - Uploads the newly used configuration to the cluster ConfigMap
 func runApply(flags *applyFlags, userVersion string) error {
-
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
@@ -225,7 +224,6 @@ func EnforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Vers
 
 // PerformControlPlaneUpgrade actually performs the upgrade procedure for the cluster of your type (self-hosted or static-pod-hosted)
 func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration) error {
-
 	// OK, the cluster is hosted using static pods. Upgrade a static-pod hosted cluster
 	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", internalcfg.KubernetesVersion)
 
@@ -256,8 +254,7 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
 func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.InitConfiguration) error {
-
-	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
+	dryRunManifestDir, err := constants.CreateTempDirForKubeadm(os.TempDir(), "kubeadm-upgrade-dryrun")
 	if err != nil {
 		return err
 	}

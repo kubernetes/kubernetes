@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"path"
 	"path/filepath"
 	"time"
 
@@ -38,9 +37,6 @@ const (
 	KubernetesDir = "/etc/kubernetes"
 	// ManifestsSubDirName defines directory name to store manifests
 	ManifestsSubDirName = "manifests"
-	// TempDirForKubeadm defines temporary directory for kubeadm
-	// should be joined with KubernetesDir.
-	TempDirForKubeadm = "tmp"
 
 	// CACertAndKeyBaseName defines certificate authority base name
 	CACertAndKeyBaseName = "ca"
@@ -445,44 +441,25 @@ func AddSelfHostedPrefix(componentName string) string {
 	return fmt.Sprintf("%s%s", SelfHostingPrefix, componentName)
 }
 
-// CreateTempDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp (not using /tmp as that would potentially be dangerous)
-func CreateTempDirForKubeadm(kubernetesDir, dirName string) (string, error) {
-	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
-	if len(kubernetesDir) != 0 {
-		tempDir = path.Join(kubernetesDir, TempDirForKubeadm)
+// CreateTempDirForKubeadm is a function that creates a temporary directory with name dirName in path prefix.
+// If prefix is empty, /etc/kubernetes/tmp directory will be used.
+func CreateTempDirForKubeadm(prefix, dirName string) (string, error) {
+	if prefix == "" {
+		prefix = filepath.Join(KubernetesDir, "tmp")
+		if err := os.MkdirAll(prefix, 0700); err != nil {
+			return "", errors.Wrapf(err, "couldn't create prefix directory: %q", prefix)
+		}
 	}
-
-	// creates target folder if not already exists
-	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
-	}
-
-	tempDir, err := ioutil.TempDir(tempDir, dirName)
+	tempDir, err := ioutil.TempDir(prefix, dirName)
 	if err != nil {
 		return "", errors.Wrap(err, "couldn't create a temporary directory")
 	}
 	return tempDir, nil
 }
 
-// CreateTimestampDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp formatted with the current date
-func CreateTimestampDirForKubeadm(kubernetesDir, dirName string) (string, error) {
-	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
-	if len(kubernetesDir) != 0 {
-		tempDir = path.Join(kubernetesDir, TempDirForKubeadm)
-	}
-
-	// creates target folder if not already exists
-	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
-	}
-
-	timestampDirName := fmt.Sprintf("%s-%s", dirName, time.Now().Format("2006-01-02-15-04-05"))
-	timestampDir := path.Join(tempDir, timestampDirName)
-	if err := os.Mkdir(timestampDir, 0700); err != nil {
-		return "", errors.Wrap(err, "could not create timestamp directory")
-	}
-
-	return timestampDir, nil
+// CreateTimestampDirForKubeadm is a function that creates a temporary directory formatted with the current date
+func CreateTimestampDirForKubeadm(prefix, dirName string) (string, error) {
+	return CreateTempDirForKubeadm(prefix, fmt.Sprintf("%s-%s", dirName, time.Now().Format("2006-01-02-15-04-05")))
 }
 
 // GetDNSIP returns a dnsIP, which is 10th IP in svcSubnet CIDR range

@@ -95,7 +95,6 @@ func NewKubeStaticPodPathManager(kubernetesDir, tempDir, backupDir, backupEtcdDi
 
 // NewKubeStaticPodPathManagerUsingTempDirs creates a new instance of KubeStaticPodPathManager with temporary directories backing it
 func NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir string, saveManifestsDir, saveEtcdDir bool) (StaticPodPathManager, error) {
-
 	upgradedManifestsDir, err := constants.CreateTempDirForKubeadm(kubernetesDir, "kubeadm-upgraded-manifests")
 	if err != nil {
 		return nil, err
