@@ -390,7 +390,7 @@ sig-storage-api-reviewers:
     - jsafrane
 
   
-  # sig-windows-api-reviewers:
+sig-windows-api-reviewers:
     - patricklang
     - michmike
 
