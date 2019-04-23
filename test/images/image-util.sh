@@ -109,6 +109,15 @@ build() {
     image="${alias_name}"
   fi
 
+  # image tag
+  TAG=$(<"${img_folder}/VERSION")
+
+  alias_name="$(cat "${img_folder}/ALIAS" 2>/dev/null || true)"
+  if [[ -n "${alias_name}" ]]; then
+    echo "Found an alias for '${image}'. Building / tagging image as '${alias_name}.'"
+    image="${alias_name}"
+  fi
+
   kube::util::ensure-gnu-sed
 
   for os_arch in ${os_archs}; do
@@ -196,6 +205,13 @@ push() {
   else
     # prepend linux/ to the QEMUARCHS items.
     os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[@]}")
+  fi
+
+  pushd "${image}"
+  alias_name="$(cat ALIAS 2>/dev/null || true)"
+  if [[ -n "${alias_name}" ]]; then
+    echo "Found an alias for '${image}'. Pushing image as '${alias_name}.'"
+    image="${alias_name}"
   fi
 
   pushd "${image}"
