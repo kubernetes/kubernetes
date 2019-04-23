@@ -2,6 +2,20 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 load("//build:workspace_mirror.bzl", "mirror")
 
 http_archive(
+    name = "bazel_toolchains",
+    sha256 = "8d43844d1d4447be2a108834771d617a1ad2a107f1680190bfe44925e7bf530e",
+    strip_prefix = "bazel-toolchains-4c003ad45e8a2d829ffc40e3aecfb6b8577a9406",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/4c003ad45e8a2d829ffc40e3aecfb6b8577a9406.tar.gz",
+        "https://github.com/bazelbuild/bazel-toolchains/archive/4c003ad45e8a2d829ffc40e3aecfb6b8577a9406.tar.gz",
+    ],
+)
+
+load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
+
+rbe_autoconfig(name = "rbe_default")
+
+http_archive(
     name = "bazel_skylib",
     sha256 = "eb5c57e4c12e68c0c20bc774bfbc60a568e800d025557bc4ea022c6479acc867",
     strip_prefix = "bazel-skylib-0.6.0",
