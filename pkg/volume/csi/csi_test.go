@@ -122,7 +122,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			fakeWatcher := watch.NewRaceFreeFake()
 
 			factory := informers.NewSharedInformerFactory(client, csiResyncPeriod)
-			go factory.Start(wait.NeverStop)
+			factory.Start(wait.NeverStop)
 
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(
 				tmpDir,

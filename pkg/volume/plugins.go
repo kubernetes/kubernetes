@@ -1034,7 +1034,7 @@ func (pm *VolumePluginMgr) Run(stopCh <-chan struct{}) {
 		// start informer for CSIDriver
 		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 			informerFactory := kletHost.GetInformerFactory()
-			go informerFactory.Start(stopCh)
+			informerFactory.Start(stopCh)
 		}
 	}
 }

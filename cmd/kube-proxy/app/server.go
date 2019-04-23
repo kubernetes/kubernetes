@@ -667,7 +667,7 @@ func (s *ProxyServer) Run() error {
 
 	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
 	// functions must configure their shared informer event handlers first.
-	go informerFactory.Start(wait.NeverStop)
+	informerFactory.Start(wait.NeverStop)
 
 	// Birth Cry after the birth is successful
 	s.birthCry()
