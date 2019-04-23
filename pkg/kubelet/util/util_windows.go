@@ -34,6 +34,7 @@ const (
 	npipeProtocol = "npipe"
 )
 
+// CreateListener creates a listener on the specified endpoint.
 func CreateListener(endpoint string) (net.Listener, error) {
 	protocol, addr, err := parseEndpoint(endpoint)
 	if err != nil {
@@ -52,6 +53,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 	}
 }
 
+// GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
 	protocol, addr, err := parseEndpoint(endpoint)
 	if err != nil {
