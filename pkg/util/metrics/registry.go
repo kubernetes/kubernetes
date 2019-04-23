@@ -1,0 +1,79 @@
+/*
+Copyright 2019 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package metrics
+
+import (
+	"github.com/blang/semver"
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
+)
+
+var (
+	// todo: load the version dynamically at application boot.
+	DefaultGlobalRegistry = NewKubeRegistry(semver.MustParse("1.15.0"))
+)
+
+type KubeRegistry struct {
+	PromRegistry
+	version semver.Version
+}
+
+// Register registers a collectable metric, but it uses a global registry.
+func Register(c KubeCollector) error {
+	return DefaultGlobalRegistry.Register(c)
+}
+
+// MustRegister works like Register but registers any number of
+// Collectors and panics upon the first registration that causes an
+// error.
+func MustRegister(cs ...KubeCollector) {
+	DefaultGlobalRegistry.MustRegister(cs...)
+}
+
+func (kr *KubeRegistry) Register(c KubeCollector) error {
+	if c.ActuallyCreate(&kr.version) {
+		return kr.PromRegistry.Register(c)
+	}
+	return nil
+}
+
+func (kr *KubeRegistry) MustRegister(cs ...KubeCollector) {
+	metrics := make([]prometheus.Collector, 0, len(cs))
+	for _, c := range cs {
+		if c.ActuallyCreate(&kr.version) {
+			metrics = append(metrics, c)
+		}
+	}
+	kr.PromRegistry.MustRegister(metrics...)
+}
+
+func (kr *KubeRegistry) Unregister(collector KubeCollector) bool {
+	return kr.PromRegistry.Unregister(collector)
+}
+
+func (kr *KubeRegistry) Gather() ([]*dto.MetricFamily, error) {
+	return kr.PromRegistry.Gather()
+}
+
+// NewRegistry creates a new vanilla Registry without any Collectors
+// pre-registered.
+func NewKubeRegistry(version semver.Version) *KubeRegistry {
+	return &KubeRegistry{
+		PromRegistry: prometheus.NewRegistry(),
+		version:      version,
+	}
+}

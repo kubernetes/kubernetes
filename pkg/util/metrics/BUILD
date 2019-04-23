@@ -8,20 +8,38 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["util.go"],
+    srcs = [
+        "counter.go",
+        "metric.go",
+        "opts.go",
+        "registry.go",
+        "util.go",
+        "wrappers.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/metrics",
     deps = [
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/github.com/prometheus/client_model/go:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["util_test.go"],
+    srcs = [
+        "counter_test.go",
+        "registry_test.go",
+        "util_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//vendor/github.com/blang/semver:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/github.com/prometheus/common/expfmt:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 
