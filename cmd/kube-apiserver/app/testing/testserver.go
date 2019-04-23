@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -126,7 +127,10 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	if !ok {
 		return result, fmt.Errorf("failed to get current file")
 	}
-	s.SecureServing.ServerCert.FixtureDirectory = path.Join(path.Dir(thisFile), "testdata")
+	s.SecureServing.ServerCert.FixtureDirectory = filepath.Join(path.Dir(thisFile), "testdata")
+	if testSrcdir, testWorkspace := os.Getenv("TEST_SRCDIR"), os.Getenv("TEST_WORKSPACE"); testSrcdir != "" && testWorkspace != "" {
+		s.SecureServing.ServerCert.FixtureDirectory = filepath.Join(testSrcdir, testWorkspace, "cmd/kube-apiserver/app/testing/testdata")
+	}
 
 	s.ServiceClusterIPRange.IP = net.IPv4(10, 0, 0, 0)
 	s.ServiceClusterIPRange.Mask = net.CIDRMask(16, 32)
