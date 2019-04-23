@@ -7,6 +7,7 @@ go_library(
         "csi_block.go",
         "csi_client.go",
         "csi_drivers_store.go",
+        "csi_metrics.go",
         "csi_mounter.go",
         "csi_plugin.go",
         "csi_util.go",

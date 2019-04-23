@@ -61,6 +61,41 @@ func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context) (
 	return resp.GetNodeId(), resp.GetMaxVolumesPerNode(), accessibleTopology, err
 }
 
+func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (
+	usageCountMap map[string]usageCount, err error) {
+
+	c.t.Log("calling fake.NodeGetVolumeStats...")
+	req := &csipbv1.NodeGetVolumeStatsRequest{
+		VolumeId:   volID,
+		VolumePath: targetPath,
+	}
+
+	_, err = c.nodeClient.NodeGetVolumeStats(ctx, req)
+	return nil, err
+}
+
+func (c *fakeCsiDriverClient) NodeSupportsVolumeStats(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeSupportsVolumeStats...")
+	req := &csipbv1.NodeGetCapabilitiesRequest{}
+
+	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
+	if err != nil {
+		return false, err
+	}
+
+	capabilities := resp.GetCapabilities()
+
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_GET_VOLUME_STATS {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (c *fakeCsiDriverClient) NodePublishVolume(
 	ctx context.Context,
 	volID string,

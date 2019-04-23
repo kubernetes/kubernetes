@@ -77,11 +77,8 @@ type csiClient interface {
 		ctx context.Context,
 		volID string,
 		targetPath string,
-	) (Available int64,
-		Total int64,
-		Used int64,
-		Unit csipbv1.VolumeUsage_Unit,
-		err error)
+	) (map[string]usageCount,
+		error)
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
@@ -121,6 +118,12 @@ const (
 	factor          = 2.0
 	steps           = 5
 )
+
+type usageCount struct {
+	total     int64
+	available int64
+	used      int64
+}
 
 // newV1NodeClient creates a new NodeClient with the internally used gRPC
 // connection set up. It also returns a closer which must to be called to close
@@ -860,7 +863,7 @@ func (c *csiDriverClient) NodeSupportsVolumeStats(ctx context.Context) (bool, er
 		return c.nodeSupportsVolumeStatsV1(ctx)
 
 	}
-	return false, fmt.Errorf("failed to call NodeSupportsVolumeStats. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
+	return false, fmt.Errorf("failed to call NodeSupportsVolumeStats. nodeV1ClientCreator is nil")
 }
 
 func (c *csiDriverClient) nodeSupportsVolumeStatsV1(ctx context.Context) (bool, error) {
@@ -890,29 +893,32 @@ func (c *csiDriverClient) nodeSupportsVolumeStatsV1(ctx context.Context) (bool, 
 	return volumeStatsSet, nil
 }
 
-func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (int64, int64, int64, csipbv1.VolumeUsage_Unit, error) {
+func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (map[string]usageCount, error) {
 	klog.V(4).Info(log("calling NodeGetVolumeStats rpc: [volid=%s, target_path=%s", volID, targetPath))
 	if volID == "" {
-		return 0, 0, 0, 0, errors.New("missing volume id")
+		return nil, errors.New("missing volume id")
 	}
 	if targetPath == "" {
-		return 0, 0, 0, 0, errors.New("missing target path")
+		return nil, errors.New("missing target path")
 	}
 
 	if c.nodeV1ClientCreator != nil {
 		return c.nodeGetVolumeStatsV1(ctx, volID, targetPath)
 	}
 
-	return 0, 0, 0, 0, fmt.Errorf("failed to call NodeGetVolumeStats. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
+	return nil, fmt.Errorf("failed to call NodeGetVolumeStats. nodeV1ClientCreator is nil")
 }
 
-func (c *csiDriverClient) nodeGetVolumeStatsV1(ctx context.Context, volID string, targetPath string) (int64, int64, int64, csipbv1.VolumeUsage_Unit, error) {
+func (c *csiDriverClient) nodeGetVolumeStatsV1(
+	ctx context.Context,
+	volID string,
+	targetPath string,
+) (map[string]usageCount, error) {
 
-	var available, total, used int64
 	var unit csipbv1.VolumeUsage_Unit
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
 	if err != nil {
-		return 0, 0, 0, 0, err
+		return nil, err
 	}
 	defer closer.Close()
 
@@ -923,19 +929,35 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(ctx context.Context, volID string
 
 	resp, err := nodeClient.NodeGetVolumeStats(ctx, req)
 	if err != nil {
-		return 0, 0, 0, 0, err
+		return nil, err
 	}
 
 	usages := resp.GetUsage()
 
+	usageMap := make(map[string]usageCount, 2)
 	if usages == nil {
-		return 0, 0, 0, 0, nil
+		return nil, nil
 	}
 	for _, usage := range usages {
-		available = usage.GetAvailable()
-		total = usage.GetTotal()
-		used = usage.GetUsed()
+
 		unit = usage.GetUnit()
+
+		switch unit.String() {
+		case "BYTES":
+			var ucb usageCount
+			ucb.available = usage.GetAvailable()
+			ucb.total = usage.GetTotal()
+			ucb.used = usage.GetUsed()
+			usageMap["BYTES"] = ucb
+		case "INODES":
+			var uci usageCount
+			uci.available = usage.GetAvailable()
+			uci.total = usage.GetTotal()
+			uci.used = usage.GetUsed()
+			usageMap["INODES"] = uci
+		case "UNKNOWN":
+		}
+
 	}
-	return available, total, used, unit, nil
+	return usageMap, nil
 }

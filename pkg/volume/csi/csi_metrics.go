@@ -22,8 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -37,15 +35,7 @@ type metricsCsi struct {
 	// the directory path the volume is mounted to.
 	targetPath string
 	csiClientGetter
-	k8s        kubernetes.Interface
-	plugin     *csiPlugin
-	driverName csiDriverName
-	specName   string
-	volumeID   string
-	readOnly   bool
-	spec       *volume.Spec
-	podUID     types.UID
-	volumeInfo map[string]string
+	volumeID string
 }
 
 // NewMetricsCsi creates a new metricsCsi with the Volume ID and path.
@@ -58,7 +48,6 @@ func (mc *metricsCsi) GetMetrics() (*volume.Metrics, error) {
 
 	if mc.volumeID == "" {
 		return nil, fmt.Errorf("VolumeID is nil")
-
 	}
 
 	if mc.targetPath == "" {
@@ -95,14 +84,25 @@ func (mc *metricsCsi) getCSIVolInfo(metrics *volume.Metrics) error {
 		return nil
 	}
 
-	available, total, used, _, err := csiClient.NodeGetVolumeStats(ctx, mc.volumeID, mc.targetPath)
+	var resUsageMap map[string]usageCount
+	resUsageMap, err = csiClient.NodeGetVolumeStats(ctx, mc.volumeID, mc.targetPath)
 
 	if err != nil {
 		return err
 	}
-	metrics.Used = resource.NewQuantity(used, resource.BinarySI)
-	metrics.Available = resource.NewQuantity(available, resource.BinarySI)
-	metrics.Capacity = resource.NewQuantity(total, resource.BinarySI)
 
+	for k, v := range resUsageMap {
+		if k == "BYTES" {
+			metrics.Used = resource.NewQuantity(v.used, resource.BinarySI)
+			metrics.Available = resource.NewQuantity(v.available, resource.BinarySI)
+			metrics.Capacity = resource.NewQuantity(v.total, resource.BinarySI)
+		} else if k == "INODES" {
+			metrics.InodesUsed = resource.NewQuantity(v.used, resource.BinarySI)
+			metrics.InodesFree = resource.NewQuantity(v.available, resource.BinarySI)
+			metrics.Inodes = resource.NewQuantity(v.total, resource.BinarySI)
+		} else {
+			continue
+		}
+	}
 	return nil
 }
