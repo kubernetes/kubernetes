@@ -30,11 +30,11 @@ are added for that driver with `External Storage [Driver: <Name>]` as
 prefix.
 
 To run just those tests for the example above, put that content into
-`/tmp/hostpath-testdriver.yaml` and invoke:
+`/tmp/hostpath-testdriver.yaml`, ensure `e2e.test` is in your PATH or current directory (downloaded from a test tarball like https://storage.googleapis.com/kubernetes-release/release/v1.14.0/kubernetes-test-linux-amd64.tar.gz or built via `make WHAT=test/e2e/e2e.test`), and invoke:
 
     ginkgo -p -focus='External.Storage.*csi-hostpath' \
            -skip='\[Feature:|\[Disruptive\]' \
-           ./test/e2e \
+           e2e.test \
            -- \
            -storage.testdriver=/tmp/hostpath-testdriver.yaml
 
@@ -44,6 +44,6 @@ supports them, for example snapshotting:
 
     ginkgo -p -focus='External.Storage.*csi-hostpath.*\[Feature:VolumeSnapshotDataSource\]' \
            -skip='\[Disruptive\]' \
-           ./test/e2e \
+           e2e.test \
            -- \
            -storage.testdriver=/tmp/hostpath-testdriver.yaml
