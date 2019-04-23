@@ -113,6 +113,12 @@ var (
 		gvr("", "v1", "services/proxy"): {"*": testSubresourceProxy},
 	}
 
+	// admissionExemptResources lists objects which are exempt from admission validation/mutation,
+	// only resources exempted from admission processing by API server should be listed here.
+	admissionExemptResources = map[schema.GroupVersionResource]bool{
+		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):   true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): true,
+	}
 	// excludedResources lists resources / verb combinations that are not yet tested. this set should trend to zero.
 	excludedResources = map[schema.GroupVersionResource]sets.String{
 		// TODO: verify non-persisted review objects work with webhook admission in place (and determine whether they should be sent to admission)
@@ -126,10 +132,6 @@ var (
 		gvr("authorization.k8s.io", "v1beta1", "subjectaccessreviews"):      sets.NewString("*"),
 		gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"):  sets.NewString("*"),
 		gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"):   sets.NewString("*"),
-
-		// TODO: webhook config objects are not subject to admission, verify CRUD works and webhooks do not observe them
-		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):   sets.NewString("*"),
-		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): sets.NewString("*"),
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{
@@ -142,11 +144,12 @@ type holder struct {
 
 	t *testing.T
 
-	expectGVR       metav1.GroupVersionResource
+	recordGVR       metav1.GroupVersionResource
+	recordOperation v1beta1.Operation
+	recordNamespace string
+	recordName      string
+
 	expectGVK       schema.GroupVersionKind
-	expectOperation v1beta1.Operation
-	expectNamespace string
-	expectName      string
 	expectObject    bool
 	expectOldObject bool
 
@@ -157,11 +160,11 @@ func (h *holder) reset(t *testing.T) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.t = t
-	h.expectGVR = metav1.GroupVersionResource{}
+	h.recordGVR = metav1.GroupVersionResource{}
 	h.expectGVK = schema.GroupVersionKind{}
-	h.expectOperation = ""
-	h.expectName = ""
-	h.expectNamespace = ""
+	h.recordOperation = ""
+	h.recordName = ""
+	h.recordNamespace = ""
 	h.expectObject = false
 	h.expectOldObject = false
 	h.recorded = map[string]*v1beta1.AdmissionRequest{
@@ -177,11 +180,11 @@ func (h *holder) expect(gvr schema.GroupVersionResource, gvk schema.GroupVersion
 
 	h.lock.Lock()
 	defer h.lock.Unlock()
-	h.expectGVR = metav1.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
+	h.recordGVR = metav1.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
 	h.expectGVK = gvk
-	h.expectOperation = operation
-	h.expectName = name
-	h.expectNamespace = namespace
+	h.recordOperation = operation
+	h.recordName = name
+	h.recordNamespace = namespace
 	h.expectObject = object
 	h.expectOldObject = oldObject
 	h.recorded = map[string]*v1beta1.AdmissionRequest{
@@ -203,22 +206,22 @@ func (h *holder) record(phase string, request *v1beta1.AdmissionRequest) {
 	if len(request.SubResource) > 0 {
 		resource.Resource += "/" + request.SubResource
 	}
-	if resource != h.expectGVR {
+	if resource != h.recordGVR {
 		if debug {
-			h.t.Log(resource, "!=", h.expectGVR)
+			h.t.Log(resource, "!=", h.recordGVR)
 		}
 		return
 	}
 
-	if request.Operation != h.expectOperation {
+	if request.Operation != h.recordOperation {
 		if debug {
-			h.t.Log(request.Operation, "!=", h.expectOperation)
+			h.t.Log(request.Operation, "!=", h.recordOperation)
 		}
 		return
 	}
-	if request.Namespace != h.expectNamespace {
+	if request.Namespace != h.recordNamespace {
 		if debug {
-			h.t.Log(request.Namespace, "!=", h.expectNamespace)
+			h.t.Log(request.Namespace, "!=", h.recordNamespace)
 		}
 		return
 	}
@@ -227,9 +230,9 @@ func (h *holder) record(phase string, request *v1beta1.AdmissionRequest) {
 	if name == "" && request.Object.Object != nil {
 		name = request.Object.Object.(*unstructured.Unstructured).GetName()
 	}
-	if name != h.expectName {
+	if name != h.recordName {
 		if debug {
-			h.t.Log(name, "!=", h.expectName)
+			h.t.Log(name, "!=", h.recordName)
 		}
 		return
 	}
@@ -250,6 +253,14 @@ func (h *holder) verify(t *testing.T) {
 }
 
 func (h *holder) verifyRequest(request *v1beta1.AdmissionRequest) error {
+	// Check if current resource should be exempted from Admission processing
+	if admissionExemptResources[gvr(h.recordGVR.Group, h.recordGVR.Version, h.recordGVR.Resource)] {
+		if request == nil {
+			return nil
+		}
+		return fmt.Errorf("admission webhook was called, but not supposed to")
+	}
+
 	if request == nil {
 		return fmt.Errorf("no request received")
 	}
