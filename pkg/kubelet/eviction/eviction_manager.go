@@ -24,8 +24,9 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -560,6 +561,13 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 		} else {
 			// we should never hit this
 			klog.Errorf("eviction manager: cannot get mirror pod from static pod %s, so cannot evict it", format.Pod(pod))
+			return false
+		}
+	}
+
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
+		if controllerRef.Kind == "DaemonSet" {
+			klog.Errorf("eviction manager: cannot evict a daemonset pod %s", format.Pod(pod))
 			return false
 		}
 	}
