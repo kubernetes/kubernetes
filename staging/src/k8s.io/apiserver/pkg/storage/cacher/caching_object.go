@@ -153,3 +153,13 @@ func (o *CachingObject) Encode(e runtime.WithVersionEncoder, w io.Writer) error 
 	}
 	return e.Encoder.Encode(versioned, w)
 }
+
+func (o *CachingObject) GetObjectKind() schema.ObjectKind {
+	return o.Object.GetObjectKind()
+}
+
+func (o *CachingObject) DeepCopyObject() runtime.Object {
+	// FIXME:
+	panic("CachingObject should never be deep-copied")
+	return o
+}

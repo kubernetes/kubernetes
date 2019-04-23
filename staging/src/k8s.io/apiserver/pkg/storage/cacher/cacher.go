@@ -782,6 +782,9 @@ func (c *Cacher) dispatchEvents() {
 }
 
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
+	// FIXME: Introduce caching, but only at this level for now.
+	event.Object = newCachingObject(event.Object)
+
 	c.startDispatching(event)
 	defer c.finishDispatching()
 	// Watchers stopped after startDispatching will be delayed to finishDispatching,
@@ -1138,21 +1141,34 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 		return nil
 	}
 
+	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
-		return &watch.Event{Type: watch.Added, Object: event.Object.DeepCopyObject()}
+		watchEvent.Type = watch.Added
+		if _, ok := event.Object.(*runtime.CachingObject); ok {
+			watchEvent.Object = event.Object
+		} else {
+			watchEvent.Object = event.Object.DeepCopyObject()
+		}
 	case curObjPasses && oldObjPasses:
-		return &watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
+		watchEvent.Type = watch.Modified
+		if _, ok := event.Object.(*runtime.CachingObject); ok {
+			watchEvent.Object = event.Object
+		} else {
+			watchEvent.Object = event.Object.DeepCopyObject()
+		}
 	case !curObjPasses && oldObjPasses:
+		watchEvent.Type = watch.Deleted
 		// return a delete event with the previous object content, but with the event's resource version
 		oldObj := event.PrevObject.DeepCopyObject()
 		if err := c.versioner.UpdateObject(oldObj, event.ResourceVersion); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", event.ResourceVersion, oldObj, err))
 		}
-		return &watch.Event{Type: watch.Deleted, Object: oldObj}
+		// FIXME: Here we don't have any caching...
+		watchEvent.Object = oldObj
 	}
 
-	return nil
+	return watchEvent
 }
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
