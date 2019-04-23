@@ -44,7 +44,7 @@ type Watcher struct {
 	fsWatcher      *fsnotify.Watcher
 	wg             sync.WaitGroup
 
-	mutex       sync.Mutex
+	mutex       sync.RWMutex
 	handlers    map[string]PluginHandler
 	plugins     map[string]pathInfo
 	pluginsPool map[string]map[string]*sync.Mutex // map[pluginType][pluginName]
@@ -78,8 +78,8 @@ func (w *Watcher) AddHandler(pluginType string, handler PluginHandler) {
 }
 
 func (w *Watcher) getHandler(pluginType string) (PluginHandler, bool) {
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
+	w.mutex.RLock()
+	defer w.mutex.RUnlock()
 
 	h, ok := w.handlers[pluginType]
 	return h, ok
@@ -381,8 +381,8 @@ func (w *Watcher) deRegisterPlugin(socketPath, pluginType, pluginName string) {
 }
 
 func (w *Watcher) getPlugin(socketPath string) (pathInfo, bool) {
-	w.mutex.Lock()
-	defer w.mutex.Unlock()
+	w.mutex.RLock()
+	defer w.mutex.RUnlock()
 
 	plugin, ok := w.plugins[socketPath]
 	return plugin, ok
