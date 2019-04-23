@@ -265,7 +265,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		node.Spec.Taints = nodeTaints
 	}
 	// Initially, set NodeNetworkUnavailable to true.
-	if kl.providerRequiresNetworkingConfiguration() {
+	if kl.providerRequiresNetworkingConfiguration() || kl.externalCloudProvider {
 		node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
 			Type:               v1.NodeNetworkUnavailable,
 			Status:             v1.ConditionTrue,
