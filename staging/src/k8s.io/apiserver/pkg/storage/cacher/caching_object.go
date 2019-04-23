@@ -90,6 +90,8 @@ func (o *CachingVersionedObject) DeepCopyObject() runtime.Object {
 }
 
 // FIXME: Add comment.
+//
+// FIXME: This should implement metav1.Object interface probably.
 type CachingObject struct {
 	// Object is the object (potentially in the internal version)
 	// for which serializations are cached when computed.
@@ -102,6 +104,12 @@ type CachingObject struct {
 	Versioned map[runtime.GroupVersioner]*CachingVersionedObject
 }
 
+func newCachingObject(object runtime.Object) *CachingObject {
+	return &CachingObject{
+		Object:    object,
+		Versioned: make(map[runtime.GroupVersioner]*CachingVersionedObject),
+	}
+}
 
 // FIXME:
 // - ensure that appropriate parameters are passed
@@ -145,6 +153,7 @@ func (o *CachingObject) Encode(e runtime.WithVersionEncoder, w io.Writer) error 
 				return nil, err
 			}
 		}
+		versioned.serialization = make(map[runtime.Encoder]*serializationResult)
 		o.Versioned[encodeVersion] = versioned
 		return versioned, nil
 	}()
