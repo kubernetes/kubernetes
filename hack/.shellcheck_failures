@@ -37,9 +37,6 @@
 ./hack/pin-dependency.sh
 ./hack/test-integration.sh
 ./hack/update-vendor.sh
-./hack/verify-boilerplate.sh
-./hack/verify-cli-conventions.sh
-./hack/verify-codegen.sh
 ./hack/verify-golint.sh
 ./hack/verify-no-vendor-cycles.sh
 ./hack/verify-test-featuregates.sh
