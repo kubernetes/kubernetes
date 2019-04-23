@@ -122,9 +122,13 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	// the node.
 	pm := newPodAffinityPriorityMap(nodes)
 	allNodeNames := make([]string, 0, len(nodeNameToInfo))
+	lazyInit := hasAffinityConstraints || hasAntiAffinityConstraints
 	for name := range nodeNameToInfo {
 		allNodeNames = append(allNodeNames, name)
-		pm.counts[name] = new(int64)
+		// if pod has affinity defined, or target node has affinityPods
+		if lazyInit || len(nodeNameToInfo[name].PodsWithAffinity()) != 0 {
+			pm.counts[name] = new(int64)
+		}
 	}
 
 	// convert the topology key based weights to the node name based weights
@@ -191,7 +195,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 		nodeInfo := nodeNameToInfo[allNodeNames[i]]
 		if nodeInfo.Node() != nil {
 			if hasAffinityConstraints || hasAntiAffinityConstraints {
-				// We need to process all the nodes.
+				// We need to process all the pods.
 				for _, existingPod := range nodeInfo.Pods() {
 					if err := processPod(existingPod); err != nil {
 						pm.setError(err)
@@ -214,6 +218,9 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	}
 
 	for _, node := range nodes {
+		if pm.counts[node.Name] == nil {
+			continue
+		}
 		if *pm.counts[node.Name] > maxCount {
 			maxCount = *pm.counts[node.Name]
 		}
@@ -224,9 +231,10 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 
 	// calculate final priority score for each node
 	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
+	maxMinDiff := maxCount - minCount
 	for _, node := range nodes {
 		fScore := float64(0)
-		if (maxCount - minCount) > 0 {
+		if maxMinDiff > 0 && pm.counts[node.Name] != nil {
 			fScore = float64(schedulerapi.MaxPriority) * (float64(*pm.counts[node.Name]-minCount) / float64(maxCount-minCount))
 		}
 		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
