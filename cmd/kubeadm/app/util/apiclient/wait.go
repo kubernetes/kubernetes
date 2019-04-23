@@ -238,7 +238,7 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 	})
 }
 
-// getStaticSinglePodHash computes hashes for a single Static Pod resource
+// getStaticPodSingleHash computes hashes for a single Static Pod resource
 func getStaticPodSingleHash(client clientset.Interface, nodeName string, component string) (string, error) {
 
 	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
