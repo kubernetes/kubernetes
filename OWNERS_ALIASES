@@ -384,15 +384,15 @@ aliases:
       - bsalamat
       - k82cn
   
-sig-storage-api-reviewers:
+  sig-storage-api-reviewers:
     - saad-ali
     - msau42
     - jsafrane
 
   
-  # sig-windows-api-reviewers:
-  #   - 
-  #   - 
+  sig-windows-api-reviewers:
+    - patricklang
+    - michmike
 
   dep-approvers:
     - apelisse
