@@ -44,9 +44,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/fixtures"
+	"k8s.io/legacy-cloud-providers/vsphere/vclib"
+	"k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures"
 )
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:

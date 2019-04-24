@@ -30,8 +30,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/fixtures"
+	"k8s.io/legacy-cloud-providers/vsphere/vclib"
+	"k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures"
 )
 
 func createTestServer(

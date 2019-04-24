@@ -59,7 +59,6 @@ pkg/apis/storage/v1beta1/util
 pkg/capabilities
 pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/photon
-pkg/cloudprovider/providers/vsphere
 pkg/controller
 pkg/controller/apis/config/v1alpha1
 pkg/controller/certificates
@@ -603,6 +602,7 @@ staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
 staging/src/k8s.io/kube-proxy/config/v1alpha1
 staging/src/k8s.io/kubelet/config/v1beta1
+staging/src/k8s.io/legacy-cloud-providers/vsphere
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
 staging/src/k8s.io/metrics/pkg/apis/external_metrics

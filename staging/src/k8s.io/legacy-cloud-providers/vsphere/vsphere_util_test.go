@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
+	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/simulator"

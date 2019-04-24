@@ -47,8 +47,9 @@ import (
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers"
+
+	"k8s.io/legacy-cloud-providers/vsphere/vclib"
+	"k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers"
 )
 
 // VSphere Cloud Provider constants

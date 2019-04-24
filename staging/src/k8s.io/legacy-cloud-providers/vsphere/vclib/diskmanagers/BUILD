@@ -12,9 +12,10 @@ go_library(
         "virtualdisk.go",
         "vmdm.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers",
+    importpath = "k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers",
     deps = [
-        "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
