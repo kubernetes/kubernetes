@@ -89,7 +89,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	pod := obj.(*api.Pod)
 
 	if createValidation != nil {
-		if err := createValidation(eviction); err != nil {
+		if err := createValidation(eviction.DeepCopyObject()); err != nil {
 			return nil, err
 		}
 	}
