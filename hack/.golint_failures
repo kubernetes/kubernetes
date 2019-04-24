@@ -293,7 +293,6 @@ pkg/registry/rbac/clusterrolebinding
 pkg/registry/rbac/clusterrolebinding/policybased
 pkg/registry/rbac/reconciliation
 pkg/registry/rbac/rest
-pkg/registry/rbac/role
 pkg/registry/rbac/role/policybased
 pkg/registry/rbac/rolebinding
 pkg/registry/rbac/rolebinding/policybased
