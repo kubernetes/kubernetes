@@ -427,7 +427,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright 2014 Google Inc.
+   Copyright [yyyy] [name of copyright owner]
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -441,7 +441,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    See the License for the specific language governing permissions and
    limitations under the License.
 
-= vendor/cloud.google.com/go/LICENSE a873c5645c184d51e0f9b34e1d7cf559
+= vendor/cloud.google.com/go/LICENSE 3b83ef96387f14655fc854ddc3c6bd57
 ================================================================================
 
 
@@ -19080,7 +19080,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ================================================================================
 = vendor/golang.org/x/oauth2 licensed under: =
 
-Copyright (c) 2009 The oauth2 Authors. All rights reserved.
+Copyright (c) 2009 The Go Authors. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -19108,7 +19108,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-= vendor/golang.org/x/oauth2/LICENSE 704b1e0c436dbf193e7dcbd4cf06ec81
+= vendor/golang.org/x/oauth2/LICENSE 5d4950ecb7b26d2c5e4e7b4e0dd74707
 ================================================================================
 
 
