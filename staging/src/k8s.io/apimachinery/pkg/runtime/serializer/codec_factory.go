@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 )
@@ -51,6 +52,8 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 	jsonSerializer := json.NewSerializer(mf, scheme, scheme, false)
 	jsonPrettySerializer := json.NewSerializer(mf, scheme, scheme, true)
 	yamlSerializer := json.NewYAMLSerializer(mf, scheme, scheme)
+	serializer := protobuf.NewSerializer(scheme, scheme)
+	raw := protobuf.NewRawSerializer(scheme, scheme)
 
 	serializers := []serializerType{
 		{
@@ -70,6 +73,15 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []seri
 			FileExtensions:     []string{"yaml"},
 			EncodesAsText:      true,
 			Serializer:         yamlSerializer,
+		},
+		{
+			AcceptContentTypes: []string{runtime.ContentTypeProtobuf},
+			ContentType:        runtime.ContentTypeProtobuf,
+			FileExtensions:     []string{"pb"},
+			Serializer:         serializer,
+
+			Framer:           protobuf.LengthDelimitedFramer,
+			StreamSerializer: raw,
 		},
 	}
 
