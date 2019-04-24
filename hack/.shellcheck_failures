@@ -37,6 +37,7 @@
 ./hack/update-vendor.sh
 ./hack/verify-golint.sh
 ./hack/verify-no-vendor-cycles.sh
+./hack/verify-test-featuregates.sh
 ./test/cmd/apply.sh
 ./test/cmd/apps.sh
 ./test/cmd/authorization.sh
