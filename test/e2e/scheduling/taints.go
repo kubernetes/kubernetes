@@ -198,10 +198,13 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		}
 	})
 
-	// 1. Run a pod with toleration
-	// 2. Taint the node running this pod with a no-execute taint
-	// 3. See if pod won't get evicted
-	It("doesn't evict pod with tolerations from tainted nodes", func() {
+	/*
+		Release : v1.15
+		Testname: Taint, Pod toleration to no-execute
+		Description: Create a pod with toleration and wait for it to be scheduled onto a node. Taint the concerned node
+						with a no-execute taint and wait to check if the pod is retained. The test MUST pass.
+	*/
+	framework.ConformanceIt("doesn't evict pod with tolerations from tainted nodes", func() {
 		podName := "taint-eviction-2"
 		pod := createPodForTaintsTest(true, 0, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
