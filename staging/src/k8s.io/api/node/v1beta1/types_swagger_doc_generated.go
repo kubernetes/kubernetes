@@ -31,7 +31,7 @@ var map_RuntimeClass = map[string]string{
 	"":         "RuntimeClass defines a class of container runtime supported in the cluster. The RuntimeClass is used to determine which container runtime is used to run all containers in a pod. RuntimeClasses are (currently) manually defined by a user or cluster provisioner, and referenced in the PodSpec. The Kubelet is responsible for resolving the RuntimeClassName reference before running the pod.  For more details, see https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md",
 	"metadata": "More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"handler":  "Handler specifies the underlying runtime and configuration that the CRI implementation will use to handle pods of this class. The possible values are specific to the node & CRI configuration.  It is assumed that all handlers are available on every node, and handlers of the same name are equivalent on every node. For example, a handler called \"runc\" might specify that the runc OCI runtime (using native Linux containers) will be used to run the containers in a pod. The Handler must conform to the DNS Label (RFC 1123) requirements, and is immutable.",
-	"topology": "Topology describes the set of nodes in the cluster that support this RuntimeClass. The rules are applied to the pod during scheduling time. If topology is nil, this RuntimeClass is assumed to be supported by all nodes. pods to the right node",
+	"topology": "Topology describes the set of nodes in the cluster that support this RuntimeClass. The rules are applied applied to pods running with this RuntimeClass and semantically merged with other scheduling constraints on the pod. If topology is nil, this RuntimeClass is assumed to be supported by all nodes.",
 }
 
 func (RuntimeClass) SwaggerDoc() map[string]string {
@@ -50,8 +50,8 @@ func (RuntimeClassList) SwaggerDoc() map[string]string {
 
 var map_Topology = map[string]string{
 	"":             "Topology specifies the scheduling constraints for nodes supporting a RuntimeClass.",
-	"nodeSelector": "nodeSelector selects the set of nodes that support this RuntimeClass. Pods using this RuntimeClass can only be scheduled to a node matched by this selector. The nodeSelector is intersected (AND) with a pod's other node affinity or node selector requirements. A nil nodeSelector selects all nodes.",
-	"tolerations":  "tolerations adds tolerations to pods running with this RuntimeClass. the tolerations are appended (excluding duplicates) to the pod's tolerations during admission.",
+	"nodeSelector": "NodeSelector selects the set of nodes that support this RuntimeClass. Pods using this RuntimeClass can only be scheduled to a node matched by this selector. The NodeSelector is intersected (AND) with a pod's other NodeAffinity or NodeSelector requirements. A nil NodeSelector selects all nodes.",
+	"tolerations":  "Tolerations are appended (excluding duplicates) to pods running with this RuntimeClass during admission, effectively unioning the set of nodes tolerated by the pod and the RuntimeClass.",
 }
 
 func (Topology) SwaggerDoc() map[string]string {
