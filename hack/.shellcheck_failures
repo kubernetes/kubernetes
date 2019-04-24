@@ -21,7 +21,6 @@
 ./cluster/test-e2e.sh
 ./cluster/validate-cluster.sh
 ./hack/ginkgo-e2e.sh
-./hack/grab-profiles.sh
 ./hack/lib/init.sh
 ./hack/lib/swagger.sh
 ./hack/lib/test.sh
