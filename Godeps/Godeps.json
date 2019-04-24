@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.11",
+	"GoVersion": "go1.12",
 	"GodepVersion": "v80-k8s-r1",
 	"Packages": [
 		"github.com/onsi/ginkgo/ginkgo",
@@ -35,34 +35,34 @@
 			"Rev": "3b1ae45394a234c385be014e9a488f2bb6eef821"
 		},
 		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute",
-			"Comment": "v21.3.0",
-			"Rev": "da91af54816b4cf72949c225a2d0980f51fab01b"
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute",
+			"Comment": "v21.4.0",
+			"Rev": "32916f57ad7b421f5fdaab86b73a795632fff117"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry",
-			"Comment": "v21.3.0",
-			"Rev": "da91af54816b4cf72949c225a2d0980f51fab01b"
+			"Comment": "v21.4.0",
+			"Rev": "32916f57ad7b421f5fdaab86b73a795632fff117"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network",
-			"Comment": "v21.3.0",
-			"Rev": "da91af54816b4cf72949c225a2d0980f51fab01b"
+			"Comment": "v21.4.0",
+			"Rev": "32916f57ad7b421f5fdaab86b73a795632fff117"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage",
-			"Comment": "v21.3.0",
-			"Rev": "da91af54816b4cf72949c225a2d0980f51fab01b"
+			"Comment": "v21.4.0",
+			"Rev": "32916f57ad7b421f5fdaab86b73a795632fff117"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/storage",
-			"Comment": "v21.3.0",
-			"Rev": "da91af54816b4cf72949c225a2d0980f51fab01b"
+			"Comment": "v21.4.0",
+			"Rev": "32916f57ad7b421f5fdaab86b73a795632fff117"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/version",
-			"Comment": "v21.3.0",
-			"Rev": "da91af54816b4cf72949c225a2d0980f51fab01b"
+			"Comment": "v21.4.0",
+			"Rev": "32916f57ad7b421f5fdaab86b73a795632fff117"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
