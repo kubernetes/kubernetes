@@ -1058,6 +1058,21 @@ function Create-DockerRegistryKey {
   Remove-Item -Force -Recurse ${tmp_dir}
 }
 
+# Configure Docker daemon and restart the service.
+function Configure-Dockerd {
+  Set-Content "C:\ProgramData\docker\config\daemon.json" @'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "1m",
+    "max-file": "5"
+  }
+}
+'@
+
+ Restart-Service Docker
+}
+
 # TODO(pjh): move the Stackdriver logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
