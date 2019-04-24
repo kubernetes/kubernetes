@@ -244,7 +244,7 @@ Pid Limiting is Graduating to Beta ([#757](https://github.com/kubernetes/enhance
 
 - Prevents a pod from starving pid resource
 - Ability to isolate pid resources pod-to-pod and node-to-pod
-kubernetes/kubernetes: [#73651](http://github.com/kubernetes/kubernetes/pull/73651)
+kubernetes/kubernetes: [#73651](https://github.com/kubernetes/kubernetes/pull/73651)
 kubernetes/enhancements: [#757](https://github.com/kubernetes/enhancements/issues/757) [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/20190129-pid-limiting.md)]
 
 Pod Priority and Preemption in Kubernetes ([#564](https://github.com/kubernetes/enhancements/issues/564))
