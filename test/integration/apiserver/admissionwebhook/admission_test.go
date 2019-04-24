@@ -119,23 +119,26 @@ var (
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):   true,
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): true,
 	}
-	// excludedResources lists resources / verb combinations that are not yet tested. this set should trend to zero.
-	excludedResources = map[schema.GroupVersionResource]sets.String{
-		// TODO: verify non-persisted review objects work with webhook admission in place (and determine whether they should be sent to admission)
-		gvr("authentication.k8s.io", "v1", "tokenreviews"):                  sets.NewString("*"),
-		gvr("authentication.k8s.io", "v1beta1", "tokenreviews"):             sets.NewString("*"),
-		gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"):      sets.NewString("*"),
-		gvr("authorization.k8s.io", "v1", "subjectaccessreviews"):           sets.NewString("*"),
-		gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"):       sets.NewString("*"),
-		gvr("authorization.k8s.io", "v1", "selfsubjectrulesreviews"):        sets.NewString("*"),
-		gvr("authorization.k8s.io", "v1beta1", "localsubjectaccessreviews"): sets.NewString("*"),
-		gvr("authorization.k8s.io", "v1beta1", "subjectaccessreviews"):      sets.NewString("*"),
-		gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"):  sets.NewString("*"),
-		gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"):   sets.NewString("*"),
-	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{
 		gvr("extensions", "v1beta1", "replicationcontrollers/scale"): gvr("", "v1", "replicationcontrollers"),
+	}
+
+	// stubDataOverrides holds either non persistent resources' definitions or resources where default stub needs to be overridden.
+	stubDataOverrides = map[schema.GroupVersionResource]string{
+		// Non persistent Reviews resource
+		gvr("authentication.k8s.io", "v1", "tokenreviews"):                  `{"metadata": {"name": "tokenreview"}, "spec": {"token": "token", "audience": ["audience1","audience2"]}}`,
+		gvr("authentication.k8s.io", "v1beta1", "tokenreviews"):             `{"metadata": {"name": "tokenreview"}, "spec": {"token": "token", "audience": ["audience1","audience2"]}}`,
+		gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"):      `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"uid": "token", "user": "user1","groups": ["group1","group2"],"resourceAttributes": {"name":"name1","namespace":"` + testNamespace + `"}}}`,
+		gvr("authorization.k8s.io", "v1", "subjectaccessreviews"):           `{"metadata": {"name": "", "namespace":""}, "spec": {"user":"user1","resourceAttributes": {"name":"name1", "namespace":"` + testNamespace + `"}}}`,
+		gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"):       `{"metadata": {"name": "", "namespace":""}, "spec": {"resourceAttributes": {"name":"name1", "namespace":""}}}`,
+		gvr("authorization.k8s.io", "v1", "selfsubjectrulesreviews"):        `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"namespace":"` + testNamespace + `"}}`,
+		gvr("authorization.k8s.io", "v1beta1", "localsubjectaccessreviews"): `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"uid": "token", "user": "user1","groups": ["group1","group2"],"resourceAttributes": {"name":"name1","namespace":"` + testNamespace + `"}}}`,
+		gvr("authorization.k8s.io", "v1beta1", "subjectaccessreviews"):      `{"metadata": {"name": "", "namespace":""}, "spec": {"user":"user1","resourceAttributes": {"name":"name1", "namespace":"` + testNamespace + `"}}}`,
+		gvr("authorization.k8s.io", "v1beta1", "selfsubjectaccessreviews"):  `{"metadata": {"name": "", "namespace":""}, "spec": {"resourceAttributes": {"name":"name1", "namespace":""}}}`,
+		gvr("authorization.k8s.io", "v1beta1", "selfsubjectrulesreviews"):   `{"metadata": {"name": "", "namespace":"` + testNamespace + `"}, "spec": {"namespace":"` + testNamespace + `"}}`,
+
+		// Other Non persistent resources
 	}
 )
 
@@ -887,7 +890,6 @@ func testSubresourceProxy(c *testContext) {
 		// verify the result
 		c.admissionHolder.verify(c.t)
 	}
-
 }
 
 //
@@ -979,13 +981,19 @@ func getTestFunc(gvr schema.GroupVersionResource, verb string) testFunc {
 }
 
 func getStubObj(gvr schema.GroupVersionResource, resource metav1.APIResource) (*unstructured.Unstructured, error) {
-	data, ok := etcd.GetEtcdStorageDataForNamespace(testNamespace)[gvr]
-	if !ok {
+	stub := ""
+	if data, ok := etcd.GetEtcdStorageDataForNamespace(testNamespace)[gvr]; ok {
+		stub = data.Stub
+	}
+	if data, ok := stubDataOverrides[gvr]; ok {
+		stub = data
+	}
+	if len(stub) == 0 {
 		return nil, fmt.Errorf("no stub data for %#v", gvr)
 	}
 
 	stubObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	if err := json.Unmarshal([]byte(data.Stub), &stubObj.Object); err != nil {
+	if err := json.Unmarshal([]byte(stub), &stubObj.Object); err != nil {
 		return nil, fmt.Errorf("error unmarshaling stub for %#v: %v", gvr, err)
 	}
 	return stubObj, nil
@@ -1021,14 +1029,14 @@ func shouldTestResource(gvr schema.GroupVersionResource, resource metav1.APIReso
 	if !sets.NewString(resource.Verbs...).HasAny("create", "update", "patch", "connect", "delete", "deletecollection") {
 		return false
 	}
-	return !excludedResources[gvr].Has("*")
+	return true
 }
 
 func shouldTestResourceVerb(gvr schema.GroupVersionResource, resource metav1.APIResource, verb string) bool {
 	if !sets.NewString(resource.Verbs...).Has(verb) {
 		return false
 	}
-	return !excludedResources[gvr].Has(verb)
+	return true
 }
 
 //
