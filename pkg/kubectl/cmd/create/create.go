@@ -97,11 +97,11 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	o := NewCreateOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "create -f FILENAME",
+		Use: "create -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a resource from a file or from stdin."),
-		Long:                  createLong,
-		Example:               createExample,
+		Short:   i18n.T("Create a resource from a file or from stdin."),
+		Long:    createLong,
+		Example: createExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
 				ioStreams.ErrOut.Write([]byte("Error: must specify one of -f and -k\n\n"))
@@ -453,6 +453,11 @@ func (o *CreateSubcommandOptions) Run() error {
 		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(asUnstructured, metav1.CreateOptions{})
 		if err != nil {
 			return err
+		}
+
+		status, ok := actualObject.(*metav1.Status)
+		if ok && status.Status == "Failure" {
+			return fmt.Errorf("An error occured creating the object (%s)", status.Message)
 		}
 
 		// ensure we pass a versioned object to the printer
