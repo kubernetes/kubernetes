@@ -148,6 +148,7 @@ type ControllerExpectationsInterface interface {
 	ExpectCreations(controllerKey string, adds int) error
 	ExpectDeletions(controllerKey string, dels int) error
 	CreationObserved(controllerKey string)
+	CreationsObserved(controllerKey string, add int)
 	DeletionObserved(controllerKey string)
 	RaiseExpectations(controllerKey string, add, del int)
 	LowerExpectations(controllerKey string, add, del int)
@@ -249,6 +250,10 @@ func (r *ControllerExpectations) RaiseExpectations(controllerKey string, add, de
 // CreationObserved atomically decrements the `add` expectation count of the given controller.
 func (r *ControllerExpectations) CreationObserved(controllerKey string) {
 	r.LowerExpectations(controllerKey, 1, 0)
+}
+
+func (r *ControllerExpectations) CreationsObserved(controllerKey string, add int) {
+	r.LowerExpectations(controllerKey, add, 0)
 }
 
 // DeletionObserved atomically decrements the `del` expectation count of the given controller.

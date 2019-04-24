@@ -797,10 +797,8 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 			if errorCount < len(errCh) && skippedPods > 0 {
 				klog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for job %q/%q", skippedPods, job.Namespace, job.Name)
 				active -= skippedPods
-				for i := int32(0); i < skippedPods; i++ {
-					// Decrement the expected number of creates because the informer won't observe this pod
-					jm.expectations.CreationObserved(jobKey)
-				}
+				// Decrement the expected number of creates because the informer won't observe this pod
+				jm.expectations.CreationsObserved(jobKey, int(skippedPods))
 				// The skipped pods will be retried later. The next controller resync will
 				// retry the slow start process.
 				break
