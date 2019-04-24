@@ -17,8 +17,8 @@ limitations under the License.
 package node
 
 import (
-	v1 "k8s.io/kubernetes/pkg/apis/core"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -47,24 +47,32 @@ type RuntimeClass struct {
 	// immutable.
 	Handler string
 
-	// Topology specifies the scheduling constrains that are necessary to assign
-	// pods to the right node
+	// Topology describes the set of nodes in the cluster that support this
+	// RuntimeClass. The rules are applied applied to pods running with this
+	// RuntimeClass and semantically merged with other scheduling constraints on
+	// the pod.
+	// If topology is nil, this RuntimeClass is assumed to be supported by all
+	// nodes.
 	// +optional
 	Topology *Topology
 }
 
-// Topology specifies the structure of scheduling constrains for the runtime class
+// Topology specifies the scheduling constraints for nodes supporting a
+// RuntimeClass.
 type Topology struct {
-	// nodeSelector selects the set of nodes that support this RuntimeClass.
+	// NodeSelector selects the set of nodes that support this RuntimeClass.
 	// Pods using this RuntimeClass can only be scheduled to a node matched by
-	// this selector. The nodeSelector is intersected (AND) with a pod's other
-	// node affinity or node selector requirements.
+	// this selector. The NodeSelector is intersected (AND) with a pod's other
+	// NodeAffinity or NodeSelector requirements.
+	// A nil NodeSelector selects all nodes.
 	// +optional
-	NodeSelector *v1.NodeSelector
+	NodeSelector *core.NodeSelector
 
-	// tolerations adds tolerations to pods running with this RuntimeClass.
+	// Tolerations are appended (excluding duplicates) to pods running with this
+	// RuntimeClass during admission, effectively unioning the set of nodes
+	// tolerated by the pod and the RuntimeClass.
 	// +optional
-	Tolerations []v1.Toleration
+	Tolerations []core.Toleration
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

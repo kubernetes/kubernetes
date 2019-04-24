@@ -21,8 +21,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	v1alpha1 "k8s.io/api/node/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
 )
 
@@ -31,24 +33,91 @@ func TestRuntimeClassConversion(t *testing.T) {
 		name    = "puppy"
 		handler = "heidi"
 	)
-	internalRC := node.RuntimeClass{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Handler:    handler,
-	}
-	v1alpha1RC := v1alpha1.RuntimeClass{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: v1alpha1.RuntimeClassSpec{
-			RuntimeHandler: handler,
+	tests := map[string]struct {
+		internal *node.RuntimeClass
+		external *v1alpha1.RuntimeClass
+	}{
+		"fully-specified": {
+			internal: &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Handler:    handler,
+				Topology: &node.Topology{
+					NodeSelector: &core.NodeSelector{
+						NodeSelectorTerms: []core.NodeSelectorTerm{{
+							MatchExpressions: []core.NodeSelectorRequirement{{
+								Key:      "extra-soft",
+								Operator: core.NodeSelectorOpExists,
+							}},
+						}},
+					},
+					Tolerations: []core.Toleration{{
+						Key:      "stinky",
+						Operator: core.TolerationOpExists,
+						Effect:   core.TaintEffectNoSchedule,
+					}},
+				},
+			},
+			external: &v1alpha1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: v1alpha1.RuntimeClassSpec{
+					RuntimeHandler: handler,
+					Topology: &v1alpha1.Topology{
+						NodeSelector: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{{
+								MatchExpressions: []corev1.NodeSelectorRequirement{{
+									Key:      "extra-soft",
+									Operator: corev1.NodeSelectorOpExists,
+								}},
+							}},
+						},
+						Tolerations: []corev1.Toleration{{
+							Key:      "stinky",
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
+						}},
+					},
+				},
+			},
+		},
+		"empty-topology": {
+			internal: &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Handler:    handler,
+				Topology:   &node.Topology{},
+			},
+			external: &v1alpha1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: v1alpha1.RuntimeClassSpec{
+					RuntimeHandler: handler,
+					Topology:       &v1alpha1.Topology{},
+				},
+			},
+		},
+		"empty": {
+			internal: &node.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Handler:    handler,
+			},
+			external: &v1alpha1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: v1alpha1.RuntimeClassSpec{
+					RuntimeHandler: handler,
+				},
+			},
 		},
 	}
 
-	convertedInternal := node.RuntimeClass{}
-	require.NoError(t,
-		Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(&v1alpha1RC, &convertedInternal, nil))
-	assert.Equal(t, internalRC, convertedInternal)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			convertedInternal := &node.RuntimeClass{}
+			require.NoError(t,
+				Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(test.external, convertedInternal, nil))
+			assert.Equal(t, test.internal, convertedInternal, "external -> internal")
 
-	convertedV1alpha1 := v1alpha1.RuntimeClass{}
-	require.NoError(t,
-		Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass(&internalRC, &convertedV1alpha1, nil))
-	assert.Equal(t, v1alpha1RC, convertedV1alpha1)
+			convertedV1alpha1 := &v1alpha1.RuntimeClass{}
+			require.NoError(t,
+				Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass(test.internal, convertedV1alpha1, nil))
+			assert.Equal(t, test.external, convertedV1alpha1, "internal -> external")
+		})
+	}
 }
