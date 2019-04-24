@@ -160,7 +160,6 @@ pkg/kubectl/generate/versioned
 pkg/kubectl/metricsutil
 pkg/kubectl/util/templates
 pkg/kubelet
-pkg/kubelet/apis
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/apis/deviceplugin/v1beta1
