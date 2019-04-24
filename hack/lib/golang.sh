@@ -18,6 +18,52 @@
 readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
 readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 
+# The server platform we are building on.
+readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
+  linux/amd64
+  linux/arm
+  linux/arm64
+  linux/s390x
+  linux/ppc64le
+)
+
+# The node platforms we build for
+readonly KUBE_SUPPORTED_NODE_PLATFORMS=(
+  linux/amd64
+  linux/arm
+  linux/arm64
+  linux/s390x
+  linux/ppc64le
+  windows/amd64
+)
+
+# If we update this we should also update the set of platforms whose standard
+# library is precompiled for in build/build-image/cross/Dockerfile
+readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
+  linux/amd64
+  linux/386
+  linux/arm
+  linux/arm64
+  linux/s390x
+  linux/ppc64le
+  darwin/amd64
+  darwin/386
+  windows/amd64
+  windows/386
+)
+
+# Which platforms we should compile test targets for.
+# Not all client platforms need these tests
+readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
+  linux/amd64
+  linux/arm
+  linux/arm64
+  linux/s390x
+  linux/ppc64le
+  darwin/amd64
+  windows/amd64
+)
+
 # The set of server targets that we are only building for Linux
 # If you update this list, please also update build/BUILD.
 kube::golang::server_targets() {
@@ -87,77 +133,106 @@ readonly KUBE_NODE_TARGETS
 readonly KUBE_NODE_BINARIES=("${KUBE_NODE_TARGETS[@]##*/}")
 readonly KUBE_NODE_BINARIES_WIN=("${KUBE_NODE_BINARIES[@]/%/.exe}")
 
-if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
-  IFS=" " read -ra KUBE_SERVER_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
-  IFS=" " read -ra KUBE_NODE_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
-  IFS=" " read -ra KUBE_TEST_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
-  IFS=" " read -ra KUBE_CLIENT_PLATFORMS <<< "${KUBE_BUILD_PLATFORMS}"
-  readonly KUBE_SERVER_PLATFORMS
-  readonly KUBE_NODE_PLATFORMS
-  readonly KUBE_TEST_PLATFORMS
-  readonly KUBE_CLIENT_PLATFORMS
-elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
-  readonly KUBE_SERVER_PLATFORMS=(linux/amd64)
-  readonly KUBE_NODE_PLATFORMS=(linux/amd64)
-  if [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
-    readonly KUBE_TEST_PLATFORMS=(
-      darwin/amd64
-      linux/amd64
-    )
-    readonly KUBE_CLIENT_PLATFORMS=(
-      darwin/amd64
-      linux/amd64
-    )
+# ------------
+# NOTE: All functions that return lists should use newlines.
+# bash functions can't return arrays, and spaces are tricky, so newline
+# separators are the preferred pattern.
+# To transform a string of newline-separated items to an array, use mapfile -t:
+# mapfile -t FOO <<< "$(kube::golang::dups a b c a)"
+#
+# ALWAYS remember to quote your subshells. Not doing so will break in
+# bash 4.3, and potentially cause other issues.
+# ------------
+
+# Returns a sorted newline-separated list containing only duplicated items.
+kube::golang::dups() {
+  # We use printf to insert newlines, which are required by sort.
+  printf "%s\n" "$@" | sort | uniq -d
+}
+
+# Returns a sorted newline-separated list with duplicated items removed.
+kube::golang::dedup() {
+  # We use printf to insert newlines, which are required by sort.
+  printf "%s\n" "$@" | sort -u
+}
+
+# Depends on values of user-facing KUBE_BUILD_PLATFORMS, KUBE_FASTBUILD,
+# and KUBE_BUILDER_OS.
+# Configures KUBE_SERVER_PLATFORMS, KUBE_NODE_PLATFOMRS,
+# KUBE_TEST_PLATFORMS, and KUBE_CLIENT_PLATFORMS, then sets them
+# to readonly.
+# The configured vars will only contain platforms allowed by the
+# KUBE_SUPPORTED* vars at the top of this file.
+kube::golang::setup_platforms() {
+  if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
+    # KUBE_BUILD_PLATFORMS needs to be read into an array before the next
+    # step, or quoting treats it all as one element.
+    local -a platforms
+    IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS}"
+
+    # Deduplicate to ensure the intersection trick with kube::golang::dups
+    # is not defeated by duplicates in user input.
+    mapfile -t platforms <<< "$(kube::golang::dedup "${platforms[@]}")"
+
+    # Use kube::golang::dups to restrict the builds to the platforms in
+    # KUBE_SUPPORTED_*_PLATFORMS. Items should only appear at most once in each
+    # set, so if they appear twice after the merge they are in the intersection.
+    mapfile -t KUBE_SERVER_PLATFORMS <<< "$(kube::golang::dups \
+        "${platforms[@]}" \
+        "${KUBE_SUPPORTED_SERVER_PLATFORMS[@]}" \
+      )"
+    readonly KUBE_SERVER_PLATFORMS
+
+    mapfile -t KUBE_NODE_PLATFORMS <<< "$(kube::golang::dups \
+        "${platforms[@]}" \
+        "${KUBE_SUPPORTED_NODE_PLATFORMS[@]}" \
+      )"
+    readonly KUBE_NODE_PLATFORMS
+
+    mapfile -t KUBE_TEST_PLATFORMS <<< "$(kube::golang::dups \
+        "${platforms[@]}" \
+        "${KUBE_SUPPORTED_TEST_PLATFORMS[@]}" \
+      )"
+    readonly KUBE_TEST_PLATFORMS
+
+    mapfile -t KUBE_CLIENT_PLATFORMS <<< "$(kube::golang::dups \
+        "${platforms[@]}" \
+        "${KUBE_SUPPORTED_CLIENT_PLATFORMS[@]}" \
+      )"
+    readonly KUBE_CLIENT_PLATFORMS
+
+  elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
+    readonly KUBE_SERVER_PLATFORMS=(linux/amd64)
+    readonly KUBE_NODE_PLATFORMS=(linux/amd64)
+    if [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
+      readonly KUBE_TEST_PLATFORMS=(
+        darwin/amd64
+        linux/amd64
+      )
+      readonly KUBE_CLIENT_PLATFORMS=(
+        darwin/amd64
+        linux/amd64
+      )
+    else
+      readonly KUBE_TEST_PLATFORMS=(linux/amd64)
+      readonly KUBE_CLIENT_PLATFORMS=(linux/amd64)
+    fi
   else
-    readonly KUBE_TEST_PLATFORMS=(linux/amd64)
-    readonly KUBE_CLIENT_PLATFORMS=(linux/amd64)
+    KUBE_SERVER_PLATFORMS=("${KUBE_SUPPORTED_SERVER_PLATFORMS[@]}")
+    readonly KUBE_SERVER_PLATFORMS
+
+    KUBE_NODE_PLATFORMS=("${KUBE_SUPPORTED_NODE_PLATFORMS[@]}")
+    readonly KUBE_NODE_PLATFORMS
+
+    KUBE_CLIENT_PLATFORMS=("${KUBE_SUPPORTED_CLIENT_PLATFORMS[@]}")
+    readonly KUBE_CLIENT_PLATFORMS
+
+    KUBE_TEST_PLATFORMS=("${KUBE_SUPPORTED_TEST_PLATFORMS[@]}")
+    readonly KUBE_TEST_PLATFORMS
   fi
-else
+}
 
-  # The server platform we are building on.
-  readonly KUBE_SERVER_PLATFORMS=(
-    linux/amd64
-    linux/arm
-    linux/arm64
-    linux/s390x
-    linux/ppc64le
-  )
-
-  # The node platforms we build for
-  readonly KUBE_NODE_PLATFORMS=(
-    linux/amd64
-    linux/arm
-    linux/arm64
-    linux/s390x
-    linux/ppc64le
-    windows/amd64
-  )
-
-  # If we update this we should also update the set of platforms whose standard library is precompiled for in build/build-image/cross/Dockerfile
-  readonly KUBE_CLIENT_PLATFORMS=(
-    linux/amd64
-    linux/386
-    linux/arm
-    linux/arm64
-    linux/s390x
-    linux/ppc64le
-    darwin/amd64
-    darwin/386
-    windows/amd64
-    windows/386
-  )
-
-  # Which platforms we should compile test targets for. Not all client platforms need these tests
-  readonly KUBE_TEST_PLATFORMS=(
-    linux/amd64
-    linux/arm
-    linux/arm64
-    linux/s390x
-    linux/ppc64le
-    darwin/amd64
-    windows/amd64
-  )
-fi
+kube::golang::setup_platforms
 
 # The set of client targets that we are building for all platforms
 # If you update this list, please also update build/BUILD.
