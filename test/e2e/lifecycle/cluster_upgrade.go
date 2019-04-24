@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2elifecycle "k8s.io/kubernetes/test/e2e/framework/lifecycle"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	apps "k8s.io/kubernetes/test/e2e/upgrades/apps"
 	"k8s.io/kubernetes/test/e2e/upgrades/storage"
@@ -103,7 +104,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				defer finalizeUpgradeTest(start, masterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(target))
-				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.MasterUpgrade, upgradeFunc)
 		})
@@ -125,7 +126,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				defer finalizeUpgradeTest(start, nodeUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
-				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.NodeUpgrade, upgradeFunc)
 		})
@@ -144,9 +145,9 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				defer finalizeUpgradeTest(start, clusterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(target))
-				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
-				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -175,9 +176,9 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 				// Yes this really is a downgrade. And nodes must downgrade first.
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
-				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgrade(target))
-				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -228,7 +229,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(target))
-				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.MasterUpgrade, upgradeFunc)
 		})
@@ -246,9 +247,9 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(target))
-				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
-				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -266,9 +267,9 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				defer finalizeUpgradeTest(start, gpuDowngradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
-				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgrade(target))
-				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -294,9 +295,9 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				defer finalizeUpgradeTest(start, statefulUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgrade(target))
-				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
-				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, statefulsetUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -329,9 +330,9 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				defer finalizeUpgradeTest(start, kubeProxyUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, true))
-				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, true))
-				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, kubeProxyUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -357,9 +358,9 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				// Yes this really is a downgrade. And nodes must downgrade first.
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, false))
-				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, false))
-				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, kubeProxyDowngradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -506,7 +507,7 @@ func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget string) (*u
 		return upgCtx, nil
 	}
 
-	next, err := framework.RealVersion(upgradeTarget)
+	next, err := e2elifecycle.RealVersion(upgradeTarget)
 	if err != nil {
 		return nil, err
 	}
