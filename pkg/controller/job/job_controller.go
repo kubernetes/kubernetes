@@ -49,6 +49,7 @@ import (
 )
 
 const statusUpdateRetries = 3
+const maxJobBackOff = 360 * 1000000000
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
@@ -848,14 +849,11 @@ func getBackoff(queue workqueue.RateLimitingInterface, key interface{}) time.Dur
 
 	// The backoff is capped such that 'calculated' value never overflows.
 	backoff := float64(DefaultJobBackOff.Nanoseconds()) * math.Pow(2, float64(exp-1))
-	if backoff > math.MaxInt64 {
+	if backoff > maxJobBackOff {
 		return MaxJobBackOff
 	}
 
 	calculated := time.Duration(backoff)
-	if calculated > MaxJobBackOff {
-		return MaxJobBackOff
-	}
 	return calculated
 }
 
