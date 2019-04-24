@@ -224,6 +224,70 @@ func guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
 	if cpuQuantity.Value()*1000 != cpuQuantity.MilliValue() {
 		return 0
 	}
+
+	// The code below works around a bug in the CPUManager, whereby it doesn't
+	// honor the "effective requests/limits" of a Pod as defined by:
+	//
+	//     https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#resources
+	//
+	// The rule states that a Pod’s "effective request/limit" for a resource
+	// should be the larger of:
+	//     * The highest of any particular resource request or limit defined on
+	//       all init Containers
+	//     * The sum of all app Containers request/limit for a resource
+	//
+	// Moreover, the rule states that:
+	//     * The effective QoS tier is the same for init Containers and app
+	//       containers alike
+	//
+	// This means that the resource requests of init Containers and app
+	// Containers should be able to overlap, such that the larger of the two
+	// becomes the "effective resource request/limit" for the Pod. Likewise, if
+	// a QoS tier of "Guaranteed" is determined for the Pod, then both init
+	// Containers and app Containers should run in this tier.
+	//
+	// In its current implementation, the CPU manager honors the effective QoS
+	// tier for both init and app containers, but doesn't honor the "effective
+	// request/limit" correctly.
+	//
+	// Instead, it treats the "effective request/limit" as:
+	//     * The sum of all init Containers plus the sum of all app Containers
+	//       request/limit for a resource
+	//
+	// It does this by pre-allocating non-overlapping CPUs to all containers
+	// (whether init or app) in the "Guaranteed" QoS tier before any of the
+	// containers in the Pod actually start.
+	//
+	// This effectively blocks these Pods from running if the total number of
+	// CPUs being requested across init and app Containers goes beyond the
+	// limits of the system.
+	//
+	// The right way to fix this problem is to update the CPUManager so that it
+	// "reuses", any guaranteed CPUs it grants to init Containers when it
+	// allocates CPUs to app Containers. However, this would take substantial
+	// effort to implement and would require some redesign on the part of the
+	// CPUManager as a whole.
+	//
+	// In the meantime, the code below relaxes the requirement that the
+	// effective QoS tier is the same for init Containers and app Containers,
+	// and instead runs all init containers without guaranteed CPUs.
+	//
+	// This essentially swaps the guarantees currently in place.
+	//
+	// Init Containers will no longer be granted guaranteed CPUs, allowing
+	// only app containers to pre-reserve CPUs at pod creation time. Init
+	// containers will still be granted whatever CPU share they request, but
+	// the CPUs they run on will be pulled from the DefaultCPUSet instead of
+	// their own private CPUSet. When it comes time to run app containers,
+	// they will be granted guaranteed CPUs as expected.
+	//
+	// TODO(klueska): Remove once the CPUManager honors guaranteed CPU
+	// inheritance from init containers into app containers.
+	for _, c := range pod.Spec.InitContainers {
+		if c.Name == container.Name {
+			return 0
+		}
+	}
 	// Safe downcast to do for all systems with < 2.1 billion CPUs.
 	// Per the language spec, `int` is guaranteed to be at least 32 bits wide.
 	// https://golang.org/ref/spec#Numeric_types
