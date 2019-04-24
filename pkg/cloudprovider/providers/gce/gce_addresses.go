@@ -21,9 +21,8 @@ import (
 
 	"k8s.io/klog"
 
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
-	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/compute/v1"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
@@ -78,15 +77,6 @@ func (g *Cloud) ReserveRegionAddress(addr *compute.Address, region string) error
 	return mc.Observe(g.c.Addresses().Insert(ctx, meta.RegionalKey(addr.Name, region), addr))
 }
 
-// ReserveAlphaRegionAddress creates an Alpha, regional address.
-func (g *Cloud) ReserveAlphaRegionAddress(addr *computealpha.Address, region string) error {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newAddressMetricContext("reserve", region)
-	return mc.Observe(g.c.AlphaAddresses().Insert(ctx, meta.RegionalKey(addr.Name, region), addr))
-}
-
 // ReserveBetaRegionAddress creates a beta region address
 func (g *Cloud) ReserveBetaRegionAddress(addr *computebeta.Address, region string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
@@ -112,16 +102,6 @@ func (g *Cloud) GetRegionAddress(name, region string) (*compute.Address, error) 
 
 	mc := newAddressMetricContext("get", region)
 	v, err := g.c.Addresses().Get(ctx, meta.RegionalKey(name, region))
-	return v, mc.Observe(err)
-}
-
-// GetAlphaRegionAddress returns the Alpha, regional address by name.
-func (g *Cloud) GetAlphaRegionAddress(name, region string) (*computealpha.Address, error) {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newAddressMetricContext("get", region)
-	v, err := g.c.AlphaAddresses().Get(ctx, meta.RegionalKey(name, region))
 	return v, mc.Observe(err)
 }
 
@@ -188,9 +168,9 @@ func (g *Cloud) getNetworkTierFromAddress(name, region string) (string, error) {
 	if !g.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
 		return cloud.NetworkTierDefault.ToGCEValue(), nil
 	}
-	addr, err := g.GetAlphaRegionAddress(name, region)
+	addr, err := g.GetBetaRegionAddress(name, region)
 	if err != nil {
-		return handleAlphaNetworkTierGetError(err)
+		return handleBetaNetworkTierGetError(err)
 	}
 	return addr.NetworkTier, nil
 }

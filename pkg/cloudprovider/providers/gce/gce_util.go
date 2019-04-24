@@ -245,7 +245,8 @@ func makeGoogleAPINotFoundError(message string) error {
 }
 
 // TODO(#51665): Remove this once Network Tiers becomes Beta in GCP.
-func handleAlphaNetworkTierGetError(err error) (string, error) {
+// TODO(dims): FIXME
+func handleBetaNetworkTierGetError(err error) (string, error) {
 	if isForbidden(err) {
 		// Network tier is still an Alpha feature in GCP, and not every project
 		// is whitelisted to access the API. If we cannot access the API, just

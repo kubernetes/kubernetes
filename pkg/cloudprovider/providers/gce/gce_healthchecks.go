@@ -19,9 +19,8 @@ package gce
 import (
 	"k8s.io/klog"
 
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
-	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/compute/v1"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
@@ -167,16 +166,6 @@ func (g *Cloud) GetHealthCheck(name string) (*compute.HealthCheck, error) {
 	return v, mc.Observe(err)
 }
 
-// GetAlphaHealthCheck returns the given alpha HealthCheck by name.
-func (g *Cloud) GetAlphaHealthCheck(name string) (*computealpha.HealthCheck, error) {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newHealthcheckMetricContextWithVersion("get", computeAlphaVersion)
-	v, err := g.c.AlphaHealthChecks().Get(ctx, meta.GlobalKey(name))
-	return v, mc.Observe(err)
-}
-
 // GetBetaHealthCheck returns the given beta HealthCheck by name.
 func (g *Cloud) GetBetaHealthCheck(name string) (*computebeta.HealthCheck, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
@@ -194,15 +183,6 @@ func (g *Cloud) UpdateHealthCheck(hc *compute.HealthCheck) error {
 
 	mc := newHealthcheckMetricContext("update")
 	return mc.Observe(g.c.HealthChecks().Update(ctx, meta.GlobalKey(hc.Name), hc))
-}
-
-// UpdateAlphaHealthCheck applies the given alpha HealthCheck as an update.
-func (g *Cloud) UpdateAlphaHealthCheck(hc *computealpha.HealthCheck) error {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newHealthcheckMetricContextWithVersion("update", computeAlphaVersion)
-	return mc.Observe(g.c.AlphaHealthChecks().Update(ctx, meta.GlobalKey(hc.Name), hc))
 }
 
 // UpdateBetaHealthCheck applies the given beta HealthCheck as an update.
@@ -230,15 +210,6 @@ func (g *Cloud) CreateHealthCheck(hc *compute.HealthCheck) error {
 
 	mc := newHealthcheckMetricContext("create")
 	return mc.Observe(g.c.HealthChecks().Insert(ctx, meta.GlobalKey(hc.Name), hc))
-}
-
-// CreateAlphaHealthCheck creates the given alpha HealthCheck.
-func (g *Cloud) CreateAlphaHealthCheck(hc *computealpha.HealthCheck) error {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newHealthcheckMetricContextWithVersion("create", computeAlphaVersion)
-	return mc.Observe(g.c.AlphaHealthChecks().Insert(ctx, meta.GlobalKey(hc.Name), hc))
 }
 
 // CreateBetaHealthCheck creates the given beta HealthCheck.

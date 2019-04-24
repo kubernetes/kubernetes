@@ -17,9 +17,8 @@ limitations under the License.
 package gce
 
 import (
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
-	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/compute/v1"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
@@ -54,16 +53,6 @@ func (g *Cloud) GetBetaGlobalBackendService(name string) (*computebeta.BackendSe
 	return v, mc.Observe(err)
 }
 
-// GetAlphaGlobalBackendService retrieves alpha backend by name.
-func (g *Cloud) GetAlphaGlobalBackendService(name string) (*computealpha.BackendService, error) {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newBackendServiceMetricContextWithVersion("get", "", computeAlphaVersion)
-	v, err := g.c.AlphaBackendServices().Get(ctx, meta.GlobalKey(name))
-	return v, mc.Observe(err)
-}
-
 // UpdateGlobalBackendService applies the given BackendService as an update to
 // an existing service.
 func (g *Cloud) UpdateGlobalBackendService(bg *compute.BackendService) error {
@@ -82,16 +71,6 @@ func (g *Cloud) UpdateBetaGlobalBackendService(bg *computebeta.BackendService) e
 
 	mc := newBackendServiceMetricContextWithVersion("update", "", computeBetaVersion)
 	return mc.Observe(g.c.BetaBackendServices().Update(ctx, meta.GlobalKey(bg.Name), bg))
-}
-
-// UpdateAlphaGlobalBackendService applies the given alpha BackendService as an
-// update to an existing service.
-func (g *Cloud) UpdateAlphaGlobalBackendService(bg *computealpha.BackendService) error {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newBackendServiceMetricContextWithVersion("update", "", computeAlphaVersion)
-	return mc.Observe(g.c.AlphaBackendServices().Update(ctx, meta.GlobalKey(bg.Name), bg))
 }
 
 // DeleteGlobalBackendService deletes the given BackendService by name.
@@ -119,15 +98,6 @@ func (g *Cloud) CreateBetaGlobalBackendService(bg *computebeta.BackendService) e
 
 	mc := newBackendServiceMetricContextWithVersion("create", "", computeBetaVersion)
 	return mc.Observe(g.c.BetaBackendServices().Insert(ctx, meta.GlobalKey(bg.Name), bg))
-}
-
-// CreateAlphaGlobalBackendService creates the given alpha BackendService.
-func (g *Cloud) CreateAlphaGlobalBackendService(bg *computealpha.BackendService) error {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newBackendServiceMetricContextWithVersion("create", "", computeAlphaVersion)
-	return mc.Observe(g.c.AlphaBackendServices().Insert(ctx, meta.GlobalKey(bg.Name), bg))
 }
 
 // ListGlobalBackendServices lists all backend services in the project.
@@ -222,14 +192,4 @@ func (g *Cloud) SetSecurityPolicyForBetaGlobalBackendService(backendServiceName 
 
 	mc := newBackendServiceMetricContextWithVersion("set_security_policy", "", computeBetaVersion)
 	return mc.Observe(g.c.BetaBackendServices().SetSecurityPolicy(ctx, meta.GlobalKey(backendServiceName), securityPolicyReference))
-}
-
-// SetSecurityPolicyForAlphaGlobalBackendService sets the given
-// SecurityPolicyReference for the BackendService identified by the given name.
-func (g *Cloud) SetSecurityPolicyForAlphaGlobalBackendService(backendServiceName string, securityPolicyReference *computealpha.SecurityPolicyReference) error {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newBackendServiceMetricContextWithVersion("set_security_policy", "", computeAlphaVersion)
-	return mc.Observe(g.c.AlphaBackendServices().SetSecurityPolicy(ctx, meta.GlobalKey(backendServiceName), securityPolicyReference))
 }

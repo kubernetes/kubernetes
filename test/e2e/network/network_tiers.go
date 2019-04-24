@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"time"
 
-	computealpha "google.golang.org/api/compute/v0.alpha"
+	computebeta "google.golang.org/api/compute/v0.beta"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	v1 "k8s.io/api/core/v1"
@@ -105,7 +105,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		requestedAddrName := fmt.Sprintf("e2e-ext-lb-net-tier-%s", framework.RunID)
 		gceCloud, err := gce.GetGCECloud()
 		Expect(err).NotTo(HaveOccurred())
-		requestedIP, err := reserveAlphaRegionalAddress(gceCloud, requestedAddrName, cloud.NetworkTierStandard)
+		requestedIP, err := reserveBetaRegionalAddress(gceCloud, requestedAddrName, cloud.NetworkTierStandard)
 		Expect(err).NotTo(HaveOccurred(), "failed to reserve a STANDARD tiered address")
 		defer func() {
 			if requestedAddrName != "" {
@@ -171,7 +171,7 @@ func waitAndVerifyLBWithTier(jig *framework.ServiceTestJig, ns, svcName, existin
 }
 
 func getLBNetworkTierByIP(ip string) (cloud.NetworkTier, error) {
-	var rule *computealpha.ForwardingRule
+	var rule *computebeta.ForwardingRule
 	// Retry a few times to tolerate flakes.
 	err := wait.PollImmediate(5*time.Second, 15*time.Second, func() (bool, error) {
 		obj, err := getGCEForwardingRuleByIP(ip)
@@ -187,12 +187,12 @@ func getLBNetworkTierByIP(ip string) (cloud.NetworkTier, error) {
 	return cloud.NetworkTierGCEValueToType(rule.NetworkTier), nil
 }
 
-func getGCEForwardingRuleByIP(ip string) (*computealpha.ForwardingRule, error) {
+func getGCEForwardingRuleByIP(ip string) (*computebeta.ForwardingRule, error) {
 	cloud, err := gce.GetGCECloud()
 	if err != nil {
 		return nil, err
 	}
-	ruleList, err := cloud.ListAlphaRegionForwardingRules(cloud.Region())
+	ruleList, err := cloud.ListBetaRegionForwardingRules(cloud.Region())
 	if err != nil {
 		return nil, err
 	}
@@ -222,13 +222,14 @@ func clearNetworkTier(svc *v1.Service) {
 
 // TODO: add retries if this turns out to be flaky.
 // TODO(#51665): remove this helper function once Network Tiers becomes beta.
-func reserveAlphaRegionalAddress(cloud *gcecloud.Cloud, name string, netTier cloud.NetworkTier) (string, error) {
-	alphaAddr := &computealpha.Address{
+// TODO(dims): Do we need this?
+func reserveBetaRegionalAddress(cloud *gcecloud.Cloud, name string, netTier cloud.NetworkTier) (string, error) {
+	alphaAddr := &computebeta.Address{
 		Name:        name,
 		NetworkTier: netTier.ToGCEValue(),
 	}
 
-	if err := cloud.ReserveAlphaRegionAddress(alphaAddr, cloud.Region()); err != nil {
+	if err := cloud.ReserveBetaRegionAddress(alphaAddr, cloud.Region()); err != nil {
 		return "", err
 	}
 

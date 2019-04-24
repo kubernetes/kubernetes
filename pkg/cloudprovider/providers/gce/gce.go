@@ -32,7 +32,6 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
@@ -97,7 +96,6 @@ type Cloud struct {
 
 	service          *compute.Service
 	serviceBeta      *computebeta.Service
-	serviceAlpha     *computealpha.Service
 	containerService *container.Service
 	tpuService       *tpuService
 	client           clientset.Interface
@@ -224,13 +222,12 @@ func init() {
 type Services struct {
 	// GA, Alpha, Beta versions of the compute API.
 	GA    *compute.Service
-	Alpha *computealpha.Service
 	Beta  *computebeta.Service
 }
 
 // ComputeServices returns access to the internal compute services.
 func (g *Cloud) ComputeServices() *Services {
-	return &Services{g.service, g.serviceAlpha, g.serviceBeta}
+	return &Services{g.service, g.serviceBeta}
 }
 
 // Compute returns the generated stubs for the compute API.
@@ -412,11 +409,6 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 	if err != nil {
 		return nil, err
 	}
-	serviceAlpha, err := computealpha.New(client)
-	if err != nil {
-		return nil, err
-	}
-	serviceAlpha.UserAgent = userAgent
 
 	// Expect override api endpoint to always be v1 api and follows the same pattern as prod.
 	// Generate alpha and beta api endpoints based on override v1 api endpoint.
@@ -425,7 +417,6 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 	if config.APIEndpoint != "" {
 		service.BasePath = fmt.Sprintf("%sprojects/", config.APIEndpoint)
 		serviceBeta.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(config.APIEndpoint, "v1", "beta", -1))
-		serviceAlpha.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(config.APIEndpoint, "v1", "alpha", -1))
 	}
 
 	containerService, err := container.New(client)
@@ -505,7 +496,6 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 
 	gce := &Cloud{
 		service:                  service,
-		serviceAlpha:             serviceAlpha,
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
 		tpuService:               tpuService,
@@ -531,7 +521,6 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 	gce.manager = &gceServiceManager{gce}
 	gce.s = &cloud.Service{
 		GA:            service,
-		Alpha:         serviceAlpha,
 		Beta:          serviceBeta,
 		ProjectRouter: &gceProjectRouter{gce},
 		RateLimiter:   &gceRateLimiter{gce},

@@ -21,7 +21,6 @@ import (
 
 	"fmt"
 
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
@@ -644,7 +643,6 @@ type FakeServiceManager struct {
 
 	// Fields for TestCreateDisk
 	createDiskCalled   bool
-	diskToCreateAlpha  *computealpha.Disk
 	diskToCreateBeta   *computebeta.Disk
 	diskToCreateStable *compute.Disk
 
@@ -696,17 +694,6 @@ func (manager *FakeServiceManager) CreateDiskOnCloudProvider(
 		}
 		manager.diskToCreateBeta = diskToCreateBeta
 		manager.zonalDisks[zone] = diskToCreateBeta.Name
-		return nil
-	case targetAlpha:
-		diskTypeURI := gceComputeAPIEndpointBeta + "projects/" + fmt.Sprintf(diskTypeURITemplateSingleZone, manager.gceProjectID, zone, diskType)
-		diskToCreateAlpha := &computealpha.Disk{
-			Name:        name,
-			SizeGb:      sizeGb,
-			Description: tagsStr,
-			Type:        diskTypeURI,
-		}
-		manager.diskToCreateAlpha = diskToCreateAlpha
-		manager.zonalDisks[zone] = diskToCreateAlpha.Name
 		return nil
 	default:
 		return fmt.Errorf("unexpected type: %T", t)

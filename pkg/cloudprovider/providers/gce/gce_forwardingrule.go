@@ -20,7 +20,7 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
-	computealpha "google.golang.org/api/compute/v0.alpha"
+	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 )
 
@@ -90,13 +90,13 @@ func (g *Cloud) GetRegionForwardingRule(name, region string) (*compute.Forwardin
 	return v, mc.Observe(err)
 }
 
-// GetAlphaRegionForwardingRule returns the Alpha forwarding rule by name & region.
-func (g *Cloud) GetAlphaRegionForwardingRule(name, region string) (*computealpha.ForwardingRule, error) {
+// GetBetaRegionForwardingRule returns the Beta forwarding rule by name & region.
+func (g *Cloud) GetBetaRegionForwardingRule(name, region string) (*computebeta.ForwardingRule, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
-	mc := newForwardingRuleMetricContextWithVersion("get", region, computeAlphaVersion)
-	v, err := g.c.AlphaForwardingRules().Get(ctx, meta.RegionalKey(name, region))
+	mc := newForwardingRuleMetricContextWithVersion("get", region, computeBetaVersion)
+	v, err := g.c.BetaForwardingRules().Get(ctx, meta.RegionalKey(name, region))
 	return v, mc.Observe(err)
 }
 
@@ -110,13 +110,13 @@ func (g *Cloud) ListRegionForwardingRules(region string) ([]*compute.ForwardingR
 	return v, mc.Observe(err)
 }
 
-// ListAlphaRegionForwardingRules lists all RegionalForwardingRules in the project & region.
-func (g *Cloud) ListAlphaRegionForwardingRules(region string) ([]*computealpha.ForwardingRule, error) {
+// ListBetaRegionForwardingRules lists all RegionalForwardingRules in the project & region.
+func (g *Cloud) ListBetaRegionForwardingRules(region string) ([]*computebeta.ForwardingRule, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
-	mc := newForwardingRuleMetricContextWithVersion("list", region, computeAlphaVersion)
-	v, err := g.c.AlphaForwardingRules().List(ctx, region, filter.None)
+	mc := newForwardingRuleMetricContextWithVersion("list", region, computeBetaVersion)
+	v, err := g.c.BetaForwardingRules().List(ctx, region, filter.None)
 	return v, mc.Observe(err)
 }
 
@@ -130,14 +130,14 @@ func (g *Cloud) CreateRegionForwardingRule(rule *compute.ForwardingRule, region 
 	return mc.Observe(g.c.ForwardingRules().Insert(ctx, meta.RegionalKey(rule.Name, region), rule))
 }
 
-// CreateAlphaRegionForwardingRule creates and returns an Alpha
+// CreateBetaRegionForwardingRule creates and returns an Beta
 // forwarding fule in the given region.
-func (g *Cloud) CreateAlphaRegionForwardingRule(rule *computealpha.ForwardingRule, region string) error {
+func (g *Cloud) CreateBetaRegionForwardingRule(rule *computebeta.ForwardingRule, region string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
-	mc := newForwardingRuleMetricContextWithVersion("create", region, computeAlphaVersion)
-	return mc.Observe(g.c.AlphaForwardingRules().Insert(ctx, meta.RegionalKey(rule.Name, region), rule))
+	mc := newForwardingRuleMetricContextWithVersion("create", region, computeBetaVersion)
+	return mc.Observe(g.c.BetaForwardingRules().Insert(ctx, meta.RegionalKey(rule.Name, region), rule))
 }
 
 // DeleteRegionForwardingRule deletes the RegionalForwardingRule by name & region.
@@ -154,9 +154,9 @@ func (g *Cloud) getNetworkTierFromForwardingRule(name, region string) (string, e
 	if !g.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
 		return cloud.NetworkTierDefault.ToGCEValue(), nil
 	}
-	fwdRule, err := g.GetAlphaRegionForwardingRule(name, region)
+	fwdRule, err := g.GetBetaRegionForwardingRule(name, region)
 	if err != nil {
-		return handleAlphaNetworkTierGetError(err)
+		return handleBetaNetworkTierGetError(err)
 	}
 	return fwdRule.NetworkTier, nil
 }

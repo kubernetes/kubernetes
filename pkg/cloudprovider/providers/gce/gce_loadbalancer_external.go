@@ -31,7 +31,7 @@ import (
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	utilnet "k8s.io/utils/net"
 
-	computealpha "google.golang.org/api/compute/v0.alpha"
+	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/klog"
 )
@@ -915,7 +915,7 @@ func createForwardingRule(s CloudForwardingRuleService, name, serviceName, regio
 		}
 		err = s.CreateRegionForwardingRule(rule, region)
 	default:
-		rule := &computealpha.ForwardingRule{
+		rule := &computebeta.ForwardingRule{
 			Name:        name,
 			Description: desc,
 			IPAddress:   ipAddress,
@@ -924,7 +924,7 @@ func createForwardingRule(s CloudForwardingRuleService, name, serviceName, regio
 			Target:      target,
 			NetworkTier: netTier.ToGCEValue(),
 		}
-		err = s.CreateAlphaRegionForwardingRule(rule, region)
+		err = s.CreateBetaRegionForwardingRule(rule, region)
 	}
 
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
@@ -1027,7 +1027,7 @@ func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP
 		}
 		creationErr = s.ReserveRegionAddress(addressObj, region)
 	default:
-		addressObj := &computealpha.Address{
+		addressObj := &computebeta.Address{
 			Name:        name,
 			Description: desc,
 			NetworkTier: netTier.ToGCEValue(),
@@ -1035,7 +1035,7 @@ func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP
 		if existingIP != "" {
 			addressObj.Address = existingIP
 		}
-		creationErr = s.ReserveAlphaRegionAddress(addressObj, region)
+		creationErr = s.ReserveBetaRegionAddress(addressObj, region)
 	}
 
 	if creationErr != nil {

@@ -25,7 +25,6 @@ import (
 const (
 	// Version strings for recording metrics.
 	computeV1Version    = "v1"
-	computeAlphaVersion = "alpha"
 	computeBetaVersion  = "beta"
 )
 
