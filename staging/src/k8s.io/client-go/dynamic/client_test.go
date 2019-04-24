@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -347,6 +348,7 @@ func TestCreate(t *testing.T) {
 		namespace   string
 		obj         *unstructured.Unstructured
 		path        string
+		statusErr   *metav1.Status
 	}{
 		{
 			resource: "rtest",
@@ -376,6 +378,36 @@ func TestCreate(t *testing.T) {
 			path:        "/apis/gtest/vtest/namespaces/nstest/rtest/namespaced_subresource_create/srtest",
 			obj:         getObject("vTest", "srTest", "namespaced_subresource_create"),
 		},
+		{
+			resource: "rtest",
+			name:     "create_failure_with_ok_status_response",
+			path:     "/apis/gtest/vtest/rtest",
+			obj:      getObject("gtest/vTest", "rTest", "abnormal_create"),
+			statusErr: &metav1.Status{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Status",
+				},
+				Message: "cannot create",
+				Status:  metav1.StatusFailure,
+				Code:    http.StatusOK,
+			},
+		},
+		{
+			resource: "rtest",
+			name:     "create_failure_with_forbidden_status_response",
+			path:     "/apis/gtest/vtest/rtest",
+			obj:      getObject("gtest/vTest", "rTest", "abnormal_create"),
+			statusErr: &metav1.Status{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Status",
+				},
+				Message: "cannot create",
+				Status:  metav1.StatusFailure,
+				Code:    http.StatusForbidden,
+			},
+		},
 	}
 	for _, tc := range tcs {
 		resource := schema.GroupVersionResource{Group: "gtest", Version: "vtest", Resource: tc.resource}
@@ -395,8 +427,11 @@ func TestCreate(t *testing.T) {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-
-			w.Write(data)
+			if tc.statusErr != nil {
+				unstructured.UnstructuredJSONScheme.Encode(tc.statusErr, w)
+			} else {
+				w.Write(data)
+			}
 		})
 		if err != nil {
 			t.Errorf("unexpected error when creating client: %v", err)
@@ -405,13 +440,20 @@ func TestCreate(t *testing.T) {
 		defer srv.Close()
 
 		got, err := cl.Resource(resource).Namespace(tc.namespace).Create(tc.obj, metav1.CreateOptions{}, tc.subresource...)
-		if err != nil {
+		if tc.statusErr == nil && err != nil {
 			t.Errorf("unexpected error when creating %q: %v", tc.name, err)
 			continue
 		}
 
-		if !reflect.DeepEqual(got, tc.obj) {
-			t.Errorf("Create(%q) want: %v\ngot: %v", tc.name, tc.obj, got)
+		if tc.statusErr != nil {
+			expectedErr := errors.FromObject(tc.statusErr)
+			if !reflect.DeepEqual(expectedErr, err) {
+				t.Errorf("Create(%q) want status: %v\ngot: %v", tc.name, expectedErr, err)
+			}
+		} else {
+			if !reflect.DeepEqual(got, tc.obj) {
+				t.Errorf("Create(%q) want: %v\ngot: %v", tc.name, tc.obj, got)
+			}
 		}
 	}
 }

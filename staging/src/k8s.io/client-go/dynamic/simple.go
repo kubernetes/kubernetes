@@ -19,7 +19,7 @@ package dynamic
 import (
 	"fmt"
 	"io"
-
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -126,6 +126,9 @@ func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, opts meta
 	if err != nil {
 		return nil, err
 	}
+	if err := c.recognizeStatusError(uncastObj); err != nil {
+		return nil, err
+	}
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
@@ -159,6 +162,9 @@ func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, opts meta
 	}
 	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.recognizeStatusError(uncastObj); err != nil {
 		return nil, err
 	}
 	return uncastObj.(*unstructured.Unstructured), nil
@@ -197,6 +203,9 @@ func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opt
 	if err != nil {
 		return nil, err
 	}
+	if err := c.recognizeStatusError(uncastObj); err != nil {
+		return nil, err
+	}
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
@@ -217,6 +226,20 @@ func (c *dynamicResourceClient) Delete(name string, opts *metav1.DeleteOptions, 
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
 		Body(deleteOptionsByte).
 		Do()
+	if err := result.Error(); err != nil {
+		return err
+	}
+	retBytes, err := result.Raw()
+	if err != nil {
+		return err
+	}
+	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
+	if err != nil {
+		return err
+	}
+	if err := c.recognizeStatusError(uncastObj); err != nil {
+		return err
+	}
 	return result.Error()
 }
 
@@ -235,6 +258,17 @@ func (c *dynamicResourceClient) DeleteCollection(opts *metav1.DeleteOptions, lis
 		Body(deleteOptionsByte).
 		SpecificallyVersionedParams(&listOptions, dynamicParameterCodec, versionV1).
 		Do()
+	retBytes, err := result.Raw()
+	if err != nil {
+		return err
+	}
+	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
+	if err != nil {
+		return err
+	}
+	if err := c.recognizeStatusError(uncastObj); err != nil {
+		return err
+	}
 	return result.Error()
 }
 
@@ -252,6 +286,9 @@ func (c *dynamicResourceClient) Get(name string, opts metav1.GetOptions, subreso
 	}
 	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.recognizeStatusError(uncastObj); err != nil {
 		return nil, err
 	}
 	return uncastObj.(*unstructured.Unstructured), nil
@@ -276,6 +313,9 @@ func (c *dynamicResourceClient) List(opts metav1.ListOptions) (*unstructured.Uns
 
 	list, err := uncastObj.(*unstructured.Unstructured).ToList()
 	if err != nil {
+		return nil, err
+	}
+	if err := c.recognizeStatusError(uncastObj); err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -352,4 +392,18 @@ func (c *dynamicResourceClient) makeURLSegments(name string) []string {
 	}
 
 	return url
+}
+
+func (c *dynamicResourceClient) recognizeStatusError(uncastObj runtime.Object) error {
+	// unstructured must have gvk
+	if gvk := uncastObj.GetObjectKind().GroupVersionKind(); gvk.Group == "" && gvk.Kind == "Status" {
+		status := &metav1.Status{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(uncastObj.(*unstructured.Unstructured).Object, status); err == nil {
+			if status.Status != metav1.StatusSuccess {
+				return errors.FromObject(status)
+			}
+		}
+	}
+
+	return nil
 }
