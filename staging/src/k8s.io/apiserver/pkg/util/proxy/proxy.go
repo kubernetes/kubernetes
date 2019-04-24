@@ -96,8 +96,12 @@ func ResolveCluster(services listersv1.ServiceLister, namespace, id string, port
 	}
 
 	switch {
+	// use service domain for Headless Service
 	case svc.Spec.Type == v1.ServiceTypeClusterIP && svc.Spec.ClusterIP == v1.ClusterIPNone:
-		return nil, fmt.Errorf(`cannot route to service with ClusterIP "None"`)
+		return &url.URL{
+			Scheme: "https",
+			Host:   net.JoinHostPort(fmt.Sprintf("%s.%s.svc", svc.Name, svc.Namespace), fmt.Sprintf("%d", port)),
+		}, nil
 	// use IP from a clusterIP for these service types
 	case svc.Spec.Type == v1.ServiceTypeClusterIP, svc.Spec.Type == v1.ServiceTypeLoadBalancer, svc.Spec.Type == v1.ServiceTypeNodePort:
 		svcPort, err := findServicePort(svc, port)

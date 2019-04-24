@@ -34,7 +34,12 @@ func TestResolve(t *testing.T) {
 			if p.TargetPort.Type != intstr.Int {
 				continue
 			}
-			ports = append(ports, v1.EndpointPort{Name: p.Name, Port: p.TargetPort.IntVal})
+			// for Headless Service cases
+			port := p.TargetPort.IntVal
+			if 0 == port {
+				port = p.Port
+			}
+			ports = append(ports, v1.EndpointPort{Name: p.Name, Port: port})
 		}
 
 		return []*v1.Endpoints{{
@@ -126,12 +131,36 @@ func TestResolve(t *testing.T) {
 					Spec: v1.ServiceSpec{
 						Type:      v1.ServiceTypeClusterIP,
 						ClusterIP: v1.ClusterIPNone,
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443},
+							{Port: 1234},
+						},
+					},
+				},
+			},
+			endpoints: matchingEndpoints,
+
+			clusterMode:  expectation{url: "https://alfa.one.svc:443"},
+			endpointMode: expectation{url: "https://127.0.0.1:443"},
+		},
+		{
+			name: "none cluster ip without endpoints",
+			services: []*v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "alfa"},
+					Spec: v1.ServiceSpec{
+						Type:      v1.ServiceTypeClusterIP,
+						ClusterIP: v1.ClusterIPNone,
+						Ports: []v1.ServicePort{
+							{Name: "https", Port: 443},
+							{Port: 1234},
+						},
 					},
 				},
 			},
 			endpoints: nil,
 
-			clusterMode:  expectation{error: true},
+			clusterMode:  expectation{url: "https://alfa.one.svc:443"},
 			endpointMode: expectation{error: true},
 		},
 		{
