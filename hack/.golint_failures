@@ -288,7 +288,6 @@ pkg/registry/networking/rest
 pkg/registry/node/rest
 pkg/registry/policy/poddisruptionbudget/storage
 pkg/registry/policy/rest
-pkg/registry/rbac/clusterrole
 pkg/registry/rbac/clusterrole/policybased
 pkg/registry/rbac/clusterrolebinding
 pkg/registry/rbac/clusterrolebinding/policybased
