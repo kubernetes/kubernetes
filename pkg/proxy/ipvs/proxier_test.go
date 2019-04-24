@@ -462,7 +462,7 @@ func TestNodePortUDP(t *testing.T) {
 	epVS := &netlinktest.ExpectedVirtualServer{
 		VSNum: 2, IP: nodeIP.String(), Port: uint16(svcNodePort), Protocol: string(v1.ProtocolTCP),
 		RS: []netlinktest.ExpectedRealServer{{
-			IP: epIP, Port: uint16(svcPort),
+			IP: epIP, Port: uint16(svcPort), Weight: 1,
 		}}}
 	checkIPVS(t, fp, epVS)
 
@@ -948,7 +948,7 @@ func TestLoadBalancer(t *testing.T) {
 	epVS := &netlinktest.ExpectedVirtualServer{
 		VSNum: 2, IP: svcLBIP, Port: uint16(svcNodePort), Protocol: string(v1.ProtocolTCP),
 		RS: []netlinktest.ExpectedRealServer{{
-			IP: epIP, Port: uint16(svcPort),
+			IP: epIP, Port: uint16(svcPort), Weight: 1,
 		}}}
 	checkIPVS(t, fp, epVS)
 
@@ -1045,7 +1045,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	epVS := &netlinktest.ExpectedVirtualServer{
 		VSNum: 3, IP: nodeIP.String(), Port: uint16(svcNodePort), Protocol: string(v1.ProtocolTCP),
 		RS: []netlinktest.ExpectedRealServer{{
-			IP: epIP, Port: uint16(svcPort),
+			IP: epIP, Port: uint16(svcPort), Weight: 1,
 		}}}
 	checkIPVS(t, fp, epVS)
 
@@ -1125,7 +1125,7 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 	epVS := &netlinktest.ExpectedVirtualServer{
 		VSNum: 2, IP: svcLBIP, Port: uint16(svcPort), Protocol: string(v1.ProtocolTCP),
 		RS: []netlinktest.ExpectedRealServer{{
-			IP: epIP, Port: uint16(svcPort),
+			IP: epIP, Port: uint16(svcPort), Weight: 1,
 		}}}
 	checkIPVS(t, fp, epVS)
 
@@ -1302,7 +1302,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	epVS := &netlinktest.ExpectedVirtualServer{
 		VSNum: 2, IP: svcLBIP, Port: uint16(svcPort), Protocol: string(v1.ProtocolTCP),
 		RS: []netlinktest.ExpectedRealServer{{
-			IP: epIP, Port: uint16(svcPort),
+			IP: epIP, Port: uint16(svcPort), Weight: 1,
 		}}}
 	checkIPVS(t, fp, epVS)
 
@@ -1408,13 +1408,77 @@ func TestSchedulerPerService(t *testing.T) {
 				VSNum: 1, IP: s.svcIP, Port: uint16(s.svcPort), Protocol: string(v1.ProtocolTCP),
 				Scheduler: s.expectedScheduler,
 				RS: []netlinktest.ExpectedRealServer{{
-					IP: s.epIP, Port: uint16(s.svcTargetPort),
+					IP: s.epIP, Port: uint16(s.svcTargetPort), Weight: 1,
 				}},
 			}
 
 			checkIPVS(t, fp, epVS)
 		})
 	}
+}
+
+func TestServiceLocalEndpointWeight(t *testing.T) {
+	_, fp := buildFakeProxier()
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcTargetPort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Annotations = map[string]string{ipvsServiceLocalEndpointWeightAnnotation: "1000"}
+			svc.Spec.Type = "ClusterIP"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:       svcPortName.Port,
+				Port:       int32(svcPort),
+				Protocol:   v1.ProtocolTCP,
+				TargetPort: intstr.FromInt(svcTargetPort),
+			}}
+		}),
+	)
+
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{
+					{
+						IP:       "10.180.0.1",
+						Hostname: testHostname,
+					},
+					{
+						IP:       "10.190.0.1",
+						Hostname: "foo-hostname",
+					},
+				},
+				Ports: []v1.EndpointPort{
+					{
+						Name: svcPortName.Port,
+						Port: int32(svcTargetPort),
+					},
+					{
+						Name: svcPortName.Port,
+						Port: int32(svcTargetPort),
+					},
+				},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	epVS := &netlinktest.ExpectedVirtualServer{
+		VSNum: 1, IP: svcIP, Port: uint16(svcPort), Protocol: string(v1.ProtocolTCP),
+		RS: []netlinktest.ExpectedRealServer{
+			{IP: "10.180.0.1", Port: uint16(svcTargetPort), Weight: 1000},
+			{IP: "10.190.0.1", Port: uint16(svcTargetPort), Weight: 1},
+		}}
+
+	checkIPVS(t, fp, epVS)
 }
 
 func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port, nodeport int32, targetPort int) []v1.ServicePort {
@@ -2894,7 +2958,9 @@ func checkIPVS(t *testing.T, fp *Proxier, vs *netlinktest.ExpectedVirtualServer)
 				t.Errorf("Expected %d destinations, got %d destinations", len(vs.RS), len(destinations))
 			}
 			if len(vs.RS) == 1 {
-				if destinations[0].Address.String() != vs.RS[0].IP || destinations[0].Port != vs.RS[0].Port {
+				if destinations[0].Address.String() != vs.RS[0].IP ||
+					destinations[0].Port != vs.RS[0].Port ||
+					destinations[0].Weight != vs.RS[0].Weight {
 					t.Errorf("Unexpected mismatch destinations")
 				}
 			}

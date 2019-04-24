@@ -36,8 +36,9 @@ type ExpectedVirtualServer struct {
 
 // ExpectedRealServer is the expected ipvs RealServer
 type ExpectedRealServer struct {
-	IP   string
-	Port uint16
+	IP     string
+	Port   uint16
+	Weight int
 }
 
 // ExpectedIptablesChain is a map of expected iptables chain and jump rules

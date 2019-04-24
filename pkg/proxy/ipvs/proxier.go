@@ -169,6 +169,7 @@ const sysctlArpIgnore = "net/ipv4/conf/all/arp_ignore"
 const sysctlArpAnnounce = "net/ipv4/conf/all/arp_announce"
 
 const ipvsServiceSchedulerAnnotation = "proxy.ipvs.alpha.k8s.io/scheduler"
+const ipvsServiceLocalEndpointWeightAnnotation = "proxy.ipvs.alpha.k8s.io/local-endpoint-weight"
 
 // Proxier is an ipvs based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
@@ -441,8 +442,10 @@ func NewProxier(ipt utiliptables.Interface,
 // internal struct for string service information
 type serviceInfo struct {
 	*proxy.BaseServiceInfo
-	// optional ipvs scheduler method.
+	// Optional ipvs scheduler method.
 	scheduler *string
+	// Optional ipvs local real server weight.
+	localEndpointWeight *int
 	// The following fields are computed and stored for performance reasons.
 	serviceNameString string
 }
@@ -458,6 +461,14 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 
 	if v, ok := service.Annotations[ipvsServiceSchedulerAnnotation]; ok && v != "" {
 		info.scheduler = &v
+	}
+
+	if v, ok := service.Annotations[ipvsServiceLocalEndpointWeightAnnotation]; ok && v != "" {
+		if w, err := strconv.Atoi(v); err == nil {
+			info.localEndpointWeight = &w
+		} else {
+			klog.Errorf("Could not parse %s annotation: %v", ipvsServiceLocalEndpointWeightAnnotation, err)
+		}
 	}
 
 	return info
@@ -876,7 +887,7 @@ func (proxier *Proxier) syncProxyRules() {
 			activeBindAddrs[serv.Address.String()] = true
 			// ExternalTrafficPolicy only works for NodePort and external LB traffic, does not affect ClusterIP
 			// So we still need clusterIP rules in onlyNodeLocalEndpoints mode.
-			if err := proxier.syncEndpoint(svcName, false, serv); err != nil {
+			if err := proxier.syncEndpoint(svcInfo, svcName, false, serv); err != nil {
 				klog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 			}
 		} else {
@@ -946,7 +957,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if err := proxier.syncService(svcNameString, serv, true); err == nil {
 				activeIPVSServices[serv.String()] = true
 				activeBindAddrs[serv.Address.String()] = true
-				if err := proxier.syncEndpoint(svcName, false, serv); err != nil {
+				if err := proxier.syncEndpoint(svcInfo, svcName, false, serv); err != nil {
 					klog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 				}
 			} else {
@@ -1047,7 +1058,7 @@ func (proxier *Proxier) syncProxyRules() {
 				if err := proxier.syncService(svcNameString, serv, true); err == nil {
 					activeIPVSServices[serv.String()] = true
 					activeBindAddrs[serv.Address.String()] = true
-					if err := proxier.syncEndpoint(svcName, svcInfo.OnlyNodeLocalEndpoints, serv); err != nil {
+					if err := proxier.syncEndpoint(svcInfo, svcName, svcInfo.OnlyNodeLocalEndpoints, serv); err != nil {
 						klog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 					}
 				} else {
@@ -1193,7 +1204,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
 				if err := proxier.syncService(svcNameString, serv, false); err == nil {
 					activeIPVSServices[serv.String()] = true
-					if err := proxier.syncEndpoint(svcName, svcInfo.OnlyNodeLocalEndpoints, serv); err != nil {
+					if err := proxier.syncEndpoint(svcInfo, svcName, svcInfo.OnlyNodeLocalEndpoints, serv); err != nil {
 						klog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 					}
 				} else {
@@ -1577,7 +1588,12 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 	return nil
 }
 
-func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNodeLocalEndpoints bool, vs *utilipvs.VirtualServer) error {
+func (proxier *Proxier) syncEndpoint(
+	info *serviceInfo,
+	svcPortName proxy.ServicePortName,
+	onlyNodeLocalEndpoints bool,
+	vs *utilipvs.VirtualServer,
+) error {
 	appliedVirtualServer, err := proxier.ipvs.GetVirtualServer(vs)
 	if err != nil || appliedVirtualServer == nil {
 		klog.Errorf("Failed to get IPVS service, error: %v", err)
@@ -1588,6 +1604,8 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	curEndpoints := sets.NewString()
 	// newEndpoints represents Endpoints watched from API Server.
 	newEndpoints := sets.NewString()
+	// newEndpointsWeights represents newEndpoints weights.
+	newEndpointsWeights := make(map[string]int)
 
 	curDests, err := proxier.ipvs.GetRealServers(appliedVirtualServer)
 	if err != nil {
@@ -1603,6 +1621,11 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 			continue
 		}
 		newEndpoints.Insert(epInfo.String())
+		weight := 1
+		if epInfo.GetIsLocal() && info.localEndpointWeight != nil {
+			weight = *info.localEndpointWeight
+		}
+		newEndpointsWeights[epInfo.String()] = weight
 	}
 
 	// Create new endpoints
@@ -1621,7 +1644,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		newDest := &utilipvs.RealServer{
 			Address: net.ParseIP(ip),
 			Port:    uint16(portNum),
-			Weight:  1,
+			Weight:  newEndpointsWeights[ep],
 		}
 
 		if curEndpoints.Has(ep) {
