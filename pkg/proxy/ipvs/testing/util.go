@@ -23,13 +23,15 @@ import (
 // ExpectedVirtualServer is the expected ipvs rules with VirtualServer and RealServer
 // VSNum is the expected ipvs virtual server number
 // IP:Port protocol is the expected ipvs vs info
+// Scheduler is a virtual server scheduler method
 // RS is the RealServer of this expected VirtualServer
 type ExpectedVirtualServer struct {
-	VSNum    int
-	IP       string
-	Port     uint16
-	Protocol string
-	RS       []ExpectedRealServer
+	VSNum     int
+	IP        string
+	Port      uint16
+	Protocol  string
+	Scheduler string
+	RS        []ExpectedRealServer
 }
 
 // ExpectedRealServer is the expected ipvs RealServer

@@ -1337,6 +1337,86 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	checkIptables(t, ipt, epIpt)
 }
 
+func TestSchedulerPerService(t *testing.T) {
+	services := []struct {
+		svcName           string
+		svcAnnotations    map[string]string
+		svcIP             string
+		epIP              string
+		svcPort           int
+		svcTargetPort     int
+		svcPortName       proxy.ServicePortName
+		expectedScheduler string
+	}{
+		{
+			svcName:        "svc1",
+			svcAnnotations: map[string]string{ipvsServiceSchedulerAnnotation: "wlc"},
+			svcIP:          "10.20.30.41",
+			epIP:           "10.180.0.1",
+			svcPort:        80,
+			svcTargetPort:  3001,
+			svcPortName: proxy.ServicePortName{
+				NamespacedName: makeNSN("ns1", "svc1"),
+				Port:           "p80",
+			},
+			expectedScheduler: "wlc",
+		},
+		{
+			svcName:       "svc2",
+			svcIP:         "10.30.40.51",
+			epIP:          "10.190.1.2",
+			svcPort:       80,
+			svcTargetPort: 3001,
+			svcPortName: proxy.ServicePortName{
+				NamespacedName: makeNSN("ns1", "svc2"),
+				Port:           "p80",
+			},
+			expectedScheduler: DefaultScheduler,
+		},
+	}
+
+	for _, s := range services {
+		t.Run(s.svcName, func(t *testing.T) {
+			_, fp := buildFakeProxier()
+			makeServiceMap(fp, makeTestService(s.svcPortName.Namespace, s.svcPortName.Name, func(svc *v1.Service) {
+				svc.Annotations = s.svcAnnotations
+				svc.Spec.Type = "ClusterIP"
+				svc.Spec.ClusterIP = s.svcIP
+				svc.Spec.Ports = []v1.ServicePort{{
+					Name:       s.svcPortName.Port,
+					Port:       int32(s.svcPort),
+					Protocol:   v1.ProtocolTCP,
+					TargetPort: intstr.FromInt(s.svcTargetPort),
+				}}
+			}))
+			makeEndpointsMap(fp, makeTestEndpoints(s.svcPortName.Namespace, s.svcPortName.Name, func(ept *v1.Endpoints) {
+				ept.Subsets = []v1.EndpointSubset{{
+					Addresses: []v1.EndpointAddress{{
+						IP:       s.epIP,
+						NodeName: nil,
+					}},
+					Ports: []v1.EndpointPort{{
+						Name: s.svcPortName.Port,
+						Port: int32(s.svcTargetPort),
+					}},
+				}}
+			}))
+
+			fp.syncProxyRules()
+
+			epVS := &netlinktest.ExpectedVirtualServer{
+				VSNum: 1, IP: s.svcIP, Port: uint16(s.svcPort), Protocol: string(v1.ProtocolTCP),
+				Scheduler: s.expectedScheduler,
+				RS: []netlinktest.ExpectedRealServer{{
+					IP: s.epIP, Port: uint16(s.svcTargetPort),
+				}},
+			}
+
+			checkIPVS(t, fp, epVS)
+		})
+	}
+}
+
 func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port, nodeport int32, targetPort int) []v1.ServicePort {
 	svcPort := v1.ServicePort{
 		Name:       name,
@@ -2806,6 +2886,9 @@ func checkIPVS(t *testing.T, fp *Proxier, vs *netlinktest.ExpectedVirtualServer)
 	}
 	for _, svc := range services {
 		if svc.Address.String() == vs.IP && svc.Port == vs.Port && svc.Protocol == vs.Protocol {
+			if vs.Scheduler != "" && svc.Scheduler != vs.Scheduler {
+				t.Errorf("Expected %s scheduler, got %s scheduler", vs.Scheduler, svc.Scheduler)
+			}
 			destinations, _ := fp.ipvs.GetRealServers(svc)
 			if len(destinations) != len(vs.RS) {
 				t.Errorf("Expected %d destinations, got %d destinations", len(vs.RS), len(destinations))

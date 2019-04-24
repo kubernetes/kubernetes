@@ -168,6 +168,8 @@ const sysctlForward = "net/ipv4/ip_forward"
 const sysctlArpIgnore = "net/ipv4/conf/all/arp_ignore"
 const sysctlArpAnnounce = "net/ipv4/conf/all/arp_announce"
 
+const ipvsServiceSchedulerAnnotation = "proxy.ipvs.alpha.k8s.io/scheduler"
+
 // Proxier is an ipvs based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
@@ -439,6 +441,8 @@ func NewProxier(ipt utiliptables.Interface,
 // internal struct for string service information
 type serviceInfo struct {
 	*proxy.BaseServiceInfo
+	// optional ipvs scheduler method.
+	scheduler *string
 	// The following fields are computed and stored for performance reasons.
 	serviceNameString string
 }
@@ -451,6 +455,10 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
 	info.serviceNameString = svcPortName.String()
+
+	if v, ok := service.Annotations[ipvsServiceSchedulerAnnotation]; ok && v != "" {
+		info.scheduler = &v
+	}
 
 	return info
 }
@@ -855,7 +863,7 @@ func (proxier *Proxier) syncProxyRules() {
 			Address:   svcInfo.ClusterIP,
 			Port:      uint16(svcInfo.Port),
 			Protocol:  string(svcInfo.Protocol),
-			Scheduler: proxier.ipvsScheduler,
+			Scheduler: proxier.serviceScheduler(svcInfo),
 		}
 		// Set session affinity flag and timeout for IPVS service
 		if svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP {
@@ -929,7 +937,7 @@ func (proxier *Proxier) syncProxyRules() {
 				Address:   net.ParseIP(externalIP),
 				Port:      uint16(svcInfo.Port),
 				Protocol:  string(svcInfo.Protocol),
-				Scheduler: proxier.ipvsScheduler,
+				Scheduler: proxier.serviceScheduler(svcInfo),
 			}
 			if svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP {
 				serv.Flags |= utilipvs.FlagPersistent
@@ -1030,7 +1038,7 @@ func (proxier *Proxier) syncProxyRules() {
 					Address:   net.ParseIP(ingress.IP),
 					Port:      uint16(svcInfo.Port),
 					Protocol:  string(svcInfo.Protocol),
-					Scheduler: proxier.ipvsScheduler,
+					Scheduler: proxier.serviceScheduler(svcInfo),
 				}
 				if svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP {
 					serv.Flags |= utilipvs.FlagPersistent
@@ -1176,7 +1184,7 @@ func (proxier *Proxier) syncProxyRules() {
 					Address:   nodeIP,
 					Port:      uint16(svcInfo.NodePort),
 					Protocol:  string(svcInfo.Protocol),
-					Scheduler: proxier.ipvsScheduler,
+					Scheduler: proxier.serviceScheduler(svcInfo),
 				}
 				if svcInfo.SessionAffinityType == v1.ServiceAffinityClientIP {
 					serv.Flags |= utilipvs.FlagPersistent
@@ -1737,6 +1745,13 @@ func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, curre
 		}
 	}
 	return legacyAddrs
+}
+
+func (proxier *Proxier) serviceScheduler(svcInfo *serviceInfo) string {
+	if svcInfo.scheduler != nil {
+		return *svcInfo.scheduler
+	}
+	return proxier.ipvsScheduler
 }
 
 // Join all words with spaces, terminate with newline and write to buff.
