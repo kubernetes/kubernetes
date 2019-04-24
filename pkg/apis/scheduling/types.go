@@ -36,8 +36,6 @@ const (
 	SystemNodeCritical    = SystemPriorityClassPrefix + "node-critical"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PriorityClass defines the mapping from a priority class name to the priority
