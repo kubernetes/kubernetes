@@ -33,9 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
-// KubernetesDir is the directory Kubernetes owns for storing various configuration files
-// This semi-constant MUST NOT be modified during runtime. It's a variable solely for use in unit testing.
-var KubernetesDir = "/etc/kubernetes"
 
 const (
 	// ManifestsSubDirName defines directory name to store manifests
@@ -353,6 +350,10 @@ const (
 
 	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
 	KubeadmCertsSecret = "kubeadm-certs"
+
+	// KubernetesDir is the directory Kubernetes owns for storing various configuration files
+	// This constant MUST NOT be modified during runtime. It's a variable solely for use in unit testing.
+	KubernetesDir = "/etc/kubernetes"
 )
 
 var (
