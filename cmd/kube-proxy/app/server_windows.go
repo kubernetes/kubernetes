@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+
+	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
 
 	"k8s.io/api/core/v1"
@@ -63,7 +65,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if cleanupAndExit {
-		return &ProxyServer{CleanupAndExit: cleanupAndExit}, nil
+		return &ProxyServer{}, nil
 	}
 
 	client, eventClient, err := createClients(config.ClientConnection, master)
