@@ -491,6 +491,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 				predicateResultLock.Lock()
 				errs[err.Error()]++
 				predicateResultLock.Unlock()
+				cancel()
 				return
 			}
 			if fits {
