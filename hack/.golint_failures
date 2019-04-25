@@ -4,7 +4,6 @@ cmd/kube-controller-manager/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 pkg/apis/abac/latest
 pkg/apis/admission
-pkg/apis/admissionregistration
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
 pkg/apis/apps
