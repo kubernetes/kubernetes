@@ -30,14 +30,14 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // TODO: it would probably be slightly better to build up the objects
 // in the code and then serialize to yaml.
-var reconcile_addon_controller = `
+var reconcileAddonController = `
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -65,7 +65,7 @@ spec:
 `
 
 // Should update "reconcile" class addon.
-var reconcile_addon_controller_updated = `
+var reconcileAddonControllerUpdated = `
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -93,7 +93,7 @@ spec:
           protocol: TCP
 `
 
-var ensure_exists_addon_service = `
+var ensureExistsAddonService = `
 apiVersion: v1
 kind: Service
 metadata:
@@ -112,7 +112,7 @@ spec:
 `
 
 // Should create but don't update "ensure exist" class addon.
-var ensure_exists_addon_service_updated = `
+var ensureExistsAddonServiceUpdated = `
 apiVersion: v1
 kind: Service
 metadata:
@@ -131,7 +131,7 @@ spec:
     k8s-app: addon-ensure-exists-test
 `
 
-var deprecated_label_addon_service = `
+var deprecatedLabelAddonService = `
 apiVersion: v1
 kind: Service
 metadata:
@@ -150,7 +150,7 @@ spec:
 `
 
 // Should update addon with label "kubernetes.io/cluster-service=true".
-var deprecated_label_addon_service_updated = `
+var deprecatedLabelAddonServiceUpdated = `
 apiVersion: v1
 kind: Service
 metadata:
@@ -170,7 +170,7 @@ spec:
 `
 
 // Should not create addon without valid label.
-var invalid_addon_controller = `
+var invalidAddonController = `
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -214,7 +214,7 @@ var _ = SIGDescribe("Addon update", func() {
 	var sshClient *ssh.Client
 	f := framework.NewDefaultFramework("addon-update-test")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// This test requires:
 		// - SSH master access
 		// ... so the provider check should be identical to the intersection of
@@ -225,17 +225,17 @@ var _ = SIGDescribe("Addon update", func() {
 
 		var err error
 		sshClient, err = getMasterSSHClient()
-		Expect(err).NotTo(HaveOccurred(), "Failed to get the master SSH client.")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to get the master SSH client.")
 	})
 
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		if sshClient != nil {
 			sshClient.Close()
 		}
 	})
 
 	// WARNING: the test is not parallel-friendly!
-	It("should propagate add-on file changes [Slow]", func() {
+	ginkgo.It("should propagate add-on file changes [Slow]", func() {
 		// This test requires:
 		// - SSH
 		// - master access
@@ -244,7 +244,7 @@ var _ = SIGDescribe("Addon update", func() {
 		framework.SkipUnlessProviderIs("gce")
 
 		//these tests are long, so I squeezed several cases in one scenario
-		Expect(sshClient).NotTo(BeNil())
+		gomega.Expect(sshClient).NotTo(gomega.BeNil())
 		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 
 		temporaryRemotePathPrefix := "addon-test-dir"
@@ -262,18 +262,18 @@ var _ = SIGDescribe("Addon update", func() {
 		svcAddonEnsureExistsUpdated := "addon-ensure-exists-service-updated.yaml"
 
 		var remoteFiles []stringPair = []stringPair{
-			{fmt.Sprintf(reconcile_addon_controller, addonNsName, serveHostnameImage), rcAddonReconcile},
-			{fmt.Sprintf(reconcile_addon_controller_updated, addonNsName, serveHostnameImage), rcAddonReconcileUpdated},
-			{fmt.Sprintf(deprecated_label_addon_service, addonNsName), svcAddonDeprecatedLabel},
-			{fmt.Sprintf(deprecated_label_addon_service_updated, addonNsName), svcAddonDeprecatedLabelUpdated},
-			{fmt.Sprintf(ensure_exists_addon_service, addonNsName), svcAddonEnsureExists},
-			{fmt.Sprintf(ensure_exists_addon_service_updated, addonNsName), svcAddonEnsureExistsUpdated},
-			{fmt.Sprintf(invalid_addon_controller, addonNsName, serveHostnameImage), rcInvalid},
+			{fmt.Sprintf(reconcileAddonController, addonNsName, serveHostnameImage), rcAddonReconcile},
+			{fmt.Sprintf(reconcileAddonControllerUpdated, addonNsName, serveHostnameImage), rcAddonReconcileUpdated},
+			{fmt.Sprintf(deprecatedLabelAddonService, addonNsName), svcAddonDeprecatedLabel},
+			{fmt.Sprintf(deprecatedLabelAddonServiceUpdated, addonNsName), svcAddonDeprecatedLabelUpdated},
+			{fmt.Sprintf(ensureExistsAddonService, addonNsName), svcAddonEnsureExists},
+			{fmt.Sprintf(ensureExistsAddonServiceUpdated, addonNsName), svcAddonEnsureExistsUpdated},
+			{fmt.Sprintf(invalidAddonController, addonNsName, serveHostnameImage), rcInvalid},
 		}
 
 		for _, p := range remoteFiles {
 			err := writeRemoteFile(sshClient, p.data, temporaryRemotePath, p.fileName, 0644)
-			Expect(err).NotTo(HaveOccurred(), "Failed to write file %q at remote path %q with ssh client %+v", p.fileName, temporaryRemotePath, sshClient)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to write file %q at remote path %q with ssh client %+v", p.fileName, temporaryRemotePath, sshClient)
 		}
 
 		// directory on kubernetes-master
@@ -282,23 +282,23 @@ var _ = SIGDescribe("Addon update", func() {
 
 		// cleanup from previous tests
 		_, _, _, err := sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix))
-		Expect(err).NotTo(HaveOccurred(), "Failed to remove remote dir %q with ssh client %+v", destinationDirPrefix, sshClient)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to remove remote dir %q with ssh client %+v", destinationDirPrefix, sshClient)
 
 		defer sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix)) // ignore result in cleanup
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo mkdir -p %s", destinationDir))
 
-		By("copy invalid manifests to the destination dir")
+		ginkgo.By("copy invalid manifests to the destination dir")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcInvalid, destinationDir, rcInvalid))
 		// we will verify at the end of the test that the objects weren't created from the invalid manifests
 
-		By("copy new manifests")
+		ginkgo.By("copy new manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcAddonReconcile, destinationDir, rcAddonReconcile))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonDeprecatedLabel, destinationDir, svcAddonDeprecatedLabel))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonEnsureExists, destinationDir, svcAddonEnsureExists))
 		// Delete the "ensure exist class" addon at the end.
 		defer func() {
 			framework.Logf("Cleaning up ensure exist class addon.")
-			Expect(f.ClientSet.CoreV1().Services(addonNsName).Delete("addon-ensure-exists-test", nil)).NotTo(HaveOccurred())
+			gomega.Expect(f.ClientSet.CoreV1().Services(addonNsName).Delete("addon-ensure-exists-test", nil)).NotTo(gomega.HaveOccurred())
 		}()
 
 		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-reconcile-test", true)
@@ -306,7 +306,7 @@ var _ = SIGDescribe("Addon update", func() {
 		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-ensure-exists-test", true)
 
 		// Replace the manifests with new contents.
-		By("update manifests")
+		ginkgo.By("update manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcAddonReconcileUpdated, destinationDir, rcAddonReconcile))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonDeprecatedLabelUpdated, destinationDir, svcAddonDeprecatedLabel))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonEnsureExistsUpdated, destinationDir, svcAddonEnsureExists))
@@ -320,7 +320,7 @@ var _ = SIGDescribe("Addon update", func() {
 		ensureExistSelector := labels.SelectorFromSet(labels.Set(map[string]string{"newLabel": "addon-ensure-exists-test"}))
 		waitForServicewithSelectorInAddonTest(f.ClientSet, addonNsName, false, ensureExistSelector)
 
-		By("remove manifests")
+		ginkgo.By("remove manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, rcAddonReconcile))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, svcAddonDeprecatedLabel))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, svcAddonEnsureExists))
@@ -330,9 +330,9 @@ var _ = SIGDescribe("Addon update", func() {
 		// "Ensure exist class" addon will not be deleted when manifest is removed.
 		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-ensure-exists-test", true)
 
-		By("verify invalid addons weren't created")
+		ginkgo.By("verify invalid addons weren't created")
 		_, err = f.ClientSet.CoreV1().ReplicationControllers(addonNsName).Get("invalid-addon-test", metav1.GetOptions{})
-		Expect(err).To(HaveOccurred())
+		gomega.Expect(err).To(gomega.HaveOccurred())
 
 		// Invalid addon manifests and the "ensure exist class" addon will be deleted by the deferred function.
 	})
@@ -384,8 +384,8 @@ func getMasterSSHClient() (*ssh.Client, error) {
 
 func sshExecAndVerify(client *ssh.Client, cmd string) {
 	_, _, rc, err := sshExec(client, cmd)
-	Expect(err).NotTo(HaveOccurred(), "Failed to execute %q with ssh client %+v", cmd, client)
-	Expect(rc).To(Equal(0), "error return code from executing command on the cluster: %s", cmd)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to execute %q with ssh client %+v", cmd, client)
+	gomega.Expect(rc).To(gomega.Equal(0), "error return code from executing command on the cluster: %s", cmd)
 }
 
 func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {

@@ -32,8 +32,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -53,7 +53,7 @@ const (
 var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	var f *framework.Framework
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// These tests requires SSH to nodes, so the provider check should be identical to there
 		// (the limiting factor is the implementation of util.go's framework.GetSigner(...)).
 
@@ -61,14 +61,14 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 	})
 
-	AfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+	ginkgo.AfterEach(func() {
+		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			// Most of the reboot tests just make sure that addon/system pods are running, so dump
 			// events for the kube-system namespace on failures
 			namespaceName := metav1.NamespaceSystem
-			By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
+			ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
 			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			for _, e := range events.Items {
 				framework.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
@@ -82,38 +82,38 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		//
 		// TODO(cjcullen) reduce this sleep (#19314)
 		if framework.ProviderIs("gke") {
-			By("waiting 5 minutes for all dead tunnels to be dropped")
+			ginkgo.By("waiting 5 minutes for all dead tunnels to be dropped")
 			time.Sleep(5 * time.Minute)
 		}
 	})
 
 	f = framework.NewDefaultFramework("reboot")
 
-	It("each node by ordering clean reboot and ensure they function upon restart", func() {
+	ginkgo.It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is rebooted.
 		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &", nil)
 	})
 
-	It("each node by ordering unclean reboot and ensure they function upon restart", func() {
+	ginkgo.It("each node by ordering unclean reboot and ensure they function upon restart", func() {
 		// unclean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is shutdown.
 		testReboot(f.ClientSet, "nohup sh -c 'echo 1 | sudo tee /proc/sys/kernel/sysrq && sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
-	It("each node by triggering kernel panic and ensure they function upon restart", func() {
+	ginkgo.It("each node by triggering kernel panic and ensure they function upon restart", func() {
 		// kernel panic
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before kernel panic is triggered.
 		testReboot(f.ClientSet, "nohup sh -c 'echo 1 | sudo tee /proc/sys/kernel/sysrq && sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
-	It("each node by switching off the network interface and ensure they function upon switch on", func() {
+	ginkgo.It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
 		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo ip link set eth0 down && sleep 120 && sudo ip link set eth0 up && (sudo dhclient || true)' >/dev/null 2>&1 &", nil)
 	})
 
-	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
+	ginkgo.It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all inbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
@@ -121,7 +121,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		testReboot(f.ClientSet, dropPacketsScript("INPUT", tmpLogPath), catLogHook(tmpLogPath))
 	})
 
-	It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
+	ginkgo.It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all outbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.

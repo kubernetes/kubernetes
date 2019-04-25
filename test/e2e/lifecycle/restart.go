@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 func nodeNames(nodes []v1.Node) []string {
@@ -47,23 +47,23 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 	var numNodes int
 	var systemNamespace string
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// This test requires the ability to restart all nodes, so the provider
 		// check must be identical to that call.
 		framework.SkipUnlessProviderIs("gce", "gke")
 		var err error
 		ps, err = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		numNodes, err = framework.NumberOfRegisteredNodes(f.ClientSet)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		systemNamespace = metav1.NamespaceSystem
 
-		By("ensuring all nodes are ready")
+		ginkgo.By("ensuring all nodes are ready")
 		originalNodes, err = framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		framework.Logf("Got the following nodes before restart: %v", nodeNames(originalNodes))
 
-		By("ensuring all pods are running and ready")
+		ginkgo.By("ensuring all pods are running and ready")
 		allPods := ps.List()
 		pods := framework.FilterNonRestartablePods(allPods)
 
@@ -77,25 +77,25 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		}
 	})
 
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		if ps != nil {
 			ps.Stop()
 		}
 	})
 
-	It("should restart all nodes and ensure all nodes and pods recover", func() {
-		By("restarting all of the nodes")
+	ginkgo.It("should restart all nodes and ensure all nodes and pods recover", func() {
+		ginkgo.By("restarting all of the nodes")
 		err := common.RestartNodes(f.ClientSet, originalNodes)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-		By("ensuring all nodes are ready after the restart")
+		ginkgo.By("ensuring all nodes are ready after the restart")
 		nodesAfter, err := framework.CheckNodesReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		framework.Logf("Got the following nodes after restart: %v", nodeNames(nodesAfter))
 
 		// Make sure that we have the same number of nodes. We're not checking
 		// that the names match because that's implementation specific.
-		By("ensuring the same number of nodes exist after the restart")
+		ginkgo.By("ensuring the same number of nodes exist after the restart")
 		if len(originalNodes) != len(nodesAfter) {
 			framework.Failf("Had %d nodes before nodes were restarted, but now only have %d",
 				len(originalNodes), len(nodesAfter))
@@ -104,10 +104,10 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		// Make sure that we have the same number of pods. We're not checking
 		// that the names match because they are recreated with different names
 		// across node restarts.
-		By("ensuring the same number of pods are running and ready after restart")
+		ginkgo.By("ensuring the same number of pods are running and ready after restart")
 		podCheckStart := time.Now()
 		podNamesAfter, err := framework.WaitForNRestartablePods(ps, len(originalPodNames), framework.RestartPodReadyAgainTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
 		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, podNamesAfter, remaining) {
 			pods := ps.List()
