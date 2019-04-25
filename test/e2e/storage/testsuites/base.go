@@ -18,8 +18,10 @@ package testsuites
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -31,12 +33,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	csilib "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/podlogs"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
+
+var (
+	migratedPlugins *string
+)
+
+func init() {
+	migratedPlugins = flag.String("storage.migratedPlugins", "", "comma seperated list of in-tree plugin names of form 'kubernetes.io/{pluginName}' migrated to CSI")
+}
+
+type opCounts map[string]int64
 
 // TestSuite represents an interface for a set of tests which works with TestDriver
 type TestSuite interface {
@@ -464,4 +479,158 @@ func StartPodLogs(f *framework.Framework) func() {
 	}
 
 	return cancel
+}
+
+func getVolumeOpsFromMetricsForPlugin(ms metrics.ControllerManagerMetrics, pluginName string) opCounts {
+	totOps := opCounts{}
+
+	for method, samples := range ms {
+		switch method {
+		case "storage_operation_status_count":
+			for _, sample := range samples {
+				plugin := string(sample.Metric["volume_plugin"])
+				if pluginName != plugin {
+					continue
+				}
+				opName := string(sample.Metric["operation_name"])
+				if opName == "verify_controller_attached_volume" {
+					// We ignore verify_controller_attached_volume because it does not call into
+					// the plugin. It only watches Node API and updates Actual State of World cache
+					continue
+				}
+				totOps[opName] = totOps[opName] + int64(sample.Value)
+			}
+		}
+	}
+	return totOps
+}
+
+func getVolumeOpsFromKubeletMetricsForPlugin(ms metrics.KubeletMetrics, pluginName string) opCounts {
+	totOps := opCounts{}
+
+	for method, samples := range ms {
+		switch method {
+		case "storage_operation_status_count":
+			for _, sample := range samples {
+				plugin := string(sample.Metric["volume_plugin"])
+				if pluginName != plugin {
+					continue
+				}
+				opName := string(sample.Metric["operation_name"])
+				if opName == "verify_controller_attached_volume" {
+					// We ignore verify_controller_attached_volume because it does not call into
+					// the plugin. It only watches Node API and updates Actual State of World cache
+					continue
+				}
+				totOps[opName] = totOps[opName] + int64(sample.Value)
+			}
+		}
+	}
+	return totOps
+}
+
+func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
+	metricsGrabber, err := metrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
+
+	if err != nil {
+		framework.Failf("Error creating metrics grabber : %v", err)
+	}
+
+	if !metricsGrabber.HasRegisteredMaster() {
+		framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+	}
+
+	controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+	framework.ExpectNoError(err, "Error getting c-m metrics : %v", err)
+	totOps := getVolumeOpsFromMetricsForPlugin(controllerMetrics, pluginName)
+
+	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	framework.ExpectNoError(err, "Error listing nodes: %v", err)
+	for _, node := range nodes.Items {
+		nodeMetrics, err := metricsGrabber.GrabFromKubelet(node.GetName())
+		framework.ExpectNoError(err, "Error getting Kubelet %v metrics: %v", node.GetName(), err)
+		totOps = addOpCounts(totOps, getVolumeOpsFromKubeletMetricsForPlugin(nodeMetrics, pluginName))
+	}
+
+	return totOps
+}
+
+func addOpCounts(o1 opCounts, o2 opCounts) opCounts {
+	totOps := opCounts{}
+	seen := sets.NewString()
+	for op, count := range o1 {
+		seen.Insert(op)
+		totOps[op] = totOps[op] + count
+		totOps[op] = totOps[op] + o2[op]
+	}
+	for op, count := range o2 {
+		if !seen.Has(op) {
+			totOps[op] = totOps[op] + count
+		}
+	}
+	return totOps
+}
+
+func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCounts, opCounts) {
+	if len(pluginName) > 0 {
+		var migratedOps opCounts
+		csiName, err := csilib.GetCSINameFromInTreeName(pluginName)
+		if err != nil {
+			framework.Logf("Could not find CSI Name for in-tree plugin %v", pluginName)
+			migratedOps = opCounts{}
+		} else {
+			csiName = "kubernetes.io/csi:" + csiName
+			migratedOps = getVolumeOpCounts(cs, csiName)
+		}
+		return getVolumeOpCounts(cs, pluginName), migratedOps
+	} else {
+		// Not an in-tree driver
+		framework.Logf("Test running for native CSI Driver, not checking metrics")
+		return opCounts{}, opCounts{}
+	}
+}
+
+func getTotOps(ops opCounts) int64 {
+	var tot int64 = 0
+	for _, count := range ops {
+		tot += count
+	}
+	return tot
+}
+
+func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, oldInTreeOps, oldMigratedOps opCounts) {
+	if len(pluginName) == 0 {
+		// This is a native CSI Driver and we don't check ops
+		return
+	}
+
+	newInTreeOps, newMigratedOps := getMigrationVolumeOpCounts(cs, pluginName)
+
+	if sets.NewString(strings.Split(*migratedPlugins, ",")...).Has(pluginName) {
+		// If this plugin is migrated based on the test flag storage.migratedPlugins
+		for op, count := range newInTreeOps {
+			if count != oldInTreeOps[op] {
+				framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", pluginName, count-oldInTreeOps[op], op)
+			}
+		}
+		totMigrated := getTotOps(newMigratedOps)
+		oldTotMigrated := getTotOps(oldMigratedOps)
+		if totMigrated-oldTotMigrated <= 0 {
+			framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v metrics for migrated plugin", pluginName, totMigrated-oldTotMigrated)
+
+		}
+	} else {
+		// In-tree plugin is not migrated
+		totInTree := getTotOps(newInTreeOps)
+		oldTotInTree := getTotOps(oldInTreeOps)
+		if totInTree == oldTotInTree {
+			framework.Failf("In-tree plugin %v NOT migrated to CSI Driver, however found did not find any operation metrics for in-tree plugin", pluginName)
+		}
+		// We don't check counts for the Migrated version of the driver because if tests are running in parallel a test could be using
+		// the CSI Driver natively and increase the metrics count
+
+		// TODO(dyzz): Add a dimension to OperationGenerator metrics for "migrated"->true/false so that we can disambiguate migrated metrics
+		// and native CSI Driver metrics. This way we can check the counts for migrated version of the driver for stronger negative test case
+		// guarantees (as well as more informative metrics).
+	}
 }
