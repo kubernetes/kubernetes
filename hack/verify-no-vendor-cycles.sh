@@ -18,16 +18,20 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 export GO111MODULE=auto
 
-staging_repos=($(ls "${KUBE_ROOT}/staging/src/k8s.io/"))
+staging_repos=()
+while IFS= read -r repo; do
+  staging_repos+=( "${repo}" )
+done < <(ls "${KUBE_ROOT}/staging/src/k8s.io/")
+
 staging_repos_pattern=$(IFS="|"; echo "${staging_repos[*]}")
 
 failed=false
-for i in $(find vendor/ -type d); do
-  deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ./$i 2> /dev/null || echo "")
+while IFS= read -r -d '' i; do
+  deps=$(go list -f '{{range .Deps}}{{.}}{{"\n"}}{{end}}' ./"$i" 2> /dev/null || echo "")
   deps_on_main=$(echo "${deps}" | grep -v "k8s.io/kubernetes/vendor/" | grep "k8s.io/kubernetes" || echo "")
   if [ -n "${deps_on_main}" ]; then
     echo "Package ${i} has a cyclic dependency on the main repository."
@@ -38,7 +42,7 @@ for i in $(find vendor/ -type d); do
     echo "Package ${i} has a cyclic dependency on staging repository packages: ${deps_on_staging}"
     failed=true
   fi
-done
+done < <(find vendor/ -type d)
 
 if [[ "${failed}" == "true" ]]; then
   exit 1
