@@ -90,11 +90,13 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
 	return nil
 }
 
+// IsStaticPod returns true if the pod is a static pod.
 func IsStaticPod(pod *v1.Pod) bool {
 	source, err := kubetypes.GetPodSource(pod)
 	return err == nil && source != kubetypes.ApiserverSource
 }
 
+// IsMirrorPod returns true if the pod is a mirror pod.
 func IsMirrorPod(pod *v1.Pod) bool {
 	_, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return ok
