@@ -34,9 +34,9 @@ go_library(
         "azure_wrap.go",
         "azure_zones.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure",
+    importpath = "k8s.io/legacy-cloud-providers/azure",
     deps = [
-        "//pkg/cloudprovider/providers/azure/auth:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -58,6 +58,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/errors:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage:go_default_library",
@@ -95,13 +96,13 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/cloudprovider/providers/azure/auth:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage:go_default_library",
@@ -122,7 +123,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/cloudprovider/providers/azure/auth:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -32,8 +32,8 @@ import (
 	"k8s.io/klog"
 	"sigs.k8s.io/yaml"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/legacy-cloud-providers/azure/auth"
 )
 
 var flagConfigFile = pflag.String("azure-container-registry-config", "",

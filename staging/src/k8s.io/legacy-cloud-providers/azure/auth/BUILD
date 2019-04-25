@@ -3,7 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["azure_auth.go"],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/auth",
+    importpath = "k8s.io/legacy-cloud-providers/azure/auth",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
