@@ -226,7 +226,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 
 		err := utilerrors.NewAggregate(errs)
-		Expect(err).NotTo(HaveOccurred(), "while cleaning up after test")
+		framework.ExpectNoError(err, "while cleaning up after test")
 	}
 
 	// The CSIDriverRegistry feature gate is needed for this test in Kubernetes 1.12.
@@ -349,7 +349,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	})
 
 	Context("CSI volume limit information using mock driver", func() {
-		It("should report attach limit when limit is bigger than 0", func() {
+		It("should report attach limit when limit is bigger than 0 [Slow]", func() {
 			// define volume limit to be 2 for this test
 
 			var err error
@@ -360,7 +360,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			attachKey := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(m.provisioner))
 
 			nodeAttachLimit, err := checkNodeForLimits(nodeName, attachKey, m.cs)
-			Expect(err).NotTo(HaveOccurred(), "while fetching node %v", err)
+			framework.ExpectNoError(err, "while fetching node %v", err)
 
 			Expect(nodeAttachLimit).To(Equal(2))
 
@@ -379,7 +379,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			_, _, pod3 := createPod()
 			Expect(pod3).NotTo(BeNil(), "while creating third pod")
 			err = waitForMaxVolumeCondition(pod3, m.cs)
-			Expect(err).NotTo(HaveOccurred(), "while waiting for max volume condition on pod : %+v", pod3)
+			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod3)
 		})
 	})
 
@@ -440,7 +440,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
 				pvc, err = expandPVCSize(pvc, newSize, m.cs)
-				Expect(err).NotTo(HaveOccurred(), "While updating pvc for more size")
+				framework.ExpectNoError(err, "While updating pvc for more size")
 				Expect(pvc).NotTo(BeNil())
 
 				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
@@ -455,12 +455,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				By("Waiting for persistent volume resize to finish")
 				err = waitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
-				Expect(err).NotTo(HaveOccurred(), "While waiting for CSI PV resize to finish")
+				framework.ExpectNoError(err, "While waiting for CSI PV resize to finish")
 
 				checkPVCSize := func() {
 					By("Waiting for PVC resize to finish")
 					pvc, err = waitForFSResize(pvc, m.cs)
-					Expect(err).NotTo(HaveOccurred(), "while waiting for PVC resize to finish")
+					framework.ExpectNoError(err, "while waiting for PVC resize to finish")
 
 					pvcConditions := pvc.Status.Conditions
 					Expect(len(pvcConditions)).To(Equal(0), "pvc should not have conditions")
@@ -472,7 +472,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				} else {
 					By("Checking for conditions on pvc")
 					pvc, err = m.cs.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
-					Expect(err).NotTo(HaveOccurred(), "While fetching pvc after controller resize")
+					framework.ExpectNoError(err, "While fetching pvc after controller resize")
 
 					inProgressConditions := pvc.Status.Conditions
 					if len(inProgressConditions) > 0 {
@@ -481,12 +481,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 					By("Deleting the previously created pod")
 					err = framework.DeletePodWithWait(f, m.cs, pod)
-					Expect(err).NotTo(HaveOccurred(), "while deleting pod for resizing")
+					framework.ExpectNoError(err, "while deleting pod for resizing")
 
 					By("Creating a new pod with same volume")
 					pod2, err := createPodWithPVC(pvc)
 					Expect(pod2).NotTo(BeNil(), "while creating pod for csi resizing")
-					Expect(err).NotTo(HaveOccurred(), "while recreating pod for resizing")
+					framework.ExpectNoError(err, "while recreating pod for resizing")
 
 					checkPVCSize()
 				}
@@ -531,7 +531,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				By("Expanding current pvc")
 				newSize := resource.MustParse("6Gi")
 				pvc, err = expandPVCSize(pvc, newSize, m.cs)
-				Expect(err).NotTo(HaveOccurred(), "While updating pvc for more size")
+				framework.ExpectNoError(err, "While updating pvc for more size")
 				Expect(pvc).NotTo(BeNil())
 
 				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
@@ -541,11 +541,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				By("Waiting for persistent volume resize to finish")
 				err = waitForControllerVolumeResize(pvc, m.cs, csiResizeWaitPeriod)
-				Expect(err).NotTo(HaveOccurred(), "While waiting for PV resize to finish")
+				framework.ExpectNoError(err, "While waiting for PV resize to finish")
 
 				By("Waiting for PVC resize to finish")
 				pvc, err = waitForFSResize(pvc, m.cs)
-				Expect(err).NotTo(HaveOccurred(), "while waiting for PVC to finish")
+				framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 				pvcConditions := pvc.Status.Conditions
 				Expect(len(pvcConditions)).To(Equal(0), "pvc should not have conditions")
@@ -613,7 +613,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node f
 
 	pvcClaims := []*v1.PersistentVolumeClaim{claim}
 	_, err = framework.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
+	framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

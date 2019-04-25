@@ -119,14 +119,14 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		for _, cluster := range insecureConfig.Clusters {
 			clusterCABytes = cluster.CertificateAuthorityData
 		}
-		clusterCA, err := parsePEMCert(clusterCABytes)
+		clusterCAs, err := parsePEMCerts(clusterCABytes)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to parse cluster CA from the %s configmap", bootstrapapi.ConfigMapClusterInfo)
 
 		}
 
 		// Validate the cluster CA public key against the pinned set
-		err = pubKeyPins.Check(clusterCA)
+		err = pubKeyPins.CheckAny(clusterCAs)
 		if err != nil {
 			return nil, errors.Wrapf(err, "cluster CA found in %s configmap is invalid", bootstrapapi.ConfigMapClusterInfo)
 		}
@@ -226,14 +226,27 @@ func fetchKubeConfigWithTimeout(apiEndpoint string, discoveryTimeout time.Durati
 	}
 }
 
-// parsePEMCert decodes a PEM-formatted certificate and returns it as an x509.Certificate
-func parsePEMCert(certData []byte) (*x509.Certificate, error) {
-	pemBlock, trailingData := pem.Decode(certData)
-	if pemBlock == nil {
-		return nil, errors.New("invalid PEM data")
+// parsePEMCerts decodes PEM-formatted certificates into a slice of x509.Certificates
+func parsePEMCerts(certData []byte) ([]*x509.Certificate, error) {
+	var certificates []*x509.Certificate
+	var pemBlock *pem.Block
+
+	for {
+		pemBlock, certData = pem.Decode(certData)
+		if pemBlock == nil {
+			return nil, errors.New("invalid PEM data")
+		}
+
+		cert, err := x509.ParseCertificate(pemBlock.Bytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to parse certificate")
+		}
+		certificates = append(certificates, cert)
+
+		if len(certData) == 0 {
+			break
+		}
 	}
-	if len(trailingData) != 0 {
-		return nil, errors.New("trailing data after first PEM block")
-	}
-	return x509.ParseCertificate(pemBlock.Bytes)
+
+	return certificates, nil
 }

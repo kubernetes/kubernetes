@@ -29,13 +29,13 @@ import (
 	"net/http"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -72,9 +72,9 @@ func main() {
 		klog.Fatalf("Failed to make client: %v", err)
 	}
 
-	var nodes *api.NodeList
+	var nodes *corev1.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = client.Core().Nodes().List(metav1.ListOptions{})
+		nodes, err = client.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err == nil {
 			break
 		}
@@ -96,18 +96,18 @@ func main() {
 	queries := *queriesAverage * len(nodes.Items) * *podsPerNode
 
 	// Create a uniquely named namespace.
-	got, err := client.Core().Namespaces().Create(&api.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "serve-hostnames-"}})
+	got, err := client.CoreV1().Namespaces().Create(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "serve-hostnames-"}})
 	if err != nil {
 		klog.Fatalf("Failed to create namespace: %v", err)
 	}
 	ns := got.Name
 	defer func(ns string) {
-		if err := client.Core().Namespaces().Delete(ns, nil); err != nil {
+		if err := client.CoreV1().Namespaces().Delete(ns, nil); err != nil {
 			klog.Warningf("Failed to delete namespace %s: %v", ns, err)
 		} else {
 			// wait until the namespace disappears
 			for i := 0; i < int(namespaceDeleteTimeout/time.Second); i++ {
-				if _, err := client.Core().Namespaces().Get(ns, metav1.GetOptions{}); err != nil {
+				if _, err := client.CoreV1().Namespaces().Get(ns, metav1.GetOptions{}); err != nil {
 					if errors.IsNotFound(err) {
 						return
 					}
@@ -121,18 +121,18 @@ func main() {
 	// Create a service for these pods.
 	klog.Infof("Creating service %s/serve-hostnames", ns)
 	// Make several attempts to create a service.
-	var svc *api.Service
+	var svc *corev1.Service
 	for start := time.Now(); time.Since(start) < serviceCreateTimeout; time.Sleep(2 * time.Second) {
 		t := time.Now()
-		svc, err = client.Core().Services(ns).Create(&api.Service{
+		svc, err = client.CoreV1().Services(ns).Create(&corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "serve-hostnames",
 				Labels: map[string]string{
 					"name": "serve-hostname",
 				},
 			},
-			Spec: api.ServiceSpec{
-				Ports: []api.ServicePort{{
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{
 					Protocol:   "TCP",
 					Port:       9376,
 					TargetPort: intstr.FromInt(9376),
@@ -157,7 +157,7 @@ func main() {
 		klog.Infof("Cleaning up service %s/serve-hostnames", ns)
 		// Make several attempts to delete the service.
 		for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-			if err := client.Core().Services(ns).Delete(svc.Name, nil); err == nil {
+			if err := client.CoreV1().Services(ns).Delete(svc.Name, nil); err == nil {
 				return
 			}
 			klog.Warningf("After %v unable to delete service %s/%s: %v", time.Since(start), ns, svc.Name, err)
@@ -174,19 +174,19 @@ func main() {
 			for start := time.Now(); time.Since(start) < podCreateTimeout; time.Sleep(2 * time.Second) {
 				klog.Infof("Creating pod %s/%s on node %s", ns, podName, node.Name)
 				t := time.Now()
-				_, err = client.Core().Pods(ns).Create(&api.Pod{
+				_, err = client.CoreV1().Pods(ns).Create(&corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 						Labels: map[string]string{
 							"name": "serve-hostname",
 						},
 					},
-					Spec: api.PodSpec{
-						Containers: []api.Container{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
 							{
 								Name:  "serve-hostname",
 								Image: framework.ServeHostnameImage,
-								Ports: []api.ContainerPort{{ContainerPort: 9376}},
+								Ports: []corev1.ContainerPort{{ContainerPort: 9376}},
 							},
 						},
 						NodeName: node.Name,
@@ -210,7 +210,7 @@ func main() {
 		// Make several attempts to delete the pods.
 		for _, podName := range podNames {
 			for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-				if err = client.Core().Pods(ns).Delete(podName, nil); err == nil {
+				if err = client.CoreV1().Pods(ns).Delete(podName, nil); err == nil {
 					break
 				}
 				klog.Warningf("After %v failed to delete pod %s/%s: %v", time.Since(start), ns, podName, err)
@@ -220,18 +220,18 @@ func main() {
 
 	klog.Info("Waiting for the serve-hostname pods to be ready")
 	for _, podName := range podNames {
-		var pod *api.Pod
+		var pod *corev1.Pod
 		for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
-			pod, err = client.Core().Pods(ns).Get(podName, metav1.GetOptions{})
+			pod, err = client.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 			if err != nil {
 				klog.Warningf("Get pod %s/%s failed, ignoring for %v: %v", ns, podName, err, podStartTimeout)
 				continue
 			}
-			if pod.Status.Phase == api.PodRunning {
+			if pod.Status.Phase == corev1.PodRunning {
 				break
 			}
 		}
-		if pod.Status.Phase != api.PodRunning {
+		if pod.Status.Phase != corev1.PodRunning {
 			klog.Warningf("Gave up waiting on pod %s/%s to be running (saw %v)", ns, podName, pod.Status.Phase)
 		} else {
 			klog.Infof("%s/%s is running", ns, podName)

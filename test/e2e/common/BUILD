@@ -77,6 +77,8 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/replicaset:go_default_library",
+        "//test/e2e/framework/volume:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

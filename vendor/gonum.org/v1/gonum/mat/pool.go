@@ -186,7 +186,7 @@ func getWorkspaceVec(n int, clear bool) *VecDense {
 	if clear {
 		zero(v.mat.Data)
 	}
-	v.n = n
+	v.mat.N = n
 	return v
 }
 

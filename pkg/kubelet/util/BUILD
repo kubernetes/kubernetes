@@ -79,6 +79,7 @@ filegroup(
         "//pkg/kubelet/util/cache:all-srcs",
         "//pkg/kubelet/util/format:all-srcs",
         "//pkg/kubelet/util/ioutils:all-srcs",
+        "//pkg/kubelet/util/logreduction:all-srcs",
         "//pkg/kubelet/util/manager:all-srcs",
         "//pkg/kubelet/util/pluginwatcher:all-srcs",
         "//pkg/kubelet/util/queue:all-srcs",

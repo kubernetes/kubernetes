@@ -38,7 +38,7 @@ import (
 	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -301,7 +301,7 @@ func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("Failed creating cert: %v", err)
 	}
 	if err := pem.Encode(&keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
-		return nil, nil, fmt.Errorf("Failed creating keay: %v", err)
+		return nil, nil, fmt.Errorf("Failed creating key: %v", err)
 	}
 	return certOut.Bytes(), keyOut.Bytes(), nil
 }
@@ -871,7 +871,7 @@ func generateBacksideHTTPSIngressSpec(ns string) *extensions.Ingress {
 			Namespace: ns,
 		},
 		Spec: extensions.IngressSpec{
-			// Note kubemci requres a default backend.
+			// Note kubemci requires a default backend.
 			Backend: &extensions.IngressBackend{
 				ServiceName: "echoheaders-https",
 				ServicePort: intstr.IntOrString{

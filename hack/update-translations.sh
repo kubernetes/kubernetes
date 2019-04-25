@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 KUBECTL_FILES="pkg/kubectl/cmd/*.go pkg/kubectl/cmd/*/*.go"
@@ -61,7 +61,7 @@ fi
 
 if [[ "${generate_pot}" == "true" ]]; then
   echo "Extracting strings to POT"
-  go-xgettext -k=i18n.T ${KUBECTL_FILES} > tmp.pot
+  go-xgettext -k=i18n.T "${KUBECTL_FILES}" > tmp.pot
   perl -pi -e 's/CHARSET/UTF-8/' tmp.pot
   perl -pi -e 's/\\\(/\\\\\(/g' tmp.pot
   perl -pi -e 's/\\\)/\\\\\)/g' tmp.pot
@@ -78,10 +78,10 @@ fi
 if [[ "${generate_mo}" == "true" ]]; then
   echo "Generating .po and .mo files"
   for x in translations/*/*/*/*.po; do
-    msgcat -s ${x} > tmp.po
-    mv tmp.po ${x}
+    msgcat -s "${x}" > tmp.po
+    mv tmp.po "${x}"
     echo "generating .mo file for: ${x}"
-    msgfmt ${x} -o "$(dirname ${x})/$(basename ${x} .po).mo"
+    msgfmt "${x}" -o "$(dirname "${x}")/$(basename "${x}" .po).mo"
   done
 fi
 

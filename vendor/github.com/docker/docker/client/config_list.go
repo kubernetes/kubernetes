@@ -27,12 +27,12 @@ func (cli *Client) ConfigList(ctx context.Context, options types.ConfigListOptio
 	}
 
 	resp, err := cli.get(ctx, "/configs", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return nil, err
 	}
 
 	var configs []swarm.Config
 	err = json.NewDecoder(resp.body).Decode(&configs)
-	ensureReaderClosed(resp)
 	return configs, err
 }

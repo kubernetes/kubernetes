@@ -19,11 +19,31 @@ go_library(
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/internal/spec_iterator:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/internal/writer:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters/stenographer:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/github.com/hpcloud/tail:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/github.com/hpcloud/tail:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/github.com/hpcloud/tail:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/hpcloud/tail:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/github.com/hpcloud/tail:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/github.com/hpcloud/tail:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/github.com/hpcloud/tail:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],

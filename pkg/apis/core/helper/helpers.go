@@ -276,10 +276,12 @@ var standardFinalizers = sets.NewString(
 	metav1.FinalizerDeleteDependents,
 )
 
+// IsStandardFinalizerName checks if the input string is a standard finalizer name
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
 }
 
+// LoadBalancerStatusEqual checks if the status of the load balancer is equal to the target status
 // TODO: make method on LoadBalancerStatus?
 func LoadBalancerStatusEqual(l, r *core.LoadBalancerStatus) bool {
 	return ingressSliceEqual(l.Ingress, r.Ingress)
@@ -324,7 +326,7 @@ func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {
 	return strings.Join(modesStr, ",")
 }
 
-// GetAccessModesAsString returns an array of AccessModes from a string created by GetAccessModesAsString
+// GetAccessModesFromString returns an array of AccessModes from a string created by GetAccessModesAsString
 func GetAccessModesFromString(modes string) []core.PersistentVolumeAccessMode {
 	strmodes := strings.Split(modes, ",")
 	accessModes := []core.PersistentVolumeAccessMode{}

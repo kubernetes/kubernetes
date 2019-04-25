@@ -32,6 +32,12 @@ run_clusterroles_tests() {
   # test `kubectl create clusterrole`
   kubectl create "${kube_flags[@]}" clusterrole pod-admin --verb=* --resource=pods
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
+  output_message=$(kubectl delete clusterrole pod-admin -n test 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'warning: deleting cluster-scoped resources'
+  kube::test::if_has_string "${output_message}" 'clusterrole.rbac.authorization.k8s.io "pod-admin" deleted'
+
+  kubectl create "${kube_flags[@]}" clusterrole pod-admin --verb=* --resource=pods
+  kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':'
   kubectl create "${kube_flags[@]}" clusterrole resource-reader --verb=get,list --resource=pods,deployments.apps

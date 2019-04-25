@@ -123,7 +123,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 
 		By("creating a StorageClass " + class.Name)
 		class, err := cs.StorageV1().StorageClasses().Create(class)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)
 			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(class.Name, nil))
@@ -131,7 +131,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 
 		By("creating a claim")
 		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			// typically this claim has already been deleted
@@ -141,20 +141,20 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			}
 		}()
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("checking the claim")
 		// Get new copy of the claim
 		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		// Get the bound PV
 		pv, err := cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("creating a SnapshotClass")
 		vsc, err = dc.Resource(snapshotClassGVR).Create(vsc, metav1.CreateOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting SnapshotClass %s", vsc.GetName())
 			framework.ExpectNoError(dc.Resource(snapshotClassGVR).Delete(vsc.GetName(), nil))
@@ -164,7 +164,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		snapshot := getSnapshot(pvc.Name, pvc.Namespace, vsc.GetName())
 
 		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Create(snapshot, metav1.CreateOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 			// typically this snapshot has already been deleted
@@ -174,18 +174,18 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			}
 		}()
 		err = WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("checking the snapshot")
 		// Get new copy of the snapshot
 		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Get(snapshot.GetName(), metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		// Get the bound snapshotContent
 		snapshotSpec := snapshot.Object["spec"].(map[string]interface{})
 		snapshotContentName := snapshotSpec["snapshotContentName"].(string)
 		snapshotContent, err := dc.Resource(snapshotContentGVR).Get(snapshotContentName, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		snapshotContentSpec := snapshotContent.Object["spec"].(map[string]interface{})
 		volumeSnapshotRef := snapshotContentSpec["volumeSnapshotRef"].(map[string]interface{})

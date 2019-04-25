@@ -687,7 +687,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 						}
 					}
 				}
-				return false, nil, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
+				return false, nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
 			}
 
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
@@ -696,7 +696,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 			}
 
 			if pv == nil {
-				return false, nil, fmt.Errorf("PersistentVolume not found: %q", pvName)
+				return false, nil, fmt.Errorf("PersistentVolume was not found: %q", pvName)
 			}
 
 			for k, v := range pv.ObjectMeta.Labels {
@@ -1095,6 +1095,9 @@ func PodFitsHostPorts(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulerno
 
 // search two arrays and return true if they have at least one common element; return false otherwise
 func haveOverlap(a1, a2 []string) bool {
+	if len(a1) > len(a2) {
+		a1, a2 = a2, a1
+	}
 	m := map[string]bool{}
 
 	for _, val := range a1 {
@@ -1295,11 +1298,11 @@ func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.P
 
 	topologyMaps := newTopologyPairsMaps()
 	for _, term := range GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
 		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 		if err != nil {
 			return nil, err
 		}
+		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
 		if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
 			if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 				pair := topologyPair{key: term.TopologyKey, value: topologyValue}

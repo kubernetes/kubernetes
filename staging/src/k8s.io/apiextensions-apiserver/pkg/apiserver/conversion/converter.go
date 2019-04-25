@@ -19,6 +19,7 @@ package conversion
 import (
 	"fmt"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
+	typedscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // CRConverterFactory is the factory for all CR converters.
@@ -77,7 +79,20 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensions.CustomResourceDefin
 	default:
 		return nil, nil, fmt.Errorf("unknown conversion strategy %q for CRD %s", crd.Spec.Conversion.Strategy, crd.Name)
 	}
+
+	// Determine whether we should expect to be asked to "convert" autoscaling/v1 Scale types
+	convertScale := false
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
+		convertScale = crd.Spec.Subresources != nil && crd.Spec.Subresources.Scale != nil
+		for _, version := range crd.Spec.Versions {
+			if version.Subresources != nil && version.Subresources.Scale != nil {
+				convertScale = true
+			}
+		}
+	}
+
 	unsafe = &crConverter{
+		convertScale:  convertScale,
 		validVersions: validVersions,
 		clusterScoped: crd.Spec.Scope == apiextensions.ClusterScoped,
 		converter:     converter,
@@ -96,6 +111,7 @@ type crConverterInterface interface {
 // crConverter extends the delegate converter with generic CR conversion behaviour. The delegate will implement the
 // user defined conversion strategy given in the CustomResourceDefinition.
 type crConverter struct {
+	convertScale  bool
 	converter     crConverterInterface
 	validVersions map[schema.GroupVersion]bool
 	clusterScoped bool
@@ -114,14 +130,23 @@ func (c *crConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, valu
 }
 
 func (c *crConverter) Convert(in, out, context interface{}) error {
+	// Special-case typed scale conversion if this custom resource supports a scale endpoint
+	if c.convertScale {
+		_, isInScale := in.(*autoscalingv1.Scale)
+		_, isOutScale := out.(*autoscalingv1.Scale)
+		if isInScale || isOutScale {
+			return typedscheme.Scheme.Convert(in, out, context)
+		}
+	}
+
 	unstructIn, ok := in.(*unstructured.Unstructured)
 	if !ok {
-		return fmt.Errorf("input type %T in not valid for unstructured conversion", in)
+		return fmt.Errorf("input type %T in not valid for unstructured conversion to %T", in, out)
 	}
 
 	unstructOut, ok := out.(*unstructured.Unstructured)
 	if !ok {
-		return fmt.Errorf("output type %T in not valid for unstructured conversion", out)
+		return fmt.Errorf("output type %T in not valid for unstructured conversion from %T", out, in)
 	}
 
 	outGVK := unstructOut.GroupVersionKind()

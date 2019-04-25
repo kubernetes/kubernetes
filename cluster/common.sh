@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
+KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 
 DEFAULT_KUBECONFIG="${HOME:-.}/.kube/config"
 
@@ -376,7 +376,8 @@ function generate-etcd-cert() {
                 "usages": [
                     "signing",
                     "key encipherment",
-                    "server auth"
+                    "server auth",
+                    "client auth"
                 ]
             },
             "client": {

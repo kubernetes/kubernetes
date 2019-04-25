@@ -39,29 +39,30 @@ ACI_DIR=${STAGING_DIR}/gci-mounter
 CWD=${PWD}
 
 # Cleanup the temporary directories
-function cleanup {
-    rm -rf ${DOWNLOAD_DIR}
-    rm -rf ${STAGING_DIR}
-    cd ${CWD}
+cleanup() {
+    rm -rf "${DOWNLOAD_DIR}"
+    rm -rf "${STAGING_DIR}"
+    cd "${CWD}"
 }
 
 # Delete temporary directories on exit
 trap cleanup EXIT
 
-mkdir ${ACI_DIR}
+mkdir "${ACI_DIR}"
 
 # Convert docker image to aci and stage it
 echo "Downloading docker2aci ${DOCKER2ACI_VERSION}"
-wget "https://github.com/appc/docker2aci/releases/download/${DOCKER2ACI_VERSION}/docker2aci-${DOCKER2ACI_VERSION}.tar.gz" &> /dev/null
+wget "https://github.com/appc/docker2aci/releases/download/${DOCKER2ACI_VERSION}/docker2aci-${DOCKER2ACI_VERSION}.tar.gz" >/dev/null 2>&1
 echo "Extracting docker2aci ${DOCKER2ACI_VERSION}"
 tar xzf docker2aci-${DOCKER2ACI_VERSION}.tar.gz
-ACI_IMAGE=$(${DOWNLOAD_DIR}/docker2aci-${DOCKER2ACI_VERSION}/docker2aci ${DOCKER_IMAGE} 2>/dev/null | tail -n 1)
-cp ${ACI_IMAGE} ${ACI_DIR}/${MOUNTER_ACI_IMAGE}
+ACI_IMAGE=$("${DOWNLOAD_DIR}/docker2aci-${DOCKER2ACI_VERSION}/docker2aci" "${DOCKER_IMAGE}" 2>/dev/null | tail -n 1)
+cp "${ACI_IMAGE}" "${ACI_DIR}/${MOUNTER_ACI_IMAGE}"
 
 # Upload the contents to gcs
 echo "Uploading gci mounter ACI in ${ACI_DIR} to ${MOUNTER_GCS_DIR}"
-gsutil cp ${ACI_DIR}/${MOUNTER_ACI_IMAGE} ${MOUNTER_GCS_DIR}
+gsutil cp "${ACI_DIR}/${MOUNTER_ACI_IMAGE}" "${MOUNTER_GCS_DIR}"
 
 echo "Upload completed"
 echo "Updated gci-mounter ACI version and SHA1 in cluster/gce/gci/configure.sh"
-echo "${MOUNTER_ACI_IMAGE} hash: $(sha1sum ${ACI_DIR}/${MOUNTER_ACI_IMAGE})"
+ACI_HASH=$(sha1sum "${ACI_DIR}/${MOUNTER_ACI_IMAGE}")
+echo "${MOUNTER_ACI_IMAGE} hash: ${ACI_HASH}"

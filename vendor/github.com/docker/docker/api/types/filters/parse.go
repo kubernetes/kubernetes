@@ -323,6 +323,22 @@ func (args Args) WalkValues(field string, op func(value string) error) error {
 	return nil
 }
 
+// Clone returns a copy of args.
+func (args Args) Clone() (newArgs Args) {
+	newArgs.fields = make(map[string]map[string]bool, len(args.fields))
+	for k, m := range args.fields {
+		var mm map[string]bool
+		if m != nil {
+			mm = make(map[string]bool, len(m))
+			for kk, v := range m {
+				mm[kk] = v
+			}
+		}
+		newArgs.fields[k] = mm
+	}
+	return newArgs
+}
+
 func deprecatedArgs(d map[string][]string) map[string]map[string]bool {
 	m := map[string]map[string]bool{}
 	for k, v := range d {

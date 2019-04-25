@@ -59,21 +59,6 @@ type kubeConfigSpec struct {
 	ClientCertAuth *clientCertAuth
 }
 
-// CreateInitKubeConfigFiles will create and write to disk all kubeconfig files necessary in the kubeadm init phase
-// to establish the control plane, including also the admin kubeconfig file.
-// If kubeconfig files already exists, they are used only if evaluated equal; otherwise an error is returned.
-func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	klog.V(1).Infoln("creating all kubeconfig files")
-	return createKubeConfigFiles(
-		outDir,
-		cfg,
-		kubeadmconstants.AdminKubeConfigFileName,
-		kubeadmconstants.KubeletKubeConfigFileName,
-		kubeadmconstants.ControllerManagerKubeConfigFileName,
-		kubeadmconstants.SchedulerKubeConfigFileName,
-	)
-}
-
 // CreateJoinControlPlaneKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm
 // join --control-plane workflow, plus the admin kubeconfig file used by the administrator and kubeadm itself; the
 // kubelet.conf file must not be created because it will be created and signed by the kubelet TLS bootstrap process.

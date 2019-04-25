@@ -142,11 +142,8 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, fmt.Errorf("%s does not support block volume provisioning", a.plugin.GetPluginName())
 	}
 
-	var sku, resourceGroup, location, account string
+	var sku, resourceGroup, location, account, shareName string
 
-	// File share name has a length limit of 63, and it cannot contain two consecutive '-'s.
-	name := util.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
-	name = strings.Replace(name, "--", "-", -1)
 	capacity := a.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestGiB := int(volumehelpers.RoundUpToGiB(capacity))
 	secretNamespace := a.options.PVC.Namespace
@@ -164,6 +161,8 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			secretNamespace = v
 		case "resourcegroup":
 			resourceGroup = v
+		case "sharename":
+			shareName = v
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, a.plugin.GetPluginName())
 		}
@@ -173,12 +172,18 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Azure file")
 	}
 
+	if shareName == "" {
+		// File share name has a length limit of 63, and it cannot contain two consecutive '-'s.
+		name := util.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
+		shareName = strings.Replace(name, "--", "-", -1)
+	}
+
 	// when use azure file premium, account kind should be specified as FileStorage
 	accountKind := string(storage.StorageV2)
 	if strings.HasPrefix(strings.ToLower(sku), "premium") {
 		accountKind = string(storage.FileStorage)
 	}
-	account, key, err := a.azureProvider.CreateFileShare(name, account, sku, accountKind, resourceGroup, location, requestGiB)
+	account, key, err := a.azureProvider.CreateFileShare(shareName, account, sku, accountKind, resourceGroup, location, requestGiB)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +211,7 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				AzureFile: &v1.AzureFilePersistentVolumeSource{
 					SecretName:      secretName,
-					ShareName:       name,
+					ShareName:       shareName,
 					SecretNamespace: &secretNamespace,
 				},
 			},

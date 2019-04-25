@@ -308,8 +308,8 @@ func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
 	return &detacher, nil
 }
 
-func (plugin *TestPlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *TestPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func (plugin *TestPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {

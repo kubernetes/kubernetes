@@ -132,6 +132,36 @@ const (
 	SECURITY_NT_NON_UNIQUE_RID          = 0x15
 )
 
+// Predefined domain-relative RIDs for local groups.
+// See https://msdn.microsoft.com/en-us/library/windows/desktop/aa379649(v=vs.85).aspx
+const (
+	DOMAIN_ALIAS_RID_ADMINS                         = 0x220
+	DOMAIN_ALIAS_RID_USERS                          = 0x221
+	DOMAIN_ALIAS_RID_GUESTS                         = 0x222
+	DOMAIN_ALIAS_RID_POWER_USERS                    = 0x223
+	DOMAIN_ALIAS_RID_ACCOUNT_OPS                    = 0x224
+	DOMAIN_ALIAS_RID_SYSTEM_OPS                     = 0x225
+	DOMAIN_ALIAS_RID_PRINT_OPS                      = 0x226
+	DOMAIN_ALIAS_RID_BACKUP_OPS                     = 0x227
+	DOMAIN_ALIAS_RID_REPLICATOR                     = 0x228
+	DOMAIN_ALIAS_RID_RAS_SERVERS                    = 0x229
+	DOMAIN_ALIAS_RID_PREW2KCOMPACCESS               = 0x22a
+	DOMAIN_ALIAS_RID_REMOTE_DESKTOP_USERS           = 0x22b
+	DOMAIN_ALIAS_RID_NETWORK_CONFIGURATION_OPS      = 0x22c
+	DOMAIN_ALIAS_RID_INCOMING_FOREST_TRUST_BUILDERS = 0x22d
+	DOMAIN_ALIAS_RID_MONITORING_USERS               = 0X22e
+	DOMAIN_ALIAS_RID_LOGGING_USERS                  = 0x22f
+	DOMAIN_ALIAS_RID_AUTHORIZATIONACCESS            = 0x230
+	DOMAIN_ALIAS_RID_TS_LICENSE_SERVERS             = 0x231
+	DOMAIN_ALIAS_RID_DCOM_USERS                     = 0x232
+	DOMAIN_ALIAS_RID_IUSERS                         = 0x238
+	DOMAIN_ALIAS_RID_CRYPTO_OPERATORS               = 0x239
+	DOMAIN_ALIAS_RID_CACHEABLE_PRINCIPALS_GROUP     = 0x23b
+	DOMAIN_ALIAS_RID_NON_CACHEABLE_PRINCIPALS_GROUP = 0x23c
+	DOMAIN_ALIAS_RID_EVENT_LOG_READERS_GROUP        = 0x23d
+	DOMAIN_ALIAS_RID_CERTSVC_DCOM_ACCESS_GROUP      = 0x23e
+)
+
 //sys	LookupAccountSid(systemName *uint16, sid *SID, name *uint16, nameLen *uint32, refdDomainName *uint16, refdDomainNameLen *uint32, use *uint32) (err error) = advapi32.LookupAccountSidW
 //sys	LookupAccountName(systemName *uint16, accountName *uint16, sid *SID, sidLen *uint32, refdDomainName *uint16, refdDomainNameLen *uint32, use *uint32) (err error) = advapi32.LookupAccountNameW
 //sys	ConvertSidToStringSid(sid *SID, stringSid **uint16) (err error) = advapi32.ConvertSidToStringSidW
@@ -266,6 +296,7 @@ const (
 	TOKEN_ADJUST_PRIVILEGES
 	TOKEN_ADJUST_GROUPS
 	TOKEN_ADJUST_DEFAULT
+	TOKEN_ADJUST_SESSIONID
 
 	TOKEN_ALL_ACCESS = STANDARD_RIGHTS_REQUIRED |
 		TOKEN_ASSIGN_PRIMARY |
@@ -275,7 +306,8 @@ const (
 		TOKEN_QUERY_SOURCE |
 		TOKEN_ADJUST_PRIVILEGES |
 		TOKEN_ADJUST_GROUPS |
-		TOKEN_ADJUST_DEFAULT
+		TOKEN_ADJUST_DEFAULT |
+		TOKEN_ADJUST_SESSIONID
 	TOKEN_READ  = STANDARD_RIGHTS_READ | TOKEN_QUERY
 	TOKEN_WRITE = STANDARD_RIGHTS_WRITE |
 		TOKEN_ADJUST_PRIVILEGES |
@@ -335,6 +367,8 @@ type Tokengroups struct {
 	Groups     [1]SIDAndAttributes
 }
 
+// Authorization Functions
+//sys checkTokenMembership(tokenHandle Token, sidToCheck *SID, isMember *int32) (err error) = advapi32.CheckTokenMembership
 //sys	OpenProcessToken(h Handle, access uint32, token *Token) (err error) = advapi32.OpenProcessToken
 //sys	GetTokenInformation(t Token, infoClass uint32, info *byte, infoLen uint32, returnedLen *uint32) (err error) = advapi32.GetTokenInformation
 //sys	GetUserProfileDirectory(t Token, dir *uint16, dirLen *uint32) (err error) = userenv.GetUserProfileDirectoryW
@@ -432,4 +466,13 @@ func (t Token) GetUserProfileDirectory() (string, error) {
 			return "", e
 		}
 	}
+}
+
+// IsMember reports whether the access token t is a member of the provided SID.
+func (t Token) IsMember(sid *SID) (bool, error) {
+	var b int32
+	if e := checkTokenMembership(t, sid, &b); e != nil {
+		return false, e
+	}
+	return b != 0, nil
 }

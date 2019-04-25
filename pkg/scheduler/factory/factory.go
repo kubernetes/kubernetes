@@ -56,7 +56,6 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/plugins"
 	pluginsv1alpha1 "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
@@ -456,7 +455,6 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.percentageOfNodesToScore,
 	)
 
-	podBackoff := util.CreateDefaultPodBackoff()
 	return &Config{
 		SchedulerCache: c.schedulerCache,
 		// The scheduler only needs to consider schedulable nodes.
@@ -470,7 +468,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
 		},
 		NextPod:         internalqueue.MakeNextPodFunc(c.podQueue),
-		Error:           MakeDefaultErrorFunc(c.client, podBackoff, c.podQueue, c.schedulerCache, c.StopEverything),
+		Error:           MakeDefaultErrorFunc(c.client, c.podQueue, c.schedulerCache, c.StopEverything),
 		StopEverything:  c.StopEverything,
 		VolumeBinder:    c.volumeBinder,
 		SchedulingQueue: c.podQueue,
@@ -639,7 +637,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
+func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			klog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
@@ -662,7 +660,6 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, 
 			}
 		}
 
-		backoff.Gc()
 		podSchedulingCycle := podQueue.SchedulingCycle()
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
@@ -673,16 +670,9 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, 
 				Name:      pod.Name,
 			}
 
-			// When pod priority is enabled, we would like to place an unschedulable
-			// pod in the unschedulable queue. This ensures that if the pod is nominated
-			// to run on a node, scheduler takes the pod into account when running
-			// predicates for the node.
-			if !util.PodPriorityEnabled() {
-				if !backoff.TryBackoffAndWait(podID, stopEverything) {
-					klog.Warningf("Request for pod %v already in flight, abandoning", podID)
-					return
-				}
-			}
+			// An unschedulable pod will be placed in the unschedulable queue.
+			// This ensures that if the pod is nominated to run on a node,
+			// scheduler takes the pod into account when running predicates for the node.
 			// Get the pod again; it may have changed/been scheduled already.
 			getBackoff := initialGetBackoff
 			for {
@@ -705,24 +695,6 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, 
 			}
 		}()
 	}
-}
-
-// nodeEnumerator allows a cache.Poller to enumerate items in a v1.NodeList
-type nodeEnumerator struct {
-	*v1.NodeList
-}
-
-// Len returns the number of items in the node list.
-func (ne *nodeEnumerator) Len() int {
-	if ne.NodeList == nil {
-		return 0
-	}
-	return len(ne.Items)
-}
-
-// Get returns the item (and ID) with the particular index.
-func (ne *nodeEnumerator) Get(index int) interface{} {
-	return &ne.Items[index]
 }
 
 type binder struct {

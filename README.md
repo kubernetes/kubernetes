@@ -42,17 +42,17 @@ If you want to build Kubernetes right away there are two options:
 ##### You have a working [Go environment].
 
 ```
-$ go get -d k8s.io/kubernetes
-$ cd $GOPATH/src/k8s.io/kubernetes
-$ make
+go get -d k8s.io/kubernetes
+cd $GOPATH/src/k8s.io/kubernetes
+make
 ```
 
 ##### You have a working [Docker environment].
 
 ```
-$ git clone https://github.com/kubernetes/kubernetes
-$ cd kubernetes
-$ make quick-release
+git clone https://github.com/kubernetes/kubernetes
+cd kubernetes
+make quick-release
 ```
 
 For the full story, head over to the [developer's documentation].

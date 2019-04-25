@@ -17,10 +17,11 @@ spec:
       containers:
         - name: csi-provisioner
           # TODO: replace with official image
-          image: quay.io/k8scsi/csi-provisioner:tmp-test-1.14
+          image: quay.io/k8scsi/csi-provisioner:v1.1.0-rc1
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
+            - "--feature-gates=Topology=true"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -33,7 +34,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: gce-pd-driver
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.3.1-gke.0
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.4.0-gke.0
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"

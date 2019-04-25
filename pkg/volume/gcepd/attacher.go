@@ -350,8 +350,8 @@ func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string)
 	return mount.CleanupMountPoint(deviceMountPath, detacher.host.GetMounter(gcePersistentDiskPluginName), false)
 }
 
-func (plugin *gcePersistentDiskPlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *gcePersistentDiskPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {

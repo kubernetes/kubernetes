@@ -289,16 +289,6 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 			},
 			expectedError: true,
 		},
-		{ // Test CreateInitKubeConfigFiles (wrapper to createKubeConfigFile)
-			name:                     "CreateInitKubeConfigFiles",
-			createKubeConfigFunction: CreateInitKubeConfigFiles,
-			expectedFiles: []string{
-				kubeadmconstants.AdminKubeConfigFileName,
-				kubeadmconstants.KubeletKubeConfigFileName,
-				kubeadmconstants.ControllerManagerKubeConfigFileName,
-				kubeadmconstants.SchedulerKubeConfigFileName,
-			},
-		},
 		{ // Test CreateJoinControlPlaneKubeConfigFiles (wrapper to createKubeConfigFile)
 			name:                     "CreateJoinControlPlaneKubeConfigFiles",
 			createKubeConfigFunction: CreateJoinControlPlaneKubeConfigFiles,

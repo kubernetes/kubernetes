@@ -24,11 +24,12 @@ import (
 	"github.com/onsi/ginkgo"
 	"golang.org/x/oauth2/google"
 	gcm "google.golang.org/api/monitoring/v3"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/gpu"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	"k8s.io/kubernetes/test/utils/image"
@@ -88,7 +89,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 					Args:    []string{"nvidia-smi && sleep infinity"},
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
-							framework.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+							gpu.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
 						},
 					},
 				},

@@ -15,7 +15,7 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-attacher
-          image: quay.io/k8scsi/csi-attacher:v1.0.1
+          image: quay.io/k8scsi/csi-attacher:v1.1.0
           args:
             - --v=5
             - --csi-address=$(ADDRESS)

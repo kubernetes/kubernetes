@@ -54,7 +54,7 @@ const (
 var _ = SIGDescribe("Proxy", func() {
 	version := "v1"
 	Context("version "+version, func() {
-		options := framework.FrameworkOptions{
+		options := framework.Options{
 			ClientQPS: -1.0,
 		}
 		f := framework.NewFramework("proxy", options, nil)

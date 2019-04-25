@@ -21,7 +21,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 prefix="${KUBE_ROOT%"k8s.io/kubernetes"}"
 
@@ -98,7 +98,6 @@ packages_without_install=(
 )
 known_version_files=(
 	"pkg/master/import_known_versions.go"
-	"pkg/client/clientset_generated/internal_clientset/import_known_versions.go"
 )
 for expected_install_package in "${expected_install_packages[@]}"; do
 	found=0
@@ -112,8 +111,8 @@ for expected_install_package in "${expected_install_packages[@]}"; do
 	fi
 
 	for known_version_file in "${known_version_files[@]}"; do
-		if ! grep -q "${expected_install_package}/install" ${known_version_files} ; then
-			echo "missing ${expected_install_package}/install from ${known_version_files}"
+		if ! grep -q "${expected_install_package}/install" "${known_version_file}" ; then
+			echo "missing ${expected_install_package}/install from ${known_version_file}"
 			exit 1
 		fi
 	done

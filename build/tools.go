@@ -24,8 +24,6 @@ import (
 	_ "github.com/bazelbuild/buildtools/buildozer"
 	_ "github.com/cespare/prettybench"
 	_ "github.com/client9/misspell/cmd/misspell"
-	_ "github.com/cloudflare/cfssl/cmd/cfssl"
-	_ "github.com/cloudflare/cfssl/cmd/cfssljson"
 	_ "github.com/jstemmer/go-junit-report"
 	_ "github.com/jteeuwen/go-bindata/go-bindata"
 	_ "github.com/onsi/ginkgo/ginkgo"

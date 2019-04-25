@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -153,5 +154,38 @@ func TestUploadConfiguration(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMutateClusterStatus(t *testing.T) {
+	cm := &v1.ConfigMap{
+		Data: map[string]string{
+			kubeadmconstants.ClusterStatusConfigMapKey: "",
+		},
+	}
+
+	endpoints := map[string]kubeadmapi.APIEndpoint{
+		"some-node": {
+			AdvertiseAddress: "127.0.0.1",
+			BindPort:         6443,
+		},
+	}
+
+	err := mutateClusterStatus(cm, func(cs *kubeadmapi.ClusterStatus) error {
+		cs.APIEndpoints = endpoints
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("could not mutate cluster status: %v", err)
+	}
+
+	// Try to unmarshal the cluster status back and compare with the original mutated structure
+	cs, err := configutil.UnmarshalClusterStatus(cm.Data)
+	if err != nil {
+		t.Fatalf("could not unmarshal cluster status: %v", err)
+	}
+
+	if !reflect.DeepEqual(cs.APIEndpoints, endpoints) {
+		t.Fatalf("mutation of cluster status failed: %v", err)
 	}
 }

@@ -21,7 +21,9 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/proxy:go_default_library",
+        "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/util:go_default_library",
+        "//pkg/util/async:go_default_library",
         "//pkg/util/conntrack:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/slice:go_default_library",
@@ -85,6 +87,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],

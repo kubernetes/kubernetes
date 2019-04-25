@@ -94,17 +94,12 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 	var embeddedEncoder runtime.Encoder
 	contentKind, contentSerializer, transform := targetEncodingForTransform(scope, mediaTypeOptions, req)
 	if transform {
-		var embedded runtime.Serializer
-		for _, supported := range contentSerializer.SupportedMediaTypes() {
-			if supported.MediaType == serializer.MediaType {
-				embedded = supported.Serializer
-			}
-		}
-		if embedded == nil {
+		info, ok := runtime.SerializerInfoForMediaType(contentSerializer.SupportedMediaTypes(), serializer.MediaType)
+		if !ok {
 			scope.err(fmt.Errorf("no encoder for %q exists in the requested target %#v", serializer.MediaType, contentSerializer), w, req)
 			return
 		}
-		embeddedEncoder = contentSerializer.EncoderForVersion(embedded, contentKind.GroupVersion())
+		embeddedEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind.GroupVersion())
 	} else {
 		embeddedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
 	}

@@ -36,8 +36,8 @@ var (
 func NewKubeletStartPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "kubelet-start",
-		Short:   "Writes kubelet settings and (re)starts the kubelet",
-		Long:    "Writes a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)starts kubelet.",
+		Short:   "Write kubelet settings and (re)start the kubelet",
+		Long:    "Write a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)start kubelet.",
 		Example: kubeletStartPhaseExample,
 		Run:     runKubeletStart,
 		InheritFlags: []string{

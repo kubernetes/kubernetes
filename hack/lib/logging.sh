@@ -20,7 +20,7 @@ KUBE_VERBOSE="${KUBE_VERBOSE:-5}"
 # Handler for when we exit automatically on an error.
 # Borrowed from https://gist.github.com/ahendrix/7030300
 kube::log::errexit() {
-  local err="${PIPESTATUS[@]}"
+  local err="${PIPESTATUS[*]}"
 
   # If the shell we are in doesn't have errexit set (common in subshells) then
   # don't dump stacks.
@@ -60,7 +60,7 @@ kube::log::stack() {
   if [[ ${#FUNCNAME[@]} -gt ${stack_skip} ]]; then
     echo "Call stack:" >&2
     local i
-    for ((i=1 ; i <= ${#FUNCNAME[@]} - ${stack_skip} ; i++))
+    for ((i=1 ; i <= ${#FUNCNAME[@]} - stack_skip ; i++))
     do
       local frame_no=$((i - 1 + stack_skip))
       local source_file=${BASH_SOURCE[${frame_no}]}

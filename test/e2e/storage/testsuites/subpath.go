@@ -372,7 +372,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		testReadFile(f, l.filePathInSubpath, l.pod, 0)
 	})
 
-	It("should verify container cannot write to subpath readonly volumes", func() {
+	It("should verify container cannot write to subpath readonly volumes [Slow]", func() {
 		init()
 		defer cleanup()
 		if l.roVolSource == nil {
@@ -439,7 +439,7 @@ func TestBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 
 	By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
-	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
+	framework.ExpectNoError(err, "while deleting pod")
 }
 
 func generateSuffixForPodName(s string) string {
@@ -641,14 +641,6 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 	}
 }
 
-func clearSubpathPodCommands(pod *v1.Pod) {
-	pod.Spec.InitContainers[0].Command = nil
-	pod.Spec.InitContainers[1].Args = nil
-	pod.Spec.InitContainers[2].Args = nil
-	pod.Spec.Containers[0].Args = nil
-	pod.Spec.Containers[1].Args = nil
-}
-
 func setInitCommand(pod *v1.Pod, command string) {
 	pod.Spec.InitContainers[0].Command = []string{"/bin/sh", "-ec", command}
 }
@@ -699,7 +691,7 @@ func testReadFile(f *framework.Framework, file string, pod *v1.Pod, containerInd
 
 	By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
-	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
+	framework.ExpectNoError(err, "while deleting pod")
 }
 
 func testPodFailSubpath(f *framework.Framework, pod *v1.Pod, allowContainerTerminationError bool) {
@@ -716,7 +708,7 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 	}()
 	By("Checking for subpath error in container status")
 	err = waitForPodSubpathError(f, pod, allowContainerTerminationError)
-	Expect(err).NotTo(HaveOccurred(), "while waiting for subpath failure")
+	framework.ExpectNoError(err, "while waiting for subpath failure")
 }
 
 func findSubpathContainerName(pod *v1.Pod) string {

@@ -35,7 +35,7 @@ export GOPATH=
 export GOFLAGS=
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
 if [[ "${GOPROXY:-}" == "off" ]]; then
-  kube::log::error "Cannot run hack/pin-dependency.sh with \$GOPROXY=off"
+  kube::log::error "Cannot run with \$GOPROXY=off"
   exit 1
 fi
 
@@ -54,17 +54,52 @@ if [[ -z "${dep}" || -z "${sha}" ]]; then
   exit 1
 fi
 
+_tmp="${KUBE_ROOT}/_tmp"
+cleanup() {
+  rm -rf "${_tmp}"
+}
+trap "cleanup" EXIT SIGINT
+cleanup
+mkdir -p "${_tmp}"
+
 # Add the require directive
 echo "Running: go get ${dep}@${sha}"
-go get "${dep}@${sha}"
+go get -m -d "${dep}@${sha}"
 
 # Find the resolved version
-rev=$(go mod edit -json | jq -r '.Require[] | select(.Path == "github.com/docker/docker") | .Version')
+rev=$(go mod edit -json | jq -r ".Require[] | select(.Path == \"${dep}\") | .Version")
+
+# No entry in go.mod, we must be using the natural version indirectly
+if [[ -z "${rev}" ]]; then
+  # backup the go.mod file, since go list modifies it
+  cp go.mod "${_tmp}/go.mod.bak"
+  # find the revision
+  rev=$(go list -m -json "${dep}" | jq -r .Version)
+  # restore the go.mod file
+  mv "${_tmp}/go.mod.bak" go.mod
+fi
+
+# No entry found
+if [[ -z "${rev}" ]]; then
+  echo "Could not resolve ${sha}"
+  exit 1
+fi
+
 echo "Resolved to ${dep}@${rev}"
 
 # Add the replace directive
 echo "Running: go mod edit -replace ${dep}=${dep}@${rev}"
 go mod edit -replace "${dep}=${dep}@${rev}"
+
+# Propagate pinned version to staging repos that also have that dependency
+for repo in $(ls staging/src/k8s.io | sort); do
+  pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
+    if go mod edit -json | jq -e -r ".Require[] | select(.Path == \"${dep}\")" > /dev/null; then
+      go mod edit -require "${dep}@${rev}"
+      go mod edit -replace "${dep}=${dep}@${rev}"
+    fi
+  popd >/dev/null 2>&1
+done
 
 echo ""
 echo "Run hack/update-vendor.sh to rebuild the vendor directory"

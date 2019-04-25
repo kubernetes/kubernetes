@@ -18,7 +18,7 @@ func IsPathIn(g graph.Graph, path []graph.Node) bool {
 	case 0:
 		return true
 	case 1:
-		return g.Has(path[0].ID())
+		return g.Node(path[0].ID()) != nil
 	default:
 		var canReach func(uid, vid int64) bool
 		switch g := g.(type) {

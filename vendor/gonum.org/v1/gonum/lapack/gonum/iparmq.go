@@ -52,7 +52,7 @@ func (Implementation) Iparmq(ispec int, name, opts string, n, ilo, ihi, lwork in
 
 	switch ispec {
 	default:
-		panic("lapack: bad ispec")
+		panic(badIspec)
 
 	case 12:
 		// Matrices of order smaller than nmin get sent to Dlahqr, the
@@ -82,7 +82,7 @@ func (Implementation) Iparmq(ispec int, name, opts string, n, ilo, ihi, lwork in
 
 	case 16:
 		if len(name) != 6 {
-			panic("lapack: bad name")
+			panic(badName)
 		}
 		const (
 			k22min = 14

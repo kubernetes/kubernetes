@@ -434,14 +434,6 @@ func formatThreshold(threshold evictionapi.Threshold) string {
 	return fmt.Sprintf("threshold(signal=%v, operator=%v, value=%v, gracePeriod=%v)", threshold.Signal, threshold.Operator, evictionapi.ThresholdValue(threshold.Value), threshold.GracePeriod)
 }
 
-// formatevictionapi.ThresholdValue formats a thresholdValue for logging.
-func formatThresholdValue(value evictionapi.ThresholdValue) string {
-	if value.Quantity != nil {
-		return value.Quantity.String()
-	}
-	return fmt.Sprintf("%f%%", value.Percentage*float32(100))
-}
-
 // cachedStatsFunc returns a statsFunc based on the provided pod stats.
 func cachedStatsFunc(podStats []statsapi.PodStats) statsFunc {
 	uid2PodStats := map[string]statsapi.PodStats{}

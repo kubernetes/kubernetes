@@ -349,6 +349,20 @@ type ListOptions struct {
 	// add, update, and remove notifications. Specify resourceVersion.
 	// +optional
 	Watch bool `json:"watch,omitempty" protobuf:"varint,3,opt,name=watch"`
+	// allowWatchBookmarks requests watch events with type "BOOKMARK".
+	// Servers that do not implement bookmarks may ignore this flag and
+	// bookmarks are sent at the server's discretion. Clients should not
+	// assume bookmarks are returned at any specific interval, nor may they
+	// assume the server will send any BOOKMARK event during a session.
+	// If this is not a watch, this field is ignored.
+	// If the feature gate WatchBookmarks is not enabled in apiserver,
+	// this field is ignored.
+	//
+	// This field is alpha and can be changed or removed without notice.
+	//
+	// +optional
+	AllowWatchBookmarks bool `json:"allowWatchBookmarks,omitempty" protobuf:"varint,9,opt,name=allowWatchBookmarks"`
+
 	// When specified with a watch call, shows changes that occur after that particular version of a resource.
 	// Defaults to changes from the beginning of history.
 	// When specified for list:

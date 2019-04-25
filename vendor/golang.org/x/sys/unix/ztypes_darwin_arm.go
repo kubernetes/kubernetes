@@ -7,11 +7,11 @@
 package unix
 
 const (
-	sizeofPtr      = 0x4
-	sizeofShort    = 0x2
-	sizeofInt      = 0x4
-	sizeofLong     = 0x4
-	sizeofLongLong = 0x8
+	SizeofPtr      = 0x4
+	SizeofShort    = 0x2
+	SizeofInt      = 0x4
+	SizeofLong     = 0x4
+	SizeofLongLong = 0x8
 )
 
 type (
@@ -137,13 +137,13 @@ type Fsid struct {
 }
 
 type Dirent struct {
-	Ino       uint64
-	Seekoff   uint64
-	Reclen    uint16
-	Namlen    uint16
-	Type      uint8
-	Name      [1024]int8
-	Pad_cgo_0 [3]byte
+	Ino     uint64
+	Seekoff uint64
+	Reclen  uint16
+	Namlen  uint16
+	Type    uint8
+	Name    [1024]int8
+	_       [3]byte
 }
 
 type RawSockaddrInet4 struct {
@@ -296,14 +296,14 @@ const (
 )
 
 type IfMsghdr struct {
-	Msglen    uint16
-	Version   uint8
-	Type      uint8
-	Addrs     int32
-	Flags     int32
-	Index     uint16
-	Pad_cgo_0 [2]byte
-	Data      IfData
+	Msglen  uint16
+	Version uint8
+	Type    uint8
+	Addrs   int32
+	Flags   int32
+	Index   uint16
+	_       [2]byte
+	Data    IfData
 }
 
 type IfData struct {
@@ -339,51 +339,51 @@ type IfData struct {
 }
 
 type IfaMsghdr struct {
-	Msglen    uint16
-	Version   uint8
-	Type      uint8
-	Addrs     int32
-	Flags     int32
-	Index     uint16
-	Pad_cgo_0 [2]byte
-	Metric    int32
+	Msglen  uint16
+	Version uint8
+	Type    uint8
+	Addrs   int32
+	Flags   int32
+	Index   uint16
+	_       [2]byte
+	Metric  int32
 }
 
 type IfmaMsghdr struct {
-	Msglen    uint16
-	Version   uint8
-	Type      uint8
-	Addrs     int32
-	Flags     int32
-	Index     uint16
-	Pad_cgo_0 [2]byte
+	Msglen  uint16
+	Version uint8
+	Type    uint8
+	Addrs   int32
+	Flags   int32
+	Index   uint16
+	_       [2]byte
 }
 
 type IfmaMsghdr2 struct {
-	Msglen    uint16
-	Version   uint8
-	Type      uint8
-	Addrs     int32
-	Flags     int32
-	Index     uint16
-	Pad_cgo_0 [2]byte
-	Refcount  int32
+	Msglen   uint16
+	Version  uint8
+	Type     uint8
+	Addrs    int32
+	Flags    int32
+	Index    uint16
+	_        [2]byte
+	Refcount int32
 }
 
 type RtMsghdr struct {
-	Msglen    uint16
-	Version   uint8
-	Type      uint8
-	Index     uint16
-	Pad_cgo_0 [2]byte
-	Flags     int32
-	Addrs     int32
-	Pid       int32
-	Seq       int32
-	Errno     int32
-	Use       int32
-	Inits     uint32
-	Rmx       RtMetrics
+	Msglen  uint16
+	Version uint8
+	Type    uint8
+	Index   uint16
+	_       [2]byte
+	Flags   int32
+	Addrs   int32
+	Pid     int32
+	Seq     int32
+	Errno   int32
+	Use     int32
+	Inits   uint32
+	Rmx     RtMetrics
 }
 
 type RtMetrics struct {
@@ -431,11 +431,11 @@ type BpfInsn struct {
 }
 
 type BpfHdr struct {
-	Tstamp    Timeval
-	Caplen    uint32
-	Datalen   uint32
-	Hdrlen    uint16
-	Pad_cgo_0 [2]byte
+	Tstamp  Timeval
+	Caplen  uint32
+	Datalen uint32
+	Hdrlen  uint16
+	_       [2]byte
 }
 
 type Termios struct {
@@ -480,3 +480,11 @@ const (
 	POLLWRBAND = 0x100
 	POLLWRNORM = 0x4
 )
+
+type Utsname struct {
+	Sysname  [256]byte
+	Nodename [256]byte
+	Release  [256]byte
+	Version  [256]byte
+	Machine  [256]byte
+}

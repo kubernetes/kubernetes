@@ -7,7 +7,6 @@ go_library(
     importpath = "golang.org/x/oauth2/jwt",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/golang.org/x/oauth2:go_default_library",
         "//vendor/golang.org/x/oauth2/internal:go_default_library",
         "//vendor/golang.org/x/oauth2/jws:go_default_library",

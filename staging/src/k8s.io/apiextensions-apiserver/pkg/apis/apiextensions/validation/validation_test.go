@@ -68,6 +68,94 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 		errors   []validationMatch
 	}{
 		{
+			name: "webhookconfig: invalid port 0",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      0,
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				invalid("spec", "conversion", "webhookClientConfig", "service", "port"),
+			},
+		},
+		{
+			name: "webhookconfig: invalid port 65536",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      65536,
+							},
+						},
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				invalid("spec", "conversion", "webhookClientConfig", "service", "port"),
+			},
+		},
+		{
 			name: "webhookconfig: both service and URL provided",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},

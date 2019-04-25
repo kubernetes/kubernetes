@@ -72,8 +72,9 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.Version
 				continue
 			}
 			klog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
+			return apierrors.NewInternalError(err)
 		}
-		return apierrors.NewInternalError(err)
+		return err
 	}
 
 	// convert attr.VersionedObject to the internal version in the underlying admission.Attributes

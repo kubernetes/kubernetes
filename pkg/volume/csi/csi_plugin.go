@@ -37,10 +37,8 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	csiapiinformer "k8s.io/client-go/informers"
-	csiinformer "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
-	csilister "k8s.io/client-go/listers/storage/v1beta1"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -68,10 +66,9 @@ const (
 var deprecatedSocketDirVersions = []string{"0.1.0", "0.2.0", "0.3.0", "0.4.0"}
 
 type csiPlugin struct {
-	host              volume.VolumeHost
-	blockEnabled      bool
-	csiDriverLister   csilister.CSIDriverLister
-	csiDriverInformer csiinformer.CSIDriverInformer
+	host            volume.VolumeHost
+	blockEnabled    bool
+	csiDriverLister storagelisters.CSIDriverLister
 }
 
 //TODO (vladimirvivien) add this type to storage api
@@ -217,11 +214,21 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		if csiClient == nil {
 			klog.Warning(log("kubeclient not set, assuming standalone kubelet"))
 		} else {
-			// Start informer for CSIDrivers.
-			factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
-			p.csiDriverInformer = factory.Storage().V1beta1().CSIDrivers()
-			p.csiDriverLister = p.csiDriverInformer.Lister()
-			go factory.Start(wait.NeverStop)
+			// set CSIDriverLister
+			adcHost, ok := host.(volume.AttachDetachVolumeHost)
+			if ok {
+				p.csiDriverLister = adcHost.CSIDriverLister()
+				if p.csiDriverLister == nil {
+					klog.Error(log("CSIDriverLister not found on AttachDetachVolumeHost"))
+				}
+			}
+			kletHost, ok := host.(volume.KubeletVolumeHost)
+			if ok {
+				p.csiDriverLister = kletHost.CSIDriverLister()
+				if p.csiDriverLister == nil {
+					klog.Error(log("CSIDriverLister not found on KubeletVolumeHost"))
+				}
+			}
 		}
 	}
 
@@ -574,38 +581,44 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-// TODO change CanAttach to return error to propagate ability
-// to support Attachment or an error - see https://github.com/kubernetes/kubernetes/issues/74810
-func (p *csiPlugin) CanAttach(spec *volume.Spec) bool {
+func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
 	driverMode, err := p.getDriverMode(spec)
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	if driverMode == ephemeralDriverMode {
-		klog.V(4).Info(log("driver ephemeral mode detected for spec %v", spec.Name))
-		return false
+		klog.V(5).Info(log("plugin.CanAttach = false, ephemeral mode detected for spec %v", spec.Name()))
+		return false, nil
 	}
 
 	pvSrc, err := getCSISourceFromSpec(spec)
 	if err != nil {
-		klog.Error(log("plugin.CanAttach failed to get info from spec: %s", err))
-		return false
+		return false, err
 	}
 
 	driverName := pvSrc.Driver
 
 	skipAttach, err := p.skipAttach(driverName)
 	if err != nil {
-		klog.Error(log("plugin.CanAttach error when calling plugin.skipAttach for driver %s: %s", driverName, err))
-		return false
+		return false, err
 	}
 
-	return !skipAttach
+	return !skipAttach, nil
 }
 
-// TODO (#75352) add proper logic to determine device moutability by inspecting the spec.
+// CanDeviceMount returns true if the spec supports device mount
 func (p *csiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	driverMode, err := p.getDriverMode(spec)
+	if err != nil {
+		return false, err
+	}
+
+	if driverMode == ephemeralDriverMode {
+		klog.V(5).Info(log("plugin.CanDeviceMount skipped ephemeral mode detected for spec %v", spec.Name()))
+		return false, nil
+	}
+
 	return true, nil
 }
 
@@ -757,6 +770,12 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		return false, nil
 	}
+
+	kletHost, ok := p.host.(volume.KubeletVolumeHost)
+	if ok {
+		kletHost.WaitForCacheSync()
+	}
+
 	if p.csiDriverLister == nil {
 		return false, errors.New("CSIDriver lister does not exist")
 	}
@@ -884,13 +903,4 @@ func isV0Version(version string) bool {
 	}
 
 	return parsedVersion.Major() == 0
-}
-
-func isV1Version(version string) bool {
-	parsedVersion, err := utilversion.ParseGeneric(version)
-	if err != nil {
-		return false
-	}
-
-	return parsedVersion.Major() == 1
 }

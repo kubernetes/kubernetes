@@ -90,17 +90,6 @@ func NewServiceAccountSigningKey() (*rsa.PrivateKey, error) {
 	return saSigningKey, nil
 }
 
-// NewCACertAndKey will generate a self signed CA.
-func NewCACertAndKey(certSpec *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
-
-	caCert, caKey, err := pkiutil.NewCertificateAuthority(certSpec)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failure while generating CA certificate and key")
-	}
-
-	return caCert, caKey, nil
-}
-
 // CreateCACertAndKeyFiles generates and writes out a given certificate authority.
 // The certSpec should be one of the variables from this package.
 func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) error {
@@ -114,7 +103,7 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 		return err
 	}
 
-	caCert, caKey, err := NewCACertAndKey(certConfig)
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(certConfig)
 	if err != nil {
 		return err
 	}
@@ -293,7 +282,7 @@ func writeKeyFilesIfNotExist(pkiDir string, baseName string, key *rsa.PrivateKey
 	return nil
 }
 
-// writeCertificateAuthorithyFilesIfNotExist write a new CSR to the given path.
+// writeCSRFilesIfNotExist writes a new CSR to the given path.
 // If there already is a CSR file at the given path; kubeadm tries to load it and check if it's a valid certificate.
 // otherwise this function returns an error.
 func writeCSRFilesIfNotExist(csrDir string, baseName string, csr *x509.CertificateRequest, key *rsa.PrivateKey) error {

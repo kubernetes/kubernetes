@@ -102,7 +102,7 @@ func GetSupportedShells() []string {
 func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "completion SHELL",
-		Short:   "Output shell completion code for the specified shell (bash or zsh).",
+		Short:   "Output shell completion code for the specified shell (bash or zsh)",
 		Long:    completionLong,
 		Example: completionExample,
 		Run: func(cmd *cobra.Command, args []string) {

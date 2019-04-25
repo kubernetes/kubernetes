@@ -16,10 +16,11 @@ type WriterInterface interface {
 }
 
 type Writer struct {
-	buffer    *bytes.Buffer
-	outWriter io.Writer
-	lock      *sync.Mutex
-	stream    bool
+	buffer     *bytes.Buffer
+	outWriter  io.Writer
+	lock       *sync.Mutex
+	stream     bool
+	redirector io.Writer
 }
 
 func New(outWriter io.Writer) *Writer {
@@ -29,6 +30,10 @@ func New(outWriter io.Writer) *Writer {
 		outWriter: outWriter,
 		stream:    true,
 	}
+}
+
+func (w *Writer) AndRedirectTo(writer io.Writer) {
+	w.redirector = writer
 }
 
 func (w *Writer) SetStream(stream bool) {
@@ -42,6 +47,9 @@ func (w *Writer) Write(b []byte) (n int, err error) {
 	defer w.lock.Unlock()
 
 	n, err = w.buffer.Write(b)
+	if w.redirector != nil {
+		w.redirector.Write(b)
+	}
 	if w.stream {
 		return w.outWriter.Write(b)
 	}

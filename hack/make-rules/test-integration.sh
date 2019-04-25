@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 # Lists of API Versions of each groups that should be tested, groups are
 # separated by comma, lists are separated by semicolon. e.g.,
@@ -40,7 +40,7 @@ KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-"garbagecollector*=6,graph_builder*=6"}
 
 kube::test::find_integration_test_dirs() {
   (
-    cd ${KUBE_ROOT}
+    cd "${KUBE_ROOT}"
     find test/integration/ -name '*_test.go' -print0 \
       | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
       | LC_ALL=C sort -u
@@ -67,7 +67,10 @@ runTests() {
   kube::etcd::start
   kube::log::status "Running integration test cases"
 
-  KUBE_RACE="-race"
+  # export KUBE_RACE
+  #
+  # Enable the Go race detector.
+  export KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
@@ -94,7 +97,7 @@ checkEtcdOnPath
 trap cleanup EXIT
 
 # Convert the CSV to an array of API versions to test
-IFS=';' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
+IFS=';' read -ra apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 for apiVersion in "${apiVersions[@]}"; do
   runTests "${apiVersion}"
 done

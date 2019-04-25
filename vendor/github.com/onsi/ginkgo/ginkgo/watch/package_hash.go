@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-var goRegExp = regexp.MustCompile(`\.go$`)
 var goTestRegExp = regexp.MustCompile(`_test\.go$`)
 
 type PackageHash struct {
@@ -16,14 +15,16 @@ type PackageHash struct {
 	TestModifiedTime time.Time
 	Deleted          bool
 
-	path     string
-	codeHash string
-	testHash string
+	path        string
+	codeHash    string
+	testHash    string
+	watchRegExp *regexp.Regexp
 }
 
-func NewPackageHash(path string) *PackageHash {
+func NewPackageHash(path string, watchRegExp *regexp.Regexp) *PackageHash {
 	p := &PackageHash{
-		path: path,
+		path:        path,
+		watchRegExp: watchRegExp,
 	}
 
 	p.codeHash, _, p.testHash, _, p.Deleted = p.computeHashes()
@@ -82,7 +83,7 @@ func (p *PackageHash) computeHashes() (codeHash string, codeModifiedTime time.Ti
 			continue
 		}
 
-		if goRegExp.Match([]byte(info.Name())) {
+		if p.watchRegExp.Match([]byte(info.Name())) {
 			codeHash += p.hashForFileInfo(info)
 			if info.ModTime().After(codeModifiedTime) {
 				codeModifiedTime = info.ModTime()

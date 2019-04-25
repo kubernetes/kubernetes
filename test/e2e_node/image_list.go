@@ -30,6 +30,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/gpu"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -52,7 +53,7 @@ var NodeImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Netexec),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	imageutils.GetPauseImageName(),
-	framework.GetGPUDevicePluginImage(),
+	gpu.GetGPUDevicePluginImage(),
 	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-is:1.0",
 	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-ep:1.0",
 	"gcr.io/kubernetes-e2e-test-images/node-perf/tf-wide-deep-amd64:1.0",

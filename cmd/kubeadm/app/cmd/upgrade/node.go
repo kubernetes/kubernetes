@@ -40,17 +40,17 @@ import (
 
 var (
 	upgradeNodeConfigLongDesc = normalizer.LongDesc(`
-		Downloads the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
+		Download the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
 		where X is the minor version of the kubelet. kubeadm uses the --kubelet-version parameter to determine
 		what the _desired_ kubelet version is. Give
 		`)
 
 	upgradeNodeConfigExample = normalizer.Examples(fmt.Sprintf(`
-		# Downloads the kubelet configuration from the ConfigMap in the cluster. Uses a specific desired kubelet version.
+		# Download the kubelet configuration from the ConfigMap in the cluster. Use a specific desired kubelet version.
 		kubeadm upgrade node config --kubelet-version %s
 
-		# Simulates the downloading of the kubelet configuration from the ConfigMap in the cluster with a specific desired
-		# version. Does not change any state locally on the node.
+		# Simulate the downloading of the kubelet configuration from the ConfigMap in the cluster with a specific desired
+		# version. Do not change any state locally on the node.
 		kubeadm upgrade node config --kubelet-version %[1]s --dry-run
 		`, constants.CurrentKubernetesVersion))
 )
@@ -73,7 +73,7 @@ type controlplaneUpgradeFlags struct {
 func NewCmdNode() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "node",
-		Short: "Upgrade commands for a node in the cluster. Currently only supports upgrading the configuration, not the kubelet itself.",
+		Short: "Upgrade commands for a node in the cluster. Currently only support upgrading the configuration, not the kubelet itself",
 		RunE:  cmdutil.SubCmdRunE("node"),
 	}
 	cmd.AddCommand(NewCmdUpgradeNodeConfig())
@@ -92,7 +92,7 @@ func NewCmdUpgradeNodeConfig() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "config",
-		Short:   "Downloads the kubelet configuration from the cluster ConfigMap kubelet-config-1.X, where X is the minor version of the kubelet.",
+		Short:   "Download the kubelet configuration from the cluster ConfigMap kubelet-config-1.X, where X is the minor version of the kubelet",
 		Long:    upgradeNodeConfigLongDesc,
 		Example: upgradeNodeConfigExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -119,7 +119,7 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "experimental-control-plane",
-		Short:   "Upgrades the control plane instance deployed on this node. IMPORTANT. This command should be executed after executing `kubeadm upgrade apply` on another control plane instance",
+		Short:   "Upgrade the control plane instance deployed on this node. IMPORTANT. This command should be executed after executing `kubeadm upgrade apply` on another control plane instance",
 		Long:    upgradeNodeConfigLongDesc,
 		Example: upgradeNodeConfigExample,
 		Run: func(cmd *cobra.Command, args []string) {

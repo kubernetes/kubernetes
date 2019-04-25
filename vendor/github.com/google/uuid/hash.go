@@ -27,7 +27,7 @@ var (
 func NewHash(h hash.Hash, space UUID, data []byte, version int) UUID {
 	h.Reset()
 	h.Write(space[:])
-	h.Write([]byte(data))
+	h.Write(data)
 	s := h.Sum(nil)
 	var uuid UUID
 	copy(uuid[:], s)

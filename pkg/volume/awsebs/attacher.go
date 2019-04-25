@@ -277,8 +277,8 @@ func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath stri
 	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 }
 
-func (plugin *awsElasticBlockStorePlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *awsElasticBlockStorePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {

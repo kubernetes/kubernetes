@@ -553,14 +553,14 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	currentReplicas := scale.Status.Replicas
 	a.recordInitialRecommendation(currentReplicas, key)
 
-	var metricStatuses []autoscalingv2.MetricStatus
-	metricDesiredReplicas := int32(0)
-	metricName := ""
-	metricTimestamp := time.Time{}
+	var (
+		metricStatuses        []autoscalingv2.MetricStatus
+		metricDesiredReplicas int32
+		metricName            string
+	)
 
 	desiredReplicas := int32(0)
 	rescaleReason := ""
-	timestamp := time.Now()
 
 	rescale := true
 
@@ -579,7 +579,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		rescaleReason = "Current number of replicas must be greater than 0"
 		desiredReplicas = 1
 	} else {
-
+		var metricTimestamp time.Time
 		metricDesiredReplicas, metricName, metricStatuses, metricTimestamp, err = a.computeReplicasForMetrics(hpa, scale, hpa.Spec.Metrics)
 		if err != nil {
 			a.setCurrentReplicasInStatus(hpa, currentReplicas)
@@ -590,12 +590,11 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			return fmt.Errorf("failed to compute desired number of replicas based on listed metrics for %s: %v", reference, err)
 		}
 
-		klog.V(4).Infof("proposing %v desired replicas (based on %s from %s) for %s", metricDesiredReplicas, metricName, timestamp, reference)
+		klog.V(4).Infof("proposing %v desired replicas (based on %s from %s) for %s", metricDesiredReplicas, metricName, metricTimestamp, reference)
 
 		rescaleMetric := ""
 		if metricDesiredReplicas > desiredReplicas {
 			desiredReplicas = metricDesiredReplicas
-			timestamp = metricTimestamp
 			rescaleMetric = metricName
 		}
 		if desiredReplicas > currentReplicas {

@@ -37,26 +37,8 @@ package proto
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 )
-
-// RequiredNotSetError is the error returned if Marshal is called with
-// a protocol buffer struct whose required fields have not
-// all been initialized. It is also the error returned if Unmarshal is
-// called with an encoded protocol buffer that does not include all the
-// required fields.
-//
-// When printed, RequiredNotSetError reports the first unset required field in a
-// message. If the field cannot be precisely determined, it is reported as
-// "{Unknown}".
-type RequiredNotSetError struct {
-	field string
-}
-
-func (e *RequiredNotSetError) Error() string {
-	return fmt.Sprintf("proto: required field %q not set", e.field)
-}
 
 var (
 	// errRepeatedHasNil is the error returned if Marshal is called with

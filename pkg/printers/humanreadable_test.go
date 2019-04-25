@@ -61,7 +61,6 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 			name: "no tablecolumndefinition and includeheader flase",
 			h: &handlerEntry{
 				columnDefinitions: []metav1beta1.TableColumnDefinition{},
-				printRows:         true,
 				printFunc:         printFunc,
 			},
 			opt: PrintOptions{},
@@ -75,7 +74,6 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 			name: "no tablecolumndefinition and includeheader true",
 			h: &handlerEntry{
 				columnDefinitions: []metav1beta1.TableColumnDefinition{},
-				printRows:         true,
 				printFunc:         printFunc,
 			},
 			opt: PrintOptions{},
@@ -89,7 +87,6 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 			name: "have tablecolumndefinition and includeheader true",
 			h: &handlerEntry{
 				columnDefinitions: testNamespaceColumnDefinitions,
-				printRows:         true,
 				printFunc:         printFunc,
 			},
 			opt: PrintOptions{},
@@ -103,7 +100,6 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 			name: "print namespace and withnamespace true, should not print header",
 			h: &handlerEntry{
 				columnDefinitions: testNamespaceColumnDefinitions,
-				printRows:         true,
 				printFunc:         printFunc,
 			},
 			opt: PrintOptions{

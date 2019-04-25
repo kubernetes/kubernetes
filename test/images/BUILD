@@ -11,6 +11,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/images/agnhost:all-srcs",
         "//test/images/apparmor-loader:all-srcs",
         "//test/images/audit-proxy:all-srcs",
         "//test/images/crd-conversion-webhook:all-srcs",

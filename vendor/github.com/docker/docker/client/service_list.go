@@ -24,12 +24,12 @@ func (cli *Client) ServiceList(ctx context.Context, options types.ServiceListOpt
 	}
 
 	resp, err := cli.get(ctx, "/services", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return nil, err
 	}
 
 	var services []swarm.Service
 	err = json.NewDecoder(resp.body).Decode(&services)
-	ensureReaderClosed(resp)
 	return services, err
 }

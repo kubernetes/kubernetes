@@ -33,7 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
@@ -42,14 +41,16 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
-const serviceAccount = "serviceaccount1"
-const serviceAccountMissingErrString = "serviceaccount is required"
-const resourceMissingErrString = `You must provide one or more resources by argument or filename.
+const (
+	serviceAccount                 = "serviceaccount1"
+	serviceAccountMissingErrString = "serviceaccount is required"
+	resourceMissingErrString       = `You must provide one or more resources by argument or filename.
 Example resource specifications include:
    '-f rsrc.yaml'
    '--filename=rsrc.json'
    '<resource> <name>'
    '<resource>'`
+)
 
 func TestSetServiceAccountLocal(t *testing.T) {
 	inputs := []struct {
@@ -104,7 +105,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
-		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -322,7 +323,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         input.groupVersion,
-				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == input.path && m == http.MethodGet:

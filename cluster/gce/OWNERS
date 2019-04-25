@@ -2,6 +2,7 @@
 
 reviewers:
   - bowei
+  - cjcullen
   - gmarek
   - jszczepkowski
   - vishh
@@ -9,8 +10,10 @@ reviewers:
   - MaciekPytel
   - jingax10
   - yujuhong
+  - zmerlynn
 approvers:
   - bowei
+  - cjcullen
   - gmarek
   - jszczepkowski
   - vishh
@@ -18,3 +21,4 @@ approvers:
   - MaciekPytel
   - jingax10
   - yujuhong
+  - zmerlynn

@@ -1436,7 +1436,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 			}
 
 			if !expectedZones.IsSuperset(zones) {
-				t.Errorf("Obtained zones %v not subset of of expectedZones %v in %s", zones, expectedZones, test.Name)
+				t.Errorf("Obtained zones %v not subset of expectedZones %v in %s", zones, expectedZones, test.Name)
 			}
 		}
 	}
@@ -1622,7 +1622,7 @@ func TestChooseZonesForVolumeIncludingZone(t *testing.T) {
 			}
 
 			if !expectedZones.IsSuperset(zones) {
-				t.Errorf("Obtained zones %v not subset of of expectedZones %v in %s", zones, expectedZones, test.Name)
+				t.Errorf("Obtained zones %v not subset of expectedZones %v in %s", zones, expectedZones, test.Name)
 			}
 		}
 	}

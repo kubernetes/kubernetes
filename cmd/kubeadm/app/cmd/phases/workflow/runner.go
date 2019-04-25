@@ -308,7 +308,7 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 	// adds the phases subcommand
 	phaseCommand := &cobra.Command{
 		Use:   "phase",
-		Short: fmt.Sprintf("use this command to invoke single phase of the %s workflow", cmd.Name()),
+		Short: fmt.Sprintf("Use this command to invoke single phase of the %s workflow", cmd.Name()),
 	}
 
 	cmd.AddCommand(phaseCommand)

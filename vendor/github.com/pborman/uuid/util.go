@@ -4,19 +4,8 @@
 
 package uuid
 
-import (
-	"io"
-)
-
-// randomBits completely fills slice b with random data.
-func randomBits(b []byte) {
-	if _, err := io.ReadFull(rander, b); err != nil {
-		panic(err.Error()) // rand should never fail
-	}
-}
-
 // xvalues returns the value of a byte as a hexadecimal digit or 255.
-var xvalues = []byte{
+var xvalues = [256]byte{
 	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
 	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
 	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,

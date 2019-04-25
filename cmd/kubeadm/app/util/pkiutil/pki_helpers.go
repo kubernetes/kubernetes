@@ -61,12 +61,12 @@ const (
 func NewCertificateAuthority(config *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := NewPrivateKey()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to create private key")
+		return nil, nil, errors.Wrap(err, "unable to create private key while generating CA certificate")
 	}
 
 	cert, err := certutil.NewSelfSignedCACert(*config, key)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to create self-signed certificate")
+		return nil, nil, errors.Wrap(err, "unable to create self-signed CA certificate")
 	}
 
 	return cert, key, nil

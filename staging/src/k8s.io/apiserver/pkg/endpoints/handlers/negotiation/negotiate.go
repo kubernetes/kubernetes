@@ -79,10 +79,7 @@ func NegotiateInputSerializerForMediaType(mediaType string, streaming bool, ns r
 		mediaType = mediaTypes[0].MediaType
 	}
 	if mediaType, _, err := mime.ParseMediaType(mediaType); err == nil {
-		for _, info := range mediaTypes {
-			if info.MediaType != mediaType {
-				continue
-			}
+		if info, ok := runtime.SerializerInfoForMediaType(mediaTypes, mediaType); ok {
 			return info, nil
 		}
 	}
