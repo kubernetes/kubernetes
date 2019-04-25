@@ -15,14 +15,11 @@ limitations under the License.
 */
 
 // This file contains structures that implement scheduling queue types.
-// Scheduling queues hold pods waiting to be scheduled. This file has two types
-// of scheduling queue: 1) a FIFO, which is mostly the same as cache.FIFO, 2) a
+// Scheduling queues hold pods waiting to be scheduled. This file implements a
 // priority queue which has two sub queues. One sub-queue holds pods that are
 // being considered for scheduling. This is called activeQ. Another queue holds
 // pods that are already tried and are determined to be unschedulable. The latter
 // is called unschedulableQ.
-// FIFO is here for flag-gating purposes and allows us to use the traditional
-// scheduling queue when util.PodPriorityEnabled() returns false.
 
 package queue
 
@@ -89,113 +86,9 @@ type SchedulingQueue interface {
 	NumUnschedulablePods() int
 }
 
-// NewSchedulingQueue initializes a new scheduling queue. If pod priority is
-// enabled a priority queue is returned. If it is disabled, a FIFO is returned.
+// NewSchedulingQueue initializes a priority queue as a new scheduling queue.
 func NewSchedulingQueue(stop <-chan struct{}) SchedulingQueue {
-	if util.PodPriorityEnabled() {
-		return NewPriorityQueue(stop)
-	}
-	return NewFIFO()
-}
-
-// FIFO is basically a simple wrapper around cache.FIFO to make it compatible
-// with the SchedulingQueue interface.
-type FIFO struct {
-	*cache.FIFO
-}
-
-var _ = SchedulingQueue(&FIFO{}) // Making sure that FIFO implements SchedulingQueue.
-
-// Add adds a pod to the FIFO.
-func (f *FIFO) Add(pod *v1.Pod) error {
-	return f.FIFO.Add(pod)
-}
-
-// AddIfNotPresent adds a pod to the FIFO if it is absent in the FIFO.
-func (f *FIFO) AddIfNotPresent(pod *v1.Pod) error {
-	return f.FIFO.AddIfNotPresent(pod)
-}
-
-// AddUnschedulableIfNotPresent adds an unschedulable pod back to the queue. In
-// FIFO it is added to the end of the queue.
-func (f *FIFO) AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingCycle int64) error {
-	return f.FIFO.AddIfNotPresent(pod)
-}
-
-// SchedulingCycle implements SchedulingQueue.SchedulingCycle interface.
-func (f *FIFO) SchedulingCycle() int64 {
-	return 0
-}
-
-// Update updates a pod in the FIFO.
-func (f *FIFO) Update(oldPod, newPod *v1.Pod) error {
-	return f.FIFO.Update(newPod)
-}
-
-// Delete deletes a pod in the FIFO.
-func (f *FIFO) Delete(pod *v1.Pod) error {
-	return f.FIFO.Delete(pod)
-}
-
-// Pop removes the head of FIFO and returns it.
-// This is just a copy/paste of cache.Pop(queue Queue) from fifo.go that scheduler
-// has always been using. There is a comment in that file saying that this method
-// shouldn't be used in production code, but scheduler has always been using it.
-// This function does minimal error checking.
-func (f *FIFO) Pop() (*v1.Pod, error) {
-	result, err := f.FIFO.Pop(func(obj interface{}) error { return nil })
-	if err == cache.FIFOClosedError {
-		return nil, fmt.Errorf(queueClosed)
-	}
-	return result.(*v1.Pod), err
-}
-
-// PendingPods returns all the pods in the queue.
-func (f *FIFO) PendingPods() []*v1.Pod {
-	result := []*v1.Pod{}
-	for _, pod := range f.FIFO.List() {
-		result = append(result, pod.(*v1.Pod))
-	}
-	return result
-}
-
-// FIFO does not need to react to events, as all pods are always in the active
-// scheduling queue anyway.
-
-// AssignedPodAdded does nothing here.
-func (f *FIFO) AssignedPodAdded(pod *v1.Pod) {}
-
-// AssignedPodUpdated does nothing here.
-func (f *FIFO) AssignedPodUpdated(pod *v1.Pod) {}
-
-// MoveAllToActiveQueue does nothing in FIFO as all pods are always in the active queue.
-func (f *FIFO) MoveAllToActiveQueue() {}
-
-// NominatedPodsForNode returns pods that are nominated to run on the given node,
-// but FIFO does not support it.
-func (f *FIFO) NominatedPodsForNode(nodeName string) []*v1.Pod {
-	return nil
-}
-
-// Close closes the FIFO queue.
-func (f *FIFO) Close() {
-	f.FIFO.Close()
-}
-
-// DeleteNominatedPodIfExists does nothing in FIFO.
-func (f *FIFO) DeleteNominatedPodIfExists(pod *v1.Pod) {}
-
-// UpdateNominatedPodForNode does nothing in FIFO.
-func (f *FIFO) UpdateNominatedPodForNode(pod *v1.Pod, nodeName string) {}
-
-// NumUnschedulablePods returns the number of unschedulable pods exist in the SchedulingQueue.
-func (f *FIFO) NumUnschedulablePods() int {
-	return 0
-}
-
-// NewFIFO creates a FIFO object.
-func NewFIFO() *FIFO {
-	return &FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
+	return NewPriorityQueue(stop)
 }
 
 // NominatedNodeName returns nominated node name of a Pod.
@@ -203,7 +96,7 @@ func NominatedNodeName(pod *v1.Pod) string {
 	return pod.Status.NominatedNodeName
 }
 
-// PriorityQueue implements a scheduling queue. It is an alternative to FIFO.
+// PriorityQueue implements a scheduling queue.
 // The head of PriorityQueue is the highest priority pending pod. This structure
 // has three sub queues. One sub-queue holds pods that are being considered for
 // scheduling. This is called activeQ and is a Heap. Another queue holds

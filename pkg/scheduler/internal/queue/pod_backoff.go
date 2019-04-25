@@ -60,20 +60,6 @@ func (pbm *PodBackoffMap) GetBackoffTime(nsPod ktypes.NamespacedName) (time.Time
 	return backoffTime, true
 }
 
-// TryBackoffAndWait tries to perform backoff for a non-preempting pod.
-// it is invoked from factory.go if util.PodPriorityEnabled() returns false.
-func (pbm *PodBackoffMap) TryBackoffAndWait(nsPod ktypes.NamespacedName, stop <-chan struct{}) bool {
-	pbm.lock.RLock()
-	defer pbm.lock.RUnlock()
-	backoffDuration := pbm.calculateBackoffDuration(nsPod)
-	select {
-	case <-time.After(backoffDuration):
-		return true
-	case <-stop:
-		return false
-	}
-}
-
 // calculateBackoffDuration is a helper function for calculating the backoffDuration
 // based on the number of attempts the pod has made.
 func (pbm *PodBackoffMap) calculateBackoffDuration(nsPod ktypes.NamespacedName) time.Duration {
