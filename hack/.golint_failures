@@ -55,7 +55,6 @@ pkg/apis/storage/v1
 pkg/apis/storage/v1/util
 pkg/apis/storage/v1beta1
 pkg/apis/storage/v1beta1/util
-pkg/capabilities
 pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/photon
 pkg/controller
