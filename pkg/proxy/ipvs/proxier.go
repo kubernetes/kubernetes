@@ -280,9 +280,11 @@ func parseExcludedCIDRs(excludeCIDRs []string) []*net.IPNet {
 	var cidrExclusions []*net.IPNet
 	for _, excludedCIDR := range excludeCIDRs {
 		_, n, err := net.ParseCIDR(excludedCIDR)
-		if err == nil {
-			cidrExclusions = append(cidrExclusions, n)
+		if err != nil {
+			klog.Errorf("Error parsing exclude CIDR %q,  err: %v", excludedCIDR, err)
+			continue
 		}
+		cidrExclusions = append(cidrExclusions, n)
 	}
 	return cidrExclusions
 }
