@@ -98,6 +98,9 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		testCleanup func()
 
 		resource *genericVolumeTestResource
+
+		intreeOps   opCounts
+		migratedOps opCounts
 	}
 	var dInfo = driver.GetDriverInfo()
 	var l local
@@ -119,6 +122,8 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		if l.resource.volSource == nil {
 			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
+
+		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
 	}
 
 	cleanup := func() {
@@ -131,6 +136,8 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 			l.testCleanup()
 			l.testCleanup = nil
 		}
+
+		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	It("should be mountable", func() {

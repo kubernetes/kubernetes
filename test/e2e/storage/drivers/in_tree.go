@@ -87,9 +87,9 @@ var _ testsuites.DynamicPVTestDriver = &nfsDriver{}
 func InitNFSDriver() testsuites.TestDriver {
 	return &nfsDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "nfs",
-			PluginName:  "kubernetes.io/nfs",
-			MaxFileSize: testpatterns.FileSizeLarge,
+			Name:             "nfs",
+			InTreePluginName: "kubernetes.io/nfs",
+			MaxFileSize:      testpatterns.FileSizeLarge,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -229,9 +229,9 @@ var _ testsuites.PreprovisionedPVTestDriver = &glusterFSDriver{}
 func InitGlusterFSDriver() testsuites.TestDriver {
 	return &glusterFSDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "gluster",
-			PluginName:  "kubernetes.io/glusterfs",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "gluster",
+			InTreePluginName: "kubernetes.io/glusterfs",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -347,10 +347,10 @@ var _ testsuites.PreprovisionedPVTestDriver = &iSCSIDriver{}
 func InitISCSIDriver() testsuites.TestDriver {
 	return &iSCSIDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "iscsi",
-			PluginName:  "kubernetes.io/iscsi",
-			FeatureTag:  "[Feature:Volumes]",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "iscsi",
+			InTreePluginName: "kubernetes.io/iscsi",
+			FeatureTag:       "[Feature:Volumes]",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -460,10 +460,10 @@ var _ testsuites.PreprovisionedPVTestDriver = &rbdDriver{}
 func InitRbdDriver() testsuites.TestDriver {
 	return &rbdDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "rbd",
-			PluginName:  "kubernetes.io/rbd",
-			FeatureTag:  "[Feature:Volumes]",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "rbd",
+			InTreePluginName: "kubernetes.io/rbd",
+			FeatureTag:       "[Feature:Volumes]",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -588,10 +588,10 @@ var _ testsuites.PreprovisionedPVTestDriver = &cephFSDriver{}
 func InitCephFSDriver() testsuites.TestDriver {
 	return &cephFSDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "ceph",
-			PluginName:  "kubernetes.io/cephfs",
-			FeatureTag:  "[Feature:Volumes]",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "ceph",
+			InTreePluginName: "kubernetes.io/cephfs",
+			FeatureTag:       "[Feature:Volumes]",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -688,9 +688,9 @@ var _ testsuites.InlineVolumeTestDriver = &hostPathDriver{}
 func InitHostPathDriver() testsuites.TestDriver {
 	return &hostPathDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "hostPath",
-			PluginName:  "kubernetes.io/host-path",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "hostPath",
+			InTreePluginName: "kubernetes.io/host-path",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -761,9 +761,9 @@ var _ testsuites.InlineVolumeTestDriver = &hostPathSymlinkDriver{}
 func InitHostPathSymlinkDriver() testsuites.TestDriver {
 	return &hostPathSymlinkDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "hostPathSymlink",
-			PluginName:  "kubernetes.io/host-path",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "hostPathSymlink",
+			InTreePluginName: "kubernetes.io/host-path",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -902,9 +902,9 @@ var _ testsuites.InlineVolumeTestDriver = &emptydirDriver{}
 func InitEmptydirDriver() testsuites.TestDriver {
 	return &emptydirDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "emptydir",
-			PluginName:  "kubernetes.io/empty-dir",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "emptydir",
+			InTreePluginName: "kubernetes.io/empty-dir",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -968,9 +968,9 @@ var _ testsuites.DynamicPVTestDriver = &cinderDriver{}
 func InitCinderDriver() testsuites.TestDriver {
 	return &cinderDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "cinder",
-			PluginName:  "kubernetes.io/cinder",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "cinder",
+			InTreePluginName: "kubernetes.io/cinder",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext3",
@@ -1138,7 +1138,7 @@ func InitGcePdDriver() testsuites.TestDriver {
 	return &gcePdDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:                 "gcepd",
-			PluginName:           "kubernetes.io/gce-pd",
+			InTreePluginName:     "kubernetes.io/gce-pd",
 			MaxFileSize:          testpatterns.FileSizeMedium,
 			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
@@ -1265,9 +1265,9 @@ var _ testsuites.DynamicPVTestDriver = &vSphereDriver{}
 func InitVSphereDriver() testsuites.TestDriver {
 	return &vSphereDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "vSphere",
-			PluginName:  "kubernetes.io/vsphere-volume",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "vSphere",
+			InTreePluginName: "kubernetes.io/vsphere-volume",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
@@ -1387,9 +1387,9 @@ var _ testsuites.DynamicPVTestDriver = &azureDriver{}
 func InitAzureDriver() testsuites.TestDriver {
 	return &azureDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "azure",
-			PluginName:  "kubernetes.io/azure-file",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "azure",
+			InTreePluginName: "kubernetes.io/azure-file",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
@@ -1506,9 +1506,9 @@ var _ testsuites.DynamicPVTestDriver = &awsDriver{}
 func InitAwsDriver() testsuites.TestDriver {
 	return &awsDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "aws",
-			PluginName:  "kubernetes.io/aws-ebs",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "aws",
+			InTreePluginName: "kubernetes.io/aws-ebs",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext3",
@@ -1673,12 +1673,12 @@ func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func() test
 		}
 		return &localDriver{
 			driverInfo: testsuites.DriverInfo{
-				Name:            "local",
-				PluginName:      "kubernetes.io/local-volume",
-				FeatureTag:      featureTag,
-				MaxFileSize:     maxFileSize,
-				SupportedFsType: supportedFsTypes,
-				Capabilities:    capabilities,
+				Name:             "local",
+				InTreePluginName: "kubernetes.io/local-volume",
+				FeatureTag:       featureTag,
+				MaxFileSize:      maxFileSize,
+				SupportedFsType:  supportedFsTypes,
+				Capabilities:     capabilities,
 			},
 			volumeType: volumeType,
 		}

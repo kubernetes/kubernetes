@@ -305,8 +305,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		}
 
 		// useCSIPlugin will check both CSIMigration and the plugin specific feature gates
-		ucp := useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec)
-		if ucp && nu {
+		if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
@@ -391,12 +390,15 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	// of the CSI Driver we migrated to. Fixing this requires a larger refactor that
 	// involves determining the plugin_name for the metric generating "CompleteFunc"
 	// during the actual "OperationFunc" and not during this generation function
-	nu, _ := nodeUsingCSIPlugin(og, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
-	ucp := useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec)
+
+	nu, err := nodeUsingCSIPlugin(og, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+	if err != nil {
+		klog.Errorf("GenerateAttachVolumeFunc failed to check if node is using CSI Plugin, metric for this operation may be inaccurate: %v", err)
+	}
 
 	// Need to translate the spec here if the plugin is migrated so that the metrics
 	// emitted show the correct (migrated) plugin
-	if ucp && nu {
+	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
 		csiSpec, err := translateSpec(volumeToAttach.VolumeSpec)
 		if err == nil {
 			volumeToAttach.VolumeSpec = csiSpec

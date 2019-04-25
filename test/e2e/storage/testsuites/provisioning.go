@@ -89,6 +89,9 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		cs       clientset.Interface
 		pvc      *v1.PersistentVolumeClaim
 		sc       *storage.StorageClass
+
+		intreeOps   opCounts
+		migratedOps opCounts
 	}
 	var (
 		dInfo   = driver.GetDriverInfo()
@@ -119,6 +122,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 		// Now do the more expensive test initialization.
 		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
 		l.cs = l.config.Framework.ClientSet
 		claimSize := dDriver.GetClaimSize()
 		l.sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
@@ -142,6 +146,8 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 			l.testCleanup()
 			l.testCleanup = nil
 		}
+
+		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	It("should provision storage with defaults", func() {
