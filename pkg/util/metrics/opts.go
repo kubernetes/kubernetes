@@ -23,9 +23,9 @@ import (
 	"sync"
 )
 
-// KubeOpts is superset struct for prometheus.Opts. We choose not to embed
-// the prometheus Opts structure here because that would change struct initialization
-// in the manner to which people are currently accustomed.
+// KubeOpts is superset struct for prometheus.Opts. The prometheus Opts structure
+// is purposefully not embedded here because that would change struct initialization
+// in the manner which people are currently accustomed.
 //
 // Name must be set to a non-empty string. DeprecatedVersion is defined only
 // if the metric for which this options applies is, in fact, deprecated.

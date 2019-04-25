@@ -53,13 +53,13 @@ func (c *kubeCounter) setPrometheusCounter(counter prometheus.Counter) {
 	c.initSelfCollection(counter)
 }
 
-// GetDeprecatedVersion returns a pointer to the Version or nil
-func (c *kubeCounter) GetDeprecatedVersion() *semver.Version {
+// DeprecatedVersion returns a pointer to the Version or nil
+func (c *kubeCounter) DeprecatedVersion() *semver.Version {
 	return c.CounterOpts.DeprecatedVersion
 }
 
 // initializeMetric invocation creates the actual underlying Counter. Until this method is called
-// our underlying counter is a no-op.
+// the underlying counter is a no-op.
 func (c *kubeCounter) initializeMetric() {
 	c.CounterOpts.annotateStabilityLevel()
 	// this actually creates the underlying prometheus counter.
@@ -67,13 +67,13 @@ func (c *kubeCounter) initializeMetric() {
 }
 
 // initializeDeprecatedMetric invocation creates the actual (but deprecated) Counter. Until this method
-// is called our underlying counter is a no-op.
+// is called the underlying counter is a no-op.
 func (c *kubeCounter) initializeDeprecatedMetric() {
 	c.CounterOpts.markDeprecated()
 	c.initializeMetric()
 }
 
-// kubeCounterVec is our internal representation of our wrapping struct around prometheus
+// kubeCounterVec is the internal representation of our wrapping struct around prometheus
 // counterVecs. kubeCounterVec implements both KubeCollector and KubeCounterVec.
 type kubeCounterVec struct {
 	*prometheus.CounterVec
@@ -96,30 +96,34 @@ func NewCounterVec(opts CounterOpts, labels []string) *kubeCounterVec {
 	return cv
 }
 
-// GetDeprecatedVersion returns a pointer to the Version or nil
-func (v *kubeCounterVec) GetDeprecatedVersion() *semver.Version {
+// DeprecatedVersion returns a pointer to the Version or nil
+func (v *kubeCounterVec) DeprecatedVersion() *semver.Version {
 	return v.CounterOpts.DeprecatedVersion
 }
 
 // initializeMetric invocation creates the actual underlying CounterVec. Until this method is called
-// our underlying counterVec is a no-op.
+// the underlying counterVec is a no-op.
 func (v *kubeCounterVec) initializeMetric() {
 	v.CounterVec = prometheus.NewCounterVec(v.CounterOpts.toPromCounterOpts(), v.originalLabels)
 }
 
-// initializeMetric invocation creates the actual (but deprecated) CounterVec. Until this method is called
-// our underlying counterVec is a no-op.
+// initializeDeprecatedMetric invocation creates the actual (but deprecated) CounterVec. Until this method is called
+// the underlying counterVec is a no-op.
 func (v *kubeCounterVec) initializeDeprecatedMetric() {
 	v.CounterOpts.markDeprecated()
 	v.initializeMetric()
 }
 
 // Default Prometheus behavior actually results in the creation of a new metric
-// if a metric with the unique label values is not found in the underlying stored metricMap. This
-// is undesirable for us, since we want a way to turn OFF metrics which end up turning into memory
-// leaks.
+// if a metric with the unique label values is not found in the underlying stored metricMap.
+// This means  that if this function is called but the underlying metric is not registered
+// (which means it will never be exposed externally nor consumed), the metric will exist in memory
+// for perpetuity (i.e. throughout application lifecycle).
 //
-// For reference: https://github.com/prometheus/client_golang/blob/master/prometheus/counter.go#L148-L177
+// For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/counter.go#L179-L197
+//
+// This method returns a no-op metric if the metric is not actually created/registered, avoiding that
+// memory leak.
 func (v *kubeCounterVec) WithLabelValues(lvs ...string) KubeCounter {
 	if !v.IsCreated() {
 		return noop // return no-op counter

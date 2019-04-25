@@ -101,7 +101,7 @@ func TestCounter(t *testing.T) {
 				}
 			}
 
-			// let's increment the counter N number of times and verify that the metric retains the count correctly
+			// increment the counter N number of times and verify that the metric retains the count correctly
 			numberOfTimesToIncrement := 3
 			for i := 0; i < numberOfTimesToIncrement; i++ {
 				c.Inc()
@@ -188,7 +188,7 @@ func TestCounterVec(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Gather failed %v", err)
 			}
-			// we no-opt here when we don't have any metric families (i.e. when the metric is hidden)
+			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
 				if len(mf.GetMetric()) != 1 {
 					t.Errorf("Got %v metrics, wanted 1 as the count", len(mf.GetMetric()))
@@ -206,7 +206,7 @@ func TestCounterVec(t *testing.T) {
 				t.Fatalf("Gather failed %v", err)
 			}
 
-			// we no-opt here when we don't have any metric families (i.e. when the metric is hidden)
+			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
 				if len(mf.GetMetric()) != 3 {
 					t.Errorf("Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))

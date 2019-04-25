@@ -45,7 +45,7 @@ func MustRegister(cs ...KubeCollector) {
 }
 
 func (kr *KubeRegistry) Register(c KubeCollector) error {
-	if c.ActuallyCreate(&kr.version) {
+	if c.Create(&kr.version) {
 		return kr.PromRegistry.Register(c)
 	}
 	return nil
@@ -54,7 +54,7 @@ func (kr *KubeRegistry) Register(c KubeCollector) error {
 func (kr *KubeRegistry) MustRegister(cs ...KubeCollector) {
 	metrics := make([]prometheus.Collector, 0, len(cs))
 	for _, c := range cs {
-		if c.ActuallyCreate(&kr.version) {
+		if c.Create(&kr.version) {
 			metrics = append(metrics, c)
 		}
 	}

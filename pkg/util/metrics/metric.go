@@ -24,39 +24,41 @@ import (
 	"sync"
 )
 
-/**
- * This extends the prometheus.Collector interface so that we can customize the metric
- * registration process. Specifically, we defer metric initialization until ActuallyCreate
- * is called, which then delegates to the underlying metric's initializeMetric or
- * initializeDeprecatedMetric method call depending on whether the metric is deprecated or not.
+/*
+This extends the prometheus.Collector interface to allow customization of the metric
+registration process. Defer metric initialization until Create() is called, which then
+delegates to the underlying metric's initializeMetric or initializeDeprecatedMetric
+method call depending on whether the metric is deprecated or not.
  */
 type KubeCollector interface {
 	Collector
 	LazyMetric
-	GetDeprecatedVersion() *semver.Version
+	DeprecatedVersion() *semver.Version
 	// Each collector metric should provide an initialization function
 	// for both deprecated and non-deprecated variants of a metric. This
-	// is necessary since we are now deferring metric instantiation
+	// is necessary since metric instantiation will be deferred
 	// until the metric is actually registered somewhere.
 	initializeMetric()
 	initializeDeprecatedMetric()
 }
 
-// LazyMetric defines our registration functionality. We expect LazyMetric
-// objects to lazily instantiate metrics (i.e defer metric instantiation until when
-// ActuallyCreate is explicitly called).
+/*
+LazyMetric defines our registration functionality. LazyMetric objects are expected
+to lazily instantiate metrics (i.e defer metric instantiation until when
+the Create() function is explicitly called).
+ */
 type LazyMetric interface {
-	ActuallyCreate(*semver.Version) bool
+	Create(*semver.Version) bool
 	IsCreated() bool
 	IsHidden() bool
 	IsDeprecated() bool
 }
 
 /*
- * lazyMetric implements LazyMetric. A lazy metric is lazy because it waits until metric
- * registration time before instantiation. Add it as an anonymous field to a struct that
- * implements KubeCollector to get deferred registration behavior. You must call lazyInit
- * with the KubeCollector itself as an argument.
+lazyMetric implements LazyMetric. A lazy metric is lazy because it waits until metric
+registration time before instantiation. Add it as an anonymous field to a struct that
+implements KubeCollector to get deferred registration behavior. You must call lazyInit
+with the KubeCollector itself as an argument.
  */
 type lazyMetric struct {
 	isDeprecated        bool
@@ -78,11 +80,11 @@ func (r *lazyMetric) lazyInit(self KubeCollector) {
 	r.self = self
 }
 
-// determineDeprecationStatus figures out whether our lazy metric should be deprecated or not. It takes
-// a Version argument which should be the version of the binary in which this code is currently being
-// executed.
+// determineDeprecationStatus figures out whether the lazy metric should be deprecated or not.
+// This method takes a Version argument which should be the version of the binary in which
+// this code is currently being executed.
 func (r *lazyMetric) determineDeprecationStatus(version semver.Version) {
-	selfVersion := r.self.GetDeprecatedVersion()
+	selfVersion := r.self.DeprecatedVersion()
 	if selfVersion == nil {
 		return
 	}
@@ -105,13 +107,12 @@ func (r *lazyMetric) IsDeprecated() bool {
 	return r.isDeprecated
 }
 
-// Defer initialization of metric until we know if we actually need to
-// register the thing. This wrapper just allows us to consolidate the
-// syncOnce logic in a single spot and toggle the flag, since this
-// behavior will be consistent across metrics.
-//
-// This no-opts and returns true if metric is already created.
-func (r *lazyMetric) ActuallyCreate(version *semver.Version) bool {
+// Create forces the initialization of metric which has been deferred until
+// the point at which this method is invoked. This method will determine whether
+// the metric is deprecated or hidden, no-opting if the metric should be considered
+// hidden. Furthermore, this function no-opts and returns true if metric is already
+// created.
+func (r *lazyMetric) Create(version *semver.Version) bool {
 	if version != nil {
 		r.determineDeprecationStatus(*version)
 	}
@@ -130,11 +131,11 @@ func (r *lazyMetric) ActuallyCreate(version *semver.Version) bool {
 	return r.IsCreated()
 }
 
-/**
- * This code is directly lifted from the prometheus codebase. It's a convenience struct which
- * allows you satisfy the Collector interface automatically if you already satisfy the Metric interface.
- *
- * For reference: https://github.com/prometheus/client_golang/blob/65d3a96fbaa7c8c9535d7133d6d98cd50eed4db8/prometheus/collector.go#L98-L120
+/*
+This code is directly lifted from the prometheus codebase. It's a convenience struct which
+allows you satisfy the Collector interface automatically if you already satisfy the Metric interface.
+
+For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/collector.go#L98-L120
  */
 type selfCollector struct {
 	metric prometheus.Metric
