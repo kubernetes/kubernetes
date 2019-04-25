@@ -38,7 +38,6 @@ pkg/apis/core/validation
 pkg/apis/events/v1beta1
 pkg/apis/extensions
 pkg/apis/extensions/v1beta1
-pkg/apis/networking
 pkg/apis/networking/v1
 pkg/apis/node/v1alpha1
 pkg/apis/policy
