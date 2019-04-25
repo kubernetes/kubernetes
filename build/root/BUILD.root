@@ -110,10 +110,15 @@ genrule(
 platform(
     name = "rbe_with_network",
     parents = ["@rbe_default//config:platform"],
+    # https://cloud.google.com/remote-build-execution/docs/remote-execution-environment#remote_execution_properties
     remote_execution_properties = """
       properties: {
         name: "dockerNetwork"
         value: "standard"
+      }
+      properties: {
+        name: "dockerPrivileged"
+        value: "true"
       }
       {PARENT_REMOTE_EXECUTION_PROPERTIES}
     """,
