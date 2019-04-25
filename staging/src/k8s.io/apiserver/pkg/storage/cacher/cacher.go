@@ -716,7 +716,7 @@ func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 		return nil, false
 	}
 	result := make([]string, 0, 2)
-	matchValues := c.triggerFunc(event.Object)
+	matchValues := c.triggerFunc(event.BaseObject())
 	if len(matchValues) > 0 {
 		result = append(result, matchValues[0].Value)
 	}

@@ -58,6 +58,13 @@ type watchCacheEvent struct {
 	ResourceVersion uint64
 }
 
+func (e *watchCacheEvent) BaseObject() runtime.Object {
+	if o, ok := e.Object.(*CachingObject); ok {
+		return o.Object
+	}
+	return e.Object
+}
+
 // Computing a key of an object is generally non-trivial (it performs
 // e.g. validation underneath). Similarly computing object fields and
 // labels. To avoid computing them multiple times (to serve the event
