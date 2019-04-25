@@ -20,8 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -39,19 +38,19 @@ func nodeNames(nodes []v1.Node) []string {
 	return result
 }
 
-var _ = Describe("Recreate [Feature:Recreate]", func() {
+var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 	f := framework.NewDefaultFramework("recreate")
 	var originalNodes []v1.Node
 	var originalPodNames []string
 	var ps *testutils.PodStore
 	systemNamespace := metav1.NamespaceSystem
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		var err error
 		numNodes, err := framework.NumberOfRegisteredNodes(f.ClientSet)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		originalNodes, err = framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		framework.Logf("Got the following nodes before recreate %v", nodeNames(originalNodes))
 
@@ -69,13 +68,13 @@ var _ = Describe("Recreate [Feature:Recreate]", func() {
 
 	})
 
-	AfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+	ginkgo.AfterEach(func() {
+		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			// Make sure that addon/system pods are running, so dump
 			// events for the kube-system namespace on failures
-			By(fmt.Sprintf("Collecting events from namespace %q.", systemNamespace))
+			ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", systemNamespace))
 			events, err := f.ClientSet.CoreV1().Events(systemNamespace).List(metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			for _, e := range events.Items {
 				framework.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
@@ -86,7 +85,7 @@ var _ = Describe("Recreate [Feature:Recreate]", func() {
 		}
 	})
 
-	It("recreate nodes and ensure they function upon restart", func() {
+	ginkgo.It("recreate nodes and ensure they function upon restart", func() {
 		testRecreate(f.ClientSet, ps, systemNamespace, originalNodes, originalPodNames)
 	})
 })
@@ -104,7 +103,7 @@ func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace
 	}
 
 	nodesAfter, err := framework.CheckNodesReady(c, len(nodes), framework.RestartNodeReadyAgainTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.Logf("Got the following nodes after recreate: %v", nodeNames(nodesAfter))
 
 	if len(nodes) != len(nodesAfter) {
@@ -115,7 +114,7 @@ func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace
 	// Make sure the pods from before node recreation are running/completed
 	podCheckStart := time.Now()
 	podNamesAfter, err := framework.WaitForNRestartablePods(ps, len(podNames), framework.RestartPodReadyAgainTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
 	if !framework.CheckPodsRunningReadyOrSucceeded(c, systemNamespace, podNamesAfter, remaining) {
 		framework.Failf("At least one pod wasn't running and ready after the restart.")
