@@ -24,6 +24,7 @@ import (
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -145,11 +146,30 @@ func generateRenewalFunction(cert *certsphase.KubeadmCert, caCert *certsphase.Ku
 			return
 		}
 
-		renewer, err := getRenewer(cfg, caCert.BaseName)
-		kubeadmutil.CheckErr(err)
+		var externalCA bool
+		switch caCert.BaseName {
+		case kubeadmconstants.CACertAndKeyBaseName:
+			// Check if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
+			externalCA, _ = certsphase.UsingExternalCA(&internalcfg.ClusterConfiguration)
+		case kubeadmconstants.FrontProxyCACertAndKeyBaseName:
+			// Check if an external Front-Proxy CA is provided by the user (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
+			externalCA, _ = certsphase.UsingExternalFrontProxyCA(&internalcfg.ClusterConfiguration)
+		default:
+			externalCA = false
+		}
 
-		err = renewal.RenewExistingCert(internalcfg.CertificatesDir, cert.BaseName, renewer)
-		kubeadmutil.CheckErr(err)
+		if !externalCA {
+			renewer, err := getRenewer(cfg, caCert.BaseName)
+			kubeadmutil.CheckErr(err)
+
+			err = renewal.RenewExistingCert(internalcfg.CertificatesDir, cert.BaseName, renewer)
+			kubeadmutil.CheckErr(err)
+
+			fmt.Printf("Certificate %s renewed\n", cert.Name)
+			return
+		}
+
+		fmt.Printf("Detected external %s, certificate %s can't be renewed\n", cert.CAName, cert.Name)
 	}
 }
 

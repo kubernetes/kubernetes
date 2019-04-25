@@ -54,8 +54,17 @@ func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
-					Name:  "vector-addition",
+					Name:  "vector-addition-cuda8",
 					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+						},
+					},
+				},
+				{
+					Name:  "vector-addition-cuda10",
+					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd2),
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
 							gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),

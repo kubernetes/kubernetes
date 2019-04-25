@@ -32,7 +32,6 @@ import (
 	fakecerts "k8s.io/client-go/kubernetes/typed/certificates/v1beta1/fake"
 	k8stesting "k8s.io/client-go/testing"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -40,7 +39,7 @@ import (
 
 func TestRenewImplementations(t *testing.T) {
 	caCertCfg := &certutil.Config{CommonName: "kubernetes"}
-	caCert, caKey, err := certs.NewCACertAndKey(caCertCfg)
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(caCertCfg)
 	if err != nil {
 		t.Fatalf("couldn't create CA: %v", err)
 	}
@@ -198,7 +197,7 @@ func TestRenewExistingCert(t *testing.T) {
 	}
 
 	caCertCfg := &certutil.Config{CommonName: "kubernetes"}
-	caCert, caKey, err := certs.NewCACertAndKey(caCertCfg)
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(caCertCfg)
 	if err != nil {
 		t.Fatalf("couldn't create CA: %v", err)
 	}

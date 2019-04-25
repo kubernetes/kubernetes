@@ -138,7 +138,7 @@ type SelfSubjectAccessReviewSpec struct {
 	NonResourceAttributes *NonResourceAttributes
 }
 
-// SubjectAccessReviewStatus
+// SubjectAccessReviewStatus represents the current state of a SubjectAccessReview.
 type SubjectAccessReviewStatus struct {
 	// Allowed is required. True if the action would be allowed, false otherwise.
 	Allowed bool
@@ -177,6 +177,7 @@ type SelfSubjectRulesReview struct {
 	Status SubjectRulesReviewStatus
 }
 
+// SelfSubjectRulesReviewSpec defines the specification for SelfSubjectRulesReview.
 type SelfSubjectRulesReviewSpec struct {
 	// Namespace to evaluate rules for. Required.
 	Namespace string

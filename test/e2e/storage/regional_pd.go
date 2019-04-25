@@ -542,30 +542,6 @@ func getTwoRandomZones(c clientset.Interface) []string {
 	return []string{zone1, zone2}
 }
 
-// Waits for at least 1 replica of a StatefulSet to become not ready or until timeout occurs, whichever comes first.
-func waitForStatefulSetReplicasNotReady(statefulSetName, ns string, c clientset.Interface) error {
-	const poll = 3 * time.Second
-	const timeout = statefulSetReadyTimeout
-
-	framework.Logf("Waiting up to %v for StatefulSet %s to have at least 1 replica to become not ready", timeout, statefulSetName)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		sts, err := c.AppsV1().StatefulSets(ns).Get(statefulSetName, metav1.GetOptions{})
-		if err != nil {
-			framework.Logf("Get StatefulSet %s failed, ignoring for %v: %v", statefulSetName, poll, err)
-			continue
-		} else {
-			if sts.Status.ReadyReplicas < *sts.Spec.Replicas {
-				framework.Logf("%d replicas are ready out of a total of %d replicas in StatefulSet %s. (%v)",
-					sts.Status.ReadyReplicas, *sts.Spec.Replicas, statefulSetName, time.Since(start))
-				return nil
-			} else {
-				framework.Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
-			}
-		}
-	}
-	return fmt.Errorf("All replicas in StatefulSet %s are still ready within %v", statefulSetName, timeout)
-}
-
 // If match is true, check if zones in PV exactly match zones given.
 // Otherwise, check whether zones in PV is superset of zones given.
 func verifyZonesInPV(volume *v1.PersistentVolume, zones sets.String, match bool) error {

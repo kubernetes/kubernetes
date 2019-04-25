@@ -94,6 +94,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should provide basic identity", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			framework.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 3
 			sst := framework.NewStatefulSetTester(c)
 			sst.PauseNewPods(ss)
@@ -133,6 +134,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should adopt matching orphans and release non-matching pods", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			framework.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 1
 			sst := framework.NewStatefulSetTester(c)
 			sst.PauseNewPods(ss)
@@ -218,6 +220,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should not deadlock when a pod's predecessor fails", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			framework.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 2
 			sst := framework.NewStatefulSetTester(c)
 			sst.PauseNewPods(ss)
@@ -254,6 +257,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should perform rolling updates and roll backs of template modifications with PVCs", func() {
 			ginkgo.By("Creating a new StatefulSet with PVCs")
+			framework.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 3
 			rollbackTest(c, ns, ss)
 		})

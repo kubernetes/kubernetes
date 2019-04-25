@@ -42,7 +42,7 @@ const (
 	defaultFSType = "ext4"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&localVolumePlugin{}}
 }
@@ -587,15 +587,15 @@ func (u *localVolumeUnmapper) TearDownDevice(mapPath, _ string) error {
 
 // GetGlobalMapPath returns global map path and error.
 // path: plugins/kubernetes.io/kubernetes.io/local-volume/volumeDevices/{volumeName}
-func (lv *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
-	return filepath.Join(lv.plugin.host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(localVolumePluginName)),
-		lv.volName), nil
+func (l *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
+	return filepath.Join(l.plugin.host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(localVolumePluginName)),
+		l.volName), nil
 }
 
 // GetPodDeviceMapPath returns pod device map path and volume name.
 // path: pods/{podUid}/volumeDevices/kubernetes.io~local-volume
 // volName: local-pv-ff0d6d4
-func (lv *localVolume) GetPodDeviceMapPath() (string, string) {
-	return lv.plugin.host.GetPodVolumeDeviceDir(lv.podUID,
-		utilstrings.EscapeQualifiedName(localVolumePluginName)), lv.volName
+func (l *localVolume) GetPodDeviceMapPath() (string, string) {
+	return l.plugin.host.GetPodVolumeDeviceDir(l.podUID,
+		utilstrings.EscapeQualifiedName(localVolumePluginName)), l.volName
 }

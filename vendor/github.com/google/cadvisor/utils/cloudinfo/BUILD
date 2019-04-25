@@ -21,7 +21,12 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/google/cadvisor/utils/cloudinfo/aws:all-srcs",
+        "//vendor/github.com/google/cadvisor/utils/cloudinfo/azure:all-srcs",
+        "//vendor/github.com/google/cadvisor/utils/cloudinfo/gce:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

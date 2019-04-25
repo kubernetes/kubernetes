@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -80,23 +79,6 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 			}
 			return true, nil
 		}))
-}
-
-func waitForPodInNamespace(c clientset.Interface, ns, podName string) *v1.Pod {
-	var pod *v1.Pod
-	var err error
-	err = wait.PollImmediate(2*time.Second, 15*time.Second, func() (bool, error) {
-		pod, err = c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get pod %s in namespace: %s", podName, ns)
-	return pod
 }
 
 func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {

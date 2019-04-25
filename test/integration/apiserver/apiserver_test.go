@@ -971,7 +971,7 @@ func expectPartialObjectMetaEvents(t *testing.T, d *json.Decoder, values ...stri
 func expectPartialObjectMetaEventsProtobuf(t *testing.T, r io.Reader, values ...string) {
 	scheme := runtime.NewScheme()
 	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
-	rs := protobuf.NewRawSerializer(scheme, scheme, "application/vnd.kubernetes.protobuf")
+	rs := protobuf.NewRawSerializer(scheme, scheme)
 	d := streaming.NewDecoder(
 		protobuf.LengthDelimitedFramer.NewFrameReader(ioutil.NopCloser(r)),
 		rs,

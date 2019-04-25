@@ -588,7 +588,7 @@ var _ = SIGDescribe("Services", func() {
 		staticIPName := ""
 		if framework.ProviderIs("gce", "gke") {
 			By("creating a static load balancer IP")
-			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunId)
+			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunID)
 			gceCloud, err := gce.GetGCECloud()
 			Expect(err).NotTo(HaveOccurred(), "failed to get GCE cloud provider")
 

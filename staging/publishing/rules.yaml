@@ -286,6 +286,22 @@ rules:
       branch: master
     - repository: client-go
       branch: master
+- destination: legacy-cloud-providers
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/legacy-cloud-providers
+    name: master
+    dependencies:
+    - repository: api
+      branch: master
+    - repository: apimachinery
+      branch: master
+    - repository: client-go
+      branch: master
+    - repository: cloud-provider
+      branch: master
 - destination: node-api
   library: true
   branches:

@@ -36,7 +36,7 @@ type NetworkPolicy struct {
 	Spec NetworkPolicySpec
 }
 
-// Policy Type string describes the NetworkPolicy type
+// PolicyType describes the NetworkPolicy type
 // This type is beta-level in 1.8
 type PolicyType string
 

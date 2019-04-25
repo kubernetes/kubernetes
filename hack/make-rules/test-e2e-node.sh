@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 focus=${FOCUS:-""}
@@ -26,7 +26,7 @@ skip=${SKIP-"\[Flaky\]|\[Slow\]|\[Serial\]"}
 # Currently, parallelism only affects when REMOTE=true. For local test,
 # ginkgo default parallelism (cores - 1) is used.
 parallelism=${PARALLELISM:-8}
-artifacts=${ARTIFACTS:-"/tmp/_artifacts/`date +%y%m%dT%H%M%S`"}
+artifacts="${ARTIFACTS:-"/tmp/_artifacts/$(date +%y%m%dT%H%M%S)"}"
 remote=${REMOTE:-"false"}
 runtime=${RUNTIME:-"docker"}
 container_runtime_endpoint=${CONTAINER_RUNTIME_ENDPOINT:-""}
@@ -38,7 +38,7 @@ extra_envs=${EXTRA_ENVS:-}
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
-if [[ ${parallelism} > 1 ]]; then
+if [[ ${parallelism} -gt 1 ]]; then  
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
 
@@ -57,21 +57,21 @@ fi
 # Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host
 if [ ! -d "${artifacts}" ]; then
   echo "Creating artifacts directory at ${artifacts}"
-  mkdir -p ${artifacts}
+  mkdir -p "${artifacts}"
 fi
 echo "Test artifacts will be written to ${artifacts}"
 
 if [[ ${runtime} == "remote" ]] ; then
-  if [[ ! -z ${container_runtime_endpoint} ]] ; then
+  if [[ -n ${container_runtime_endpoint} ]] ; then
     test_args="--container-runtime-endpoint=${container_runtime_endpoint} ${test_args}"
   fi
-  if [[ ! -z ${image_service_endpoint} ]] ; then
+  if [[ -n ${image_service_endpoint} ]] ; then
     test_args="--image-service-endpoint=${image_service_endpoint} ${test_args}"
   fi
 fi
 
 
-if [ ${remote} = true ] ; then
+if [ "${remote}" = true ] ; then
   # The following options are only valid in remote run.
   images=${IMAGES:-""}
   hosts=${HOSTS:-""}
@@ -85,8 +85,8 @@ if [ ${remote} = true ] ; then
   gubernator=${GUBERNATOR:-"false"}
   image_config_file=${IMAGE_CONFIG_FILE:-""}
   if [[ ${hosts} == "" && ${images} == "" && ${image_config_file} == "" ]]; then
-    image_project=${IMAGE_PROJECT:-"cos-cloud"}
-    gci_image=$(gcloud compute images list --project ${image_project} \
+    image_project="${IMAGE_PROJECT:-"cos-cloud"}"
+    gci_image=$(gcloud compute images list --project "${image_project}" \
     --no-standard-images --filter="name ~ 'cos-beta.*'" --format="table[no-heading](name)")
     images=${gci_image}
     metadata="user-data<${KUBE_ROOT}/test/e2e_node/jenkins/gci-init.yaml,gci-update-strategy=update_disabled"
@@ -116,7 +116,7 @@ if [ ${remote} = true ] ; then
   IFS=',' read -ra IM <<< "${images}"
        images=""
        for i in "${IM[@]}"; do
-         if [[ $(gcloud compute instances list "${instance_prefix}-${i}" | grep ${i}) ]]; then
+         if gcloud compute instances list "${instance_prefix}-${i}" | grep "${i}"; then
            if [[ "${hosts}" != "" ]]; then
              hosts="${hosts},"
            fi

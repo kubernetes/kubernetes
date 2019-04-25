@@ -39,13 +39,6 @@ func SetupCertificateAuthorithy(t *testing.T) (*x509.Certificate, *rsa.PrivateKe
 	return caCert, caKey
 }
 
-// AssertCertificateIsCa is a utility function for kubeadm testing that asserts if a given certificate is a CA
-func AssertCertificateIsCa(t *testing.T, cert *x509.Certificate) {
-	if !cert.IsCA {
-		t.Error("cert is not a valida CA")
-	}
-}
-
 // AssertCertificateIsSignedByCa is a utility function for kubeadm testing that asserts if a given certificate is signed
 // by the expected CA
 func AssertCertificateIsSignedByCa(t *testing.T, cert *x509.Certificate, signingCa *x509.Certificate) {

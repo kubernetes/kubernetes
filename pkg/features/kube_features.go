@@ -322,7 +322,7 @@ const (
 	PodReadinessGates utilfeature.Feature = "PodReadinessGates"
 
 	// owner: @kevtaylor
-	// alpha: v1.11
+	// beta: v1.15
 	//
 	// Allow subpath environment variable substitution
 	// Only applicable if the VolumeSubpath feature is also enabled
@@ -495,7 +495,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
-	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSubpathEnvExpansion:                   {Default: true, PreRelease: utilfeature.Beta},
 	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
 	CSIBlockVolume:                              {Default: true, PreRelease: utilfeature.Beta},

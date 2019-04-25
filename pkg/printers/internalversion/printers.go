@@ -1010,14 +1010,6 @@ func printServiceList(list *api.ServiceList, options printers.PrintOptions) ([]m
 	return rows, nil
 }
 
-// backendStringer behaves just like a string interface and converts the given backend to a string.
-func backendStringer(backend *networking.IngressBackend) string {
-	if backend == nil {
-		return ""
-	}
-	return fmt.Sprintf("%v:%v", backend.ServiceName, backend.ServicePort.String())
-}
-
 func formatHosts(rules []networking.IngressRule) string {
 	list := []string{}
 	max := 3

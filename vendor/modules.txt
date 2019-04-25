@@ -1,10 +1,9 @@
 # bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690 => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
 bitbucket.org/bertimus9/systemstat
-# cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2 => cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2
+# cloud.google.com/go v0.34.0 => cloud.google.com/go v0.34.0
 cloud.google.com/go/compute/metadata
-cloud.google.com/go/internal
-# github.com/Azure/azure-sdk-for-go v21.3.0+incompatible => github.com/Azure/azure-sdk-for-go v21.3.0+incompatible
-github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute
+# github.com/Azure/azure-sdk-for-go v21.4.0+incompatible => github.com/Azure/azure-sdk-for-go v21.4.0+incompatible
+github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute
 github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry
 github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network
 github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage
@@ -13,7 +12,7 @@ github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
-# github.com/Azure/go-autorest v11.1.0+incompatible => github.com/Azure/go-autorest v11.1.0+incompatible
+# github.com/Azure/go-autorest v11.1.2+incompatible => github.com/Azure/go-autorest v11.1.2+incompatible
 github.com/Azure/go-autorest/autorest
 github.com/Azure/go-autorest/autorest/adal
 github.com/Azure/go-autorest/autorest/azure
@@ -445,6 +444,9 @@ github.com/google/cadvisor/storage
 github.com/google/cadvisor/summary
 github.com/google/cadvisor/utils
 github.com/google/cadvisor/utils/cloudinfo
+github.com/google/cadvisor/utils/cloudinfo/aws
+github.com/google/cadvisor/utils/cloudinfo/azure
+github.com/google/cadvisor/utils/cloudinfo/gce
 github.com/google/cadvisor/utils/cpuload
 github.com/google/cadvisor/utils/cpuload/netlink
 github.com/google/cadvisor/utils/docker
@@ -863,7 +865,7 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181 => golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181
+# golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a => golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
 golang.org/x/oauth2
 golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
@@ -1199,6 +1201,8 @@ k8s.io/apiserver/pkg/apis/audit/v1beta1
 k8s.io/apiserver/pkg/apis/audit/validation
 k8s.io/apiserver/pkg/apis/config
 k8s.io/apiserver/pkg/apis/config/v1
+k8s.io/apiserver/pkg/apis/example
+k8s.io/apiserver/pkg/apis/example/v1
 k8s.io/apiserver/pkg/audit
 k8s.io/apiserver/pkg/audit/event
 k8s.io/apiserver/pkg/audit/policy
@@ -1625,6 +1629,11 @@ k8s.io/kube-proxy/config/v1alpha1
 k8s.io/kube-scheduler/config/v1alpha1
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
 k8s.io/kubelet/config/v1beta1
+# k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
+k8s.io/legacy-cloud-providers/vsphere
+k8s.io/legacy-cloud-providers/vsphere/testing
+k8s.io/legacy-cloud-providers/vsphere/vclib
+k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers
 # k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
 k8s.io/metrics/pkg/apis/custom_metrics
 k8s.io/metrics/pkg/apis/custom_metrics/v1beta1

@@ -46,7 +46,8 @@ import (
 )
 
 const (
-	unknownVolumePlugin string = "UnknownVolumePlugin"
+	unknownVolumePlugin           string = "UnknownVolumePlugin"
+	unknownAttachableVolumePlugin string = "UnknownAttachableVolumePlugin"
 )
 
 var _ OperationGenerator = &operationGenerator{}
@@ -97,7 +98,7 @@ type OperationGenerator interface {
 	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error)
 
 	// Generates the AttachVolume function needed to perform attach of a volume plugin
-	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations
 
 	// Generates the DetachVolume function needed to perform the detach of a volume plugin
 	GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
@@ -293,57 +294,41 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 
 func (og *operationGenerator) GenerateAttachVolumeFunc(
 	volumeToAttach VolumeToAttach,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
-	var err error
-	var attachableVolumePlugin volume.AttachableVolumePlugin
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
+	attachVolumeFunc := func() (error, error) {
+		var attachableVolumePlugin volume.AttachableVolumePlugin
+		originalSpec := volumeToAttach.VolumeSpec
+		nu, err := nodeUsingCSIPlugin(og, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+		if err != nil {
+			return volumeToAttach.GenerateError("AttachVolume.NodeUsingCSIPlugin failed", err)
+		}
 
-	// Get attacher plugin
-	eventRecorderFunc := func(err *error) {
-		if *err != nil {
-			for _, pod := range volumeToAttach.ScheduledPods {
-				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, (*err).Error())
+		// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
+		if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
+			// The volume represented by this spec is CSI and thus should be migrated
+			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
+			if err != nil || attachableVolumePlugin == nil {
+				return volumeToAttach.GenerateError("AttachVolume.FindAttachablePluginByName failed", err)
+			}
+
+			csiSpec, err := translateSpec(volumeToAttach.VolumeSpec)
+			if err != nil {
+				return volumeToAttach.GenerateError("AttachVolume.TranslateSpec failed", err)
+			}
+			volumeToAttach.VolumeSpec = csiSpec
+		} else {
+			attachableVolumePlugin, err =
+				og.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
+			if err != nil || attachableVolumePlugin == nil {
+				return volumeToAttach.GenerateError("AttachVolume.FindAttachablePluginBySpec failed", err)
 			}
 		}
-	}
 
-	originalSpec := volumeToAttach.VolumeSpec
-	nu, err := nodeUsingCSIPlugin(og, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
-	if err != nil {
-		eventRecorderFunc(&err)
-		return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.NodeUsingCSIPlugin failed", err)
-	}
-
-	// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
-	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
-		// The volume represented by this spec is CSI and thus should be migrated
-		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
-		if err != nil || attachableVolumePlugin == nil {
-			eventRecorderFunc(&err)
-			return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.FindAttachablePluginByName failed", err)
+		volumeAttacher, newAttacherErr := attachableVolumePlugin.NewAttacher()
+		if newAttacherErr != nil {
+			return volumeToAttach.GenerateError("AttachVolume.NewAttacher failed", newAttacherErr)
 		}
 
-		csiSpec, err := translateSpec(volumeToAttach.VolumeSpec)
-		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.TranslateSpec failed", err)
-		}
-
-		volumeToAttach.VolumeSpec = csiSpec
-	} else {
-		attachableVolumePlugin, err =
-			og.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
-		if err != nil || attachableVolumePlugin == nil {
-			eventRecorderFunc(&err)
-			return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.FindAttachablePluginBySpec failed", err)
-		}
-	}
-
-	volumeAttacher, newAttacherErr := attachableVolumePlugin.NewAttacher()
-	if newAttacherErr != nil {
-		eventRecorderFunc(&err)
-		return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.NewAttacher failed", newAttacherErr)
-	}
-
-	attachVolumeFunc := func() (error, error) {
 		// Execute attach
 		devicePath, attachErr := volumeAttacher.Attach(
 			volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
@@ -389,12 +374,32 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		return nil, nil
 	}
 
+	eventRecorderFunc := func(err *error) {
+		if *err != nil {
+			for _, pod := range volumeToAttach.ScheduledPods {
+				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, (*err).Error())
+			}
+		}
+	}
+
+	// Get attacher plugin
+	attachableVolumePluginName := unknownAttachableVolumePlugin
+	attachableVolumePlugin, err :=
+		og.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
+	// It's ok to ignore the error, returning error is not expected from this function.
+	// If an error case occurred during the function generation, this error case(skipped one) will also trigger an error
+	// while the generated function is executed. And those errors will be handled during the execution of the generated
+	// function with a back off policy.
+	if err == nil && attachableVolumePlugin != nil {
+		attachableVolumePluginName = attachableVolumePlugin.GetPluginName()
+	}
+
 	return volumetypes.GeneratedOperations{
 		OperationName:     "volume_attach",
 		OperationFunc:     attachVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
-		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(attachableVolumePlugin.GetPluginName(), volumeToAttach.VolumeSpec), "volume_attach"),
-	}, nil
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(attachableVolumePluginName, volumeToAttach.VolumeSpec), "volume_attach"),
+	}
 }
 
 func (og *operationGenerator) GetVolumePluginMgr() *volume.VolumePluginMgr {

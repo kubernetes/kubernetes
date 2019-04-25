@@ -25,7 +25,6 @@ import (
 	"net"
 	"net/url"
 	"reflect"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -111,11 +110,6 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 		clock:         &clock.RealClock{},
 	}
 	return r
-}
-
-func makeValidPrometheusMetricLabel(in string) string {
-	// this isn't perfect, but it removes our common characters
-	return strings.NewReplacer("/", "_", ".", "_", "-", "_", ":", "_").Replace(in)
 }
 
 // internalPackages are packages that ignored when creating a default reflector name. These packages are in the common

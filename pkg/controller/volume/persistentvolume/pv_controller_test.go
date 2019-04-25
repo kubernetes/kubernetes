@@ -234,14 +234,6 @@ func TestControllerCacheParsingError(t *testing.T) {
 	}
 }
 
-func addVolumeAnnotation(volume *v1.PersistentVolume, annName, annValue string) *v1.PersistentVolume {
-	if volume.Annotations == nil {
-		volume.Annotations = make(map[string]string)
-	}
-	volume.Annotations[annName] = annValue
-	return volume
-}
-
 func makePVCClass(scName *string, hasSelectNodeAnno bool) *v1.PersistentVolumeClaim {
 	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

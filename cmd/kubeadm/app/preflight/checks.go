@@ -1088,10 +1088,6 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 // RunChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
 func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String) error {
-	type checkErrors struct {
-		Name   string
-		Errors []error
-	}
 	var errsBuffer bytes.Buffer
 
 	for _, c := range checks {
