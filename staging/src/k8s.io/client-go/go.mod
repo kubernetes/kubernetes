@@ -5,7 +5,7 @@ module k8s.io/client-go
 go 1.12
 
 require (
-	github.com/Azure/go-autorest v11.1.0+incompatible
+	github.com/Azure/go-autorest v11.1.2+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda // indirect
 	github.com/evanphx/json-patch v0.0.0-20190203023257-5858425f7550
