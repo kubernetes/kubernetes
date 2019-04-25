@@ -141,9 +141,13 @@ func ListenAndServeKubeletServer(
 	klog.Infof("Starting to listen on %s:%d", address, port)
 	handler := NewServer(host, resourceAnalyzer, auth, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, criHandler)
 	s := &http.Server{
-		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
-		Handler:        &handler,
-		MaxHeaderBytes: 1 << 20,
+		Addr:              net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
+		Handler:           &handler,
+		MaxHeaderBytes:    1 << 20,
+		ReadTimeout:       30 * time.Second,
+		ReadHeaderTimeout: 30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       30 * time.Second,
 	}
 	if tlsOptions != nil {
 		s.TLSConfig = tlsOptions.Config
