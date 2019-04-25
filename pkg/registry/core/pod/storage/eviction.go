@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/util/dryrun"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	"k8s.io/client-go/util/retry"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -78,11 +80,36 @@ func (r *EvictionREST) New() runtime.Object {
 	return &policy.Eviction{}
 }
 
+// Propagate dry-run takes the dry-run option from the request and pushes it into the eviction object.
+// It returns an error if they have non-matching dry-run options.
+func propagateDryRun(eviction *policy.Eviction, options *metav1.CreateOptions) (*metav1.DeleteOptions, error) {
+	if eviction.DeleteOptions == nil {
+		return &metav1.DeleteOptions{DryRun: options.DryRun}, nil
+	}
+	if len(eviction.DeleteOptions.DryRun) == 0 {
+		eviction.DeleteOptions.DryRun = options.DryRun
+		return eviction.DeleteOptions, nil
+	}
+	if len(options.DryRun) == 0 {
+		return eviction.DeleteOptions, nil
+	}
+
+	if !reflect.DeepEqual(options.DryRun, eviction.DeleteOptions.DryRun) {
+		return nil, fmt.Errorf("Non-matching dry-run options in request and content: %v and %v", options.DryRun, eviction.DeleteOptions.DryRun)
+	}
+	return eviction.DeleteOptions, nil
+}
+
 // Create attempts to create a new eviction.  That is, it tries to evict a pod.
 func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	eviction := obj.(*policy.Eviction)
 
-	obj, err := r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
+	deletionOptions, err := propagateDryRun(eviction, options)
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err = r.store.Get(ctx, eviction.Name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +124,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
 	// There is no need to check for pdb.
 	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-		_, _, err = r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
+		_, _, err = r.store.Delete(ctx, eviction.Name, deletionOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +153,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 
 			// If it was false already, or if it becomes false during the course of our retries,
 			// raise an error marked as a 429.
-			if err := r.checkAndDecrement(pod.Namespace, pod.Name, pdb); err != nil {
+			if err := r.checkAndDecrement(pod.Namespace, pod.Name, pdb, dryrun.IsDryRun(deletionOptions.DryRun)); err != nil {
 				return err
 			}
 		}
@@ -146,11 +173,6 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	// At this point there was either no PDB or we succeeded in decrementing
 
 	// Try the delete
-	deletionOptions := eviction.DeleteOptions
-	if deletionOptions == nil {
-		// default to non-nil to trigger graceful deletion
-		deletionOptions = &metav1.DeleteOptions{}
-	}
 	_, _, err = r.store.Delete(ctx, eviction.Name, deletionOptions)
 	if err != nil {
 		return nil, err
@@ -161,7 +183,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 }
 
 // checkAndDecrement checks if the provided PodDisruptionBudget allows any disruption.
-func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policyv1beta1.PodDisruptionBudget) error {
+func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policyv1beta1.PodDisruptionBudget, dryRun bool) error {
 	if pdb.Status.ObservedGeneration < pdb.Generation {
 		// TODO(mml): Add a Retry-After header.  Once there are time-based
 		// budgets, we can sometimes compute a sensible suggested value.  But
@@ -187,6 +209,12 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	if pdb.Status.DisruptedPods == nil {
 		pdb.Status.DisruptedPods = make(map[string]metav1.Time)
 	}
+
+	// If this is a dry-run, we don't need to go any further than that.
+	if dryRun == true {
+		return nil
+	}
+
 	// Eviction handler needs to inform the PDB controller that it is about to delete a pod
 	// so it should not consider it as available in calculations when updating PodDisruptions allowed.
 	// If the pod is not deleted within a reasonable time limit PDB controller will assume that it won't
