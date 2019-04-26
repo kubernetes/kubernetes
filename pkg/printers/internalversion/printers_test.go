@@ -171,7 +171,7 @@ func TestPrintUnstructuredObject(t *testing.T) {
 
 	for _, test := range tests {
 		out.Reset()
-		printer := printers.NewTablePrinter(test.options).With(AddDefaultHandlers)
+		printer := printers.NewTablePrinter(test.options)
 		printer.PrintObj(test.object, out)
 
 		matches, err := regexp.MatchString(test.expected, out.String())
@@ -1339,7 +1339,8 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 					Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
 					Ports:     []api.EndpointPort{{Port: 8080}},
 				},
-				}},
+				},
+			},
 			isNamespaced: true,
 		},
 		{
@@ -1370,7 +1371,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 		},
 		{
 			obj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
+				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec:       api.PersistentVolumeSpec{},
 			},
 			isNamespaced: false,
@@ -1414,33 +1415,46 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			},
 			isNamespaced: false,
 		},
+		{
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "Foo",
+					"apiVersion": "example.com/v1",
+					"metadata":   map[string]interface{}{"name": "test", "namespace": namespaceName},
+				},
+			},
+			isNamespaced: true,
+		},
+		{
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "Foo",
+					"apiVersion": "example.com/v1",
+					"metadata":   map[string]interface{}{"name": "test"},
+				},
+			},
+			isNamespaced: false,
+		},
 	}
 
 	for i, test := range table {
+		printer := printers.NewTablePrinter(printers.PrintOptions{
+			WithNamespace: true,
+			NoHeaders:     true,
+		})
+		AddHandlers(printer)
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(test.obj, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing object: %#v", err)
+		}
 		if test.isNamespaced {
-			// Expect output to include namespace when requested.
-			printer := printers.NewTablePrinter(printers.PrintOptions{
-				WithNamespace: true,
-			})
-			AddHandlers(printer)
-			buffer := &bytes.Buffer{}
-			err := printer.PrintObj(test.obj, buffer)
-			if err != nil {
-				t.Fatalf("An error occurred printing object: %#v", err)
-			}
-			matched := contains(strings.Fields(buffer.String()), fmt.Sprintf("%s", namespaceName))
-			if !matched {
-				t.Errorf("%d: Expect printing object to contain namespace: %#v", i, test.obj)
+			if !strings.HasPrefix(buffer.String(), namespaceName+" ") {
+				t.Errorf("%d: Expect printing object %T to contain namespace %q, got %s", i, test.obj, namespaceName, buffer.String())
 			}
 		} else {
-			// Expect error when trying to get all namespaces for un-namespaced object.
-			printer := printers.NewTablePrinter(printers.PrintOptions{
-				WithNamespace: true,
-			})
-			buffer := &bytes.Buffer{}
-			err := printer.PrintObj(test.obj, buffer)
-			if err == nil {
-				t.Errorf("Expected error when printing un-namespaced type")
+			if !strings.HasPrefix(buffer.String(), " ") {
+				t.Errorf("%d: Expect printing object %T to not contain namespace got %s", i, test.obj, buffer.String())
 			}
 		}
 	}
