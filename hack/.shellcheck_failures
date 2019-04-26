@@ -1,7 +1,6 @@
 ./build/lib/release.sh
 ./cluster/addons/addon-manager/kube-addons.sh
 ./cluster/addons/fluentd-elasticsearch/es-image/run.sh
-./cluster/clientbin.sh
 ./cluster/common.sh
 ./cluster/gce/config-common.sh
 ./cluster/gce/config-default.sh
