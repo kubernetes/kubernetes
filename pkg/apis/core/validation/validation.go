@@ -4101,11 +4101,28 @@ func ValidateNodeSpecificAnnotations(annotations map[string]string, fldPath *fie
 	return allErrs
 }
 
+func validateNodeSpecificLabels(meta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	labels := meta.Labels
+
+	// Ensure that `metadata.Name` = `kubernetes.io/hostname`, as many
+	// mechanisms depend on the `kubernetes.io/hostname` being accurate.
+	if hostnameLabel, exists := labels["kubernetes.io/hostname"]; exists {
+		if hostnameLabel != meta.Name {
+			allErrs = append(allErrs, field.Invalid(fldPath, hostnameLabel, "Must equal metadata.Name"))
+		}
+	}
+
+	return allErrs
+}
+
 // ValidateNode tests if required fields in the node are set.
 func ValidateNode(node *core.Node) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName, fldPath)
 	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, validateNodeSpecificLabels(&node.ObjectMeta, fldPath.Child("labels"))...)
 	if len(node.Spec.Taints) > 0 {
 		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
 	}
@@ -4161,6 +4178,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&node.ObjectMeta, &oldNode.ObjectMeta, fldPath)
 	allErrs = append(allErrs, ValidateNodeSpecificAnnotations(node.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, validateNodeSpecificLabels(&node.ObjectMeta, fldPath.Child("labels"))...)
 
 	// TODO: Enable the code once we have better core object.status update model. Currently,
 	// anyone can update node status.

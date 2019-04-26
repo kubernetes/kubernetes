@@ -10135,6 +10135,21 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 		},
+		"hostname-label-different-than-name": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+				Labels: map[string]string{
+					"kubernetes.io/hostname": "different-hostname",
+				},
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{},
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+		},
 		"invalid-labels": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "abc-123",
@@ -10626,6 +10641,18 @@ func TestValidateNodeUpdate(t *testing.T) {
 							        }
 							    ]
 							}`,
+				},
+			},
+		}, false},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+				Labels: map[string]string{
+					"kubernetes.io/hostname": "invalid-new-name",
 				},
 			},
 		}, false},
