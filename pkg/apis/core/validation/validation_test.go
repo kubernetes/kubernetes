@@ -6192,7 +6192,6 @@ func TestValidatePodSpec(t *testing.T) {
 	maxGroupID := int64(2147483647)
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
 
 	successCases := []core.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
