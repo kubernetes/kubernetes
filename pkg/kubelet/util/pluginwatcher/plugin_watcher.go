@@ -166,13 +166,13 @@ func (w *Watcher) Stop() error {
 		w.wg.Wait()
 	}()
 
+	defer w.fsWatcher.Close()
+
 	select {
 	case <-c:
 	case <-time.After(11 * time.Second):
 		return fmt.Errorf("timeout on stopping watcher")
 	}
-
-	w.fsWatcher.Close()
 
 	return nil
 }
