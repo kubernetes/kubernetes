@@ -42,8 +42,8 @@ import (
 
 // Leases is an interface which assists in managing the set of active masters
 type Leases interface {
-	// ListLeases retrieves a list of the current master IPs
-	ListLeases() ([]string, error)
+	// ListLeases retrieves a list of the current master addresses
+	ListLeases() ([]corev1.EndpointAddress, error)
 
 	// UpdateLease adds or refreshes a master's lease
 	UpdateLease(ip string) error
@@ -55,26 +55,27 @@ type Leases interface {
 type storageLeases struct {
 	storage   storage.Interface
 	baseKey   string
+	nodeName  *string
 	leaseTime time.Duration
 }
 
 var _ Leases = &storageLeases{}
 
 // ListLeases retrieves a list of the current master IPs from storage
-func (s *storageLeases) ListLeases() ([]string, error) {
+func (s *storageLeases) ListLeases() ([]corev1.EndpointAddress, error) {
 	ipInfoList := &corev1.EndpointsList{}
 	if err := s.storage.List(apirequest.NewDefaultContext(), s.baseKey, "0", storage.Everything, ipInfoList); err != nil {
 		return nil, err
 	}
 
-	ipList := make([]string, len(ipInfoList.Items))
+	epaList := make([]corev1.EndpointAddress, len(ipInfoList.Items))
 	for i, ip := range ipInfoList.Items {
-		ipList[i] = ip.Subsets[0].Addresses[0].IP
+		epaList[i] = ip.Subsets[0].Addresses[0]
 	}
 
-	klog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
+	klog.V(6).Infof("Current masters listed in storage are %v", formatEndpointAddresses(epaList))
 
-	return ipList, nil
+	return epaList, nil
 }
 
 // UpdateLease resets the TTL on a master IP in storage
@@ -85,7 +86,7 @@ func (s *storageLeases) UpdateLease(ip string) error {
 		existing := input.(*corev1.Endpoints)
 		existing.Subsets = []corev1.EndpointSubset{
 			{
-				Addresses: []corev1.EndpointAddress{{IP: ip}},
+				Addresses: []corev1.EndpointAddress{{IP: ip, NodeName: s.nodeName}},
 			},
 		}
 
@@ -110,10 +111,11 @@ func (s *storageLeases) RemoveLease(ip string) error {
 }
 
 // NewLeases creates a new etcd-based Leases implementation.
-func NewLeases(storage storage.Interface, baseKey string, leaseTime time.Duration) Leases {
+func NewLeases(nodeName *string, storage storage.Interface, baseKey string, leaseTime time.Duration) Leases {
 	return &storageLeases{
 		storage:   storage,
 		baseKey:   baseKey,
+		nodeName:  nodeName,
 		leaseTime: leaseTime,
 	}
 }
@@ -176,8 +178,8 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		}
 	}
 
-	// ... and the list of master IP keys from etcd
-	masterIPs, err := r.masterLeases.ListLeases()
+	// ... and the list of master addresses from etcd
+	masters, err := r.masterLeases.ListLeases()
 	if err != nil {
 		return err
 	}
@@ -185,12 +187,12 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	// Since we just refreshed our own key, assume that zero endpoints
 	// returned from storage indicates an issue or invalid state, and thus do
 	// not update the endpoints list based on the result.
-	if len(masterIPs) == 0 {
-		return fmt.Errorf("no master IPs were listed in storage, refusing to erase all endpoints for the kubernetes service")
+	if len(masters) == 0 {
+		return fmt.Errorf("no masters were listed in storage, refusing to erase all endpoints for the kubernetes service")
 	}
 
-	// Next, we compare the current list of endpoints with the list of master IP keys
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
+	// Next, we compare the current list of endpoints with the list of master addresses
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masters, endpointPorts, reconcilePorts)
 	if formatCorrect && ipCorrect && portsCorrect {
 		return nil
 	}
@@ -205,9 +207,9 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 
 	if !formatCorrect || !ipCorrect {
 		// repopulate the addresses according to the expected IPs from etcd
-		e.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(masterIPs))
-		for ind, ip := range masterIPs {
-			e.Subsets[0].Addresses[ind] = corev1.EndpointAddress{IP: ip}
+		e.Subsets[0].Addresses = make([]corev1.EndpointAddress, len(masters))
+		for ind, epa := range masters {
+			e.Subsets[0].Addresses[ind] = epa
 		}
 
 		// Lexicographic order is retained by this step.
@@ -219,7 +221,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		e.Subsets[0].Ports = endpointPorts
 	}
 
-	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
+	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, formatEndpointAddresses(masters))
 	if shouldCreate {
 		if _, err = r.endpointClient.Endpoints(corev1.NamespaceDefault).Create(e); errors.IsAlreadyExists(err) {
 			err = nil
@@ -238,7 +240,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 // * ipsCorrect when the addresses in the endpoints match the expected addresses list
 // * portsCorrect is true when endpoint ports exactly match provided ports.
 //     portsCorrect is only evaluated when reconcilePorts is set to true.
-func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []string, ports []corev1.EndpointPort, reconcilePorts bool) (formatCorrect bool, ipsCorrect bool, portsCorrect bool) {
+func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expected []corev1.EndpointAddress, ports []corev1.EndpointPort, reconcilePorts bool) (formatCorrect bool, ipsCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
 		return false, false, false
 	}
@@ -258,25 +260,36 @@ func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []strin
 	}
 
 	ipsCorrect = true
-	if len(sub.Addresses) != len(expectedIPs) {
+	if len(sub.Addresses) != len(expected) {
 		ipsCorrect = false
 	} else {
 		// check the actual content of the addresses
-		// present addrs is used as a set (the keys) and to indicate if a
-		// value was already found (the values)
-		presentAddrs := make(map[string]bool, len(expectedIPs))
-		for _, ip := range expectedIPs {
-			presentAddrs[ip] = false
+		expectedByIP := make(map[string]corev1.EndpointAddress, len(expected))
+		alreadySeen := make(map[string]bool, len(expected))
+		for _, epa := range expected {
+			expectedByIP[epa.IP] = epa
+			alreadySeen[epa.IP] = false
 		}
 
 		// uniqueness is assumed amongst all Addresses.
 		for _, addr := range sub.Addresses {
-			if alreadySeen, ok := presentAddrs[addr.IP]; alreadySeen || !ok {
+			epa, ok := expectedByIP[addr.IP]
+			if !ok {
 				ipsCorrect = false
 				break
 			}
 
-			presentAddrs[addr.IP] = true
+			if addr.NodeName == nil || *addr.NodeName != *epa.NodeName {
+				ipsCorrect = false
+				break
+			}
+
+			if seen, ok := alreadySeen[addr.IP]; seen || !ok {
+				ipsCorrect = false
+				break
+			}
+
+			alreadySeen[addr.IP] = true
 		}
 	}
 
@@ -295,4 +308,15 @@ func (r *leaseEndpointReconciler) StopReconciling() {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 	r.stopReconcilingCalled = true
+}
+
+func formatEndpointAddresses(addrs []corev1.EndpointAddress) []string {
+	items := make([]string, len(addrs))
+	for i, epa := range addrs {
+		items[i] = epa.IP
+		if epa.NodeName != nil {
+			items[i] = fmt.Sprintf("%s:%s", epa.IP, *epa.NodeName)
+		}
+	}
+	return items
 }

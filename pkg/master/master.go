@@ -196,6 +196,7 @@ type CompletedConfig struct {
 type EndpointReconcilerConfig struct {
 	Reconciler reconcilers.EndpointReconciler
 	Interval   time.Duration
+	Nodename   *string
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -207,7 +208,11 @@ type Master struct {
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointClient)
+	return reconcilers.NewMasterCountEndpointReconciler(
+		c.ExtraConfig.EndpointReconcilerConfig.Nodename,
+		c.ExtraConfig.MasterCount,
+		endpointClient,
+	)
 }
 
 func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
@@ -225,7 +230,7 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	if err != nil {
 		klog.Fatalf("Error creating storage factory: %v", err)
 	}
-	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
+	masterLeases := reconcilers.NewLeases(c.ExtraConfig.EndpointReconcilerConfig.Nodename, leaseStorage, "/masterleases/", ttl)
 	return reconcilers.NewLeaseEndpointReconciler(endpointClient, masterLeases)
 }
 
@@ -283,6 +288,14 @@ func (cfg *Config) Complete() CompletedConfig {
 
 	if c.ExtraConfig.MasterEndpointReconcileTTL == 0 {
 		c.ExtraConfig.MasterEndpointReconcileTTL = DefaultEndpointReconcilerTTL
+	}
+
+	if c.ExtraConfig.EndpointReconcilerConfig.Nodename == nil {
+		if hostname, err := nodeutil.GetHostname(""); err == nil {
+			c.ExtraConfig.EndpointReconcilerConfig.Nodename = &hostname
+		} else {
+			klog.Warningf("Could not get node hostname: %v", err)
+		}
 	}
 
 	if c.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {

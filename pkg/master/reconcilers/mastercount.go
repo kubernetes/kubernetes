@@ -35,15 +35,17 @@ import (
 type masterCountEndpointReconciler struct {
 	masterCount           int
 	endpointClient        corev1client.EndpointsGetter
+	nodeName              *string
 	stopReconcilingCalled bool
 	reconcilingLock       sync.Mutex
 }
 
 // NewMasterCountEndpointReconciler creates a new EndpointReconciler that reconciles based on a
 // specified expected number of masters.
-func NewMasterCountEndpointReconciler(masterCount int, endpointClient corev1client.EndpointsGetter) EndpointReconciler {
+func NewMasterCountEndpointReconciler(nodeName *string, masterCount int, endpointClient corev1client.EndpointsGetter) EndpointReconciler {
 	return &masterCountEndpointReconciler{
 		masterCount:    masterCount,
+		nodeName:       nodeName,
 		endpointClient: endpointClient,
 	}
 }
@@ -80,7 +82,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	if errors.IsNotFound(err) {
 		// Simply create non-existing endpoints for the service.
 		e.Subsets = []corev1.EndpointSubset{{
-			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
+			Addresses: []corev1.EndpointAddress{{IP: ip.String(), NodeName: r.nodeName}},
 			Ports:     endpointPorts,
 		}}
 		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Create(e)
@@ -93,7 +95,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	if !formatCorrect {
 		// Something is egregiously wrong, just re-make the endpoints record.
 		e.Subsets = []corev1.EndpointSubset{{
-			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
+			Addresses: []corev1.EndpointAddress{{IP: ip.String(), NodeName: r.nodeName}},
 			Ports:     endpointPorts,
 		}}
 		klog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
@@ -105,7 +107,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	}
 	if !ipCorrect {
 		// We *always* add our own IP address.
-		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, corev1.EndpointAddress{IP: ip.String()})
+		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, corev1.EndpointAddress{IP: ip.String(), NodeName: r.nodeName})
 
 		// Lexicographic order is retained by this step.
 		e.Subsets = endpointsv1.RepackSubsets(e.Subsets)

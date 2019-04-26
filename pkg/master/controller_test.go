@@ -29,6 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 )
 
+const testNodeName = "test-nodename"
+
 func TestReconcileEndpoints(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {
@@ -53,7 +55,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -67,7 +69,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -82,15 +84,18 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "4.3.2.1"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+						Addresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)},
+							{IP: "4.3.2.1", NodeName: strToPtr(testNodeName)},
+						},
+						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -106,11 +111,11 @@ func TestReconcileEndpoints(t *testing.T) {
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.1"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
+							{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)},
+							{IP: "4.3.2.1", NodeName: strToPtr(testNodeName)},
+							{IP: "4.3.2.2", NodeName: strToPtr(testNodeName)},
+							{IP: "4.3.2.3", NodeName: strToPtr(testNodeName)},
+							{IP: "4.3.2.4", NodeName: strToPtr(testNodeName)},
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
@@ -120,10 +125,10 @@ func TestReconcileEndpoints(t *testing.T) {
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "1.2.3.4"},
-						{IP: "4.3.2.2"},
-						{IP: "4.3.2.3"},
-						{IP: "4.3.2.4"},
+						{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)},
+						{IP: "4.3.2.2", NodeName: strToPtr(testNodeName)},
+						{IP: "4.3.2.3", NodeName: strToPtr(testNodeName)},
+						{IP: "4.3.2.4", NodeName: strToPtr(testNodeName)},
 					},
 					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
@@ -140,11 +145,11 @@ func TestReconcileEndpoints(t *testing.T) {
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.1"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
+							{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)},
+							{IP: "4.3.2.1", NodeName: strToPtr(testNodeName)},
+							{IP: "4.3.2.2", NodeName: strToPtr(testNodeName)},
+							{IP: "4.3.2.3", NodeName: strToPtr(testNodeName)},
+							{IP: "4.3.2.4", NodeName: strToPtr(testNodeName)},
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
@@ -154,10 +159,10 @@ func TestReconcileEndpoints(t *testing.T) {
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "4.3.2.1"},
-						{IP: "4.3.2.2"},
-						{IP: "4.3.2.3"},
-						{IP: "4.3.2.4"},
+						{IP: "4.3.2.1", NodeName: strToPtr(testNodeName)},
+						{IP: "4.3.2.2", NodeName: strToPtr(testNodeName)},
+						{IP: "4.3.2.3", NodeName: strToPtr(testNodeName)},
+						{IP: "4.3.2.4", NodeName: strToPtr(testNodeName)},
 					},
 					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
@@ -174,8 +179,8 @@ func TestReconcileEndpoints(t *testing.T) {
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
-							{IP: "4.3.2.1"},
-							{IP: "4.3.2.2"},
+							{IP: "4.3.2.1", NodeName: strToPtr(testNodeName)},
+							{IP: "4.3.2.2", NodeName: strToPtr(testNodeName)},
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
@@ -194,7 +199,7 @@ func TestReconcileEndpoints(t *testing.T) {
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
-							{IP: "4.3.2.1"},
+							{IP: "4.3.2.1", NodeName: strToPtr(testNodeName)},
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
@@ -204,8 +209,8 @@ func TestReconcileEndpoints(t *testing.T) {
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "4.3.2.1"},
-						{IP: "4.3.2.2"},
+						{IP: "4.3.2.1", NodeName: strToPtr(testNodeName)},
+						{IP: "4.3.2.2", NodeName: strToPtr(testNodeName)},
 					},
 					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
@@ -220,7 +225,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("bar"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -228,7 +233,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -242,7 +247,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1"}},
+						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1", NodeName: strToPtr(testNodeName)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -250,7 +255,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -264,7 +269,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 9090, Protocol: "TCP"}},
 					}},
 				}},
@@ -272,7 +277,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -286,7 +291,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "UDP"}},
 					}},
 				}},
@@ -294,7 +299,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -308,7 +313,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -316,7 +321,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports:     []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -334,7 +339,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 						Ports: []corev1.EndpointPort{
 							{Name: "foo", Port: 8080, Protocol: "TCP"},
 							{Name: "bar", Port: 1000, Protocol: "TCP"},
@@ -356,7 +361,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -364,7 +369,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports: []corev1.EndpointPort{
 						{Name: "foo", Port: 8080, Protocol: "TCP"},
 						{Name: "bar", Port: 1000, Protocol: "TCP"},
@@ -381,7 +386,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("boo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports:     []corev1.EndpointPort{{Name: "boo", Port: 7777, Protocol: "SCTP"}},
 				}},
 			},
@@ -392,7 +397,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		if test.endpoints != nil {
 			fakeClient = fake.NewSimpleClientset(test.endpoints)
 		}
-		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, fakeClient.CoreV1())
+		reconciler := reconcilers.NewMasterCountEndpointReconciler(strToPtr(testNodeName), test.additionalMasters+1, fakeClient.CoreV1())
 		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -458,7 +463,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -477,7 +482,7 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1"}},
+						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1", NodeName: strToPtr(testNodeName)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -485,7 +490,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -499,7 +504,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			expectCreate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -510,7 +515,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		if test.endpoints != nil {
 			fakeClient = fake.NewSimpleClientset(test.endpoints)
 		}
-		reconciler := reconcilers.NewMasterCountEndpointReconciler(test.additionalMasters+1, fakeClient.CoreV1())
+		reconciler := reconcilers.NewMasterCountEndpointReconciler(strToPtr(testNodeName), test.additionalMasters+1, fakeClient.CoreV1())
 		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -959,4 +964,8 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, updates)
 		}
 	}
+}
+
+func strToPtr(s string) *string {
+	return &s
 }

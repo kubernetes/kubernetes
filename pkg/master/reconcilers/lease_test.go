@@ -31,43 +31,54 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+const testNodename = "test-nodeName"
+
 type fakeLeases struct {
-	keys map[string]bool
+	nodeName *string
+	items    map[string]corev1.EndpointAddress
+	updated  map[string]bool
 }
 
 var _ Leases = &fakeLeases{}
 
-func newFakeLeases() *fakeLeases {
-	return &fakeLeases{make(map[string]bool)}
+func newFakeLeases(nodeName string) *fakeLeases {
+	return &fakeLeases{
+		nodeName: &nodeName,
+		items:    make(map[string]corev1.EndpointAddress),
+		updated:  make(map[string]bool),
+	}
 }
 
-func (f *fakeLeases) ListLeases() ([]string, error) {
-	res := make([]string, 0, len(f.keys))
-	for ip := range f.keys {
-		res = append(res, ip)
+func (f *fakeLeases) ListLeases() ([]corev1.EndpointAddress, error) {
+	res := make([]corev1.EndpointAddress, 0, len(f.items))
+	for _, epa := range f.items {
+		res = append(res, epa)
 	}
 	return res, nil
 }
 
 func (f *fakeLeases) UpdateLease(ip string) error {
-	f.keys[ip] = true
+	f.updated[ip] = true
+	f.items[ip] = corev1.EndpointAddress{IP: ip, NodeName: f.nodeName}
 	return nil
 }
 
 func (f *fakeLeases) RemoveLease(ip string) error {
-	delete(f.keys, ip)
+	delete(f.items, ip)
+	delete(f.updated, ip)
 	return nil
 }
 
-func (f *fakeLeases) SetKeys(keys []string) {
-	for _, ip := range keys {
-		f.keys[ip] = false
+func (f *fakeLeases) SetItems(items []string) {
+	for _, ip := range items {
+		f.updated[ip] = false
+		f.items[ip] = corev1.EndpointAddress{IP: ip, NodeName: f.nodeName}
 	}
 }
 
-func (f *fakeLeases) GetUpdatedKeys() []string {
+func (f *fakeLeases) GetUpdatedItems() []string {
 	res := []string{}
-	for ip, updated := range f.keys {
+	for ip, updated := range f.updated {
 		if updated {
 			res = append(res, ip)
 		}
@@ -85,7 +96,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		serviceName   string
 		ip            string
 		endpointPorts []corev1.EndpointPort
-		endpointKeys  []string
+		endpointItems []string
 		endpoints     *corev1.EndpointsList
 		expectUpdate  *corev1.Endpoints // nil means none expected
 	}{
@@ -98,7 +109,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -112,7 +123,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -123,12 +134,12 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"1.2.3.4"},
+			endpointItems: []string{"1.2.3.4"},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -143,15 +154,18 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "4.3.2.1"}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+						Addresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.1", NodeName: strToPtr(testNodename)},
+						},
+						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -161,17 +175,17 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			endpointItems: []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.1"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
+							{IP: "1.2.3.4", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.1", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.2", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.3", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.4", NodeName: strToPtr(testNodename)},
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
@@ -181,10 +195,10 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "1.2.3.4"},
-						{IP: "4.3.2.2"},
-						{IP: "4.3.2.3"},
-						{IP: "4.3.2.4"},
+						{IP: "1.2.3.4", NodeName: strToPtr(testNodename)},
+						{IP: "4.3.2.2", NodeName: strToPtr(testNodename)},
+						{IP: "4.3.2.3", NodeName: strToPtr(testNodename)},
+						{IP: "4.3.2.4", NodeName: strToPtr(testNodename)},
 					},
 					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
@@ -195,17 +209,17 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "4.3.2.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			endpointItems: []string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.1"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
+							{IP: "1.2.3.4", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.1", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.2", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.3", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.4", NodeName: strToPtr(testNodename)},
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
@@ -215,10 +229,10 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "4.3.2.1"},
-						{IP: "4.3.2.2"},
-						{IP: "4.3.2.3"},
-						{IP: "4.3.2.4"},
+						{IP: "4.3.2.1", NodeName: strToPtr(testNodename)},
+						{IP: "4.3.2.2", NodeName: strToPtr(testNodename)},
+						{IP: "4.3.2.3", NodeName: strToPtr(testNodename)},
+						{IP: "4.3.2.4", NodeName: strToPtr(testNodename)},
 					},
 					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
@@ -229,13 +243,13 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			serviceName:   "foo",
 			ip:            "4.3.2.2",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			endpointKeys:  []string{"4.3.2.1"},
+			endpointItems: []string{"4.3.2.1"},
 			endpoints: &corev1.EndpointsList{
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
-							{IP: "4.3.2.1"},
+							{IP: "4.3.2.1", NodeName: strToPtr(testNodename)},
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
@@ -245,8 +259,8 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "4.3.2.1"},
-						{IP: "4.3.2.2"},
+						{IP: "4.3.2.1", NodeName: strToPtr(testNodename)},
+						{IP: "4.3.2.2", NodeName: strToPtr(testNodename)},
 					},
 					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
@@ -261,7 +275,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("bar"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -269,7 +283,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -283,7 +297,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1"}},
+						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1", NodeName: strToPtr(testNodename)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -291,7 +305,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -305,7 +319,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 9090, Protocol: "TCP"}},
 					}},
 				}},
@@ -313,7 +327,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -327,7 +341,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "UDP"}},
 					}},
 				}},
@@ -335,7 +349,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -349,7 +363,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -357,7 +371,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 					Ports:     []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -375,7 +389,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 						Ports: []corev1.EndpointPort{
 							{Name: "foo", Port: 8080, Protocol: "TCP"},
 							{Name: "bar", Port: 1000, Protocol: "TCP"},
@@ -397,7 +411,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -405,7 +419,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 					Ports: []corev1.EndpointPort{
 						{Name: "foo", Port: 8080, Protocol: "TCP"},
 						{Name: "bar", Port: 1000, Protocol: "TCP"},
@@ -415,8 +429,8 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		},
 	}
 	for _, test := range reconcileTests {
-		fakeLeases := newFakeLeases()
-		fakeLeases.SetKeys(test.endpointKeys)
+		fakeLeases := newFakeLeases(testNodename)
+		fakeLeases.SetItems(test.endpointItems)
 		clientset := fake.NewSimpleClientset()
 		if test.endpoints != nil {
 			for _, ep := range test.endpoints.Items {
@@ -440,7 +454,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
 			}
 		}
-		if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
+		if updatedKeys := fakeLeases.GetUpdatedItems(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
 			t.Errorf("case %q: expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", test.testName, updatedKeys)
 		}
 	}
@@ -466,7 +480,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -485,7 +499,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1"}},
+						Addresses: []corev1.EndpointAddress{{IP: "4.3.2.1", NodeName: strToPtr(testNodename)}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
@@ -493,7 +507,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -507,7 +521,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodename)}},
 					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
@@ -515,8 +529,8 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	}
 	for _, test := range nonReconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
-			fakeLeases := newFakeLeases()
-			fakeLeases.SetKeys(test.endpointKeys)
+			fakeLeases := newFakeLeases(testNodename)
+			fakeLeases.SetItems(test.endpointKeys)
 			clientset := fake.NewSimpleClientset()
 			if test.endpoints != nil {
 				for _, ep := range test.endpoints.Items {
@@ -540,7 +554,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 					t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
 				}
 			}
-			if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
+			if updatedKeys := fakeLeases.GetUpdatedItems(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
 				t.Errorf("case %q: expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", test.testName, updatedKeys)
 			}
 		})
@@ -572,10 +586,10 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
+							{IP: "1.2.3.4", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.2", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.3", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.4", NodeName: strToPtr(testNodename)},
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
@@ -585,9 +599,9 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "4.3.2.2"},
-						{IP: "4.3.2.3"},
-						{IP: "4.3.2.4"},
+						{IP: "4.3.2.2", NodeName: strToPtr(testNodename)},
+						{IP: "4.3.2.3", NodeName: strToPtr(testNodename)},
+						{IP: "4.3.2.4", NodeName: strToPtr(testNodename)},
 					},
 					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
@@ -604,10 +618,10 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{
-							{IP: "1.2.3.4"},
-							{IP: "4.3.2.2"},
-							{IP: "4.3.2.3"},
-							{IP: "4.3.2.4"},
+							{IP: "1.2.3.4", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.2", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.3", NodeName: strToPtr(testNodename)},
+							{IP: "4.3.2.4", NodeName: strToPtr(testNodename)},
 						},
 						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
@@ -617,8 +631,8 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	}
 	for _, test := range stopTests {
 		t.Run(test.testName, func(t *testing.T) {
-			fakeLeases := newFakeLeases()
-			fakeLeases.SetKeys(test.endpointKeys)
+			fakeLeases := newFakeLeases(testNodename)
+			fakeLeases.SetItems(test.endpointKeys)
 			clientset := fake.NewSimpleClientset()
 			for _, ep := range test.endpoints.Items {
 				if _, err := clientset.CoreV1().Endpoints(ep.Namespace).Create(&ep); err != nil {
@@ -640,11 +654,15 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 					t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
 				}
 			}
-			for _, key := range fakeLeases.GetUpdatedKeys() {
+			for _, key := range fakeLeases.GetUpdatedItems() {
 				if key == test.ip {
 					t.Errorf("case %q: Found ip %s in leases but shouldn't be there", test.testName, key)
 				}
 			}
 		})
 	}
+}
+
+func strToPtr(s string) *string {
+	return &s
 }
