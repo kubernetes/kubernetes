@@ -42,13 +42,6 @@ _ETCD_TARBALL_ARCH_SHA256 = {
     "ppc64le": "148fe96f0ec1813c5db9916199e96a913174304546bc8447a2d2f9fee4b8f6c2",
 }
 
-# Note that these are digests for the manifest list. We resolve the manifest
-# list to each of its platform-specific images in
-# debian_image_dependencies().
-_DEBIAN_BASE_DIGEST = "sha256:6966a0aedd7592c18ff2dd803c08bd85780ee19f5e3a2e7cf908a4cd837afcde"  # 0.4.1
-_DEBIAN_IPTABLES_DIGEST = "sha256:b522b0035dba3ac2d5c0dbaaf8217bd66248e790332ccfdf653e0f943a280dcf"  # v11.0.2
-_DEBIAN_HYPERKUBE_BASE_DIGEST = "sha256:8cabe02be6e86685d8860b7ace7c7addc9591a339728703027a4854677f1c772"  # 0.12.1
-
 # Dependencies needed for a Kubernetes "release", e.g. building docker images,
 # debs, RPMs, or tarballs.
 def release_dependencies():
@@ -75,30 +68,67 @@ def cri_tarballs():
             urls = mirror("https://github.com/kubernetes-incubator/cri-tools/releases/download/v%s/crictl-v%s-linux-%s.tar.gz" % (CRI_TOOLS_VERSION, CRI_TOOLS_VERSION, arch)),
         )
 
+# Use go get -u github.com/estesp/manifest-tool to find these values
+_DEBIAN_BASE_DIGEST = {
+    "manifest": "sha256:6966a0aedd7592c18ff2dd803c08bd85780ee19f5e3a2e7cf908a4cd837afcde",
+    "amd64": "sha256:8ccb65cd2dd7e0c24193d0742a20e4a673dbd11af5a33f16fcd471a31486866c",
+    "arm": "sha256:3432b41de3f6dfffdc1386fce961cfd1f9f8e208b3a35070e10ef3e2a733cb17",
+    "arm64": "sha256:9189251e1d1eb4126d6e6add2e272338f9c8a6a3db38863044625bca4b667f31",
+    "ppc64le": "sha256:50aa659e1e75e4231ee8293c3b4115e5755bb0517142b9b4bddbc134bf4354db",
+    "s390x": "sha256:bbb8ee3a2aaca738c00809f450233d98029fea4e319d8faaa30aa94c8b17a806",
+}
+
+_DEBIAN_IPTABLES_DIGEST = {
+    "manifest": "sha256:b522b0035dba3ac2d5c0dbaaf8217bd66248e790332ccfdf653e0f943a280dcf",
+    "amd64": "sha256:adc40e9ec817c15d35b26d1d6aa4d0f8096fba4c99e26a026159bb0bc98c6a89",
+    "arm": "sha256:58e8a1d3b187eed2d8d3664cd1c9723e5029698714a24dfca4b6ef42ea27a9d4",
+    "arm64": "sha256:1a63fdd216fe7b84561d40ab1ebaa0daae1fc73e4232a6caffbd8353d9a14cea",
+    "ppc64le": "sha256:9f90adbc7513cc96d92fcec7633c4b29e766dd31cf876af03c0b54374e22fa9c",
+    "s390x": "sha256:4f147708deff2a0163ee49b6980cc95423514bec5f4091612d65773b898fbdae",
+}
+
+_DEBIAN_HYPERKUBE_BASE_DIGEST = {
+    "manifest": "sha256:8cabe02be6e86685d8860b7ace7c7addc9591a339728703027a4854677f1c772",
+    "amd64": "sha256:5d4ea2fb5fbe9a9a9da74f67cf2faefc881968bc39f2ac5d62d9167e575812a1",
+    "arm": "sha256:73260814af61522ff6aa48291df457d3bb0a91c4bf72e7cfa51fbaf03eb65fae",
+    "arm64": "sha256:78eeb1a31eef7c16f954444d64636d939d89307e752964ad6d9d06966c722da3",
+    "ppc64le": "sha256:92857d647abe8d9c7b4d7160cd5699112afc12fde369082a8ed00688b17928a9",
+    "s390x": "sha256:c11d74fa0538c67238576c247bfaddf95ebaa90cd03cb4d2f2ac3c6ebe0441e2",
+}
+
+def _digest(d, arch):
+    if arch not in d:
+        print("WARNING: %s not found in %r" % (arch, d))
+        return d["manifest"]
+    return d[arch]
+
 def debian_image_dependencies():
     for arch in SERVER_PLATFORMS["linux"]:
         container_pull(
             name = "debian-base-" + arch,
             architecture = arch,
-            digest = _DEBIAN_BASE_DIGEST,
+            digest = _digest(_DEBIAN_BASE_DIGEST, arch),
             registry = "k8s.gcr.io",
             repository = "debian-base",
+            tag = "0.4.1",  # ignored, but kept here for documentation
         )
 
         container_pull(
             name = "debian-iptables-" + arch,
             architecture = arch,
-            digest = _DEBIAN_IPTABLES_DIGEST,
+            digest = _digest(_DEBIAN_IPTABLES_DIGEST, arch),
             registry = "k8s.gcr.io",
             repository = "debian-iptables",
+            tag = "v11.0.2",  # ignored, but kept here for documentation
         )
 
         container_pull(
             name = "debian-hyperkube-base-" + arch,
             architecture = arch,
-            digest = _DEBIAN_HYPERKUBE_BASE_DIGEST,
+            digest = _digest(_DEBIAN_HYPERKUBE_BASE_DIGEST, arch),
             registry = "k8s.gcr.io",
             repository = "debian-hyperkube-base",
+            tag = "0.12.1",  # ignored, but kept here for documentation
         )
 
 def etcd_tarballs():
