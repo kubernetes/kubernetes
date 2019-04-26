@@ -79,11 +79,11 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	// Invalidate the cache right after updating
-	defer as.cloud.vmCache.Delete(vmName)
-
 	_, err = as.VirtualMachinesClient.CreateOrUpdate(ctx, nodeResourceGroup, vmName, newVM)
 	if err != nil {
+		// clean vm cache right after failure
+		as.cloud.vmCache.Delete(vmName)
+
 		klog.Errorf("azureDisk - attach disk(%s, %s) failed, err: %v", diskName, diskURI, err)
 		detail := err.Error()
 		if strings.Contains(detail, errLeaseFailed) || strings.Contains(detail, errDiskBlobNotFound) {
@@ -144,10 +144,12 @@ func (as *availabilitySet) DetachDisk(diskName, diskURI string, nodeName types.N
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	// Invalidate the cache right after updating
-	defer as.cloud.vmCache.Delete(vmName)
-
-	return as.VirtualMachinesClient.CreateOrUpdate(ctx, nodeResourceGroup, vmName, newVM)
+	resp, err := as.VirtualMachinesClient.CreateOrUpdate(ctx, nodeResourceGroup, vmName, newVM)
+	if err != nil {
+		// clean vm cache right after failure
+		as.cloud.vmCache.Delete(vmName)
+	}
+	return resp, err
 }
 
 // GetDataDisks gets a list of data disks attached to the node.
