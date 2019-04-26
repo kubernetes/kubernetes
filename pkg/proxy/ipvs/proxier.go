@@ -274,15 +274,17 @@ func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 // Proxier implements ProxyProvider
 var _ proxy.ProxyProvider = &Proxier{}
 
-// ParseExcludedCIDRs parses the input strings and returns net.IPNet
+// parseExcludedCIDRs parses the input strings and returns net.IPNet
 // The validation has been done earlier so the error condition will never happen under normal conditions
-func ParseExcludedCIDRs(excludeCIDRStrs []string) []*net.IPNet {
+func parseExcludedCIDRs(excludeCIDRs []string) []*net.IPNet {
 	var cidrExclusions []*net.IPNet
-	for _, excludedCIDR := range excludeCIDRStrs {
+	for _, excludedCIDR := range excludeCIDRs {
 		_, n, err := net.ParseCIDR(excludedCIDR)
-		if err == nil {
-			cidrExclusions = append(cidrExclusions, n)
+		if err != nil {
+			klog.Errorf("Error parsing exclude CIDR %q,  err: %v", excludedCIDR, err)
+			continue
 		}
+		cidrExclusions = append(cidrExclusions, n)
 	}
 	return cidrExclusions
 }
@@ -299,7 +301,7 @@ func NewProxier(ipt utiliptables.Interface,
 	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
-	excludeCIDRStrs []string,
+	excludeCIDRs []string,
 	strictARP bool,
 	masqueradeAll bool,
 	masqueradeBit int,
@@ -410,7 +412,7 @@ func NewProxier(ipt utiliptables.Interface,
 		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, &isIPv6, recorder),
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
-		excludeCIDRs:          ParseExcludedCIDRs(excludeCIDRStrs),
+		excludeCIDRs:          parseExcludedCIDRs(excludeCIDRs),
 		iptables:              ipt,
 		masqueradeAll:         masqueradeAll,
 		masqueradeMark:        masqueradeMark,
