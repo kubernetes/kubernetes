@@ -69,7 +69,6 @@ type cniNetworkPlugin struct {
 
 	host         network.Host
 	execer       utilexec.Interface
-	nsenterPath  string
 	confDir      string
 	binDirs      []string
 	cacheDir     string
@@ -222,11 +221,6 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 }
 
 func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
-	err := plugin.platformInit()
-	if err != nil {
-		return err
-	}
-
 	plugin.host = host
 
 	plugin.syncNetworkConfig()
