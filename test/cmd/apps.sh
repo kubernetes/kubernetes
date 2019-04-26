@@ -326,8 +326,7 @@ run_deployment_tests() {
   newrs="$(kubectl describe deployment nginx | grep NewReplicaSet | awk '{print $2}')"
   rs="$(kubectl get rs "${newrs}" -o yaml)"
   kube::test::if_has_string "${rs}" "deployment.kubernetes.io/revision: \"6\""
-  cat hack/testdata/deployment-revision1.yaml | ${SED} "s/name: nginx$/name: nginx2/" | kubectl create -f - "${kube_flags[@]}"
-  #${SED} "s/name: nginx$/name: nginx2/" hack/testdata/deployment-revision1.yaml | kubectl create -f - "${kube_flags[@]:?}"
+  ${SED} "s/name: nginx$/name: nginx2/" hack/testdata/deployment-revision1.yaml | kubectl create -f - "${kube_flags[@]:?}"
   # Deletion of both deployments should not be blocked
   kubectl delete deployment nginx2 "${kube_flags[@]:?}"
   # Clean up
