@@ -178,7 +178,7 @@ func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo) proxy.Endpoint {
 	return &endpointsInfo{BaseEndpointInfo: baseInfo}
 }
 
-// Equal overrides the Equal() function imlemented by proxy.BaseEndpointInfo.
+// Equal overrides the Equal() function implemented by proxy.BaseEndpointInfo.
 func (e *endpointsInfo) Equal(other proxy.Endpoint) bool {
 	o, ok := other.(*endpointsInfo)
 	if !ok {
