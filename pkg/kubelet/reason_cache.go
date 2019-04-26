@@ -83,7 +83,7 @@ func (c *ReasonCache) Update(uid types.UID, result kubecontainer.PodSyncResult) 
 			toRemove = append(toRemove, name)
 		}
 	}
-	if len(toAdd) + len(toRemove) > 0 {
+	if len(toAdd)+len(toRemove) > 0 {
 		c.lock.Lock()
 		defer c.lock.Unlock()
 		if len(toAdd) > 0 {
