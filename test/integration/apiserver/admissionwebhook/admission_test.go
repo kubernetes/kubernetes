@@ -34,6 +34,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -353,31 +354,32 @@ func TestWebhookV1beta1(t *testing.T) {
 	defer webhookServer.Close()
 
 	// start API server
-	s, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
+	etcdConfig := framework.SharedEtcd()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		// turn off admission plugins that add finalizers
 		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
-		"--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true",
-	}, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.TearDownFn()
-
-	// create CRDs so we can make sure that custom resources do not get lost
-	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(s.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+		// force enable all resources so we can check storage.
+		// TODO: drop these once we stop allowing them to be served.
+		"--runtime-config=api/all=true,extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true",
+	}, etcdConfig)
+	defer server.TearDownFn()
 
 	// Configure a client with a distinct user name so that it is easy to distinguish requests
 	// made by the client from requests made by controllers. We use this to filter out requests
 	// before recording them to ensure we don't accidentally mistake requests from controllers
 	// as requests made by the client.
-	clientConfig := rest.CopyConfig(s.ClientConfig)
+	clientConfig := rest.CopyConfig(server.ClientConfig)
 	clientConfig.Impersonate.UserName = testClientUsername
 	clientConfig.Impersonate.Groups = []string{"system:masters", "system:authenticated"}
 	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := client.CoreV1().Namespaces().Create(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+	// create CRDs
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+
+	if _, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := createV1beta1MutationWebhook(client, webhookServer.URL+"/"+mutation); err != nil {
