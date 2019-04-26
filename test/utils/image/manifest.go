@@ -114,6 +114,8 @@ const (
 	CudaVectorAdd
 	// CudaVectorAdd2 image
 	CudaVectorAdd2
+	// CudaVectorAdd3 image
+	CudaVectorAdd3
 	// Dnsutils image
 	Dnsutils
 	// EchoServer image
