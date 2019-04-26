@@ -57,6 +57,7 @@ spec:
         # Remove these lines for non-GKE clusters, and when GKE supports token-based auth.
         - --kubelet-port=10255
         - --deprecated-kubelet-completely-insecure=true
+        - --kubelet-preferred-address-types=InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP
         ports:
         - containerPort: 443
           name: https
