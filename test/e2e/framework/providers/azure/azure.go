@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/legacy-cloud-providers/azure"
 )
 
 func init() {
