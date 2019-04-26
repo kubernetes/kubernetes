@@ -142,3 +142,78 @@ func TestIsNodeUnmanagedByProviderID(t *testing.T) {
 		assert.Equal(t, test.expected, isUnmanagedNode, test.providerID)
 	}
 }
+
+func TestIsBackendPoolOnSameLB(t *testing.T) {
+	tests := []struct {
+		backendPoolID        string
+		existingBackendPools []string
+		expected             bool
+		expectedLBName       string
+		expectError          bool
+	}{
+		{
+			backendPoolID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1/backendAddressPools/pool1",
+			existingBackendPools: []string{
+				"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1/backendAddressPools/pool2",
+			},
+			expected:       true,
+			expectedLBName: "",
+		},
+		{
+			backendPoolID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1-internal/backendAddressPools/pool1",
+			existingBackendPools: []string{
+				"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1/backendAddressPools/pool2",
+			},
+			expected:       true,
+			expectedLBName: "",
+		},
+		{
+			backendPoolID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1/backendAddressPools/pool1",
+			existingBackendPools: []string{
+				"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1-internal/backendAddressPools/pool2",
+			},
+			expected:       true,
+			expectedLBName: "",
+		},
+		{
+			backendPoolID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1/backendAddressPools/pool1",
+			existingBackendPools: []string{
+				"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb2/backendAddressPools/pool2",
+			},
+			expected:       false,
+			expectedLBName: "lb2",
+		},
+		{
+			backendPoolID: "wrong-backendpool-id",
+			existingBackendPools: []string{
+				"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1/backendAddressPools/pool2",
+			},
+			expectError: true,
+		},
+		{
+			backendPoolID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb1/backendAddressPools/pool1",
+			existingBackendPools: []string{
+				"wrong-existing-backendpool-id",
+			},
+			expectError: true,
+		},
+		{
+			backendPoolID: "wrong-backendpool-id",
+			existingBackendPools: []string{
+				"wrong-existing-backendpool-id",
+			},
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		isSameLB, lbName, err := isBackendPoolOnSameLB(test.backendPoolID, test.existingBackendPools)
+		if test.expectError {
+			assert.Error(t, err)
+			continue
+		}
+
+		assert.Equal(t, test.expected, isSameLB)
+		assert.Equal(t, test.expectedLBName, lbName)
+	}
+}
