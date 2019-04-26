@@ -67,7 +67,7 @@ func (o *CounterOpts) annotateStabilityLevel() {
 
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
-func (o CounterOpts) toPromCounterOpts() prometheus.CounterOpts {
+func (o *CounterOpts) toPromCounterOpts() prometheus.CounterOpts {
 	return prometheus.CounterOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,

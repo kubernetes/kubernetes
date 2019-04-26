@@ -33,13 +33,13 @@ type kubeCounter struct {
 // NewCounter returns an object which satisfies the KubeCollector and KubeCounter interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
-func NewCounter(opts CounterOpts) *kubeCounter {
+func NewCounter(opts *CounterOpts) *kubeCounter {
 	// todo: handle defaulting better
 	if opts.StabilityLevel == "" {
 		opts.StabilityLevel = ALPHA
 	}
 	kc := &kubeCounter{
-		CounterOpts: &opts,
+		CounterOpts: opts,
 		lazyMetric:  lazyMetric{},
 	}
 	kc.setPrometheusCounter(noop)
@@ -85,10 +85,10 @@ type kubeCounterVec struct {
 // NewCounterVec returns an object which satisfies the KubeCollector and KubeCounterVec interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
-func NewCounterVec(opts CounterOpts, labels []string) *kubeCounterVec {
+func NewCounterVec(opts *CounterOpts, labels []string) *kubeCounterVec {
 	cv := &kubeCounterVec{
 		CounterVec:     noopCounterVec,
-		CounterOpts:    &opts,
+		CounterOpts:    opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}

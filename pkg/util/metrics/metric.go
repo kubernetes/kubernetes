@@ -29,7 +29,7 @@ This extends the prometheus.Collector interface to allow customization of the me
 registration process. Defer metric initialization until Create() is called, which then
 delegates to the underlying metric's initializeMetric or initializeDeprecatedMetric
 method call depending on whether the metric is deprecated or not.
- */
+*/
 type KubeCollector interface {
 	Collector
 	LazyMetric
@@ -46,7 +46,7 @@ type KubeCollector interface {
 LazyMetric defines our registration functionality. LazyMetric objects are expected
 to lazily instantiate metrics (i.e defer metric instantiation until when
 the Create() function is explicitly called).
- */
+*/
 type LazyMetric interface {
 	Create(*semver.Version) bool
 	IsCreated() bool
@@ -59,7 +59,7 @@ lazyMetric implements LazyMetric. A lazy metric is lazy because it waits until m
 registration time before instantiation. Add it as an anonymous field to a struct that
 implements KubeCollector to get deferred registration behavior. You must call lazyInit
 with the KubeCollector itself as an argument.
- */
+*/
 type lazyMetric struct {
 	isDeprecated        bool
 	isHidden            bool
@@ -136,7 +136,7 @@ This code is directly lifted from the prometheus codebase. It's a convenience st
 allows you satisfy the Collector interface automatically if you already satisfy the Metric interface.
 
 For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/collector.go#L98-L120
- */
+*/
 type selfCollector struct {
 	metric prometheus.Metric
 }

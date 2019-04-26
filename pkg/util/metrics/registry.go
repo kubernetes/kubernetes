@@ -20,12 +20,11 @@ import (
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/version"
 )
 
-var (
-	// todo: load the version dynamically at application boot.
-	DefaultGlobalRegistry = NewKubeRegistry(semver.MustParse("1.15.0"))
-)
+var DefaultGlobalRegistry = NewKubeRegistry()
 
 type KubeRegistry struct {
 	PromRegistry
@@ -69,9 +68,23 @@ func (kr *KubeRegistry) Gather() ([]*dto.MetricFamily, error) {
 	return kr.PromRegistry.Gather()
 }
 
-// NewRegistry creates a new vanilla Registry without any Collectors
+func NewKubeRegistry() *KubeRegistry {
+	v, err := parseVersion(version.Get())
+	if err != nil {
+		klog.Fatalf("Can't initialize a registry without a valid version %v", err)
+	}
+	if v == nil {
+		klog.Fatalf("No valid version %v", *v)
+	}
+	return &KubeRegistry{
+		PromRegistry: prometheus.NewRegistry(),
+		version:      semver.MustParse(*v),
+	}
+}
+
+// newKubeRegistry creates a new vanilla Registry without any Collectors
 // pre-registered.
-func NewKubeRegistry(version semver.Version) *KubeRegistry {
+func newKubeRegistry(version semver.Version) *KubeRegistry {
 	return &KubeRegistry{
 		PromRegistry: prometheus.NewRegistry(),
 		version:      version,

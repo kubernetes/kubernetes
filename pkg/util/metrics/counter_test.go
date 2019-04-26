@@ -28,14 +28,14 @@ func TestCounter(t *testing.T) {
 	v114 := semver.MustParse("1.14.0")
 	var tests = []struct {
 		desc string
-		CounterOpts
+		*CounterOpts
 		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
 		{
 			desc: "Test non deprecated",
-			CounterOpts: CounterOpts{
+			CounterOpts: &CounterOpts{
 				Namespace:      "namespace",
 				Name:           "metric_test_name",
 				Subsystem:      "subsystem",
@@ -48,7 +48,7 @@ func TestCounter(t *testing.T) {
 		},
 		{
 			desc: "Test deprecated",
-			CounterOpts: CounterOpts{
+			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -62,7 +62,7 @@ func TestCounter(t *testing.T) {
 		},
 		{
 			desc: "Test hidden",
-			CounterOpts: CounterOpts{
+			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -77,7 +77,7 @@ func TestCounter(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := NewKubeRegistry(*test.registryVersion)
+			registry := newKubeRegistry(*test.registryVersion)
 			c := NewCounter(test.CounterOpts)
 			registry.MustRegister(c)
 
@@ -126,7 +126,7 @@ func TestCounterVec(t *testing.T) {
 	v114 := semver.MustParse("1.14.0")
 	var tests = []struct {
 		desc string
-		CounterOpts
+		*CounterOpts
 		labels                    []string
 		registryVersion           *semver.Version
 		expectedMetricFamilyCount int
@@ -134,7 +134,7 @@ func TestCounterVec(t *testing.T) {
 	}{
 		{
 			desc: "Test non deprecated",
-			CounterOpts: CounterOpts{
+			CounterOpts: &CounterOpts{
 				Namespace: "namespace",
 				Name:      "metric_test_name",
 				Subsystem: "subsystem",
@@ -147,7 +147,7 @@ func TestCounterVec(t *testing.T) {
 		},
 		{
 			desc: "Test deprecated",
-			CounterOpts: CounterOpts{
+			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -161,7 +161,7 @@ func TestCounterVec(t *testing.T) {
 		},
 		{
 			desc: "Test hidden",
-			CounterOpts: CounterOpts{
+			CounterOpts: &CounterOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -177,7 +177,7 @@ func TestCounterVec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := NewKubeRegistry(*test.registryVersion)
+			registry := newKubeRegistry(*test.registryVersion)
 			c := NewCounterVec(test.CounterOpts, test.labels)
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Inc()

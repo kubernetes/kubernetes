@@ -27,7 +27,7 @@ var (
 	v115         = semver.MustParse("1.15.0")
 	v114         = semver.MustParse("1.14.0")
 	alphaCounter = NewCounter(
-		CounterOpts{
+		&CounterOpts{
 			Namespace:      "some_namespace",
 			Name:           "test_counter_name",
 			Subsystem:      "subsystem",
@@ -36,7 +36,7 @@ var (
 		},
 	)
 	alphaDeprecatedCounter = NewCounter(
-		CounterOpts{
+		&CounterOpts{
 			Namespace:         "some_namespace",
 			Name:              "test_alpha_dep_counter",
 			Subsystem:         "subsystem",
@@ -46,7 +46,7 @@ var (
 		},
 	)
 	alphaHiddenCounter = NewCounter(
-		CounterOpts{
+		&CounterOpts{
 			Namespace:         "some_namespace",
 			Name:              "test_alpha_hidden_counter",
 			Subsystem:         "subsystem",
@@ -56,7 +56,7 @@ var (
 		},
 	)
 	stableCounter = NewCounter(
-		CounterOpts{
+		&CounterOpts{
 			Namespace:      "some_namespace",
 			Name:           "test_some_other_counter",
 			Subsystem:      "subsystem",
@@ -116,7 +116,7 @@ func TestRegister(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := NewKubeRegistry(*test.registryVersion)
+			registry := newKubeRegistry(*test.registryVersion)
 			for i, m := range test.metrics {
 				err := registry.Register(m)
 				if err != test.expectedErrors[i] && err.Error() != test.expectedErrors[i].Error() {
@@ -183,7 +183,7 @@ func TestMustRegister(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := NewKubeRegistry(*test.registryVersion)
+			registry := newKubeRegistry(*test.registryVersion)
 			for i, m := range test.metrics {
 				if test.expectedPanics[i] {
 					assert.Panics(t,
