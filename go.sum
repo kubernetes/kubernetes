@@ -337,8 +337,6 @@ github.com/prometheus/procfs v0.0.0-20181204211112-1dc9a6cbc91a h1:9a8MnZMP0X2nL
 github.com/prometheus/procfs v0.0.0-20181204211112-1dc9a6cbc91a/go.mod h1:c3At6R/oaqEKCNdg8wHV1ftS6bRYblBhIjjI8uT2IGk=
 github.com/quobyte/api v0.1.2 h1:lPHLsuvtjFyk8WhC4uHoHRkScijIHcffTWBBP+YpzYo=
 github.com/quobyte/api v0.1.2/go.mod h1:jL7lIHrmqQ7yh05OJ+eEEdHr0u/kmT1Ff9iHd+4H6VI=
-github.com/rancher/go-rancher v0.0.0-20160922212217-09693a8743ba h1:YPSbZK9YwHzifTgnX/TdxhL+UV9FCk+9ku9Iz1uc8kc=
-github.com/rancher/go-rancher v0.0.0-20160922212217-09693a8743ba/go.mod h1:7oQvGNiJsGvrUgB+7AH8bmdzuR0uhULfwKb43Ht0hUk=
 github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446/go.mod h1:uYEyJGbgTkfkS4+E/PavXkNJcbFIpEtjt2B0KDQ5+9M=
 github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8 h1:b904/jbnmYuSPd5ojGzVTLjKPVTSj3t/e1vEPiPGjEg=
 github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8/go.mod h1:JGuDeoQd7Z6yL4zQhZ3OPEVHB7fL6Ka6skscFHfmt2k=

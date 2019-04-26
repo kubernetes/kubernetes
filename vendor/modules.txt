@@ -719,8 +719,6 @@ github.com/prometheus/procfs/nfs
 github.com/prometheus/procfs/xfs
 # github.com/quobyte/api v0.1.2 => github.com/quobyte/api v0.1.2
 github.com/quobyte/api
-# github.com/rancher/go-rancher v0.0.0-20160922212217-09693a8743ba => github.com/rancher/go-rancher v0.0.0-20160922212217-09693a8743ba
-github.com/rancher/go-rancher/client
 # github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8 => github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
 github.com/robfig/cron
 # github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
