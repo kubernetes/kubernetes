@@ -39,7 +39,7 @@ function container_runtime_monitoring {
   fi
   # Container runtime startup takes time. Make initial attempts before starting
   # killing the container runtime.
-  until timeout 60 ${healthcheck_command} > /dev/null; do
+  until timeout 60 "${healthcheck_command}" > /dev/null; do
     if (( attempt == max_attempts )); then
       echo "Max attempt ${max_attempts} reached! Proceeding to monitor container runtime healthiness."
       break
@@ -48,7 +48,7 @@ function container_runtime_monitoring {
     sleep "$(( 2 ** attempt++ ))"
   done
   while true; do
-    if ! timeout 60 ${healthcheck_command} > /dev/null; then
+    if ! timeout 60 "${healthcheck_command}" > /dev/null; then
       echo "Container runtime ${container_runtime_name} failed!"
       if [[ "$container_runtime_name" == "docker" ]]; then
           # Dump stack of docker daemon for investigation.
@@ -71,10 +71,10 @@ function kubelet_monitoring {
   sleep 120
   local -r max_seconds=10
   local output=""
-  while [ 1 ]; do
+  while true; do
     if ! output=$(curl -m "${max_seconds}" -f -s -S http://127.0.0.1:10255/healthz 2>&1); then
       # Print the response and/or errors.
-      echo $output
+      echo "$output"
       echo "Kubelet is unhealthy!"
       systemctl kill kubelet
       # Wait for a while, as we don't want to kill it again before it is really up.
@@ -108,5 +108,5 @@ if [[ "${component}" == "container-runtime" ]]; then
 elif [[ "${component}" == "kubelet" ]]; then
   kubelet_monitoring
 else
-  echo "Health monitoring for component "${component}" is not supported!"
+  echo "Health monitoring for component ${component} is not supported!"
 fi
