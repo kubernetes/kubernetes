@@ -70,15 +70,34 @@ func (c *ReasonCache) add(uid types.UID, name string, reason error, message stri
 // Update updates the reason cache with the SyncPodResult. Only SyncResult with
 // StartContainer action will change the cache.
 func (c *ReasonCache) Update(uid types.UID, result kubecontainer.PodSyncResult) {
+	toAdd := []*kubecontainer.SyncResult{}
+	toRemove := []string{}
 	for _, r := range result.SyncResults {
 		if r.Action != kubecontainer.StartContainer {
 			continue
 		}
 		name := r.Target.(string)
 		if r.Error != nil {
-			c.add(uid, name, r.Error, r.Message)
+			toAdd = append(toAdd, r)
 		} else {
-			c.Remove(uid, name)
+			toRemove = append(toRemove, name)
+		}
+	}
+	if len(toAdd) + len(toRemove) > 0 {
+		c.lock.Lock()
+		defer c.lock.Unlock()
+		if len(toAdd) > 0 {
+			for i := range toAdd {
+				r := toAdd[i]
+				name := r.Target.(string)
+				c.cache.Add(c.composeKey(uid, name), reasonItem{r.Error, r.Message})
+			}
+		}
+		if len(toRemove) > 0 {
+			for i := range toRemove {
+				name := toRemove[i]
+				c.cache.Remove(c.composeKey(uid, name))
+			}
 		}
 	}
 }
