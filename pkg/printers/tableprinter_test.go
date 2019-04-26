@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ import (
 	"reflect"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var testNamespaceColumnDefinitions = []metav1beta1.TableColumnDefinition{
@@ -34,7 +34,7 @@ var testNamespaceColumnDefinitions = []metav1beta1.TableColumnDefinition{
 	{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 }
 
-func testPrintNamespace(obj *api.Namespace, options PrintOptions) ([]metav1beta1.TableRow, error) {
+func testPrintNamespace(obj *corev1.Namespace, options PrintOptions) ([]metav1beta1.TableRow, error) {
 	if options.WithNamespace {
 		return nil, fmt.Errorf("namespace is not namespaced")
 	}
@@ -64,7 +64,7 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 				printFunc:         printFunc,
 			},
 			opt: PrintOptions{},
-			obj: &api.Namespace{
+			obj: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			},
 			includeHeader: false,
@@ -77,7 +77,7 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 				printFunc:         printFunc,
 			},
 			opt: PrintOptions{},
-			obj: &api.Namespace{
+			obj: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			},
 			includeHeader: true,
@@ -90,7 +90,7 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 				printFunc:         printFunc,
 			},
 			opt: PrintOptions{},
-			obj: &api.Namespace{
+			obj: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			},
 			includeHeader: true,
@@ -105,7 +105,7 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 			opt: PrintOptions{
 				WithNamespace: true,
 			},
-			obj: &api.Namespace{
+			obj: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			},
 			includeHeader: true,
