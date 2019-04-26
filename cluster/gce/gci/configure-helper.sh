@@ -594,6 +594,9 @@ function create-master-auth {
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
   fi
+  if [[ -n "${GCE_GLBC_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${GCE_GLBC_TOKEN},"                "system:controller:glbc,uid:system:controller:glbc"
+  fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
@@ -1045,6 +1048,30 @@ contexts:
     user: kube-controller-manager
   name: service-account-context
 current-context: service-account-context
+EOF
+}
+
+function create-l7-lb-controller-kubeconfig {
+  echo "Creating l7-lb-controller kubeconfig file"
+  mkdir -p /etc/srv/kubernetes/l7-lb-controller
+  cat <<EOF >/etc/srv/kubernetes/l7-lb-controller/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: l7-lb-controller
+  user:
+    token: ${GCE_GLBC_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: l7-lb-controller
+  name: l7-lb-controller
+current-context: l7-lb-controller
 EOF
 }
 
@@ -2737,6 +2764,8 @@ function start-lb-controller {
     echo "Start GCE L7 pod"
     prepare-log-file /var/log/glbc.log
     setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
+    setup-addon-manifests "addons" "rbac/cluster-loadbalancing/glbc"
+    create-l7-lb-controller-kubeconfig
 
     local -r src_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
     local -r dest_manifest="/etc/kubernetes/manifests/glbc.manifest"
@@ -2906,6 +2935,9 @@ function main() {
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
+  if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
+    GCE_GLBC_TOKEN="$(secure_random 32)"
+  fi
 
   setup-os-params
   config-ip-firewall
