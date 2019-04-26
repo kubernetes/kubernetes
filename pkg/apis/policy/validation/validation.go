@@ -41,17 +41,6 @@ func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorLis
 	return allErrs
 }
 
-func ValidatePodDisruptionBudgetUpdate(pdb, oldPdb *policy.PodDisruptionBudget) field.ErrorList {
-	restoreGeneration := pdb.Generation
-	pdb.Generation = oldPdb.Generation
-
-	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
-	allErrs = append(allErrs, ValidatePodDisruptionBudgetStatus(pdb.Status, field.NewPath("status"))...)
-
-	pdb.Generation = restoreGeneration
-	return allErrs
-}
-
 func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
