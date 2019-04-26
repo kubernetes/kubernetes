@@ -33,7 +33,7 @@ import (
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/join"
@@ -127,7 +127,7 @@ type joinOptions struct {
 	token                 string
 	controlPlane          bool
 	ignorePreflightErrors []string
-	externalcfg           *kubeadmapiv1beta1.JoinConfiguration
+	externalcfg           *kubeadmapiv1beta2.JoinConfiguration
 	certificateKey        string
 }
 
@@ -217,7 +217,7 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 }
 
 // addJoinConfigFlags adds join flags bound to the config to the specified flagset
-func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration) {
+func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.JoinConfiguration) {
 	flagSet.StringVar(
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
@@ -283,13 +283,13 @@ func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 // newJoinOptions returns a struct ready for being used for creating cmd join flags.
 func newJoinOptions() *joinOptions {
 	// initialize the public kubeadm config API by applying defaults
-	externalcfg := &kubeadmapiv1beta1.JoinConfiguration{}
+	externalcfg := &kubeadmapiv1beta2.JoinConfiguration{}
 
 	// Add optional config objects to host flags.
 	// un-set objects will be cleaned up afterwards (into newJoinData func)
-	externalcfg.Discovery.File = &kubeadmapiv1beta1.FileDiscovery{}
-	externalcfg.Discovery.BootstrapToken = &kubeadmapiv1beta1.BootstrapTokenDiscovery{}
-	externalcfg.ControlPlane = &kubeadmapiv1beta1.JoinControlPlane{}
+	externalcfg.Discovery.File = &kubeadmapiv1beta2.FileDiscovery{}
+	externalcfg.Discovery.BootstrapToken = &kubeadmapiv1beta2.BootstrapTokenDiscovery{}
+	externalcfg.ControlPlane = &kubeadmapiv1beta2.JoinControlPlane{}
 
 	// Apply defaults
 	kubeadmscheme.Scheme.Default(externalcfg)
@@ -377,7 +377,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 			return nil, errors.Errorf("File %s does not exists. Please use 'kubeadm join phase control-plane-prepare' subcommands to generate it.", adminKubeConfigPath)
 		}
 		klog.V(1).Infof("[preflight] found discovery flags missing for this command. using FileDiscovery: %s", adminKubeConfigPath)
-		opt.externalcfg.Discovery.File = &kubeadmapiv1beta1.FileDiscovery{KubeConfigPath: adminKubeConfigPath}
+		opt.externalcfg.Discovery.File = &kubeadmapiv1beta2.FileDiscovery{KubeConfigPath: adminKubeConfigPath}
 		opt.externalcfg.Discovery.BootstrapToken = nil //NB. this could be removed when we get better control on args (e.g. phases without discovery should have NoArgs )
 	}
 

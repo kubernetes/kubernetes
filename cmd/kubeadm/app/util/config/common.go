@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -40,11 +40,11 @@ import (
 func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
 	switch internalcfg := obj.(type) {
 	case *kubeadmapi.InitConfiguration:
-		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1beta1.SchemeGroupVersion)
+		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1beta2.SchemeGroupVersion)
 	case *kubeadmapi.ClusterConfiguration:
-		return MarshalClusterConfigurationToBytes(internalcfg, kubeadmapiv1beta1.SchemeGroupVersion)
+		return MarshalClusterConfigurationToBytes(internalcfg, kubeadmapiv1beta2.SchemeGroupVersion)
 	default:
-		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1beta1.SchemeGroupVersion, kubeadmscheme.Codecs)
+		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1beta2.SchemeGroupVersion, kubeadmscheme.Codecs)
 	}
 }
 
@@ -57,7 +57,7 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	// v1.12: v1alpha2 read-only, writes only v1alpha3 config. Errors if the user tries to use v1alpha1
 	// v1.13: v1alpha3 read-only, writes only v1beta1 config. Errors if the user tries to use v1alpha1 or v1alpha2
 	// v1.14: v1alpha3 convert only, writes only v1beta1 config. Errors if the user tries to use v1alpha1 or v1alpha2
-	// v1.15: only v1beta1 config. Errors if the user tries to use v1alpha1, v1alpha2 or v1alpha3
+	// v1.15: v1beta1 read-only, writes only v1beta2 config. Errors if the user tries to use v1alpha1, v1alpha2 or v1alpha3
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
 		"kubeadm.k8s.io/v1alpha2": "v1.12",

@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	testJoinConfig = `apiVersion: kubeadm.k8s.io/v1beta1
+	testJoinConfig = `apiVersion: kubeadm.k8s.io/v1beta2
 kind: JoinConfiguration
 discovery:
   bootstrapToken:
