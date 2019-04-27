@@ -378,6 +378,42 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 			err:        false,
 		},
 		{
+			name: "test success 4 (named service port with same target port)",
+			svc: corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:       80,
+							Name:       "http",
+							TargetPort: intstr.FromInt(80),
+						},
+						{
+							Port:       443,
+							Name:       "https",
+							TargetPort: intstr.FromInt(443),
+						},
+					},
+				},
+			},
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: int32(80)},
+								{
+									ContainerPort: int32(443)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{"http", "https"},
+			translated: []string{"80", "443"},
+			err:        false,
+		},
+		{
 			name: "test success 4 (named service port with random local port)",
 			svc: corev1.Service{
 				Spec: corev1.ServiceSpec{
