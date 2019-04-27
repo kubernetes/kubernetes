@@ -211,23 +211,17 @@ func TestEventChannelFull(t *testing.T) {
 		}},
 	}
 	pleg.relist()
-	// event channel is full, discard events
-	expected = []*PodLifecycleEvent{
+	allEvents := []*PodLifecycleEvent{
 		{ID: "1234", Type: ContainerRemoved, Data: "c1"},
 		{ID: "1234", Type: ContainerDied, Data: "c2"},
 		{ID: "1234", Type: ContainerStarted, Data: "c3"},
 		{ID: "4567", Type: ContainerRemoved, Data: "c1"},
 		{ID: "4567", Type: ContainerStarted, Data: "c4"},
 	}
+	// event channel is full, discard events
 	actual = getEventsFromChannel(ch)
 	assert.True(t, len(actual) == 4, "channel length should be 4")
-	for _, actualEvent := range actual {
-		for _, expectedEvent := range expected {
-			if actualEvent.ID == expectedEvent.ID && actualEvent.Data == expectedEvent.Data {
-				assert.True(t, actualEvent.Type == expectedEvent.Type, "event type should be equal")
-			}
-		}
-	}
+	assert.Subsetf(t, allEvents, actual, "actual events should in all events")
 }
 
 func TestDetectingContainerDeaths(t *testing.T) {
