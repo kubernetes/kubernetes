@@ -300,18 +300,6 @@ func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
 	return v
 }
 
-func scandir(dir string) {
-	v := newVisitor()
-	pkg, err := parser.ParseDir(v.FileSet, dir, nil, parser.ParseComments)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, p := range pkg {
-		ast.Walk(v, p)
-	}
-}
-
 func scanfile(path string, src interface{}) []conformanceData {
 	v := newVisitor()
 	file, err := parser.ParseFile(v.FileSet, path, src, parser.ParseComments)

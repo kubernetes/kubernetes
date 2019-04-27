@@ -31,14 +31,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/apiserver/pkg/apis/audit/v1"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/auth"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	. "github.com/onsi/ginkgo"
 )
 
@@ -652,7 +653,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 	// test authorizer annotations, RBAC is required.
 	It("should audit API calls to get a pod with unauthorized user.", func() {
-		if !framework.IsRBACEnabled(f) {
+		if !auth.IsRBACEnabled(f.ClientSet.RbacV1beta1()) {
 			framework.Skipf("RBAC not enabled.")
 		}
 
@@ -735,7 +736,7 @@ func expectEvents(f *framework.Framework, expectedEvents []utils.AuditEvent) {
 			return false, err
 		}
 		defer stream.Close()
-		missingReport, err := utils.CheckAuditLines(stream, expectedEvents, v1.SchemeGroupVersion)
+		missingReport, err := utils.CheckAuditLines(stream, expectedEvents, auditv1.SchemeGroupVersion)
 		if err != nil {
 			framework.Logf("Failed to observe audit events: %v", err)
 		} else if len(missingReport.MissingEvents) > 0 {

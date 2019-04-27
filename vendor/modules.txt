@@ -1,10 +1,9 @@
 # bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690 => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
 bitbucket.org/bertimus9/systemstat
-# cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2 => cloud.google.com/go v0.0.0-20160913182117-3b1ae45394a2
+# cloud.google.com/go v0.34.0 => cloud.google.com/go v0.34.0
 cloud.google.com/go/compute/metadata
-cloud.google.com/go/internal
-# github.com/Azure/azure-sdk-for-go v21.3.0+incompatible => github.com/Azure/azure-sdk-for-go v21.3.0+incompatible
-github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute
+# github.com/Azure/azure-sdk-for-go v21.4.0+incompatible => github.com/Azure/azure-sdk-for-go v21.4.0+incompatible
+github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute
 github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry
 github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network
 github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage
@@ -13,7 +12,7 @@ github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
-# github.com/Azure/go-autorest v11.1.0+incompatible => github.com/Azure/go-autorest v11.1.0+incompatible
+# github.com/Azure/go-autorest v11.1.2+incompatible => github.com/Azure/go-autorest v11.1.2+incompatible
 github.com/Azure/go-autorest/autorest
 github.com/Azure/go-autorest/autorest/adal
 github.com/Azure/go-autorest/autorest/azure
@@ -445,6 +444,9 @@ github.com/google/cadvisor/storage
 github.com/google/cadvisor/summary
 github.com/google/cadvisor/utils
 github.com/google/cadvisor/utils/cloudinfo
+github.com/google/cadvisor/utils/cloudinfo/aws
+github.com/google/cadvisor/utils/cloudinfo/azure
+github.com/google/cadvisor/utils/cloudinfo/gce
 github.com/google/cadvisor/utils/cpuload
 github.com/google/cadvisor/utils/cpuload/netlink
 github.com/google/cadvisor/utils/docker
@@ -533,6 +535,12 @@ github.com/hashicorp/hcl/json/token
 github.com/heketi/heketi/client/api/go-client
 github.com/heketi/heketi/pkg/glusterfs/api
 github.com/heketi/heketi/pkg/utils
+# github.com/hpcloud/tail v1.0.0 => github.com/hpcloud/tail v1.0.0
+github.com/hpcloud/tail
+github.com/hpcloud/tail/ratelimiter
+github.com/hpcloud/tail/util
+github.com/hpcloud/tail/watch
+github.com/hpcloud/tail/winfile
 # github.com/imdario/mergo v0.3.5 => github.com/imdario/mergo v0.3.5
 github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.0.0 => github.com/inconshreveable/mousetrap v1.0.0
@@ -610,7 +618,7 @@ github.com/munnerz/goautoneg
 github.com/mvdan/xurls
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 github.com/mxk/go-flowrate/flowrate
-# github.com/onsi/ginkgo v1.6.0 => github.com/onsi/ginkgo v0.0.0-20170318221715-67b9df7f55fe
+# github.com/onsi/ginkgo v1.6.0 => github.com/onsi/ginkgo v1.6.0
 github.com/onsi/ginkgo
 github.com/onsi/ginkgo/config
 github.com/onsi/ginkgo/ginkgo
@@ -711,8 +719,6 @@ github.com/prometheus/procfs/nfs
 github.com/prometheus/procfs/xfs
 # github.com/quobyte/api v0.1.2 => github.com/quobyte/api v0.1.2
 github.com/quobyte/api
-# github.com/rancher/go-rancher v0.0.0-20160922212217-09693a8743ba => github.com/rancher/go-rancher v0.0.0-20160922212217-09693a8743ba
-github.com/rancher/go-rancher/client
 # github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8 => github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
 github.com/robfig/cron
 # github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
@@ -857,7 +863,7 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181 => golang.org/x/oauth2 v0.0.0-20170412232759-a6bd8cefa181
+# golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a => golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
 golang.org/x/oauth2
 golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
@@ -994,6 +1000,8 @@ google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
 google.golang.org/grpc/transport
+# gopkg.in/fsnotify.v1 v1.4.7 => gopkg.in/fsnotify.v1 v1.4.7
+gopkg.in/fsnotify.v1
 # gopkg.in/gcfg.v1 v1.2.0 => gopkg.in/gcfg.v1 v1.2.0
 gopkg.in/gcfg.v1
 gopkg.in/gcfg.v1/scanner
@@ -1008,6 +1016,8 @@ gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
 gopkg.in/square/go-jose.v2/json
 gopkg.in/square/go-jose.v2/jwt
+# gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 => gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
+gopkg.in/tomb.v1
 # gopkg.in/warnings.v0 v0.1.1 => gopkg.in/warnings.v0 v0.1.1
 gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.2.1 => gopkg.in/yaml.v2 v2.2.1
@@ -1189,6 +1199,8 @@ k8s.io/apiserver/pkg/apis/audit/v1beta1
 k8s.io/apiserver/pkg/apis/audit/validation
 k8s.io/apiserver/pkg/apis/config
 k8s.io/apiserver/pkg/apis/config/v1
+k8s.io/apiserver/pkg/apis/example
+k8s.io/apiserver/pkg/apis/example/v1
 k8s.io/apiserver/pkg/audit
 k8s.io/apiserver/pkg/audit/event
 k8s.io/apiserver/pkg/audit/policy
@@ -1561,7 +1573,7 @@ k8s.io/gengo/parser
 k8s.io/gengo/types
 # k8s.io/heapster v1.2.0-beta.1 => k8s.io/heapster v1.2.0-beta.1
 k8s.io/heapster/metrics/api/v1/types
-# k8s.io/klog v0.0.0-20190306015804-8e90cee79f82 => k8s.io/klog v0.0.0-20190306015804-8e90cee79f82
+# k8s.io/klog v0.3.0 => k8s.io/klog v0.3.0
 k8s.io/klog
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 k8s.io/kube-aggregator/pkg/apis/apiregistration
@@ -1615,6 +1627,13 @@ k8s.io/kube-proxy/config/v1alpha1
 k8s.io/kube-scheduler/config/v1alpha1
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
 k8s.io/kubelet/config/v1beta1
+# k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
+k8s.io/legacy-cloud-providers/azure
+k8s.io/legacy-cloud-providers/azure/auth
+k8s.io/legacy-cloud-providers/vsphere
+k8s.io/legacy-cloud-providers/vsphere/testing
+k8s.io/legacy-cloud-providers/vsphere/vclib
+k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers
 # k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
 k8s.io/metrics/pkg/apis/custom_metrics
 k8s.io/metrics/pkg/apis/custom_metrics/v1beta1

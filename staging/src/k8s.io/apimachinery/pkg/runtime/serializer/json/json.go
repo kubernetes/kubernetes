@@ -37,7 +37,7 @@ import (
 // is not nil, the object has the group, version, and kind fields set.
 // Deprecated: use NewSerializerWithOptions instead.
 func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, pretty bool) *Serializer {
-	return NewSerializerWithOptions(meta, creater, typer, &SerializerOptions{false, pretty, false})
+	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{false, pretty, false})
 }
 
 // NewYAMLSerializer creates a YAML serializer that handles encoding versioned objects into the proper YAML form. If typer
@@ -45,40 +45,46 @@ func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtim
 // matches JSON, and will error if constructs are used that do not serialize to JSON.
 // Deprecated: use NewSerializerWithOptions instead.
 func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
-	return NewSerializerWithOptions(meta, creater, typer, &SerializerOptions{true, false, false})
+	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{true, false, false})
 }
 
 // NewSerializerWithOptions creates a JSON/YAML serializer that handles encoding versioned objects into the proper JSON/YAML
-// form. If typer is not nil, the object has the group, version, and kind fields set.
-func NewSerializerWithOptions(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, serializerOptions *SerializerOptions) *Serializer {
+// form. If typer is not nil, the object has the group, version, and kind fields set. Options are copied into the Serializer
+// and are immutable.
+func NewSerializerWithOptions(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, options SerializerOptions) *Serializer {
 	return &Serializer{
-		meta:              meta,
-		creater:           creater,
-		typer:             typer,
-		SerializerOptions: serializerOptions,
+		meta:    meta,
+		creater: creater,
+		typer:   typer,
+		options: options,
 	}
 }
 
-// SerializerOptions holds the options which are used to creating a JSON/YAML serializer.
-// For example:
-// (1) we can creates a JSON serializer once we set `Yaml` to `false`.
-// (2) we can creates a YAML serializer once we set `Yaml` to `true`. This serializer supports only the subset of YAML that
-//     matches JSON, and will error if constructs are used that do not serialize to JSON.
-//     Please note that `Pretty` is silently ignored when `Yaml` is `true`.
-// (3) we can creates a strict JSON/YAML serializer that can also return errors of type strictDecodingError, once we set
-//    `Strict` to `true`. And note that this serializer is not as performant as the non-strict variant, and should not be
-//    used in fast paths.
+// SerializerOptions holds the options which are used to configure a JSON/YAML serializer.
+// example:
+// (1) To configure a JSON serializer, set `Yaml` to `false`.
+// (2) To configure a YAML serializer, set `Yaml` to `true`.
+// (3) To configure a strict serializer that can return strictDecodingError, set `Strict` to `true`.
 type SerializerOptions struct {
-	Yaml   bool
+	// Yaml: configures the Serializer to work with JSON(false) or YAML(true).
+	// When `Yaml` is enabled, this serializer only supports the subset of YAML that
+	// matches JSON, and will error if constructs are used that do not serialize to JSON.
+	Yaml bool
+
+	// Pretty: configures a JSON enabled Serializer(`Yaml: false`) to produce human-readable output.
+	// This option is silently ignored when `Yaml` is `true`.
 	Pretty bool
+
+	// Strict: configures the Serializer to return strictDecodingError's when duplicate fields are present decoding JSON or YAML.
+	// Note that enabling this option is not as performant as the non-strict variant, and should not be used in fast paths.
 	Strict bool
 }
 
 type Serializer struct {
 	meta    MetaFactory
+	options SerializerOptions
 	creater runtime.ObjectCreater
 	typer   runtime.ObjectTyper
-	*SerializerOptions
 }
 
 // Serializer implements Serializer
@@ -193,7 +199,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 	}
 
 	data := originalData
-	if s.Yaml {
+	if s.options.Yaml {
 		altered, err := yaml.YAMLToJSON(data)
 		if err != nil {
 			return nil, nil, err
@@ -251,7 +257,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 	}
 
 	// If the deserializer is non-strict, return successfully here.
-	if !s.Strict {
+	if !s.options.Strict {
 		return obj, actual, nil
 	}
 
@@ -280,7 +286,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
-	if s.Yaml {
+	if s.options.Yaml {
 		json, err := caseSensitiveJsonIterator.Marshal(obj)
 		if err != nil {
 			return err
@@ -293,7 +299,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 
-	if s.Pretty {
+	if s.options.Pretty {
 		data, err := caseSensitiveJsonIterator.MarshalIndent(obj, "", "  ")
 		if err != nil {
 			return err
@@ -307,7 +313,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 
 // RecognizesData implements the RecognizingDecoder interface.
 func (s *Serializer) RecognizesData(peek io.Reader) (ok, unknown bool, err error) {
-	if s.Yaml {
+	if s.options.Yaml {
 		// we could potentially look for '---'
 		return false, true, nil
 	}

@@ -76,7 +76,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		DeleteStrategy:      pod.Strategy,
 		ReturnDeletedObject: true,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: pod.GetAttrs, TriggerFunc: pod.NodeNameTriggerFunc}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -147,6 +147,12 @@ func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createVali
 	// TODO: move me to a binding strategy
 	if errs := validation.ValidatePodBinding(binding); len(errs) != 0 {
 		return nil, errs.ToAggregate()
+	}
+
+	if createValidation != nil {
+		if err := createValidation(binding.DeepCopyObject()); err != nil {
+			return nil, err
+		}
 	}
 
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations, dryrun.IsDryRun(options.DryRun))

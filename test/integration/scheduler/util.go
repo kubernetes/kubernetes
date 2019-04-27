@@ -591,17 +591,6 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 
 // podUnschedulable returns a condition function that returns true if the given pod
 // gets unschedulable status.
-func podSchedulableCondition(c clientset.Interface, podNamespace, podName string) (*v1.PodCondition, error) {
-	pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-	return cond, nil
-}
-
-// podUnschedulable returns a condition function that returns true if the given pod
-// gets unschedulable status.
 func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})

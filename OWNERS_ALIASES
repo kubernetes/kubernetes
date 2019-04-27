@@ -345,9 +345,11 @@ aliases:
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
   
-  # sig-api-machinery-api-reviewers:
-  #   - 
-  #   - 
+  sig-api-machinery-api-reviewers:
+    - caesarxuchao
+    - deads2k
+    - jpbetz
+    - sttts
   
   # sig-apps-api-reviewers:
   #   - 
@@ -357,10 +359,11 @@ aliases:
   #   - 
   #   - 
   
-  # sig-cli-api-reviewers:
-  #   - 
-  #   - 
   
+  sig-cli-api-reviewers:
+    - pwittrock
+    - soltysh
+
   sig-cloud-provider-api-reviewers:
     - andrewsykim
     - cheftako
@@ -381,13 +384,15 @@ aliases:
       - bsalamat
       - k82cn
   
-  # sig-storage-api-reviewers:
-  #   - 
-  #   - 
+  sig-storage-api-reviewers:
+    - saad-ali
+    - msau42
+    - jsafrane
+
   
-  # sig-windows-api-reviewers:
-  #   - 
-  #   - 
+  sig-windows-api-reviewers:
+    - patricklang
+    - michmike
 
   dep-approvers:
     - apelisse

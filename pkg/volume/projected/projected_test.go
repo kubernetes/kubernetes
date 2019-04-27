@@ -1193,20 +1193,6 @@ func makeSecret(namespace, name string) v1.Secret {
 	}
 }
 
-func configMap(namespace, name string) v1.ConfigMap {
-	return v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
-		Data: map[string]string{
-			"data-1": "value-1",
-			"data-2": "value-2",
-			"data-3": "value-3",
-		},
-	}
-}
-
 func makeProjection(name string, defaultMode int32, kind string) *v1.ProjectedVolumeSource {
 	var item v1.VolumeProjection
 

@@ -1,9 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -17,13 +14,13 @@ go_library(
     ],
     deps = [
         "//pkg/cloudprovider/providers/aws:go_default_library",
-        "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/cloudprovider/providers/cloudstack:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/cloudprovider/providers/openstack:go_default_library",
         "//pkg/cloudprovider/providers/ovirt:go_default_library",
         "//pkg/cloudprovider/providers/photon:go_default_library",
-        "//pkg/cloudprovider/providers/vsphere:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/vsphere:go_default_library",
     ],
 )
 
@@ -39,14 +36,19 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/cloudprovider/providers/aws:all-srcs",
-        "//pkg/cloudprovider/providers/azure:all-srcs",
         "//pkg/cloudprovider/providers/cloudstack:all-srcs",
         "//pkg/cloudprovider/providers/fake:all-srcs",
         "//pkg/cloudprovider/providers/gce:all-srcs",
         "//pkg/cloudprovider/providers/openstack:all-srcs",
         "//pkg/cloudprovider/providers/ovirt:all-srcs",
         "//pkg/cloudprovider/providers/photon:all-srcs",
-        "//pkg/cloudprovider/providers/vsphere:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["providers_test.go"],
+    embed = [":go_default_library"],
+    deps = ["//staging/src/k8s.io/legacy-cloud-providers/vsphere/testing:go_default_library"],
 )

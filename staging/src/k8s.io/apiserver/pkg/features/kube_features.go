@@ -115,6 +115,13 @@ const (
 	//
 	// Enables support for watch bookmark events.
 	WatchBookmark utilfeature.Feature = "WatchBookmark"
+
+	// owner: @MikeSpreitzer @yue9944882
+	// alpha: v1.15
+	//
+	//
+	// Enables managing request concurrency with prioritization and fairness at each server
+	RequestManagement utilfeature.Feature = "RequestManagement"
 )
 
 func init() {
@@ -137,4 +144,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	WinOverlay:              {Default: false, PreRelease: utilfeature.Alpha},
 	WinDSR:                  {Default: false, PreRelease: utilfeature.Alpha},
 	WatchBookmark:           {Default: false, PreRelease: utilfeature.Alpha},
+	RequestManagement:       {Default: false, PreRelease: utilfeature.Alpha},
 }

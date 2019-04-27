@@ -1683,7 +1683,7 @@ type VolumeMount struct {
 	// Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
 	// Defaults to "" (volume's root).
 	// SubPathExpr and SubPath are mutually exclusive.
-	// This field is alpha in 1.14.
+	// This field is beta in 1.15.
 	// +optional
 	SubPathExpr string
 }
@@ -2672,7 +2672,7 @@ type PodSpec struct {
 	// If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
 	// empty definition that uses the default runtime handler.
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
-	// This is an alpha feature and may change in the future.
+	// This is a beta feature as of Kubernetes v1.14.
 	// +optional
 	RuntimeClassName *string
 	// EnableServiceLinks indicates whether information about services should be injected into pod's

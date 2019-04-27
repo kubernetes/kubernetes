@@ -418,9 +418,9 @@ func TestDecode(t *testing.T) {
 	for i, test := range testCases {
 		var s runtime.Serializer
 		if test.yaml {
-			s = json.NewSerializerWithOptions(json.DefaultMetaFactory, test.creater, test.typer, &json.SerializerOptions{Yaml: test.yaml, Pretty: false, Strict: test.strict})
+			s = json.NewSerializerWithOptions(json.DefaultMetaFactory, test.creater, test.typer, json.SerializerOptions{Yaml: test.yaml, Pretty: false, Strict: test.strict})
 		} else {
-			s = json.NewSerializerWithOptions(json.DefaultMetaFactory, test.creater, test.typer, &json.SerializerOptions{Yaml: test.yaml, Pretty: test.pretty, Strict: test.strict})
+			s = json.NewSerializerWithOptions(json.DefaultMetaFactory, test.creater, test.typer, json.SerializerOptions{Yaml: test.yaml, Pretty: test.pretty, Strict: test.strict})
 		}
 		obj, gvk, err := s.Decode([]byte(test.data), test.defaultGVK, test.into)
 

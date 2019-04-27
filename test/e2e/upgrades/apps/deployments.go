@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	frameworkdeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
@@ -82,7 +83,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 
 	// Trigger a new rollout so that we have some history.
 	ginkgo.By(fmt.Sprintf("Triggering a new rollout for deployment %q", deploymentName))
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *apps.Deployment) {
+	deployment, err = frameworkdeployment.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = "updated-name"
 	})
 	framework.ExpectNoError(err)
@@ -158,7 +159,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 
 	// Verify the upgraded deployment is active by scaling up the deployment by 1
 	ginkgo.By(fmt.Sprintf("Scaling up replicaset of deployment %q by 1", deploymentName))
-	_, err = framework.UpdateDeploymentWithRetries(c, ns, deploymentName, func(deployment *apps.Deployment) {
+	_, err = frameworkdeployment.UpdateDeploymentWithRetries(c, ns, deploymentName, func(deployment *apps.Deployment) {
 		*deployment.Spec.Replicas = *deployment.Spec.Replicas + 1
 	})
 	framework.ExpectNoError(err)

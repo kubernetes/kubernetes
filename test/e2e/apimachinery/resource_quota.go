@@ -1362,17 +1362,6 @@ func newTestResourceQuotaWithScopeForPriorityClass(name string, hard v1.Resource
 	}
 }
 
-// newTestResourceQuotaForEphemeralStorage returns a quota that enforces default constraints for testing feature LocalStorageCapacityIsolation
-func newTestResourceQuotaForEphemeralStorage(name string) *v1.ResourceQuota {
-	hard := v1.ResourceList{}
-	hard[v1.ResourceEphemeralStorage] = resource.MustParse("500Mi")
-	hard[v1.ResourceQuotas] = resource.MustParse("1")
-	return &v1.ResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       v1.ResourceQuotaSpec{Hard: hard},
-	}
-}
-
 // newTestResourceQuota returns a quota that enforces default constraints for testing
 func newTestResourceQuota(name string) *v1.ResourceQuota {
 	hard := v1.ResourceList{}

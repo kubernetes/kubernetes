@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -214,5 +214,116 @@ var _ = SIGDescribe("Network", func() {
 
 		Expect(math.Abs(float64(timeoutSeconds - expectedTimeoutSeconds))).Should(
 			BeNumerically("<", (epsilonSeconds)))
+	})
+
+	// Regression test for #74839, where:
+	// Packets considered INVALID by conntrack are now dropped. In particular, this fixes
+	// a problem where spurious retransmits in a long-running TCP connection to a service
+	// IP could result in the connection being closed with the error "Connection reset by
+	// peer"
+	It("should resolve connrection reset issue #74839 [Slow]", func() {
+		serverLabel := map[string]string{
+			"app": "boom-server",
+		}
+		clientLabel := map[string]string{
+			"app": "client",
+		}
+
+		serverPod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "boom-server",
+				Labels: serverLabel,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "boom-server",
+						Image: "gcr.io/kubernetes-e2e-test-images/regression-issue-74839-amd64:1.0",
+						Ports: []v1.ContainerPort{
+							{
+								ContainerPort: 9000, // Default port exposed by boom-server
+							},
+						},
+					},
+				},
+				Affinity: &v1.Affinity{
+					PodAntiAffinity: &v1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: clientLabel,
+								},
+								TopologyKey: "kubernetes.io/hostname",
+							},
+						},
+					},
+				},
+			},
+		}
+		_, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(serverPod)
+		framework.ExpectNoError(err)
+
+		By("Server pod created")
+
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "boom-server",
+			},
+			Spec: v1.ServiceSpec{
+				Selector: serverLabel,
+				Ports: []v1.ServicePort{
+					{
+						Protocol: v1.ProtocolTCP,
+						Port:     9000,
+					},
+				},
+			},
+		}
+		_, err = fr.ClientSet.CoreV1().Services(fr.Namespace.Name).Create(svc)
+		framework.ExpectNoError(err)
+
+		By("Server service created")
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "startup-script",
+				Labels: clientLabel,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "startup-script",
+						Image: "gcr.io/google-containers/startup-script:v1",
+						Command: []string{
+							"bash", "-c", "while true; do sleep 2; nc boom-server 9000& done",
+						},
+					},
+				},
+				Affinity: &v1.Affinity{
+					PodAntiAffinity: &v1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: serverLabel,
+								},
+								TopologyKey: "kubernetes.io/hostname",
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+		_, err = fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(pod)
+		framework.ExpectNoError(err)
+
+		By("Client pod created")
+
+		for i := 0; i < 20; i++ {
+			time.Sleep(3 * time.Second)
+			resultPod, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Get(serverPod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			Expect(resultPod.Status.ContainerStatuses[0].LastTerminationState.Terminated).Should(BeNil())
+		}
 	})
 })

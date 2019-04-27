@@ -275,7 +275,7 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 		return fmt.Errorf("failed to get plugin info using RPC GetInfo at socket %s, err: %v", socketPath, err)
 	}
 
-	handler, ok := w.handlers[infoResp.Type]
+	handler, ok := w.getHandler(infoResp.Type)
 	if !ok {
 		return w.notifyPlugin(client, false, fmt.Sprintf("no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath))
 	}

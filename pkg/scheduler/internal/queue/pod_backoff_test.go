@@ -92,18 +92,3 @@ func TestClearPodBackoff(t *testing.T) {
 		t.Errorf("Expected backoff of 1s for pod %s, got %s", podID, duration.String())
 	}
 }
-
-func TestTryBackoffAndWait(t *testing.T) {
-	bpm := NewPodBackoffMap(1*time.Second, 60*time.Second)
-
-	stopCh := make(chan struct{})
-	podID := ktypes.NamespacedName{Namespace: "ns", Name: "pod"}
-	if !bpm.TryBackoffAndWait(podID, stopCh) {
-		t.Error("Expected TryBackoffAndWait success for new pod, got failure.")
-	}
-
-	close(stopCh)
-	if bpm.TryBackoffAndWait(podID, stopCh) {
-		t.Error("Expected TryBackoffAndWait failure with closed stopCh, got success.")
-	}
-}

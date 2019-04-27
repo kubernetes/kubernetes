@@ -39,8 +39,8 @@ import (
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -108,11 +108,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	var c clientset.Interface
 	var ns string
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		_, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
 		framework.SkipUnlessProviderIs("gke", "aws")
@@ -122,8 +122,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	})
 
 	framework.KubeDescribe("Pods", func() {
-		Context("should return to running and ready state after network partition is healed", func() {
-			BeforeEach(func() {
+		ginkgo.Context("should return to running and ready state after network partition is healed", func() {
+			ginkgo.BeforeEach(func() {
 				framework.SkipUnlessNodeCountIsAtLeast(2)
 			})
 
@@ -133,13 +133,13 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// 1. Node is marked NotReady after timeout by nodecontroller (40seconds)
 			// 2. All pods on node are marked NotReady shortly after #1
 			// 3. Node and pods return to Ready after connectivity recovers
-			It("All pods on the unreachable node should be marked as NotReady upon the node turn NotReady "+
+			ginkgo.It("All pods on the unreachable node should be marked as NotReady upon the node turn NotReady "+
 				"AND all pods should be mark back to Ready when the node get back to Ready before pod eviction timeout", func() {
-				By("choose a node - we will block all network traffic on this node")
+				ginkgo.By("choose a node - we will block all network traffic on this node")
 				var podOpts metav1.ListOptions
 				nodeOpts := metav1.ListOptions{}
 				nodes, err := c.CoreV1().Nodes().List(nodeOpts)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				framework.FilterNodes(nodes, func(node v1.Node) bool {
 					if !framework.IsNodeConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
@@ -160,7 +160,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}
 
-				By("Set up watch on node status")
+				ginkgo.By("Set up watch on node status")
 				nodeSelector := fields.OneTermEqualSelector("metadata.name", node.Name)
 				stopCh := make(chan struct{})
 				newNode := make(chan *v1.Node)
@@ -182,7 +182,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					cache.ResourceEventHandlerFuncs{
 						UpdateFunc: func(oldObj, newObj interface{}) {
 							n, ok := newObj.(*v1.Node)
-							Expect(ok).To(Equal(true))
+							gomega.Expect(ok).To(gomega.Equal(true))
 							newNode <- n
 
 						},
@@ -196,21 +196,21 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				}()
 				go controller.Run(stopCh)
 
-				By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
+				ginkgo.By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
 				host, err := framework.GetNodeExternalIP(&node)
 				framework.ExpectNoError(err)
 				masterAddresses := framework.GetAllMasterAddresses(c)
 				defer func() {
-					By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
+					ginkgo.By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
 					for _, masterAddress := range masterAddresses {
 						framework.UnblockNetwork(host, masterAddress)
 					}
 
-					if CurrentGinkgoTestDescription().Failed {
+					if ginkgo.CurrentGinkgoTestDescription().Failed {
 						return
 					}
 
-					By("Expect to observe node and pod status change from NotReady to Ready after network connectivity recovers")
+					ginkgo.By("Expect to observe node and pod status change from NotReady to Ready after network connectivity recovers")
 					expectNodeReadiness(true, newNode)
 					if err = framework.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReady); err != nil {
 						framework.Failf("Pods on node %s did not become ready and running within %v: %v", node.Name, podReadyTimeout, err)
@@ -221,7 +221,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					framework.BlockNetwork(host, masterAddress)
 				}
 
-				By("Expect to observe node and pod status change from Ready to NotReady after network partition")
+				ginkgo.By("Expect to observe node and pod status change from Ready to NotReady after network partition")
 				expectNodeReadiness(false, newNode)
 				if err = framework.WaitForMatchPodsCondition(c, podOpts, "NotReady", podNotReadyTimeout, testutils.PodNotReady); err != nil {
 					framework.Failf("Pods on node %s did not become NotReady within %v: %v", node.Name, podNotReadyTimeout, err)
@@ -231,7 +231,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	})
 
 	framework.KubeDescribe("[ReplicationController]", func() {
-		It("should recreate pods scheduled on the unreachable node "+
+		ginkgo.It("should recreate pods scheduled on the unreachable node "+
 			"AND allow scheduling of pods on a node after it rejoins the cluster", func() {
 
 			// Create a replication controller for a service that serves its hostname.
@@ -243,32 +243,32 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, nil)
 			err = framework.VerifyPods(c, ns, name, true, replicas)
-			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Each pod should start running and responding")
 
-			By("choose a node with at least one pod - we will block some network traffic on this node")
+			ginkgo.By("choose a node with at least one pod - we will block some network traffic on this node")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.CoreV1().Pods(ns).List(options) // list pods after all have been scheduled
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName
 
 			node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// This creates a temporary network partition, verifies that 'podNameToDisappear',
 			// that belongs to replication controller 'rcName', really disappeared (because its
 			// grace period is set to 0).
 			// Finally, it checks that the replication controller recreates the
 			// pods on another node and that now the number of replicas is equal 'replicas'.
-			By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
+			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
 			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
 				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-				By("verifying whether the pod from the unreachable node is recreated")
+				ginkgo.By("verifying whether the pod from the unreachable node is recreated")
 				err = framework.VerifyPods(c, ns, name, true, replicas)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 
 			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
@@ -279,26 +279,26 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// sleep a bit, to allow Watch in NodeController to catch up.
 			time.Sleep(5 * time.Second)
 
-			By("verify whether new pods can be created on the re-attached node")
+			ginkgo.By("verify whether new pods can be created on the re-attached node")
 			// increasing the RC size is not a valid way to test this
 			// since we have no guarantees the pod will be scheduled on our node.
 			additionalPod := "additionalpod"
 			err = newPodOnNode(c, ns, additionalPod, node.Name)
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			err = framework.VerifyPods(c, ns, additionalPod, true, 1)
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// verify that it is really on the requested node
 			{
 				pod, err := c.CoreV1().Pods(ns).Get(additionalPod, metav1.GetOptions{})
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				if pod.Spec.NodeName != node.Name {
 					framework.Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
 				}
 			}
 		})
 
-		It("should eagerly create replacement pod during network partition when termination grace is non-zero", func() {
+		ginkgo.It("should eagerly create replacement pod during network partition when termination grace is non-zero", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-net"
@@ -310,32 +310,32 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, &gracePeriod)
 			err = framework.VerifyPods(c, ns, name, true, replicas)
-			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Each pod should start running and responding")
 
-			By("choose a node with at least one pod - we will block some network traffic on this node")
+			ginkgo.By("choose a node with at least one pod - we will block some network traffic on this node")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.CoreV1().Pods(ns).List(options) // list pods after all have been scheduled
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName
 
 			node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// This creates a temporary network partition, verifies that 'podNameToDisappear',
 			// that belongs to replication controller 'rcName', did not disappear (because its
 			// grace period is set to 30).
 			// Finally, it checks that the replication controller recreates the
 			// pods on another node and that now the number of replicas is equal 'replicas + 1'.
-			By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
+			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
 			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
 				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
-				Expect(err).To(Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
+				gomega.Expect(err).To(gomega.Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
 
-				By(fmt.Sprintf("verifying that there are %v running pods during partition", replicas))
+				ginkgo.By(fmt.Sprintf("verifying that there are %v running pods during partition", replicas))
 				_, err = framework.PodsCreated(c, ns, name, replicas)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 
 			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
@@ -352,10 +352,10 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		}
 		headlessSvcName := "test"
 
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
 			framework.SkipUnlessProviderIs("gke")
-			By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
+			ginkgo.By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 			framework.ExpectNoError(err)
@@ -363,20 +363,20 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			ns = f.Namespace.Name
 		})
 
-		AfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all stateful set in ns %v", ns)
 			framework.DeleteAllStatefulSets(c, ns)
 		})
 
-		It("should come back up if node goes down [Slow] [Disruptive]", func() {
+		ginkgo.It("should come back up if node goes down [Slow] [Disruptive]", func() {
 			petMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := framework.NewStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
 			_, err := c.AppsV1().StatefulSets(ns).Create(ps)
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			pst := framework.NewStatefulSetTester(c)
 
@@ -386,14 +386,14 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			framework.ExpectNoError(err)
 			common.RestartNodes(f.ClientSet, nodes)
 
-			By("waiting for pods to be running again")
+			ginkgo.By("waiting for pods to be running again")
 			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
 		})
 
-		It("should not reschedule stateful pods if there is a network partition [Slow] [Disruptive]", func() {
+		ginkgo.It("should not reschedule stateful pods if there is a network partition [Slow] [Disruptive]", func() {
 			ps := framework.NewStatefulSet(psName, ns, headlessSvcName, 3, []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
 			_, err := c.AppsV1().StatefulSets(ns).Create(ps)
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			pst := framework.NewStatefulSetTester(c)
 			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
@@ -408,7 +408,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Checking that the NodeController does not force delete stateful pods %v", pod.Name)
 				err := framework.WaitTimeoutForPodNoLongerRunningInNamespace(c, pod.Name, ns, 10*time.Minute)
-				Expect(err).To(Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
+				gomega.Expect(err).To(gomega.Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
 			})
 
 			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
@@ -416,13 +416,13 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 			}
 
-			By("waiting for pods to be running again")
+			ginkgo.By("waiting for pods to be running again")
 			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
 		})
 	})
 
 	framework.KubeDescribe("[Job]", func() {
-		It("should create new pods when node is partitioned", func() {
+		ginkgo.It("should create new pods when node is partitioned", func() {
 			parallelism := int32(2)
 			completions := int32(4)
 			backoffLimit := int32(6) // default value
@@ -430,33 +430,33 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			job := jobutil.NewTestJob("notTerminate", "network-partition", v1.RestartPolicyNever,
 				parallelism, completions, nil, backoffLimit)
 			job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			label := labels.SelectorFromSet(labels.Set(map[string]string{jobutil.JobSelectorKey: job.Name}))
 
-			By(fmt.Sprintf("verifying that there are now %v running pods", parallelism))
+			ginkgo.By(fmt.Sprintf("verifying that there are now %v running pods", parallelism))
 			_, err = framework.PodsCreatedByLabel(c, ns, job.Name, parallelism, label)
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			By("choose a node with at least one pod - we will block some network traffic on this node")
+			ginkgo.By("choose a node with at least one pod - we will block some network traffic on this node")
 			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.CoreV1().Pods(ns).List(options) // list pods after all have been scheduled
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			nodeName := pods.Items[0].Spec.NodeName
 
 			node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// This creates a temporary network partition, verifies that the job has 'parallelism' number of
 			// running pods after the node-controller detects node unreachable.
-			By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
+			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
 			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
 				err := framework.WaitForPodToDisappear(c, ns, pods.Items[0].Name, label, 20*time.Second, 10*time.Minute)
-				Expect(err).To(Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
+				gomega.Expect(err).To(gomega.Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
 
-				By(fmt.Sprintf("verifying that there are now %v running pods", parallelism))
+				ginkgo.By(fmt.Sprintf("verifying that there are now %v running pods", parallelism))
 				_, err = framework.PodsCreatedByLabel(c, ns, job.Name, parallelism, label)
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			})
 
 			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
@@ -467,8 +467,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	})
 
 	framework.KubeDescribe("Pods", func() {
-		Context("should be evicted from unready Node", func() {
-			BeforeEach(func() {
+		ginkgo.Context("should be evicted from unready Node", func() {
+			ginkgo.BeforeEach(func() {
 				framework.SkipUnlessNodeCountIsAtLeast(2)
 			})
 
@@ -478,9 +478,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// 1. Node is marked NotReady after timeout by nodecontroller (40seconds)
 			// 2. All pods on node are marked NotReady shortly after #1
 			// 3. After enough time passess all Pods are evicted from the given Node
-			It("[Feature:TaintEviction] All pods on the unreachable node should be marked as NotReady upon the node turn NotReady "+
+			ginkgo.It("[Feature:TaintEviction] All pods on the unreachable node should be marked as NotReady upon the node turn NotReady "+
 				"AND all pods should be evicted after eviction timeout passes", func() {
-				By("choose a node - we will block all network traffic on this node")
+				ginkgo.By("choose a node - we will block all network traffic on this node")
 				var podOpts metav1.ListOptions
 				nodes := framework.GetReadySchedulableNodesOrDie(c)
 				framework.FilterNodes(nodes, func(node v1.Node) bool {
@@ -542,7 +542,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					maxTolerationTime,
 				)
 
-				By("Set up watch on node status")
+				ginkgo.By("Set up watch on node status")
 				nodeSelector := fields.OneTermEqualSelector("metadata.name", node.Name)
 				stopCh := make(chan struct{})
 				newNode := make(chan *v1.Node)
@@ -564,7 +564,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					cache.ResourceEventHandlerFuncs{
 						UpdateFunc: func(oldObj, newObj interface{}) {
 							n, ok := newObj.(*v1.Node)
-							Expect(ok).To(Equal(true))
+							gomega.Expect(ok).To(gomega.Equal(true))
 							newNode <- n
 
 						},
@@ -578,21 +578,21 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				}()
 				go controller.Run(stopCh)
 
-				By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
+				ginkgo.By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
 				host, err := framework.GetNodeExternalIP(&node)
 				framework.ExpectNoError(err)
 				masterAddresses := framework.GetAllMasterAddresses(c)
 				defer func() {
-					By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
+					ginkgo.By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
 					for _, masterAddress := range masterAddresses {
 						framework.UnblockNetwork(host, masterAddress)
 					}
 
-					if CurrentGinkgoTestDescription().Failed {
+					if ginkgo.CurrentGinkgoTestDescription().Failed {
 						return
 					}
 
-					By("Expect to observe node status change from NotReady to Ready after network connectivity recovers")
+					ginkgo.By("Expect to observe node status change from NotReady to Ready after network connectivity recovers")
 					expectNodeReadiness(true, newNode)
 				}()
 
@@ -600,7 +600,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					framework.BlockNetwork(host, masterAddress)
 				}
 
-				By("Expect to observe node and pod status change from Ready to NotReady after network partition")
+				ginkgo.By("Expect to observe node and pod status change from Ready to NotReady after network partition")
 				expectNodeReadiness(false, newNode)
 				framework.ExpectNoError(wait.Poll(1*time.Second, timeout, func() (bool, error) {
 					return framework.NodeHasTaint(c, node.Name, nodepkg.UnreachableTaintTemplate)
@@ -610,7 +610,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				}
 
 				sleepTime := maxTolerationTime + 20*time.Second
-				By(fmt.Sprintf("Sleeping for %v and checking if all Pods were evicted", sleepTime))
+				ginkgo.By(fmt.Sprintf("Sleeping for %v and checking if all Pods were evicted", sleepTime))
 				time.Sleep(sleepTime)
 				pods, err = c.CoreV1().Pods(v1.NamespaceAll).List(podOpts)
 				framework.ExpectNoError(err)

@@ -607,8 +607,18 @@ func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
 	return !skipAttach, nil
 }
 
-// TODO (#75352) add proper logic to determine device moutability by inspecting the spec.
+// CanDeviceMount returns true if the spec supports device mount
 func (p *csiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	driverMode, err := p.getDriverMode(spec)
+	if err != nil {
+		return false, err
+	}
+
+	if driverMode == ephemeralDriverMode {
+		klog.V(5).Info(log("plugin.CanDeviceMount skipped ephemeral mode detected for spec %v", spec.Name()))
+		return false, nil
+	}
+
 	return true, nil
 }
 
@@ -893,13 +903,4 @@ func isV0Version(version string) bool {
 	}
 
 	return parsedVersion.Major() == 0
-}
-
-func isV1Version(version string) bool {
-	parsedVersion, err := utilversion.ParseGeneric(version)
-	if err != nil {
-		return false
-	}
-
-	return parsedVersion.Major() == 1
 }

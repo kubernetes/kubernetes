@@ -31,7 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
@@ -154,7 +154,7 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfigurati
 
 // BackupAPIServerCertIfNeeded rotates the kube-apiserver certificate if older than 180 days
 func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
-	certAndKeyDir := kubeadmapiv1beta1.DefaultCertificatesDir
+	certAndKeyDir := kubeadmapiv1beta2.DefaultCertificatesDir
 	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
 	if err != nil {
 		// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
@@ -231,7 +231,7 @@ func GetKubeletDir(dryRun bool) (string, error) {
 // backupAPIServerCertAndKey backups the old cert and key of kube-apiserver to a specified directory.
 func backupAPIServerCertAndKey(certAndKeyDir string) error {
 	subDir := filepath.Join(certAndKeyDir, "expired")
-	if err := os.Mkdir(subDir, 0766); err != nil {
+	if err := os.Mkdir(subDir, 0700); err != nil {
 		return errors.Wrapf(err, "failed to created backup directory %s", subDir)
 	}
 

@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # The api version in which objects are currently stored in etcd.
@@ -67,7 +67,7 @@ function startApiServer() {
     --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" \
     --storage-versions="${storage_versions}" \
-    --storage-media-type=${storage_media_type} 1>&2 &
+    --storage-media-type="${storage_media_type}" 1>&2 &
   APISERVER_PID=$!
 
   # url, prefix, wait, times
@@ -103,7 +103,7 @@ echo "${ETCD_VERSION}" > "${ETCD_DIR}/version.txt"
 
 # source_file,resource,namespace,name,old_version,new_version
 tests=(
-test/e2e/testing-manifests/rbd-storage-class.yaml,storageclasses,,slow,v1beta1,v1
+"test/e2e/testing-manifests/rbd-storage-class.yaml,storageclasses,,slow,v1beta1,v1"
 )
 
 KUBE_OLD_API_VERSION="networking.k8s.io/v1,storage.k8s.io/v1beta1,extensions/v1beta1"
@@ -123,7 +123,7 @@ startApiServer ${KUBE_OLD_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
 
 
 # Create object(s)
-for test in ${tests[@]}; do
+for test in "${tests[@]}"; do
   IFS=',' read -ra test_data <<<"$test"
   source_file=${test_data[0]}
 
@@ -140,7 +140,7 @@ for test in ${tests[@]}; do
     namespace="${namespace}/"
   fi
   kube::log::status "Verifying ${resource}/${namespace}${name} has storage version ${old_storage_version} in etcd"
-  ETCDCTL_API=3 ${ETCDCTL} --endpoints="http://${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep ${old_storage_version}
+  ETCDCTL_API=3 ${ETCDCTL} --endpoints="http://${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep "${old_storage_version}"
 done
 
 killApiServer
@@ -160,7 +160,7 @@ kube::log::status "Updating storage versions in etcd"
 ${UPDATE_ETCD_OBJECTS_SCRIPT}
 
 # Verify that the storage version was changed in etcd
-for test in ${tests[@]}; do
+for test in "${tests[@]}"; do
   IFS=',' read -ra test_data <<<"$test"
   resource=${test_data[1]}
   namespace=${test_data[2]}
@@ -171,7 +171,7 @@ for test in ${tests[@]}; do
     namespace="${namespace}/"
   fi
   kube::log::status "Verifying ${resource}/${namespace}${name} has updated storage version ${new_storage_version} in etcd"
-  ETCDCTL_API=3 ${ETCDCTL} --endpoints="http://${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep ${new_storage_version}
+  ETCDCTL_API=3 ${ETCDCTL} --endpoints="http://${ETCD_HOST}:${ETCD_PORT}" get "/${ETCD_PREFIX}/${resource}/${namespace}${name}" | grep "${new_storage_version}"
 done
 
 killApiServer
@@ -188,7 +188,7 @@ RUNTIME_CONFIG="api/all=false,api/v1=true,apiregistration.k8s.io/v1=true,${KUBE_
 sleep 1
 startApiServer ${KUBE_NEW_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_PROTOBUF}
 
-for test in ${tests[@]}; do
+for test in "${tests[@]}"; do
   IFS=',' read -ra test_data <<<"$test"
   resource=${test_data[1]}
   namespace=${test_data[2]}
@@ -203,8 +203,8 @@ for test in ${tests[@]}; do
   kube::log::status "Verifying we can retrieve ${resource}/${namespace}${name} via kubectl"
   # We have to remove the cached discovery information about the old version; otherwise,
   # the 'kubectl get' will use that and fail to find the resource.
-  rm -rf ${HOME}/.kube/cache/discovery/localhost_8080/${KUBE_OLD_STORAGE_VERSIONS}
-  ${KUBECTL} get ${namespace_flag} ${resource}/${name}
+  rm -rf "${HOME}/.kube/cache/discovery/localhost_8080/${KUBE_OLD_STORAGE_VERSIONS}"
+  ${KUBECTL} get "${namespace_flag}" "${resource}/${name}"
 done
 
 killApiServer

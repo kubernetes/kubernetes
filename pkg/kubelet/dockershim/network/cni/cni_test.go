@@ -291,7 +291,7 @@ func TestCNIPlugin(t *testing.T) {
 		t.Errorf("mismatch in expected port mappings. expected %v got %v", expectedMappings, inputConfig.RuntimeConfig.PortMappings)
 	}
 	expectedBandwidth := map[string]interface{}{
-		"ingressRate": 1000.0, "egressRate": 1000.0,
+		"ingressRate": 1000000.0, "egressRate": 1000000.0,
 		"ingressBurst": 2147483647.0, "egressBurst": 2147483647.0,
 	}
 	if !reflect.DeepEqual(inputConfig.RuntimeConfig.Bandwidth, expectedBandwidth) {

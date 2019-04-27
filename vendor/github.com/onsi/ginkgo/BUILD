@@ -16,6 +16,7 @@ go_library(
         "//vendor/github.com/onsi/ginkgo/internal/writer:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters/stenographer:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
     ],
 )

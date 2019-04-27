@@ -17,7 +17,7 @@ limitations under the License.
 package renewal
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"net"
@@ -32,7 +32,6 @@ import (
 	fakecerts "k8s.io/client-go/kubernetes/typed/certificates/v1beta1/fake"
 	k8stesting "k8s.io/client-go/testing"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -40,7 +39,7 @@ import (
 
 func TestRenewImplementations(t *testing.T) {
 	caCertCfg := &certutil.Config{CommonName: "kubernetes"}
-	caCert, caKey, err := certs.NewCACertAndKey(caCertCfg)
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(caCertCfg)
 	if err != nil {
 		t.Fatalf("couldn't create CA: %v", err)
 	}
@@ -114,7 +113,7 @@ func defaultReactionFunc(obj runtime.Object) k8stesting.ReactionFunc {
 	}
 }
 
-func getCertReq(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey) *certsapi.CertificateSigningRequest {
+func getCertReq(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer) *certsapi.CertificateSigningRequest {
 	cert, _, err := pkiutil.NewCertAndKey(caCert, caKey, &certutil.Config{
 		CommonName: "testcert",
 		AltNames: certutil.AltNames{
@@ -198,7 +197,7 @@ func TestRenewExistingCert(t *testing.T) {
 	}
 
 	caCertCfg := &certutil.Config{CommonName: "kubernetes"}
-	caCert, caKey, err := certs.NewCACertAndKey(caCertCfg)
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(caCertCfg)
 	if err != nil {
 		t.Fatalf("couldn't create CA: %v", err)
 	}

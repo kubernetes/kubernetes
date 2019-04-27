@@ -27,9 +27,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	versionutil "k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -142,24 +139,6 @@ func sshAndLog(cmd, host string, failOnError bool) {
 	if result.Code != 0 && failOnError {
 		framework.Failf("%s returned non-zero, stderr: %s", cmd, result.Stderr)
 	}
-}
-
-func getMasterVersion(c clientset.Interface) (*versionutil.Version, error) {
-	var err error
-	var v *version.Info
-	waitErr := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
-		v, err = c.Discovery().ServerVersion()
-		return err == nil, nil
-	})
-	if waitErr != nil {
-		return nil, fmt.Errorf("Could not get the master version: %v", waitErr)
-	}
-
-	return versionutil.MustParseSemantic(v.GitVersion), nil
-}
-
-func getNodeVersion(node *v1.Node) *versionutil.Version {
-	return versionutil.MustParseSemantic(node.Status.NodeInfo.KubeletVersion)
 }
 
 func getHostFromHostPort(hostPort string) string {

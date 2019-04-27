@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -48,16 +48,16 @@ var _ = SIGDescribe("DisruptionController", func() {
 	var ns string
 	var cs kubernetes.Interface
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 	})
 
-	It("should create a PodDisruptionBudget", func() {
+	ginkgo.It("should create a PodDisruptionBudget", func() {
 		createPDBMinAvailableOrDie(cs, ns, intstr.FromString("1%"))
 	})
 
-	It("should update PodDisruptionBudget status", func() {
+	ginkgo.It("should update PodDisruptionBudget status", func() {
 		createPDBMinAvailableOrDie(cs, ns, intstr.FromInt(2))
 
 		createPodsOrDie(cs, ns, 3)
@@ -72,7 +72,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 			return pdb.Status.PodDisruptionsAllowed > 0, nil
 		})
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 
 	evictionCases := []struct {
@@ -145,7 +145,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		if c.shouldDeny {
 			expectation = "should not allow an eviction"
 		}
-		It(fmt.Sprintf("evictions: %s => %s", c.description, expectation), func() {
+		ginkgo.It(fmt.Sprintf("evictions: %s => %s", c.description, expectation), func() {
 			if c.skipForBigClusters {
 				framework.SkipUnlessNodeCountIsAtMost(bigClusterSize - 1)
 			}
@@ -179,7 +179,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 				return false, nil
 			})
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			e := &policy.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
@@ -194,7 +194,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				time.Sleep(timeout)
 
 				err = cs.CoreV1().Pods(ns).Evict(e)
-				Expect(err).Should(MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+				gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 			} else {
 				// Only wait for running pods in the "allow" case
 				// because one of shouldDeny cases relies on the
@@ -207,11 +207,10 @@ var _ = SIGDescribe("DisruptionController", func() {
 					err = cs.CoreV1().Pods(ns).Evict(e)
 					if err != nil {
 						return false, nil
-					} else {
-						return true, nil
 					}
+					return true, nil
 				})
-				Expect(err).NotTo(HaveOccurred())
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			}
 		})
 	}
@@ -229,7 +228,7 @@ func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable
 		},
 	}
 	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 }
 
 func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavailable intstr.IntOrString) {
@@ -244,7 +243,7 @@ func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavail
 		},
 	}
 	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 }
 
 func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {
@@ -272,7 +271,7 @@ func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 }
 
 func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
-	By("Waiting for all pods to be running")
+	ginkgo.By("Waiting for all pods to be running")
 	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
 		pods, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: "foo=bar"})
 		if err != nil {

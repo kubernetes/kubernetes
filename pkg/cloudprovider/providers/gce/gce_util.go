@@ -244,10 +244,6 @@ func makeGoogleAPINotFoundError(message string) error {
 	return &googleapi.Error{Code: http.StatusNotFound, Message: message}
 }
 
-func makeGoogleAPIError(code int, message string) error {
-	return &googleapi.Error{Code: code, Message: message}
-}
-
 // TODO(#51665): Remove this once Network Tiers becomes Beta in GCP.
 func handleAlphaNetworkTierGetError(err error) (string, error) {
 	if isForbidden(err) {

@@ -27,6 +27,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/coreos/etcd/clientv3"
+	"google.golang.org/grpc/grpclog"
 	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/util/env"
@@ -109,7 +111,7 @@ func startEtcd() (func(), error) {
 		"--listen-peer-urls",
 		"http://127.0.0.1:0",
 		"--log-package-levels",
-		"*=DEBUG",
+		"*=NOTICE", // set to INFO or DEBUG for more logs
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -122,6 +124,10 @@ func startEtcd() (func(), error) {
 			klog.Warningf("error during etcd cleanup: %v", err)
 		}
 	}
+
+	// Quiet etcd logs for integration tests
+	// Comment out to get verbose logs if desired
+	clientv3.SetLogger(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, os.Stderr))
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to run etcd: %v", err)

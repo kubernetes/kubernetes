@@ -18,7 +18,7 @@ package kubeconfig
 
 import (
 	"bytes"
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 	"fmt"
 	"io"
@@ -288,16 +288,6 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 				return createKubeConfigFiles(outDir, cfg, "unknown.conf")
 			},
 			expectedError: true,
-		},
-		{ // Test CreateInitKubeConfigFiles (wrapper to createKubeConfigFile)
-			name:                     "CreateInitKubeConfigFiles",
-			createKubeConfigFunction: CreateInitKubeConfigFiles,
-			expectedFiles: []string{
-				kubeadmconstants.AdminKubeConfigFileName,
-				kubeadmconstants.KubeletKubeConfigFileName,
-				kubeadmconstants.ControllerManagerKubeConfigFileName,
-				kubeadmconstants.SchedulerKubeConfigFileName,
-			},
 		},
 		{ // Test CreateJoinControlPlaneKubeConfigFiles (wrapper to createKubeConfigFile)
 			name:                     "CreateJoinControlPlaneKubeConfigFiles",
@@ -631,7 +621,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 }
 
 // setupdKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With ClientAuth
-func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey, APIServer, clientName, clustername string, organizations ...string) *clientcmdapi.Config {
+func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, APIServer, clientName, clustername string, organizations ...string) *clientcmdapi.Config {
 	spec := &kubeConfigSpec{
 		CACert:     caCert,
 		APIServer:  APIServer,
