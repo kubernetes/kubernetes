@@ -143,6 +143,9 @@ func newProxyServer(
 	nodeIP := net.ParseIP(config.BindAddress)
 	if nodeIP.IsUnspecified() {
 		nodeIP = utilnode.GetNodeIP(client, hostname)
+		if nodeIP == nil {
+			return nil, fmt.Errorf("unable to get node IP for hostname %s", hostname)
+		}
 	}
 	if proxyMode == proxyModeIPTables {
 		klog.V(0).Info("Using iptables Proxier.")
