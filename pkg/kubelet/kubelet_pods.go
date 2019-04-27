@@ -336,9 +336,18 @@ func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]b
 		return nil, err
 	}
 	var buffer bytes.Buffer
-	buffer.WriteString(managedHostsHeaderWithHostNetwork)
-	buffer.Write(hostsFileContent)
-	buffer.Write(hostsEntriesFromHostAliases(hostAliases))
+	_, err = buffer.WriteString(managedHostsHeaderWithHostNetwork)
+	if err != nil {
+		return nil, err
+	}
+	_, err = buffer.Write(hostsFileContent)
+	if err != nil {
+		return nil, err
+	}
+	_, err = buffer.Write(hostsEntriesFromHostAliases(hostAliases))
+	if err != nil {
+		return nil, err
+	}
 	return buffer.Bytes(), nil
 }
 
