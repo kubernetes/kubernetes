@@ -34,6 +34,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
+
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/term"
@@ -81,15 +82,6 @@ func TestPodAndContainer(t *testing.T) {
 			argsLenAtDash: -1,
 			expectError:   true,
 			name:          "no cmd, w/ container",
-			obj:           execPod(),
-		},
-		{
-			p:             &ExecOptions{StreamOptions: StreamOptions{PodName: "foo"}},
-			args:          []string{"cmd"},
-			argsLenAtDash: -1,
-			expectedPod:   "foo",
-			expectedArgs:  []string{"cmd"},
-			name:          "pod in flags",
 			obj:           execPod(),
 		},
 		{
