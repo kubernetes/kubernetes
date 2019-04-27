@@ -27,10 +27,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -62,6 +61,7 @@ func TestPodAndContainer(t *testing.T) {
 		expectedPod       string
 		expectedContainer string
 		expectedArgs      []string
+		obj               *corev1.Pod
 	}{
 		{
 			p:             &ExecOptions{},
@@ -70,16 +70,18 @@ func TestPodAndContainer(t *testing.T) {
 			name:          "empty",
 		},
 		{
-			p:             &ExecOptions{StreamOptions: StreamOptions{PodName: "foo"}},
+			p:             &ExecOptions{},
 			argsLenAtDash: -1,
 			expectError:   true,
 			name:          "no cmd",
+			obj:           execPod(),
 		},
 		{
-			p:             &ExecOptions{StreamOptions: StreamOptions{PodName: "foo", ContainerName: "bar"}},
+			p:             &ExecOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
 			argsLenAtDash: -1,
 			expectError:   true,
 			name:          "no cmd, w/ container",
+			obj:           execPod(),
 		},
 		{
 			p:             &ExecOptions{StreamOptions: StreamOptions{PodName: "foo"}},
@@ -88,6 +90,7 @@ func TestPodAndContainer(t *testing.T) {
 			expectedPod:   "foo",
 			expectedArgs:  []string{"cmd"},
 			name:          "pod in flags",
+			obj:           execPod(),
 		},
 		{
 			p:             &ExecOptions{},
@@ -95,6 +98,7 @@ func TestPodAndContainer(t *testing.T) {
 			argsLenAtDash: 0,
 			expectError:   true,
 			name:          "no pod, pod name is behind dash",
+			obj:           execPod(),
 		},
 		{
 			p:             &ExecOptions{},
@@ -102,6 +106,7 @@ func TestPodAndContainer(t *testing.T) {
 			argsLenAtDash: -1,
 			expectError:   true,
 			name:          "no cmd, w/o flags",
+			obj:           execPod(),
 		},
 		{
 			p:             &ExecOptions{},
@@ -110,6 +115,7 @@ func TestPodAndContainer(t *testing.T) {
 			expectedPod:   "foo",
 			expectedArgs:  []string{"cmd"},
 			name:          "cmd, w/o flags",
+			obj:           execPod(),
 		},
 		{
 			p:             &ExecOptions{},
@@ -118,6 +124,7 @@ func TestPodAndContainer(t *testing.T) {
 			expectedPod:   "foo",
 			expectedArgs:  []string{"cmd"},
 			name:          "cmd, cmd is behind dash",
+			obj:           execPod(),
 		},
 		{
 			p:                 &ExecOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
@@ -127,10 +134,12 @@ func TestPodAndContainer(t *testing.T) {
 			expectedContainer: "bar",
 			expectedArgs:      []string{"cmd"},
 			name:              "cmd, container in flag",
+			obj:               execPod(),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			var err error
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
@@ -142,10 +151,13 @@ func TestPodAndContainer(t *testing.T) {
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			cmd := &cobra.Command{}
+			cmd := NewCmdExec(tf, genericclioptions.NewTestIOStreamsDiscard())
 			options := test.p
 			options.ErrOut = bytes.NewBuffer([]byte{})
-			err := options.Complete(tf, cmd, test.args, test.argsLenAtDash)
+			options.Out = bytes.NewBuffer([]byte{})
+			err = options.Complete(tf, cmd, test.args, test.argsLenAtDash)
+			err = options.Validate()
+
 			if test.expectError && err == nil {
 				t.Errorf("%s: unexpected non-error", test.name)
 			}
@@ -155,7 +167,9 @@ func TestPodAndContainer(t *testing.T) {
 			if err != nil {
 				return
 			}
-			if options.PodName != test.expectedPod {
+
+			pod, err := options.ExecutablePodFn(tf, test.obj, defaultPodExecTimeout)
+			if pod.Name != test.expectedPod {
 				t.Errorf("%s: expected: %s, got: %s", test.name, test.expectedPod, options.PodName)
 			}
 			if options.ContainerName != test.expectedContainer {
@@ -171,22 +185,26 @@ func TestPodAndContainer(t *testing.T) {
 func TestExec(t *testing.T) {
 	version := "v1"
 	tests := []struct {
-		name, podPath, execPath string
-		pod                     *corev1.Pod
-		execErr                 bool
+		name, version, podPath, fetchPodPath, execPath string
+		pod                                            *corev1.Pod
+		execErr                                        bool
 	}{
 		{
-			name:     "pod exec",
-			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
-			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
-			pod:      execPod(),
+			name:         "pod exec",
+			version:      version,
+			podPath:      "/api/" + version + "/namespaces/test/pods/foo",
+			fetchPodPath: "/namespaces/test/pods/foo",
+			execPath:     "/api/" + version + "/namespaces/test/pods/foo/exec",
+			pod:          execPod(),
 		},
 		{
-			name:     "pod exec error",
-			podPath:  "/api/" + version + "/namespaces/test/pods/foo",
-			execPath: "/api/" + version + "/namespaces/test/pods/foo/exec",
-			pod:      execPod(),
-			execErr:  true,
+			name:         "pod exec error",
+			version:      version,
+			podPath:      "/api/" + version + "/namespaces/test/pods/foo",
+			fetchPodPath: "/namespaces/test/pods/foo",
+			execPath:     "/api/" + version + "/namespaces/test/pods/foo/exec",
+			pod:          execPod(),
+			execErr:      true,
 		},
 	}
 	for _, test := range tests {
@@ -198,10 +216,14 @@ func TestExec(t *testing.T) {
 			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == test.podPath && m == "GET":
+						body := cmdtesting.ObjBody(codec, test.pod)
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+					case p == test.fetchPodPath && m == "GET":
 						body := cmdtesting.ObjBody(codec, test.pod)
 						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
@@ -210,7 +232,7 @@ func TestExec(t *testing.T) {
 					}
 				}),
 			}
-			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 			ex := &fakeRemoteExecutor{}
 			if test.execErr {
 				ex.execErr = fmt.Errorf("exec error")
@@ -223,8 +245,8 @@ func TestExec(t *testing.T) {
 				},
 				Executor: ex,
 			}
-			cmd := &cobra.Command{}
-			args := []string{"test", "command"}
+			cmd := NewCmdExec(tf, genericclioptions.NewTestIOStreamsDiscard())
+			args := []string{"pod/foo", "command"}
 			if err := params.Complete(tf, cmd, args, -1); err != nil {
 				t.Fatal(err)
 			}
