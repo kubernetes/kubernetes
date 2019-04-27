@@ -65,7 +65,7 @@ load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 container_pull(
     name = "official_busybox",
-    digest = "sha256:cb63aa0641a885f54de20f61d152187419e8f6b159ed11a251a09d115fdff9bd",
+    digest = "sha256:5e8e0509e829bb8f990249135a36e81a3ecbe94294e7a185cc14616e5fad96bd",
     registry = "index.docker.io",
     repository = "library/busybox",
     tag = "latest",  # ignored, but kept here for documentation
