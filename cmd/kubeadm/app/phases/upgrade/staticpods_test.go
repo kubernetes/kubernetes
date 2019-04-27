@@ -505,6 +505,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				pathMgr,
 				newcfg,
 				true,
+				true,
 				fakeTLSEtcdClient{
 					TLS: false,
 				},
@@ -637,19 +638,20 @@ func TestCleanupDirs(t *testing.T) {
 	}
 }
 
-func TestRenewCerts(t *testing.T) {
+func TestRenewCertsByComponent(t *testing.T) {
 	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
-	t.Run("all certs exist, should be rotated", func(t *testing.T) {
-	})
+
 	tests := []struct {
-		name               string
-		component          string
-		skipCreateCA       bool
-		shouldErrorOnRenew bool
-		certsShouldExist   []*certsphase.KubeadmCert
+		name                 string
+		component            string
+		externalCA           bool
+		externalFrontProxyCA bool
+		skipCreateEtcdCA     bool
+		shouldErrorOnRenew   bool
+		certsShouldExist     []*certsphase.KubeadmCert
 	}{
 		{
-			name:      "all certs exist, should be rotated",
+			name:      "all certs exist, should be rotated for etcd",
 			component: constants.Etcd,
 			certsShouldExist: []*certsphase.KubeadmCert{
 				&certsphase.KubeadmCertEtcdServer,
@@ -658,16 +660,37 @@ func TestRenewCerts(t *testing.T) {
 			},
 		},
 		{
-			name:      "just renew API cert",
+			name:      "all certs exist, should be rotated for apiserver",
 			component: constants.KubeAPIServer,
 			certsShouldExist: []*certsphase.KubeadmCert{
 				&certsphase.KubeadmCertEtcdAPIClient,
+				&certsphase.KubeadmCertAPIServer,
+				&certsphase.KubeadmCertKubeletClient,
+				&certsphase.KubeadmCertFrontProxyClient,
 			},
 		},
 		{
-			name:         "ignores other compnonents",
-			skipCreateCA: true,
-			component:    constants.KubeScheduler,
+			name:      "external CA, renew only certificates not signed by CA",
+			component: constants.KubeAPIServer,
+			certsShouldExist: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdAPIClient,
+				&certsphase.KubeadmCertFrontProxyClient,
+			},
+			externalCA: true,
+		},
+		{
+			name:      "external front-proxy-CA, renew only certificates not signed by front-proxy-CA",
+			component: constants.KubeAPIServer,
+			certsShouldExist: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdAPIClient,
+				&certsphase.KubeadmCertAPIServer,
+				&certsphase.KubeadmCertKubeletClient,
+			},
+			externalFrontProxyCA: true,
+		},
+		{
+			name:      "ignores other compnonents",
+			component: constants.KubeScheduler,
 		},
 		{
 			name:               "missing a cert to renew",
@@ -681,7 +704,7 @@ func TestRenewCerts(t *testing.T) {
 		{
 			name:               "no CA, cannot continue",
 			component:          constants.Etcd,
-			skipCreateCA:       true,
+			skipCreateEtcdCA:   true,
 			shouldErrorOnRenew: true,
 		},
 	}
@@ -695,9 +718,21 @@ func TestRenewCerts(t *testing.T) {
 			cfg := testutil.GetDefaultInternalConfig(t)
 			cfg.CertificatesDir = tmpDir
 
-			if !test.skipCreateCA {
+			if err := pkiutil.WriteCertAndKey(tmpDir, constants.CACertAndKeyBaseName, caCert, caKey); err != nil {
+				t.Fatalf("couldn't write out CA: %v", err)
+			}
+			if test.externalCA {
+				os.Remove(filepath.Join(tmpDir, constants.CAKeyName))
+			}
+			if err := pkiutil.WriteCertAndKey(tmpDir, constants.FrontProxyCACertAndKeyBaseName, caCert, caKey); err != nil {
+				t.Fatalf("couldn't write out front-proxy-CA: %v", err)
+			}
+			if test.externalFrontProxyCA {
+				os.Remove(filepath.Join(tmpDir, constants.FrontProxyCAKeyName))
+			}
+			if !test.skipCreateEtcdCA {
 				if err := pkiutil.WriteCertAndKey(tmpDir, constants.EtcdCACertAndKeyBaseName, caCert, caKey); err != nil {
-					t.Fatalf("couldn't write out CA: %v", err)
+					t.Fatalf("couldn't write out etcd-CA: %v", err)
 				}
 			}
 
@@ -719,7 +754,7 @@ func TestRenewCerts(t *testing.T) {
 			}
 
 			// Renew everything
-			err := renewCerts(cfg, test.component)
+			err := renewCertsByComponent(cfg, test.component)
 			if test.shouldErrorOnRenew {
 				if err == nil {
 					t.Fatal("expected renewal error, got nothing")

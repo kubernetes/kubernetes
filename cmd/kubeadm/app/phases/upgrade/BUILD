@@ -15,7 +15,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/images:go_default_library",
         "//cmd/kubeadm/app/phases/addons/dns:go_default_library",
@@ -45,7 +44,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )

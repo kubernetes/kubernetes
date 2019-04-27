@@ -17,7 +17,6 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -29,15 +28,12 @@ import (
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
-	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -101,11 +97,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 
-	// Rotate the kube-apiserver cert and key if needed
-	if err := BackupAPIServerCertIfNeeded(cfg, dryRun); err != nil {
-		errs = append(errs, err)
-	}
-
 	// Upgrade kube-dns/CoreDNS and kube-proxy
 	if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
 		errs = append(errs, err)
@@ -150,37 +141,6 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfigurati
 		}
 		return nil
 	}, 10)
-}
-
-// BackupAPIServerCertIfNeeded rotates the kube-apiserver certificate if older than 180 days
-func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
-	certAndKeyDir := kubeadmapiv1beta2.DefaultCertificatesDir
-	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
-	if err != nil {
-		// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
-		return errors.Wrap(err, "[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key")
-	}
-
-	if !shouldBackup {
-		return nil
-	}
-
-	// If dry-running, just say that this would happen to the user and exit
-	if dryRun {
-		fmt.Println("[postupgrade] Would rotate the API server certificate and key.")
-		return nil
-	}
-
-	// Don't fail the upgrade phase if failing to backup kube-apiserver cert and key, just continue rotating the cert
-	// TODO: We might want to reconsider this choice.
-	if err := backupAPIServerCertAndKey(certAndKeyDir); err != nil {
-		fmt.Printf("[postupgrade] WARNING: failed to backup kube-apiserver cert and key: %v\n", err)
-	}
-	return certsphase.CreateCertAndKeyFilesWithCA(
-		&certsphase.KubeadmCertAPIServer,
-		&certsphase.KubeadmCertRootCA,
-		cfg,
-	)
 }
 
 func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, newK8sVer *version.Version, dryRun bool) error {
@@ -228,20 +188,6 @@ func GetKubeletDir(dryRun bool) (string, error) {
 	return kubeadmconstants.KubeletRunDirectory, nil
 }
 
-// backupAPIServerCertAndKey backups the old cert and key of kube-apiserver to a specified directory.
-func backupAPIServerCertAndKey(certAndKeyDir string) error {
-	subDir := filepath.Join(certAndKeyDir, "expired")
-	if err := os.Mkdir(subDir, 0700); err != nil {
-		return errors.Wrapf(err, "failed to created backup directory %s", subDir)
-	}
-
-	filesToMove := map[string]string{
-		filepath.Join(certAndKeyDir, kubeadmconstants.APIServerCertName): filepath.Join(subDir, kubeadmconstants.APIServerCertName),
-		filepath.Join(certAndKeyDir, kubeadmconstants.APIServerKeyName):  filepath.Join(subDir, kubeadmconstants.APIServerKeyName),
-	}
-	return moveFiles(filesToMove)
-}
-
 // moveFiles moves files from one directory to another.
 func moveFiles(files map[string]string) error {
 	filesToRecover := map[string]string{}
@@ -263,22 +209,4 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 		}
 	}
 	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
-}
-
-// shouldBackupAPIServerCertAndKey checks if the cert of kube-apiserver will be expired in 180 days.
-func shouldBackupAPIServerCertAndKey(certAndKeyDir string) (bool, error) {
-	apiServerCert := filepath.Join(certAndKeyDir, kubeadmconstants.APIServerCertName)
-	certs, err := certutil.CertsFromFile(apiServerCert)
-	if err != nil {
-		return false, errors.Wrapf(err, "couldn't load the certificate file %s", apiServerCert)
-	}
-	if len(certs) == 0 {
-		return false, errors.New("no certificate data found")
-	}
-
-	if time.Since(certs[0].NotBefore) > expiry {
-		return true, nil
-	}
-
-	return false, nil
 }
