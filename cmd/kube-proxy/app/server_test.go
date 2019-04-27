@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -108,7 +109,6 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 		assert.Nil(t, err, "unexpected error in NewProxyServer, addr: %s", addr)
 		assert.NotNil(t, proxyserver, "nil proxy server obj, addr: %s", addr)
 		assert.NotNil(t, proxyserver.IptInterface, "nil iptables intf, addr: %s", addr)
-		assert.True(t, proxyserver.CleanupAndExit, "false CleanupAndExit, addr: %s", addr)
 
 		// Clean up config for next test case
 		configz.Delete(kubeproxyconfig.GroupName)
@@ -540,6 +540,11 @@ func (s *fakeProxyServerLongRun) Run() error {
 	}
 }
 
+// CleanupAndExit runs in the specified ProxyServer.
+func (s *fakeProxyServerLongRun) CleanupAndExit() error {
+	return nil
+}
+
 type fakeProxyServerError struct{}
 
 // Run runs the specified ProxyServer.
@@ -548,6 +553,11 @@ func (s *fakeProxyServerError) Run() error {
 		time.Sleep(2 * time.Second)
 		return fmt.Errorf("mocking error from ProxyServer.Run()")
 	}
+}
+
+// CleanupAndExit runs in the specified ProxyServer.
+func (s *fakeProxyServerError) CleanupAndExit() error {
+	return errors.New("mocking error from ProxyServer.CleanupAndExit()")
 }
 
 func TestAddressFromDeprecatedFlags(t *testing.T) {

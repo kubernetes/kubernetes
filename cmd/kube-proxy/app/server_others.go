@@ -102,7 +102,6 @@ func newProxyServer(
 			IptInterface:   iptInterface,
 			IpvsInterface:  ipvsInterface,
 			IpsetInterface: ipsetInterface,
-			CleanupAndExit: cleanupAndExit,
 		}, nil
 	}
 

@@ -92,6 +92,7 @@ const (
 // proxyRun defines the interface to run a specified ProxyServer
 type proxyRun interface {
 	Run() error
+	CleanupAndExit() error
 }
 
 // Options contains everything necessary to create and run a proxy server.
@@ -308,6 +309,11 @@ func (o *Options) Run() error {
 	if err != nil {
 		return err
 	}
+
+	if o.CleanupAndExit {
+		return proxyServer.CleanupAndExit()
+	}
+
 	o.proxyServer = proxyServer
 	return o.runLoop()
 }
@@ -475,7 +481,6 @@ type ProxyServer struct {
 	Conntracker            Conntracker // if nil, ignored
 	ProxyMode              string
 	NodeRef                *v1.ObjectReference
-	CleanupAndExit         bool
 	CleanupIPVS            bool
 	MetricsBindAddress     string
 	EnableProfiling        bool
@@ -524,19 +529,10 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
+// TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
 func (s *ProxyServer) Run() error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
-	// remove iptables rules and exit
-	if s.CleanupAndExit {
-		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
-		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
-		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface, s.CleanupIPVS) || encounteredError
-		if encounteredError {
-			return errors.New("encountered an error while tearing down rules")
-		}
-		return nil
-	}
 
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster
@@ -681,4 +677,16 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 		return floor, nil
 	}
 	return 0, nil
+}
+
+// CleanupAndExit remove iptables rules and exit if success return nil
+func (s *ProxyServer) CleanupAndExit() error {
+	encounteredError := userspace.CleanupLeftovers(s.IptInterface)
+	encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
+	encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface, s.CleanupIPVS) || encounteredError
+	if encounteredError {
+		return errors.New("encountered an error while tearing down rules")
+	}
+
+	return nil
 }
