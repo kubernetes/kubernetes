@@ -92,7 +92,7 @@ func (dc *Datacenter) GetHostByVMUUID(ctx context.Context, vmUUID string) (*type
 	pc := property.DefaultCollector(virtualMachine.Client())
 	err = pc.RetrieveOne(ctx, virtualMachine.Reference(), []string{"summary.runtime.host"}, &vmMo)
 	if err != nil {
-		klog.Errorf("Failed to retrive VM runtime host, err: %v", err)
+		klog.Errorf("Failed to retrieve VM runtime host, err: %v", err)
 		return nil, err
 	}
 	host := vmMo.Summary.Runtime.Host
