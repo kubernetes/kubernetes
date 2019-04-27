@@ -549,3 +549,79 @@ func (s *fakeProxyServerError) Run() error {
 		return fmt.Errorf("mocking error from ProxyServer.Run()")
 	}
 }
+
+func TestAddressFromDeprecatedFlags(t *testing.T) {
+	testCases := []struct {
+		name               string
+		healthzPort        int32
+		healthzBindAddress string
+		metricsPort        int32
+		metricsBindAddress string
+		expHealthz         string
+		expMetrics         string
+	}{
+		{
+			name:               "IPv4 bind address",
+			healthzBindAddress: "1.2.3.4",
+			healthzPort:        12345,
+			metricsBindAddress: "2.3.4.5",
+			metricsPort:        23456,
+			expHealthz:         "1.2.3.4:12345",
+			expMetrics:         "2.3.4.5:23456",
+		},
+		{
+			name:               "IPv4 bind address has port",
+			healthzBindAddress: "1.2.3.4:12345",
+			healthzPort:        23456,
+			metricsBindAddress: "2.3.4.5:12345",
+			metricsPort:        23456,
+			expHealthz:         "1.2.3.4:12345",
+			expMetrics:         "2.3.4.5:12345",
+		},
+		{
+			name:               "IPv6 bind address",
+			healthzBindAddress: "fd00:1::5",
+			healthzPort:        12345,
+			metricsBindAddress: "fd00:1::6",
+			metricsPort:        23456,
+			expHealthz:         "[fd00:1::5]:12345",
+			expMetrics:         "[fd00:1::6]:23456",
+		},
+		{
+			name:               "IPv6 bind address has port",
+			healthzBindAddress: "[fd00:1::5]:12345",
+			healthzPort:        56789,
+			metricsBindAddress: "[fd00:1::6]:56789",
+			metricsPort:        12345,
+			expHealthz:         "[fd00:1::5]:12345",
+			expMetrics:         "[fd00:1::6]:56789",
+		},
+		{
+			name:               "Invalid IPv6 Config",
+			healthzBindAddress: "[fd00:1::5]",
+			healthzPort:        12345,
+			metricsBindAddress: "[fd00:1::6]",
+			metricsPort:        56789,
+			expHealthz:         "[fd00:1::5]",
+			expMetrics:         "[fd00:1::6]",
+		},
+	}
+
+	for i := range testCases {
+		gotHealthz := addressFromDeprecatedFlags(testCases[i].healthzBindAddress, testCases[i].healthzPort)
+		gotMetrics := addressFromDeprecatedFlags(testCases[i].metricsBindAddress, testCases[i].metricsPort)
+
+		errFn := func(name, except, got string) {
+			t.Errorf("case %s: expected %v, got %v", name, except, got)
+		}
+
+		if gotHealthz != testCases[i].expHealthz {
+			errFn(testCases[i].name, testCases[i].expHealthz, gotHealthz)
+		}
+
+		if gotMetrics != testCases[i].expMetrics {
+			errFn(testCases[i].name, testCases[i].expMetrics, gotMetrics)
+		}
+
+	}
+}
