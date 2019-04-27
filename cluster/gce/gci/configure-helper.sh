@@ -1400,12 +1400,9 @@ function prepare-etcd-manifest {
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
-  local etcd_apiserver_protocol="http"
   local etcd_creds=""
   local etcd_apiserver_creds="${ETCD_APISERVER_CREDS:-}"
   local etcd_extra_args="${ETCD_EXTRA_ARGS:-}"
-  local suffix="$1"
-  local etcd_livenessprobe_port="$2"
 
   if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
     cluster_state="${INITIAL_ETCD_CLUSTER_STATE}"
@@ -1415,12 +1412,8 @@ function prepare-etcd-manifest {
     etcd_protocol="https"
   fi
 
-  # mTLS should only be enabled for etcd server but not etcd-events. if $1 suffix is empty, it's etcd server.
-  if [[ -z "${suffix}" && -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
+  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" ]]; then
     etcd_apiserver_creds=" --client-cert-auth --trusted-ca-file ${ETCD_APISERVER_CA_CERT_PATH} --cert-file ${ETCD_APISERVER_SERVER_CERT_PATH} --key-file ${ETCD_APISERVER_SERVER_KEY_PATH} "
-    etcd_apiserver_protocol="https"
-    etcd_livenessprobe_port="2382"
-    etcd_extra_args+=" --listen-metrics-urls=http://127.0.0.1:${etcd_livenessprobe_port} "
   fi
 
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
@@ -1467,11 +1460,9 @@ function prepare-etcd-manifest {
     sed -i -e "s@{{ *pillar\.get('etcd_docker_repository', '\(.*\)') *}}@\1@g" "${temp_file}"
   fi
   sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_apiserver_protocol *}}@$etcd_apiserver_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_apiserver_creds *}}@$etcd_apiserver_creds@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_extra_args *}}@$etcd_extra_args@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_livenessprobe_port *}}@$etcd_livenessprobe_port@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
   else
@@ -1574,23 +1565,16 @@ function start-kube-apiserver {
   params+=" --allow-privileged=true"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
-
-  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-      params+=" --etcd-servers=${ETCD_SERVERS:-https://127.0.0.1:2379}"
-      params+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
-      params+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
-      params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
-  elif [[ -z "${ETCD_APISERVER_CA_KEY:-}" && -z "${ETCD_APISERVER_CA_CERT:-}" && -z "${ETCD_APISERVER_SERVER_KEY:-}" && -z "${ETCD_APISERVER_SERVER_CERT:-}" && -z "${ETCD_APISERVER_CLIENT_KEY:-}" && -z "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-      echo "WARNING: ALL of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver is not enabled."
-  else
-      echo "ERROR: Some of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver cannot be enabled. Please provide all mTLS credential."
-      exit 1
-  fi
-
+  params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
   if [[ -z "${ETCD_SERVERS:-}" ]]; then
     params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
   elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
     params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
+  fi
+  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
+    params+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
+    params+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
+    params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
   fi
   params+=" --secure-port=443"
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-true}" != "true" ]]; then
