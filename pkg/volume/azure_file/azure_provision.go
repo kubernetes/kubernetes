@@ -139,11 +139,8 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, fmt.Errorf("%s does not support block volume provisioning", a.plugin.GetPluginName())
 	}
 
-	var sku, resourceGroup, location, account string
+	var sku, resourceGroup, location, account, shareName string
 
-	// File share name has a length limit of 63, and it cannot contain two consecutive '-'s.
-	name := util.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
-	name = strings.Replace(name, "--", "-", -1)
 	capacity := a.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
 	requestGiB := int(util.RoundUpSize(requestBytes, 1024*1024*1024))
@@ -162,6 +159,8 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			secretNamespace = v
 		case "resourcegroup":
 			resourceGroup = v
+		case "sharename":
+			shareName = v
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, a.plugin.GetPluginName())
 		}
@@ -171,7 +170,13 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Azure file")
 	}
 
-	account, key, err := a.azureProvider.CreateFileShare(name, account, sku, resourceGroup, location, requestGiB)
+	if shareName == "" {
+		// File share name has a length limit of 63, and it cannot contain two consecutive '-'s.
+		name := util.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
+		shareName = strings.Replace(name, "--", "-", -1)
+	}
+
+	account, key, err := a.azureProvider.CreateFileShare(shareName, account, sku, resourceGroup, location, requestGiB)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +204,7 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				AzureFile: &v1.AzureFilePersistentVolumeSource{
 					SecretName:      secretName,
-					ShareName:       name,
+					ShareName:       shareName,
 					SecretNamespace: &secretNamespace,
 				},
 			},
