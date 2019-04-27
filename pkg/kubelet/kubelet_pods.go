@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -1071,7 +1072,8 @@ func (kl *Kubelet) HandlePodCleanups() error {
 // podKiller launches a goroutine to kill a pod received from the channel if
 // another goroutine isn't already in action.
 func (kl *Kubelet) podKiller() {
-	killing := sets.NewString()
+	killing := map[string]int64{}
+	timeLastClean := int64(0)
 	// guard for the killing set
 	lock := sync.Mutex{}
 	for podPair := range kl.podKillingCh {
@@ -1079,9 +1081,9 @@ func (kl *Kubelet) podKiller() {
 		apiPod := podPair.APIPod
 
 		lock.Lock()
-		exists := killing.Has(string(runningPod.ID))
+		_, exists := killing[string(runningPod.ID)]
 		if !exists {
-			killing.Insert(string(runningPod.ID))
+			killing[string(runningPod.ID)] = time.Now().Unix()
 		}
 		lock.Unlock()
 
@@ -1092,10 +1094,18 @@ func (kl *Kubelet) podKiller() {
 				if err != nil {
 					klog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
 				}
-				lock.Lock()
-				killing.Delete(string(runningPod.ID))
-				lock.Unlock()
 			}(apiPod, runningPod)
+		}
+		// clean every 10 minutes
+		if time.Now().Unix()-timeLastClean > 600 {
+			lock.Lock()
+			for id, ts := range killing {
+				if time.Now().Unix()-ts > 3600 {
+					delete(killing, id)
+				}
+			}
+			lock.Unlock()
+			timeLastClean = time.Now().Unix()
 		}
 	}
 }
