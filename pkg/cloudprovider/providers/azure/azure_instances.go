@@ -210,7 +210,7 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 			return "", err
 		}
 		// Compose instanceID based on ssName and instanceID for vmss instance.
-		return az.getVmssMachineID(ssName, instanceID), nil
+		return az.getVmssMachineID(az.ResourceGroup, ssName, instanceID), nil
 	}
 
 	return az.vmSet.GetInstanceIDByNodeName(nodeName)
