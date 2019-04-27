@@ -376,8 +376,7 @@ function generate-etcd-cert() {
                 "usages": [
                     "signing",
                     "key encipherment",
-                    "server auth",
-                    "client auth"
+                    "server auth"
                 ]
             },
             "client": {
