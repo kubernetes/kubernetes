@@ -77,7 +77,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		if errors.IsNotFound(err) {
 			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
 		}
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating the pod")
 		name := "pod-preset-pod"
@@ -195,7 +195,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		if errors.IsNotFound(err) {
 			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
 		}
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating the pod")
 		name := "pod-preset-pod"
