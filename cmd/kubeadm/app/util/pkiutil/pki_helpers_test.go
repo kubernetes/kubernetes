@@ -17,6 +17,9 @@ limitations under the License.
 package pkiutil
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -49,27 +52,38 @@ func TestNewCertificateAuthority(t *testing.T) {
 
 func TestNewCertAndKey(t *testing.T) {
 	var tests = []struct {
-		name      string
-		caKeySize int
-		expected  bool
+		name       string
+		keyGenFunc func() (crypto.Signer, error)
+		expected   bool
 	}{
 		{
-			name:      "RSA key too small",
-			caKeySize: 128,
-			expected:  false,
+			name: "RSA key too small",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return rsa.GenerateKey(rand.Reader, 128)
+			},
+			expected: false,
 		},
 		{
-			name:      "Should succeed",
-			caKeySize: 2048,
-			expected:  true,
+			name: "RSA should succeed",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return rsa.GenerateKey(rand.Reader, 2048)
+			},
+			expected: true,
+		},
+		{
+			name: "ECDSA should succeed",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+			},
+			expected: true,
 		},
 	}
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			caKey, err := rsa.GenerateKey(rand.Reader, rt.caKeySize)
+			caKey, err := rt.keyGenFunc()
 			if err != nil {
-				t.Fatalf("Couldn't create rsa Private Key")
+				t.Fatalf("Couldn't create Private Key")
 			}
 			caCert := &x509.Certificate{}
 			config := &certutil.Config{
@@ -375,49 +389,66 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 }
 
 func TestTryLoadKeyFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
-	}
-	defer os.RemoveAll(tmpdir)
-
-	_, caKey, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
-	if err != nil {
-		t.Errorf(
-			"failed to create cert and key with an error: %v",
-			err,
-		)
-	}
-	err = WriteKey(tmpdir, "foo", caKey)
-	if err != nil {
-		t.Errorf(
-			"failed to write cert and key with an error: %v",
-			err,
-		)
-	}
 
 	var tests = []struct {
-		desc     string
-		path     string
-		name     string
-		expected bool
+		desc       string
+		pathSuffix string
+		name       string
+		keyGenFunc func() (crypto.Signer, error)
+		expected   bool
 	}{
 		{
-			desc:     "empty path and name",
-			path:     "",
-			name:     "",
+			desc:       "empty path and name",
+			pathSuffix: "somegarbage",
+			name:       "",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return rsa.GenerateKey(rand.Reader, 2048)
+			},
 			expected: false,
 		},
 		{
-			desc:     "valid path and name",
-			path:     tmpdir,
-			name:     "foo",
+			desc:       "RSA valid path and name",
+			pathSuffix: "",
+			name:       "foo",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return rsa.GenerateKey(rand.Reader, 2048)
+			},
+			expected: true,
+		},
+		{
+			desc:       "ECDSA valid path and name",
+			pathSuffix: "",
+			name:       "foo",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+			},
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.desc, func(t *testing.T) {
-			_, actual := TryLoadKeyFromDisk(rt.path, rt.name)
+			tmpdir, err := ioutil.TempDir("", "")
+			if err != nil {
+				t.Fatalf("Couldn't create tmpdir")
+			}
+			defer os.RemoveAll(tmpdir)
+
+			caKey, err := rt.keyGenFunc()
+			if err != nil {
+				t.Errorf(
+					"failed to create key with an error: %v",
+					err,
+				)
+			}
+
+			err = WriteKey(tmpdir, "foo", caKey)
+			if err != nil {
+				t.Errorf(
+					"failed to write key with an error: %v",
+					err,
+				)
+			}
+			_, actual := TryLoadKeyFromDisk(tmpdir+rt.pathSuffix, rt.name)
 			if (actual == nil) != rt.expected {
 				t.Errorf(
 					"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",

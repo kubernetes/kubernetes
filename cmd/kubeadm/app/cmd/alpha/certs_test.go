@@ -209,11 +209,13 @@ func TestRunRenewCommands(t *testing.T) {
 					t.Errorf("couldn't verify renewed cert: %v", err)
 				}
 
-				pubKey, ok := newCert.PublicKey.(*rsa.PublicKey)
-				if !ok {
+				switch pubKey := newCert.PublicKey.(type) {
+				case *rsa.PublicKey:
+					if pubKey.N.Cmp(newKey.(*rsa.PrivateKey).N) != 0 {
+						t.Error("private key does not match public key")
+					}
+				default:
 					t.Errorf("unknown public key type %T", newCert.PublicKey)
-				} else if pubKey.N.Cmp(newKey.N) != 0 {
-					t.Error("private key does not match public key")
 				}
 			}
 
