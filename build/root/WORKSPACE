@@ -3,17 +3,24 @@ load("//build:workspace_mirror.bzl", "mirror")
 
 http_archive(
     name = "bazel_toolchains",
-    sha256 = "8d43844d1d4447be2a108834771d617a1ad2a107f1680190bfe44925e7bf530e",
-    strip_prefix = "bazel-toolchains-4c003ad45e8a2d829ffc40e3aecfb6b8577a9406",
+    sha256 = "f5acacb61693e00c993dbe3357cb4eb71eb49c6ed1e8b11215cef8738c7674cb",
+    strip_prefix = "bazel-toolchains-997c10a",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/4c003ad45e8a2d829ffc40e3aecfb6b8577a9406.tar.gz",
-        "https://github.com/bazelbuild/bazel-toolchains/archive/4c003ad45e8a2d829ffc40e3aecfb6b8577a9406.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/997c10a.tar.gz",
+        "https://github.com/bazelbuild/bazel-toolchains/archive/997c10a.tar.gz",
     ],
 )
 
 load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
 
-rbe_autoconfig(name = "rbe_default")
+rbe_autoconfig(
+    name = "rbe_default",
+    base_container_digest = "sha256:677c1317f14c6fd5eba2fd8ec645bfdc5119f64b3e5e944e13c89e0525cc8ad1",
+    digest = "sha256:b7c2e7a18968b9df2db43eda722c5ae592aafbf774ba2766074a9c96926743d8",
+    registry = "gcr.io",
+    repository = "k8s-testimages/bazel-krte",
+    # tag = "latest",
+)
 
 http_archive(
     name = "bazel_skylib",
