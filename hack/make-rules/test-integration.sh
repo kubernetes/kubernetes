@@ -72,7 +72,7 @@ runTests() {
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
       KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} --alsologtostderr=true" \
-      KUBE_RACE="" \
+      KUBE_RACE="-race" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_TEST_API_VERSIONS="$1"
 
