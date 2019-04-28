@@ -20,7 +20,7 @@ The Kubernetes logo is available in 2 formats (PNG & SVG), 3 layouts --
 horizontal (also known as landscape format), stacked (which is closer to
 square), and icon (which does not include the name and is square), and 5
 colors (color/black/white/all-blue/white-text) -- so over 20 versions -- in the
-CNCF [artwork](https://github.com/cncf/artwork/tree/master/kubernetes)
+CNCF [artwork](https://github.com/cncf/artwork/tree/master/projects/kubernetes)
 repo.
 
 
