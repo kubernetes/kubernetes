@@ -374,3 +374,41 @@ func TestGetNodeNameByIPConfigurationID(t *testing.T) {
 		assert.Equal(t, test.expected, nodeName, test.description)
 	}
 }
+
+func TestExtractResourceGroupByVMSSNicID(t *testing.T) {
+	vmssNicIDTemplate := "/subscriptions/script/resourceGroups/%s/providers/Microsoft.Compute/virtualMachineScaleSets/%s/virtualMachines/%s/networkInterfaces/nic-0"
+
+	testCases := []struct {
+		description string
+		vmssNicID   string
+		expected    string
+		expectError bool
+	}{
+		{
+			description: "extractResourceGroupByVMSSNicID should get resource group name for vmss nic ID",
+			vmssNicID:   fmt.Sprintf(vmssNicIDTemplate, "rg1", "vmss1", "0"),
+			expected:    "rg1",
+		},
+		{
+			description: "extractResourceGroupByVMSSNicID should return error for VM nic ID",
+			vmssNicID:   "/subscriptions/script/resourceGroups/rg2/providers/Microsoft.Network/networkInterfaces/nic-0",
+			expectError: true,
+		},
+		{
+			description: "extractResourceGroupByVMSSNicID should return error for wrong vmss nic ID",
+			vmssNicID:   "wrong-nic-id",
+			expectError: true,
+		},
+	}
+
+	for _, test := range testCases {
+		resourceGroup, err := extractResourceGroupByVMSSNicID(test.vmssNicID)
+		if test.expectError {
+			assert.Error(t, err, test.description)
+			continue
+		}
+
+		assert.NoError(t, err, test.description)
+		assert.Equal(t, test.expected, resourceGroup, test.description)
+	}
+}
