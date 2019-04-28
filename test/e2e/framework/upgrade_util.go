@@ -26,39 +26,40 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // RealVersion turns a version constants into a version string deployable on
 // GKE.  See hack/get-build.sh for more information.
 func RealVersion(s string) (string, error) {
-	Logf("Getting real version for %q", s)
+	log.Logf("Getting real version for %q", s)
 	v, _, err := RunCmd(path.Join(TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
 	if err != nil {
 		return v, fmt.Errorf("error getting real version for %q: %v", s, err)
 	}
-	Logf("Version for %q is %q", s, v)
+	log.Logf("Version for %q is %q", s, v)
 	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil
 }
 
 func traceRouteToMaster() {
 	path, err := exec.LookPath("traceroute")
 	if err != nil {
-		Logf("Could not find traceroute program")
+		log.Logf("Could not find traceroute program")
 		return
 	}
 	cmd := exec.Command(path, "-I", GetMasterHost())
 	out, err := cmd.Output()
 	if len(out) != 0 {
-		Logf(string(out))
+		log.Logf(string(out))
 	}
 	if exiterr, ok := err.(*exec.ExitError); err != nil && ok {
-		Logf("Error while running traceroute: %s", exiterr.Stderr)
+		log.Logf("Error while running traceroute: %s", exiterr.Stderr)
 	}
 }
 
 // CheckMasterVersion validates the master version
 func CheckMasterVersion(c clientset.Interface, want string) error {
-	Logf("Checking master version")
+	log.Logf("Checking master version")
 	var err error
 	var v *version.Info
 	waitErr := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
@@ -79,7 +80,7 @@ func CheckMasterVersion(c clientset.Interface, want string) error {
 	if !strings.HasPrefix(got, want) {
 		return fmt.Errorf("master had kube-apiserver version %s which does not start with %s", got, want)
 	}
-	Logf("Master is at version %s", want)
+	log.Logf("Master is at version %s", want)
 	return nil
 }
 

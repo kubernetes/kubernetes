@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package ssh
 
 import (
 	"bytes"
@@ -27,9 +27,12 @@ import (
 	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
+	//clientset "k8s.io/client-go/kubernetes"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
+	"k8s.io/kubernetes/test/e2e/framework/log"
 )
+
+var sshPort = "22"
 
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
 // used to SSH to their nodes.
@@ -78,39 +81,6 @@ func GetSigner(provider string) (ssh.Signer, error) {
 	return sshutil.MakePrivateKeySignerFromFile(keyfile)
 }
 
-// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this
-// excludes master node. If it can't find any external IPs, it falls back to
-// looking for internal IPs. If it can't find an internal IP for every node it
-// returns an error, though it still returns all hosts that it found in that
-// case.
-func NodeSSHHosts(c clientset.Interface) ([]string, error) {
-	nodelist := waitListSchedulableNodesOrDie(c)
-
-	hosts := NodeAddresses(nodelist, v1.NodeExternalIP)
-	// If ExternalIPs aren't set, assume the test programs can reach the
-	// InternalIP. Simplified exception logic here assumes that the hosts will
-	// either all have ExternalIP or none will. Simplifies handling here and
-	// should be adequate since the setting of the external IPs is provider
-	// specific: they should either all have them or none of them will.
-	if len(hosts) == 0 {
-		Logf("No external IP address on nodes, falling back to internal IPs")
-		hosts = NodeAddresses(nodelist, v1.NodeInternalIP)
-	}
-
-	// Error if any node didn't have an external/internal IP.
-	if len(hosts) != len(nodelist.Items) {
-		return hosts, fmt.Errorf(
-			"only found %d IPs on nodes, but found %d nodes. Nodelist: %v",
-			len(hosts), len(nodelist.Items), nodelist)
-	}
-
-	sshHosts := make([]string, 0, len(hosts))
-	for _, h := range hosts {
-		sshHosts = append(sshHosts, net.JoinHostPort(h, sshPort))
-	}
-	return sshHosts, nil
-}
-
 // SSHResult holds the execution result of SSH command
 type SSHResult struct {
 	User   string
@@ -119,13 +89,6 @@ type SSHResult struct {
 	Stdout string
 	Stderr string
 	Code   int
-}
-
-// NodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
-// eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
-// cloud providers since it involves ssh.
-func NodeExec(nodeName, cmd string) (SSHResult, error) {
-	return SSH(cmd, net.JoinHostPort(nodeName, sshPort), TestContext.Provider)
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
@@ -234,15 +197,15 @@ func RunSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer)
 // LogSSHResult records SSHResult log
 func LogSSHResult(result SSHResult) {
 	remote := fmt.Sprintf("%s@%s", result.User, result.Host)
-	Logf("ssh %s: command:   %s", remote, result.Cmd)
-	Logf("ssh %s: stdout:    %q", remote, result.Stdout)
-	Logf("ssh %s: stderr:    %q", remote, result.Stderr)
-	Logf("ssh %s: exit code: %d", remote, result.Code)
+	log.Logf("ssh %s: command:   %s", remote, result.Cmd)
+	log.Logf("ssh %s: stdout:    %q", remote, result.Stdout)
+	log.Logf("ssh %s: stderr:    %q", remote, result.Stderr)
+	log.Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
 // IssueSSHCommandWithResult tries to execute a SSH command and returns the execution result
 func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult, error) {
-	Logf("Getting external IP address for %s", node.Name)
+	log.Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
@@ -265,7 +228,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*SSHResult,
 		return nil, fmt.Errorf("couldn't find any IP address for node %s", node.Name)
 	}
 
-	Logf("SSH %q on %s(%s)", cmd, node.Name, host)
+	log.Logf("SSH %q on %s(%s)", cmd, node.Name, host)
 	result, err := SSH(cmd, host, provider)
 	LogSSHResult(result)
 

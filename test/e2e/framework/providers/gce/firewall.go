@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // MakeFirewallNameForLBService return the expected firewall name for a LB service.
@@ -42,7 +43,7 @@ func MakeFirewallNameForLBService(name string) string {
 // ConstructFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
 func ConstructFirewallForLBService(svc *v1.Service, nodeTag string) *compute.Firewall {
 	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
-		framework.Failf("can not construct firewall rule for non-loadbalancer type service")
+		log.Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
 	fw.Name = MakeFirewallNameForLBService(cloudprovider.DefaultLoadBalancerName(svc))
@@ -70,7 +71,7 @@ func MakeHealthCheckFirewallNameForLBService(clusterID, name string, isNodesHeal
 // ConstructHealthCheckFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
 func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service, nodeTag string, isNodesHealthCheck bool) *compute.Firewall {
 	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
-		framework.Failf("can not construct firewall rule for non-loadbalancer type service")
+		log.Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
 	fw.Name = MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.DefaultLoadBalancerName(svc), isNodesHealthCheck)
@@ -395,7 +396,7 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 
 // WaitForFirewallRule waits for the specified firewall existence
 func WaitForFirewallRule(gceCloud *gcecloud.Cloud, fwName string, exist bool, timeout time.Duration) (*compute.Firewall, error) {
-	framework.Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
+	log.Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
 	var fw *compute.Firewall
 	var err error
 

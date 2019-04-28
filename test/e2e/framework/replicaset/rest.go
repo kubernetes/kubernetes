@@ -29,7 +29,7 @@ import (
 
 // UpdateReplicaSetWithRetries updates replicaset template with retries.
 func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateReplicaSetFunc) (*apps.ReplicaSet, error) {
-	return testutils.UpdateReplicaSetWithRetries(c, namespace, name, applyUpdate, framework.Logf, framework.Poll, framework.PollShortTimeout)
+	return testutils.UpdateReplicaSetWithRetries(c, namespace, name, applyUpdate, log.Logf, framework.Poll, framework.PollShortTimeout)
 }
 
 // CheckNewRSAnnotations check if the new RS's annotation is as expected

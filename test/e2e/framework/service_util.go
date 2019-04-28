@@ -40,6 +40,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
+	"k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -161,7 +163,7 @@ func (j *ServiceTestJig) CreateTCPServiceWithPort(namespace string, tweak func(s
 	}
 	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
-		Failf("Failed to create TCP Service %q: %v", svc.Name, err)
+		log.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
 	return result
 }
@@ -176,7 +178,7 @@ func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc
 	}
 	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
-		Failf("Failed to create TCP Service %q: %v", svc.Name, err)
+		log.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
 	return result
 }
@@ -191,7 +193,7 @@ func (j *ServiceTestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc
 	}
 	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
-		Failf("Failed to create UDP Service %q: %v", svc.Name, err)
+		log.Failf("Failed to create UDP Service %q: %v", svc.Name, err)
 	}
 	return result
 }
@@ -216,7 +218,7 @@ func (j *ServiceTestJig) CreateExternalNameServiceOrFail(namespace string, tweak
 	}
 	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
-		Failf("Failed to create ExternalName Service %q: %v", svc.Name, err)
+		log.Failf("Failed to create ExternalName Service %q: %v", svc.Name, err)
 	}
 	return result
 }
@@ -350,7 +352,7 @@ func PickNodeIP(c clientset.Interface) string {
 	publicIps, err := GetNodePublicIps(c)
 	ExpectNoError(err)
 	if len(publicIps) == 0 {
-		Failf("got unexpected number (%d) of public IPs", len(publicIps))
+		log.Failf("got unexpected number (%d) of public IPs", len(publicIps))
 	}
 	ip := publicIps[0]
 	return ip
@@ -381,10 +383,10 @@ func (j *ServiceTestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
 	nodes := j.GetNodes(MaxNodesForEndpointsTests)
 	endpoints, err := j.Client.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
 	if err != nil {
-		Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+		log.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 	}
 	if len(endpoints.Subsets) == 0 {
-		Failf("Endpoint has no subsets, cannot determine node addresses.")
+		log.Failf("Endpoint has no subsets, cannot determine node addresses.")
 	}
 	epNodes := sets.NewString()
 	for _, ss := range endpoints.Subsets {
@@ -427,22 +429,22 @@ func (j *ServiceTestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName 
 	err := wait.PollImmediate(Poll, LoadBalancerCreateTimeoutDefault, func() (bool, error) {
 		endpoints, err := j.Client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
-			Logf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
+			log.Logf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
 			return false, nil
 		}
 		if len(endpoints.Subsets) == 0 {
-			Logf("Expect endpoints with subsets, got none.")
+			log.Logf("Expect endpoints with subsets, got none.")
 			return false, nil
 		}
 		// TODO: Handle multiple endpoints
 		if len(endpoints.Subsets[0].Addresses) == 0 {
-			Logf("Expected Ready endpoints - found none")
+			log.Logf("Expected Ready endpoints - found none")
 			return false, nil
 		}
 		epHostName := *endpoints.Subsets[0].Addresses[0].NodeName
-		Logf("Pod for service %s/%s is on node %s", namespace, serviceName, epHostName)
+		log.Logf("Pod for service %s/%s is on node %s", namespace, serviceName, epHostName)
 		if epHostName != nodeName {
-			Logf("Found endpoint on wrong node, expected %v, got %v", nodeName, epHostName)
+			log.Logf("Found endpoint on wrong node, expected %v, got %v", nodeName, epHostName)
 			return false, nil
 		}
 		return true, nil
@@ -452,19 +454,19 @@ func (j *ServiceTestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName 
 
 func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceType) {
 	if svc.Spec.Type != svcType {
-		Failf("unexpected Spec.Type (%s) for service, expected %s", svc.Spec.Type, svcType)
+		log.Failf("unexpected Spec.Type (%s) for service, expected %s", svc.Spec.Type, svcType)
 	}
 
 	if svcType != v1.ServiceTypeExternalName {
 		if svc.Spec.ExternalName != "" {
-			Failf("unexpected Spec.ExternalName (%s) for service, expected empty", svc.Spec.ExternalName)
+			log.Failf("unexpected Spec.ExternalName (%s) for service, expected empty", svc.Spec.ExternalName)
 		}
 		if svc.Spec.ClusterIP != api.ClusterIPNone && svc.Spec.ClusterIP == "" {
-			Failf("didn't get ClusterIP for non-ExternamName service")
+			log.Failf("didn't get ClusterIP for non-ExternamName service")
 		}
 	} else {
 		if svc.Spec.ClusterIP != "" {
-			Failf("unexpected Spec.ClusterIP (%s) for ExternamName service, expected empty", svc.Spec.ClusterIP)
+			log.Failf("unexpected Spec.ClusterIP (%s) for ExternamName service, expected empty", svc.Spec.ClusterIP)
 		}
 	}
 
@@ -475,11 +477,11 @@ func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceT
 	for i, port := range svc.Spec.Ports {
 		hasNodePort := (port.NodePort != 0)
 		if hasNodePort != expectNodePorts {
-			Failf("unexpected Spec.Ports[%d].NodePort (%d) for service", i, port.NodePort)
+			log.Failf("unexpected Spec.Ports[%d].NodePort (%d) for service", i, port.NodePort)
 		}
 		if hasNodePort {
 			if !ServiceNodePortRange.Contains(int(port.NodePort)) {
-				Failf("out-of-range nodePort (%d) for service", port.NodePort)
+				log.Failf("out-of-range nodePort (%d) for service", port.NodePort)
 			}
 		}
 	}
@@ -489,12 +491,12 @@ func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceT
 	}
 	hasIngress := len(svc.Status.LoadBalancer.Ingress) != 0
 	if hasIngress != expectIngress {
-		Failf("unexpected number of Status.LoadBalancer.Ingress (%d) for service", len(svc.Status.LoadBalancer.Ingress))
+		log.Failf("unexpected number of Status.LoadBalancer.Ingress (%d) for service", len(svc.Status.LoadBalancer.Ingress))
 	}
 	if hasIngress {
 		for i, ing := range svc.Status.LoadBalancer.Ingress {
 			if ing.IP == "" && ing.Hostname == "" {
-				Failf("unexpected Status.LoadBalancer.Ingress[%d] for service: %#v", i, ing)
+				log.Failf("unexpected Status.LoadBalancer.Ingress[%d] for service: %#v", i, ing)
 			}
 		}
 	}
@@ -527,13 +529,13 @@ func (j *ServiceTestJig) UpdateService(namespace, name string, update func(*v1.S
 func (j *ServiceTestJig) UpdateServiceOrFail(namespace, name string, update func(*v1.Service)) *v1.Service {
 	svc, err := j.UpdateService(namespace, name, update)
 	if err != nil {
-		Failf(err.Error())
+		log.Failf(err.Error())
 	}
 	return svc
 }
 
 func (j *ServiceTestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP string, timeout time.Duration) *v1.Service {
-	Logf("Waiting up to %v for service %q to get a new ingress IP", timeout, name)
+	log.Logf("Waiting up to %v for service %q to get a new ingress IP", timeout, name)
 	service := j.waitForConditionOrFail(namespace, name, timeout, "have a new ingress IP", func(svc *v1.Service) bool {
 		if len(svc.Status.LoadBalancer.Ingress) == 0 {
 			return false
@@ -558,20 +560,20 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 			s.Spec.Ports[0].NodePort = int32(newPort)
 		})
 		if err != nil && strings.Contains(err.Error(), portallocator.ErrAllocated.Error()) {
-			Logf("tried nodePort %d, but it is in use, will try another", newPort)
+			log.Logf("tried nodePort %d, but it is in use, will try another", newPort)
 			continue
 		}
 		// Otherwise err was nil or err was a real error
 		break
 	}
 	if err != nil {
-		Failf("Could not change the nodePort: %v", err)
+		log.Failf("Could not change the nodePort: %v", err)
 	}
 	return service
 }
 
 func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *v1.Service {
-	Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
+	log.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
 	service := j.waitForConditionOrFail(namespace, name, timeout, "have a load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) > 0
 	})
@@ -582,11 +584,11 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	defer func() {
 		if err := EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port)); err != nil {
-			Logf("Failed to delete cloud resources for service: %s %d (%v)", ip, port, err)
+			log.Logf("Failed to delete cloud resources for service: %s %d (%v)", ip, port, err)
 		}
 	}()
 
-	Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
+	log.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
 	service := j.waitForConditionOrFail(namespace, name, timeout, "have no load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) == 0
 	})
@@ -607,7 +609,7 @@ func (j *ServiceTestJig) waitForConditionOrFail(namespace, name string, timeout 
 		return false, nil
 	}
 	if err := wait.PollImmediate(Poll, timeout, pollFunc); err != nil {
-		Failf("Timed out waiting for service %q to %s", name, message)
+		log.Failf("Timed out waiting for service %q to %s", name, message)
 	}
 	return service
 }
@@ -680,10 +682,10 @@ func (j *ServiceTestJig) CreatePDBOrFail(namespace string, rc *v1.ReplicationCon
 	pdb := j.newPDBTemplate(namespace, rc)
 	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Create(pdb)
 	if err != nil {
-		Failf("Failed to create PDB %q %v", pdb.Name, err)
+		log.Failf("Failed to create PDB %q %v", pdb.Name, err)
 	}
 	if err := j.waitForPdbReady(namespace); err != nil {
-		Failf("Failed waiting for PDB to be ready: %v", err)
+		log.Failf("Failed waiting for PDB to be ready: %v", err)
 	}
 
 	return newPdb
@@ -720,14 +722,14 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 	}
 	result, err := j.Client.CoreV1().ReplicationControllers(namespace).Create(rc)
 	if err != nil {
-		Failf("Failed to create RC %q: %v", rc.Name, err)
+		log.Failf("Failed to create RC %q: %v", rc.Name, err)
 	}
 	pods, err := j.waitForPodsCreated(namespace, int(*(rc.Spec.Replicas)))
 	if err != nil {
-		Failf("Failed to create pods: %v", err)
+		log.Failf("Failed to create pods: %v", err)
 	}
 	if err := j.waitForPodsReady(namespace, pods); err != nil {
-		Failf("Failed waiting for pods to be running: %v", err)
+		log.Failf("Failed waiting for pods to be running: %v", err)
 	}
 	return result
 }
@@ -736,20 +738,20 @@ func (j *ServiceTestJig) Scale(namespace string, replicas int) {
 	rc := j.Name
 	scale, err := j.Client.CoreV1().ReplicationControllers(namespace).GetScale(rc, metav1.GetOptions{})
 	if err != nil {
-		Failf("Failed to get scale for RC %q: %v", rc, err)
+		log.Failf("Failed to get scale for RC %q: %v", rc, err)
 	}
 
 	scale.Spec.Replicas = int32(replicas)
 	_, err = j.Client.CoreV1().ReplicationControllers(namespace).UpdateScale(rc, scale)
 	if err != nil {
-		Failf("Failed to scale RC %q: %v", rc, err)
+		log.Failf("Failed to scale RC %q: %v", rc, err)
 	}
 	pods, err := j.waitForPodsCreated(namespace, replicas)
 	if err != nil {
-		Failf("Failed waiting for pods: %v", err)
+		log.Failf("Failed waiting for pods: %v", err)
 	}
 	if err := j.waitForPodsReady(namespace, pods); err != nil {
-		Failf("Failed waiting for pods to be running: %v", err)
+		log.Failf("Failed waiting for pods to be running: %v", err)
 	}
 }
 
@@ -772,7 +774,7 @@ func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]s
 	timeout := 2 * time.Minute
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(j.Labels))
-	Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
+	log.Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := j.Client.CoreV1().Pods(namespace).List(options)
@@ -788,10 +790,10 @@ func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]s
 			found = append(found, pod.Name)
 		}
 		if len(found) == replicas {
-			Logf("Found all %d pods", replicas)
+			log.Logf("Found all %d pods", replicas)
 			return found, nil
 		}
-		Logf("Found %d/%d pods - will retry", len(found), replicas)
+		log.Logf("Found %d/%d pods - will retry", len(found), replicas)
 	}
 	return nil, fmt.Errorf("timeout waiting for %d pods to be created", replicas)
 }
@@ -839,7 +841,7 @@ func newNetexecPodSpec(podName string, httpPort, udpPort int32, hostNetwork bool
 }
 
 func (j *ServiceTestJig) LaunchNetexecPodOnNode(f *Framework, nodeName, podName string, httpPort, udpPort int32, hostNetwork bool) {
-	Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, f.Namespace.Name)
+	log.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, f.Namespace.Name)
 	pod := newNetexecPodSpec(podName, httpPort, udpPort, hostNetwork)
 	pod.Spec.NodeName = nodeName
 	pod.ObjectMeta.Labels = j.Labels
@@ -847,7 +849,7 @@ func (j *ServiceTestJig) LaunchNetexecPodOnNode(f *Framework, nodeName, podName 
 	_, err := podClient.Create(pod)
 	ExpectNoError(err)
 	ExpectNoError(f.WaitForPodRunning(podName))
-	Logf("Netexec pod  %q in namespace %q running", pod.Name, f.Namespace.Name)
+	log.Logf("Netexec pod  %q in namespace %q running", pod.Name, f.Namespace.Name)
 }
 
 // newEchoServerPodSpec returns the pod spec of echo server pod
@@ -875,7 +877,7 @@ func newEchoServerPodSpec(podName string) *v1.Pod {
 // as the target for source IP preservation test. The client's source ip would
 // be echoed back by the web server.
 func (j *ServiceTestJig) LaunchEchoserverPodOnNode(f *Framework, nodeName, podName string) {
-	Logf("Creating echo server pod %q in namespace %q", podName, f.Namespace.Name)
+	log.Logf("Creating echo server pod %q in namespace %q", podName, f.Namespace.Name)
 	pod := newEchoServerPodSpec(podName)
 	pod.Spec.NodeName = nodeName
 	pod.ObjectMeta.Labels = j.Labels
@@ -883,7 +885,7 @@ func (j *ServiceTestJig) LaunchEchoserverPodOnNode(f *Framework, nodeName, podNa
 	_, err := podClient.Create(pod)
 	ExpectNoError(err)
 	ExpectNoError(f.WaitForPodRunning(podName))
-	Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
+	log.Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
 }
 
 func (j *ServiceTestJig) TestReachableHTTP(host string, port int, timeout time.Duration) {
@@ -905,9 +907,9 @@ func (j *ServiceTestJig) TestReachableHTTPWithRetriableErrorCodes(host string, p
 
 	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
 		if err == wait.ErrWaitTimeout {
-			Failf("Could not reach HTTP service through %v:%v after %v", host, port, timeout)
+			log.Failf("Could not reach HTTP service through %v:%v after %v", host, port, timeout)
 		} else {
-			Failf("Failed to reach HTTP service through %v:%v: %v", host, port, err)
+			log.Failf("Failed to reach HTTP service through %v:%v: %v", host, port, err)
 		}
 	}
 }
@@ -922,7 +924,7 @@ func (j *ServiceTestJig) TestNotReachableHTTP(host string, port int, timeout tim
 	}
 
 	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
-		Failf("HTTP service %v:%v reachable after %v: %v", host, port, timeout, err)
+		log.Failf("HTTP service %v:%v reachable after %v: %v", host, port, timeout, err)
 	}
 }
 
@@ -936,7 +938,7 @@ func (j *ServiceTestJig) TestRejectedHTTP(host string, port int, timeout time.Du
 	}
 
 	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
-		Failf("HTTP service %v:%v not rejected: %v", host, port, err)
+		log.Failf("HTTP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 
@@ -953,7 +955,7 @@ func (j *ServiceTestJig) TestReachableUDP(host string, port int, timeout time.Du
 	}
 
 	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
-		Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
+		log.Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
 
@@ -966,7 +968,7 @@ func (j *ServiceTestJig) TestNotReachableUDP(host string, port int, timeout time
 		return false, nil // caller can retry
 	}
 	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
-		Failf("UDP service %v:%v reachable after %v: %v", host, port, timeout, err)
+		log.Failf("UDP service %v:%v reachable after %v: %v", host, port, timeout, err)
 	}
 }
 
@@ -979,7 +981,7 @@ func (j *ServiceTestJig) TestRejectedUDP(host string, port int, timeout time.Dur
 		return false, nil // caller can retry
 	}
 	if err := wait.PollImmediate(Poll, timeout, pollfn); err != nil {
-		Failf("UDP service %v:%v not rejected: %v", host, port, err)
+		log.Failf("UDP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 
@@ -993,7 +995,7 @@ func (j *ServiceTestJig) GetHTTPContent(host string, port int, timeout time.Dura
 		}
 		return false, nil
 	}); pollErr != nil {
-		Failf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
+		log.Failf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
 	}
 	return body
 }
@@ -1002,18 +1004,18 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
 	url := fmt.Sprintf("http://%s%s", ipPort, request)
 	if ip == "" || port == 0 {
-		Failf("Got empty IP for reachability check (%s)", url)
+		log.Failf("Got empty IP for reachability check (%s)", url)
 		return false, fmt.Errorf("invalid input ip or port")
 	}
-	Logf("Testing HTTP health check on %v", url)
+	log.Logf("Testing HTTP health check on %v", url)
 	resp, err := httpGetNoConnectionPoolTimeout(url, 5*time.Second)
 	if err != nil {
-		Logf("Got error testing for reachability of %s: %v", url, err)
+		log.Logf("Got error testing for reachability of %s: %v", url, err)
 		return false, err
 	}
 	defer resp.Body.Close()
 	if err != nil {
-		Logf("Got error reading response from %s: %v", url, err)
+		log.Logf("Got error reading response from %s: %v", url, err)
 		return false, err
 	}
 	// HealthCheck responder returns 503 for no local endpoints
@@ -1230,31 +1232,31 @@ func translatePodNameToUIDOrFail(c clientset.Interface, ns string, expectedEndpo
 	for name, portList := range expectedEndpoints {
 		pod, err := c.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
+			log.Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
 		}
 		portsByUID[pod.ObjectMeta.UID] = portList
 	}
-	// Logf("successfully translated pod names to UIDs: %v -> %v on namespace %s", expectedEndpoints, portsByUID, ns)
+	// log.Logf("successfully translated pod names to UIDs: %v -> %v on namespace %s", expectedEndpoints, portsByUID, ns)
 	return portsByUID
 }
 
 func validatePortsOrFail(endpoints PortsByPodUID, expectedEndpoints PortsByPodUID) {
 	if len(endpoints) != len(expectedEndpoints) {
 		// should not happen because we check this condition before
-		Failf("invalid number of endpoints got %v, expected %v", endpoints, expectedEndpoints)
+		log.Failf("invalid number of endpoints got %v, expected %v", endpoints, expectedEndpoints)
 	}
 	for podUID := range expectedEndpoints {
 		if _, ok := endpoints[podUID]; !ok {
-			Failf("endpoint %v not found", podUID)
+			log.Failf("endpoint %v not found", podUID)
 		}
 		if len(endpoints[podUID]) != len(expectedEndpoints[podUID]) {
-			Failf("invalid list of ports for uid %v. Got %v, expected %v", podUID, endpoints[podUID], expectedEndpoints[podUID])
+			log.Failf("invalid list of ports for uid %v. Got %v, expected %v", podUID, endpoints[podUID], expectedEndpoints[podUID])
 		}
 		sort.Ints(endpoints[podUID])
 		sort.Ints(expectedEndpoints[podUID])
 		for index := range endpoints[podUID] {
 			if endpoints[podUID][index] != expectedEndpoints[podUID][index] {
-				Failf("invalid list of ports for uid %v. Got %v, expected %v", podUID, endpoints[podUID], expectedEndpoints[podUID])
+				log.Failf("invalid list of ports for uid %v. Got %v, expected %v", podUID, endpoints[podUID], expectedEndpoints[podUID])
 			}
 		}
 	}
@@ -1266,36 +1268,36 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 	for start := time.Now(); time.Since(start) < ServiceStartTimeout; time.Sleep(1 * time.Second) {
 		endpoints, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
-			Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
+			log.Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
 			continue
 		}
-		// Logf("Found endpoints %v", endpoints)
+		// log.Logf("Found endpoints %v", endpoints)
 
 		portsByPodUID := GetContainerPortsByPodUID(endpoints)
-		// Logf("Found port by pod UID %v", portsByPodUID)
+		// log.Logf("Found port by pod UID %v", portsByPodUID)
 
 		expectedPortsByPodUID := translatePodNameToUIDOrFail(c, namespace, expectedEndpoints)
 		if len(portsByPodUID) == len(expectedEndpoints) {
 			validatePortsOrFail(portsByPodUID, expectedPortsByPodUID)
-			Logf("successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)",
+			log.Logf("successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)",
 				serviceName, namespace, expectedEndpoints, time.Since(start))
 			return
 		}
 
 		if i%5 == 0 {
-			Logf("Unexpected endpoints: found %v, expected %v (%v elapsed, will retry)", portsByPodUID, expectedEndpoints, time.Since(start))
+			log.Logf("Unexpected endpoints: found %v, expected %v (%v elapsed, will retry)", portsByPodUID, expectedEndpoints, time.Since(start))
 		}
 		i++
 	}
 
 	if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{}); err == nil {
 		for _, pod := range pods.Items {
-			Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+			log.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 		}
 	} else {
-		Logf("Can't list pod debug info: %v", err)
+		log.Logf("Can't list pod debug info: %v", err)
 	}
-	Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, ServiceStartTimeout)
+	log.Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, ServiceStartTimeout)
 }
 
 // StartServeHostnameService creates a replication controller that serves its
@@ -1378,22 +1380,22 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 		// verify service from node
 		func() string {
 			cmd := "set -e; " + buildCommand("wget -q --timeout=0.2 --tries=1 -O -")
-			Logf("Executing cmd %q on host %v", cmd, host)
-			result, err := SSH(cmd, host, TestContext.Provider)
+			log.Logf("Executing cmd %q on host %v", cmd, host)
+			result, err := ssh.SSH(cmd, host, TestContext.Provider)
 			if err != nil || result.Code != 0 {
-				LogSSHResult(result)
-				Logf("error while SSH-ing to node: %v", err)
+				ssh.LogSSHResult(result)
+				log.Logf("error while SSH-ing to node: %v", err)
 			}
 			return result.Stdout
 		},
 		// verify service from pod
 		func() string {
 			cmd := buildCommand("wget -q -T 1 -O -")
-			Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPodName)
+			log.Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPodName)
 			// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
 			output, err := RunHostCmd(ns, execPodName, cmd)
 			if err != nil {
-				Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPodName, err, output)
+				log.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPodName, err, output)
 			}
 			return output
 		},
@@ -1419,12 +1421,12 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 			// and we need a better way to track how often it occurs.
 			if gotEndpoints.IsSuperset(expectedEndpoints) {
 				if !gotEndpoints.Equal(expectedEndpoints) {
-					Logf("Ignoring unexpected output wgetting endpoints of service %s: %v", serviceIP, gotEndpoints.Difference(expectedEndpoints))
+					log.Logf("Ignoring unexpected output wgetting endpoints of service %s: %v", serviceIP, gotEndpoints.Difference(expectedEndpoints))
 				}
 				passed = true
 				break
 			}
-			Logf("Unable to reach the following endpoints of service %s: %v", serviceIP, expectedEndpoints.Difference(gotEndpoints))
+			log.Logf("Unable to reach the following endpoints of service %s: %v", serviceIP, expectedEndpoints.Difference(gotEndpoints))
 		}
 		if !passed {
 			// Sort the lists so they're easier to visually diff.
@@ -1447,15 +1449,15 @@ func VerifyServeHostnameServiceDown(c clientset.Interface, host string, serviceI
 		"curl -g -s --connect-timeout 2 http://%s && exit 99", ipPort)
 
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := SSH(command, host, TestContext.Provider)
+		result, err := ssh.SSH(command, host, TestContext.Provider)
 		if err != nil {
-			LogSSHResult(result)
-			Logf("error while SSH-ing to node: %v", err)
+			ssh.LogSSHResult(result)
+			log.Logf("error while SSH-ing to node: %v", err)
 		}
 		if result.Code != 99 {
 			return nil
 		}
-		Logf("service still alive - still waiting")
+		log.Logf("service still alive - still waiting")
 	}
 	return fmt.Errorf("waiting for service to be down timed out")
 }
@@ -1466,10 +1468,10 @@ func CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zo
 }
 
 func DescribeSvc(ns string) {
-	Logf("\nOutput of kubectl describe svc:\n")
+	log.Logf("\nOutput of kubectl describe svc:\n")
 	desc, _ := RunKubectl(
 		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
-	Logf(desc)
+	log.Logf(desc)
 }
 
 func CreateServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *v1.Service {
@@ -1516,7 +1518,7 @@ type affinityTracker struct {
 // Record the response going to a given host.
 func (at *affinityTracker) recordHost(host string) {
 	at.hostTrace = append(at.hostTrace, host)
-	Logf("Received response from host: %s", host)
+	log.Logf("Received response from host: %s", host)
 }
 
 // Check that we got a constant count requests going to the same host.
@@ -1539,8 +1541,8 @@ func (at *affinityTracker) checkHostTrace(count int) (fulfilled, affinityHolds b
 }
 
 func checkAffinityFailed(tracker affinityTracker, err string) {
-	Logf("%v", tracker.hostTrace)
-	Failf(err)
+	log.Logf("%v", tracker.hostTrace)
+	log.Failf(err)
 }
 
 // CheckAffinity function tests whether the service affinity works as expected.
@@ -1560,7 +1562,7 @@ func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIP string, target
 		if execPod != nil {
 			stdout, err := RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
-				Logf("Failed to get response from %s. Retry until timeout", targetIPPort)
+				log.Logf("Failed to get response from %s. Retry until timeout", targetIPPort)
 				return false, nil
 			}
 			tracker.recordHost(stdout)

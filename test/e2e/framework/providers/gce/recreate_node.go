@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -53,7 +54,7 @@ var _ = Describe("Recreate [Feature:Recreate]", func() {
 		originalNodes, err = framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
-		framework.Logf("Got the following nodes before recreate %v", nodeNames(originalNodes))
+		log.Logf("Got the following nodes before recreate %v", nodeNames(originalNodes))
 
 		ps, err = testutils.NewPodStore(f.ClientSet, systemNamespace, labels.Everything(), fields.Everything())
 		allPods := ps.List()
@@ -64,7 +65,7 @@ var _ = Describe("Recreate [Feature:Recreate]", func() {
 		}
 
 		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
-			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
+			log.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
 
 	})
@@ -78,7 +79,7 @@ var _ = Describe("Recreate [Feature:Recreate]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, e := range events.Items {
-				framework.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
+				log.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
 			}
 		}
 		if ps != nil {
@@ -95,20 +96,20 @@ var _ = Describe("Recreate [Feature:Recreate]", func() {
 func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace string, nodes []v1.Node, podNames []string) {
 	err := recreateNodes(c, nodes)
 	if err != nil {
-		framework.Failf("Test failed; failed to start the restart instance group command.")
+		log.Failf("Test failed; failed to start the restart instance group command.")
 	}
 
 	err = waitForNodeBootIdsToChange(c, nodes, framework.RecreateNodeReadyAgainTimeout)
 	if err != nil {
-		framework.Failf("Test failed; failed to recreate at least one node in %v.", framework.RecreateNodeReadyAgainTimeout)
+		log.Failf("Test failed; failed to recreate at least one node in %v.", framework.RecreateNodeReadyAgainTimeout)
 	}
 
 	nodesAfter, err := framework.CheckNodesReady(c, len(nodes), framework.RestartNodeReadyAgainTimeout)
 	Expect(err).NotTo(HaveOccurred())
-	framework.Logf("Got the following nodes after recreate: %v", nodeNames(nodesAfter))
+	log.Logf("Got the following nodes after recreate: %v", nodeNames(nodesAfter))
 
 	if len(nodes) != len(nodesAfter) {
-		framework.Failf("Had %d nodes before nodes were recreated, but now only have %d",
+		log.Failf("Had %d nodes before nodes were recreated, but now only have %d",
 			len(nodes), len(nodesAfter))
 	}
 
@@ -118,6 +119,6 @@ func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace
 	Expect(err).NotTo(HaveOccurred())
 	remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
 	if !framework.CheckPodsRunningReadyOrSucceeded(c, systemNamespace, podNamesAfter, remaining) {
-		framework.Failf("At least one pod wasn't running and ready after the restart.")
+		log.Failf("At least one pod wasn't running and ready after the restart.")
 	}
 }

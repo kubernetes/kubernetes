@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -62,7 +63,7 @@ func WaitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string
 }
 
 func logReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet) {
-	testutils.LogReplicaSetsOfDeployment(deployment, allOldRSs, newRS, Logf)
+	testutils.LogReplicaSetsOfDeployment(deployment, allOldRSs, newRS, log.Logf)
 }
 
 // WaitForObservedDeployment waits for the specified deployment generation.
@@ -72,14 +73,14 @@ func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string,
 
 // WaitForDeploymentWithCondition waits for the specified deployment condition.
 func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType apps.DeploymentConditionType) error {
-	return testutils.WaitForDeploymentWithCondition(c, ns, deploymentName, reason, condType, Logf, Poll, PollLongTimeout)
+	return testutils.WaitForDeploymentWithCondition(c, ns, deploymentName, reason, condType, log.Logf, Poll, PollLongTimeout)
 }
 
 // WaitForDeploymentRevisionAndImage waits for the deployment's and its new RS's revision and container image to match the given revision and image.
 // Note that deployment revision and its new RS revision should be updated shortly most of the time, but an overwhelmed RS controller
 // may result in taking longer to relabel a RS.
 func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName string, revision, image string) error {
-	return testutils.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, revision, image, Logf, Poll, PollLongTimeout)
+	return testutils.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, revision, image, log.Logf, Poll, PollLongTimeout)
 }
 
 // NewDeployment returns a deployment spec with the specified argument.
@@ -118,13 +119,13 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 // Rolling update strategy is used only during a rolling update, and can be violated in other situations,
 // such as shortly after a scaling event or the deployment is just created.
 func WaitForDeploymentComplete(c clientset.Interface, d *apps.Deployment) error {
-	return testutils.WaitForDeploymentComplete(c, d, Logf, Poll, PollLongTimeout)
+	return testutils.WaitForDeploymentComplete(c, d, log.Logf, Poll, PollLongTimeout)
 }
 
 // WaitForDeploymentCompleteAndCheckRolling waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
 // Rolling update strategy should not be broken during a rolling update.
 func WaitForDeploymentCompleteAndCheckRolling(c clientset.Interface, d *apps.Deployment) error {
-	return testutils.WaitForDeploymentCompleteAndCheckRolling(c, d, Logf, Poll, PollLongTimeout)
+	return testutils.WaitForDeploymentCompleteAndCheckRolling(c, d, log.Logf, Poll, PollLongTimeout)
 }
 
 // WaitForDeploymentUpdatedReplicasGTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
@@ -160,7 +161,7 @@ func WatchRecreateDeployment(c clientset.Interface, d *apps.Deployment) error {
 			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c.AppsV1())
 			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c.AppsV1())
 			if err == nil && nerr == nil {
-				Logf("%+v", d)
+				log.Logf("%+v", d)
 				logReplicaSetsOfDeployment(d, allOldRSs, newRS)
 				logPodsOfDeployment(c, d, append(allOldRSs, newRS))
 			}
@@ -190,7 +191,7 @@ func RunDeployment(config testutils.DeploymentConfig) error {
 }
 
 func logPodsOfDeployment(c clientset.Interface, deployment *apps.Deployment, rsList []*apps.ReplicaSet) {
-	testutils.LogPodsOfDeployment(c, deployment, rsList, Logf)
+	testutils.LogPodsOfDeployment(c, deployment, rsList, log.Logf)
 }
 
 // WaitForDeploymentRevision waits for becoming the target revision of a delopyment.
@@ -221,7 +222,7 @@ func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q Create API error: %v", deploymentSpec.Name, err)
 	}
-	Logf("Waiting deployment %q to complete", deploymentSpec.Name)
+	log.Logf("Waiting deployment %q to complete", deploymentSpec.Name)
 	err = WaitForDeploymentComplete(client, deployment)
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q failed to complete: %v", deploymentSpec.Name, err)

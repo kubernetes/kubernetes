@@ -20,10 +20,11 @@ import (
 	apps "k8s.io/api/apps/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // UpdateDeploymentWithRetries updates the specified deployment with retries.
 func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*apps.Deployment, error) {
-	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, framework.Logf, framework.Poll, framework.PollShortTimeout)
+	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, log.Logf, framework.Poll, framework.PollShortTimeout)
 }
