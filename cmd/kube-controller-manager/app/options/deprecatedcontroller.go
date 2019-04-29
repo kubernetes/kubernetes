@@ -19,6 +19,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
+	"k8s.io/component-base/logs"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
@@ -34,6 +35,7 @@ func (o *DeprecatedControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	fs.SetOutput(logs.WarningWriter())
 	fs.Float32Var(&o.DeletingPodsQPS, "deleting-pods-qps", 0.1, "Number of nodes per second on which pods are deleted in case of node failure.")
 	fs.MarkDeprecated("deleting-pods-qps", "This flag is currently no-op and will be deleted.")
 	fs.Int32Var(&o.DeletingPodsBurst, "deleting-pods-burst", 0, "Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.")

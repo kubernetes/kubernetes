@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/logs"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -138,6 +139,7 @@ type Options struct {
 
 // AddFlags adds flags to fs and binds them to options.
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
+	fs.SetOutput(logs.WarningWriter())
 	o.addOSFlags(fs)
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the default configuration values to this file and exit.")

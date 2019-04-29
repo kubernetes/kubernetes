@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 	"k8s.io/klog"
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -359,6 +360,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 // AddFlags adds flags for a specific KubeletFlags to the specified FlagSet
 func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs := pflag.NewFlagSet("", pflag.ExitOnError)
+	fs.SetOutput(logs.WarningWriter())
 	defer func() {
 		// Unhide deprecated flags. We want deprecated flags to show in Kubelet help.
 		// We have some hidden flags, but we might as well unhide these when they are deprecated,

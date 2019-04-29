@@ -34,6 +34,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	"k8s.io/component-base/logs"
 )
 
 type EtcdOptions struct {
@@ -112,6 +113,7 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	if s == nil {
 		return
 	}
+	fs.SetOutput(logs.WarningWriter())
 
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
 		"Per-resource etcd servers overrides, comma separated. The individual override "+

@@ -26,6 +26,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
@@ -139,6 +140,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
 	fs := fss.FlagSet("misc")
+	fs.SetOutput(logs.WarningWriter())
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events.")
 

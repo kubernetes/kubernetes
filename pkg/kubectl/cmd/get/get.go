@@ -170,6 +170,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 
 	o.PrintFlags.AddFlags(cmd)
 
+	cmd.Flags().SetOutput(cmdutil.WarningWriter{})
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
 	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")

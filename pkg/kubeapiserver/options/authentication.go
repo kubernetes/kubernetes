@@ -32,6 +32,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -190,6 +191,7 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 }
 
 func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.SetOutput(logs.WarningWriter())
 	fs.StringSliceVar(&s.APIAudiences, "api-audiences", s.APIAudiences, ""+
 		"Identifiers of the API. The service account token authenticator will validate that "+
 		"tokens used against the API are bound to at least one of these audiences. If the "+

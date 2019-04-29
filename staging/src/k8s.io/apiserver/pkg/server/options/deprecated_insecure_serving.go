@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/logs"
 )
 
 // DeprecatedInsecureServingOptions are for creating an unauthenticated, unauthorized, insecure port.
@@ -67,6 +68,7 @@ func (s *DeprecatedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	fs.SetOutput(logs.WarningWriter())
 	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
 	// Though this flag is deprecated, we discovered security concerns over how to do health checks without it e.g. #43784

@@ -63,6 +63,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/config:go_default_library",
+        "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//staging/src/k8s.io/kube-proxy/config/v1alpha1:go_default_library",
         "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

@@ -415,6 +415,7 @@ func AddServerSideApplyFlags(cmd *cobra.Command) {
 }
 
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
+	cmd.Flags().SetOutput(WarningWriter{})
 	cmd.Flags().Bool("include-uninitialized", false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
 	cmd.Flags().MarkDeprecated("include-uninitialized", "The Initializers feature has been removed. This flag is now a no-op, and will be removed in v1.15")
 }
@@ -659,4 +660,13 @@ func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
 		newGeneratorName,
 		oldGeneratorName,
 	)
+}
+
+// WarningWriter serves as a bridge between the standard log package and the klog package.
+type WarningWriter struct{}
+
+// Write implements the io.Writer interface.
+func (writer WarningWriter) Write(data []byte) (n int, err error) {
+	klog.WarningDepth(1, string(data))
+	return len(data), nil
 }

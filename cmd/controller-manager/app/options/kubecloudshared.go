@@ -19,6 +19,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
+	"k8s.io/component-base/logs"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
@@ -49,6 +50,7 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	fs.SetOutput(logs.WarningWriter())
 	o.CloudProvider.AddFlags(fs)
 	fs.StringVar(&o.ExternalCloudVolumePlugin, "external-cloud-volume-plugin", o.ExternalCloudVolumePlugin, "The plugin to use when cloud provider is set to external. Can be empty, should only be set when cloud-provider is external. Currently used to allow node and volume controllers to work for in tree cloud providers.")
 	fs.BoolVar(&o.UseServiceAccountCredentials, "use-service-account-credentials", o.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")

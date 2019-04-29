@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/component-base/logs"
 )
 
 type FeatureOptions struct {
@@ -42,6 +43,7 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	fs.SetOutput(logs.WarningWriter())
 	fs.BoolVar(&o.EnableProfiling, "profiling", o.EnableProfiling,
 		"Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", o.EnableContentionProfiling,

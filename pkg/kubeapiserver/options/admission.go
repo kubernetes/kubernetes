@@ -28,6 +28,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/logs"
 )
 
 // AdmissionOptions holds the admission options.
@@ -64,6 +65,7 @@ func NewAdmissionOptions() *AdmissionOptions {
 
 // AddFlags adds flags related to admission for kube-apiserver to the specified FlagSet
 func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.SetOutput(logs.WarningWriter())
 	fs.StringSliceVar(&a.PluginNames, "admission-control", a.PluginNames, ""+
 		"Admission is divided into two phases. "+
 		"In the first phase, only mutating admission plugins run. "+

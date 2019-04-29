@@ -94,6 +94,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			cmdutil.CheckErr(options.Run())
 		},
 	}
+	cmd.Flags().SetOutput(cmdutil.WarningWriter{})
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodExecTimeout)
 	cmd.Flags().StringVarP(&options.PodName, "pod", "p", options.PodName, "Pod name")
 	cmd.Flags().MarkDeprecated("pod", "This flag is deprecated and will be removed in future. Use exec POD_NAME instead.")

@@ -48,6 +48,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/logs"
 )
 
 const (
@@ -553,6 +554,7 @@ func (o *AuditLogOptions) newBackend(w io.Writer) audit.Backend {
 }
 
 func (o *AuditWebhookOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.SetOutput(logs.WarningWriter())
 	fs.StringVar(&o.ConfigFile, "audit-webhook-config-file", o.ConfigFile,
 		"Path to a kubeconfig formatted file that defines the audit webhook configuration.")
 	fs.DurationVar(&o.InitialBackoff, "audit-webhook-initial-backoff",

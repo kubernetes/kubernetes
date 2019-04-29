@@ -18,9 +18,11 @@ package options
 
 import (
 	"fmt"
+
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/logs"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 )
@@ -43,6 +45,7 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 		return
 	}
 
+	fs.SetOutput(logs.WarningWriter())
 	// TODO: unify deprecation mechanism, string prefix or MarkDeprecated (the latter hides the flag. We also don't want that).
 	fs.StringVar(&o.AlgorithmProvider, "algorithm-provider", o.AlgorithmProvider, "DEPRECATED: the scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
 	fs.StringVar(&o.PolicyConfigFile, "policy-config-file", o.PolicyConfigFile, "DEPRECATED: file with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config=true")

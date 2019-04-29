@@ -42,12 +42,23 @@ func AddFlags(fs *pflag.FlagSet) {
 }
 
 // KlogWriter serves as a bridge between the standard log package and the glog package.
-type KlogWriter struct{}
+type KlogWriter struct {
+	warning bool
+}
 
 // Write implements the io.Writer interface.
 func (writer KlogWriter) Write(data []byte) (n int, err error) {
-	klog.InfoDepth(1, string(data))
+	if writer.warning {
+		klog.WarningDepth(1, string(data))
+	} else {
+		klog.InfoDepth(1, string(data))
+	}
 	return len(data), nil
+}
+
+// WarningWriter serves as a bridge between the standard log package and the klog package.
+func WarningWriter() KlogWriter {
+	return KlogWriter{warning: true}
 }
 
 // InitLogs initializes logs the way we want for kubernetes.
