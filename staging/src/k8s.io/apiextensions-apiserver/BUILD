@@ -47,6 +47,7 @@ filegroup(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/establish:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/finalizer:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/nonstructuralschema:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/openapi:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/status:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/crdserverscheme:all-srcs",

@@ -1066,6 +1066,7 @@ k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation
 k8s.io/apiextensions-apiserver/pkg/apiserver
 k8s.io/apiextensions-apiserver/pkg/apiserver/conversion
+k8s.io/apiextensions-apiserver/pkg/apiserver/schema
 k8s.io/apiextensions-apiserver/pkg/apiserver/validation
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
@@ -1087,6 +1088,7 @@ k8s.io/apiextensions-apiserver/pkg/cmd/server/options
 k8s.io/apiextensions-apiserver/pkg/cmd/server/testing
 k8s.io/apiextensions-apiserver/pkg/controller/establish
 k8s.io/apiextensions-apiserver/pkg/controller/finalizer
+k8s.io/apiextensions-apiserver/pkg/controller/nonstructuralschema
 k8s.io/apiextensions-apiserver/pkg/controller/openapi
 k8s.io/apiextensions-apiserver/pkg/controller/status
 k8s.io/apiextensions-apiserver/pkg/crdserverscheme
