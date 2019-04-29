@@ -61,6 +61,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/deployment:go_default_library",
         "//test/e2e/framework/job:go_default_library",
         "//test/e2e/framework/replicaset:go_default_library",
         "//test/utils:go_default_library",

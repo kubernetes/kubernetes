@@ -18,6 +18,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -31,14 +32,17 @@ import (
 	"k8s.io/klog"
 	"sigs.k8s.io/yaml"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/legacy-cloud-providers/azure/auth"
 )
 
 var flagConfigFile = pflag.String("azure-container-registry-config", "",
 	"Path to the file containing Azure container registry configuration information.")
 
-const dummyRegistryEmail = "name@contoso.com"
+const (
+	dummyRegistryEmail = "name@contoso.com"
+	maxReadLength      = 10 * 1 << 20 // 10MB
+)
 
 var containerRegistryUrls = []string{"*.azurecr.io", "*.azurecr.cn", "*.azurecr.de", "*.azurecr.us"}
 
@@ -117,9 +121,13 @@ func parseConfig(configReader io.Reader) (*auth.AzureAuthConfig, error) {
 		return &config, nil
 	}
 
-	configContents, err := ioutil.ReadAll(configReader)
+	limitedReader := &io.LimitedReader{R: configReader, N: maxReadLength}
+	configContents, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
+	}
+	if limitedReader.N <= 0 {
+		return nil, errors.New("the read limit is reached")
 	}
 	err = yaml.Unmarshal(configContents, &config)
 	if err != nil {

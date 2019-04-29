@@ -30,10 +30,6 @@ import (
 var scaleConverter = NewScaleConverter()
 var codecs = serializer.NewCodecFactory(scaleConverter.Scheme())
 
-// restInterfaceProvider turns a restclient.Config into a restclient.Interface.
-// It's overridable for the purposes of testing.
-type restInterfaceProvider func(*restclient.Config) (restclient.Interface, error)
-
 // scaleClient is an implementation of ScalesGetter
 // which makes use of a RESTMapper and a generic REST
 // client to support an discoverable resource.

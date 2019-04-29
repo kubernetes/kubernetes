@@ -93,8 +93,12 @@ func TestAdmit(t *testing.T) {
 				t.Errorf("%s: expected an error saying %q, but got: %v", tt.Name, tt.ErrorContains, err)
 			}
 		}
-		if _, isStatusErr := err.(*errors.StatusError); err != nil && !isStatusErr {
+		if statusErr, isStatusErr := err.(*errors.StatusError); err != nil && !isStatusErr {
 			t.Errorf("%s: expected a StatusError, got %T", tt.Name, err)
+		} else if isStatusErr {
+			if statusErr.ErrStatus.Code != tt.ExpectStatusCode {
+				t.Errorf("%s: expected status code %d, got %d", tt.Name, tt.ExpectStatusCode, statusErr.ErrStatus.Code)
+			}
 		}
 		fakeAttr, ok := attr.(*webhooktesting.FakeAttributes)
 		if !ok {

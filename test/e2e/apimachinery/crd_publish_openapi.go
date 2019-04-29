@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -52,11 +52,11 @@ var (
 var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublishOpenAPI]", func() {
 	f := framework.NewDefaultFramework("crd-publish-openapi")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessServerVersionGTE(crdPublishOpenAPIVersion, f.ClientSet.Discovery())
 	})
 
-	It("works for CRD with validation schema", func() {
+	ginkgo.It("works for CRD with validation schema", func() {
 		crd, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -65,7 +65,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-foo")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
-		By("client-side validation (kubectl create and apply) allows request with known and required properties")
+		ginkgo.By("client-side validation (kubectl create and apply) allows request with known and required properties")
 		validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(validCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create valid CR %s: %v", validCR, err)
@@ -80,7 +80,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 			framework.Failf("failed to delete valid CR: %v", err)
 		}
 
-		By("client-side validation (kubectl create and apply) rejects request with unknown properties when disallowed by the schema")
+		ginkgo.By("client-side validation (kubectl create and apply) rejects request with unknown properties when disallowed by the schema")
 		unknownCR := fmt.Sprintf(`{%s,"spec":{"foo":true}}`, meta)
 		if _, err := framework.RunKubectlInput(unknownCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
 			framework.Failf("unexpected no error when creating CR with unknown field: %v", err)
@@ -89,7 +89,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 			framework.Failf("unexpected no error when applying CR with unknown field: %v", err)
 		}
 
-		By("client-side validation (kubectl create and apply) rejects request without required properties")
+		ginkgo.By("client-side validation (kubectl create and apply) rejects request without required properties")
 		noRequireCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"age":"10"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(noRequireCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
 			framework.Failf("unexpected no error when creating CR without required field: %v", err)
@@ -98,12 +98,12 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 			framework.Failf("unexpected no error when applying CR without required field: %v", err)
 		}
 
-		By("kubectl explain works to explain CR properties")
+		ginkgo.By("kubectl explain works to explain CR properties")
 		if err := verifyKubectlExplain(crd.GetPluralName(), `(?s)DESCRIPTION:.*Foo CRD for Testing.*FIELDS:.*apiVersion.*<string>.*APIVersion defines.*spec.*<Object>.*Specification of Foo`); err != nil {
 			framework.Failf("%v", err)
 		}
 
-		By("kubectl explain works to explain CR properties recursively")
+		ginkgo.By("kubectl explain works to explain CR properties recursively")
 		if err := verifyKubectlExplain(crd.GetPluralName()+".metadata", `(?s)DESCRIPTION:.*Standard object's metadata.*FIELDS:.*creationTimestamp.*<string>.*CreationTimestamp is a timestamp`); err != nil {
 			framework.Failf("%v", err)
 		}
@@ -114,7 +114,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 			framework.Failf("%v", err)
 		}
 
-		By("kubectl explain works to return error when explain is called on property that doesn't exist")
+		ginkgo.By("kubectl explain works to return error when explain is called on property that doesn't exist")
 		if _, err := framework.RunKubectl("explain", crd.GetPluralName()+".spec.bars2"); err == nil || !strings.Contains(err.Error(), `field "bars2" does not exist`) {
 			framework.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
 		}
@@ -124,7 +124,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		}
 	})
 
-	It("works for CRD without validation schema", func() {
+	ginkgo.It("works for CRD without validation schema", func() {
 		crd, err := setupCRD(f, nil, "empty", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -133,7 +133,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
-		By("client-side validation (kubectl create and apply) allows request with any unknown properties")
+		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
 		randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(randomCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create random CR %s for CRD without schema: %v", randomCR, err)
@@ -148,7 +148,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 			framework.Failf("failed to delete random CR: %v", err)
 		}
 
-		By("kubectl explain works to explain CR without validation schema")
+		ginkgo.By("kubectl explain works to explain CR without validation schema")
 		if err := verifyKubectlExplain(crd.GetPluralName(), `(?s)DESCRIPTION:.*<empty>`); err != nil {
 			framework.Failf("%v", err)
 		}
@@ -158,8 +158,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		}
 	})
 
-	It("works for multiple CRDs of different groups", func() {
-		By("CRs in different groups (two CRDs) show up in OpenAPI documentation")
+	ginkgo.It("works for multiple CRDs of different groups", func() {
+		ginkgo.By("CRs in different groups (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -185,8 +185,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		}
 	})
 
-	It("works for multiple CRDs of same group but different versions", func() {
-		By("CRs in the same group but different versions (one multiversion CRD) show up in OpenAPI documentation")
+	ginkgo.It("works for multiple CRDs of same group but different versions", func() {
+		ginkgo.By("CRs in the same group but different versions (one multiversion CRD) show up in OpenAPI documentation")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -201,7 +201,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 			framework.Failf("%v", err)
 		}
 
-		By("CRs in the same group but different versions (two CRDs) show up in OpenAPI documentation")
+		ginkgo.By("CRs in the same group but different versions (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "common-group", "v4")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -227,8 +227,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		}
 	})
 
-	It("works for multiple CRDs of same group and version but different kinds", func() {
-		By("CRs in the same group and version but different kinds (two CRDs) show up in OpenAPI documentation")
+	ginkgo.It("works for multiple CRDs of same group and version but different kinds", func() {
+		ginkgo.By("CRs in the same group and version but different kinds (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "common-group", "v6")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -254,8 +254,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		}
 	})
 
-	It("updates the published spec when one versin gets renamed", func() {
-		By("set up a multi version CRD")
+	ginkgo.It("updates the published spec when one versin gets renamed", func() {
+		ginkgo.By("set up a multi version CRD")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -267,22 +267,22 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 			framework.Failf("%v", err)
 		}
 
-		By("rename a version")
+		ginkgo.By("rename a version")
 		patch := []byte(`{"spec":{"versions":[{"name":"v2","served":true,"storage":true},{"name":"v4","served":true,"storage":false}]}}`)
 		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crdMultiVer.GetMetaName(), types.MergePatchType, patch)
 		if err != nil {
 			framework.Failf("%v", err)
 		}
 
-		By("check the new version name is served")
+		ginkgo.By("check the new version name is served")
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v4"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
-		By("check the old version name is removed")
+		ginkgo.By("check the old version name is removed")
 		if err := waitForDefinitionCleanup(f.ClientSet, definitionName(crdMultiVer, "v3")); err != nil {
 			framework.Failf("%v", err)
 		}
-		By("check the other version is not changed")
+		ginkgo.By("check the other version is not changed")
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}
@@ -295,8 +295,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		}
 	})
 
-	It("removes definition from spec when one versin gets changed to not be served", func() {
-		By("set up a multi version CRD")
+	ginkgo.It("removes definition from spec when one versin gets changed to not be served", func() {
+		ginkgo.By("set up a multi version CRD")
 		crd, err := setupCRD(f, schemaFoo, "multi-to-single-ver", "v5", "v6alpha1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -309,18 +309,18 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 			framework.Failf("%v", err)
 		}
 
-		By("mark a version not serverd")
+		ginkgo.By("mark a version not serverd")
 		crd.Crd.Spec.Versions[1].Served = false
 		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd.Crd)
 		if err != nil {
 			framework.Failf("%v", err)
 		}
 
-		By("check the unserved version gets removed")
+		ginkgo.By("check the unserved version gets removed")
 		if err := waitForDefinitionCleanup(f.ClientSet, definitionName(crd, "v6alpha1")); err != nil {
 			framework.Failf("%v", err)
 		}
-		By("check the other version is not changed")
+		ginkgo.By("check the other version is not changed")
 		if err := waitForDefinition(f.ClientSet, definitionName(crd, "v5"), schemaFoo); err != nil {
 			framework.Failf("%v", err)
 		}

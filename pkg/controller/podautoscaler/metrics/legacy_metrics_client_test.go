@@ -389,22 +389,6 @@ func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 	tc.runTest(t)
 }
 
-func testCollapseTimeSamples(t *testing.T) {
-	now := time.Now()
-	metrics := heapster.MetricResult{
-		Metrics: []heapster.MetricPoint{
-			{Timestamp: now, Value: 50, FloatValue: nil},
-			{Timestamp: now.Add(-15 * time.Second), Value: 100, FloatValue: nil},
-			{Timestamp: now.Add(-60 * time.Second), Value: 100000, FloatValue: nil}},
-		LatestTimestamp: now,
-	}
-
-	val, timestamp, hadMetrics := collapseTimeSamples(metrics, time.Minute)
-	assert.True(t, hadMetrics, "should report that it received a populated list of metrics")
-	assert.InEpsilon(t, float64(75), val, 0.1, "collapsed sample value should be as expected")
-	assert.True(t, timestamp.Equal(now), "timestamp should be the current time (the newest)")
-}
-
 func offsetTimestampBy(t int) time.Time {
 	return fixedTimestamp.Add(time.Duration(t) * time.Minute)
 }

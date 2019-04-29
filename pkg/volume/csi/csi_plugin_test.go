@@ -958,6 +958,118 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 	}
 }
 
+func TestPluginCanDeviceMount(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	tests := []struct {
+		name           string
+		driverName     string
+		spec           *volume.Spec
+		canDeviceMount bool
+		shouldFail     bool
+	}{
+		{
+			name:           "non device mountable inline",
+			driverName:     "inline-driver",
+			spec:           volume.NewSpecFromVolume(makeTestVol("test-vol", "inline-driver")),
+			canDeviceMount: false,
+		},
+		{
+			name:           "device mountable PV",
+			driverName:     "device-mountable-pv",
+			spec:           volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "device-mountable-pv", testVol), true),
+			canDeviceMount: true,
+		},
+		{
+			name:           "incomplete spec",
+			driverName:     "device-unmountable",
+			spec:           &volume.Spec{ReadOnly: true},
+			canDeviceMount: false,
+			shouldFail:     true,
+		},
+		{
+			name:           "missing spec",
+			driverName:     "device-unmountable",
+			canDeviceMount: false,
+			shouldFail:     true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plug, tmpDir := newTestPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+
+			pluginCanDeviceMount, err := plug.CanDeviceMount(test.spec)
+			if err != nil && !test.shouldFail {
+				t.Fatalf("unexpected error in plug.CanDeviceMount: %s", err)
+			}
+			if pluginCanDeviceMount != test.canDeviceMount {
+				t.Fatalf("expecting plugin.CanAttach %t got %t", test.canDeviceMount, pluginCanDeviceMount)
+			}
+		})
+	}
+}
+
+func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	tests := []struct {
+		name           string
+		driverName     string
+		spec           *volume.Spec
+		canDeviceMount bool
+		shouldFail     bool
+	}{
+		{
+			name:           "non device mountable inline",
+			driverName:     "inline-driver",
+			spec:           volume.NewSpecFromVolume(makeTestVol("test-vol", "inline-driver")),
+			canDeviceMount: false,
+		},
+		{
+			name:           "device mountable PV",
+			driverName:     "device-mountable-pv",
+			spec:           volume.NewSpecFromPersistentVolume(makeTestPV("test-vol", 20, "device-mountable-pv", testVol), true),
+			canDeviceMount: true,
+		},
+		{
+			name:           "incomplete spec",
+			driverName:     "device-unmountable",
+			spec:           &volume.Spec{ReadOnly: true},
+			canDeviceMount: false,
+			shouldFail:     true,
+		},
+		{
+			name:           "missing spec",
+			driverName:     "device-unmountable",
+			canDeviceMount: false,
+			shouldFail:     true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tmpDir, err := utiltesting.MkTmpdir("csi-test")
+			if err != nil {
+				t.Fatalf("can't create temp dir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			client := fakeclient.NewSimpleClientset()
+			host := volumetest.NewFakeVolumeHost(tmpDir, client, nil)
+			plugMgr := &volume.VolumePluginMgr{}
+			plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+
+			plug, err := plugMgr.FindDeviceMountablePluginBySpec(test.spec)
+			if err != nil && !test.shouldFail {
+				t.Fatalf("unexpected error in plugMgr.FindDeviceMountablePluginBySpec: %s", err)
+			}
+			if (plug != nil) != test.canDeviceMount {
+				t.Fatalf("expecting deviceMountablePlugin, but got nil")
+			}
+		})
+	}
+}
+
 func TestPluginNewBlockMapper(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 

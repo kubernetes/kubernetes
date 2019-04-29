@@ -21,7 +21,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 OPENAPI_ROOT_DIR="${KUBE_ROOT}/api/openapi-spec"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
@@ -33,8 +33,8 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 function cleanup()
 {
     if [[ -n ${APISERVER_PID-} ]]; then
-      kill ${APISERVER_PID} 1>&2 2>/dev/null
-      wait ${APISERVER_PID} || true
+      kill "${APISERVER_PID}" 1>&2 2>/dev/null
+      wait "${APISERVER_PID}" || true
     fi
     unset APISERVER_PID
 
@@ -56,7 +56,7 @@ API_LOGFILE=${API_LOGFILE:-/tmp/openapi-api-server.log}
 
 kube::etcd::start
 
-echo "dummy_token,admin,admin" > ${TMP_DIR}/tokenauth.csv
+echo "dummy_token,admin,admin" > "${TMP_DIR}/tokenauth.csv"
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
@@ -82,7 +82,7 @@ if ! kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "; t
   exit 1
 fi
 
-kube::log::status "Updating " ${OPENAPI_ROOT_DIR}
+kube::log::status "Updating " "${OPENAPI_ROOT_DIR}"
 
 curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" | jq -S . > "${OPENAPI_ROOT_DIR}/swagger.json"
 

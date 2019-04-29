@@ -39,14 +39,6 @@ func nodeNames(nodes []v1.Node) []string {
 	return result
 }
 
-func podNames(pods []v1.Pod) []string {
-	result := make([]string, 0, len(pods))
-	for i := range pods {
-		result = append(result, pods[i].Name)
-	}
-	return result
-}
-
 var _ = Describe("Recreate [Feature:Recreate]", func() {
 	f := framework.NewDefaultFramework("recreate")
 	var originalNodes []v1.Node

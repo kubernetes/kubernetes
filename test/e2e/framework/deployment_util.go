@@ -36,11 +36,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-// UpdateDeploymentWithRetries updates the specified deployment with retries.
-func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*apps.Deployment, error) {
-	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, Logf, Poll, PollShortTimeout)
-}
-
 // WaitForDeploymentOldRSsNum waits for the deployment to clean up old rcs.
 func WaitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string, desiredRSNum int) error {
 	var oldRSs []*apps.ReplicaSet

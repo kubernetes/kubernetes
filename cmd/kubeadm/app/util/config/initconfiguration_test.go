@@ -84,6 +84,23 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 				cfgFiles["Kubelet_componentconfig"],
 			}, []byte(constants.YAMLDocumentSeparator)),
 		},
+		{
+			name:         "v1beta2.partial1",
+			fileContents: cfgFiles["InitConfiguration_v1beta2"],
+		},
+		{
+			name:         "v1beta2.partial2",
+			fileContents: cfgFiles["ClusterConfiguration_v1beta2"],
+		},
+		{
+			name: "v1beta2.full",
+			fileContents: bytes.Join([][]byte{
+				cfgFiles["InitConfiguration_v1beta2"],
+				cfgFiles["ClusterConfiguration_v1beta2"],
+				cfgFiles["Kube-proxy_componentconfig"],
+				cfgFiles["Kubelet_componentconfig"],
+			}, []byte(constants.YAMLDocumentSeparator)),
+		},
 	}
 
 	for _, rt := range tests {

@@ -18,7 +18,7 @@ package kubeconfig
 
 import (
 	"bytes"
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 	"fmt"
 	"io"
@@ -41,7 +41,7 @@ import (
 
 // clientCertAuth struct holds info required to build a client certificate to provide authentication info in a kubeconfig object
 type clientCertAuth struct {
-	CAKey         *rsa.PrivateKey
+	CAKey         crypto.Signer
 	Organizations []string
 }
 
@@ -57,21 +57,6 @@ type kubeConfigSpec struct {
 	ClientName     string
 	TokenAuth      *tokenAuth
 	ClientCertAuth *clientCertAuth
-}
-
-// CreateInitKubeConfigFiles will create and write to disk all kubeconfig files necessary in the kubeadm init phase
-// to establish the control plane, including also the admin kubeconfig file.
-// If kubeconfig files already exists, they are used only if evaluated equal; otherwise an error is returned.
-func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	klog.V(1).Infoln("creating all kubeconfig files")
-	return createKubeConfigFiles(
-		outDir,
-		cfg,
-		kubeadmconstants.AdminKubeConfigFileName,
-		kubeadmconstants.KubeletKubeConfigFileName,
-		kubeadmconstants.ControllerManagerKubeConfigFileName,
-		kubeadmconstants.SchedulerKubeConfigFileName,
-	)
 }
 
 // CreateJoinControlPlaneKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm

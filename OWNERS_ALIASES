@@ -223,14 +223,20 @@ aliases:
     - nicksardo
     - thockin
     - rramkumar1
+  sig-apps-approvers:
+    - kow3ns
+    - janetkuo
+    - soltysh
+    - tnozicka
+    - erictune
+    - smarterclayton
   sig-apps-reviewers:
     - enisoc
     - erictune
     - foxish
     - janetkuo
     - kow3ns
-    - lukaszo
-    - mfojtik
+    - mortent
     - smarterclayton
     - soltysh
     - tnozicka
@@ -339,9 +345,11 @@ aliases:
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
   
-  # sig-api-machinery-api-reviewers:
-  #   - 
-  #   - 
+  sig-api-machinery-api-reviewers:
+    - caesarxuchao
+    - deads2k
+    - jpbetz
+    - sttts
   
   # sig-apps-api-reviewers:
   #   - 
@@ -351,13 +359,14 @@ aliases:
   #   - 
   #   - 
   
-  # sig-cli-api-reviewers:
-  #   - 
-  #   - 
   
-  # sig-cloud-provider-api-reviewers:
-  #   - 
-  #   - 
+  sig-cli-api-reviewers:
+    - pwittrock
+    - soltysh
+
+  sig-cloud-provider-api-reviewers:
+    - andrewsykim
+    - cheftako
   
   # sig-cluster-lifecycle-api-reviewers:
   #   - 
@@ -371,17 +380,19 @@ aliases:
   #   - 
   #   - 
   
-  # sig-scheduling-api-reviewers:
-  #   - 
-  #   - 
+  sig-scheduling-api-reviewers:
+      - bsalamat
+      - k82cn
   
-  # sig-storage-api-reviewers:
-  #   - 
-  #   - 
+  sig-storage-api-reviewers:
+    - saad-ali
+    - msau42
+    - jsafrane
+
   
-  # sig-windows-api-reviewers:
-  #   - 
-  #   - 
+  sig-windows-api-reviewers:
+    - patricklang
+    - michmike
 
   dep-approvers:
     - apelisse

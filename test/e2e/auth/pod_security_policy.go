@@ -19,7 +19,7 @@ package auth
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +33,7 @@ import (
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/auth"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
@@ -54,7 +55,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		if !framework.IsPodSecurityPolicyEnabled(f) {
 			framework.Skipf("PodSecurityPolicy not enabled")
 		}
-		if !framework.IsRBACEnabled(f) {
+		if !auth.IsRBACEnabled(f.ClientSet.RbacV1beta1()) {
 			framework.Skipf("RBAC not enabled")
 		}
 		ns = f.Namespace.Name
@@ -70,8 +71,9 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		framework.ExpectNoError(err)
 
 		By("Binding the edit role to the default SA")
-		framework.BindClusterRole(f.ClientSet.RbacV1beta1(), "edit", ns,
+		err = auth.BindClusterRole(f.ClientSet.RbacV1beta1(), "edit", ns,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns, Name: "default"})
+		framework.ExpectNoError(err)
 	})
 
 	It("should forbid pod creation when no PSP is available", func() {
@@ -202,7 +204,6 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		sysadmin.Spec.Containers[0].SecurityContext.RunAsUser = &uid
 		tester(sysadmin)
 	})
-
 }
 
 // createAndBindPSP creates a PSP in the policy API group.
@@ -231,12 +232,14 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policy.PodSecurityPol
 	framework.ExpectNoError(err, "Failed to create PSP role")
 
 	// Bind the role to the namespace.
-	framework.BindRoleInNamespace(f.ClientSet.RbacV1beta1(), name, ns, rbacv1beta1.Subject{
+	err = auth.BindRoleInNamespace(f.ClientSet.RbacV1beta1(), name, ns, rbacv1beta1.Subject{
 		Kind:      rbacv1beta1.ServiceAccountKind,
 		Namespace: ns,
 		Name:      "default",
 	})
-	framework.ExpectNoError(framework.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
+	framework.ExpectNoError(err)
+
+	framework.ExpectNoError(auth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
 		serviceaccount.MakeUsername(ns, "default"), ns, "use", name,
 		schema.GroupResource{Group: "policy", Resource: "podsecuritypolicies"}, true))
 

@@ -71,6 +71,7 @@ func (t *dnsFederationsConfigMapTest) run() {
             pods insecure
             upstream
             fallthrough in-addr.arpa ip6.arpa
+            ttl 30
         }
         federation %v {
            abc def.com
@@ -86,6 +87,7 @@ func (t *dnsFederationsConfigMapTest) run() {
             pods insecure
             upstream
             fallthrough in-addr.arpa ip6.arpa
+            ttl 30
         }
         federation %v {
            ghi xyz.com
@@ -235,6 +237,7 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
            pods insecure
            upstream
            fallthrough in-addr.arpa ip6.arpa
+           ttl 30
         }
         forward . %v
     }
@@ -333,6 +336,7 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
            pods insecure
            upstream
            fallthrough in-addr.arpa ip6.arpa
+           ttl 30
         }
         forward . %v
     }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),
@@ -443,6 +447,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
            pods insecure
            upstream
            fallthrough in-addr.arpa ip6.arpa
+           ttl 30
         }
         forward . %v
     }`, framework.TestContext.ClusterDNSDomain, t.dnsServerPod.Status.PodIP),

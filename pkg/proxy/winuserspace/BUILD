@@ -19,6 +19,7 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/proxy:go_default_library",
+        "//pkg/proxy/config:go_default_library",
         "//pkg/util/ipconfig:go_default_library",
         "//pkg/util/netsh:go_default_library",
         "//pkg/util/slice:go_default_library",

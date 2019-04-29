@@ -48,13 +48,6 @@ const (
 	fakeImage     = "fakeimage"
 )
 
-type statefulsetTester struct {
-	t           *testing.T
-	c           clientset.Interface
-	service     *v1.Service
-	statefulset *appsv1.StatefulSet
-}
-
 func labelMap() map[string]string {
 	return map[string]string{"foo": "bar"}
 }

@@ -80,13 +80,3 @@ func SetDefaults_ServiceReference(obj *ServiceReference) {
 		obj.Port = utilpointer.Int32Ptr(443)
 	}
 }
-
-// hasPerVersionColumns returns true if a CRD uses per-version columns.
-func hasPerVersionColumns(versions []CustomResourceDefinitionVersion) bool {
-	for _, v := range versions {
-		if len(v.AdditionalPrinterColumns) > 0 {
-			return true
-		}
-	}
-	return false
-}

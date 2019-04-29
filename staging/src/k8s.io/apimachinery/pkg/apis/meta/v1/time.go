@@ -41,11 +41,6 @@ func (t *Time) DeepCopyInto(out *Time) {
 	*out = *t
 }
 
-// String returns the representation of the time.
-func (t Time) String() string {
-	return t.Time.String()
-}
-
 // NewTime returns a wrapped instance of the provided time
 func NewTime(time time.Time) Time {
 	return Time{time}
@@ -72,7 +67,10 @@ func (t *Time) IsZero() bool {
 
 // Before reports whether the time instant t is before u.
 func (t *Time) Before(u *Time) bool {
-	return t.Time.Before(u.Time)
+	if t != nil && u != nil {
+		return t.Time.Before(u.Time)
+	}
+	return false
 }
 
 // Equal reports whether the time instant t is equal to u.

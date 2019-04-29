@@ -13,7 +13,6 @@ go_library(
         "//cmd/kube-scheduler/app/config:go_default_library",
         "//cmd/kube-scheduler/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/controller:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
