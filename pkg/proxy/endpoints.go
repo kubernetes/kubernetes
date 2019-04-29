@@ -197,18 +197,18 @@ type UpdateEndpointMapResult struct {
 }
 
 // UpdateEndpointsMap updates endpointsMap base on the given changes.
-func UpdateEndpointsMap(endpointsMap EndpointsMap, changes *EndpointChangeTracker) (result UpdateEndpointMapResult) {
+func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndpointMapResult) {
 	result.StaleEndpoints = make([]ServiceEndpoint, 0)
 	result.StaleServiceNames = make([]ServicePortName, 0)
 	result.LastChangeTriggerTimes = make([]time.Time, 0)
 
-	endpointsMap.apply(
+	em.apply(
 		changes, &result.StaleEndpoints, &result.StaleServiceNames, &result.LastChangeTriggerTimes)
 
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to endpointsMap.
 	result.HCEndpointsLocalIPSize = make(map[types.NamespacedName]int)
-	localIPs := endpointsMap.getLocalEndpointIPs()
+	localIPs := em.getLocalEndpointIPs()
 	for nsn, ips := range localIPs {
 		result.HCEndpointsLocalIPSize[nsn] = len(ips)
 	}
