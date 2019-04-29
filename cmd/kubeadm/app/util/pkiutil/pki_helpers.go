@@ -446,12 +446,15 @@ func getAltNames(cfg *kubeadmapi.InitConfiguration, certName string) (*certutil.
 // altNames is passed in with a pointer, and the struct is modified
 // valid IP address strings are parsed and added to altNames.IPs as net.IP's
 // RFC-1123 compliant DNS strings are added to altNames.DNSNames as strings
+// RFC-1123 compliant wildcard DNS strings are added to altNames.DNSNames as strings
 // certNames is used to print user facing warnings and should be the name of the cert the altNames will be used for
 func appendSANsToAltNames(altNames *certutil.AltNames, SANs []string, certName string) {
 	for _, altname := range SANs {
 		if ip := net.ParseIP(altname); ip != nil {
 			altNames.IPs = append(altNames.IPs, ip)
 		} else if len(validation.IsDNS1123Subdomain(altname)) == 0 {
+			altNames.DNSNames = append(altNames.DNSNames, altname)
+		} else if len(validation.IsWildcardDNS1123Subdomain(altname)) == 0 {
 			altNames.DNSNames = append(altNames.DNSNames, altname)
 		} else {
 			fmt.Printf(

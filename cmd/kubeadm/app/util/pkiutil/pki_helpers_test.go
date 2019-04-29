@@ -704,3 +704,31 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 		})
 	}
 }
+
+func TestAppendSANsToAltNames(t *testing.T) {
+	var tests = []struct {
+		sans     []string
+		expected int
+	}{
+		{[]string{}, 0},
+		{[]string{"abc"}, 1},
+		{[]string{"*.abc"}, 1},
+		{[]string{"**.abc"}, 0},
+		{[]string{"a.*.bc"}, 0},
+		{[]string{"a.*.bc", "abc.def"}, 1},
+		{[]string{"a*.bc", "abc.def"}, 1},
+	}
+	for _, rt := range tests {
+		altNames := certutil.AltNames{}
+		appendSANsToAltNames(&altNames, rt.sans, "foo")
+		actual := len(altNames.DNSNames)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed AppendSANsToAltNames Numbers:\n\texpected: %d\n\t  actual: %d",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+
+}

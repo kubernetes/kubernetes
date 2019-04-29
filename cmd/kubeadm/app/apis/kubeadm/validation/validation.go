@@ -308,8 +308,10 @@ func ValidateCertSANs(altnames []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, altname := range altnames {
 		if errs := validation.IsDNS1123Subdomain(altname); len(errs) != 0 {
-			if net.ParseIP(altname) == nil {
-				allErrs = append(allErrs, field.Invalid(fldPath, altname, fmt.Sprintf("altname is not a valid IP address or DNS label: %s", strings.Join(errs, "; "))))
+			if errs2 := validation.IsWildcardDNS1123Subdomain(altname); len(errs2) != 0 {
+				if net.ParseIP(altname) == nil {
+					allErrs = append(allErrs, field.Invalid(fldPath, altname, fmt.Sprintf("altname is not a valid IP address, DNS label or a DNS label with subdomain wildcards: %s; %s", strings.Join(errs, "; "), strings.Join(errs2, "; "))))
+				}
 			}
 		}
 	}
