@@ -65,12 +65,6 @@ case "$(uname -m)" in
     ;;
 esac
 
-# Get the absolute path of the directory component of a file, i.e. the
-# absolute path of the dirname of $1.
-get_absolute_dirname() {
-  echo "$(cd "$(dirname "$1")" && pwd)"
-}
-
 function get_bin() {
   bin="${1:-}"
   srcdir="${2:-}"
@@ -93,9 +87,12 @@ function get_bin() {
   # The bazel go rules place binaries in subtrees like
   # "bazel-bin/source/path/linux_amd64_pure_stripped/binaryname", so make sure
   # the platform name is matched in the path.
-  locations+=($(find "${KUBE_ROOT}/bazel-bin/${srcdir}" -type f -executable \
-    -path "*/${host_os}_${host_arch}*/${bin}" 2>/dev/null || true) )
-  echo $( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  while IFS=$'\n' read -r line; do
+    locations+=( "${line}" )
+  done < <(find "${KUBE_ROOT}/bazel-bin/${srcdir}" -type f -executable \
+    -path "*/${host_os}_${host_arch}*/${bin}" 2>/dev/null || true)
+  
+  (ls -t "${locations[@]}" 2>/dev/null || true) | head -1
 }
 
 function print_error() {
