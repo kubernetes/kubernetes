@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
@@ -187,7 +188,7 @@ func (tc *TokenCleaner) syncFunc(key string) error {
 
 func (tc *TokenCleaner) evalSecret(o interface{}) {
 	secret := o.(*v1.Secret)
-	if isSecretExpired(secret) {
+	if bootstrapsecretutil.HasExpired(secret, time.Now()) {
 		klog.V(3).Infof("Deleting expired secret %s/%s", secret.Namespace, secret.Name)
 		var options *metav1.DeleteOptions
 		if len(secret.UID) > 0 {
