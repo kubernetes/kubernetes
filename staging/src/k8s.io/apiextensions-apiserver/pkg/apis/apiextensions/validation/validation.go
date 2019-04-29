@@ -686,6 +686,10 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 		return allErrs
 	}
 
+	//
+	// WARNING: if anything new is allowed below, NewStructural must be adapted to support it.
+	//
+
 	if schema.Default != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), "default is not supported"))
 	}
