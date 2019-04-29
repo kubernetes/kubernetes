@@ -38,7 +38,7 @@ type ServiceUpgradeTest struct {
 // Name returns the tracking name of the test.
 func (ServiceUpgradeTest) Name() string { return "service-upgrade" }
 
-func shouldTestPDBs() bool { return framework.ProviderIs("gce", "gke") }
+func shouldTestPDBs() bool { return true }
 
 // Setup creates a service with a load balancer and makes sure it's reachable.
 func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
