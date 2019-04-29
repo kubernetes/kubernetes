@@ -264,6 +264,15 @@ const (
 	// NamesAccepted means the names chosen for this CustomResourceDefinition do not conflict with others in
 	// the group and are therefore accepted.
 	NamesAccepted CustomResourceDefinitionConditionType = "NamesAccepted"
+	// NonStructuralSchema means that the CustomResourceDefinition has one or more schemas which are not structural.
+	// Non-structural schemas will not be allowed anymore in v1 API groups. Moreover, new features will not be
+	// available for non-structural CRDs:
+	// - pruning
+	// - defaulting
+	// - read-only
+	// - publishing
+	// - webhook conversion
+	NonStructuralSchema CustomResourceDefinitionConditionType = "NonStructuralSchema"
 	// Terminating means that the CustomResourceDefinition has been deleted and is cleaning up.
 	Terminating CustomResourceDefinitionConditionType = "Terminating"
 )
