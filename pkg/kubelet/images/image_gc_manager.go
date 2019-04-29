@@ -54,6 +54,9 @@ type ImageGCManager interface {
 	// Start async garbage collection of images.
 	Start()
 
+	// Stop async garbage collection of images.
+	Stop()
+
 	GetImageList() ([]container.Image, error)
 
 	// Delete all unused images.
@@ -103,6 +106,9 @@ type realImageGCManager struct {
 
 	// sandbox image exempted from GC
 	sandboxImage string
+
+	// channel used to stop the manager
+	stopCh chan struct{}
 }
 
 // imageCache caches latest result of ListImages.
@@ -170,6 +176,7 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 }
 
 func (im *realImageGCManager) Start() {
+	im.stopCh = make(chan struct{})
 	go wait.Until(func() {
 		// Initial detection make detected time "unknown" in the past.
 		var ts time.Time
@@ -182,7 +189,7 @@ func (im *realImageGCManager) Start() {
 		} else {
 			im.initialized = true
 		}
-	}, 5*time.Minute, wait.NeverStop)
+	}, 5*time.Minute, im.stopCh)
 
 	// Start a goroutine periodically updates image cache.
 	// TODO(random-liu): Merge this with the previous loop.
@@ -193,8 +200,11 @@ func (im *realImageGCManager) Start() {
 		} else {
 			im.imageCache.set(images)
 		}
-	}, 30*time.Second, wait.NeverStop)
+	}, 30*time.Second, im.stopCh)
+}
 
+func (im *realImageGCManager) Stop() {
+	close(im.stopCh)
 }
 
 // Get a list of images on this node
