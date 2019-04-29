@@ -2426,7 +2426,7 @@ function setup-fluentd {
   fluentd_gcp_yaml_version="${FLUENTD_GCP_YAML_VERSION:-v3.2.0}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_yaml}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_scaler_yaml}"
-  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.6-1.6.0-1}"
+  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-1.6.8}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
   update-daemon-set-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
   start-fluentd-resource-update ${fluentd_gcp_yaml}
