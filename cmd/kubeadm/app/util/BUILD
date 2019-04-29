@@ -46,7 +46,6 @@ go_test(
     srcs = [
         "arguments_test.go",
         "cgroupdriver_test.go",
-        "chroot_test.go",
         "endpoint_test.go",
         "error_test.go",
         "marshal_test.go",
