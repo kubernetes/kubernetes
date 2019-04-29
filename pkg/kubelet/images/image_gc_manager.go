@@ -180,7 +180,7 @@ func (im *realImageGCManager) Start() {
 		}
 		counter++
 
-		if counter % 6 == 0 {
+		if counter % 10 == 0 {
 			// Initial detection make detected time "unknown" in the past.
 			var ts time.Time
 			if im.initialized {
