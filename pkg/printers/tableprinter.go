@@ -34,10 +34,10 @@ var _ ResourcePrinter = &HumanReadablePrinter{}
 
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 
-// NewHumanReadablePrinter creates a printer suitable for calling PrintObj().
+// NewTablePrinter creates a printer suitable for calling PrintObj().
 // TODO(seans3): Change return type to ResourcePrinter interface once we no longer need
 // to constuct the "handlerMap".
-func NewHumanReadablePrinter(options PrintOptions) *HumanReadablePrinter {
+func NewTablePrinter(options PrintOptions) *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{
 		handlerMap: make(map[reflect.Type]*handlerEntry),
 		options:    options,
