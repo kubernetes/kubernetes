@@ -171,30 +171,30 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 
 func (im *realImageGCManager) Start() {
 	go wait.Until(func() {
-		// Initial detection make detected time "unknown" in the past.
-		var ts time.Time
-		if im.initialized {
-			ts = time.Now()
-		}
-		_, err := im.detectImages(ts)
-		if err != nil {
-			klog.Warningf("[imageGCManager] Failed to monitor images: %v", err)
-		} else {
-			im.initialized = true
-		}
-	}, 5*time.Minute, wait.NeverStop)
-
-	// Start a goroutine periodically updates image cache.
-	// TODO(random-liu): Merge this with the previous loop.
-	go wait.Until(func() {
+		counter := 0
 		images, err := im.runtime.ListImages()
 		if err != nil {
 			klog.Warningf("[imageGCManager] Failed to update image list: %v", err)
 		} else {
 			im.imageCache.set(images)
 		}
-	}, 30*time.Second, wait.NeverStop)
+		counter++
 
+		if counter % 6 == 0 {
+			// Initial detection make detected time "unknown" in the past.
+			var ts time.Time
+			if im.initialized {
+				ts = time.Now()
+			}
+			_, err = im.detectImages(ts)
+			if err != nil {
+				klog.Warningf("[imageGCManager] Failed to monitor images: %v", err)
+			} else {
+				im.initialized = true
+			}
+			counter = 0
+		}
+	}, 30*time.Second, wait.NeverStop)
 }
 
 // Get a list of images on this node
