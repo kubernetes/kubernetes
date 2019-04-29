@@ -105,3 +105,8 @@ func (el *EndpointsLock) Describe() string {
 func (el *EndpointsLock) Identity() string {
 	return el.LockConfig.Identity
 }
+
+// returns the leader election configuration of the lock
+func (el *EndpointsLock) LeaderElectionConfig() (*int, *int, *int) {
+	return &el.LockConfig.LeaseDurationSeconds, &el.LockConfig.RenewDeadlineSeconds, &el.LockConfig.RetryPeriodSeconds
+}

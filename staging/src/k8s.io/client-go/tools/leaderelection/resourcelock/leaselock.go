@@ -89,6 +89,11 @@ func (ll *LeaseLock) Identity() string {
 	return ll.LockConfig.Identity
 }
 
+// returns the leader election config of the lock
+func (ll *LeaseLock) LeaderElectionConfig() (*int, *int, *int) {
+	return &ll.LockConfig.LeaseDurationSeconds, &ll.LockConfig.RenewDeadlineSeconds, &ll.LockConfig.RetryPeriodSeconds
+}
+
 func LeaseSpecToLeaderElectionRecord(spec *coordinationv1.LeaseSpec) *LeaderElectionRecord {
 	holderIdentity := ""
 	if spec.HolderIdentity != nil {

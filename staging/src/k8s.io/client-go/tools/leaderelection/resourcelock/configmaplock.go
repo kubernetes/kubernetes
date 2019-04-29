@@ -110,3 +110,8 @@ func (cml *ConfigMapLock) Describe() string {
 func (cml *ConfigMapLock) Identity() string {
 	return cml.LockConfig.Identity
 }
+
+// returns the leader election configuration of the lock
+func (cml *ConfigMapLock) LeaderElectionConfig() (*int, *int, *int) {
+	return &cml.LockConfig.LeaseDurationSeconds, &cml.LockConfig.RenewDeadlineSeconds, &cml.LockConfig.RetryPeriodSeconds
+}

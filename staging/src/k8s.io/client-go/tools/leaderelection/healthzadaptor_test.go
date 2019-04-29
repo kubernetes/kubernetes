@@ -27,7 +27,10 @@ import (
 )
 
 type fakeLock struct {
-	identity string
+	identity      string
+	leaseDuration int
+	renewDuration int
+	retryDuration int
 }
 
 // Get is a dummy to allow us to have a fakeLock for testing.
@@ -51,6 +54,11 @@ func (fl *fakeLock) RecordEvent(string) {}
 // Identity is a dummy to allow us to have a fakeLock for testing.
 func (fl *fakeLock) Identity() string {
 	return fl.identity
+}
+
+// Identity is a dummy to allow us to have a fakeLock for testing.
+func (fl *fakeLock) LeaderElectionConfig() (*int, *int, *int) {
+	return &fl.leaseDuration, &fl.renewDuration, &fl.retryDuration
 }
 
 // Describe is a dummy to allow us to have a fakeLock for testing.

@@ -62,6 +62,16 @@ type ResourceLockConfig struct {
 	Identity string
 	// EventRecorder is optional.
 	EventRecorder EventRecorder
+
+	// LeaseDurationSeconds is the duration that non-leader candidates will
+	// wait to force acquire leadership.
+	LeaseDurationSeconds int
+	// RenewDeadlineSeconds is the duration that the acting master will retry
+	// refreshing leadership before giving up.
+	RenewDeadlineSeconds int
+	// RetryPeriodSeconds is the duration the LeaderElector clients should wait
+	// between tries of actions.
+	RetryPeriodSeconds int
 }
 
 // Interface offers a common interface for locking on arbitrary
@@ -84,6 +94,9 @@ type Interface interface {
 
 	// Identity will return the locks Identity
 	Identity() string
+
+	// LeaderElectionConfig will return leader election's lease duration, lease renew and retry configurations
+	LeaderElectionConfig() (*int, *int, *int)
 
 	// Describe is used to convert details on current resource lock
 	// into a string
