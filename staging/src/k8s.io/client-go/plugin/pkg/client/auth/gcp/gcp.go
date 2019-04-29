@@ -104,6 +104,11 @@ var (
 //       # golang reference time in the format that the expiration timestamp uses.
 //       # If omitted, defaults to time.RFC3339Nano
 //       "time-fmt": "2006-01-02 15:04:05.999999999"
+//
+//       # Service Account Credentials JSON options
+//
+//       # Service Account Credentials JSON to use to generate an access token.
+//       "service-acct": '{"type": "service_account",  "project_id": "pj-212", ... }'
 //     }
 //   }
 // }
@@ -114,7 +119,7 @@ type gcpAuthProvider struct {
 }
 
 func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
-	ts, err := tokenSource(isCmdTokenSource(gcpConfig), gcpConfig)
+	ts, err := tokenSource(gcpConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -130,9 +135,14 @@ func isCmdTokenSource(gcpConfig map[string]string) bool {
 	return ok
 }
 
-func tokenSource(isCmd bool, gcpConfig map[string]string) (oauth2.TokenSource, error) {
+func isServiceAcctCredTokenSource(gcpConfig map[string]string) bool {
+	_, ok := gcpConfig["service-acct"]
+	return ok
+}
+
+func tokenSource(gcpConfig map[string]string) (oauth2.TokenSource, error) {
 	// Command-based token source
-	if isCmd {
+	if isCmdTokenSource(gcpConfig) {
 		cmd := gcpConfig["cmd-path"]
 		if len(cmd) == 0 {
 			return nil, fmt.Errorf("missing access token cmd")
@@ -151,13 +161,31 @@ func tokenSource(isCmd bool, gcpConfig map[string]string) (oauth2.TokenSource, e
 		return newCmdTokenSource(cmd, args, gcpConfig["token-key"], gcpConfig["expiry-key"], gcpConfig["time-fmt"]), nil
 	}
 
-	// Google Application Credentials-based token source
 	scopes := parseScopes(gcpConfig)
+	// Service Account Credentials in JSON-based token source
+	if isServiceAcctCredTokenSource(gcpConfig) {
+		ts, err := tokenSourceFromJSON(context.Background(), gcpConfig["service-acct"], scopes...)
+		if err != nil {
+			return nil, fmt.Errorf("cannot construct service-acct token source: %v", err)
+		}
+		return ts, nil
+	}
+
+	// Google Application Credentials-based token source
 	ts, err := google.DefaultTokenSource(context.Background(), scopes...)
 	if err != nil {
 		return nil, fmt.Errorf("cannot construct google default token source: %v", err)
 	}
 	return ts, nil
+}
+
+// tokenSourceFromJSON returns the token source for a given Service Account Credentials JSON data string
+func tokenSourceFromJSON(ctx context.Context, jsonData string, scopes ...string) (oauth2.TokenSource, error) {
+	creds, err := google.CredentialsFromJSON(ctx, []byte(jsonData), scopes...)
+	if err != nil {
+		return nil, err
+	}
+	return creds.TokenSource, nil
 }
 
 // parseScopes constructs a list of scopes that should be included in token source
