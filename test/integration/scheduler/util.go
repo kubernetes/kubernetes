@@ -210,14 +210,6 @@ func initTestSchedulerWithOptions(
 		controller.WaitForCacheSync("scheduler", context.schedulerConfig.StopEverything, podInformer.Informer().HasSynced)
 	}
 
-<<<<<<< HEAD
-=======
-	// Set pluginSet if provided. DefaultPluginSet is used if this is not specified.
-	if pluginSet != nil {
-		context.scheduler.PluginSet = pluginSet
-	}
-
->>>>>>> refactoring
 	eventBroadcaster := record.NewBroadcaster()
 	context.scheduler.Recorder = eventBroadcaster.NewRecorder(
 		legacyscheme.Scheme,

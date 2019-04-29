@@ -52,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -76,11 +75,11 @@ type Scheduler struct {
 
 	NodeLister algorithm.NodeLister
 	Algorithm  core.ScheduleAlgorithm
-	GetBinder  func(pod *v1.Pod) Binder
+	GetBinder  func(pod *v1.Pod) factory.Binder
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
-	PodConditionUpdater PodConditionUpdater
+	PodConditionUpdater factory.PodConditionUpdater
 	// PodPreemptor is used to evict pods and update 'NominatedNode' field of
 	// the preemptor pod.
 	PodPreemptor PodPreemptor
@@ -391,7 +390,6 @@ func New(client clientset.Interface,
 		options.percentageOfNodesToScore,
 	)
 
-	podBackoff := util.CreateDefaultPodBackoff()
 	metrics.Register()
 	sched := &Scheduler{
 		SchedulerCache: schedulerCache,
@@ -406,14 +404,14 @@ func New(client clientset.Interface,
 			return cache.WaitForCacheSync(stopEverything, scheduledPodsHasSynced)
 		},
 		NextPod:           internalqueue.MakeNextPodFunc(podQueue),
-		Error:             factory.MakeDefaultErrorFunc(client, podBackoff, podQueue, schedulerCache, stopEverything),
+		Error:             factory.MakeDefaultErrorFunc(client, podQueue, schedulerCache, stopEverything),
 		StopEverything:    stopEverything,
 		VolumeBinder:      volumeBinder,
 		SchedulingQueue:   podQueue,
 		Recorder:          recorder,
 		DisablePreemption: options.disablePreemption,
 	}
-	AddAllEventHandlers(sched, options.schedulerName, nodeInformer, podInformer, pvInformer, pvcInformer, replicationControllerInformer, replicaSetInformer, statefulSetInformer, serviceInformer, pdbInformer, storageClassInformer)
+	AddAllEventHandlers(sched, options.schedulerName, nodeInformer, podInformer, pvInformer, pvcInformer, serviceInformer, storageClassInformer)
 	return sched, nil
 
 }
@@ -767,15 +765,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 
 // scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne() {
-<<<<<<< HEAD
-	fwk := sched.config.Framework
-=======
-	plugins := sched.PluginSet
-	// Remove all plugin context data at the beginning of a scheduling cycle.
-	if plugins.Data().Ctx != nil {
-		plugins.Data().Ctx.Reset()
-	}
->>>>>>> flatten Scheduler struct
+	fwk := sched.Framework
 
 	pod := sched.NextPod()
 	// pod could be nil when schedulerQueue is closed
