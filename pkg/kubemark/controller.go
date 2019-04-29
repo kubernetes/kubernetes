@@ -52,7 +52,7 @@ type KubemarkController struct {
 	rand                   *rand.Rand
 	createNodeQueue        chan string
 	nodeGroupQueueSize     map[string]int
-	nodeGroupQueueSizeLock sync.Mutex
+	nodeGroupQueueSizeLock sync.RWMutex
 }
 
 // externalCluster is used to communicate with the external cluster that hosts
@@ -102,7 +102,7 @@ func NewKubemarkController(externalClient kubeclient.Interface, externalInformer
 		rand:                   rand.New(rand.NewSource(time.Now().UnixNano())),
 		createNodeQueue:        make(chan string, 1000),
 		nodeGroupQueueSize:     make(map[string]int),
-		nodeGroupQueueSizeLock: sync.Mutex{},
+		nodeGroupQueueSizeLock: sync.RWMutex{},
 	}
 
 	kubemarkNodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -160,8 +160,8 @@ func (kubemarkController *KubemarkController) GetNodeGroupSize(nodeGroup string)
 // GetNodeGroupTargetSize returns the size of the node group as a sum of current
 // observed size and number of upcoming nodes.
 func (kubemarkController *KubemarkController) GetNodeGroupTargetSize(nodeGroup string) (int, error) {
-	kubemarkController.nodeGroupQueueSizeLock.Lock()
-	defer kubemarkController.nodeGroupQueueSizeLock.Unlock()
+	kubemarkController.nodeGroupQueueSizeLock.RLock()
+	defer kubemarkController.nodeGroupQueueSizeLock.RUnlock()
 	realSize, err := kubemarkController.GetNodeGroupSize(nodeGroup)
 	if err != nil {
 		return realSize, err
