@@ -18,8 +18,6 @@ package token
 
 import (
 	"bytes"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"sync"
 	"time"
@@ -31,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	certutil "k8s.io/client-go/util/cert"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -119,7 +118,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		for _, cluster := range insecureConfig.Clusters {
 			clusterCABytes = cluster.CertificateAuthorityData
 		}
-		clusterCAs, err := parsePEMCerts(clusterCABytes)
+		clusterCAs, err := certutil.ParseCertsPEM(clusterCABytes)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to parse cluster CA from the %s configmap", bootstrapapi.ConfigMapClusterInfo)
 
@@ -224,29 +223,4 @@ func fetchKubeConfigWithTimeout(apiEndpoint string, discoveryTimeout time.Durati
 		wg.Wait()
 		return resultingKubeConfig, nil
 	}
-}
-
-// parsePEMCerts decodes PEM-formatted certificates into a slice of x509.Certificates
-func parsePEMCerts(certData []byte) ([]*x509.Certificate, error) {
-	var certificates []*x509.Certificate
-	var pemBlock *pem.Block
-
-	for {
-		pemBlock, certData = pem.Decode(certData)
-		if pemBlock == nil {
-			return nil, errors.New("invalid PEM data")
-		}
-
-		cert, err := x509.ParseCertificate(pemBlock.Bytes)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to parse certificate")
-		}
-		certificates = append(certificates, cert)
-
-		if len(certData) == 0 {
-			break
-		}
-	}
-
-	return certificates, nil
 }
