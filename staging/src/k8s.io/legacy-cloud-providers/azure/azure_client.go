@@ -81,7 +81,7 @@ type SubnetsClient interface {
 
 // SecurityGroupsClient defines needed functions for azure network.SecurityGroupsClient
 type SecurityGroupsClient interface {
-	CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup) (resp *http.Response, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, etag string) (resp *http.Response, err error)
 	Delete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (resp *http.Response, err error)
 	Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, err error)
 	List(ctx context.Context, resourceGroupName string) (result []network.SecurityGroup, err error)
@@ -714,7 +714,7 @@ func newAzSecurityGroupsClient(config *azClientConfig) *azSecurityGroupsClient {
 	}
 }
 
-func (az *azSecurityGroupsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup) (resp *http.Response, err error) {
+func (az *azSecurityGroupsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, etag string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
 		err = createRateLimitErr(true, "NSGCreateOrUpdate")
@@ -727,7 +727,13 @@ func (az *azSecurityGroupsClient) CreateOrUpdate(ctx context.Context, resourceGr
 	}()
 
 	mc := newMetricContext("security_groups", "create_or_update", resourceGroupName, az.client.SubscriptionID)
-	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, networkSecurityGroupName, parameters)
+	req, err := az.createOrUpdatePreparer(ctx, resourceGroupName, networkSecurityGroupName, parameters, etag)
+	if err != nil {
+		mc.Observe(err)
+		return nil, err
+	}
+
+	future, err := az.client.CreateOrUpdateSender(req)
 	if err != nil {
 		mc.Observe(err)
 		return future.Response(), err
@@ -736,6 +742,34 @@ func (az *azSecurityGroupsClient) CreateOrUpdate(ctx context.Context, resourceGr
 	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
+}
+
+// createOrUpdatePreparer prepares the CreateOrUpdate request.
+func (az *azSecurityGroupsClient) createOrUpdatePreparer(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, etag string) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"networkSecurityGroupName": autorest.Encode("path", networkSecurityGroupName),
+		"resourceGroupName":        autorest.Encode("path", resourceGroupName),
+		"subscriptionId":           autorest.Encode("path", az.client.SubscriptionID),
+	}
+
+	const APIVersion = "2017-09-01"
+	queryParameters := map[string]interface{}{
+		"api-version": APIVersion,
+	}
+
+	preparerDecorators := []autorest.PrepareDecorator{
+		autorest.AsContentType("application/json; charset=utf-8"),
+		autorest.AsPut(),
+		autorest.WithBaseURL(az.client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/networkSecurityGroups/{networkSecurityGroupName}", pathParameters),
+		autorest.WithJSON(parameters),
+		autorest.WithQueryParameters(queryParameters),
+	}
+	if etag != "" {
+		preparerDecorators = append(preparerDecorators, autorest.WithHeader("If-Match", autorest.String(etag)))
+	}
+	preparer := autorest.CreatePreparer(preparerDecorators...)
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
 }
 
 func (az *azSecurityGroupsClient) Delete(ctx context.Context, resourceGroupName string, networkSecurityGroupName string) (resp *http.Response, err error) {
