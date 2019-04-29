@@ -17,6 +17,7 @@ limitations under the License.
 package cni
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -326,7 +327,7 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
 	klog.V(4).Infof("Adding %s to network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
-	res, err := cniNet.AddNetworkList(netConf, rt)
+	res, err := cniNet.AddNetworkList(context.TODO(), netConf, rt)
 	if err != nil {
 		klog.Errorf("Error adding %s to network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
 		return nil, err
@@ -345,7 +346,7 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
 	klog.V(4).Infof("Deleting %s from network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
-	err = cniNet.DelNetworkList(netConf, rt)
+	err = cniNet.DelNetworkList(context.TODO(), netConf, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {

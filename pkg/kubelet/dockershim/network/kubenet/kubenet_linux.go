@@ -19,6 +19,7 @@ limitations under the License.
 package kubenet
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -570,7 +571,7 @@ func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.Network
 	// The network plugin can take up to 3 seconds to execute,
 	// so yield the lock while it runs.
 	plugin.mu.Unlock()
-	res, err := plugin.cniConfig.AddNetwork(config, rt)
+	res, err := plugin.cniConfig.AddNetwork(context.TODO(), config, rt)
 	plugin.mu.Lock()
 	if err != nil {
 		return nil, fmt.Errorf("Error adding container to network: %v", err)
@@ -585,7 +586,7 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 	}
 
 	klog.V(3).Infof("Removing %s/%s from '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-	err = plugin.cniConfig.DelNetwork(config, rt)
+	err = plugin.cniConfig.DelNetwork(context.TODO(), config, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
