@@ -341,7 +341,7 @@ func (o *Options) runLoop() error {
 	}
 }
 
-func (o *Options) writeConfigFile() error {
+func (o *Options) writeConfigFile() (err error) {
 	const mediaType = runtime.ContentTypeYAML
 	info, ok := runtime.SerializerInfoForMediaType(o.codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
@@ -354,10 +354,15 @@ func (o *Options) writeConfigFile() error {
 	if err != nil {
 		return err
 	}
-	// TODO handle error
-	defer configFile.Close()
 
-	if err := encoder.Encode(o.config, configFile); err != nil {
+	defer func() {
+		ferr := configFile.Close()
+		if ferr != nil && err == nil {
+			err = ferr
+		}
+	}()
+
+	if err = encoder.Encode(o.config, configFile); err != nil {
 		return err
 	}
 
