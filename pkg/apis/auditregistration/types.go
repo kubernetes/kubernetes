@@ -57,8 +57,6 @@ const (
 	StagePanic = "Panic"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // AuditSink represents a cluster level sink for audit data

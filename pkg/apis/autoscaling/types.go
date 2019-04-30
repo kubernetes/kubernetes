@@ -383,7 +383,6 @@ type MetricValueStatus struct {
 	AverageUtilization *int32
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HorizontalPodAutoscaler is the configuration for a horizontal pod

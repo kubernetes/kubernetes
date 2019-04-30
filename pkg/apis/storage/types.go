@@ -21,8 +21,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StorageClass describes a named "class" of storage offered in a cluster.
@@ -94,8 +92,6 @@ type StorageClassList struct {
 	Items []StorageClass
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Captures the intent to attach or detach the specified volume to/from
@@ -216,8 +212,6 @@ const (
 	VolumeBindingWaitForFirstConsumer VolumeBindingMode = "WaitForFirstConsumer"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CSIDriver captures information about a Container Storage Interface (CSI)
@@ -294,8 +288,6 @@ type CSIDriverSpec struct {
 	PodInfoOnMount *bool
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CSINode holds information about all CSI drivers installed on a node.
