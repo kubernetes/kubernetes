@@ -51,6 +51,9 @@ type KubeProxyIPVSConfiguration struct {
 	// excludeCIDRs is a list of CIDR's which the ipvs proxier should not touch
 	// when cleaning up ipvs services.
 	ExcludeCIDRs []string `json:"excludeCIDRs"`
+	// strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries
+	// from kube-ipvs0 interface
+	StrictARP bool `json:"strictARP"`
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
