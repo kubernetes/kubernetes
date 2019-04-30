@@ -64,11 +64,7 @@ const (
 // persistent disks that can be attached to an instance. Please refer to gcloud doc
 // https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
 const (
-	OneCPU         = 1
-	EightCPUs      = 8
 	VolumeLimit16  = 16
-	VolumeLimit32  = 32
-	VolumeLimit64  = 64
 	VolumeLimit128 = 128
 )
 
@@ -152,22 +148,12 @@ func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, erro
 		klog.Errorf("Failed to get instance type from GCE cloud provider")
 		return volumeLimits, nil
 	}
-	if strings.HasPrefix(instanceType, "n1-") {
-		splits := strings.Split(instanceType, "-")
-		if len(splits) < 3 {
-			return volumeLimits, nil
-		}
-		last := splits[2]
-		if num, err := strconv.Atoi(last); err == nil {
-			if num == OneCPU {
-				volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit32
-			} else if num < EightCPUs {
-				volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit64
-			} else {
-				volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit128
-			}
-		}
+	if strings.HasPrefix(instanceType, "n1-") || strings.HasPrefix(instanceType, "custom-") {
+		volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit128
+	} else {
+		volumeLimits[util.GCEVolumeLimitKey] = VolumeLimit16
 	}
+
 	return volumeLimits, nil
 }
 
