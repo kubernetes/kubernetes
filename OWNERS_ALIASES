@@ -353,12 +353,11 @@ aliases:
   # sig-apps-api-reviewers:
   #   - 
   #   - 
-  
-  # sig-auth-api-reviewers:
-  #   - 
-  #   - 
-  
-  
+
+  sig-auth-api-reviewers:
+    - enj
+    - mikedanese
+
   sig-cli-api-reviewers:
     - pwittrock
     - soltysh
