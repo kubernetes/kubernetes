@@ -401,25 +401,23 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 func iptablesSaveCommand(protocol Protocol) string {
 	if protocol == ProtocolIpv6 {
 		return cmdIP6TablesSave
-	} else {
-		return cmdIPTablesSave
 	}
+	return cmdIPTablesSave
 }
 
 func iptablesRestoreCommand(protocol Protocol) string {
 	if protocol == ProtocolIpv6 {
 		return cmdIP6TablesRestore
-	} else {
-		return cmdIPTablesRestore
 	}
+	return cmdIPTablesRestore
+
 }
 
 func iptablesCommand(protocol Protocol) string {
 	if protocol == ProtocolIpv6 {
 		return cmdIP6Tables
-	} else {
-		return cmdIPTables
 	}
+	return cmdIPTables
 }
 
 func (runner *runner) run(op operation, args []string) ([]byte, error) {
@@ -579,9 +577,9 @@ func getIPTablesWaitFlag(vstring string) []string {
 	}
 	if version.LessThan(minVersion) {
 		return []string{WaitString}
-	} else {
-		return []string{WaitString, WaitSecondsValue}
 	}
+	return []string{WaitString, WaitSecondsValue}
+
 }
 
 // getIPTablesVersionString runs "iptables --version" to get the version string
@@ -656,9 +654,9 @@ func (runner *runner) dbusSignalHandler(bus utildbus.Connection) {
 		switch s.Name {
 		case "org.freedesktop.DBus.NameOwnerChanged":
 			name := s.Body[0].(string)
-			new_owner := s.Body[2].(string)
+			newOwner := s.Body[2].(string)
 
-			if name != firewalldName || len(new_owner) == 0 {
+			if name != firewalldName || len(newOwner) == 0 {
 				continue
 			}
 
