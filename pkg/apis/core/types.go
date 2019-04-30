@@ -255,8 +255,6 @@ const (
 	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type PersistentVolume struct {
@@ -363,7 +361,6 @@ type PersistentVolumeList struct {
 	Items []PersistentVolume
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
@@ -2879,7 +2876,6 @@ type PodStatusResult struct {
 	Status PodStatus
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
@@ -2909,7 +2905,6 @@ type PodTemplateSpec struct {
 	Spec PodSpec
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodTemplate describes a template for creating copies of a predefined pod.
@@ -3017,9 +3012,6 @@ type ReplicationControllerCondition struct {
 	Message string
 }
 
-// +genclient
-// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
-// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/autoscaling.Scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicationController represents the configuration of a replication controller.
@@ -3293,7 +3285,6 @@ type ServicePort struct {
 	NodePort int32
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -3313,7 +3304,6 @@ type Service struct {
 	Status ServiceStatus
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ServiceAccount binds together:
@@ -3351,7 +3341,6 @@ type ServiceAccountList struct {
 	Items []ServiceAccount
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Endpoints is a collection of endpoints that implement the actual service.  Example:
@@ -3776,8 +3765,6 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Node is a worker node in Kubernetes
@@ -3839,8 +3826,6 @@ const (
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // A namespace provides a scope for Names.
@@ -4095,7 +4080,6 @@ const (
 	EventTypeWarning string = "Warning"
 )
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Event is a report of an event somewhere in the cluster.
@@ -4239,7 +4223,6 @@ type LimitRangeSpec struct {
 	Limits []LimitRangeItem
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
@@ -4386,7 +4369,6 @@ type ResourceQuotaStatus struct {
 	Used ResourceList
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -4416,7 +4398,6 @@ type ResourceQuotaList struct {
 	Items []ResourceQuota
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Secret holds secret data of a certain type.  The total bytes of the values in
@@ -4536,7 +4517,6 @@ type SecretList struct {
 	Items []Secret
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ConfigMap holds configuration data for components or applications to consume.
@@ -4634,8 +4614,6 @@ type ComponentCondition struct {
 	Error string
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.

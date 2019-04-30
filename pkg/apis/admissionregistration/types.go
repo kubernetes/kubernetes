@@ -103,8 +103,6 @@ const (
 	SideEffectClassNoneOnDryRun SideEffectClass = "NoneOnDryRun"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects and object without changing it.
@@ -131,8 +129,6 @@ type ValidatingWebhookConfigurationList struct {
 	Items []ValidatingWebhookConfiguration
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
