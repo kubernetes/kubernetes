@@ -39,13 +39,7 @@ import (
 
 const (
 	diskPartitionSuffix = ""
-	diskXVDPath         = "/dev/xvd"
-	diskXVDPattern      = "/dev/xvd*"
-	maxChecks           = 60
-	maxRetries          = 10
 	checkSleepDuration  = time.Second
-	errorSleepDuration  = 5 * time.Second
-	ebsMaxReplicasInAZ  = 1
 )
 
 // AWSDiskUtil provides operations for EBS volume.
