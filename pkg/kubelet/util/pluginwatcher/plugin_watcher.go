@@ -211,7 +211,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 			}
 			//TODO: Handle errors by taking corrective measures
 			if err := w.handleCreateEvent(event); err != nil {
-				klog.Errorf("error %v when handling create event: %s", err, event)
+				return fmt.Errorf("error %v when handling create event: %s", err, event)
 			}
 		default:
 			klog.V(5).Infof("Ignoring file %s with mode %v", path, mode)
