@@ -19,8 +19,9 @@ package predicates
 import (
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -146,4 +147,170 @@ func isCSIMigrationOn(csiNode *storagev1beta1.CSINode, pluginName string) bool {
 	}
 
 	return mpaSet.Has(pluginName)
+}
+
+// utilities for building pod/node objects using a "chained" manner
+type nodeSelectorWrapper struct{ v1.NodeSelector }
+
+func makeNodeSelector() *nodeSelectorWrapper {
+	return &nodeSelectorWrapper{v1.NodeSelector{}}
+}
+
+// NOTE: each time we append a selectorTerm into `s`
+// and overall all selecterTerms are ORed
+func (s *nodeSelectorWrapper) in(key string, vals []string) *nodeSelectorWrapper {
+	expression := v1.NodeSelectorRequirement{
+		Key:      key,
+		Operator: v1.NodeSelectorOpIn,
+		Values:   vals,
+	}
+	selectorTerm := v1.NodeSelectorTerm{}
+	selectorTerm.MatchExpressions = append(selectorTerm.MatchExpressions, expression)
+	s.NodeSelectorTerms = append(s.NodeSelectorTerms, selectorTerm)
+	return s
+}
+
+func (s *nodeSelectorWrapper) obj() *v1.NodeSelector {
+	return &s.NodeSelector
+}
+
+type labelSelectorWrapper struct{ metav1.LabelSelector }
+
+func makeLabelSelector() *labelSelectorWrapper {
+	return &labelSelectorWrapper{metav1.LabelSelector{}}
+}
+
+func (s *labelSelectorWrapper) label(k, v string) *labelSelectorWrapper {
+	if s.MatchLabels == nil {
+		s.MatchLabels = make(map[string]string)
+	}
+	s.MatchLabels[k] = v
+	return s
+}
+
+func (s *labelSelectorWrapper) in(key string, vals []string) *labelSelectorWrapper {
+	expression := metav1.LabelSelectorRequirement{
+		Key:      key,
+		Operator: metav1.LabelSelectorOpIn,
+		Values:   vals,
+	}
+	s.MatchExpressions = append(s.MatchExpressions, expression)
+	return s
+}
+
+func (s *labelSelectorWrapper) notIn(key string, vals []string) *labelSelectorWrapper {
+	expression := metav1.LabelSelectorRequirement{
+		Key:      key,
+		Operator: metav1.LabelSelectorOpNotIn,
+		Values:   vals,
+	}
+	s.MatchExpressions = append(s.MatchExpressions, expression)
+	return s
+}
+
+func (s *labelSelectorWrapper) exists(k string) *labelSelectorWrapper {
+	expression := metav1.LabelSelectorRequirement{
+		Key:      k,
+		Operator: metav1.LabelSelectorOpExists,
+	}
+	s.MatchExpressions = append(s.MatchExpressions, expression)
+	return s
+}
+
+func (s *labelSelectorWrapper) notExist(k string) *labelSelectorWrapper {
+	expression := metav1.LabelSelectorRequirement{
+		Key:      k,
+		Operator: metav1.LabelSelectorOpDoesNotExist,
+	}
+	s.MatchExpressions = append(s.MatchExpressions, expression)
+	return s
+}
+
+func (s *labelSelectorWrapper) obj() *metav1.LabelSelector {
+	return &s.LabelSelector
+}
+
+type podWrapper struct{ v1.Pod }
+
+func makePod() *podWrapper {
+	return &podWrapper{v1.Pod{}}
+}
+
+func (p *podWrapper) obj() *v1.Pod {
+	return &p.Pod
+}
+
+func (p *podWrapper) name(s string) *podWrapper {
+	p.Name = s
+	return p
+}
+
+func (p *podWrapper) namespace(s string) *podWrapper {
+	p.Namespace = s
+	return p
+}
+
+func (p *podWrapper) node(s string) *podWrapper {
+	p.Spec.NodeName = s
+	return p
+}
+
+func (p *podWrapper) nodeSelector(m map[string]string) *podWrapper {
+	p.Spec.NodeSelector = m
+	return p
+}
+
+// particular represents HARD node affinity
+func (p *podWrapper) nodeAffinityIn(key string, vals []string) *podWrapper {
+	if p.Spec.Affinity == nil {
+		p.Spec.Affinity = &v1.Affinity{}
+	}
+	if p.Spec.Affinity.NodeAffinity == nil {
+		p.Spec.Affinity.NodeAffinity = &v1.NodeAffinity{}
+	}
+	nodeSelector := makeNodeSelector().in(key, vals).obj()
+	p.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeSelector
+	return p
+}
+
+func (p *podWrapper) spreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintResponse, selector *metav1.LabelSelector) *podWrapper {
+	c := v1.TopologySpreadConstraint{
+		MaxSkew:           int32(maxSkew),
+		TopologyKey:       tpKey,
+		WhenUnsatisfiable: mode,
+		LabelSelector:     selector,
+	}
+	p.Spec.TopologySpreadConstraints = append(p.Spec.TopologySpreadConstraints, c)
+	return p
+}
+
+func (p *podWrapper) label(k, v string) *podWrapper {
+	if p.Labels == nil {
+		p.Labels = make(map[string]string)
+	}
+	p.Labels[k] = v
+	return p
+}
+
+type nodeWrapper struct{ v1.Node }
+
+func makeNode() *nodeWrapper {
+	return &nodeWrapper{v1.Node{}}
+}
+
+func (n *nodeWrapper) obj() *v1.Node {
+	return &n.Node
+}
+
+func (n *nodeWrapper) name(s string) *nodeWrapper {
+	n.Name = s
+	return n
+}
+
+func (n *nodeWrapper) label(k, v string) *nodeWrapper {
+	if n.Labels == nil {
+		n.Labels = make(map[string]string)
+	}
+	n.Labels[k] = v
+	return n
 }

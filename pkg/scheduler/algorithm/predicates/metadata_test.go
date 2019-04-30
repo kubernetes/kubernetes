@@ -511,6 +511,39 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 				},
 			},
 		},
+		topologyPairsPodSpreadMap: &topologyPairsPodSpreadMap{
+			minMatches: []int32{1},
+			topologyPairsMaps: &topologyPairsMaps{
+				topologyPairToPods: map[topologyPair]podSet{
+					{key: "name", value: "nodeA"}: {
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+							Spec: v1.PodSpec{NodeName: "nodeA"},
+						}: struct{}{},
+					},
+					{key: "name", value: "nodeC"}: {
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+							Spec: v1.PodSpec{
+								NodeName: "nodeC",
+							},
+						}: struct{}{},
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p6", Labels: selector1},
+							Spec: v1.PodSpec{NodeName: "nodeC"},
+						}: struct{}{},
+					},
+				},
+				podToTopologyPairs: map[string]topologyPairSet{
+					"p1_": {
+						topologyPair{key: "name", value: "nodeA"}: struct{}{},
+					},
+					"p2_": {
+						topologyPair{key: "name", value: "nodeC"}: struct{}{},
+					},
+					"p6_": {
+						topologyPair{key: "name", value: "nodeC"}: struct{}{},
+					},
+				},
+			},
+		},
 		serviceAffinityInUse: true,
 		serviceAffinityMatchingPodList: []*v1.Pod{
 			{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
@@ -790,4 +823,410 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPodLabelsMatchesSpreadConstraints(t *testing.T) {
+	tests := []struct {
+		name        string
+		podLabels   map[string]string
+		constraints []v1.TopologySpreadConstraint
+		want        bool
+		wantErr     bool
+	}{
+		{
+			name:      "normal match",
+			podLabels: map[string]string{"foo": "", "bar": ""},
+			constraints: []v1.TopologySpreadConstraint{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name:      "normal mismatch",
+			podLabels: map[string]string{"foo": "", "baz": ""},
+			constraints: []v1.TopologySpreadConstraint{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpExists,
+							},
+							{
+								Key:      "bar",
+								Operator: metav1.LabelSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "podLabels is nil",
+			constraints: []v1.TopologySpreadConstraint{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "constraint.LabelSelector is nil",
+			podLabels: map[string]string{
+				"foo": "",
+				"bar": "",
+			},
+			constraints: []v1.TopologySpreadConstraint{
+				{
+					MaxSkew: 1,
+				},
+			},
+			want: false,
+		},
+		{
+			name: "both podLabels and constraint.LabelSelector are nil",
+			constraints: []v1.TopologySpreadConstraint{
+				{
+					MaxSkew: 1,
+				},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := podLabelsMatchesSpreadConstraints(tt.podLabels, tt.constraints)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("podLabelsMatchesSpreadConstraints() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("podLabelsMatchesSpreadConstraints() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
+	// we need to inject the exact pod pointers to want.topologyPairsMaps.topologyPairToPods
+	// otherwise, *pod (as key of a map) will always fail in reflect.DeepEqual()
+	tests := []struct {
+		name              string
+		pod               *v1.Pod
+		nodes             []*v1.Node
+		existingPods      []*v1.Pod
+		injectPodPointers map[topologyPair][]int
+		want              *topologyPairsPodSpreadMap
+	}{
+		{
+			name: "clean cluster with one spreadConstraint",
+			pod: makePod().name("p").label("foo", "").spreadConstraint(
+				1, "zone", hardSpread, makeLabelSelector().exists("foo").obj(),
+			).obj(),
+			nodes: []*v1.Node{
+				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
+				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
+				makeNode().name("node-x").label("zone", "zone2").label("node", "node-x").obj(),
+				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+			},
+			injectPodPointers: map[topologyPair][]int{
+				// denotes no existing pod is matched on this zone pair, but still needed to be
+				// calculated if incoming pod matches its own spread constraints
+				{key: "zone", value: "zone1"}: []int{},
+				{key: "zone", value: "zone2"}: []int{},
+			},
+			want: &topologyPairsPodSpreadMap{
+				minMatches: []int32{0},
+				topologyPairsMaps: &topologyPairsMaps{
+					podToTopologyPairs: make(map[string]topologyPairSet),
+				},
+			},
+		},
+		{
+			name: "normal case with one spreadConstraint",
+			pod: makePod().name("p").label("foo", "").spreadConstraint(
+				1, "zone", hardSpread, makeLabelSelector().exists("foo").obj(),
+			).obj(),
+			nodes: []*v1.Node{
+				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
+				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
+				makeNode().name("node-x").label("zone", "zone2").label("node", "node-x").obj(),
+				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+			},
+			existingPods: []*v1.Pod{
+				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
+				makePod().name("p-a2").node("node-a").label("foo", "").obj(),
+				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
+				makePod().name("p-y1").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
+			},
+			injectPodPointers: map[topologyPair][]int{
+				// denotes existingPods[0,1,2]
+				{key: "zone", value: "zone1"}: []int{0, 1, 2},
+				// denotes existingPods[3,4]
+				{key: "zone", value: "zone2"}: []int{3, 4},
+			},
+			want: &topologyPairsPodSpreadMap{
+				minMatches: []int32{2},
+				topologyPairsMaps: &topologyPairsMaps{
+					podToTopologyPairs: map[string]topologyPairSet{
+						"p-a1_": newPairSet("zone", "zone1"),
+						"p-a2_": newPairSet("zone", "zone1"),
+						"p-b1_": newPairSet("zone", "zone1"),
+						"p-y1_": newPairSet("zone", "zone2"),
+						"p-y2_": newPairSet("zone", "zone2"),
+					},
+				},
+			},
+		},
+		{
+			name: "namespace mis-match doesn't count",
+			pod: makePod().name("p").label("foo", "").spreadConstraint(
+				1, "zone", hardSpread, makeLabelSelector().exists("foo").obj(),
+			).obj(),
+			nodes: []*v1.Node{
+				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
+				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
+				makeNode().name("node-x").label("zone", "zone2").label("node", "node-x").obj(),
+				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+			},
+			existingPods: []*v1.Pod{
+				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
+				makePod().name("p-a2").namespace("ns1").node("node-a").label("foo", "").obj(),
+				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
+				makePod().name("p-y1").namespace("ns2").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
+			},
+			injectPodPointers: map[topologyPair][]int{
+				{key: "zone", value: "zone1"}: []int{0, 2},
+				{key: "zone", value: "zone2"}: []int{4},
+			},
+			want: &topologyPairsPodSpreadMap{
+				minMatches: []int32{1},
+				topologyPairsMaps: &topologyPairsMaps{
+					podToTopologyPairs: map[string]topologyPairSet{
+						"p-a1_": newPairSet("zone", "zone1"),
+						"p-b1_": newPairSet("zone", "zone1"),
+						"p-y2_": newPairSet("zone", "zone2"),
+					},
+				},
+			},
+		},
+		{
+			name: "normal case with two spreadConstraints",
+			pod: makePod().name("p").label("foo", "").
+				spreadConstraint(1, "zone", hardSpread, makeLabelSelector().exists("foo").obj()).
+				spreadConstraint(1, "node", hardSpread, makeLabelSelector().exists("foo").obj()).
+				obj(),
+			nodes: []*v1.Node{
+				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
+				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
+				makeNode().name("node-x").label("zone", "zone2").label("node", "node-x").obj(),
+				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+			},
+			existingPods: []*v1.Pod{
+				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
+				makePod().name("p-a2").node("node-a").label("foo", "").obj(),
+				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
+				makePod().name("p-y1").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y3").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y4").node("node-y").label("foo", "").obj(),
+			},
+			injectPodPointers: map[topologyPair][]int{
+				{key: "zone", value: "zone1"}:  []int{0, 1, 2},
+				{key: "zone", value: "zone2"}:  []int{3, 4, 5, 6},
+				{key: "node", value: "node-a"}: []int{0, 1},
+				{key: "node", value: "node-b"}: []int{2},
+				{key: "node", value: "node-x"}: []int{},
+				{key: "node", value: "node-y"}: []int{3, 4, 5, 6},
+			},
+			want: &topologyPairsPodSpreadMap{
+				minMatches: []int32{3, 0},
+				topologyPairsMaps: &topologyPairsMaps{
+					podToTopologyPairs: map[string]topologyPairSet{
+						"p-a1_": newPairSet("zone", "zone1", "node", "node-a"),
+						"p-a2_": newPairSet("zone", "zone1", "node", "node-a"),
+						"p-b1_": newPairSet("zone", "zone1", "node", "node-b"),
+						"p-y1_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y2_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y3_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y4_": newPairSet("zone", "zone2", "node", "node-y"),
+					},
+				},
+			},
+		},
+		{
+			name: "soft spreadConstraints should be bypassed",
+			pod: makePod().name("p").label("foo", "").
+				spreadConstraint(1, "zone", softSpread, makeLabelSelector().exists("foo").obj()).
+				spreadConstraint(1, "zone", hardSpread, makeLabelSelector().exists("foo").obj()).
+				spreadConstraint(1, "zone", softSpread, makeLabelSelector().exists("foo").obj()).
+				spreadConstraint(1, "node", hardSpread, makeLabelSelector().exists("foo").obj()).
+				obj(),
+			nodes: []*v1.Node{
+				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
+				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
+				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+			},
+			existingPods: []*v1.Pod{
+				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
+				makePod().name("p-a2").node("node-a").label("foo", "").obj(),
+				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
+				makePod().name("p-y1").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y3").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y4").node("node-y").label("foo", "").obj(),
+			},
+			injectPodPointers: map[topologyPair][]int{
+				{key: "zone", value: "zone1"}:  []int{0, 1, 2},
+				{key: "zone", value: "zone2"}:  []int{3, 4, 5, 6},
+				{key: "node", value: "node-a"}: []int{0, 1},
+				{key: "node", value: "node-b"}: []int{2},
+				{key: "node", value: "node-y"}: []int{3, 4, 5, 6},
+			},
+			want: &topologyPairsPodSpreadMap{
+				minMatches: []int32{3, 1},
+				topologyPairsMaps: &topologyPairsMaps{
+					podToTopologyPairs: map[string]topologyPairSet{
+						"p-a1_": newPairSet("zone", "zone1", "node", "node-a"),
+						"p-a2_": newPairSet("zone", "zone1", "node", "node-a"),
+						"p-b1_": newPairSet("zone", "zone1", "node", "node-b"),
+						"p-y1_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y2_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y3_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y4_": newPairSet("zone", "zone2", "node", "node-y"),
+					},
+				},
+			},
+		},
+		{
+			name: "different labelSelectors",
+			pod: makePod().name("p").label("foo", "").label("bar", "").
+				spreadConstraint(1, "zone", hardSpread, makeLabelSelector().exists("foo").obj()).
+				spreadConstraint(1, "node", hardSpread, makeLabelSelector().exists("bar").obj()).
+				obj(),
+			nodes: []*v1.Node{
+				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
+				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
+				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+			},
+			existingPods: []*v1.Pod{
+				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
+				makePod().name("p-a2").node("node-a").label("foo", "").label("bar", "").obj(),
+				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
+				makePod().name("p-y1").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y2").node("node-y").label("foo", "").label("bar", "").obj(),
+				makePod().name("p-y3").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y4").node("node-y").label("foo", "").label("bar", "").obj(),
+			},
+			injectPodPointers: map[topologyPair][]int{
+				{key: "zone", value: "zone1"}:  []int{1},
+				{key: "zone", value: "zone2"}:  []int{4, 6},
+				{key: "node", value: "node-a"}: []int{1},
+				{key: "node", value: "node-b"}: []int{},
+				{key: "node", value: "node-y"}: []int{4, 6},
+			},
+			want: &topologyPairsPodSpreadMap{
+				minMatches: []int32{1, 0},
+				topologyPairsMaps: &topologyPairsMaps{
+					podToTopologyPairs: map[string]topologyPairSet{
+						"p-a2_": newPairSet("zone", "zone1", "node", "node-a"),
+						"p-y2_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y4_": newPairSet("zone", "zone2", "node", "node-y"),
+					},
+				},
+			},
+		},
+		{
+			name: "two spreadConstraints, and with podAffinity",
+			pod: makePod().name("p").label("foo", "").
+				nodeAffinityIn("node", []string{"node-a", "node-b", "node-y"}). // exclude node-x
+				spreadConstraint(1, "zone", hardSpread, makeLabelSelector().exists("foo").obj()).
+				spreadConstraint(1, "node", hardSpread, makeLabelSelector().exists("foo").obj()).
+				obj(),
+			nodes: []*v1.Node{
+				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
+				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
+				makeNode().name("node-x").label("zone", "zone2").label("node", "node-x").obj(),
+				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+			},
+			existingPods: []*v1.Pod{
+				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
+				makePod().name("p-a2").node("node-a").label("foo", "").obj(),
+				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
+				makePod().name("p-y1").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y3").node("node-y").label("foo", "").obj(),
+				makePod().name("p-y4").node("node-y").label("foo", "").obj(),
+			},
+			injectPodPointers: map[topologyPair][]int{
+				{key: "zone", value: "zone1"}:  []int{0, 1, 2},
+				{key: "zone", value: "zone2"}:  []int{3, 4, 5, 6},
+				{key: "node", value: "node-a"}: []int{0, 1},
+				{key: "node", value: "node-b"}: []int{2},
+				{key: "node", value: "node-y"}: []int{3, 4, 5, 6},
+			},
+			want: &topologyPairsPodSpreadMap{
+				minMatches: []int32{3, 1},
+				topologyPairsMaps: &topologyPairsMaps{
+					podToTopologyPairs: map[string]topologyPairSet{
+						"p-a1_": newPairSet("zone", "zone1", "node", "node-a"),
+						"p-a2_": newPairSet("zone", "zone1", "node", "node-a"),
+						"p-b1_": newPairSet("zone", "zone1", "node", "node-b"),
+						"p-y1_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y2_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y3_": newPairSet("zone", "zone2", "node", "node-y"),
+						"p-y4_": newPairSet("zone", "zone2", "node", "node-y"),
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.want.topologyPairToPods = make(map[topologyPair]podSet)
+			for pair, indexes := range tt.injectPodPointers {
+				pSet := make(podSet)
+				for _, i := range indexes {
+					pSet[tt.existingPods[i]] = struct{}{}
+				}
+				tt.want.topologyPairToPods[pair] = pSet
+			}
+			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
+			if got, _ := getTPMapMatchingSpreadConstraints(tt.pod, nodeInfoMap); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getTPMapMatchingSpreadConstraints() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+var (
+	hardSpread = v1.DoNotSchedule
+	softSpread = v1.ScheduleAnyway
+)
+
+func newPairSet(kv ...string) topologyPairSet {
+	result := make(topologyPairSet)
+	for i := 0; i < len(kv); i += 2 {
+		pair := topologyPair{key: kv[i], value: kv[i+1]}
+		result[pair] = struct{}{}
+	}
+	return result
 }
