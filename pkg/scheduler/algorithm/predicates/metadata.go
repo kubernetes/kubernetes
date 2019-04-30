@@ -374,6 +374,31 @@ func (m *topologyPairsMaps) clone() *topologyPairsMaps {
 	return copy
 }
 
+func (m *topologyPairsPodSpreadMap) removePod(deletedPod *v1.Pod) {
+	if m == nil || deletedPod == nil {
+		return
+	}
+
+	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
+	pairSet, ok := m.podToTopologyPairs[deletedPodFullName]
+	if !ok {
+		return
+	}
+	topologyPairToPods := m.topologyPairToPods
+	for pair := range pairSet {
+		delete(topologyPairToPods[pair], deletedPod)
+		// if topologyPairToPods[pair] is empty after deletion
+		// don't clean it up as that topology counts as a match now
+
+		// removal of the deletedPod would probably genereate a smaller matching number
+		// so re-calculate minMatch to a smaller value if possible
+		if l := int32(len(topologyPairToPods[pair])); l < m.topologyKeyToMinPodsMap[pair.key] {
+			m.topologyKeyToMinPodsMap[pair.key] = l
+		}
+	}
+	delete(m.podToTopologyPairs, deletedPodFullName)
+}
+
 func (m *topologyPairsPodSpreadMap) clone() *topologyPairsPodSpreadMap {
 	// m could be nil when EvenPodsSpread feature is disabled
 	if m == nil {
@@ -400,6 +425,8 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 	// Delete pod from the matching affinity or anti-affinity topology pairs maps.
 	meta.topologyPairsPotentialAffinityPods.removePod(deletedPod)
 	meta.topologyPairsPotentialAntiAffinityPods.removePod(deletedPod)
+	// Delete pod from the pod spread topology maps.
+	meta.topologyPairsPodSpreadMap.removePod(deletedPod)
 	// All pods in the serviceAffinityMatchingPodList are in the same namespace.
 	// So, if the namespace of the first one is not the same as the namespace of the
 	// deletedPod, we don't need to check the list, as deletedPod isn't in the list.
