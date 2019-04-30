@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -266,26 +267,17 @@ func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
 
 // cleanDir removes everything in a directory, but not the directory itself
 func cleanDir(filePath string) error {
-	// If the directory doesn't even exist there's nothing to do, and we do
-	// not consider this an error
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		return nil
+	names, err := ioutil.ReadDir(filePath)
+	if err != nil {
+		return err
 	}
 
-	d, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-	defer d.Close()
-	names, err := d.Readdirnames(-1)
-	if err != nil {
-		return err
-	}
 	for _, name := range names {
-		if err = os.RemoveAll(filepath.Join(filePath, name)); err != nil {
+		if err = os.RemoveAll(filepath.Join(filePath, name.Name())); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
