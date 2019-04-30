@@ -2786,18 +2786,21 @@ function create-linux-nodes() {
     this_mig_size=$((${instances_left} / (${NUM_MIGS}-${i}+1)))
     instances_left=$((instances_left-${this_mig_size}))
 
-    gcloud compute instance-groups managed \
-        create "${group_name}" \
-        --project "${PROJECT}" \
-        --zone "${ZONE}" \
-        --base-instance-name "${group_name}" \
-        --size "${this_mig_size}" \
-        --template "${template_name}" || true;
-    gcloud compute instance-groups managed wait-until-stable \
-        "${group_name}" \
-        --zone "${ZONE}" \
-        --project "${PROJECT}" \
-        --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true &
+    # Run instance-groups creation in parallel.
+    {
+      gcloud compute instance-groups managed \
+          create "${group_name}" \
+          --project "${PROJECT}" \
+          --zone "${ZONE}" \
+          --base-instance-name "${group_name}" \
+          --size "${this_mig_size}" \
+          --template "${template_name}" || true;
+      gcloud compute instance-groups managed wait-until-stable \
+          "${group_name}" \
+          --zone "${ZONE}" \
+          --project "${PROJECT}" \
+          --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true
+    } &
   done
   wait
 }
