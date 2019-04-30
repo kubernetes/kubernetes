@@ -154,6 +154,7 @@ filegroup(
         "//test/e2e/framework/gpu:all-srcs",
         "//test/e2e/framework/ingress:all-srcs",
         "//test/e2e/framework/job:all-srcs",
+        "//test/e2e/framework/log:all-srcs",
         "//test/e2e/framework/metrics:all-srcs",
         "//test/e2e/framework/podlogs:all-srcs",
         "//test/e2e/framework/providers/aws:all-srcs",
