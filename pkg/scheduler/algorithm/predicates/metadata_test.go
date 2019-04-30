@@ -61,13 +61,13 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	if meta1.podBestEffort != meta2.podBestEffort {
 		return fmt.Errorf("podBestEfforts are not equal")
 	}
-	if meta1.serviceAffinityInUse != meta1.serviceAffinityInUse {
+	if meta1.serviceAffinityInUse != meta2.serviceAffinityInUse {
 		return fmt.Errorf("serviceAffinityInUses are not equal")
 	}
 	if len(meta1.podPorts) != len(meta2.podPorts) {
 		return fmt.Errorf("podPorts are not equal")
 	}
-	for !reflect.DeepEqual(meta1.podPorts, meta2.podPorts) {
+	if !reflect.DeepEqual(meta1.podPorts, meta2.podPorts) {
 		return fmt.Errorf("podPorts are not equal")
 	}
 	if !reflect.DeepEqual(meta1.topologyPairsPotentialAffinityPods, meta2.topologyPairsPotentialAffinityPods) {

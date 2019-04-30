@@ -58,14 +58,14 @@ func (r *ResourceAllocationPriority) PriorityMap(
 	requested.Memory += nodeInfo.NonZeroRequest().Memory
 	var score int64
 	// Check if the pod has volumes and this could be added to scorer function for balanced resource allocation.
-	if len(pod.Spec.Volumes) >= 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
+	if len(pod.Spec.Volumes) > 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
 		score = r.scorer(&requested, &allocatable, true, nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes, nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount)
 	} else {
 		score = r.scorer(&requested, &allocatable, false, 0, 0)
 	}
 
 	if klog.V(10) {
-		if len(pod.Spec.Volumes) >= 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
+		if len(pod.Spec.Volumes) > 0 && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && nodeInfo.TransientInfo != nil {
 			klog.Infof(
 				"%v -> %v: %v, capacity %d millicores %d memory bytes, %d volumes, total request %d millicores %d memory bytes %d volumes, score %d",
 				pod.Name, node.Name, r.Name,

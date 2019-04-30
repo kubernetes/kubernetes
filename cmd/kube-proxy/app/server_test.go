@@ -549,10 +549,8 @@ type fakeProxyServerError struct{}
 
 // Run runs the specified ProxyServer.
 func (s *fakeProxyServerError) Run() error {
-	for {
-		time.Sleep(2 * time.Second)
-		return fmt.Errorf("mocking error from ProxyServer.Run()")
-	}
+	time.Sleep(2 * time.Second)
+	return fmt.Errorf("mocking error from ProxyServer.Run()")
 }
 
 // CleanupAndExit runs in the specified ProxyServer.

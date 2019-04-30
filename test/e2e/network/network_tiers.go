@@ -136,14 +136,10 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 
 func waitAndVerifyLBWithTier(jig *framework.ServiceTestJig, ns, svcName, existingIP string, waitTimeout, checkTimeout time.Duration) string {
 	var svc *v1.Service
-	if existingIP == "" {
-		// Creating the LB for the first time; wait for any ingress IP to show
-		// up.
-		svc = jig.WaitForNewIngressIPOrFail(ns, svcName, existingIP, waitTimeout)
-	} else {
-		// Re-creating the LB; wait for the ingress IP to change.
-		svc = jig.WaitForNewIngressIPOrFail(ns, svcName, existingIP, waitTimeout)
-	}
+
+	// Creating the LB for the first time; wait for any ingress IP to show
+	// up. Or re-creating the LB; wait for the ingress IP to change.
+	svc = jig.WaitForNewIngressIPOrFail(ns, svcName, existingIP, waitTimeout)
 
 	svcPort := int(svc.Spec.Ports[0].Port)
 	lbIngress := &svc.Status.LoadBalancer.Ingress[0]
