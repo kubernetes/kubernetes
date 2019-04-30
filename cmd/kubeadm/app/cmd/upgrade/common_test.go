@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	validConfig = `apiVersion: kubeadm.k8s.io/v1beta1
+	validConfig = `apiVersion: kubeadm.k8s.io/v1beta2
 kind: ClusterConfiguration
 kubernetesVersion: 1.13.0
 `
@@ -179,7 +179,7 @@ func TestPrintConfiguration(t *testing.T) {
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta1
+	apiVersion: kubeadm.k8s.io/v1beta2
 	certificatesDir: ""
 	controlPlaneEndpoint: ""
 	controllerManager: {}
@@ -216,7 +216,7 @@ func TestPrintConfiguration(t *testing.T) {
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta1
+	apiVersion: kubeadm.k8s.io/v1beta2
 	certificatesDir: ""
 	controlPlaneEndpoint: ""
 	controllerManager: {}

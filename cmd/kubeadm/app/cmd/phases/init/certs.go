@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/pflag"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -149,8 +149,8 @@ func getCertPhaseFlags(name string) []string {
 
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	//Defaulted config we will use to get SAN certs
-	defaultConfig := &kubeadmapiv1beta1.InitConfiguration{
-		LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{
+	defaultConfig := &kubeadmapiv1beta2.InitConfiguration{
+		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{
 			// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
 			AdvertiseAddress: "127.0.0.1",
 		},

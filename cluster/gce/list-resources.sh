@@ -49,7 +49,7 @@ function gcloud-list() {
   local attempt=1
   local result=""
   while true; do
-    if result=$(gcloud "${group}" "${resource}" list --project="${PROJECT}" "${filter:+--filter="$filter"}" "${@:4}"); then
+    if result=$(gcloud "${group}" "${resource}" list --project="${PROJECT}" ${filter:+--filter="$filter"} "${@:4}"); then
       if [[ -n "${GREP_REGEX:-}" ]]; then
         result=$(echo "${result}" | grep "${GREP_REGEX}" || true)
       fi

@@ -29,7 +29,7 @@ import (
 
 const (
 	testInitConfig = `---
-apiVersion: kubeadm.k8s.io/v1beta1
+apiVersion: kubeadm.k8s.io/v1beta2
 kind: InitConfiguration
 localAPIEndpoint:
   advertiseAddress: "1.2.3.4"
@@ -39,7 +39,7 @@ nodeRegistration:
   criSocket: /run/containerd/containerd.sock
   name: someName
 ---
-apiVersion: kubeadm.k8s.io/v1beta1
+apiVersion: kubeadm.k8s.io/v1beta2
 kind: ClusterConfiguration
 controlPlaneEndpoint: "3.4.5.6"
 `

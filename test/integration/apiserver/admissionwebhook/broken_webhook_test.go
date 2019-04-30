@@ -150,7 +150,7 @@ func exampleDeployment(name string) *appsv1.Deployment {
 
 func brokenWebhookConfig(name string) *admissionregistrationv1beta1.ValidatingWebhookConfiguration {
 	var path string
-	var failurePolicy admissionregistrationv1beta1.FailurePolicyType = admissionregistrationv1beta1.Fail
+	var failurePolicy = admissionregistrationv1beta1.Fail
 	return &admissionregistrationv1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

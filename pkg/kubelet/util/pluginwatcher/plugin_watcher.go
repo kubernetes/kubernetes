@@ -102,44 +102,7 @@ func (w *Watcher) Start() error {
 	}
 	w.fsWatcher = fsWatcher
 
-	w.wg.Add(1)
-	go func(fsWatcher *fsnotify.Watcher) {
-		defer w.wg.Done()
-		for {
-			select {
-			case event := <-fsWatcher.Events:
-				//TODO: Handle errors by taking corrective measures
-
-				w.wg.Add(1)
-				func() {
-					defer w.wg.Done()
-
-					if event.Op&fsnotify.Create == fsnotify.Create {
-						err := w.handleCreateEvent(event)
-						if err != nil {
-							klog.Errorf("error %v when handling create event: %s", err, event)
-						}
-					} else if event.Op&fsnotify.Remove == fsnotify.Remove {
-						err := w.handleDeleteEvent(event)
-						if err != nil {
-							klog.Errorf("error %v when handling delete event: %s", err, event)
-						}
-					}
-					return
-				}()
-				continue
-			case err := <-fsWatcher.Errors:
-				if err != nil {
-					klog.Errorf("fsWatcher received error: %v", err)
-				}
-				continue
-			case <-w.stopCh:
-				return
-			}
-		}
-	}(fsWatcher)
-
-	// Traverse plugin dir after starting the plugin processing goroutine
+	// Traverse plugin dir and add filesystem watchers before starting the plugin processing goroutine.
 	if err := w.traversePluginDir(w.path); err != nil {
 		w.Stop()
 		return fmt.Errorf("failed to traverse plugin socket path %q, err: %v", w.path, err)
@@ -152,6 +115,37 @@ func (w *Watcher) Start() error {
 			return fmt.Errorf("failed to traverse deprecated plugin socket path %q, err: %v", w.deprecatedPath, err)
 		}
 	}
+
+	w.wg.Add(1)
+	go func(fsWatcher *fsnotify.Watcher) {
+		defer w.wg.Done()
+
+		for {
+			select {
+			case event := <-fsWatcher.Events:
+				//TODO: Handle errors by taking corrective measures
+				if event.Op&fsnotify.Create == fsnotify.Create {
+					err := w.handleCreateEvent(event)
+					if err != nil {
+						klog.Errorf("error %v when handling create event: %s", err, event)
+					}
+				} else if event.Op&fsnotify.Remove == fsnotify.Remove {
+					err := w.handleDeleteEvent(event)
+					if err != nil {
+						klog.Errorf("error %v when handling delete event: %s", err, event)
+					}
+				}
+				continue
+			case err := <-fsWatcher.Errors:
+				if err != nil {
+					klog.Errorf("fsWatcher received error: %v", err)
+				}
+				continue
+			case <-w.stopCh:
+				return
+			}
+		}
+	}(fsWatcher)
 
 	return nil
 }
@@ -211,14 +205,14 @@ func (w *Watcher) traversePluginDir(dir string) error {
 				return fmt.Errorf("failed to watch %s, err: %v", path, err)
 			}
 		case mode&os.ModeSocket != 0:
-			w.wg.Add(1)
-			go func() {
-				defer w.wg.Done()
-				w.fsWatcher.Events <- fsnotify.Event{
-					Name: path,
-					Op:   fsnotify.Create,
-				}
-			}()
+			event := fsnotify.Event{
+				Name: path,
+				Op:   fsnotify.Create,
+			}
+			//TODO: Handle errors by taking corrective measures
+			if err := w.handleCreateEvent(event); err != nil {
+				klog.Errorf("error %v when handling create event: %s", err, event)
+			}
 		default:
 			klog.V(5).Infof("Ignoring file %s with mode %v", path, mode)
 		}

@@ -226,8 +226,11 @@ type MetricTarget struct {
 type MetricTargetType string
 
 var (
-	UtilizationMetricType  MetricTargetType = "Utilization"
-	ValueMetricType        MetricTargetType = "Value"
+	// UtilizationMetricType is a possible value for MetricTarget.Type.
+	UtilizationMetricType MetricTargetType = "Utilization"
+	// ValueMetricType is a possible value for MetricTarget.Type.
+	ValueMetricType MetricTargetType = "Value"
+	// AverageValueMetricType is a possible value for MetricTarget.Type.
 	AverageValueMetricType MetricTargetType = "AverageValue"
 )
 
@@ -373,6 +376,7 @@ type ExternalMetricStatus struct {
 	Current MetricValueStatus
 }
 
+// MetricValueStatus indicates the current value of a metric.
 type MetricValueStatus struct {
 	Value              *resource.Quantity
 	AverageValue       *resource.Quantity

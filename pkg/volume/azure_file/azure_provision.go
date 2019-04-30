@@ -21,16 +21,15 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
-	"k8s.io/klog"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/azure"
 	utilstrings "k8s.io/utils/strings"
 )
 

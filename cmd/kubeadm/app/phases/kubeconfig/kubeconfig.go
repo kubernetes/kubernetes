@@ -18,7 +18,7 @@ package kubeconfig
 
 import (
 	"bytes"
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 	"fmt"
 	"io"
@@ -41,7 +41,7 @@ import (
 
 // clientCertAuth struct holds info required to build a client certificate to provide authentication info in a kubeconfig object
 type clientCertAuth struct {
-	CAKey         *rsa.PrivateKey
+	CAKey         crypto.Signer
 	Organizations []string
 }
 

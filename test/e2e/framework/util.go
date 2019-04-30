@@ -158,8 +158,6 @@ const (
 	podRespondingTimeout = 15 * time.Minute
 	// ServiceRespondingTimeout is how long to wait for a service to be responding.
 	ServiceRespondingTimeout = 2 * time.Minute
-	// EndpointRegisterTimeout is how long to wait for an endpoint to be registered.
-	EndpointRegisterTimeout = time.Minute
 
 	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
 	ClaimProvisionTimeout = 5 * time.Minute
@@ -1746,25 +1744,6 @@ func countEndpointsNum(e *v1.Endpoints) int {
 		num += len(sub.Addresses)
 	}
 	return num
-}
-
-// WaitForEndpoint waits for the specified endpoint to be ready.
-func WaitForEndpoint(c clientset.Interface, ns, name string) error {
-	for t := time.Now(); time.Since(t) < EndpointRegisterTimeout; time.Sleep(Poll) {
-		endpoint, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
-		if apierrs.IsNotFound(err) {
-			Logf("Endpoint %s/%s is not ready yet", ns, name)
-			continue
-		}
-		ExpectNoError(err, "Failed to get endpoints for %s/%s", ns, name)
-		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
-			Logf("Endpoint %s/%s is not ready yet", ns, name)
-			continue
-		} else {
-			return nil
-		}
-	}
-	return fmt.Errorf("Failed to get endpoints for %s/%s", ns, name)
 }
 
 // PodProxyResponseChecker is a context for checking pods responses by issuing GETs to them (via the API

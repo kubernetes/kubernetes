@@ -66,6 +66,7 @@ type controlplaneUpgradeFlags struct {
 	advertiseAddress string
 	nodeName         string
 	etcdUpgrade      bool
+	renewCerts       bool
 	dryRun           bool
 }
 
@@ -114,6 +115,7 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 		kubeConfigPath:   constants.GetKubeletKubeConfigPath(),
 		advertiseAddress: "",
 		etcdUpgrade:      true,
+		renewCerts:       true,
 		dryRun:           false,
 	}
 
@@ -151,6 +153,7 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeConfigPath)
 	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output the actions that would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
+	cmd.Flags().BoolVar(&flags.renewCerts, "certificate-renewal", flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	return cmd
 }
 
@@ -221,18 +224,13 @@ func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
 		return errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
 
-	// Rotate API server certificate if needed
-	if err := upgrade.BackupAPIServerCertIfNeeded(cfg, flags.dryRun); err != nil {
-		return errors.Wrap(err, "unable to rotate API server certificate")
-	}
-
 	// Upgrade the control plane and etcd if installed on this node
 	fmt.Printf("[upgrade] Upgrading your Static Pod-hosted control plane instance to version %q...\n", cfg.KubernetesVersion)
 	if flags.dryRun {
 		return DryRunStaticPodUpgrade(cfg)
 	}
 
-	if err := PerformStaticPodUpgrade(client, waiter, cfg, flags.etcdUpgrade); err != nil {
+	if err := PerformStaticPodUpgrade(client, waiter, cfg, flags.etcdUpgrade, flags.renewCerts); err != nil {
 		return errors.Wrap(err, "couldn't complete the static pod upgrade")
 	}
 

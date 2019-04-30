@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -109,44 +109,44 @@ func TestMarshalUnmarshalYaml(t *testing.T) {
 }
 
 func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
-	cfg := &kubeadmapiv1beta1.InitConfiguration{
+	cfg := &kubeadmapiv1beta2.InitConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       constants.InitConfigurationKind,
-			APIVersion: kubeadmapiv1beta1.SchemeGroupVersion.String(),
+			APIVersion: kubeadmapiv1beta2.SchemeGroupVersion.String(),
 		},
-		NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 			Name:      "testNode",
 			CRISocket: "/var/run/cri.sock",
 		},
-		BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
+		BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
 			{
-				Token: &kubeadmapiv1beta1.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &kubeadmapiv1beta2.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 			},
 		},
 		// NOTE: Using MarshalToYamlForCodecs and UnmarshalFromYamlForCodecs for ClusterConfiguration fields here won't work
 		// by design. This is because we have a `json:"-"` annotation in order to avoid struct duplication. See the comment
-		// at the kubeadmapiv1beta1.InitConfiguration definition.
+		// at the kubeadmapiv1beta2.InitConfiguration definition.
 	}
 
-	kubeadmapiv1beta1.SetDefaults_InitConfiguration(cfg)
+	kubeadmapiv1beta2.SetDefaults_InitConfiguration(cfg)
 	scheme := runtime.NewScheme()
-	if err := kubeadmapiv1beta1.AddToScheme(scheme); err != nil {
+	if err := kubeadmapiv1beta2.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
 	codecs := serializer.NewCodecFactory(scheme)
 
-	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1beta1.SchemeGroupVersion, codecs)
+	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1beta2.SchemeGroupVersion, codecs)
 	if err != nil {
 		t.Fatalf("unexpected error marshalling InitConfiguration: %v", err)
 	}
 	t.Logf("\n%s", bytes)
 
-	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1beta1.SchemeGroupVersion, codecs)
+	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1beta2.SchemeGroupVersion, codecs)
 	if err != nil {
 		t.Fatalf("unexpected error unmarshalling InitConfiguration: %v", err)
 	}
 
-	cfg2, ok := obj.(*kubeadmapiv1beta1.InitConfiguration)
+	cfg2, ok := obj.(*kubeadmapiv1beta2.InitConfiguration)
 	if !ok || cfg2 == nil {
 		t.Fatal("did not get InitConfiguration back")
 	}
@@ -154,12 +154,6 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 		t.Errorf("expected %v, got %v", *cfg, *cfg2)
 	}
 }
-
-// {{InitConfiguration kubeadm.k8s.io/v1beta1} [{<nil>  nil <nil> [] []}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc4200ad2c0 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0x156e2f4} map[] kubernetes}
-// {{InitConfiguration kubeadm.k8s.io/v1beta1} [{<nil>  &Duration{Duration:24h0m0s,} <nil> [signing authentication] [system:bootstrappers:kubeadm:default-node-token]}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc4205c5260 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0xc4204dd82c} map[] kubernetes}
-
-// {{InitConfiguration kubeadm.k8s.io/v1beta1} [{abcdef.abcdef0123456789  nil <nil> [] []}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc42012ca80 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0x156e2f4} map[] kubernetes}
-// {{InitConfiguration kubeadm.k8s.io/v1beta1} [{abcdef.abcdef0123456789  &Duration{Duration:24h0m0s,} <nil> [signing authentication] [system:bootstrappers:kubeadm:default-node-token]}] {testNode /var/run/cri.sock [] map[]} {10.100.0.1  4332} {0xc42039d1a0 <nil>} {10.100.0.0/24 10.100.1.0/24 cluster.local} stable-1.11 map[] map[] map[] [] [] [] [] /etc/kubernetes/pki k8s.gcr.io  { /var/log/kubernetes/audit 0xc4204fef3c} map[] kubernetes}
 
 func TestSplitYAMLDocuments(t *testing.T) {
 	var tests = []struct {

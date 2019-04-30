@@ -28,7 +28,7 @@ import (
 	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
@@ -65,22 +65,22 @@ func TestUploadConfiguration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t2 *testing.T) {
-			initialcfg := &kubeadmapiv1beta1.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{
+			initialcfg := &kubeadmapiv1beta2.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
 					KubernetesVersion: kubeadmconstants.MinimumControlPlaneVersion.WithPatch(10).String(),
 				},
-				BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
+				BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
 					{
-						Token: &kubeadmapiv1beta1.BootstrapTokenString{
+						Token: &kubeadmapiv1beta2.BootstrapTokenString{
 							ID:     "abcdef",
 							Secret: "abcdef0123456789",
 						},
 					},
 				},
-				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 					Name:      "node-foo",
 					CRISocket: "/var/run/custom-cri.sock",
 				},

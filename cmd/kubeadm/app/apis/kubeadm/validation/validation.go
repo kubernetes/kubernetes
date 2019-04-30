@@ -33,7 +33,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmcmdoptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -308,8 +308,10 @@ func ValidateCertSANs(altnames []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, altname := range altnames {
 		if errs := validation.IsDNS1123Subdomain(altname); len(errs) != 0 {
-			if net.ParseIP(altname) == nil {
-				allErrs = append(allErrs, field.Invalid(fldPath, altname, fmt.Sprintf("altname is not a valid IP address or DNS label: %s", strings.Join(errs, "; "))))
+			if errs2 := validation.IsWildcardDNS1123Subdomain(altname); len(errs2) != 0 {
+				if net.ParseIP(altname) == nil {
+					allErrs = append(allErrs, field.Invalid(fldPath, altname, fmt.Sprintf("altname is not a valid IP address, DNS label or a DNS label with subdomain wildcards: %s; %s", strings.Join(errs, "; "), strings.Join(errs2, "; "))))
+				}
 			}
 		}
 	}
@@ -488,7 +490,7 @@ func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 		if !filepath.IsAbs(u.Path) {
 			return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("path is not absolute: %s", socket)))
 		}
-	} else if u.Scheme != kubeadmapiv1beta1.DefaultUrlScheme {
+	} else if u.Scheme != kubeadmapiv1beta2.DefaultUrlScheme {
 		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("URL scheme %s is not supported", u.Scheme)))
 	}
 

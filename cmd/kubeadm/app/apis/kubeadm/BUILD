@@ -44,6 +44,7 @@ filegroup(
         "//cmd/kubeadm/app/apis/kubeadm/fuzzer:all-srcs",
         "//cmd/kubeadm/app/apis/kubeadm/scheme:all-srcs",
         "//cmd/kubeadm/app/apis/kubeadm/v1beta1:all-srcs",
+        "//cmd/kubeadm/app/apis/kubeadm/v1beta2:all-srcs",
         "//cmd/kubeadm/app/apis/kubeadm/validation:all-srcs",
     ],
     tags = ["automanaged"],

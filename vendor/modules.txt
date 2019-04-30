@@ -719,8 +719,6 @@ github.com/prometheus/procfs/nfs
 github.com/prometheus/procfs/xfs
 # github.com/quobyte/api v0.1.2 => github.com/quobyte/api v0.1.2
 github.com/quobyte/api
-# github.com/rancher/go-rancher v0.0.0-20160922212217-09693a8743ba => github.com/rancher/go-rancher v0.0.0-20160922212217-09693a8743ba
-github.com/rancher/go-rancher/client
 # github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8 => github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
 github.com/robfig/cron
 # github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
@@ -1630,6 +1628,8 @@ k8s.io/kube-scheduler/config/v1alpha1
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
 k8s.io/kubelet/config/v1beta1
 # k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
+k8s.io/legacy-cloud-providers/azure
+k8s.io/legacy-cloud-providers/azure/auth
 k8s.io/legacy-cloud-providers/vsphere
 k8s.io/legacy-cloud-providers/vsphere/testing
 k8s.io/legacy-cloud-providers/vsphere/vclib

@@ -48,7 +48,6 @@ require (
 	github.com/d2g/dhcp4client v0.0.0-20170829104524-6e570ed0a266
 	github.com/davecgh/go-spew v1.1.1
 	github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
-	github.com/dnaeon/go-vcr v1.0.1 // indirect
 	github.com/docker/distribution v0.0.0-20170726174610-edc3ab29cdff
 	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
 	github.com/docker/go-connections v0.3.0
@@ -101,7 +100,6 @@ require (
 	github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc v0.1.1 // indirect
 	github.com/magiconair/properties v0.0.0-20160816085511-61b492c03cf4 // indirect
-	github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c // indirect
 	github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de // indirect
 	github.com/mesos/mesos-go v0.0.9 // indirect
 	github.com/mholt/caddy v0.0.0-20180213163048-2de495001514
@@ -131,11 +129,8 @@ require (
 	github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910
 	github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
 	github.com/quobyte/api v0.1.2
-	github.com/rancher/go-rancher v0.0.0-20160922212217-09693a8743ba
 	github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
-	github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
 	github.com/russross/blackfriday v0.0.0-20151117072312-300106c228d5
-	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/seccomp/libseccomp-golang v0.0.0-20150813023252-1b506fc7c24e // indirect
 	github.com/shurcooL/sanitized_anchor_name v0.0.0-20151028001915-10ef21a441db // indirect
 	github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d

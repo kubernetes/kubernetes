@@ -78,6 +78,7 @@ const (
 	guestbookResponseTimeout = 3 * time.Minute
 	simplePodSelector        = "name=nginx"
 	simplePodName            = "nginx"
+	simplePodResourceName    = "pod/nginx"
 	nginxDefaultOutput       = "Welcome to nginx!"
 	simplePodPort            = 80
 	pausePodSelector         = "name=pause"
@@ -404,6 +405,14 @@ var _ = SIGDescribe("Kubectl client", func() {
 				WithStdinReader(r).
 				ExecOrDie()
 			if e, a := "hi", strings.TrimSpace(execOutput); e != a {
+				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
+			}
+		})
+
+		ginkgo.It("should support exec using resource/name", func() {
+			ginkgo.By("executing a command in the container")
+			execOutput := framework.RunKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), simplePodResourceName, "echo", "running", "in", "container")
+			if e, a := "running in container", strings.TrimSpace(execOutput); e != a {
 				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
 		})

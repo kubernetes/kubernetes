@@ -326,7 +326,6 @@ filegroup(
         "//vendor/github.com/prometheus/common/model:all-srcs",
         "//vendor/github.com/prometheus/procfs:all-srcs",
         "//vendor/github.com/quobyte/api:all-srcs",
-        "//vendor/github.com/rancher/go-rancher/client:all-srcs",
         "//vendor/github.com/robfig/cron:all-srcs",
         "//vendor/github.com/rubiojr/go-vhd/vhd:all-srcs",
         "//vendor/github.com/russross/blackfriday:all-srcs",

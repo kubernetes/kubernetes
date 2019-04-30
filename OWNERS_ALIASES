@@ -243,7 +243,6 @@ aliases:
   sig-autoscaling-maintainers:
     - aleksandra-malinowska
     - bskiba
-    - DirectXMan12
     - MaciekPytel
     - mwielgus
 
@@ -354,12 +353,11 @@ aliases:
   # sig-apps-api-reviewers:
   #   - 
   #   - 
-  
-  # sig-auth-api-reviewers:
-  #   - 
-  #   - 
-  
-  
+
+  sig-auth-api-reviewers:
+    - enj
+    - mikedanese
+
   sig-cli-api-reviewers:
     - pwittrock
     - soltysh
@@ -416,7 +414,6 @@ aliases:
     - deads2k         # API Machinery
     - derekwaynecarr  # Node
     - dghubble        # On Premise
-    - directxman12    # Autoscaling
     - jdumars         # Architecture, Cluster Ops, Release
     - kow3ns          # Apps
     - lavalamp        # API Machinery

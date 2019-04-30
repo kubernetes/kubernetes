@@ -39,11 +39,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	pluginsv1alpha1 "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	utiltrace "k8s.io/utils/trace"
@@ -158,11 +158,11 @@ type genericScheduler struct {
 	priorityMetaProducer     priorities.PriorityMetadataProducer
 	predicateMetaProducer    predicates.PredicateMetadataProducer
 	prioritizers             []priorities.PriorityConfig
-	pluginSet                pluginsv1alpha1.PluginSet
+	framework                framework.Framework
 	extenders                []algorithm.SchedulerExtender
 	lastNodeIndex            uint64
 	alwaysCheckAllPredicates bool
-	nodeInfoSnapshot         internalcache.NodeInfoSnapshot
+	nodeInfoSnapshot         *internalcache.NodeInfoSnapshot
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                algorithm.PDBLister
@@ -174,7 +174,7 @@ type genericScheduler struct {
 // functions.
 func (g *genericScheduler) snapshot() error {
 	// Used for all fit and priority funcs.
-	return g.cache.UpdateNodeInfoSnapshot(&g.nodeInfoSnapshot)
+	return g.cache.UpdateNodeInfoSnapshot(g.nodeInfoSnapshot)
 }
 
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
@@ -1206,7 +1206,7 @@ func NewGenericScheduler(
 	predicateMetaProducer predicates.PredicateMetadataProducer,
 	prioritizers []priorities.PriorityConfig,
 	priorityMetaProducer priorities.PriorityMetadataProducer,
-	pluginSet pluginsv1alpha1.PluginSet,
+	framework framework.Framework,
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
@@ -1222,9 +1222,9 @@ func NewGenericScheduler(
 		predicateMetaProducer:    predicateMetaProducer,
 		prioritizers:             prioritizers,
 		priorityMetaProducer:     priorityMetaProducer,
-		pluginSet:                pluginSet,
+		framework:                framework,
 		extenders:                extenders,
-		nodeInfoSnapshot:         internalcache.NewNodeInfoSnapshot(),
+		nodeInfoSnapshot:         framework.NodeInfoSnapshot(),
 		volumeBinder:             volumeBinder,
 		pvcLister:                pvcLister,
 		pdbLister:                pdbLister,

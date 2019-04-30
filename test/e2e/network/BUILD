@@ -59,6 +59,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
+        "//test/e2e/framework/endpoints:go_default_library",
         "//test/e2e/framework/ingress:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
         "//test/e2e/network/scale:go_default_library",

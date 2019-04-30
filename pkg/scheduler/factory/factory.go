@@ -51,11 +51,10 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/api/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	"k8s.io/kubernetes/pkg/scheduler/plugins"
-	pluginsv1alpha1 "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
@@ -92,8 +91,8 @@ type Config struct {
 	// PodPreemptor is used to evict pods and update 'NominatedNode' field of
 	// the preemptor pod.
 	PodPreemptor PodPreemptor
-	// PlugingSet has a set of plugins and data used to run them.
-	PluginSet pluginsv1alpha1.PluginSet
+	// Framework runs scheduler plugins at configured extension points.
+	Framework framework.Framework
 
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
@@ -183,8 +182,8 @@ type configFactory struct {
 	pdbLister policylisters.PodDisruptionBudgetLister
 	// a means to list all StorageClasses
 	storageClassLister storagelisters.StorageClassLister
-	// pluginRunner has a set of plugins and the context used for running them.
-	pluginSet pluginsv1alpha1.PluginSet
+	// framework has a set of plugins and the context used for running them.
+	framework framework.Framework
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
@@ -238,6 +237,7 @@ type ConfigFactoryArgs struct {
 	PercentageOfNodesToScore       int32
 	BindTimeoutSeconds             int64
 	StopCh                         <-chan struct{}
+	Registry                       framework.Registry
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
@@ -248,6 +248,11 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		stopEverything = wait.NeverStop
 	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
+	// TODO(bsalamat): config files should be passed to the framework.
+	framework, err := framework.NewFramework(args.Registry, nil)
+	if err != nil {
+		klog.Fatalf("error initializing the scheduling framework: %v", err)
+	}
 
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
 	var storageClassLister storagelisters.StorageClassLister
@@ -267,6 +272,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		statefulSetLister:              args.StatefulSetInformer.Lister(),
 		pdbLister:                      args.PdbInformer.Lister(),
 		storageClassLister:             storageClassLister,
+		framework:                      framework,
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  args.SchedulerName,
@@ -435,9 +441,6 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		return nil, err
 	}
 
-	// TODO(bsalamat): the default registrar should be able to process config files.
-	c.pluginSet = plugins.NewDefaultPluginSet(pluginsv1alpha1.NewPluginContext(), &c.schedulerCache)
-
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
 		c.podQueue,
@@ -445,7 +448,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		predicateMetaProducer,
 		priorityConfigs,
 		priorityMetaProducer,
-		c.pluginSet,
+		c.framework,
 		extenders,
 		c.volumeBinder,
 		c.pVCLister,
@@ -463,7 +466,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		GetBinder:           getBinderFunc(c.client, extenders),
 		PodConditionUpdater: &podConditionUpdater{c.client},
 		PodPreemptor:        &podPreemptor{c.client},
-		PluginSet:           c.pluginSet,
+		Framework:           c.framework,
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
 		},

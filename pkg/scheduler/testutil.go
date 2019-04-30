@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 )
 
 // FakeConfigurator is an implementation for test.
@@ -91,25 +91,5 @@ func (fc *FakeConfigurator) CreateFromKeys(predicateKeys, priorityKeys sets.Stri
 	return fc.Config, nil
 }
 
-// EmptyPluginSet is the default plugin registrar used by the default scheduler.
-type EmptyPluginSet struct{}
-
-var _ = plugins.PluginSet(EmptyPluginSet{})
-
-// ReservePlugins returns a slice of default reserve plugins.
-func (r EmptyPluginSet) ReservePlugins() []plugins.ReservePlugin {
-	return []plugins.ReservePlugin{}
-}
-
-// PrebindPlugins returns a slice of default prebind plugins.
-func (r EmptyPluginSet) PrebindPlugins() []plugins.PrebindPlugin {
-	return []plugins.PrebindPlugin{}
-}
-
-// Data returns a pointer to PluginData.
-func (r EmptyPluginSet) Data() *plugins.PluginData {
-	return &plugins.PluginData{
-		Ctx:            nil,
-		SchedulerCache: nil,
-	}
-}
+// EmptyPluginRegistry is an empty plugin registry used in tests.
+var EmptyPluginRegistry = framework.Registry{}

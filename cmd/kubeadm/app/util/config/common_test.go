@@ -23,7 +23,7 @@ import (
 	"github.com/lithammer/dedent"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -69,6 +69,12 @@ func TestValidateSupportedVersion(t *testing.T) {
 			gv: schema.GroupVersion{
 				Group:   KubeadmGroupName,
 				Version: "v1beta1",
+			},
+		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta2",
 			},
 		},
 		{
@@ -119,9 +125,9 @@ func TestLowercaseSANs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					APIServer: kubeadmapiv1beta1.APIServer{
+			cfg := &kubeadmapiv1beta2.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
+					APIServer: kubeadmapiv1beta2.APIServer{
 						CertSANs: test.in,
 					},
 				},

@@ -285,6 +285,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pv"},
 		{Name: "Reason", Type: "string", Description: apiv1.PersistentVolumeStatus{}.SwaggerDoc()["reason"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "VolumeMode", Type: "string", Priority: 1, Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["volumeMode"]},
 	}
 	h.TableHandler(persistentVolumeColumnDefinitions, printPersistentVolume)
 	h.TableHandler(persistentVolumeColumnDefinitions, printPersistentVolumeList)
@@ -297,6 +298,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Access Modes", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["accessModes"]},
 		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pvc"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "VolumeMode", Type: "string", Priority: 1, Description: apiv1.PersistentVolumeClaimSpec{}.SwaggerDoc()["volumeMode"]},
 	}
 	h.TableHandler(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaim)
 	h.TableHandler(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaimList)
@@ -1328,11 +1330,14 @@ func printPersistentVolume(obj *api.PersistentVolume, options printers.PrintOpti
 	if obj.ObjectMeta.DeletionTimestamp != nil {
 		phase = "Terminating"
 	}
+	volumeMode := "<unset>"
+	if obj.Spec.VolumeMode != nil {
+		volumeMode = string(*obj.Spec.VolumeMode)
+	}
 
 	row.Cells = append(row.Cells, obj.Name, aSize, modesStr, reclaimPolicyStr,
 		string(phase), claimRefUID, helper.GetPersistentVolumeClass(obj),
-		obj.Status.Reason,
-		translateTimestampSince(obj.CreationTimestamp))
+		obj.Status.Reason, translateTimestampSince(obj.CreationTimestamp), volumeMode)
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1361,13 +1366,19 @@ func printPersistentVolumeClaim(obj *api.PersistentVolumeClaim, options printers
 	storage := obj.Spec.Resources.Requests[api.ResourceStorage]
 	capacity := ""
 	accessModes := ""
+	volumeMode := "<unset>"
 	if obj.Spec.VolumeName != "" {
 		accessModes = helper.GetAccessModesAsString(obj.Status.AccessModes)
 		storage = obj.Status.Capacity[api.ResourceStorage]
 		capacity = storage.String()
 	}
 
-	row.Cells = append(row.Cells, obj.Name, string(phase), obj.Spec.VolumeName, capacity, accessModes, helper.GetPersistentVolumeClaimClass(obj), translateTimestampSince(obj.CreationTimestamp))
+	if obj.Spec.VolumeMode != nil {
+		volumeMode = string(*obj.Spec.VolumeMode)
+	}
+
+	row.Cells = append(row.Cells, obj.Name, string(phase), obj.Spec.VolumeName, capacity, accessModes,
+		helper.GetPersistentVolumeClaimClass(obj), translateTimestampSince(obj.CreationTimestamp), volumeMode)
 	return []metav1beta1.TableRow{row}, nil
 }
 
