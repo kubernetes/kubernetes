@@ -73,7 +73,7 @@ func (s *storageLeases) ListLeases() ([]corev1.EndpointAddress, error) {
 		epaList[i] = ip.Subsets[0].Addresses[0]
 	}
 
-	klog.V(6).Infof("Current masters listed in storage are %v", formatEndpointAddresses(epaList))
+	klog.V(6).Infof("Current masters listed in storage are %v", prepareForDisplay(epaList))
 
 	return epaList, nil
 }
@@ -221,7 +221,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		e.Subsets[0].Ports = endpointPorts
 	}
 
-	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, formatEndpointAddresses(masters))
+	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, prepareForDisplay(masters))
 	if shouldCreate {
 		if _, err = r.endpointClient.Endpoints(corev1.NamespaceDefault).Create(e); errors.IsAlreadyExists(err) {
 			err = nil
@@ -310,7 +310,7 @@ func (r *leaseEndpointReconciler) StopReconciling() {
 	r.stopReconcilingCalled = true
 }
 
-func formatEndpointAddresses(addrs []corev1.EndpointAddress) []string {
+func prepareForDisplay(addrs []corev1.EndpointAddress) []string {
 	items := make([]string, len(addrs))
 	for i, epa := range addrs {
 		items[i] = epa.IP
