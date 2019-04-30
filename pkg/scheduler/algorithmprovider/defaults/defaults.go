@@ -87,6 +87,12 @@ func ApplyFeatureGates() {
 		klog.Infof("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
 	}
 
+	// Only register EvenPodsSpreadPredicate if the feature is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.EvenPodsSpread) {
+		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.EvenPodsSpreadPred)
+		factory.RegisterFitPredicate(predicates.EvenPodsSpreadPred, predicates.EvenPodsSpreadPredicate)
+	}
+
 	// Prioritizes nodes that satisfy pod's resource limits
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
