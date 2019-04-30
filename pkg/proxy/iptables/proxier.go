@@ -1081,7 +1081,12 @@ func (proxier *Proxier) syncProxyRules() {
 					// Jump to the service chain.
 					writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
 				} else {
-					// TODO: Make all nodePorts jump to the firewall chain.
+					for _, lp := range lps {
+						writeLine(proxier.natRules,
+							append(args, "-d", lp.IP,
+								"--dport", strconv.Itoa(svcInfo.NodePort),
+								"-j", string(fwChain))...)
+					}
 					// Currently we only create it for loadbalancers (#33586).
 
 					// Fix localhost martian source error
