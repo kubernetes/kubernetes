@@ -77,8 +77,7 @@ type csiClient interface {
 		ctx context.Context,
 		volID string,
 		targetPath string,
-	) (map[string]usageCount,
-		error)
+	) (map[string]usageCount, error)
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
@@ -955,7 +954,8 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(
 			uci.total = usage.GetTotal()
 			uci.used = usage.GetUsed()
 			usageMap["INODES"] = uci
-		case "UNKNOWN":
+		case "default":
+			klog.Errorf("unknown key %s in usagemap", unit.String())
 		}
 
 	}

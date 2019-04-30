@@ -100,8 +100,6 @@ func (mc *metricsCsi) getCSIVolInfo(metrics *volume.Metrics) error {
 			metrics.InodesUsed = resource.NewQuantity(v.used, resource.BinarySI)
 			metrics.InodesFree = resource.NewQuantity(v.available, resource.BinarySI)
 			metrics.Inodes = resource.NewQuantity(v.total, resource.BinarySI)
-		} else {
-			continue
 		}
 	}
 	return nil
