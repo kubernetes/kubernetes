@@ -91,7 +91,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 
 	// First, determine if the endpoint is in the format we expect (one
 	// subset, ports matching endpointPorts, N IP addresses).
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), endpointPorts, r.masterCount, reconcilePorts)
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), r.nodeName, endpointPorts, r.masterCount, reconcilePorts)
 	if !formatCorrect {
 		// Something is egregiously wrong, just re-make the endpoints record.
 		e.Subsets = []corev1.EndpointSubset{{
@@ -182,12 +182,13 @@ func (r *masterCountEndpointReconciler) StopReconciling() {
 //     of addresses is less than or equal to the master count.
 // * portsCorrect is true when endpoint ports exactly match provided ports.
 //     portsCorrect is only evaluated when reconcilePorts is set to true.
-func checkEndpointSubsetFormat(e *corev1.Endpoints, ip string, ports []corev1.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
+func checkEndpointSubsetFormat(e *corev1.Endpoints, ip string, nodeName *string, ports []corev1.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
 		return false, false, false
 	}
 	sub := &e.Subsets[0]
 	portsCorrect = true
+	formatCorrect = true
 	if reconcilePorts {
 		if len(sub.Ports) != len(ports) {
 			portsCorrect = false
@@ -200,12 +201,21 @@ func checkEndpointSubsetFormat(e *corev1.Endpoints, ip string, ports []corev1.En
 		}
 	}
 	for _, addr := range sub.Addresses {
+		if addr.NodeName == nil {
+			formatCorrect = false
+			break
+		}
+
 		if addr.IP == ip {
+			if *addr.NodeName != *nodeName {
+				formatCorrect = false
+				break
+			}
 			ipCorrect = len(sub.Addresses) <= count
 			break
 		}
 	}
-	return true, ipCorrect, portsCorrect
+	return formatCorrect, ipCorrect, portsCorrect
 }
 
 // GetMasterServiceUpdateIfNeeded sets service attributes for the

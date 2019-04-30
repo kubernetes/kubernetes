@@ -391,6 +391,50 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 		},
+		{
+			testName:      "existing endpoints empty nodename",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpoints: &corev1.EndpointsList{
+				Items: []corev1.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []corev1.EndpointSubset{{
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
+						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+			expectUpdate: &corev1.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []corev1.EndpointSubset{{
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
+					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+				}},
+			},
+		},
+		{
+			testName:      "existing endpoints stale nodename",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpoints: &corev1.EndpointsList{
+				Items: []corev1.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []corev1.EndpointSubset{{
+						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr("stale-nodename")}},
+						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+			expectUpdate: &corev1.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []corev1.EndpointSubset{{
+					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
+					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+				}},
+			},
+		},
 	}
 	for _, test := range reconcile_tests {
 		fakeClient := fake.NewSimpleClientset()
