@@ -70,18 +70,18 @@ http_file(
 
 docker_pull(
     name = "debian-base-amd64",
-    digest = "sha256:8ccb65cd2dd7e0c24193d0742a20e4a673dbd11af5a33f16fcd471a31486866c",
+    digest = "sha256:5f25d97ece9076612b64bb551e12f1e39a520176b684e2d663ce1bd53c5d0618",
     registry = "k8s.gcr.io",
     repository = "debian-base-amd64",
-    tag = "0.4.1",  # ignored, but kept here for documentation
+    tag = "v1.0.0",  # ignored, but kept here for documentation
 )
 
 docker_pull(
     name = "debian-iptables-amd64",
-    digest = "sha256:9c41b4c326304b94eb96fdd2e181aa6e9995cc4642fcdfb570cedd73a419ba39",
+    digest = "sha256:adc40e9ec817c15d35b26d1d6aa4d0f8096fba4c99e26a026159bb0bc98c6a89",
     registry = "k8s.gcr.io",
     repository = "debian-iptables-amd64",
-    tag = "v11.0.1",  # ignored, but kept here for documentation
+    tag = "v11.0.2",  # ignored, but kept here for documentation
 )
 
 docker_pull(
