@@ -2,12 +2,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["registrar.go"],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/plugins",
+    srcs = ["prebind.go"],
+    importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/examples/prebind",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/scheduler/internal/cache:go_default_library",
-        "//pkg/scheduler/plugins/v1alpha1:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
 )
 
@@ -20,11 +21,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/scheduler/plugins/examples:all-srcs",
-        "//pkg/scheduler/plugins/v1alpha1:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

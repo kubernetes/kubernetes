@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ type ContextKey string
 // PluginContext does not provide any data protection, as all plugins are assumed to be
 // trusted.
 type PluginContext struct {
-	Mx      sync.RWMutex
+	mx      sync.RWMutex
 	storage map[ContextKey]ContextData
 }
 
@@ -50,6 +50,8 @@ func NewPluginContext() *PluginContext {
 
 // Read retrieves data with the given "key" from PluginContext. If the key is not
 // present an error is returned.
+// This function is not thread safe. In multi-threaded code, lock should be
+// acquired first.
 func (c *PluginContext) Read(key ContextKey) (ContextData, error) {
 	if v, ok := c.storage[key]; ok {
 		return v, nil
@@ -57,38 +59,36 @@ func (c *PluginContext) Read(key ContextKey) (ContextData, error) {
 	return nil, errors.New(NotFound)
 }
 
-// SyncRead is the thread safe version of Read(...).
-func (c *PluginContext) SyncRead(key ContextKey) (ContextData, error) {
-	c.Mx.RLock()
-	defer c.Mx.RUnlock()
-	return c.Read(key)
-}
-
 // Write stores the given "val" in PluginContext with the given "key".
+// This function is not thread safe. In multi-threaded code, lock should be
+// acquired first.
 func (c *PluginContext) Write(key ContextKey, val ContextData) {
 	c.storage[key] = val
 }
 
-// SyncWrite is the thread safe version of Write(...).
-func (c *PluginContext) SyncWrite(key ContextKey, val ContextData) {
-	c.Mx.Lock()
-	defer c.Mx.Unlock()
-	c.Write(key, val)
-}
-
 // Delete deletes data with the given key from PluginContext.
+// This function is not thread safe. In multi-threaded code, lock should be
+// acquired first.
 func (c *PluginContext) Delete(key ContextKey) {
 	delete(c.storage, key)
 }
 
-// SyncDelete is the thread safe version of Write(...).
-func (c *PluginContext) SyncDelete(key ContextKey) {
-	c.Mx.Lock()
-	defer c.Mx.Unlock()
-	c.Delete(key)
+// Lock acquires PluginContext lock.
+func (c *PluginContext) Lock() {
+	c.mx.Lock()
 }
 
-// Reset removes all the information in the PluginContext.
-func (c *PluginContext) Reset() {
-	c.storage = make(map[ContextKey]ContextData)
+// Unlock releases PluginContext lock.
+func (c *PluginContext) Unlock() {
+	c.mx.Unlock()
+}
+
+// RLock acquires PluginContext read lock.
+func (c *PluginContext) RLock() {
+	c.mx.RLock()
+}
+
+// RUnlock releases PluginContext read lock.
+func (c *PluginContext) RUnlock() {
+	c.mx.RUnlock()
 }
