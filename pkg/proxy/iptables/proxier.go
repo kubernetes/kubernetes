@@ -491,6 +491,7 @@ func (proxier *Proxier) SyncLoop() {
 	// Update healthz timestamp at beginning in case Sync() never succeeds.
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.UpdateTimestamp()
+		proxier.healthzServer.UpdateApiTimestamp()
 	}
 	proxier.syncRunner.Loop(wait.NeverStop)
 }
@@ -538,6 +539,9 @@ func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	if proxier.endpointsChanges.Update(oldEndpoints, endpoints) && proxier.isInitialized() {
+		if proxier.healthzServer != nil {
+			proxier.healthzServer.UpdateApiTimestamp()
+		}
 		proxier.syncRunner.Run()
 	}
 }

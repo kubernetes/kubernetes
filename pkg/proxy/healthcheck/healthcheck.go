@@ -246,9 +246,10 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 	return nil
 }
 
-// HealthzUpdater allows callers to update healthz timestamp only.
+// HealthzUpdater allows 
 type HealthzUpdater interface {
-	UpdateTimestamp()
+	UpdateTimestamp() //used for sync runs
+	UpdateAPITimestamp() // user for service/endpoint updates
 }
 
 // HealthzServer returns 200 "OK" by default. Once timestamp has been
@@ -266,6 +267,7 @@ type HealthzServer struct {
 	nodeRef       *v1.ObjectReference
 
 	lastUpdated atomic.Value
+	apiLastUpdated atomic.Value
 }
 
 // NewDefaultHealthzServer returns a default healthz http server.
@@ -297,6 +299,11 @@ func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c 
 // UpdateTimestamp updates the lastUpdated timestamp.
 func (hs *HealthzServer) UpdateTimestamp() {
 	hs.lastUpdated.Store(hs.clock.Now())
+}
+
+// UpdateTimestamp updates the lastUpdated timestamp.
+func (hs *HealthzServer) UpdateApiTimestamp() {
+	hs.apiLastUpdated.Store(hs.clock.Now())
 }
 
 // Run starts the healthz http server and returns.
@@ -340,8 +347,11 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	if !lastUpdated.IsZero() && currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
+	} else if !apiLastUpdated.IsZero() && currentTime.After(apiLastUpdated.Add(h.hs.healthTimeout)) {
+		//could hide this behidn a config flag users have to turn on. Also different timeout period?
+		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
 		resp.WriteHeader(http.StatusOK)
 	}
-	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q,"currentTime": %q}`, lastUpdated, currentTime))
+	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "apiLastUpdate": %q, "currentTime": %q}`, lastUpdated, apiLastUpdated, currentTime))
 }
