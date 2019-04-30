@@ -48,6 +48,13 @@ func newFakeCsiDriverClientWithExpansion(t *testing.T, stagingCapable bool, expa
 	}
 }
 
+func newFakeCsiDriverClientWithVolumeStats(t *testing.T, volumeStatsSet bool) *fakeCsiDriverClient {
+	return &fakeCsiDriverClient{
+		t:          t,
+		nodeClient: fake.NewNodeClientWithVolumeStats(volumeStatsSet),
+	}
+}
+
 func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context) (
 	nodeID string,
 	maxVolumePerNode int64,
@@ -253,6 +260,10 @@ func setupClient(t *testing.T, stageUnstageSet bool) csiClient {
 
 func setupClientWithExpansion(t *testing.T, stageUnstageSet bool, expansionSet bool) csiClient {
 	return newFakeCsiDriverClientWithExpansion(t, stageUnstageSet, expansionSet)
+}
+
+func setupClientWithVolumeStats(t *testing.T, volumeStatsSet bool) csiClient {
+	return newFakeCsiDriverClient(t, volumeStatsSet)
 }
 
 func checkErr(t *testing.T, expectedAnError bool, actualError error) {

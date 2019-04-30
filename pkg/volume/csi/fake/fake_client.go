@@ -95,6 +95,14 @@ func NewNodeClientWithExpansion(stageUnstageSet bool, expansionSet bool) *NodeCl
 	}
 }
 
+func NewNodeClientWithVolumeStats(volumeStatsSet bool) *NodeClient {
+	return &NodeClient{
+		nodePublishedVolumes: make(map[string]CSIVolume),
+		nodeStagedVolumes:    make(map[string]CSIVolume),
+		volumeStatsSet:       volumeStatsSet,
+	}
+}
+
 // SetNextError injects next expected error
 func (f *NodeClient) SetNextError(err error) {
 	f.nextErr = err
