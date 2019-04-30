@@ -166,7 +166,7 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 		return nil, fmt.Errorf("object %q/%q not registered", namespace, name)
 	}
 	if err := wait.PollImmediate(10*time.Millisecond, time.Second, item.hasSynced); err != nil {
-		return nil, fmt.Errorf("couldn't propagate object cache: %v", err)
+		return nil, fmt.Errorf("failed to sync %s cache: %v", c.groupResource.String(), err)
 	}
 
 	obj, exists, err := item.store.GetByKey(c.key(namespace, name))
