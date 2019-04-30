@@ -16,7 +16,6 @@ pkg/apis/auditregistration/v1alpha1
 pkg/apis/authentication/v1
 pkg/apis/authorization/v1
 pkg/apis/authorization/validation
-pkg/apis/autoscaling
 pkg/apis/autoscaling/v1
 pkg/apis/autoscaling/v2beta1
 pkg/apis/autoscaling/v2beta2
