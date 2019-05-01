@@ -643,6 +643,7 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.Lock()
 
 	if spec == nil {
+		pm.mutex.Unlock()
 		return nil, fmt.Errorf("Could not find plugin because volume spec is nil")
 	}
 
@@ -681,6 +682,7 @@ func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
 	pm.mutex.Lock()
 
 	if spec == nil {
+		pm.mutex.Unlock()
 		return false, fmt.Errorf("could not find if plugin is migratable because volume spec is nil")
 	}
 
