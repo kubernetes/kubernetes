@@ -1034,7 +1034,12 @@ func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
 }
 
 func newClaim(t testsuites.StorageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
-	return getClaim(t.ClaimSize, ns)
+	claim := getClaim(t.ClaimSize, ns)
+	if t.VolumeMode == v1.PersistentVolumeBlock {
+		blockVolumeMode := v1.PersistentVolumeBlock
+		claim.Spec.VolumeMode = &blockVolumeMode
+	}
+	return claim
 }
 
 func getDefaultPluginName() string {

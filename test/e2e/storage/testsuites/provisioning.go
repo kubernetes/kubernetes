@@ -53,7 +53,7 @@ type StorageClassTest struct {
 	ClaimSize            string
 	ExpectedSize         string
 	PvCheck              func(claim *v1.PersistentVolumeClaim)
-	VolumeMode           *v1.PersistentVolumeMode
+	VolumeMode           v1.PersistentVolumeMode
 	AllowVolumeExpansion bool
 }
 
