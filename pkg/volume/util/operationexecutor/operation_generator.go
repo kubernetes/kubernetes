@@ -295,15 +295,16 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 func (og *operationGenerator) GenerateAttachVolumeFunc(
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
+	originalSpec := volumeToAttach.VolumeSpec
 	attachVolumeFunc := func() (error, error) {
 		var attachableVolumePlugin volume.AttachableVolumePlugin
-		originalSpec := volumeToAttach.VolumeSpec
+
 		nu, err := nodeUsingCSIPlugin(og, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
 		if err != nil {
 			return volumeToAttach.GenerateError("AttachVolume.NodeUsingCSIPlugin failed", err)
 		}
 
-		// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
+		// useCSIPlugin will check both CSIMigration and the plugin specific feature gates
 		if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
@@ -382,8 +383,32 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		}
 	}
 
-	// Get attacher plugin
 	attachableVolumePluginName := unknownAttachableVolumePlugin
+	// TODO(dyzz) Ignoring this error means that if the plugin is migrated and
+	// any transient error is encountered (API unavailable, driver not installed)
+	// the operation will have it's metric registered with the in-tree plugin instead
+	// of the CSI Driver we migrated to. Fixing this requires a larger refactor that
+	// involves determining the plugin_name for the metric generating "CompleteFunc"
+	// during the actual "OperationFunc" and not during this generation function
+
+	nu, err := nodeUsingCSIPlugin(og, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+	if err != nil {
+		klog.Errorf("GenerateAttachVolumeFunc failed to check if node is using CSI Plugin, metric for this operation may be inaccurate: %v", err)
+	}
+
+	// Need to translate the spec here if the plugin is migrated so that the metrics
+	// emitted show the correct (migrated) plugin
+	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
+		csiSpec, err := translateSpec(volumeToAttach.VolumeSpec)
+		if err == nil {
+			volumeToAttach.VolumeSpec = csiSpec
+		}
+		// If we have an error here we ignore it, the metric emitted will then be for the
+		// in-tree plugin. This error case(skipped one) will also trigger an error
+		// while the generated function is executed. And those errors will be handled during the execution of the generated
+		// function with a back off policy.
+	}
+	// Get attacher plugin
 	attachableVolumePlugin, err :=
 		og.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
 	// It's ok to ignore the error, returning error is not expected from this function.
@@ -528,7 +553,20 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	isRemount bool) volumetypes.GeneratedOperations {
 	// Get mounter plugin
+	originalSpec := volumeToMount.VolumeSpec
 	volumePluginName := unknownVolumePlugin
+	// Need to translate the spec here if the plugin is migrated so that the metrics
+	// emitted show the correct (migrated) plugin
+	if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
+		csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
+		if err == nil {
+			volumeToMount.VolumeSpec = csiSpec
+		}
+		// If we have an error here we ignore it, the metric emitted will then be for the
+		// in-tree plugin. This error case(skipped one) will also trigger an error
+		// while the generated function is executed. And those errors will be handled during the execution of the generated
+		// function with a back off policy.
+	}
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
 	if err == nil && volumePlugin != nil {
@@ -536,7 +574,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	}
 
 	mountVolumeFunc := func() (error, error) {
-		originalSpec := volumeToMount.VolumeSpec
+
 		// Get mounter plugin
 		if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
 			csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
