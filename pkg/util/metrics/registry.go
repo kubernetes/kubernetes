@@ -74,12 +74,9 @@ func NewKubeRegistry() *KubeRegistry {
 		klog.Fatalf("Can't initialize a registry without a valid version %v", err)
 	}
 	if v == nil {
-		klog.Fatalf("No valid version %v", *v)
+		klog.Fatalf("No valid version loaded for metrics registry")
 	}
-	return &KubeRegistry{
-		PromRegistry: prometheus.NewRegistry(),
-		version:      semver.MustParse(*v),
-	}
+	return newKubeRegistry(semver.MustParse(*v))
 }
 
 // newKubeRegistry creates a new vanilla Registry without any Collectors
