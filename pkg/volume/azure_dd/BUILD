@@ -40,7 +40,6 @@ go_library(
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-        "//vendor/k8s.io/utils/keymutex:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
