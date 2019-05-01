@@ -696,16 +696,39 @@ func (runner *runner) reload() {
 	}
 }
 
+var iptablesNotFoundStrings = []string{
+	// iptables-legacy [-A|-I] BAD-CHAIN [...]
+	// iptables-legacy [-C|-D] GOOD-CHAIN [...non-matching rule...]
+	// iptables-legacy [-X|-F|-Z] BAD-CHAIN
+	// iptables-nft -X BAD-CHAIN
+	// NB: iptables-nft [-F|-Z] BAD-CHAIN exits with no error
+	"No chain/target/match by that name",
+
+	// iptables-legacy [...] -j BAD-CHAIN
+	// iptables-nft-1.8.0 [-A|-I] BAD-CHAIN [...]
+	// iptables-nft-1.8.0 [-A|-I] GOOD-CHAIN -j BAD-CHAIN
+	// NB: also matches some other things like "-m BAD-MODULE"
+	"No such file or directory",
+
+	// iptables-legacy [-C|-D] BAD-CHAIN [...]
+	// iptables-nft [-C|-D] GOOD-CHAIN [...non-matching rule...]
+	"does a matching rule exist",
+
+	// iptables-nft-1.8.2 [-A|-C|-D|-I] BAD-CHAIN [...]
+	// iptables-nft-1.8.2 [...] -j BAD-CHAIN
+	"does not exist",
+}
+
 // IsNotFoundError returns true if the error indicates "not found".  It parses
-// the error string looking for known values, which is imperfect but works in
-// practice.
+// the error string looking for known values, which is imperfect; beware using
+// this function for anything beyond deciding between logging or ignoring an
+// error.
 func IsNotFoundError(err error) bool {
 	es := err.Error()
-	if strings.Contains(es, "No such file or directory") {
-		return true
-	}
-	if strings.Contains(es, "No chain/target/match by that name") {
-		return true
+	for _, str := range iptablesNotFoundStrings {
+		if strings.Contains(es, str) {
+			return true
+		}
 	}
 	return false
 }
