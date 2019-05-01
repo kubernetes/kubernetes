@@ -90,7 +90,7 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 		}
 		return true, nil
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 dummy users")
@@ -100,7 +100,7 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Verifying that the users exist")
 	users, err := t.listUsers()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(len(users)).To(gomega.Equal(2))
 }
 
@@ -143,7 +143,7 @@ func (t *EtcdUpgradeTest) addUser(name string) error {
 
 func (t *EtcdUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
 	svc, err := f.ClientSet.CoreV1().Services(ns).Get(svcName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -200,6 +200,6 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 // Teardown does one final check of the data's availability.
 func (t *EtcdUpgradeTest) Teardown(f *framework.Framework) {
 	users, err := t.listUsers()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(len(users) >= t.successfulWrites).To(gomega.BeTrue())
 }
