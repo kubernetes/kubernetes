@@ -226,6 +226,7 @@ type Proxier struct {
 	iptables       utiliptables.Interface
 	masqueradeAll  bool
 	masqueradeMark string
+	logPrefix      string
 	exec           utilexec.Interface
 	clusterCIDR    string
 	hostname       string
@@ -285,6 +286,7 @@ func NewProxier(ipt utiliptables.Interface,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
+	logPrefix string,
 	clusterCIDR string,
 	hostname string,
 	nodeIP net.IP,
@@ -1472,4 +1474,12 @@ func openLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 	}
 	klog.V(2).Infof("Opened local port %s", lp.String())
 	return socket, nil
+}
+
+// hasLogPrefix return iptables --log-prefix [Log] format
+func (proxier *Proxier) hasLogPrefix() string {
+	if proxier.logPrefix != "" {
+		return "--log-prefix " + proxier.logPrefix
+	}
+	return ""
 }

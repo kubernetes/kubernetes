@@ -39,6 +39,8 @@ type KubeProxyIPTablesConfiguration struct {
 	// minSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').
 	MinSyncPeriod metav1.Duration
+	// Setup iptables log prefix
+	LogPrefix string
 }
 
 // KubeProxyIPVSConfiguration contains ipvs-related configuration

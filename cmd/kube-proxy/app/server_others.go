@@ -155,6 +155,7 @@ func newProxyServer(
 			config.IPTables.MinSyncPeriod.Duration,
 			config.IPTables.MasqueradeAll,
 			int(*config.IPTables.MasqueradeBit),
+			config.IPTables.LogPrefix,
 			config.ClusterCIDR,
 			hostname,
 			nodeIP,
