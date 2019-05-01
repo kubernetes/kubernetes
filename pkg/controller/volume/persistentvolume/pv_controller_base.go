@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,6 +91,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		claimQueue:                    workqueue.NewNamed("claims"),
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 		resyncPeriod:                  p.SyncPeriod,
+		operationTimestamps:           cache.NewThreadSafeStore(cache.Indexers{}, cache.Indices{}),
 	}
 
 	// Prober is nil because PV is not aware of Flexvolume.
