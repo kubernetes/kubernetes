@@ -45,13 +45,6 @@ func GetCgroupDriverDocker(execer utilsexec.Interface) (string, error) {
 	return strings.TrimSuffix(driver, "\n"), nil
 }
 
-func validateCgroupDriver(driver string) error {
-	if driver != CgroupDriverCgroupfs && driver != CgroupDriverSystemd {
-		return errors.Errorf("unknown cgroup driver %q", driver)
-	}
-	return nil
-}
-
 func callDockerInfo(execer utilsexec.Interface) (string, error) {
 	out, err := execer.Command("docker", "info", "-f", "{{.CgroupDriver}}").Output()
 	if err != nil {

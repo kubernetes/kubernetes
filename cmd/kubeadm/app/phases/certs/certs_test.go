@@ -376,7 +376,7 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 			t.Fatalf("Failed to marshal expected private key: %v", err)
 		}
 
-		if bytes.Compare(resultingKeyPEM, expectedKeyPEM) != 0 {
+		if !bytes.Equal(resultingKeyPEM, expectedKeyPEM) {
 			t.Error("created key does not match expected key")
 		}
 	}
@@ -736,7 +736,6 @@ func TestNewCSR(t *testing.T) {
 func TestCreateCertificateFilesMethods(t *testing.T) {
 
 	var tests = []struct {
-		setupFunc     func(cfg *kubeadmapi.InitConfiguration) error
 		createFunc    func(cfg *kubeadmapi.InitConfiguration) error
 		expectedFiles []string
 		externalEtcd  bool

@@ -117,7 +117,6 @@ type initData struct {
 	dryRunDir               string
 	externalCA              bool
 	client                  clientset.Interface
-	waiter                  apiclient.Waiter
 	outputWriter            io.Writer
 	uploadCerts             bool
 	certificateKey          string
