@@ -641,17 +641,14 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 // support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
 
 	if spec == nil {
 		return nil, fmt.Errorf("Could not find plugin because volume spec is nil")
 	}
 
-	matchedPluginNames := []string{}
 	matches := []VolumePlugin{}
-	for k, v := range pm.plugins {
+	for _, v := range pm.plugins {
 		if v.CanSupport(spec) {
-			matchedPluginNames = append(matchedPluginNames, k)
 			matches = append(matches, v)
 		}
 	}
@@ -659,15 +656,19 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.refreshProbedPlugins()
 	for _, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
-			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
 			matches = append(matches, plugin)
 		}
 	}
+	pm.mutex.Unlock()
 
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("no volume plugin matched")
 	}
 	if len(matches) > 1 {
+		matchedPluginNames := []string{}
+		for _, plugin := range matches {
+			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
+		}
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 	return matches[0], nil
