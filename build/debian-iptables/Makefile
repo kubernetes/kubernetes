@@ -16,12 +16,12 @@
 
 REGISTRY?="staging-k8s.gcr.io"
 IMAGE=$(REGISTRY)/debian-iptables
-TAG?=v11.0.1
+TAG?=v11.0.2
 ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 TEMP_DIR:=$(shell mktemp -d)
 
-BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):0.4.1
+BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):v1.0.0
 
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
