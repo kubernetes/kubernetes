@@ -104,14 +104,18 @@ func (w *Watcher) Start() error {
 
 	// Traverse plugin dir and add filesystem watchers before starting the plugin processing goroutine.
 	if err := w.traversePluginDir(w.path); err != nil {
-		w.Stop()
+		if stopError := w.Stop(); stopError != nil {
+			klog.Errorf("Failed to stop watching plugins at %s: %v", w.path, stopError)
+		}
 		return fmt.Errorf("failed to traverse plugin socket path %q, err: %v", w.path, err)
 	}
 
 	// Traverse deprecated plugin dir, if specified.
 	if len(w.deprecatedPath) != 0 {
 		if err := w.traversePluginDir(w.deprecatedPath); err != nil {
-			w.Stop()
+			if stopError := w.Stop(); stopError != nil {
+				klog.Errorf("Failed to stop watching plugins at %s: %v", w.path, stopError)
+			}
 			return fmt.Errorf("failed to traverse deprecated plugin socket path %q, err: %v", w.deprecatedPath, err)
 		}
 	}
