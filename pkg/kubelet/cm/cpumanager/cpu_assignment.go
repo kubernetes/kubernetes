@@ -110,19 +110,23 @@ func (a *cpuAccumulator) freeCPUs() []int {
 			// as each core.
 			iSocketColoScore := a.topo.CPUDetails.CPUsInSocket(iSocket).Intersection(a.result).Size()
 			jSocketColoScore := a.topo.CPUDetails.CPUsInSocket(jSocket).Intersection(a.result).Size()
+			if iSocketColoScore > jSocketColoScore {
+				return true
+			}
 
 			// Compute the number of available CPUs available on the same socket
 			// as each core.
 			iSocketFreeScore := a.details.CPUsInSocket(iSocket).Size()
 			jSocketFreeScore := a.details.CPUsInSocket(jSocket).Size()
+			if iSocketFreeScore < jSocketFreeScore {
+				return true
+			}
 
 			// Compute the number of available CPUs on each core.
 			iCoreFreeScore := a.details.CPUsInCore(iCore).Size()
 			jCoreFreeScore := a.details.CPUsInCore(jCore).Size()
 
-			return iSocketColoScore > jSocketColoScore ||
-				iSocketFreeScore < jSocketFreeScore ||
-				iCoreFreeScore < jCoreFreeScore ||
+			return iCoreFreeScore < jCoreFreeScore ||
 				iSocket < jSocket ||
 				iCore < jCore
 		})
