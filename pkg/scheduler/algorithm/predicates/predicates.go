@@ -1722,9 +1722,60 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
 	}
+
 	constraints := getHardTopologySpreadConstraints(pod)
 	if len(constraints) == 0 {
 		return true, nil, nil
 	}
+
+	var topologyPairsPodSpreadMap *topologyPairsPodSpreadMap
+	if predicateMeta, ok := meta.(*predicateMetadata); ok {
+		topologyPairsPodSpreadMap = predicateMeta.topologyPairsPodSpreadMap
+	} else { // We don't have precomputed metadata. We have to follow a slow path to check spread constraints.
+		// TODO(Huang-Wei): get it implemented
+		return false, nil, errors.New("metadata not pre-computed for EvenPodsSpreadPredicate")
+	}
+
+	if topologyPairsPodSpreadMap == nil || len(topologyPairsPodSpreadMap.topologyKeyToMinPodsMap) == 0 {
+		return true, nil, nil
+	}
+
+	selfMatch, err := podLabelsMatchesSpreadConstraints(pod.Labels, constraints)
+	if err != nil {
+		return false, nil, err
+	}
+	selfMatchNum := 0
+	if selfMatch {
+		selfMatchNum = 1
+	}
+	for _, constraint := range constraints {
+		tpKey := constraint.TopologyKey
+		tpVal, ok := node.Labels[constraint.TopologyKey]
+		if !ok {
+			klog.V(5).Infof("node '%s' doesn't have required label '%s'", node.Name, tpKey)
+			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
+		}
+
+		pair := topologyPair{key: tpKey, value: tpVal}
+		minMatchNum, ok := topologyPairsPodSpreadMap.topologyKeyToMinPodsMap[tpKey]
+		if !ok {
+			// error which should not happen
+			klog.Errorf("internal error: get minMatchNum from key %q of %#v", tpKey, topologyPairsPodSpreadMap.topologyKeyToMinPodsMap)
+			continue
+		}
+		// judging criteria:
+		// 'existing matching num' + 'if self-match (1 or 0)' - 'global min matching num' <= 'maxSkew'
+		matchNum := len(topologyPairsPodSpreadMap.topologyPairToPods[pair])
+
+		// TODO(Huang-Wei): remove this after thorough testing
+		// fmt.Printf("node '%s' => spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) ?<= maxSkew(%d)\n", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, constraint.MaxSkew)
+
+		// TODO(Huang-Wei): check if it can overflow?
+		if int32(matchNum+selfMatchNum)-minMatchNum > constraint.MaxSkew {
+			klog.V(5).Infof("node '%s' failed spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) > maxSkew(%d)", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, constraint.MaxSkew)
+			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
+		}
+	}
+
 	return true, nil, nil
 }
