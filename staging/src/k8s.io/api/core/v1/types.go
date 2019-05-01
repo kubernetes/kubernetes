@@ -46,7 +46,13 @@ type Volume struct {
 
 // Represents the source of a volume to mount.
 // Only one of its members may be specified.
+// +union
 type VolumeSource struct {
+	// VolumeSourceType is the type of volume selected in that union.
+	// +optional
+	// +unionDiscriminator
+	VolumeSourceType *string `json:"volumeSourceType,omitempty" protobuf:"bytes,20000,opt,name=volumeSourceType"`
+
 	// HostPath represents a pre-existing file or directory on the host
 	// machine that is directly exposed to the container. This is generally
 	// used for system agents or other privileged things that are allowed
@@ -172,7 +178,13 @@ type PersistentVolumeClaimVolumeSource struct {
 
 // PersistentVolumeSource is similar to VolumeSource but meant for the
 // administrator who creates PVs. Exactly one of its members must be set.
+// +union
 type PersistentVolumeSource struct {
+	// VolumeSourceType is the type of volume selected in that union.
+	// +optional
+	// +unionDiscriminator
+	VolumeSourceType *string `json:"volumeSourceType,omitempty" protobuf:"bytes,20000,opt,name=volumeSourceType"`
+
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
@@ -871,6 +883,7 @@ type CephFSPersistentVolumeSource struct {
 // Represents a Flocker volume mounted by the Flocker agent.
 // One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
+// +union
 type FlockerVolumeSource struct {
 	// Name of the dataset stored as metadata -> name on the dataset for Flocker
 	// should be considered as deprecated
@@ -1818,8 +1831,6 @@ type EnvVar struct {
 	// Name of the environment variable. Must be a C_IDENTIFIER.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
-	// Optional: no more than one of the following may be specified.
-
 	// Variable references $(VAR_NAME) are expanded
 	// using the previous defined environment variables in the container and
 	// any service environment variables. If a variable cannot be resolved,
@@ -1829,9 +1840,11 @@ type EnvVar struct {
 	// exists or not.
 	// Defaults to "".
 	// +optional
+	// +unionDeprecated
 	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 	// Source for the environment variable's value. Cannot be used if value is not empty.
 	// +optional
+	// +unionDeprecated
 	ValueFrom *EnvVarSource `json:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
 }
 
@@ -2237,6 +2250,7 @@ type Container struct {
 
 // Handler defines a specific action that should be taken
 // TODO: pass structured data to these actions, and document that data here.
+// +union
 type Handler struct {
 	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
@@ -2332,6 +2346,7 @@ type ContainerStateTerminated struct {
 // ContainerState holds a possible state of container.
 // Only one of its members may be specified.
 // If none of them is specified, the default one is ContainerStateWaiting.
+// +union
 type ContainerState struct {
 	// Details about a waiting container
 	// +optional

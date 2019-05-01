@@ -384,16 +384,15 @@ const (
 )
 
 // DeploymentStrategy describes how to replace existing pods with new ones.
+// +union
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
 	// +optional
+	// +unionDiscriminator
 	Type DeploymentStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=DeploymentStrategyType"`
 
 	// Rolling update config params. Present only if DeploymentStrategyType =
 	// RollingUpdate.
-	//---
-	// TODO: Update this to follow our convention for oneOf, whatever we decide it
-	// to be.
 	// +optional
 	RollingUpdate *RollingUpdateDeployment `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
 }

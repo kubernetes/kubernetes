@@ -54,8 +54,11 @@ type Volume struct {
 }
 
 // VolumeSource represents the source location of a volume to mount.
-// Only one of its members may be specified.
+// Only one of its members may be specified on top of VolumeSourceType (discriminator)
 type VolumeSource struct {
+	// VolumeSourceType is the type of volume selected in that union.
+	VolumeSourceType *string
+
 	// HostPath represents file or directory on the host machine that is
 	// directly exposed to the container. This is generally used for system
 	// agents or other privileged things that are allowed to see the host
@@ -160,8 +163,11 @@ type VolumeSource struct {
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
-// Exactly one of its members must be set.
+// Exactly one of its members must be set on top of VolumeSourceType (discriminator)
 type PersistentVolumeSource struct {
+	// VolumeSourceType is the type of volume selected in that union.
+	VolumeSourceType *string
+
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	// +optional
