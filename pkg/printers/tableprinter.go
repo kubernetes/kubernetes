@@ -31,7 +31,6 @@ import (
 )
 
 var _ ResourcePrinter = &HumanReadablePrinter{}
-
 var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
 
 // NewTablePrinter creates a printer suitable for calling PrintObj().
@@ -43,6 +42,13 @@ func NewTablePrinter(options PrintOptions) *HumanReadablePrinter {
 		options:    options,
 	}
 	return printer
+}
+
+func printHeader(columnNames []string, w io.Writer) error {
+	if _, err := fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t")); err != nil {
+		return err
+	}
+	return nil
 }
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
@@ -297,13 +303,6 @@ func printRowsForHandlerEntry(output io.Writer, handler *handlerEntry, obj runti
 		return nil
 	}
 	return results[1].Interface().(error)
-}
-
-func printHeader(columnNames []string, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "%s\n", strings.Join(columnNames, "\t")); err != nil {
-		return err
-	}
-	return nil
 }
 
 // printRows writes the provided rows to output.

@@ -2866,8 +2866,8 @@ func TestPrintPodShowLabels(t *testing.T) {
 }
 
 func TestPrintService(t *testing.T) {
-	single_ExternalIP := []string{"80.11.12.10"}
-	mul_ExternalIP := []string{"80.11.12.10", "80.11.12.11"}
+	singleExternalIP := []string{"80.11.12.10"}
+	mulExternalIP := []string{"80.11.12.10", "80.11.12.11"}
 	tests := []struct {
 		service api.Service
 		expect  string
@@ -2937,7 +2937,7 @@ func TestPrintService(t *testing.T) {
 						},
 					},
 					ClusterIP:   "10.9.8.7",
-					ExternalIPs: single_ExternalIP,
+					ExternalIPs: singleExternalIP,
 				},
 			},
 			"test4\tLoadBalancer\t10.9.8.7\t80.11.12.10\t8888/tcp\t<unknown>\n",
@@ -2955,7 +2955,7 @@ func TestPrintService(t *testing.T) {
 						},
 					},
 					ClusterIP:   "10.9.8.7",
-					ExternalIPs: single_ExternalIP,
+					ExternalIPs: singleExternalIP,
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
@@ -2983,7 +2983,7 @@ func TestPrintService(t *testing.T) {
 						},
 					},
 					ClusterIP:   "10.9.8.7",
-					ExternalIPs: mul_ExternalIP,
+					ExternalIPs: mulExternalIP,
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
