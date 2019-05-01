@@ -64,6 +64,9 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		ns        *v1.Namespace
 		driver    TestDriver
 		resources []*genericVolumeTestResource
+
+		intreeOps   opCounts
+		migratedOps opCounts
 	}
 	var (
 		dInfo = driver.GetDriverInfo()
@@ -91,6 +94,7 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 
 		// Now do the more expensive test initialization.
 		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
 	}
 
 	cleanup := func() {
@@ -102,6 +106,8 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 			l.testCleanup()
 			l.testCleanup = nil
 		}
+
+		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	// This tests below configuration:

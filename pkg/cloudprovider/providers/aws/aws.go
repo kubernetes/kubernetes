@@ -3396,7 +3396,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	listeners := []*elb.Listener{}
 	v2Mappings := []nlbPortMapping{}
 
-	portList := getPortSets(annotations[ServiceAnnotationLoadBalancerSSLPorts])
+	sslPorts := getPortSets(annotations[ServiceAnnotationLoadBalancerSSLPorts])
 	for _, port := range apiService.Spec.Ports {
 		if port.Protocol != v1.ProtocolTCP {
 			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
@@ -3407,16 +3407,32 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 
 		if isNLB(annotations) {
-			v2Mappings = append(v2Mappings, nlbPortMapping{
-				FrontendPort: int64(port.Port),
-				TrafficPort:  int64(port.NodePort),
+			portMapping := nlbPortMapping{
+				FrontendPort:     int64(port.Port),
+				FrontendProtocol: string(port.Protocol),
+				TrafficPort:      int64(port.NodePort),
+				TrafficProtocol:  string(port.Protocol),
+
 				// if externalTrafficPolicy == "Local", we'll override the
 				// health check later
 				HealthCheckPort:     int64(port.NodePort),
 				HealthCheckProtocol: elbv2.ProtocolEnumTcp,
-			})
+			}
+
+			certificateARN := annotations[ServiceAnnotationLoadBalancerCertificate]
+			if certificateARN != "" && (sslPorts == nil || sslPorts.numbers.Has(int64(port.Port)) || sslPorts.names.Has(port.Name)) {
+				portMapping.FrontendProtocol = elbv2.ProtocolEnumTls
+				portMapping.SSLCertificateARN = certificateARN
+				portMapping.SSLPolicy = annotations[ServiceAnnotationLoadBalancerSSLNegotiationPolicy]
+
+				if backendProtocol := annotations[ServiceAnnotationLoadBalancerBEProtocol]; backendProtocol == "ssl" {
+					portMapping.TrafficProtocol = elbv2.ProtocolEnumTls
+				}
+			}
+
+			v2Mappings = append(v2Mappings, portMapping)
 		}
-		listener, err := buildListener(port, annotations, portList)
+		listener, err := buildListener(port, annotations, sslPorts)
 		if err != nil {
 			return nil, err
 		}

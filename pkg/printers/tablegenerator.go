@@ -27,10 +27,12 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
+// TableGenerator - an interface for generating metav1beta1.Table provided a runtime.Object
 type TableGenerator interface {
 	GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
 }
 
+// PrintHandler - interface to handle printing provided an array of metav1beta1.TableColumnDefinition
 type PrintHandler interface {
 	TableHandler(columns []metav1beta1.TableColumnDefinition, printFunc interface{}) error
 	DefaultTableHandler(columns []metav1beta1.TableColumnDefinition, printFunc interface{}) error
@@ -64,11 +66,12 @@ func NewTableGenerator() *HumanReadablePrinter {
 	}
 }
 
-func (a *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePrinter {
+// With method - accepts a list of builder functions that modify HumanReadablePrinter
+func (h *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePrinter {
 	for _, fn := range fns {
-		fn(a)
+		fn(h)
 	}
-	return a
+	return h
 }
 
 // GenerateTable returns a table for the provided object, using the printer registered for that type. It returns

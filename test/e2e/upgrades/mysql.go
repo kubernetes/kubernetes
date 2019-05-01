@@ -67,7 +67,7 @@ func mysqlKubectlCreate(ns, file string) {
 
 func (t *MySQLUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
 	svc, err := f.ClientSet.CoreV1().Services(ns).Get(svcName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -105,7 +105,7 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 		}
 		return true, nil
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 names to the database")
@@ -114,7 +114,7 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Verifying that the 2 names have been inserted")
 	count, err := t.countNames()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(count).To(gomega.Equal(2))
 }
 
@@ -166,7 +166,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 // Teardown performs one final check of the data's availability.
 func (t *MySQLUpgradeTest) Teardown(f *framework.Framework) {
 	count, err := t.countNames()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(count >= t.successfulWrites).To(gomega.BeTrue())
 }
 

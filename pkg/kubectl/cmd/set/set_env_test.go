@@ -78,6 +78,43 @@ func TestSetEnvLocal(t *testing.T) {
 	}
 }
 
+func TestSetEnvLocalNamespace(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Version: ""},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+	outputFormat := "yaml"
+
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
+	opts := NewEnvOptions(streams)
+	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
+	opts.FilenameOptions = resource.FilenameOptions{
+		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/namespaced-resource.yaml"},
+	}
+	opts.Local = true
+
+	err := opts.Complete(tf, NewCmdEnv(tf, streams), []string{"env=prod"})
+	assert.NoError(t, err)
+	err = opts.Validate()
+	assert.NoError(t, err)
+	err = opts.RunEnv()
+	assert.NoError(t, err)
+	if bufErr.Len() > 0 {
+		t.Errorf("unexpected error: %s", string(bufErr.String()))
+	}
+	if !strings.Contains(buf.String(), "namespace: existing-ns") {
+		t.Errorf("did not set env: %s", buf.String())
+	}
+}
+
 func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()

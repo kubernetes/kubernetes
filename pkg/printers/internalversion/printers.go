@@ -706,7 +706,7 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 				for _, condition := range pod.Status.Conditions {
 					if condition.Type == conditionType {
 						if condition.Status == api.ConditionTrue {
-							trueConditions += 1
+							trueConditions++
 						}
 						break
 					}
@@ -2072,6 +2072,7 @@ func printBool(value bool) string {
 	return "False"
 }
 
+// SortableResourceNames - An array of sortable resource names
 type SortableResourceNames []api.ResourceName
 
 func (list SortableResourceNames) Len() int {

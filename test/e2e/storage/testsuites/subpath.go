@@ -83,6 +83,9 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		subPathDir        string
 		filePathInSubpath string
 		filePathInVolume  string
+
+		intreeOps   opCounts
+		migratedOps opCounts
 	}
 	var l local
 
@@ -99,6 +102,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 
 		// Now do the more expensive test initialization.
 		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
 		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
 
 		// Setup subPath test dependent resource
@@ -157,6 +161,8 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 			l.testCleanup()
 			l.testCleanup = nil
 		}
+
+		validateMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	It("should support non-existent path", func() {

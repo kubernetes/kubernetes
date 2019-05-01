@@ -26,9 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
-// maxMsgSize use 8MB as the default message size limit.
+// maxMsgSize use 16MB as the default message size limit.
 // grpc library default is 4MB
-const maxMsgSize = 1024 * 1024 * 8
+const maxMsgSize = 1024 * 1024 * 16
 
 // DockerServer is the grpc server of dockershim.
 type DockerServer struct {

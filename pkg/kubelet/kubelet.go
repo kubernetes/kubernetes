@@ -901,7 +901,7 @@ type Kubelet struct {
 	iptClient       utilipt.Interface
 	rootDirectory   string
 
-	lastObservedNodeAddressesMux sync.Mutex
+	lastObservedNodeAddressesMux sync.RWMutex
 	lastObservedNodeAddresses    []v1.NodeAddress
 
 	// onRepeatedHeartbeatFailure is called when a heartbeat operation fails more than once. optional.

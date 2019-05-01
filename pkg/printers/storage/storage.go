@@ -25,10 +25,12 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 )
 
+// TableConvertor struct - converts objects to metav1beta1.Table using printers.TableGenerator
 type TableConvertor struct {
 	printers.TableGenerator
 }
 
+// ConvertToTable method - converts objects to metav1beta1.Table objects using TableGenerator
 func (c TableConvertor) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	noHeaders := false
 	if tableOptions != nil {

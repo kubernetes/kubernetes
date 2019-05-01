@@ -42,10 +42,7 @@ const (
 	memoryReservationTimeout = 5 * time.Minute
 	largeResizeTimeout       = 8 * time.Minute
 	largeScaleUpTimeout      = 10 * time.Minute
-	largeScaleDownTimeout    = 20 * time.Minute
-	minute                   = 1 * time.Minute
-
-	maxNodes = 1000
+	maxNodes                 = 1000
 )
 
 type clusterPredicates struct {

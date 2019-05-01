@@ -80,6 +80,9 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		testCleanup func()
 
 		resource *genericVolumeTestResource
+
+		intreeOps   opCounts
+		migratedOps opCounts
 	}
 	var (
 		dInfo = driver.GetDriverInfo()
@@ -99,10 +102,13 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 
 		// Now do the more expensive test initialization.
 		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
+
 		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
 		if l.resource.volSource == nil {
 			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
+
 	}
 
 	cleanup := func() {
@@ -115,6 +121,8 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 			l.testCleanup()
 			l.testCleanup = nil
 		}
+
+		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	It("should write files of various sizes, verify size, validate content [Slow]", func() {

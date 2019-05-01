@@ -366,7 +366,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 				t.Fatal(err)
 			}
 			if spec == nil {
-				t.Fatal("nil volume.Spec contstructed")
+				t.Fatal("nil volume.Spec constructed")
 			}
 
 			// inspect spec
@@ -474,7 +474,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 				t.Fatal(err)
 			}
 			if spec == nil {
-				t.Fatal("nil volume.Spec contstructed")
+				t.Fatal("nil volume.Spec constructed")
 			}
 
 			if spec.Name() != tc.specVolID {
