@@ -143,6 +143,7 @@ go_test(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/networking:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/kubelet/client:go_default_library",
