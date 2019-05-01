@@ -170,7 +170,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 			By(fmt.Sprintf("waiting for Ingress %s to get instance group annotation", name))
 			pollErr := wait.Poll(2*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
-				ing, err := f.ClientSet.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+				ing, err := f.ClientSet.NetworkingV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				annotations := ing.Annotations
 				if annotations == nil || annotations[instanceGroupAnnotation] == "" {
@@ -193,7 +193,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			scKey := ingress.StatusPrefix + "/ssl-cert"
 			beKey := ingress.StatusPrefix + "/backends"
 			wait.Poll(2*time.Second, time.Minute, func() (bool, error) {
-				ing, err := f.ClientSet.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+				ing, err := f.ClientSet.NetworkingV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				annotations := ing.Annotations
 				if annotations != nil && (annotations[umKey] != "" || annotations[fwKey] != "" ||

@@ -2291,7 +2291,7 @@ type IngressDescriber struct {
 }
 
 func (i *IngressDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
-	c := i.ExtensionsV1beta1().Ingresses(namespace)
+	c := i.NetworkingV1beta1().Ingresses(namespace)
 	ing, err := c.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2299,7 +2299,7 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings de
 	return i.describeIngress(ing, describerSettings)
 }
 
-func (i *IngressDescriber) describeBackend(ns string, backend *extensionsv1beta1.IngressBackend) string {
+func (i *IngressDescriber) describeBackend(ns string, backend *networkingv1beta1.IngressBackend) string {
 	endpoints, _ := i.CoreV1().Endpoints(ns).Get(backend.ServiceName, metav1.GetOptions{})
 	service, _ := i.CoreV1().Services(ns).Get(backend.ServiceName, metav1.GetOptions{})
 	spName := ""
@@ -2319,7 +2319,7 @@ func (i *IngressDescriber) describeBackend(ns string, backend *extensionsv1beta1
 	return formatEndpoints(endpoints, sets.NewString(spName))
 }
 
-func (i *IngressDescriber) describeIngress(ing *extensionsv1beta1.Ingress, describerSettings describe.DescriberSettings) (string, error) {
+func (i *IngressDescriber) describeIngress(ing *networkingv1beta1.Ingress, describerSettings describe.DescriberSettings) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
@@ -2330,7 +2330,7 @@ func (i *IngressDescriber) describeIngress(ing *extensionsv1beta1.Ingress, descr
 		if def == nil {
 			// Ingresses that don't specify a default backend inherit the
 			// default backend in the kube-system namespace.
-			def = &extensionsv1beta1.IngressBackend{
+			def = &networkingv1beta1.IngressBackend{
 				ServiceName: "default-http-backend",
 				ServicePort: intstr.IntOrString{Type: intstr.Int, IntVal: 80},
 			}
@@ -2372,7 +2372,7 @@ func (i *IngressDescriber) describeIngress(ing *extensionsv1beta1.Ingress, descr
 	})
 }
 
-func describeIngressTLS(w PrefixWriter, ingTLS []extensionsv1beta1.IngressTLS) {
+func describeIngressTLS(w PrefixWriter, ingTLS []networkingv1beta1.IngressTLS) {
 	w.Write(LEVEL_0, "TLS:\n")
 	for _, t := range ingTLS {
 		if t.SecretName == "" {
@@ -4494,7 +4494,7 @@ func extractCSRStatus(csr *certificatesv1beta1.CertificateSigningRequest) (strin
 }
 
 // backendStringer behaves just like a string interface and converts the given backend to a string.
-func backendStringer(backend *extensionsv1beta1.IngressBackend) string {
+func backendStringer(backend *networkingv1beta1.IngressBackend) string {
 	if backend == nil {
 		return ""
 	}
