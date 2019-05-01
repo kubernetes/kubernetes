@@ -35,12 +35,13 @@ type gvkParser struct {
 	parser typed.Parser
 }
 
-func (p *gvkParser) Type(gvk schema.GroupVersionKind) typed.ParseableType {
+func (p *gvkParser) Type(gvk schema.GroupVersionKind) *typed.ParseableType {
 	typeName, ok := p.gvks[gvk]
 	if !ok {
 		return nil
 	}
-	return p.parser.Type(typeName)
+	t := p.parser.Type(typeName)
+	return &t
 }
 
 func newGVKParser(models proto.Models) (*gvkParser, error) {

@@ -127,17 +127,26 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		return nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}
 
-	managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
+	newObjTyped, managed, err = f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
 	managed = f.stripFields(managed, manager)
 
+	newObj, err = f.typeConverter.TypedToObject(newObjTyped)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert new typed object to object: %v", err)
+	}
+
 	if err := internal.EncodeObjectManagedFields(newObj, managed); err != nil {
 		return nil, fmt.Errorf("failed to encode managed fields: %v", err)
 	}
 
-	return newObj, nil
+	newObjUnversioned, err := f.toUnversioned(newObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert to unversioned: %v", err)
+	}
+	return newObjUnversioned, nil
 }
 
 // Apply is used when server-side apply is called, as it merges the
