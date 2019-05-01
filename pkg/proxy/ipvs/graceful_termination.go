@@ -17,10 +17,10 @@ limitations under the License.
 package ipvs
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
-	"fmt"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
@@ -164,10 +164,10 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 	}
 	for _, rs := range rss {
 		if rsToDelete.RealServer.Equal(rs) {
-			// Delete RS with no connections
-			// For UDP, ActiveConn is always 0
-			// For TCP, InactiveConn are connections not in ESTABLISHED state
-			if rs.ActiveConn+rs.InactiveConn != 0 {
+			// For UDP traffic, no graceful termination, we immediately delete the RS
+			//     (existing connections will be deleted on the next packet because sysctlExpireNoDestConn=1)
+			// For other protocols, don't delete until all connections have expired)
+			if rsToDelete.VirtualServer.Protocol != "udp" && rs.ActiveConn+rs.InactiveConn != 0 {
 				klog.Infof("Not deleting, RS %v: %v ActiveConn, %v InactiveConn", rsToDelete.String(), rs.ActiveConn, rs.InactiveConn)
 				return false, nil
 			}
