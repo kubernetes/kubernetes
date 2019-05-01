@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -356,11 +357,11 @@ func waitForReplicationControllerwithSelectorInAddonTest(c clientset.Interface, 
 		addonTestPollTimeout))
 }
 
-// TODO use the framework.SSH code, either adding an SCP to it or copying files
+// TODO use the ssh.SSH code, either adding an SCP to it or copying files
 // differently.
 func getMasterSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
-	signer, err := framework.GetSigner(framework.TestContext.Provider)
+	signer, err := e2essh.GetSigner(framework.TestContext.Provider)
 	if err != nil {
 		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", framework.TestContext.Provider, err)
 	}

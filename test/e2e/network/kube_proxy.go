@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/images/net/nat"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -79,7 +80,7 @@ var _ = SIGDescribe("Network", func() {
 		zero := int64(0)
 
 		// Some distributions (Ubuntu 16.04 etc.) don't support the proc file.
-		_, err := framework.IssueSSHCommandWithResult(
+		_, err := e2essh.IssueSSHCommandWithResult(
 			"ls /proc/net/nf_conntrack",
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
@@ -181,7 +182,7 @@ var _ = SIGDescribe("Network", func() {
 		By("Checking /proc/net/nf_conntrack for the timeout")
 		// If test flakes occur here, then this check should be performed
 		// in a loop as there may be a race with the client connecting.
-		framework.IssueSSHCommandWithResult(
+		e2essh.IssueSSHCommandWithResult(
 			fmt.Sprintf("sudo cat /proc/net/nf_conntrack | grep 'dport=%v'",
 				testDaemonTCPPort),
 			framework.TestContext.Provider,
@@ -189,7 +190,7 @@ var _ = SIGDescribe("Network", func() {
 
 		// Timeout in seconds is available as the fifth column from
 		// /proc/net/nf_conntrack.
-		result, err := framework.IssueSSHCommandWithResult(
+		result, err := e2essh.IssueSSHCommandWithResult(
 			fmt.Sprintf(
 				"sudo cat /proc/net/nf_conntrack "+
 					"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' "+
