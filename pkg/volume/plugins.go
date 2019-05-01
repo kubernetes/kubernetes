@@ -842,7 +842,7 @@ func (pm *VolumePluginMgr) FindProvisionablePluginByName(name string) (Provision
 	return nil, fmt.Errorf("no provisionable volume plugin matched")
 }
 
-// FindDeletablePluginBySppec fetches a persistent volume plugin by spec.  If
+// FindDeletablePluginBySpec fetches a persistent volume plugin by spec.  If
 // no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
