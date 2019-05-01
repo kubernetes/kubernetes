@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metrics
+package framework
 
 import (
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
