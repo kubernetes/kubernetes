@@ -77,7 +77,7 @@ func TestLog(t *testing.T) {
 				return o
 			},
 			expectedOutSubstrings: []string{
-				// Order in this case muse always by the same, because we read requests sequentially
+				// Order in this case must always be the same, because we read requests sequentially
 				"test log content from source 1\ntest log content from source 2\ntest log content from source 3\n",
 			},
 		},
