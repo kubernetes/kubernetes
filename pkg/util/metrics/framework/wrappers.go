@@ -27,38 +27,37 @@ import (
 // so that we can prevent breakage if methods are ever added to prometheus
 // variants of them.
 
-/**
- * Collector defines a subset of prometheus.Collector interface methods
- */
+// Collector defines a subset of prometheus.Collector interface methods
 type Collector interface {
 	Describe(chan<- *prometheus.Desc)
 	Collect(chan<- prometheus.Metric)
 }
 
-/**
- * Metric defines a subset of prometheus.Metric interface methods
- */
+// Metric defines a subset of prometheus.Metric interface methods
 type Metric interface {
 	Desc() *prometheus.Desc
 	Write(*dto.Metric) error
 }
 
-// Counter is a Metric that represents a single numerical value that only ever
+// CounterMetric is a Metric that represents a single numerical value that only ever
 // goes up. That implies that it cannot be used to count items whose number can
 // also go down, e.g. the number of currently running goroutines. Those
 // "counters" are represented by Gauges.
-//
-// This interface defines a subset of the interface provided by prometheus.Counter
-type KubeCounter interface {
+
+// CounterMetric is an interface which defines a subset of the interface provided by prometheus.Counter
+type CounterMetric interface {
 	Inc()
 	Add(float64)
 }
 
-type KubeCounterVec interface {
-	WithLabelValues(...string) KubeCounter
-	With(prometheus.Labels) KubeCounter
+// CounterVecMetric is an interface which prometheus.CounterVec satisfies.
+type CounterVecMetric interface {
+	WithLabelValues(...string) CounterMetric
+	With(prometheus.Labels) CounterMetric
 }
 
+// PromRegistry is an interface which implements a subset of prometheus.Registerer and
+// prometheus.Gatherer interfaces
 type PromRegistry interface {
 	Register(prometheus.Collector) error
 	MustRegister(...prometheus.Collector)

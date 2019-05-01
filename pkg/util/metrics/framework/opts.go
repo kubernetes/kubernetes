@@ -41,13 +41,19 @@ type KubeOpts struct {
 	StabilityLevel    StabilityLevel
 }
 
+// StabilityLevel represents the API guarantees for a given defined metric.
 type StabilityLevel string
 
 const (
-	ALPHA  StabilityLevel = "ALPHA"
+	// ALPHA metrics have no stability guarantees, as such, labels may
+	// be arbitrarily added/removed and the metric may be deleted at any time.
+	ALPHA StabilityLevel = "ALPHA"
+	// STABLE metrics are guaranteed not be mutated and removal is governed by
+	// the deprecation policy outlined in by the control plane metrics stability KEP.
 	STABLE StabilityLevel = "STABLE"
 )
 
+// CounterOpts is an alias for Opts. See there for doc comments.
 type CounterOpts KubeOpts
 
 // Modify help description on the metric description.

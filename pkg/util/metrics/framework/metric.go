@@ -25,7 +25,7 @@ import (
 )
 
 /*
-This extends the prometheus.Collector interface to allow customization of the metric
+KubeCollector extends the prometheus.Collector interface to allow customization of the metric
 registration process. Defer metric initialization until Create() is called, which then
 delegates to the underlying metric's initializeMetric or initializeDeprecatedMetric
 method call depending on whether the metric is deprecated or not.

@@ -69,7 +69,7 @@ var (
 func TestRegister(t *testing.T) {
 	var tests = []struct {
 		desc                    string
-		metrics                 []*kubeCounter
+		metrics                 []*Counter
 		registryVersion         *semver.Version
 		expectedErrors          []error
 		expectedIsCreatedValues []bool
@@ -78,7 +78,7 @@ func TestRegister(t *testing.T) {
 	}{
 		{
 			desc:                    "test alpha metric",
-			metrics:                 []*kubeCounter{alphaCounter},
+			metrics:                 []*Counter{alphaCounter},
 			registryVersion:         &v115,
 			expectedErrors:          []error{nil},
 			expectedIsCreatedValues: []bool{true},
@@ -87,7 +87,7 @@ func TestRegister(t *testing.T) {
 		},
 		{
 			desc:                    "test registering same metric multiple times",
-			metrics:                 []*kubeCounter{alphaCounter, alphaCounter},
+			metrics:                 []*Counter{alphaCounter, alphaCounter},
 			registryVersion:         &v115,
 			expectedErrors:          []error{nil, prometheus.AlreadyRegisteredError{}},
 			expectedIsCreatedValues: []bool{true, true},
@@ -96,7 +96,7 @@ func TestRegister(t *testing.T) {
 		},
 		{
 			desc:                    "test alpha deprecated metric",
-			metrics:                 []*kubeCounter{alphaDeprecatedCounter},
+			metrics:                 []*Counter{alphaDeprecatedCounter},
 			registryVersion:         &v115,
 			expectedErrors:          []error{nil, prometheus.AlreadyRegisteredError{}},
 			expectedIsCreatedValues: []bool{true},
@@ -105,7 +105,7 @@ func TestRegister(t *testing.T) {
 		},
 		{
 			desc:                    "test alpha hidden metric",
-			metrics:                 []*kubeCounter{alphaHiddenCounter},
+			metrics:                 []*Counter{alphaHiddenCounter},
 			registryVersion:         &v115,
 			expectedErrors:          []error{nil, prometheus.AlreadyRegisteredError{}},
 			expectedIsCreatedValues: []bool{false},
@@ -139,43 +139,43 @@ func TestRegister(t *testing.T) {
 func TestMustRegister(t *testing.T) {
 	var tests = []struct {
 		desc            string
-		metrics         []*kubeCounter
+		metrics         []*Counter
 		registryVersion *semver.Version
 		expectedPanics  []bool
 	}{
 		{
 			desc:            "test alpha metric",
-			metrics:         []*kubeCounter{alphaCounter},
+			metrics:         []*Counter{alphaCounter},
 			registryVersion: &v115,
 			expectedPanics:  []bool{false},
 		},
 		{
 			desc:            "test registering same metric multiple times",
-			metrics:         []*kubeCounter{alphaCounter, alphaCounter},
+			metrics:         []*Counter{alphaCounter, alphaCounter},
 			registryVersion: &v115,
 			expectedPanics:  []bool{false, true},
 		},
 		{
 			desc:            "test alpha deprecated metric",
-			metrics:         []*kubeCounter{alphaDeprecatedCounter},
+			metrics:         []*Counter{alphaDeprecatedCounter},
 			registryVersion: &v115,
 			expectedPanics:  []bool{false},
 		},
 		{
 			desc:            "test must registering same deprecated metric",
-			metrics:         []*kubeCounter{alphaDeprecatedCounter, alphaDeprecatedCounter},
+			metrics:         []*Counter{alphaDeprecatedCounter, alphaDeprecatedCounter},
 			registryVersion: &v115,
 			expectedPanics:  []bool{false, true},
 		},
 		{
 			desc:            "test alpha hidden metric",
-			metrics:         []*kubeCounter{alphaHiddenCounter},
+			metrics:         []*Counter{alphaHiddenCounter},
 			registryVersion: &v115,
 			expectedPanics:  []bool{false},
 		},
 		{
 			desc:            "test must registering same hidden metric",
-			metrics:         []*kubeCounter{alphaHiddenCounter, alphaHiddenCounter},
+			metrics:         []*Counter{alphaHiddenCounter, alphaHiddenCounter},
 			registryVersion: &v115,
 			expectedPanics:  []bool{false, false}, // hidden metrics no-opt
 		},

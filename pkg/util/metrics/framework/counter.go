@@ -21,24 +21,24 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// kubeCounter is our internal representation for our wrapping struct around prometheus
-// counters. kubeCounter implements both KubeCollector and KubeCounter.
-type kubeCounter struct {
-	KubeCounter
+// Counter is our internal representation for our wrapping struct around prometheus
+// counters. Counter implements both KubeCollector and CounterMetric.
+type Counter struct {
+	CounterMetric
 	*CounterOpts
 	lazyMetric
 	selfCollector
 }
 
-// NewCounter returns an object which satisfies the KubeCollector and KubeCounter interfaces.
+// NewCounter returns an object which satisfies the KubeCollector and CounterMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
-func NewCounter(opts *CounterOpts) *kubeCounter {
+func NewCounter(opts *CounterOpts) *Counter {
 	// todo: handle defaulting better
 	if opts.StabilityLevel == "" {
 		opts.StabilityLevel = ALPHA
 	}
-	kc := &kubeCounter{
+	kc := &Counter{
 		CounterOpts: opts,
 		lazyMetric:  lazyMetric{},
 	}
@@ -47,20 +47,20 @@ func NewCounter(opts *CounterOpts) *kubeCounter {
 	return kc
 }
 
-// setPrometheusCounter sets the underlying KubeCounter object, i.e. the thing that does the measurement.
-func (c *kubeCounter) setPrometheusCounter(counter prometheus.Counter) {
-	c.KubeCounter = counter
+// setPrometheusCounter sets the underlying CounterMetric object, i.e. the thing that does the measurement.
+func (c *Counter) setPrometheusCounter(counter prometheus.Counter) {
+	c.CounterMetric = counter
 	c.initSelfCollection(counter)
 }
 
 // DeprecatedVersion returns a pointer to the Version or nil
-func (c *kubeCounter) DeprecatedVersion() *semver.Version {
+func (c *Counter) DeprecatedVersion() *semver.Version {
 	return c.CounterOpts.DeprecatedVersion
 }
 
 // initializeMetric invocation creates the actual underlying Counter. Until this method is called
 // the underlying counter is a no-op.
-func (c *kubeCounter) initializeMetric() {
+func (c *Counter) initializeMetric() {
 	c.CounterOpts.annotateStabilityLevel()
 	// this actually creates the underlying prometheus counter.
 	c.setPrometheusCounter(prometheus.NewCounter(c.CounterOpts.toPromCounterOpts()))
@@ -68,25 +68,25 @@ func (c *kubeCounter) initializeMetric() {
 
 // initializeDeprecatedMetric invocation creates the actual (but deprecated) Counter. Until this method
 // is called the underlying counter is a no-op.
-func (c *kubeCounter) initializeDeprecatedMetric() {
+func (c *Counter) initializeDeprecatedMetric() {
 	c.CounterOpts.markDeprecated()
 	c.initializeMetric()
 }
 
-// kubeCounterVec is the internal representation of our wrapping struct around prometheus
-// counterVecs. kubeCounterVec implements both KubeCollector and KubeCounterVec.
-type kubeCounterVec struct {
+// CounterVec is the internal representation of our wrapping struct around prometheus
+// counterVecs. CounterVec implements both KubeCollector and CounterVecMetric.
+type CounterVec struct {
 	*prometheus.CounterVec
 	*CounterOpts
 	lazyMetric
 	originalLabels []string
 }
 
-// NewCounterVec returns an object which satisfies the KubeCollector and KubeCounterVec interfaces.
+// NewCounterVec returns an object which satisfies the KubeCollector and CounterVecMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
-func NewCounterVec(opts *CounterOpts, labels []string) *kubeCounterVec {
-	cv := &kubeCounterVec{
+func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
+	cv := &CounterVec{
 		CounterVec:     noopCounterVec,
 		CounterOpts:    opts,
 		originalLabels: labels,
@@ -97,19 +97,19 @@ func NewCounterVec(opts *CounterOpts, labels []string) *kubeCounterVec {
 }
 
 // DeprecatedVersion returns a pointer to the Version or nil
-func (v *kubeCounterVec) DeprecatedVersion() *semver.Version {
+func (v *CounterVec) DeprecatedVersion() *semver.Version {
 	return v.CounterOpts.DeprecatedVersion
 }
 
 // initializeMetric invocation creates the actual underlying CounterVec. Until this method is called
 // the underlying counterVec is a no-op.
-func (v *kubeCounterVec) initializeMetric() {
+func (v *CounterVec) initializeMetric() {
 	v.CounterVec = prometheus.NewCounterVec(v.CounterOpts.toPromCounterOpts(), v.originalLabels)
 }
 
 // initializeDeprecatedMetric invocation creates the actual (but deprecated) CounterVec. Until this method is called
 // the underlying counterVec is a no-op.
-func (v *kubeCounterVec) initializeDeprecatedMetric() {
+func (v *CounterVec) initializeDeprecatedMetric() {
 	v.CounterOpts.markDeprecated()
 	v.initializeMetric()
 }
@@ -121,17 +121,23 @@ func (v *kubeCounterVec) initializeDeprecatedMetric() {
 // for perpetuity (i.e. throughout application lifecycle).
 //
 // For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/counter.go#L179-L197
-//
-// This method returns a no-op metric if the metric is not actually created/registered, avoiding that
-// memory leak.
-func (v *kubeCounterVec) WithLabelValues(lvs ...string) KubeCounter {
+
+// WithLabelValues returns the Counter for the given slice of label
+// values (same order as the VariableLabels in Desc). If that combination of
+// label values is accessed for the first time, a new Counter is created IFF the counterVec
+// has been registered to a metrics registry.
+func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
 	}
 	return v.CounterVec.WithLabelValues(lvs...)
 }
 
-func (v *kubeCounterVec) With(labels prometheus.Labels) KubeCounter {
+// With returns the Counter for the given Labels map (the label names
+// must match those of the VariableLabels in Desc). If that label map is
+// accessed for the first time, a new Counter is created IFF the counterVec has
+// been registered to a metrics registry.
+func (v *CounterVec) With(labels prometheus.Labels) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
 	}
