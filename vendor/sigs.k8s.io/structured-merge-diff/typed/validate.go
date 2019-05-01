@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/structured-merge-diff/value"
 )
 
-func (tv typedValue) walker() *validatingObjectWalker {
+func (tv TypedValue) walker() *validatingObjectWalker {
 	return &validatingObjectWalker{
 		value:   tv.value,
 		schema:  tv.schema,
@@ -52,7 +52,7 @@ type validatingObjectWalker struct {
 }
 
 func (v validatingObjectWalker) validate() ValidationErrors {
-	return resolveSchema(v.schema, v.typeRef, v)
+	return resolveSchema(v.schema, v.typeRef, &v.value, v)
 }
 
 // doLeaf should be called on leaves before descending into children, if there
@@ -220,13 +220,4 @@ func (v validatingObjectWalker) doMap(t schema.Map) (errs ValidationErrors) {
 	errs = v.visitMapItems(t, m)
 
 	return errs
-}
-
-func (v validatingObjectWalker) doUntyped(t schema.Untyped) (errs ValidationErrors) {
-	if t.ElementRelationship == "" || t.ElementRelationship == schema.Atomic {
-		// Untyped sections allow anything, and are considered leaf
-		// fields.
-		v.doLeaf()
-	}
-	return nil
 }
