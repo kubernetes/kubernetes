@@ -230,11 +230,13 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		}
 	})
 
-	// 1. Run a pod with a finite toleration
-	// 2. Taint the node running this pod with a no-execute taint
-	// 3. See if pod won't get evicted before toleration time runs out
-	// 4. See if pod will get evicted after toleration time runs out
-	It("eventually evict pod with finite tolerations from tainted nodes", func() {
+	/*
+		Release : v1.15
+		Testname: Taint, Pod toleration to no-execute with toleration timeout
+		Description: Create a Pod with toleration time-out and wait for it to be scheduled onto a Node. Taint the concerned Node
+						with a no-execute taint and verify that the Pod id evicted only after Toleration Timeout is reached. The test MUST pass.
+	*/
+	framework.ConformanceIt("eventually evict pod with finite tolerations from tainted nodes", func() {
 		podName := "taint-eviction-3"
 		pod := createPodForTaintsTest(true, KubeletPodDeletionDelaySeconds+2*AdditionalWaitPerDeleteSeconds, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
