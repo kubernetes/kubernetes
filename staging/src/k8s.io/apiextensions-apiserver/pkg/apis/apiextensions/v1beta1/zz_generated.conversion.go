@@ -504,6 +504,7 @@ func autoConvert_v1beta1_CustomResourceDefinitionSpec_To_apiextensions_CustomRes
 	} else {
 		out.Conversion = nil
 	}
+	out.PreserveUnknownFields = (*bool)(unsafe.Pointer(in.PreserveUnknownFields))
 	return nil
 }
 
@@ -550,6 +551,7 @@ func autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1beta1_CustomRes
 	} else {
 		out.Conversion = nil
 	}
+	out.PreserveUnknownFields = (*bool)(unsafe.Pointer(in.PreserveUnknownFields))
 	return nil
 }
 
