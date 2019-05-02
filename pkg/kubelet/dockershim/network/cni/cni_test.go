@@ -71,6 +71,10 @@ func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, 
 	pluginExec := path.Join(testBinDir, binName)
 	f, err = os.Create(pluginExec)
 
+	if err != nil {
+		t.Errorf("Failed creating exec plugin, %v", err)
+	}
+
 	const execScriptTempl = `#!/usr/bin/env bash
 cat > {{.InputFile}}
 env > {{.OutputEnv}}
@@ -323,6 +327,9 @@ func TestCNIPlugin(t *testing.T) {
 		t.Errorf("Expected nil: %v", err)
 	}
 	output, err = ioutil.ReadFile(outputFile)
+	if err != nil {
+		t.Errorf("Could not read file %s, due to: %v", outputFile, err)
+	}
 	expectedOutput = "DEL /proc/12345/ns/net podNamespace podName test_infra_container"
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))

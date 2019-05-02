@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	ethtoolOutputRegex = regexp.MustCompile("peer_ifindex: (\\d+)")
+	ethtoolOutputRegex = regexp.MustCompile(`peer_ifindex: (\d+)`)
 )
 
 func findPairInterfaceOfContainerInterface(e exec.Interface, containerInterfaceName, containerDesc string, nsenterArgs []string) (string, error) {

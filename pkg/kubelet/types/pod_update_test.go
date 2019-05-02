@@ -45,7 +45,7 @@ func TestGetValidatedSources(t *testing.T) {
 	require.Len(t, sources, 3)
 
 	// Unknown source.
-	sources, err = GetValidatedSources([]string{"taco"})
+	_, err = GetValidatedSources([]string{"taco"})
 	require.Error(t, err)
 }
 

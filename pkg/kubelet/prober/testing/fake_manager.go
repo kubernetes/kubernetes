@@ -24,12 +24,12 @@ import (
 type FakeManager struct{}
 
 // Unused methods.
-func (_ FakeManager) AddPod(_ *v1.Pod)        {}
-func (_ FakeManager) RemovePod(_ *v1.Pod)     {}
-func (_ FakeManager) CleanupPods(_ []*v1.Pod) {}
-func (_ FakeManager) Start()                  {}
+func (FakeManager) AddPod(_ *v1.Pod)        {}
+func (FakeManager) RemovePod(_ *v1.Pod)     {}
+func (FakeManager) CleanupPods(_ []*v1.Pod) {}
+func (FakeManager) Start()                  {}
 
-func (_ FakeManager) UpdatePodStatus(_ types.UID, podStatus *v1.PodStatus) {
+func (FakeManager) UpdatePodStatus(_ types.UID, podStatus *v1.PodStatus) {
 	for i := range podStatus.ContainerStatuses {
 		podStatus.ContainerStatuses[i].Ready = true
 	}

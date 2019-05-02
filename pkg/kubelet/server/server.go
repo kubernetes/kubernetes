@@ -676,7 +676,6 @@ func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams 
 }
 
 type responder struct {
-	errorMessage string
 }
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {

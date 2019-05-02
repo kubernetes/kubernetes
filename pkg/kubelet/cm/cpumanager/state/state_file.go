@@ -20,10 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"os"
 	"sync"
+
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 type stateFileData struct {
@@ -144,7 +145,6 @@ func (sf *stateFile) storeState() {
 	if err = ioutil.WriteFile(sf.stateFilePath, content, 0644); err != nil {
 		panic("[cpumanager] state file not written")
 	}
-	return
 }
 
 func (sf *stateFile) GetCPUSet(containerID string) (cpuset.CPUSet, bool) {

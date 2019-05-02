@@ -49,7 +49,6 @@ func TestRoundTrip(t *testing.T) {
 		inputFlags    func() *KubeletServer
 		outputFlags   func() *KubeletServer
 		flagDefaulter func(*pflag.FlagSet)
-		skipDefault   bool
 		err           bool
 		expectArgs    bool
 	}{

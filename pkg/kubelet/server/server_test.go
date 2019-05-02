@@ -289,13 +289,11 @@ func (f *fakeAuth) Authorize(a authorizer.Attributes) (authorized authorizer.Dec
 }
 
 type serverTestFramework struct {
-	serverUnderTest         *Server
-	fakeKubelet             *fakeKubelet
-	fakeAuth                *fakeAuth
-	testHTTPServer          *httptest.Server
-	fakeRuntime             *fakeRuntime
-	testStreamingHTTPServer *httptest.Server
-	criHandler              *utiltesting.FakeHandler
+	serverUnderTest *Server
+	fakeKubelet     *fakeKubelet
+	fakeAuth        *fakeAuth
+	testHTTPServer  *httptest.Server
+	criHandler      *utiltesting.FakeHandler
 }
 
 func newServerTest() *serverTestFramework {

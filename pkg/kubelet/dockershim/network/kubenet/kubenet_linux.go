@@ -58,10 +58,6 @@ const (
 
 	// ebtables Chain to store dedup rules
 	dedupChain = utilebtables.Chain("KUBE-DEDUP")
-
-	// defaultIPAMDir is the default location for the checkpoint files stored by host-local ipam
-	// https://github.com/containernetworking/cni/tree/master/plugins/ipam/host-local#backends
-	defaultIPAMDir = "/var/lib/cni/networks"
 )
 
 // CNI plugins required by kubenet in /opt/cni/bin or user-specified directory
@@ -365,7 +361,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	if err != nil {
 		return err
 	}
-	if portMappings != nil && len(portMappings) > 0 {
+	if len(portMappings) > 0 {
 		if err := plugin.hostportManager.Add(id.ID, &hostport.PodPortMapping{
 			Namespace:    namespace,
 			Name:         name,
@@ -394,7 +390,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 
 	if err := plugin.setup(namespace, name, id, annotations); err != nil {
 		// Make sure everything gets cleaned up on errors
-		podIP, _ := plugin.podIPs[id]
+		podIP := plugin.podIPs[id]
 		if err := plugin.teardown(namespace, name, id, podIP); err != nil {
 			// Not a hard error or warning
 			klog.V(4).Infof("Failed to clean up %s/%s after SetUpPod failure: %v", namespace, name, err)
@@ -438,7 +434,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	portMappings, err := plugin.host.GetPodPortMappings(id.ID)
 	if err != nil {
 		errList = append(errList, err)
-	} else if portMappings != nil && len(portMappings) > 0 {
+	} else if len(portMappings) > 0 {
 		if err = plugin.hostportManager.Remove(id.ID, &hostport.PodPortMapping{
 			Namespace:    namespace,
 			Name:         name,
@@ -465,7 +461,7 @@ func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, i
 	}
 
 	// no cached IP is Ok during teardown
-	podIP, _ := plugin.podIPs[id]
+	podIP := plugin.podIPs[id]
 	if err := plugin.teardown(namespace, name, id, podIP); err != nil {
 		return err
 	}

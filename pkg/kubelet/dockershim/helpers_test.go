@@ -134,7 +134,6 @@ func TestEnsureSandboxImageExists(t *testing.T) {
 		injectErr    error
 		calls        []string
 		err          bool
-		configJSON   string
 	}{
 		"should not pull image when it already exists": {
 			injectImage: true,

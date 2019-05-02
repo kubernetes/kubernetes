@@ -359,8 +359,14 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 	volumeSpec2 := &volume.Spec{Volume: &pod2.Spec.Volumes[0]}
 	generatedVolumeName1, err := util.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec1)
+	if err != nil {
+		t.Errorf("Could not get unique name of volume1, due to: %v", err)
+	}
 	generatedVolumeName2, err := util.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec2)
+	if err != nil {
+		t.Errorf("Could not get unique name of volume2, due to: %v", err)
+	}
 
 	if generatedVolumeName1 != generatedVolumeName2 {
 		t.Fatalf(
@@ -466,6 +472,9 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 
 	volumeName, err := util.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec)
+	if err != nil {
+		t.Errorf("Failed getting unique volume name, %v", err)
+	}
 
 	podName := util.GetUniquePodName(pod)
 

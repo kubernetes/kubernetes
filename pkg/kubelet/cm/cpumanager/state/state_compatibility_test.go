@@ -68,6 +68,9 @@ func TestCheckpointToFileCompatibility(t *testing.T) {
 	defer cpm.RemoveCheckpoint(compatibilityTestingCheckpoint)
 
 	checkpointState, err := NewCheckpointState(testingDir, compatibilityTestingCheckpoint, "none")
+	if err != nil {
+		t.Errorf("Failed to create checkpointState, %v", err)
+	}
 
 	checkpointState.SetDefaultCPUSet(state.defaultCPUSet)
 	checkpointState.SetCPUAssignments(state.assignments)

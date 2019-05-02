@@ -43,7 +43,7 @@ type fakeIPTables struct {
 
 func NewFakeIPTables() *fakeIPTables {
 	return &fakeIPTables{
-		tables: make(map[string]*fakeTable, 0),
+		tables: make(map[string]*fakeTable),
 		builtinChains: map[string]sets.String{
 			string(utiliptables.TableFilter): sets.NewString("INPUT", "FORWARD", "OUTPUT"),
 			string(utiliptables.TableNAT):    sets.NewString("PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"),
@@ -203,7 +203,7 @@ func (f *fakeIPTables) EnsureRule(position utiliptables.RulePosition, tableName 
 	ruleArgs := make([]string, 0)
 	for _, arg := range args {
 		// quote args with internal spaces (like comments)
-		if strings.Index(arg, " ") >= 0 {
+		if strings.Contains(arg, " ") {
 			arg = fmt.Sprintf("\"%s\"", arg)
 		}
 		ruleArgs = append(ruleArgs, arg)

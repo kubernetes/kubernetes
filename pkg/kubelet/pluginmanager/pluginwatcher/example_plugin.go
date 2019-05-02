@@ -134,11 +134,9 @@ func (e *examplePlugin) Serve(services ...string) error {
 		case "v1beta1":
 			v1beta1 := &pluginServiceV1Beta1{server: e}
 			v1beta1.RegisterService()
-			break
 		case "v1beta2":
 			v1beta2 := &pluginServiceV1Beta2{server: e}
 			v1beta2.RegisterService()
-			break
 		default:
 			return fmt.Errorf("Unsupported service: '%s'", service)
 		}

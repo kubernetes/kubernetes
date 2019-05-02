@@ -34,7 +34,7 @@ import (
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
 func TestRemoveContainer(t *testing.T) {
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	fakeRuntime, _, m, _ := createTestRuntimeManager()
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -58,7 +58,7 @@ func TestRemoveContainer(t *testing.T) {
 
 	containerID := fakeContainers[0].Id
 	fakeOS := m.osInterface.(*containertest.FakeOS)
-	err = m.removeContainer(containerID)
+	err := m.removeContainer(containerID)
 	assert.NoError(t, err)
 	// Verify container log is removed
 	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
