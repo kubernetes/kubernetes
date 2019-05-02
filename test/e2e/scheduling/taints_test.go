@@ -61,7 +61,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 				Containers: []v1.Container{
 					{
 						Name:  "pause",
-						Image: "kubernetes/pause",
+						Image: "k8s.gcr.io/pause:3.1",
 					},
 				},
 			},
@@ -80,7 +80,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 					Containers: []v1.Container{
 						{
 							Name:  "pause",
-							Image: "kubernetes/pause",
+							Image: "k8s.gcr.io/pause:3.1",
 						},
 					},
 					Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute}},
@@ -99,7 +99,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 					Containers: []v1.Container{
 						{
 							Name:  "pause",
-							Image: "kubernetes/pause",
+							Image: "k8s.gcr.io/pause:3.1",
 						},
 					},
 					// default - tolerate forever
