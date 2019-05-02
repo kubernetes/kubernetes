@@ -203,6 +203,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			if port.Port == servicePort {
 				foundPort = true
 				portName = port.Name
+				break
 			}
 		}
 		if !foundPort {
@@ -220,15 +221,19 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "EndpointsNotFound"
 			availableCondition.Message = fmt.Sprintf("cannot find endpoints for service/%s in %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
-			return err
+			if _, err2 := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService); err2 != nil {
+				klog.Errorf("cannot update API service status: %v", err2)
+			}
+			return err2
 		} else if err != nil {
 			availableCondition.Status = apiregistration.ConditionUnknown
 			availableCondition.Reason = "EndpointsAccessError"
 			availableCondition.Message = fmt.Sprintf("service/%s in %q cannot be checked due to: %v", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, err)
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
-			return err
+			if _, err2 := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService); err2 != nil {
+				klog.Errorf("cannot update API service status: %v", err2)
+			}
+			return err2
 		}
 		hasActiveEndpoints := false
 		for _, subset := range endpoints.Subsets {
@@ -238,6 +243,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			for _, endpointPort := range subset.Ports {
 				if endpointPort.Name == portName {
 					hasActiveEndpoints = true
+					break
 				}
 			}
 		}
