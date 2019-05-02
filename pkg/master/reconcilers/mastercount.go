@@ -201,13 +201,8 @@ func checkEndpointSubsetFormat(e *corev1.Endpoints, ip string, nodeName *string,
 		}
 	}
 	for _, addr := range sub.Addresses {
-		if addr.NodeName == nil {
-			formatCorrect = false
-			break
-		}
-
 		if addr.IP == ip {
-			if *addr.NodeName != *nodeName {
+			if addr.NodeName == nil || *addr.NodeName != *nodeName {
 				formatCorrect = false
 				break
 			}

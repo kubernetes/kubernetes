@@ -422,16 +422,21 @@ func TestReconcileEndpoints(t *testing.T) {
 				Items: []corev1.Endpoints{{
 					ObjectMeta: om("foo"),
 					Subsets: []corev1.EndpointSubset{{
-						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr("stale-nodename")}},
-						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+						Addresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4", NodeName: strToPtr("stale-nodename")},
+							{IP: "4.3.2.1"},
+						},
+						Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
 			},
 			expectUpdate: &corev1.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []corev1.EndpointSubset{{
-					Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)}},
-					Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+					Addresses: []corev1.EndpointAddress{
+						{IP: "1.2.3.4", NodeName: strToPtr(testNodeName)},
+					},
+					Ports: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 				}},
 			},
 		},
