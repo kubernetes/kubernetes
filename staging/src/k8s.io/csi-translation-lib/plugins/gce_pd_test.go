@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 )
 
@@ -62,6 +63,56 @@ func TestTranslatePDInTreeVolumeOptionsToCSI(t *testing.T) {
 		}
 		if !reflect.DeepEqual(gotOptions, tc.expOptions) {
 			t.Errorf("Got parameters: %v, expected :%v", gotOptions, tc.expOptions)
+		}
+	}
+}
+
+func TestBackwardCompatibleAccessModes(t *testing.T) {
+	testCases := []struct {
+		name           string
+		accessModes    []v1.PersistentVolumeAccessMode
+		expAccessModes []v1.PersistentVolumeAccessMode
+	}{
+		{
+			name: "multiple normals",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadOnlyMany,
+				v1.ReadWriteOnce,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadOnlyMany,
+				v1.ReadWriteOnce,
+			},
+		},
+		{
+			name: "one normal",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+		},
+		{
+			name: "some readwritemany",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+				v1.ReadWriteMany,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+				v1.ReadWriteOnce,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("running test: %v", tc.name)
+
+		got := backwardCompatibleAccessModes(tc.accessModes)
+
+		if !reflect.DeepEqual(tc.expAccessModes, got) {
+			t.Fatalf("Expected access modes: %v, instead got: %v", tc.expAccessModes, got)
 		}
 	}
 }
