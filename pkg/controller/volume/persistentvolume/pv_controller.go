@@ -483,7 +483,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				// [Unit test 11-22]
 				ctrl.recordCSIMetric("provision", claimToClaimKey(claim), nil)
 				return nil
-			} else if IsVolumeBoundToClaim(volume, claim) {
+			} else if pvutil.IsVolumeBoundToClaim(volume, claim) {
 				// User asked for a PV that is claimed by this PVC
 				// OBSERVATION: pvc is "Pending", pv is "Bound"
 				klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound, finishing the binding", claimToClaimKey(claim))
