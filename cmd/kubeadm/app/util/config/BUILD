@@ -68,6 +68,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/github.com/lithammer/dedent:go_default_library",
         "//vendor/github.com/pmezard/go-difflib/difflib:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
