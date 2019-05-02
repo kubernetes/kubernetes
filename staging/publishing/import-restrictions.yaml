@@ -209,6 +209,7 @@
   - k8s.io/apimachinery
   - k8s.io/client-go
   - k8s.io/cloud-provider
+  - k8s.io/csi-translation-lib
   - k8s.io/klog
   - k8s.io/legacy-cloud-providers
   - k8s.io/utils

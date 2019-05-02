@@ -286,6 +286,20 @@ rules:
       branch: master
     - repository: client-go
       branch: master
+- destination: csi-translation-lib
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/csi-translation-lib
+    name: master
+    dependencies:
+    - repository: api
+      branch: master
+    - repository: apimachinery
+      branch: master
+    - repository: cloud-provider
+      branch: master
 - destination: legacy-cloud-providers
   library: true
   branches:
@@ -302,6 +316,8 @@ rules:
       branch: master
     - repository: cloud-provider
       branch: master
+    - repository: csi-translation-lib
+      branch: master
 - destination: node-api
   library: true
   branches:
@@ -317,20 +333,6 @@ rules:
     - repository: client-go
       branch: master
     - repository: code-generator
-      branch: master
-- destination: csi-translation-lib
-  library: true
-  branches:
-  - source:
-      branch: master
-      dir: staging/src/k8s.io/csi-translation-lib
-    name: master
-    dependencies:
-    - repository: api
-      branch: master
-    - repository: apimachinery
-      branch: master
-    - repository: cloud-provider
       branch: master
 - destination: cri-api
   library: true
