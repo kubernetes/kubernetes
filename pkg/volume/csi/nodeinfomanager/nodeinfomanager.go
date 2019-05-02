@@ -438,11 +438,6 @@ func (nim *nodeInfoManager) CreateCSINode() (*storagev1beta1.CSINode, error) {
 		return nil, fmt.Errorf("error getting kube client")
 	}
 
-	csiKubeClient := nim.volumeHost.GetKubeClient()
-	if csiKubeClient == nil {
-		return nil, fmt.Errorf("error getting CSI client")
-	}
-
 	node, err := kubeClient.CoreV1().Nodes().Get(string(nim.nodeName), metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -467,7 +462,7 @@ func (nim *nodeInfoManager) CreateCSINode() (*storagev1beta1.CSINode, error) {
 
 	setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
 
-	return csiKubeClient.StorageV1beta1().CSINodes().Create(nodeInfo)
+	return kubeClient.StorageV1beta1().CSINodes().Create(nodeInfo)
 }
 
 func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *storagev1beta1.CSINode) (modified bool) {
