@@ -181,7 +181,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		defer testcrd.CleanUp()
 		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
-		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"])
+		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"], false)
 	})
 
 	ginkgo.It("Should deny crd creation", func() {
@@ -200,6 +200,30 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
 		testMultiVersionCustomResourceWebhook(f, testcrd)
+	})
+
+	ginkgo.It("Should mutate custom resource with pruning", func() {
+		const prune = true
+		testcrd, err := createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f, func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
+			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
+			crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"mutation-start":   {Type: "string"},
+						"mutation-stage-1": {Type: "string"},
+						// mutation-stage-2 is intentionally missing such that it is pruned
+					},
+				},
+			}
+		})
+		if err != nil {
+			return
+		}
+		defer testcrd.CleanUp()
+		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
+		defer webhookCleanup()
+		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"], prune)
 	})
 
 	ginkgo.It("Should deny crd creation", func() {
@@ -1329,7 +1353,7 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1
 	}
 }
 
-func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
+func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface, prune bool) {
 	ginkgo.By("Creating a custom resource that should be mutated by the webhook")
 	crName := "cr-instance-1"
 	cr := &unstructured.Unstructured{
@@ -1350,7 +1374,9 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",
 		"mutation-stage-1": "yes",
-		"mutation-stage-2": "yes",
+	}
+	if !prune {
+		expectedCRData["mutation-stage-2"] = "yes"
 	}
 	if !reflect.DeepEqual(expectedCRData, mutatedCR.Object["data"]) {
 		framework.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
@@ -1571,9 +1597,9 @@ func testSlowWebhookTimeoutNoError(f *framework.Framework) {
 
 // createAdmissionWebhookMultiVersionTestCRDWithV1Storage creates a new CRD specifically
 // for the admissin webhook calling test.
-func createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f *framework.Framework) (*crd.TestCrd, error) {
+func createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f *framework.Framework, opts ...crd.Option) (*crd.TestCrd, error) {
 	group := fmt.Sprintf("%s-multiversion-crd-test.k8s.io", f.BaseName)
-	return crd.CreateMultiVersionTestCRD(f, group, func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
+	return crd.CreateMultiVersionTestCRD(f, group, append([]crd.Option{func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
 		crd.Spec.Versions = []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 			{
 				Name:    "v1",
@@ -1586,7 +1612,7 @@ func createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f *framework.Framewo
 				Storage: false,
 			},
 		}
-	})
+	}}, opts...)...)
 }
 
 // servedAPIVersions returns the API versions served by the CRD.
