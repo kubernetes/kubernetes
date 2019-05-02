@@ -24,6 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// AuditClasses returns a AuditClassInformer.
+	AuditClasses() AuditClassInformer
 	// AuditSinks returns a AuditSinkInformer.
 	AuditSinks() AuditSinkInformer
 }
@@ -37,6 +39,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// AuditClasses returns a AuditClassInformer.
+func (v *version) AuditClasses() AuditClassInformer {
+	return &auditClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // AuditSinks returns a AuditSinkInformer.

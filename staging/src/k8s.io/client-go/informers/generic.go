@@ -122,6 +122,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().StatefulSets().Informer()}, nil
 
 		// Group=auditregistration.k8s.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("auditclasses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Auditregistration().V1alpha1().AuditClasses().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("auditsinks"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Auditregistration().V1alpha1().AuditSinks().Informer()}, nil
 

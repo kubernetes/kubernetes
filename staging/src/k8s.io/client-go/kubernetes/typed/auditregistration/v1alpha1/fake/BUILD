@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "fake_auditclass.go",
         "fake_auditregistration_client.go",
         "fake_auditsink.go",
     ],

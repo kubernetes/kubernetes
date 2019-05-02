@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
+// AuditClassListerExpansion allows custom methods to be added to
+// AuditClassLister.
+type AuditClassListerExpansion interface{}
+
 // AuditSinkListerExpansion allows custom methods to be added to
 // AuditSinkLister.
 type AuditSinkListerExpansion interface{}

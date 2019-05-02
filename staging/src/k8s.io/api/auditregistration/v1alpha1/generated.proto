@@ -28,12 +28,39 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
+// AuditClass is a set of rules that categorize requests
+//
+// This should be considered a highly privileged object, as modifying it
+// will change what is logged.
+message AuditClass {
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // `spec` is the spec for the `auditClass`.
+  optional AuditClassSpec spec = 2;
+}
+
+// AuditClassList is a list of `auditClass` items.
+message AuditClassList {
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // `items` is a list of `auditClass` objects.
+  repeated AuditClass items = 2;
+}
+
+// AuditClassSpec is the spec for the `auditClass` object.
+message AuditClassSpec {
+  // `requestSelectors` defines a list of `requestSelector` objects. Only one must match.
+  repeated RequestSelector requestSelectors = 1;
+}
+
 // AuditSink represents a cluster level audit sink
 message AuditSink {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the audit configuration spec
+  // `spec` defines the `auditSink` spec
   optional AuditSinkSpec spec = 2;
 }
 
@@ -42,31 +69,129 @@ message AuditSinkList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // List of audit configurations.
+  // `items` is a list of `auditSink` configurations.
   repeated AuditSink items = 2;
 }
 
 // AuditSinkSpec holds the spec for the audit sink
 message AuditSinkSpec {
-  // Policy defines the policy for selecting which events should be sent to the webhook
+  // `policy` defines the policy for selecting which events should be sent to the webhook
   // required
   optional Policy policy = 1;
 
-  // Webhook to send events
+  // `webhook` to send events
   // required
   optional Webhook webhook = 2;
 }
 
+// GroupResources represents resource kinds in an API group.
+message GroupResources {
+  // `group` is the name of the API group that contains the resources.
+  // The empty string represents the core API group.
+  // +optional
+  optional string group = 1;
+
+  // `resources` is a list of resources in this group.
+  //
+  // For example:
+  // 'pods' matches pods.
+  // 'pods/log' matches the log subresource of pods.
+  // '*' matches all resources and their subresources.
+  // 'pods/*' matches all subresources of pods.
+  // 'pods*' would not match any subresources of pods because it is before the path separator.
+  // '*/scale' matches all scale subresources.
+  //
+  // If wildcard is present, the validation rule will ensure resources do not
+  // overlap with each other.
+  //
+  // An empty list implies all resources and subresources in these API groups apply.
+  // +optional
+  repeated string resources = 2;
+
+  // `objectNames` is a list of resource instance names in this group.
+  // Using this field requires resources to be specified.
+  // An empty list implies that every instance of the resource is matched.
+  // +optional
+  repeated string objectNames = 3;
+}
+
 // Policy defines the configuration of how audit events are logged
 message Policy {
-  // The Level that all requests are recorded at.
+  // `level` is the base level that all requests are recorded at.
   // available options: None, Metadata, Request, RequestResponse
   // required
   optional string level = 1;
 
-  // Stages is a list of stages for which events are created.
+  // `stages` is a list of stages for which events are created.
+  // If no stages are given nothing will be logged
   // +optional
   repeated string stages = 2;
+
+  // `rules` define how `auditClass` objects should be handled.
+  // A request may fall under multiple `auditClass` objects.
+  // Rules are evaluated in order (first matching wins).
+  // Rules take precedence over the the parent `level` & `stages`.
+  // Unmatched requests use the parent `level` rule.
+  // +optional
+  repeated PolicyRule rules = 3;
+}
+
+// PolicyRule defines what level and stages are recorded for an `auditClass`.
+message PolicyRule {
+  // `withAuditClass` is the name of the `auditClass` object. This rule matches requests that are
+  // classified with this `auditClass`
+  optional string withAuditClass = 1;
+
+  // `level` that all requests this rule applies to are recorded at.
+  // available options: None, Metadata, Request, RequestResponse
+  // This will override the parent policy Level.
+  // required
+  optional string level = 2;
+
+  // `stages` is a list of stages for which events are created.
+  // If no stages are given nothing will be logged.
+  // +optional
+  repeated string stages = 3;
+}
+
+// RequestSelector selects requests by matching on the given fields. Selectors are
+// used to compose `auditClass` objects.
+message RequestSelector {
+  // `users` (by authenticated user name) in this selector.
+  // An empty list implies every user.
+  // This list should not exceed 100 items, if you need more, use another request selector.
+  // +optional
+  repeated string users = 2;
+
+  // `userGroups` in this selector. A user is considered matching
+  // if it is a member of any of the `userGroups`.
+  // An empty list implies every user group.
+  // +optional
+  repeated string userGroups = 3;
+
+  // `verbs` included in this selector.
+  // An empty list implies every verb.
+  // +optional
+  repeated string verbs = 4;
+
+  // `resources` in this selector. An empty list implies all kinds in all API groups.
+  // +optional
+  repeated GroupResources resources = 5;
+
+  // `namespaces` in this selector.
+  // The empty string "" matches non-namespaced resources.
+  // An empty list implies every namespace.
+  // Non-namespaced resources will be matched if and only if the empty string is present in the list
+  // +optional
+  repeated string namespaces = 6;
+
+  // `nonResourceURLs` is a set of URL paths that should be audited.
+  // *s are allowed, but only as the full, final step in the path, and are delimited by the path separator
+  // Examples:
+  //  "/metrics" - Log requests for apiserver metrics
+  //  "/healthz/*" - Log all health checks
+  // +optional
+  repeated string nonResourceURLs = 7;
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
@@ -91,13 +216,13 @@ message ServiceReference {
   optional int32 port = 4;
 }
 
-// Webhook holds the configuration of the webhook
+// Webhook holds the configuration of the webhook.
 message Webhook {
-  // Throttle holds the options for throttling the webhook
+  // `throttle` holds the options for throttling the webhook.
   // +optional
   optional WebhookThrottleConfig throttle = 1;
 
-  // ClientConfig holds the connection parameters for the webhook
+  // `clientConfig` holds the connection parameters for the webhook.
   // required
   optional WebhookClientConfig clientConfig = 2;
 }
@@ -147,14 +272,14 @@ message WebhookClientConfig {
   optional bytes caBundle = 3;
 }
 
-// WebhookThrottleConfig holds the configuration for throttling events
+// WebhookThrottleConfig holds the configuration for throttling events.
 message WebhookThrottleConfig {
-  // ThrottleQPS maximum number of batches per second
+  // `qps` maximum number of batches per second.
   // default 10 QPS
   // +optional
   optional int64 qps = 1;
 
-  // ThrottleBurst is the maximum number of events sent at the same moment
+  // `burst` is the maximum number of events sent at the same moment.
   // default 15 QPS
   // +optional
   optional int64 burst = 2;

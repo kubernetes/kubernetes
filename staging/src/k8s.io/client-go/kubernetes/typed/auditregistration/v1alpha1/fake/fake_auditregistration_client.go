@@ -28,6 +28,10 @@ type FakeAuditregistrationV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAuditregistrationV1alpha1) AuditClasses() v1alpha1.AuditClassInterface {
+	return &FakeAuditClasses{c}
+}
+
 func (c *FakeAuditregistrationV1alpha1) AuditSinks() v1alpha1.AuditSinkInterface {
 	return &FakeAuditSinks{c}
 }

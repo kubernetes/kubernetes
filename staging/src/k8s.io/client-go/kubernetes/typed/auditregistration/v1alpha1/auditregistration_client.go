@@ -26,12 +26,17 @@ import (
 
 type AuditregistrationV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	AuditClassesGetter
 	AuditSinksGetter
 }
 
 // AuditregistrationV1alpha1Client is used to interact with features provided by the auditregistration.k8s.io group.
 type AuditregistrationV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AuditregistrationV1alpha1Client) AuditClasses() AuditClassInterface {
+	return newAuditClasses(c)
 }
 
 func (c *AuditregistrationV1alpha1Client) AuditSinks() AuditSinkInterface {

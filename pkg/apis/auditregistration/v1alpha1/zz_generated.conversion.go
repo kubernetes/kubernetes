@@ -37,6 +37,36 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.AuditClass)(nil), (*auditregistration.AuditClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AuditClass_To_auditregistration_AuditClass(a.(*v1alpha1.AuditClass), b.(*auditregistration.AuditClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*auditregistration.AuditClass)(nil), (*v1alpha1.AuditClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_auditregistration_AuditClass_To_v1alpha1_AuditClass(a.(*auditregistration.AuditClass), b.(*v1alpha1.AuditClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.AuditClassList)(nil), (*auditregistration.AuditClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AuditClassList_To_auditregistration_AuditClassList(a.(*v1alpha1.AuditClassList), b.(*auditregistration.AuditClassList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*auditregistration.AuditClassList)(nil), (*v1alpha1.AuditClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_auditregistration_AuditClassList_To_v1alpha1_AuditClassList(a.(*auditregistration.AuditClassList), b.(*v1alpha1.AuditClassList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.AuditClassSpec)(nil), (*auditregistration.AuditClassSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AuditClassSpec_To_auditregistration_AuditClassSpec(a.(*v1alpha1.AuditClassSpec), b.(*auditregistration.AuditClassSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*auditregistration.AuditClassSpec)(nil), (*v1alpha1.AuditClassSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_auditregistration_AuditClassSpec_To_v1alpha1_AuditClassSpec(a.(*auditregistration.AuditClassSpec), b.(*v1alpha1.AuditClassSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.AuditSink)(nil), (*auditregistration.AuditSink)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_AuditSink_To_auditregistration_AuditSink(a.(*v1alpha1.AuditSink), b.(*auditregistration.AuditSink), scope)
 	}); err != nil {
@@ -67,6 +97,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.GroupResources)(nil), (*auditregistration.GroupResources)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_GroupResources_To_auditregistration_GroupResources(a.(*v1alpha1.GroupResources), b.(*auditregistration.GroupResources), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*auditregistration.GroupResources)(nil), (*v1alpha1.GroupResources)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_auditregistration_GroupResources_To_v1alpha1_GroupResources(a.(*auditregistration.GroupResources), b.(*v1alpha1.GroupResources), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.Policy)(nil), (*auditregistration.Policy)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_Policy_To_auditregistration_Policy(a.(*v1alpha1.Policy), b.(*auditregistration.Policy), scope)
 	}); err != nil {
@@ -74,6 +114,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*auditregistration.Policy)(nil), (*v1alpha1.Policy)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_auditregistration_Policy_To_v1alpha1_Policy(a.(*auditregistration.Policy), b.(*v1alpha1.Policy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.PolicyRule)(nil), (*auditregistration.PolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PolicyRule_To_auditregistration_PolicyRule(a.(*v1alpha1.PolicyRule), b.(*auditregistration.PolicyRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*auditregistration.PolicyRule)(nil), (*v1alpha1.PolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_auditregistration_PolicyRule_To_v1alpha1_PolicyRule(a.(*auditregistration.PolicyRule), b.(*v1alpha1.PolicyRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.RequestSelector)(nil), (*auditregistration.RequestSelector)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_RequestSelector_To_auditregistration_RequestSelector(a.(*v1alpha1.RequestSelector), b.(*auditregistration.RequestSelector), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*auditregistration.RequestSelector)(nil), (*v1alpha1.RequestSelector)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_auditregistration_RequestSelector_To_v1alpha1_RequestSelector(a.(*auditregistration.RequestSelector), b.(*v1alpha1.RequestSelector), scope)
 	}); err != nil {
 		return err
 	}
@@ -118,6 +178,74 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	return nil
+}
+
+func autoConvert_v1alpha1_AuditClass_To_auditregistration_AuditClass(in *v1alpha1.AuditClass, out *auditregistration.AuditClass, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1alpha1_AuditClassSpec_To_auditregistration_AuditClassSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_AuditClass_To_auditregistration_AuditClass is an autogenerated conversion function.
+func Convert_v1alpha1_AuditClass_To_auditregistration_AuditClass(in *v1alpha1.AuditClass, out *auditregistration.AuditClass, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AuditClass_To_auditregistration_AuditClass(in, out, s)
+}
+
+func autoConvert_auditregistration_AuditClass_To_v1alpha1_AuditClass(in *auditregistration.AuditClass, out *v1alpha1.AuditClass, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_auditregistration_AuditClassSpec_To_v1alpha1_AuditClassSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_auditregistration_AuditClass_To_v1alpha1_AuditClass is an autogenerated conversion function.
+func Convert_auditregistration_AuditClass_To_v1alpha1_AuditClass(in *auditregistration.AuditClass, out *v1alpha1.AuditClass, s conversion.Scope) error {
+	return autoConvert_auditregistration_AuditClass_To_v1alpha1_AuditClass(in, out, s)
+}
+
+func autoConvert_v1alpha1_AuditClassList_To_auditregistration_AuditClassList(in *v1alpha1.AuditClassList, out *auditregistration.AuditClassList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]auditregistration.AuditClass)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1alpha1_AuditClassList_To_auditregistration_AuditClassList is an autogenerated conversion function.
+func Convert_v1alpha1_AuditClassList_To_auditregistration_AuditClassList(in *v1alpha1.AuditClassList, out *auditregistration.AuditClassList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AuditClassList_To_auditregistration_AuditClassList(in, out, s)
+}
+
+func autoConvert_auditregistration_AuditClassList_To_v1alpha1_AuditClassList(in *auditregistration.AuditClassList, out *v1alpha1.AuditClassList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]v1alpha1.AuditClass)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_auditregistration_AuditClassList_To_v1alpha1_AuditClassList is an autogenerated conversion function.
+func Convert_auditregistration_AuditClassList_To_v1alpha1_AuditClassList(in *auditregistration.AuditClassList, out *v1alpha1.AuditClassList, s conversion.Scope) error {
+	return autoConvert_auditregistration_AuditClassList_To_v1alpha1_AuditClassList(in, out, s)
+}
+
+func autoConvert_v1alpha1_AuditClassSpec_To_auditregistration_AuditClassSpec(in *v1alpha1.AuditClassSpec, out *auditregistration.AuditClassSpec, s conversion.Scope) error {
+	out.RequestSelectors = *(*[]auditregistration.RequestSelector)(unsafe.Pointer(&in.RequestSelectors))
+	return nil
+}
+
+// Convert_v1alpha1_AuditClassSpec_To_auditregistration_AuditClassSpec is an autogenerated conversion function.
+func Convert_v1alpha1_AuditClassSpec_To_auditregistration_AuditClassSpec(in *v1alpha1.AuditClassSpec, out *auditregistration.AuditClassSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AuditClassSpec_To_auditregistration_AuditClassSpec(in, out, s)
+}
+
+func autoConvert_auditregistration_AuditClassSpec_To_v1alpha1_AuditClassSpec(in *auditregistration.AuditClassSpec, out *v1alpha1.AuditClassSpec, s conversion.Scope) error {
+	out.RequestSelectors = *(*[]v1alpha1.RequestSelector)(unsafe.Pointer(&in.RequestSelectors))
+	return nil
+}
+
+// Convert_auditregistration_AuditClassSpec_To_v1alpha1_AuditClassSpec is an autogenerated conversion function.
+func Convert_auditregistration_AuditClassSpec_To_v1alpha1_AuditClassSpec(in *auditregistration.AuditClassSpec, out *v1alpha1.AuditClassSpec, s conversion.Scope) error {
+	return autoConvert_auditregistration_AuditClassSpec_To_v1alpha1_AuditClassSpec(in, out, s)
 }
 
 func autoConvert_v1alpha1_AuditSink_To_auditregistration_AuditSink(in *v1alpha1.AuditSink, out *auditregistration.AuditSink, s conversion.Scope) error {
@@ -218,9 +346,34 @@ func Convert_auditregistration_AuditSinkSpec_To_v1alpha1_AuditSinkSpec(in *audit
 	return autoConvert_auditregistration_AuditSinkSpec_To_v1alpha1_AuditSinkSpec(in, out, s)
 }
 
+func autoConvert_v1alpha1_GroupResources_To_auditregistration_GroupResources(in *v1alpha1.GroupResources, out *auditregistration.GroupResources, s conversion.Scope) error {
+	out.Group = in.Group
+	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
+	out.ObjectNames = *(*[]string)(unsafe.Pointer(&in.ObjectNames))
+	return nil
+}
+
+// Convert_v1alpha1_GroupResources_To_auditregistration_GroupResources is an autogenerated conversion function.
+func Convert_v1alpha1_GroupResources_To_auditregistration_GroupResources(in *v1alpha1.GroupResources, out *auditregistration.GroupResources, s conversion.Scope) error {
+	return autoConvert_v1alpha1_GroupResources_To_auditregistration_GroupResources(in, out, s)
+}
+
+func autoConvert_auditregistration_GroupResources_To_v1alpha1_GroupResources(in *auditregistration.GroupResources, out *v1alpha1.GroupResources, s conversion.Scope) error {
+	out.Group = in.Group
+	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
+	out.ObjectNames = *(*[]string)(unsafe.Pointer(&in.ObjectNames))
+	return nil
+}
+
+// Convert_auditregistration_GroupResources_To_v1alpha1_GroupResources is an autogenerated conversion function.
+func Convert_auditregistration_GroupResources_To_v1alpha1_GroupResources(in *auditregistration.GroupResources, out *v1alpha1.GroupResources, s conversion.Scope) error {
+	return autoConvert_auditregistration_GroupResources_To_v1alpha1_GroupResources(in, out, s)
+}
+
 func autoConvert_v1alpha1_Policy_To_auditregistration_Policy(in *v1alpha1.Policy, out *auditregistration.Policy, s conversion.Scope) error {
 	out.Level = auditregistration.Level(in.Level)
 	out.Stages = *(*[]auditregistration.Stage)(unsafe.Pointer(&in.Stages))
+	out.Rules = *(*[]auditregistration.PolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
@@ -232,12 +385,67 @@ func Convert_v1alpha1_Policy_To_auditregistration_Policy(in *v1alpha1.Policy, ou
 func autoConvert_auditregistration_Policy_To_v1alpha1_Policy(in *auditregistration.Policy, out *v1alpha1.Policy, s conversion.Scope) error {
 	out.Level = v1alpha1.Level(in.Level)
 	out.Stages = *(*[]v1alpha1.Stage)(unsafe.Pointer(&in.Stages))
+	out.Rules = *(*[]v1alpha1.PolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_auditregistration_Policy_To_v1alpha1_Policy is an autogenerated conversion function.
 func Convert_auditregistration_Policy_To_v1alpha1_Policy(in *auditregistration.Policy, out *v1alpha1.Policy, s conversion.Scope) error {
 	return autoConvert_auditregistration_Policy_To_v1alpha1_Policy(in, out, s)
+}
+
+func autoConvert_v1alpha1_PolicyRule_To_auditregistration_PolicyRule(in *v1alpha1.PolicyRule, out *auditregistration.PolicyRule, s conversion.Scope) error {
+	out.WithAuditClass = in.WithAuditClass
+	out.Level = auditregistration.Level(in.Level)
+	out.Stages = *(*[]auditregistration.Stage)(unsafe.Pointer(&in.Stages))
+	return nil
+}
+
+// Convert_v1alpha1_PolicyRule_To_auditregistration_PolicyRule is an autogenerated conversion function.
+func Convert_v1alpha1_PolicyRule_To_auditregistration_PolicyRule(in *v1alpha1.PolicyRule, out *auditregistration.PolicyRule, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PolicyRule_To_auditregistration_PolicyRule(in, out, s)
+}
+
+func autoConvert_auditregistration_PolicyRule_To_v1alpha1_PolicyRule(in *auditregistration.PolicyRule, out *v1alpha1.PolicyRule, s conversion.Scope) error {
+	out.WithAuditClass = in.WithAuditClass
+	out.Level = v1alpha1.Level(in.Level)
+	out.Stages = *(*[]v1alpha1.Stage)(unsafe.Pointer(&in.Stages))
+	return nil
+}
+
+// Convert_auditregistration_PolicyRule_To_v1alpha1_PolicyRule is an autogenerated conversion function.
+func Convert_auditregistration_PolicyRule_To_v1alpha1_PolicyRule(in *auditregistration.PolicyRule, out *v1alpha1.PolicyRule, s conversion.Scope) error {
+	return autoConvert_auditregistration_PolicyRule_To_v1alpha1_PolicyRule(in, out, s)
+}
+
+func autoConvert_v1alpha1_RequestSelector_To_auditregistration_RequestSelector(in *v1alpha1.RequestSelector, out *auditregistration.RequestSelector, s conversion.Scope) error {
+	out.Users = *(*[]string)(unsafe.Pointer(&in.Users))
+	out.UserGroups = *(*[]string)(unsafe.Pointer(&in.UserGroups))
+	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
+	out.Resources = *(*[]auditregistration.GroupResources)(unsafe.Pointer(&in.Resources))
+	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
+	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
+	return nil
+}
+
+// Convert_v1alpha1_RequestSelector_To_auditregistration_RequestSelector is an autogenerated conversion function.
+func Convert_v1alpha1_RequestSelector_To_auditregistration_RequestSelector(in *v1alpha1.RequestSelector, out *auditregistration.RequestSelector, s conversion.Scope) error {
+	return autoConvert_v1alpha1_RequestSelector_To_auditregistration_RequestSelector(in, out, s)
+}
+
+func autoConvert_auditregistration_RequestSelector_To_v1alpha1_RequestSelector(in *auditregistration.RequestSelector, out *v1alpha1.RequestSelector, s conversion.Scope) error {
+	out.Users = *(*[]string)(unsafe.Pointer(&in.Users))
+	out.UserGroups = *(*[]string)(unsafe.Pointer(&in.UserGroups))
+	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
+	out.Resources = *(*[]v1alpha1.GroupResources)(unsafe.Pointer(&in.Resources))
+	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
+	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
+	return nil
+}
+
+// Convert_auditregistration_RequestSelector_To_v1alpha1_RequestSelector is an autogenerated conversion function.
+func Convert_auditregistration_RequestSelector_To_v1alpha1_RequestSelector(in *auditregistration.RequestSelector, out *v1alpha1.RequestSelector, s conversion.Scope) error {
+	return autoConvert_auditregistration_RequestSelector_To_v1alpha1_RequestSelector(in, out, s)
 }
 
 func autoConvert_v1alpha1_ServiceReference_To_auditregistration_ServiceReference(in *v1alpha1.ServiceReference, out *auditregistration.ServiceReference, s conversion.Scope) error {
