@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"os"
 	"os/signal"
 )
@@ -42,6 +43,23 @@ func SetupSignalHandler() <-chan struct{} {
 	}()
 
 	return stop
+}
+
+// WithSignals is a context.Context wrapper that add SIGTERM and SIGINT handler into parent context
+// passed to this wrapper. When SIGTERM or SIGINT is observed, the context is cancelled.
+func WithSignals(ctx context.Context) (context.Context, context.CancelFunc) {
+	shutdownCtx, cancel := context.WithCancel(ctx)
+	shutDownChan := SetupSignalHandler()
+	go func() {
+		defer func() {
+			if shutdownCtx.Err() != context.Canceled {
+				cancel()
+			}
+		}()
+		// Wait for the SIGTERM or SIGINT, then cancel the context
+		<-shutDownChan
+	}()
+	return shutdownCtx, cancel
 }
 
 // RequestShutdown emulates a received event that is considered as shutdown signal (SIGTERM/SIGINT)
