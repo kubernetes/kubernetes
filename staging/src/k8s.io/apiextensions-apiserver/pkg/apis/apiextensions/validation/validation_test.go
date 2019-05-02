@@ -103,6 +103,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -147,6 +148,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -191,6 +193,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -231,6 +234,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							URL: strPtr(""),
 						},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -272,6 +276,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							URL: strPtr("https://example.com/webhook"),
 						},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -310,6 +315,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Strategy:                 apiextensions.ConversionStrategyType("None"),
 						ConversionReviewVersions: []string{"v1beta1"},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -351,6 +357,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						},
 						ConversionReviewVersions: []string{"invalid-version"},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -392,6 +399,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						},
 						ConversionReviewVersions: []string{"0v"},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -434,6 +442,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						},
 						ConversionReviewVersions: []string{"invalid-version", "v1beta1"},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -473,6 +482,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						},
 						ConversionReviewVersions: []string{"v1beta1", "v1beta1"},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -510,6 +520,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -547,6 +558,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("non_existing_conversion"),
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -584,6 +596,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -621,6 +634,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -659,6 +673,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -691,6 +706,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{},
@@ -709,6 +725,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural: "plural",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 			},
 			errors: []validationMatch{
@@ -752,6 +769,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "value()*a",
 						ListKind: "value()*a",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -798,6 +816,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "matching",
 						ListKind: "matching",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -843,6 +862,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{Allows: false},
 						},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -880,6 +900,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -923,6 +944,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -962,6 +984,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -971,36 +994,206 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				invalid("spec", "validation", "openAPIV3Schema", "x-kubernetes-preserve-unknown-fields"),
 			},
 		},
+		{
+			name: "preserveUnknownFields with unstructural global schema",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: validUnstructuralValidationSchema,
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "validation", "openAPIV3Schema", "properties[spec]", "type"),
+				required("spec", "validation", "openAPIV3Schema", "properties[status]", "type"),
+				required("spec", "validation", "openAPIV3Schema", "items", "type"),
+			},
+		},
+		{
+			name: "preserveUnknownFields with unstructural schema in one version",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: validValidationSchema,
+							},
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: validUnstructuralValidationSchema,
+							},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "versions[1]", "schema", "openAPIV3Schema", "properties[spec]", "type"),
+				required("spec", "versions[1]", "schema", "openAPIV3Schema", "properties[status]", "type"),
+				required("spec", "versions[1]", "schema", "openAPIV3Schema", "items", "type"),
+			},
+		},
+		{
+			name: "preserveUnknownFields with no schema in one version",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: validValidationSchema,
+							},
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: nil,
+							},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "versions[1]", "schema", "openAPIV3Schema"),
+			},
+		},
+		{
+			name: "preserveUnknownFields with no schema at all",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+							Schema:  nil,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: nil,
+							},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "versions[0]", "schema", "openAPIV3Schema"),
+				required("spec", "versions[1]", "schema", "openAPIV3Schema"),
+			},
+		},
 	}
 
 	for _, tc := range tests {
-		// duplicate defaulting behaviour
-		if tc.resource.Spec.Conversion != nil && tc.resource.Spec.Conversion.Strategy == apiextensions.WebhookConverter && len(tc.resource.Spec.Conversion.ConversionReviewVersions) == 0 {
-			tc.resource.Spec.Conversion.ConversionReviewVersions = []string{"v1beta1"}
-		}
-		errs := ValidateCustomResourceDefinition(tc.resource)
-		seenErrs := make([]bool, len(errs))
+		t.Run(tc.name, func(t *testing.T) {
+			// duplicate defaulting behaviour
+			if tc.resource.Spec.Conversion != nil && tc.resource.Spec.Conversion.Strategy == apiextensions.WebhookConverter && len(tc.resource.Spec.Conversion.ConversionReviewVersions) == 0 {
+				tc.resource.Spec.Conversion.ConversionReviewVersions = []string{"v1beta1"}
+			}
+			errs := ValidateCustomResourceDefinition(tc.resource)
+			seenErrs := make([]bool, len(errs))
 
-		for _, expectedError := range tc.errors {
-			found := false
-			for i, err := range errs {
-				if expectedError.matches(err) && !seenErrs[i] {
-					found = true
-					seenErrs[i] = true
-					break
+			for _, expectedError := range tc.errors {
+				found := false
+				for i, err := range errs {
+					if expectedError.matches(err) && !seenErrs[i] {
+						found = true
+						seenErrs[i] = true
+						break
+					}
+				}
+
+				if !found {
+					t.Errorf("expected %v at %v, got %v", expectedError.errorType, expectedError.path.String(), errs)
 				}
 			}
 
-			if !found {
-				t.Errorf("%s: expected %v at %v, got %v", tc.name, expectedError.errorType, expectedError.path.String(), errs)
+			for i, seen := range seenErrs {
+				if !seen {
+					t.Errorf("unexpected error: %v", errs[i])
+				}
 			}
-		}
-
-		for i, seen := range seenErrs {
-			if !seen {
-				t.Errorf("%s: unexpected error: %v", tc.name, errs[i])
-			}
-		}
+		})
 	}
 }
 
@@ -1043,6 +1236,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						},
 						ConversionReviewVersions: []string{"invalid-version"},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1078,6 +1272,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						},
 						ConversionReviewVersions: []string{"invalid-version_0, invalid-version"},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1117,6 +1312,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						},
 						ConversionReviewVersions: []string{"invalid-version"},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1152,6 +1348,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						},
 						ConversionReviewVersions: []string{"v1beta1", "invalid-version"},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1193,6 +1390,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						},
 						ConversionReviewVersions: []string{"invalid-version"},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1227,6 +1425,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							URL: strPtr("https://example.com/webhook"),
 						},
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1260,6 +1459,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -1292,6 +1492,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -1329,6 +1530,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -1364,6 +1566,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -1406,6 +1609,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -1442,6 +1646,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -1481,6 +1686,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -1516,6 +1722,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind2",
 						ListKind: "listkind2",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -1556,6 +1763,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -1591,6 +1799,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind2",
 						ListKind: "listkind2",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -1639,6 +1848,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1680,6 +1890,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1689,6 +1900,208 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				forbidden("spec", "validation"),
 				forbidden("spec", "subresources"),
 			},
+		},
+		{
+			name: "switch off preserveUnknownFields with structural schema before and after",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: validValidationSchema,
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: validUnstructuralValidationSchema,
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "validation", "openAPIV3Schema", "properties[spec]", "type"),
+				required("spec", "validation", "openAPIV3Schema", "properties[status]", "type"),
+				required("spec", "validation", "openAPIV3Schema", "items", "type"),
+			},
+		},
+		{
+			name: "switch off preserveUnknownFields without structural schema before, but with after",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: validUnstructuralValidationSchema,
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: validValidationSchema,
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{},
+		},
+		{
+			name: "switch on preserveUnknownFields without structural schema",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: validValidationSchema,
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: validUnstructuralValidationSchema,
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{},
 		},
 	}
 
@@ -1721,10 +2134,11 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 
 func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 	tests := []struct {
-		name          string
-		input         apiextensions.CustomResourceValidation
-		statusEnabled bool
-		wantError     bool
+		name             string
+		input            apiextensions.CustomResourceValidation
+		mustBeStructural bool
+		statusEnabled    bool
+		wantError        bool
 	}{
 		{
 			name:      "empty",
@@ -1844,10 +2258,28 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			wantError: false,
 		},
+		{
+			name: "must be structural, but isn't",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{},
+			},
+			mustBeStructural: true,
+			wantError:        true,
+		},
+		{
+			name: "must be structural",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+				},
+			},
+			mustBeStructural: true,
+			wantError:        false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ValidateCustomResourceDefinitionValidation(&tt.input, tt.statusEnabled, field.NewPath("spec", "validation"))
+			got := ValidateCustomResourceDefinitionValidation(&tt.input, tt.mustBeStructural, tt.statusEnabled, field.NewPath("spec", "validation"))
 			if !tt.wantError && len(got) > 0 {
 				t.Errorf("Expected no error, but got: %v", got)
 			} else if tt.wantError && len(got) == 0 {
@@ -1860,6 +2292,42 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 var example = apiextensions.JSON(`"This is an example"`)
 
 var validValidationSchema = &apiextensions.JSONSchemaProps{
+	Description:      "This is a description",
+	Type:             "object",
+	Format:           "date-time",
+	Title:            "This is a title",
+	Maximum:          float64Ptr(10),
+	ExclusiveMaximum: true,
+	Minimum:          float64Ptr(5),
+	ExclusiveMinimum: true,
+	MaxLength:        int64Ptr(10),
+	MinLength:        int64Ptr(5),
+	Pattern:          "^[a-z]$",
+	MaxItems:         int64Ptr(10),
+	MinItems:         int64Ptr(5),
+	MultipleOf:       float64Ptr(3),
+	Required:         []string{"spec", "status"},
+	Properties: map[string]apiextensions.JSONSchemaProps{
+		"spec": {
+			Type: "object",
+			Items: &apiextensions.JSONSchemaPropsOrArray{
+				Schema: &apiextensions.JSONSchemaProps{
+					Description: "This is a schema nested under Items",
+					Type:        "string",
+				},
+			},
+		},
+		"status": {
+			Type: "object",
+		},
+	},
+	ExternalDocs: &apiextensions.ExternalDocumentation{
+		Description: "This is an external documentation description",
+	},
+	Example: &example,
+}
+
+var validUnstructuralValidationSchema = &apiextensions.JSONSchemaProps{
 	Description:      "This is a description",
 	Type:             "object",
 	Format:           "date-time",
