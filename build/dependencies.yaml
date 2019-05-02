@@ -117,6 +117,20 @@ dependencies:
     - path: build/workspace.bzl
       match: tag =
 
+  - name: "k8s.gcr.io/go-runner"
+    version: 0.1.1
+    refPaths:
+    - path: build/go-runner/Makefile
+      match: TAG \?=
+
+  - name: "k8s.gcr.io/go-runner: dependents"
+    version: 0.1.1
+    refPaths:
+    - path: build/common.sh
+      match: go_runner_version=
+    - path: build/workspace.bzl
+      match: tag =
+
   - name: "k8s.gcr.io/pause"
     version: 3.3
     refPaths:

@@ -71,14 +71,14 @@ func TestServerOverride(t *testing.T) {
 
 			c.mustInvokeFunc(
 				tc.env,
-				kubeAPIServerConfigScriptName,
+				[]string{"configure-helper.sh", kubeAPIServerConfigScriptName},
 				"etcd.template",
 				"testdata/kube-apiserver/base.template",
 				"testdata/kube-apiserver/etcd.template",
 			)
 			c.mustLoadPodFromManifest()
 
-			execArgs := c.pod.Spec.Containers[0].Command[2]
+			execArgs := strings.Join(c.pod.Spec.Containers[0].Command, " ")
 			for _, f := range tc.want {
 				if !strings.Contains(execArgs, f) {
 					t.Fatalf("Got %q, want it to contain %q", execArgs, f)
@@ -127,14 +127,14 @@ func TestStorageOptions(t *testing.T) {
 
 			c.mustInvokeFunc(
 				tc.env,
-				kubeAPIServerConfigScriptName,
+				[]string{"configure-helper.sh", kubeAPIServerConfigScriptName},
 				"etcd.template",
 				"testdata/kube-apiserver/base.template",
 				"testdata/kube-apiserver/etcd.template",
 			)
 			c.mustLoadPodFromManifest()
 
-			execArgs := c.pod.Spec.Containers[0].Command[2]
+			execArgs := strings.Join(c.pod.Spec.Containers[0].Command, " ")
 			for _, f := range tc.want {
 				if !strings.Contains(execArgs, f) {
 					t.Fatalf("Got %q, want it to contain %q", execArgs, f)
@@ -191,14 +191,14 @@ func TestTLSFlags(t *testing.T) {
 
 			c.mustInvokeFunc(
 				tc.env,
-				kubeAPIServerConfigScriptName,
+				[]string{"configure-helper.sh", kubeAPIServerConfigScriptName},
 				"etcd.template",
 				"testdata/kube-apiserver/base.template",
 				"testdata/kube-apiserver/etcd.template",
 			)
 			c.mustLoadPodFromManifest()
 
-			execArgs := c.pod.Spec.Containers[0].Command[2]
+			execArgs := strings.Join(c.pod.Spec.Containers[0].Command, " ")
 			for _, f := range tc.want {
 				if !strings.Contains(execArgs, f) {
 					t.Fatalf("Got %q, want it to contain %q", execArgs, f)
