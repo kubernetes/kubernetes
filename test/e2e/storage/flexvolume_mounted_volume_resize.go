@@ -29,6 +29,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -143,7 +144,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 		Expect(len(pvs)).To(Equal(1))
 
 		By("Creating a deployment with the provisioned volume")
-		deployment, err := framework.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
+		deployment, err := e2edeploy.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
 		framework.ExpectNoError(err, "Failed creating deployment %v", err)
 		defer c.AppsV1().Deployments(ns).Delete(deployment.Name, &metav1.DeleteOptions{})
 
@@ -163,7 +164,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 		By("Getting a pod from deployment")
-		podList, err := framework.GetPodsForDeployment(c, deployment)
+		podList, err := e2edeploy.GetPodsForDeployment(c, deployment)
 		Expect(podList.Items).NotTo(BeEmpty())
 		pod := podList.Items[0]
 

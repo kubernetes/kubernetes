@@ -80,6 +80,7 @@ go_library(
         "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1:go_default_library",
         "//test/e2e/apps:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/deployment:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/crd:go_default_library",
