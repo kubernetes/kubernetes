@@ -35,7 +35,7 @@ DOCKERIZED_BINARIES = {
         "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
     },
     "kube-apiserver": {
-        "base": "@debian-base-{ARCH}//image",
+        "base": "@distroless-static//image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
@@ -43,7 +43,7 @@ DOCKERIZED_BINARIES = {
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": "@debian-base-{ARCH}//image",
+        "base": "@distroless-static//image",
         "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {

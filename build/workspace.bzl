@@ -47,7 +47,7 @@ _ETCD_TARBALL_ARCH_SHA256 = {
 def release_dependencies():
     cni_tarballs()
     cri_tarballs()
-    debian_image_dependencies()
+    image_dependencies()
     etcd_tarballs()
 
 def cni_tarballs():
@@ -102,8 +102,14 @@ def _digest(d, arch):
         return d["manifest"]
     return d[arch]
 
-def debian_image_dependencies():
+def image_dependencies():
     for arch in SERVER_PLATFORMS["linux"]:
+        container_pull(
+            name = "distroless-static",
+            registry = "gcr.io",
+            repository = "distroless/static",
+        )
+
         container_pull(
             name = "debian-base-" + arch,
             architecture = arch,

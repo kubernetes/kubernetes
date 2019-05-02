@@ -95,9 +95,9 @@ kube::build::get_docker_wrapped_binaries() {
   ### in build/BUILD. And kube::golang::server_image_targets
   local targets=(
     cloud-controller-manager,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
-    kube-apiserver,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
+    kube-apiserver,"gcr.io/distroless/static:latest"
     kube-controller-manager,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
-    kube-scheduler,"k8s.gcr.io/debian-base-${arch}:${debian_base_version}"
+    kube-scheduler,"gcr.io/distroless/static:latest"
     kube-proxy,"k8s.gcr.io/debian-iptables-${arch}:${debian_iptables_version}"
   )
 
