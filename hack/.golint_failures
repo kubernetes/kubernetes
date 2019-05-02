@@ -65,7 +65,6 @@ pkg/cloudprovider/providers/vsphere
 pkg/controller
 pkg/controller/apis/config/v1alpha1
 pkg/controller/certificates
-pkg/controller/certificates/approver
 pkg/controller/certificates/signer
 pkg/controller/certificates/signer/config/v1alpha1
 pkg/controller/cloud
