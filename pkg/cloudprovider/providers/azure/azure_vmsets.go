@@ -17,6 +17,8 @@ limitations under the License.
 package azure
 
 import (
+	"net/http"
+
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 
