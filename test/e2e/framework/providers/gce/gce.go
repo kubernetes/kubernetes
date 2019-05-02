@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/test/e2e/framework"
+	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
 
 func init() {

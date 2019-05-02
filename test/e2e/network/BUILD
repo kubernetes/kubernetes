@@ -32,7 +32,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/network",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/controller/endpoint:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -57,6 +56,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/gce:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/endpoints:go_default_library",

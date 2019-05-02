@@ -24,13 +24,13 @@ import (
 	"time"
 
 	compute "google.golang.org/api/compute/v1"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/test/e2e/framework"
+	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
 
 // MakeFirewallNameForLBService return the expected firewall name for a LB service.
