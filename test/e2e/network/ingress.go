@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	"k8s.io/kubernetes/test/e2e/framework/ingress"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 
 	. "github.com/onsi/ginkgo"
@@ -174,7 +175,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				framework.ExpectNoError(err)
 				annotations := ing.Annotations
 				if annotations == nil || annotations[instanceGroupAnnotation] == "" {
-					framework.Logf("Waiting for ingress to get %s annotation. Found annotations: %v", instanceGroupAnnotation, annotations)
+					e2elog.Logf("Waiting for ingress to get %s annotation. Found annotations: %v", instanceGroupAnnotation, annotations)
 					return false, nil
 				}
 				return true, nil
@@ -299,7 +300,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 			err = wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
 				if err := gceController.BackendServiceUsingIG(jig.GetServicePorts(false)); err != nil {
-					framework.Logf("Failed to verify IG backend service: %v", err)
+					e2elog.Logf("Failed to verify IG backend service: %v", err)
 					return false, nil
 				}
 				return true, nil
@@ -317,7 +318,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 			err = wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
 				if err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false)); err != nil {
-					framework.Logf("Failed to verify NEG backend service: %v", err)
+					e2elog.Logf("Failed to verify NEG backend service: %v", err)
 					return false, nil
 				}
 				return true, nil
@@ -354,7 +355,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					if err != nil {
 						return false, nil
 					}
-					framework.Logf("Expecting %d backends, got %d", num, res.Len())
+					e2elog.Logf("Expecting %d backends, got %d", num, res.Len())
 					return res.Len() == num, nil
 				})
 				Expect(err).NotTo(HaveOccurred())
@@ -423,11 +424,11 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					if res.Len() == replicas {
 						return true, nil
 					}
-					framework.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
+					e2elog.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
 					return false, nil
 
 				} else {
-					framework.Logf("Waiting for rolling update to finished. Keep sending traffic.")
+					e2elog.Logf("Waiting for rolling update to finished. Keep sending traffic.")
 					return false, nil
 				}
 			})
@@ -454,30 +455,30 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					v, ok := svc.Annotations[ingress.NEGStatusAnnotation]
 					if !ok {
 						// Wait for NEG sync loop to find NEGs
-						framework.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
+						e2elog.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
 						return false, nil
 					}
 					err = json.Unmarshal([]byte(v), &status)
 					if err != nil {
-						framework.Logf("Error in parsing Expose NEG annotation: %v", err)
+						e2elog.Logf("Error in parsing Expose NEG annotation: %v", err)
 						return false, nil
 					}
-					framework.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
+					e2elog.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
 
 					// Expect 2 NEGs to be created based on the test setup (neg-exposed)
 					if len(status.NetworkEndpointGroups) != 2 {
-						framework.Logf("Expected 2 NEGs, got %d", len(status.NetworkEndpointGroups))
+						e2elog.Logf("Expected 2 NEGs, got %d", len(status.NetworkEndpointGroups))
 						return false, nil
 					}
 
 					for _, port := range expectedKeys {
 						if _, ok := status.NetworkEndpointGroups[port]; !ok {
-							framework.Logf("Expected ServicePort key %v, but does not exist", port)
+							e2elog.Logf("Expected ServicePort key %v, but does not exist", port)
 						}
 					}
 
 					if len(status.NetworkEndpointGroups) != len(expectedKeys) {
-						framework.Logf("Expected length of %+v to equal length of %+v, but does not", status.NetworkEndpointGroups, expectedKeys)
+						e2elog.Logf("Expected length of %+v to equal length of %+v, but does not", status.NetworkEndpointGroups, expectedKeys)
 					}
 
 					gceCloud, err := gce.GetGCECloud()
@@ -486,7 +487,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 						networkEndpoints, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
 						Expect(err).NotTo(HaveOccurred())
 						if len(networkEndpoints) != num {
-							framework.Logf("Expect number of endpoints to be %d, but got %d", num, len(networkEndpoints))
+							e2elog.Logf("Expect number of endpoints to be %d, but got %d", num, len(networkEndpoints))
 							return false, nil
 						}
 					}
@@ -716,7 +717,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			if framework.ProviderIs("gce", "gke") {
 				framework.ExpectNoError(gce.GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
 			} else {
-				framework.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
+				e2elog.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
 			}
 
 			nginxController.Init()
@@ -781,7 +782,7 @@ func executePresharedCertTest(f *framework.Framework, jig *ingress.TestJig, stat
 		By(fmt.Sprintf("Deleting ssl certificate %q on GCE", preSharedCertName))
 		err := wait.Poll(framework.LoadBalancerPollInterval, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
 			if err := gceCloud.DeleteSslCertificate(preSharedCertName); err != nil && !errors.IsNotFound(err) {
-				framework.Logf("Failed to delete ssl certificate %q: %v. Retrying...", preSharedCertName, err)
+				e2elog.Logf("Failed to delete ssl certificate %q: %v. Retrying...", preSharedCertName, err)
 				return false, nil
 			}
 			return true, nil
@@ -848,13 +849,13 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJ
 	err = wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
 		resp, err := framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
 		if err != nil {
-			framework.Logf("SimpleGET failed: %v", err)
+			e2elog.Logf("SimpleGET failed: %v", err)
 			return false, nil
 		}
 		if !strings.Contains(resp, "request_scheme=https") {
 			return false, fmt.Errorf("request wasn't served by HTTPS, response body: %s", resp)
 		}
-		framework.Logf("Poll succeeded, request was served by HTTPS")
+		e2elog.Logf("Poll succeeded, request was served by HTTPS")
 		return true, nil
 	})
 	Expect(err).NotTo(HaveOccurred(), "Failed to verify backside re-encryption ingress")
@@ -871,7 +872,7 @@ func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceContro
 		if negs == 0 {
 			err := gceController.BackendServiceUsingIG(jig.GetServicePorts(false))
 			if err != nil {
-				framework.Logf("Failed to validate IG backend service: %v", err)
+				e2elog.Logf("Failed to validate IG backend service: %v", err)
 				return false, nil
 			}
 			return true, nil
@@ -880,19 +881,19 @@ func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceContro
 		var status ingress.NegStatus
 		v, ok := svc.Annotations[ingress.NEGStatusAnnotation]
 		if !ok {
-			framework.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
+			e2elog.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
 			return false, nil
 		}
 
 		err = json.Unmarshal([]byte(v), &status)
 		if err != nil {
-			framework.Logf("Error in parsing Expose NEG annotation: %v", err)
+			e2elog.Logf("Error in parsing Expose NEG annotation: %v", err)
 			return false, nil
 		}
-		framework.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
+		e2elog.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
 
 		if len(status.NetworkEndpointGroups) != negs {
-			framework.Logf("Expected %d NEGs, got %d", negs, len(status.NetworkEndpointGroups))
+			e2elog.Logf("Expected %d NEGs, got %d", negs, len(status.NetworkEndpointGroups))
 			return false, nil
 		}
 
@@ -902,14 +903,14 @@ func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceContro
 			networkEndpoints, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
 			Expect(err).NotTo(HaveOccurred())
 			if len(networkEndpoints) != 1 {
-				framework.Logf("Expect NEG %s to exist, but got %d", neg, len(networkEndpoints))
+				e2elog.Logf("Expect NEG %s to exist, but got %d", neg, len(networkEndpoints))
 				return false, nil
 			}
 		}
 
 		err = gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
 		if err != nil {
-			framework.Logf("Failed to validate NEG backend service: %v", err)
+			e2elog.Logf("Failed to validate NEG backend service: %v", err)
 			return false, nil
 		}
 		return true, nil
