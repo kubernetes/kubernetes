@@ -158,15 +158,19 @@ type VolumeAttachmentSpec struct {
 }
 
 // VolumeAttachmentSource represents a volume that should be attached.
-// Right now only PersistenVolumes can be attached via external attacher,
-// in future we may allow also inline volumes in pods.
+// InlineVolumes as well as PersistenVolumes can be attached via external attacher.
 // Exactly one member can be set.
 type VolumeAttachmentSource struct {
 	// Name of the persistent volume to attach.
 	// +optional
 	PersistentVolumeName *string `json:"persistentVolumeName,omitempty" protobuf:"bytes,1,opt,name=persistentVolumeName"`
 
-	// Placeholder for *VolumeSource to accommodate inline volumes in pods.
+	// A PersistentVolumeSpec whose fields contain translated data from a pod's inline
+	// VolumeSource to support shimming of in-tree inline volumes to a CSI backend.
+	// This field is alpha-level and is only honored by servers that
+	// enable the CSIMigration feature.
+	// +optional
+	InlineVolumeSpec *v1.PersistentVolumeSpec `json:"inlineVolumeSpec,omitempty" protobuf:"bytes,2,opt,name=inlineVolumeSpec"`
 }
 
 // VolumeAttachmentStatus is the status of a VolumeAttachment request.

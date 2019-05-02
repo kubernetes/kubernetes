@@ -121,13 +121,19 @@ message VolumeAttachmentList {
 }
 
 // VolumeAttachmentSource represents a volume that should be attached.
-// Right now only PersistenVolumes can be attached via external attacher,
-// in future we may allow also inline volumes in pods.
+// InlineVolumes as well as PersistenVolumes can be attached via external attacher.
 // Exactly one member can be set.
 message VolumeAttachmentSource {
   // Name of the persistent volume to attach.
   // +optional
   optional string persistentVolumeName = 1;
+
+  // A PersistentVolumeSpec whose fields contain translated data from a pod's inline
+  // VolumeSource to support shimming of in-tree inline volumes to a CSI backend.
+  // This field is alpha-level and is only honored by servers that
+  // enable the CSIMigration feature.
+  // +optional
+  optional k8s.io.api.core.v1.PersistentVolumeSpec inlineVolumeSpec = 2;
 }
 
 // VolumeAttachmentSpec is the specification of a VolumeAttachment request.
