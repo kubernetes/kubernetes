@@ -830,3 +830,59 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		t.Fatalf("expected:\n%v\nbut got:\n%v", expected, actual)
 	}
 }
+
+func TestUnion(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Post().
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Body(obj).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	patch := []byte(`{"spec": {"strategy": {"type": "Recreate"}}}`)
+	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Body(patch).Do().Get()
+	if err != nil {
+		t.Fatalf(`Failed to change strategy to "Recreate": %v`, err)
+	}
+}
