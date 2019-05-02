@@ -4982,6 +4982,7 @@ func Convert_core_PersistentVolumeList_To_v1_PersistentVolumeList(in *core.Persi
 }
 
 func autoConvert_v1_PersistentVolumeSource_To_core_PersistentVolumeSource(in *v1.PersistentVolumeSource, out *core.PersistentVolumeSource, s conversion.Scope) error {
+	out.VolumeSourceType = (*string)(unsafe.Pointer(in.VolumeSourceType))
 	out.GCEPersistentDisk = (*core.GCEPersistentDiskVolumeSource)(unsafe.Pointer(in.GCEPersistentDisk))
 	out.AWSElasticBlockStore = (*core.AWSElasticBlockStoreVolumeSource)(unsafe.Pointer(in.AWSElasticBlockStore))
 	out.HostPath = (*core.HostPathVolumeSource)(unsafe.Pointer(in.HostPath))
@@ -5013,6 +5014,7 @@ func Convert_v1_PersistentVolumeSource_To_core_PersistentVolumeSource(in *v1.Per
 }
 
 func autoConvert_core_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *core.PersistentVolumeSource, out *v1.PersistentVolumeSource, s conversion.Scope) error {
+	out.VolumeSourceType = (*string)(unsafe.Pointer(in.VolumeSourceType))
 	out.GCEPersistentDisk = (*v1.GCEPersistentDiskVolumeSource)(unsafe.Pointer(in.GCEPersistentDisk))
 	out.AWSElasticBlockStore = (*v1.AWSElasticBlockStoreVolumeSource)(unsafe.Pointer(in.AWSElasticBlockStore))
 	out.HostPath = (*v1.HostPathVolumeSource)(unsafe.Pointer(in.HostPath))
@@ -7455,6 +7457,7 @@ func Convert_core_VolumeProjection_To_v1_VolumeProjection(in *core.VolumeProject
 }
 
 func autoConvert_v1_VolumeSource_To_core_VolumeSource(in *v1.VolumeSource, out *core.VolumeSource, s conversion.Scope) error {
+	out.VolumeSourceType = (*string)(unsafe.Pointer(in.VolumeSourceType))
 	out.HostPath = (*core.HostPathVolumeSource)(unsafe.Pointer(in.HostPath))
 	out.EmptyDir = (*core.EmptyDirVolumeSource)(unsafe.Pointer(in.EmptyDir))
 	out.GCEPersistentDisk = (*core.GCEPersistentDiskVolumeSource)(unsafe.Pointer(in.GCEPersistentDisk))
@@ -7500,6 +7503,7 @@ func Convert_v1_VolumeSource_To_core_VolumeSource(in *v1.VolumeSource, out *core
 }
 
 func autoConvert_core_VolumeSource_To_v1_VolumeSource(in *core.VolumeSource, out *v1.VolumeSource, s conversion.Scope) error {
+	out.VolumeSourceType = (*string)(unsafe.Pointer(in.VolumeSourceType))
 	out.HostPath = (*v1.HostPathVolumeSource)(unsafe.Pointer(in.HostPath))
 	out.EmptyDir = (*v1.EmptyDirVolumeSource)(unsafe.Pointer(in.EmptyDir))
 	out.GCEPersistentDisk = (*v1.GCEPersistentDiskVolumeSource)(unsafe.Pointer(in.GCEPersistentDisk))
