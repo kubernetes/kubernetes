@@ -1324,6 +1324,7 @@ func (kl *Kubelet) initializeModules() error {
 
 	// Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
+		kl.imageManager.Stop()
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
 	}
 
