@@ -57,7 +57,19 @@ func NewGCEPersistentDiskCSITranslator() InTreePlugin {
 
 // TranslateInTreeStorageClassParametersToCSI translates InTree GCE storage class parameters to CSI storage class
 func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
-	return scParameters, nil
+	np := map[string]string{}
+	// Strip out the deprecated "zone" and "zones" parameters since the CSI
+	// Driver does not accept these, the provisioner will translate this
+	// information into topologies for the CSI Driver in a seperate function
+
+	// TODO(#77235) Translate deprecated zone and zones labels to supported
+	// topologies in the external provisioner
+	for k, v := range scParameters {
+		if k != "zone" && k != "zones" {
+			np[k] = v
+		}
+	}
+	return np, nil
 }
 
 // TranslateInTreePVToCSI takes a PV with GCEPersistentDisk set from in-tree
@@ -106,7 +118,27 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 	pv.Spec.PersistentVolumeSource.GCEPersistentDisk = nil
 	pv.Spec.PersistentVolumeSource.CSI = csiSource
 
+	pv.Spec.AccessModes = backwardCompatibleAccessModes(pv.Spec.AccessModes)
+
 	return pv, nil
+}
+
+// backwardCompatibleAccessModes translates all instances of ReadWriteMany
+// access mode from the in-tree plugin to ReadWriteOnce. This is because in-tree
+// plugin never supported ReadWriteMany but also did not validate or enforce
+// this access mode for pre-provisioned volumes. The GCE PD CSI Driver validates
+// and enforces (fails) ReadWriteMany. Therefore we treat all in-tree
+// ReadWriteMany as ReadWriteOnce volumes to not break legacy volumes.
+func backwardCompatibleAccessModes(ams []v1.PersistentVolumeAccessMode) []v1.PersistentVolumeAccessMode {
+	newAM := []v1.PersistentVolumeAccessMode{}
+	for _, am := range ams {
+		if am == v1.ReadWriteMany {
+			newAM = append(newAM, v1.ReadWriteOnce)
+		} else {
+			newAM = append(newAM, am)
+		}
+	}
+	return newAM
 }
 
 // TranslateCSIPVToInTree takes a PV with CSIPersistentVolumeSource set and
