@@ -37,6 +37,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/github.com/lithammer/dedent:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
