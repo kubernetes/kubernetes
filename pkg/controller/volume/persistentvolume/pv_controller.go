@@ -426,13 +426,14 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			if err = ctrl.bind(volume, claim); err != nil {
 				// On any error saving the volume or the claim, subsequent
 				// syncClaim will finish the binding.
-				// report count error for provisioning
-				ctrl.recordCSIMetric("provision", claim, err)
+				// record count error for provisioning
+				ctrl.recordCSIMetric("provision", claimToClaimKey(claim), err)
 				return err
 			}
 			// OBSERVATION: claim is "Bound", pv is "Bound"
-			// report end to end provisioning latency
-			ctrl.recordCSIMetric("provision", claim, nil)
+			// record end to end provisioning latency
+			// [Unit test 12-4]
+			ctrl.recordCSIMetric("provision", claimToClaimKey(claim), nil)
 			return nil
 		}
 	} else /* pvc.Spec.VolumeName != nil */ {
@@ -474,28 +475,30 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				} else if err = ctrl.bind(volume, claim); err != nil {
 					// On any error saving the volume or the claim, subsequent
 					// syncClaim will finish the binding.
-					// report count error for provisioning
-					ctrl.recordCSIMetric("provision", claim, err)
+					// record count error for provisioning
+					ctrl.recordCSIMetric("provision", claimToClaimKey(claim), err)
 					return err
 				}
 				// OBSERVATION: pvc is "Bound", pv is "Bound"
-				// report end to end provisioning latency
-				ctrl.recordCSIMetric("provision", claim, nil)
+				// record end to end provisioning latency
+				// [Unit test 11-22]
+				ctrl.recordCSIMetric("provision", claimToClaimKey(claim), nil)
 				return nil
-			} else if pvutil.IsVolumeBoundToClaim(volume, claim) {
+			} else if IsVolumeBoundToClaim(volume, claim) {
 				// User asked for a PV that is claimed by this PVC
 				// OBSERVATION: pvc is "Pending", pv is "Bound"
 				klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound, finishing the binding", claimToClaimKey(claim))
 
 				// Finish the volume binding by adding claim UID.
 				if err = ctrl.bind(volume, claim); err != nil {
-					// report count error for provisioning
-					ctrl.recordCSIMetric("provision", claim, err)
+					// record count error for provisioning
+					ctrl.recordCSIMetric("provision", claimToClaimKey(claim), err)
 					return err
 				}
 				// OBSERVATION: pvc is "Bound", pv is "Bound"
-				// report end to end provisioning latency
-				ctrl.recordCSIMetric("provision", claim, nil)
+				// record end to end provisioning latency
+				// [Unit test 12-4]
+				ctrl.recordCSIMetric("provision", claimToClaimKey(claim), nil)
 				return nil
 			} else {
 				// User asked for a PV that is claimed by someone else
@@ -1423,11 +1426,11 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
 	if err != nil {
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, err.Error())
-		klog.V(2).Infof("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
+		klog.Errorf("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
 		// failed to find the requested provisioning plugin, directly return err for now.
 		// controller will retry the provisioning in every syncUnboundClaim() call
 		// retain the original behavior of returning nil from provisionClaim call
-		return err
+		return nil
 	}
 	// for CIS provisioning, latency metric will be reported after final binding happened
 	if plugin == nil || plugin.IsMigratedToCSI() {
