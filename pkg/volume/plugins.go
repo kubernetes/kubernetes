@@ -641,9 +641,9 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 // support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
 
 	if spec == nil {
-		pm.mutex.Unlock()
 		return nil, fmt.Errorf("Could not find plugin because volume spec is nil")
 	}
 
@@ -660,7 +660,6 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 			matches = append(matches, plugin)
 		}
 	}
-	pm.mutex.Unlock()
 
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("no volume plugin matched")
@@ -680,9 +679,9 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 // support or more than one plugin can support it, return error.
 func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
 	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
 
 	if spec == nil {
-		pm.mutex.Unlock()
 		return false, fmt.Errorf("could not find if plugin is migratable because volume spec is nil")
 	}
 
@@ -692,7 +691,6 @@ func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
 			matches = append(matches, v)
 		}
 	}
-	pm.mutex.Unlock()
 
 	if len(matches) == 0 {
 		// Not a known plugin (flex) in which case it is not migratable
@@ -713,6 +711,7 @@ func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
 // is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
 
 	// Once we can get rid of legacy names we can reduce this to a map lookup.
 	matches := []VolumePlugin{}
@@ -728,7 +727,6 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 			matches = append(matches, plugin)
 		}
 	}
-	pm.mutex.Unlock()
 
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("no volume plugin matched")
