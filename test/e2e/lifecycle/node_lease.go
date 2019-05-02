@@ -26,8 +26,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Disruptive]NodeLease", func() {
@@ -37,11 +37,11 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 	var ns string
 	var group string
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		systemPods, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
-		Expect(err).To(BeNil())
+		gomega.Expect(err).To(gomega.BeNil())
 		systemPodsNo = int32(len(systemPods))
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
@@ -50,22 +50,22 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 		}
 	})
 
-	Describe("NodeLease deletion", func() {
+	ginkgo.Describe("NodeLease deletion", func() {
 		var skipped bool
 
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			skipped = true
 			framework.SkipUnlessProviderIs("gce", "gke", "aws")
 			framework.SkipUnlessNodeCountIsAtLeast(2)
 			skipped = false
 		})
 
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			if skipped {
 				return
 			}
 
-			By("restoring the original node instance group size")
+			ginkgo.By("restoring the original node instance group size")
 			if err := framework.ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
@@ -78,7 +78,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			//
 			// TODO(cjcullen) reduce this sleep (#19314)
 			if framework.ProviderIs("gke") {
-				By("waiting 5 minutes for all dead tunnels to be dropped")
+				ginkgo.By("waiting 5 minutes for all dead tunnels to be dropped")
 				time.Sleep(5 * time.Minute)
 			}
 			if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
@@ -90,21 +90,21 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
-			By("waiting for system pods to successfully restart")
+			ginkgo.By("waiting for system pods to successfully restart")
 			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 		})
 
-		It("node lease should be deleted when corresponding node is deleted", func() {
+		ginkgo.It("node lease should be deleted when corresponding node is deleted", func() {
 			leaseClient := c.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease)
 			err := framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute)
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 
-			By("verify node lease exists for every nodes")
+			ginkgo.By("verify node lease exists for every nodes")
 			originalNodes := framework.GetReadySchedulableNodesOrDie(c)
-			Expect(len(originalNodes.Items)).To(Equal(framework.TestContext.CloudConfig.NumNodes))
+			gomega.Expect(len(originalNodes.Items)).To(gomega.Equal(framework.TestContext.CloudConfig.NumNodes))
 
-			Eventually(func() error {
+			gomega.Eventually(func() error {
 				pass := true
 				for _, node := range originalNodes.Items {
 					if _, err := leaseClient.Get(node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
@@ -116,20 +116,20 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 					return nil
 				}
 				return fmt.Errorf("some node lease is not ready")
-			}, 1*time.Minute, 5*time.Second).Should(BeNil())
+			}, 1*time.Minute, 5*time.Second).Should(gomega.BeNil())
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
-			By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
+			ginkgo.By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 			err = framework.WaitForGroupSize(group, targetNumNodes)
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 			err = framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
-			Expect(err).To(BeNil())
+			gomega.Expect(err).To(gomega.BeNil())
 			targetNodes := framework.GetReadySchedulableNodesOrDie(c)
-			Expect(len(targetNodes.Items)).To(Equal(int(targetNumNodes)))
+			gomega.Expect(len(targetNodes.Items)).To(gomega.Equal(int(targetNumNodes)))
 
-			By("verify node lease is deleted for the deleted node")
+			ginkgo.By("verify node lease is deleted for the deleted node")
 			var deletedNodeName string
 			for _, originalNode := range originalNodes.Items {
 				originalNodeName := originalNode.ObjectMeta.Name
@@ -141,23 +141,23 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				deletedNodeName = originalNodeName
 				break
 			}
-			Expect(deletedNodeName).NotTo(Equal(""))
-			Eventually(func() error {
+			gomega.Expect(deletedNodeName).NotTo(gomega.Equal(""))
+			gomega.Eventually(func() error {
 				if _, err := leaseClient.Get(deletedNodeName, metav1.GetOptions{}); err == nil {
 					return fmt.Errorf("node lease is not deleted yet for node %q", deletedNodeName)
 				}
 				return nil
-			}, 1*time.Minute, 5*time.Second).Should(BeNil())
+			}, 1*time.Minute, 5*time.Second).Should(gomega.BeNil())
 
-			By("verify node leases still exist for remaining nodes")
-			Eventually(func() error {
+			ginkgo.By("verify node leases still exist for remaining nodes")
+			gomega.Eventually(func() error {
 				for _, node := range targetNodes.Items {
 					if _, err := leaseClient.Get(node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
 						return err
 					}
 				}
 				return nil
-			}, 1*time.Minute, 5*time.Second).Should(BeNil())
+			}, 1*time.Minute, 5*time.Second).Should(gomega.BeNil())
 		})
 	})
 })
