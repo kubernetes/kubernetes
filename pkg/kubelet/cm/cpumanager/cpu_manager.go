@@ -294,7 +294,9 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 }
 
 func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
-	for _, container := range status.ContainerStatuses {
+	allStatuses := status.InitContainerStatuses
+	allStatuses = append(allStatuses, status.ContainerStatuses...)
+	for _, container := range allStatuses {
 		if container.Name == name && container.ContainerID != "" {
 			cid := &kubecontainer.ContainerID{}
 			err := cid.ParseString(container.ContainerID)
