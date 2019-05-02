@@ -19,7 +19,6 @@ package upgrade
 import (
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -40,8 +39,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
-
-var expiry = 180 * 24 * time.Hour
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
