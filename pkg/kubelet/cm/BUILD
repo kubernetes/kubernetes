@@ -80,6 +80,7 @@ go_library(
             "//pkg/util/procfs:go_default_library",
             "//pkg/util/sysctl:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",
