@@ -19,7 +19,7 @@ package vsphere_volume
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -145,8 +145,8 @@ func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID t
 
 func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
-	volumePath, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
+	volumePath, err := mounter.GetDeviceNameFromMount(mountPath, pluginMntDir)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (v *vsphereVolumeUnmounter) TearDownAt(dir string) error {
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(vsphereVolumePluginName), mount.MountsInGlobalPDPath, devName)
+	return filepath.Join(host.GetPluginDir(vsphereVolumePluginName), util.MountsInGlobalPDPath, devName)
 }
 
 func (vv *vsphereVolume) GetPath() string {

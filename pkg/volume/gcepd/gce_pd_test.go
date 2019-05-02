@@ -19,7 +19,7 @@ package gcepd
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
@@ -135,7 +135,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Mounter")
 	}
 
-	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~gce-pd/vol1")
+	volPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~gce-pd/vol1")
 	path := mounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)

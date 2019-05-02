@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -174,7 +174,7 @@ func (u *storageosUtil) AttachVolume(b *storageosMounter) (string, error) {
 		}
 	}
 
-	srcPath := path.Join(b.deviceDir, vol.ID)
+	srcPath := filepath.Join(b.deviceDir, vol.ID)
 	dt, err := pathDeviceType(srcPath)
 	if err != nil {
 		klog.Warningf("volume source path %q for volume %q not ready (%v)", srcPath, b.volName, err)

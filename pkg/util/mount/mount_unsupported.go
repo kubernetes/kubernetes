@@ -58,11 +58,11 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, unsupportedErr
 }
 
-func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
 	return "", unsupportedErr
 }
 
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
 	return "", unsupportedErr
 }
 

@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -186,12 +185,12 @@ func getDevicePrefixRefCount(mounter mount.Interface, deviceNamePrefix string) (
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/iface_name/portal-some_iqn-lun-lun_id
 func makePDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string, iface string) string {
-	return path.Join(host.GetPluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
+	return filepath.Join(host.GetPluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/iface_name/portal-some_iqn-lun-lun_id
 func makeVDPDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string, iface string) string {
-	return path.Join(host.GetVolumeDevicePluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
+	return filepath.Join(host.GetVolumeDevicePluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
 }
 
 type ISCSIUtil struct{}
@@ -207,7 +206,7 @@ func (util *ISCSIUtil) MakeGlobalVDPDName(iscsi iscsiDisk) string {
 }
 
 func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
-	file := path.Join(mnt, "iscsi.json")
+	file := filepath.Join(mnt, "iscsi.json")
 	fp, err := os.Create(file)
 	if err != nil {
 		return fmt.Errorf("iscsi: create %s err %s", file, err)
@@ -221,7 +220,7 @@ func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
 }
 
 func (util *ISCSIUtil) loadISCSI(conf *iscsiDisk, mnt string) error {
-	file := path.Join(mnt, "iscsi.json")
+	file := filepath.Join(mnt, "iscsi.json")
 	fp, err := os.Open(file)
 	if err != nil {
 		return fmt.Errorf("iscsi: open %s err %s", file, err)

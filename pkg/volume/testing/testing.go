@@ -21,7 +21,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -118,27 +118,27 @@ func NewFakeVolumeHostWithMounterFSType(rootDir string, kubeClient clientset.Int
 }
 
 func (f *fakeVolumeHost) GetPluginDir(podUID string) string {
-	return path.Join(f.rootDir, "plugins", podUID)
+	return filepath.Join(f.rootDir, "plugins", podUID)
 }
 
 func (f *fakeVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {
-	return path.Join(f.rootDir, "plugins", pluginName, "volumeDevices")
+	return filepath.Join(f.rootDir, "plugins", pluginName, "volumeDevices")
 }
 
 func (f *fakeVolumeHost) GetPodsDir() string {
-	return path.Join(f.rootDir, "pods")
+	return filepath.Join(f.rootDir, "pods")
 }
 
 func (f *fakeVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
-	return path.Join(f.rootDir, "pods", string(podUID), "volumes", pluginName, volumeName)
+	return filepath.Join(f.rootDir, "pods", string(podUID), "volumes", pluginName, volumeName)
 }
 
 func (f *fakeVolumeHost) GetPodVolumeDeviceDir(podUID types.UID, pluginName string) string {
-	return path.Join(f.rootDir, "pods", string(podUID), "volumeDevices", pluginName)
+	return filepath.Join(f.rootDir, "pods", string(podUID), "volumeDevices", pluginName)
 }
 
 func (f *fakeVolumeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
-	return path.Join(f.rootDir, "pods", string(podUID), "plugins", pluginName)
+	return filepath.Join(f.rootDir, "pods", string(podUID), "plugins", pluginName)
 }
 
 func (f *fakeVolumeHost) GetKubeClient() clientset.Interface {
@@ -789,7 +789,7 @@ func (fv *FakeVolume) GetPath() string {
 }
 
 func (fv *FakeVolume) getPath() string {
-	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, utilstrings.EscapeQualifiedName(fv.Plugin.PluginName), fv.VolName))
+	return filepath.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, utilstrings.EscapeQualifiedName(fv.Plugin.PluginName), fv.VolName))
 }
 
 func (fv *FakeVolume) TearDown() error {
@@ -834,7 +834,7 @@ func (fv *FakeVolume) GetGlobalMapPath(spec *Spec) (string, error) {
 
 // Block volume support
 func (fv *FakeVolume) getGlobalMapPath() (string, error) {
-	return path.Join(fv.Plugin.Host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(fv.Plugin.PluginName)), "pluginDependentPath"), nil
+	return filepath.Join(fv.Plugin.Host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(fv.Plugin.PluginName)), "pluginDependentPath"), nil
 }
 
 // Block volume support
@@ -854,7 +854,7 @@ func (fv *FakeVolume) GetPodDeviceMapPath() (string, string) {
 
 // Block volume support
 func (fv *FakeVolume) getPodDeviceMapPath() (string, string) {
-	return path.Join(fv.Plugin.Host.GetPodVolumeDeviceDir(fv.PodUID, utilstrings.EscapeQualifiedName(fv.Plugin.PluginName))), fv.VolName
+	return filepath.Join(fv.Plugin.Host.GetPodVolumeDeviceDir(fv.PodUID, utilstrings.EscapeQualifiedName(fv.Plugin.PluginName))), fv.VolName
 }
 
 // Block volume support

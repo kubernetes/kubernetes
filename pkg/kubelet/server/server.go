@@ -824,15 +824,17 @@ func trimURLPath(path string) string {
 	return parts[0]
 }
 
+var longRunningRequestPathMap = map[string]bool{
+	"exec":        true,
+	"attach":      true,
+	"portforward": true,
+	"debug":       true,
+}
+
 // isLongRunningRequest determines whether the request is long-running or not.
 func isLongRunningRequest(path string) bool {
-	longRunningRequestPaths := []string{"exec", "attach", "portforward", "debug"}
-	for _, p := range longRunningRequestPaths {
-		if p == path {
-			return true
-		}
-	}
-	return false
+	_, ok := longRunningRequestPathMap[path]
+	return ok
 }
 
 // ServeHTTP responds to HTTP requests on the Kubelet.

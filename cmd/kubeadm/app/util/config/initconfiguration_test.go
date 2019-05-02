@@ -29,17 +29,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-const (
-	controlPlaneV1beta1YAML           = "testdata/conversion/controlplane/v1beta1.yaml"
-	controlPlaneV1beta1YAMLNonLinux   = "testdata/conversion/controlplane/v1beta1_non_linux.yaml"
-	controlPlaneInternalYAML          = "testdata/conversion/controlplane/internal.yaml"
-	controlPlaneInternalYAMLNonLinux  = "testdata/conversion/controlplane/internal_non_linux.yaml"
-	controlPlaneIncompleteYAML        = "testdata/defaulting/controlplane/incomplete.yaml"
-	controlPlaneDefaultedYAML         = "testdata/defaulting/controlplane/defaulted.yaml"
-	controlPlaneDefaultedYAMLNonLinux = "testdata/defaulting/controlplane/defaulted_non_linux.yaml"
-	controlPlaneInvalidYAML           = "testdata/validation/invalid_controlplanecfg.yaml"
-)
-
 func diff(expected, actual []byte) string {
 	// Write out the diff
 	var diffBytes bytes.Buffer

@@ -100,7 +100,6 @@ func TestCompileManifests(t *testing.T) {
 		name     string
 		manifest string
 		data     interface{}
-		expected bool
 	}{
 		{
 			name:     "KubeProxyConfigMap19",

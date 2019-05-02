@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -393,7 +393,7 @@ func doTestSetUp(scenario struct {
 		if expected.cmd[1] == "clone" {
 			fakeOutputs = append(fakeOutputs, func() ([]byte, error) {
 				// git clone, it creates new dir/files
-				os.MkdirAll(path.Join(fcmd.Dirs[0], expected.dir), 0750)
+				os.MkdirAll(filepath.Join(fcmd.Dirs[0], expected.dir), 0750)
 				return []byte{}, nil
 			})
 		} else {

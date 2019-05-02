@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 
 	"k8s.io/klog"
@@ -63,14 +62,14 @@ func (m *csiBlockMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // Example: plugins/kubernetes.io/csi/volumeDevices/staging/{pvname}
 func (m *csiBlockMapper) getStagingPath() string {
 	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(m.specName)
-	return path.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", sanitizedSpecVolID)
+	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", sanitizedSpecVolID)
 }
 
 // getPublishPath returns a publish path for a file (on the node) that should be used on NodePublishVolume/NodeUnpublishVolume
 // Example: plugins/kubernetes.io/csi/volumeDevices/publish/{pvname}
 func (m *csiBlockMapper) getPublishPath() string {
 	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(m.specName)
-	return path.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "publish", sanitizedSpecVolID)
+	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "publish", sanitizedSpecVolID)
 }
 
 // GetPodDeviceMapPath returns pod's device file which will be mapped to a volume

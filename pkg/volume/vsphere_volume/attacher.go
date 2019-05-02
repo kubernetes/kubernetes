@@ -19,7 +19,7 @@ package vsphere_volume
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -90,7 +90,7 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 		return "", err
 	}
 
-	return path.Join(diskByIDPath, diskSCSIPrefix+diskUUID), nil
+	return filepath.Join(diskByIDPath, diskSCSIPrefix+diskUUID), nil
 }
 
 func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {

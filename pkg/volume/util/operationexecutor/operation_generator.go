@@ -19,7 +19,7 @@ package operationexecutor
 import (
 	goerrors "errors"
 	"fmt"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -848,7 +848,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		subpather := og.volumePluginMgr.Host.GetSubpather()
 
 		// Remove all bind-mounts for subPaths
-		podDir := path.Join(podsDir, string(volumeToUnmount.PodUID))
+		podDir := filepath.Join(podsDir, string(volumeToUnmount.PodUID))
 		if err := subpather.CleanSubPaths(podDir, volumeToUnmount.InnerVolumeSpecName); err != nil {
 			return volumeToUnmount.GenerateError("error cleaning subPath mounts", err)
 		}
@@ -1537,10 +1537,11 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 			klog.Infof("ExpandVolume.UpdatePV succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
 		}
 
+		fsVolume, _ := util.CheckVolumeModeFilesystem(volumeSpec)
 		// No Cloudprovider resize needed, lets mark resizing as done
 		// Rest of the volume expand controller code will assume PVC as *not* resized until pvc.Status.Size
 		// reflects user requested size.
-		if !volumePlugin.RequiresFSResize() {
+		if !volumePlugin.RequiresFSResize() || !fsVolume {
 			klog.V(4).Infof("Controller resizing done for PVC %s", pvcWithResizeRequest.QualifiedName())
 			err := resizeMap.MarkAsResized(pvcWithResizeRequest, newSize)
 

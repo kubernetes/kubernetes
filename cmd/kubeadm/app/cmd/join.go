@@ -138,7 +138,6 @@ var _ phases.JoinData = &joinData{}
 // this data is shared across all the phases that are included in the workflow.
 type joinData struct {
 	cfg                   *kubeadmapi.JoinConfiguration
-	skipTokenPrint        bool
 	initCfg               *kubeadmapi.InitConfiguration
 	tlsBootstrapCfg       *clientcmdapi.Config
 	clientSet             *clientset.Clientset
@@ -187,7 +186,7 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 			} else {
 				// otherwise, if the node joined as a worker node;
 				// outputs the join done message and exit
-				fmt.Fprintf(data.outputWriter, joinWorkerNodeDoneMsg)
+				fmt.Fprint(data.outputWriter, joinWorkerNodeDoneMsg)
 			}
 		},
 		// We accept the control-plane location as an optional positional argument

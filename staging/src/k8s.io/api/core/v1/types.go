@@ -3000,6 +3000,9 @@ type PodSecurityContext struct {
 	// takes precedence for that container.
 	// +optional
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,1,opt,name=seLinuxOptions"`
+	// Windows security options.
+	// +optional
+	WindowsOptions *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" protobuf:"bytes,8,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in SecurityContext.  If set in both SecurityContext and
@@ -5267,6 +5270,9 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,3,opt,name=seLinuxOptions"`
+	// Windows security options.
+	// +optional
+	WindowsOptions *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" protobuf:"bytes,10,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
@@ -5335,6 +5341,11 @@ type SELinuxOptions struct {
 	// Level is SELinux level label that applies to the container.
 	// +optional
 	Level string `json:"level,omitempty" protobuf:"bytes,4,opt,name=level"`
+}
+
+// WindowsSecurityContextOptions contain Windows-specific options and credentials.
+type WindowsSecurityContextOptions struct {
+	// intentionally left empty for now
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

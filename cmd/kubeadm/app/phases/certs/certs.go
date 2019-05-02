@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -67,27 +68,31 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 // If the sa public/private key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string) error {
 	klog.V(1).Infoln("creating a new public/private key files for signing service account users")
-	saSigningKey, err := NewServiceAccountSigningKey()
+	_, err := keyutil.PrivateKeyFromFile(filepath.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName))
+	if err == nil {
+		// kubeadm doesn't validate the existing certificate key more than this;
+		// Basically, if we find a key file with the same path kubeadm thinks those files
+		// are equal and doesn't bother writing a new file
+		fmt.Printf("[certs] Using the existing %q key\n", kubeadmconstants.ServiceAccountKeyBaseName)
+		return nil
+	} else if !os.IsNotExist(err) {
+		return errors.Wrapf(err, "file %s existed but it could not be loaded properly", kubeadmconstants.ServiceAccountPrivateKeyName)
+	}
+
+	// The key does NOT exist, let's generate it now
+	key, err := pkiutil.NewPrivateKey()
 	if err != nil {
 		return err
 	}
 
-	return writeKeyFilesIfNotExist(
-		certsDir,
-		kubeadmconstants.ServiceAccountKeyBaseName,
-		saSigningKey,
-	)
-}
+	// Write .key and .pub files to disk
+	fmt.Printf("[certs] Generating %q key and public key\n", kubeadmconstants.ServiceAccountKeyBaseName)
 
-// NewServiceAccountSigningKey generate public/private key pairs for signing service account tokens.
-func NewServiceAccountSigningKey() (crypto.Signer, error) {
-	// The key does NOT exist, let's generate it now
-	saSigningKey, err := pkiutil.NewPrivateKey()
-	if err != nil {
-		return nil, errors.Wrap(err, "failure while creating service account token signing key")
+	if err := pkiutil.WriteKey(certsDir, kubeadmconstants.ServiceAccountKeyBaseName, key); err != nil {
+		return err
 	}
 
-	return saSigningKey, nil
+	return pkiutil.WritePublicKey(certsDir, kubeadmconstants.ServiceAccountKeyBaseName, key.Public())
 }
 
 // CreateCACertAndKeyFiles generates and writes out a given certificate authority.
@@ -240,42 +245,6 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 		}
 		if pkiutil.HasServerAuth(cert) {
 			fmt.Printf("[certs] %s serving cert is signed for DNS names %v and IPs %v\n", baseName, cert.DNSNames, cert.IPAddresses)
-		}
-	}
-
-	return nil
-}
-
-// writeKeyFilesIfNotExist write a new key to the given path.
-// If there already is a key file at the given path; kubeadm tries to load it and check if the values in the
-// existing and the expected key equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
-// otherwise this function returns an error.
-func writeKeyFilesIfNotExist(pkiDir string, baseName string, key crypto.Signer) error {
-
-	// Checks if the key exists in the PKI directory
-	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
-
-		// Try to load .key from the PKI directory
-		_, err := pkiutil.TryLoadKeyFromDisk(pkiDir, baseName)
-		if err != nil {
-			return errors.Wrapf(err, "%s key existed but it could not be loaded properly", baseName)
-		}
-
-		// kubeadm doesn't validate the existing certificate key more than this;
-		// Basically, if we find a key file with the same path kubeadm thinks those files
-		// are equal and doesn't bother writing a new file
-		fmt.Printf("[certs] Using the existing %q key\n", baseName)
-	} else {
-
-		// Write .key and .pub files to disk
-		fmt.Printf("[certs] Generating %q key and public key\n", baseName)
-
-		if err := pkiutil.WriteKey(pkiDir, baseName, key); err != nil {
-			return errors.Wrapf(err, "failure while saving %s key", baseName)
-		}
-
-		if err := pkiutil.WritePublicKey(pkiDir, baseName, key.Public()); err != nil {
-			return errors.Wrapf(err, "failure while saving %s public key", baseName)
 		}
 	}
 

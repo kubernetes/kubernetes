@@ -19,7 +19,7 @@ package vsphere_volume
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -117,7 +117,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Mounter")
 	}
 
-	mntPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~vsphere-volume/vol1")
+	mntPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~vsphere-volume/vol1")
 	path := mounter.GetPath()
 	if path != mntPath {
 		t.Errorf("Got unexpected path: %s", path)

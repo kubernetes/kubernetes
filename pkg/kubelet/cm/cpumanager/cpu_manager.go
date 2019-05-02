@@ -225,10 +225,10 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 	for _, pod := range m.activePods() {
 		allContainers := pod.Spec.InitContainers
 		allContainers = append(allContainers, pod.Spec.Containers...)
+		status, ok := m.podStatusProvider.GetPodStatus(pod.UID)
 		for _, container := range allContainers {
-			status, ok := m.podStatusProvider.GetPodStatus(pod.UID)
 			if !ok {
-				klog.Warningf("[cpumanager] reconcileState: skipping pod; status not found (pod: %s, container: %s)", pod.Name, container.Name)
+				klog.Warningf("[cpumanager] reconcileState: skipping pod; status not found (pod: %s)", pod.Name)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				break
 			}
@@ -294,7 +294,9 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 }
 
 func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
-	for _, container := range status.ContainerStatuses {
+	allStatuses := status.InitContainerStatuses
+	allStatuses = append(allStatuses, status.ContainerStatuses...)
+	for _, container := range allStatuses {
 		if container.Name == name && container.ContainerID != "" {
 			cid := &kubecontainer.ContainerID{}
 			err := cid.ParseString(container.ContainerID)

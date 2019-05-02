@@ -61,7 +61,7 @@ const (
 	defaultPodLogsTimeout   = 20 * time.Second
 )
 
-// AttachOptions declare the arguments accepted by the Exec command
+// AttachOptions declare the arguments accepted by the Attach command
 type AttachOptions struct {
 	exec.StreamOptions
 
@@ -84,6 +84,7 @@ type AttachOptions struct {
 	Config        *restclient.Config
 }
 
+// NewAttachOptions creates the options for attach
 func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 	return &AttachOptions{
 		StreamOptions: exec.StreamOptions{
@@ -94,6 +95,7 @@ func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 	}
 }
 
+// NewCmdAttach returns the attach Cobra command
 func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAttachOptions(streams)
 	cmd := &cobra.Command{
@@ -120,6 +122,7 @@ type RemoteAttach interface {
 	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error
 }
 
+// DefaultAttachFunc is the default AttachFunc used
 func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
 	return func() error {
 		restClient, err := restclient.RESTClientFor(o.Config)
@@ -146,6 +149,7 @@ func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, ra
 // DefaultRemoteAttach is the standard implementation of attaching
 type DefaultRemoteAttach struct{}
 
+// Attach executes attach to a running container
 func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
 	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
 	if err != nil {

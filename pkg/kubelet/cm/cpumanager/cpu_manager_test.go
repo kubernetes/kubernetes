@@ -352,14 +352,15 @@ func TestCPUManagerRemove(t *testing.T) {
 
 func TestReconcileState(t *testing.T) {
 	testCases := []struct {
-		description               string
-		activePods                []*v1.Pod
-		pspPS                     v1.PodStatus
-		pspFound                  bool
-		stAssignments             state.ContainerCPUAssignments
-		stDefaultCPUSet           cpuset.CPUSet
-		updateErr                 error
-		expectFailedContainerName string
+		description                  string
+		activePods                   []*v1.Pod
+		pspPS                        v1.PodStatus
+		pspFound                     bool
+		stAssignments                state.ContainerCPUAssignments
+		stDefaultCPUSet              cpuset.CPUSet
+		updateErr                    error
+		expectSucceededContainerName string
+		expectFailedContainerName    string
 	}{
 		{
 			description: "cpu manager reconclie - no error",
@@ -390,9 +391,44 @@ func TestReconcileState(t *testing.T) {
 			stAssignments: state.ContainerCPUAssignments{
 				"fakeID": cpuset.NewCPUSet(1, 2),
 			},
-			stDefaultCPUSet:           cpuset.NewCPUSet(3, 4, 5, 6, 7),
-			updateErr:                 nil,
-			expectFailedContainerName: "",
+			stDefaultCPUSet:              cpuset.NewCPUSet(3, 4, 5, 6, 7),
+			updateErr:                    nil,
+			expectSucceededContainerName: "fakeName",
+			expectFailedContainerName:    "",
+		},
+		{
+			description: "cpu manager reconcile init container - no error",
+			activePods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fakePodName",
+						UID:  "fakeUID",
+					},
+					Spec: v1.PodSpec{
+						InitContainers: []v1.Container{
+							{
+								Name: "fakeName",
+							},
+						},
+					},
+				},
+			},
+			pspPS: v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        "fakeName",
+						ContainerID: "docker://fakeID",
+					},
+				},
+			},
+			pspFound: true,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakeID": cpuset.NewCPUSet(1, 2),
+			},
+			stDefaultCPUSet:              cpuset.NewCPUSet(3, 4, 5, 6, 7),
+			updateErr:                    nil,
+			expectSucceededContainerName: "fakeName",
+			expectFailedContainerName:    "",
 		},
 		{
 			description: "cpu manager reconclie - pod status not found",
@@ -411,12 +447,13 @@ func TestReconcileState(t *testing.T) {
 					},
 				},
 			},
-			pspPS:                     v1.PodStatus{},
-			pspFound:                  false,
-			stAssignments:             state.ContainerCPUAssignments{},
-			stDefaultCPUSet:           cpuset.NewCPUSet(),
-			updateErr:                 nil,
-			expectFailedContainerName: "fakeName",
+			pspPS:                        v1.PodStatus{},
+			pspFound:                     false,
+			stAssignments:                state.ContainerCPUAssignments{},
+			stDefaultCPUSet:              cpuset.NewCPUSet(),
+			updateErr:                    nil,
+			expectSucceededContainerName: "",
+			expectFailedContainerName:    "fakeName",
 		},
 		{
 			description: "cpu manager reconclie - container id not found",
@@ -443,11 +480,12 @@ func TestReconcileState(t *testing.T) {
 					},
 				},
 			},
-			pspFound:                  true,
-			stAssignments:             state.ContainerCPUAssignments{},
-			stDefaultCPUSet:           cpuset.NewCPUSet(),
-			updateErr:                 nil,
-			expectFailedContainerName: "fakeName",
+			pspFound:                     true,
+			stAssignments:                state.ContainerCPUAssignments{},
+			stDefaultCPUSet:              cpuset.NewCPUSet(),
+			updateErr:                    nil,
+			expectSucceededContainerName: "",
+			expectFailedContainerName:    "fakeName",
 		},
 		{
 			description: "cpu manager reconclie - cpuset is empty",
@@ -478,9 +516,10 @@ func TestReconcileState(t *testing.T) {
 			stAssignments: state.ContainerCPUAssignments{
 				"fakeID": cpuset.NewCPUSet(),
 			},
-			stDefaultCPUSet:           cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
-			updateErr:                 nil,
-			expectFailedContainerName: "fakeName",
+			stDefaultCPUSet:              cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+			updateErr:                    nil,
+			expectSucceededContainerName: "",
+			expectFailedContainerName:    "fakeName",
 		},
 		{
 			description: "cpu manager reconclie - container update error",
@@ -511,9 +550,10 @@ func TestReconcileState(t *testing.T) {
 			stAssignments: state.ContainerCPUAssignments{
 				"fakeID": cpuset.NewCPUSet(1, 2),
 			},
-			stDefaultCPUSet:           cpuset.NewCPUSet(3, 4, 5, 6, 7),
-			updateErr:                 fmt.Errorf("fake container update error"),
-			expectFailedContainerName: "fakeName",
+			stDefaultCPUSet:              cpuset.NewCPUSet(3, 4, 5, 6, 7),
+			updateErr:                    fmt.Errorf("fake container update error"),
+			expectSucceededContainerName: "",
+			expectFailedContainerName:    "fakeName",
 		},
 	}
 
@@ -538,7 +578,22 @@ func TestReconcileState(t *testing.T) {
 			},
 		}
 
-		_, failure := mgr.reconcileState()
+		success, failure := mgr.reconcileState()
+
+		if testCase.expectSucceededContainerName != "" {
+			// Search succeeded reconciled containers for the supplied name.
+			foundSucceededContainer := false
+			for _, reconciled := range success {
+				if reconciled.containerName == testCase.expectSucceededContainerName {
+					foundSucceededContainer = true
+					break
+				}
+			}
+			if !foundSucceededContainer {
+				t.Errorf("%v", testCase.description)
+				t.Errorf("Expected reconciliation success for container: %s", testCase.expectSucceededContainerName)
+			}
+		}
 
 		if testCase.expectFailedContainerName != "" {
 			// Search failed reconciled containers for the supplied name.
@@ -550,6 +605,7 @@ func TestReconcileState(t *testing.T) {
 				}
 			}
 			if !foundFailedContainer {
+				t.Errorf("%v", testCase.description)
 				t.Errorf("Expected reconciliation failure for container: %s", testCase.expectFailedContainerName)
 			}
 		}

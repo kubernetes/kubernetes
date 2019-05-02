@@ -125,6 +125,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("allowedUnsafeSysctls"), spec.AllowedUnsafeSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("forbiddenSysctls"), spec.ForbiddenSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctlListsDoNotOverlap(fldPath.Child("allowedUnsafeSysctls"), fldPath.Child("forbiddenSysctls"), spec.AllowedUnsafeSysctls, spec.ForbiddenSysctls)...)
+	allErrs = append(allErrs, validateRuntimeClassStrategy(fldPath.Child("runtimeClass"), spec.RuntimeClass)...)
 
 	return allErrs
 }
@@ -473,6 +474,40 @@ func validatePSPCapsAgainstDrops(requiredDrops []core.Capability, capsToCheck []
 				fmt.Sprintf("capability is listed in %s and requiredDropCapabilities", fldPath.String())))
 		}
 	}
+	return allErrs
+}
+
+// validateRuntimeClassStrategy ensures all the RuntimeClass restrictions are valid.
+func validateRuntimeClassStrategy(fldPath *field.Path, rc *policy.RuntimeClassStrategyOptions) field.ErrorList {
+	if rc == nil {
+		return nil
+	}
+
+	var allErrs field.ErrorList
+
+	allowed := map[string]bool{}
+	for i, name := range rc.AllowedRuntimeClassNames {
+		if name != policy.AllowAllRuntimeClassNames {
+			allErrs = append(allErrs, apivalidation.ValidateRuntimeClassName(name, fldPath.Child("allowedRuntimeClassNames").Index(i))...)
+		}
+		if allowed[name] {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("allowedRuntimeClassNames").Index(i), name))
+		}
+		allowed[name] = true
+	}
+
+	if rc.DefaultRuntimeClassName != nil {
+		allErrs = append(allErrs, apivalidation.ValidateRuntimeClassName(*rc.DefaultRuntimeClassName, fldPath.Child("defaultRuntimeClassName"))...)
+		if !allowed[*rc.DefaultRuntimeClassName] && !allowed[policy.AllowAllRuntimeClassNames] {
+			allErrs = append(allErrs, field.Required(fldPath.Child("allowedRuntimeClassNames"),
+				fmt.Sprintf("default %q must be allowed", *rc.DefaultRuntimeClassName)))
+		}
+	}
+
+	if allowed[policy.AllowAllRuntimeClassNames] && len(rc.AllowedRuntimeClassNames) > 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("allowedRuntimeClassNames"), rc.AllowedRuntimeClassNames, "if '*' is present, must not specify other RuntimeClass names"))
+	}
+
 	return allErrs
 }
 

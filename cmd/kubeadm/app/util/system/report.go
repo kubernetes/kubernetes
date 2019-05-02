@@ -18,9 +18,10 @@ package system
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 // ValidationResultType is type of the validation result. Different validation results
@@ -38,9 +39,9 @@ type color int32
 
 const (
 	red    color = 31
-	green        = 32
-	yellow       = 33
-	white        = 37
+	green  color = 32
+	yellow color = 33
+	white  color = 37
 )
 
 func colorize(s string, c color) string {

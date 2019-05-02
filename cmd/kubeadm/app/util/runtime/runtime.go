@@ -109,9 +109,7 @@ func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 		return nil, errors.Wrapf(err, "output: %s, error", string(out))
 	}
 	pods := []string{}
-	for _, pod := range strings.Fields(string(out)) {
-		pods = append(pods, pod)
-	}
+	pods = append(pods, strings.Fields(string(out))...)
 	return pods, nil
 }
 
