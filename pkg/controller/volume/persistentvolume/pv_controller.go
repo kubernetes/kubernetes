@@ -339,25 +339,25 @@ func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentV
 func (ctrl *PersistentVolumeController) recordCSIMetric(opName string, claim *v1.PersistentVolumeClaim, err error) {
   // obtain corresponding operationTimestamps for this
   key := claimToClaimKey(claim)
-  fmt.Println("$$$ record csi metric: ", key)
   obj, exists := ctrl.operationTimestamps.Get(key)
   if !exists {
     // in this case, an entry has not been created yet by either provisionClaim or deleteVolume
-    // ignore this event
-    fmt.Println("$$$ ignoring as record does not exist: ", key)
+    // there are two scenarios:
+    // 1. volume already existed, thus syncUnboundClaim will *NOT* call provisionClaim
+    //    rather just bind it to a PVC, in this case, as the latency will not be
+    // 2. the plugin.IsMigratedToCSI() == false, thus provisionClaim will *NOT* create
+    //    an entry for metric recording, in this case, return directly
+    //
     return
   }
-  fmt.Println("$$$ processing: ", key, opName)
   operationTs, ok := obj.(operationTimestamps)
   if !ok {
-    fmt.Println("$$$ processing failed: ", key)
     klog.V(2).Infof("Cannot convert object from operationTimestamps cache to operationTimeStamp for volume claim key[%s], name[%s]: %#v", key, claim.Spec.VolumeName, obj)
     return
   }
   // in case of error, report count instead of latency, handled by RecordVolumeOperationMetric
   if err != nil {
     // no timeTaken is needed
-    fmt.Println("$$$$$$$$ recording error metric: ", operationTs.provisionerName, opName)
     metrics.RecordVolumeOperationMetric(operationTs.provisionerName, opName, 0.0, err)
   } else {
     // this is safe as the nature of idempotent
@@ -367,7 +367,6 @@ func (ctrl *PersistentVolumeController) recordCSIMetric(opName string, claim *v1
       operationTs.provisionCompleteTs = completionTime
       // TODO: should the cache be updated? if completionTimeTs is not nil, should the metric be reported again?
       timeTaken := time.Since(operationTs.provisionStartTs).Seconds()
-      fmt.Println("$$$$$$$$$$$$$$$$recording provisioning metric latency: ", timeTaken)
       metrics.RecordVolumeOperationMetric(operationTs.provisionerName, opName, timeTaken, nil)
     case "delete":
       timeTaken := time.Since(operationTs.deleteStartTs).Seconds()
@@ -427,12 +426,13 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
       if err = ctrl.bind(volume, claim); err != nil {
         // On any error saving the volume or the claim, subsequent
         // syncClaim will finish the binding.
-        // report count error for provisioning
+        // record count error for provisioning
         ctrl.recordCSIMetric("provision", claim, err)
         return err
       }
       // OBSERVATION: claim is "Bound", pv is "Bound"
-      // report end to end provisioning latency
+      // record end to end provisioning latency
+      // [Unit test 12-4]
       ctrl.recordCSIMetric("provision", claim, nil)
       return nil
     }
@@ -475,12 +475,13 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
         } else if err = ctrl.bind(volume, claim); err != nil {
           // On any error saving the volume or the claim, subsequent
           // syncClaim will finish the binding.
-          // report count error for provisioning
+          // record count error for provisioning
           ctrl.recordCSIMetric("provision", claim, err)
           return err
         }
         // OBSERVATION: pvc is "Bound", pv is "Bound"
-        // report end to end provisioning latency
+        // record end to end provisioning latency
+        // [Unit test 11-22]
         ctrl.recordCSIMetric("provision", claim, nil)
         return nil
       } else if IsVolumeBoundToClaim(volume, claim) {
@@ -490,12 +491,13 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 
         // Finish the volume binding by adding claim UID.
         if err = ctrl.bind(volume, claim); err != nil {
-          // report count error for provisioning
+          // record count error for provisioning
           ctrl.recordCSIMetric("provision", claim, err)
           return err
         }
         // OBSERVATION: pvc is "Bound", pv is "Bound"
-        // report end to end provisioning latency
+        // record end to end provisioning latency
+        // [Unit test 12-4]
         ctrl.recordCSIMetric("provision", claim, nil)
         return nil
       } else {
@@ -1424,13 +1426,15 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
   plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
   if err != nil {
     ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, err.Error())
-    klog.V(2).Infof("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
+    klog.Errorf("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
     // failed to find the requested provisioning plugin, directly return err for now.
     // controller will retry the provisioning in every syncUnboundClaim() call
-    return err
+    // retain the original behavior of returning nil from provisionClaim call
+    return nil
   }
   // for CIS provisioning, latency metric will be reported after final binding happened
   if plugin == nil || plugin.IsMigratedToCSI() {
+    // TEST case
     ctrl.scheduleOperation(opName, func() error {
       // create an opTimestamps without assigning provisionerName to get the current timestamp
       opTimestamps := newOperationTimestamps("")
@@ -1442,7 +1446,6 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
       claimKey := claimToClaimKey(claim)
       if _, exists := ctrl.operationTimestamps.Get(claimKey); !exists {
         ctrl.operationTimestamps.Add(claimKey, opTimestamps)
-        fmt.Println("$$$ adding claim: ", claimKey)
       }
       return err
     })
@@ -1490,8 +1493,6 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationCSI(
       ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
       return provisionerName, err
     }
-  } else {
-    fmt.Println("$$$ external CSI driver")
   }
   // Add provisioner annotation so external provisioners know when to start
   newClaim, err := ctrl.setClaimProvisioner(claim, provisionerName)
@@ -1507,7 +1508,6 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationCSI(
   ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ExternalProvisioning, msg)
   klog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
   // return provisioner name here for metric reporting
-  fmt.Println("$$$ using CSI plugin", provisionerName)
   return provisionerName, nil
 }
 
