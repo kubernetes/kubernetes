@@ -223,8 +223,9 @@ func (c *AvailableConditionController) sync(key string) error {
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
 			if _, err2 := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService); err2 != nil {
 				klog.Errorf("cannot update API service status: %v", err2)
+				return err2
 			}
-			return err2
+			return err
 		} else if err != nil {
 			availableCondition.Status = apiregistration.ConditionUnknown
 			availableCondition.Reason = "EndpointsAccessError"
@@ -232,8 +233,9 @@ func (c *AvailableConditionController) sync(key string) error {
 			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
 			if _, err2 := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService); err2 != nil {
 				klog.Errorf("cannot update API service status: %v", err2)
+				return err2
 			}
-			return err2
+			return err
 		}
 		hasActiveEndpoints := false
 		for _, subset := range endpoints.Subsets {
