@@ -47,13 +47,9 @@ pkg/apis/rbac/v1
 pkg/apis/rbac/v1alpha1
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
-pkg/apis/scheduling
 pkg/apis/storage
-pkg/apis/storage/util
 pkg/apis/storage/v1
-pkg/apis/storage/v1/util
 pkg/apis/storage/v1beta1
-pkg/apis/storage/v1beta1/util
 pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/photon
 pkg/controller
