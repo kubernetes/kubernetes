@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -413,7 +414,7 @@ func waitForEvent(w watch.Interface, expectType watch.EventType, expectObject ru
 		select {
 		case actual, ok := <-w.ResultChan():
 			if ok {
-				framework.Logf("Got : %v %v", actual.Type, actual.Object)
+				e2elog.Logf("Got : %v %v", actual.Type, actual.Object)
 			} else {
 				framework.Failf("Watch closed unexpectedly")
 			}

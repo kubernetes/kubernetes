@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -74,7 +75,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 				}
 			}
 			if cnt > maxAllowedAfterDel {
-				framework.Logf("Remaining namespaces : %v", cnt)
+				e2elog.Logf("Remaining namespaces : %v", cnt)
 				return false, nil
 			}
 			return true, nil

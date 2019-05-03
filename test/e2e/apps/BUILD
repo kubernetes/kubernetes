@@ -63,6 +63,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/deployment:go_default_library",
         "//test/e2e/framework/job:go_default_library",
+        "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/replicaset:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
         "//test/utils:go_default_library",
