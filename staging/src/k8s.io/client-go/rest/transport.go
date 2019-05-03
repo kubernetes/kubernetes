@@ -19,7 +19,9 @@ package rest
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 
 	"k8s.io/client-go/plugin/pkg/client/auth/exec"
 	"k8s.io/client-go/transport"
@@ -86,6 +88,14 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			Extra:    c.Impersonate.Extra,
 		},
 		Dial: c.Dial,
+	}
+
+	if c.ProxyURL != "" {
+		u, err := url.Parse(c.ProxyURL)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse ProxyURL %q: %v", c.ProxyURL, err)
+		}
+		conf.ProxyURL = u
 	}
 
 	if c.ExecProvider != nil && c.AuthProvider != nil {

@@ -131,6 +131,13 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+
+	// ProxyURL is the URL to the proxy to be used for all requests made by this
+	// client. URLs with "http", "https", and "socks5" schemes are supported.
+	// The scheme is defaulted to "http" if no shceme is provided in the URL.
+	// This configuration takes priority of http_proxy and https_proxy
+	// environment variables.
+	ProxyURL string
 }
 
 var _ fmt.Stringer = new(Config)
@@ -169,6 +176,10 @@ func (c *Config) String() string {
 	}
 	if cc.AuthConfigPersister != nil {
 		cc.AuthConfigPersister = sanitizedAuthConfigPersister{cc.AuthConfigPersister}
+	}
+	// ProxyURL may contain a username password.
+	if cc.ProxyURL != "" {
+		cc.ProxyURL = "--- REDACTED ---"
 	}
 
 	return fmt.Sprintf("%#v", cc)
@@ -560,6 +571,10 @@ func AnonymousClientConfig(config *Config) *Config {
 		Burst:              config.Burst,
 		Timeout:            config.Timeout,
 		Dial:               config.Dial,
+		// ProxyURL can contain usernames and passwords to socks5 proxies, but we
+		// already preserve them when they are passed via the environment. This
+		// keeps the behavior of the explicit ProxyURL configuration consistent.
+		ProxyURL: config.ProxyURL,
 	}
 }
 
@@ -601,5 +616,6 @@ func CopyConfig(config *Config) *Config {
 		RateLimiter:        config.RateLimiter,
 		Timeout:            config.Timeout,
 		Dial:               config.Dial,
+		ProxyURL:           config.ProxyURL,
 	}
 }

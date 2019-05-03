@@ -18,6 +18,7 @@ package rest
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -27,6 +28,8 @@ import (
 	"time"
 
 	"fmt"
+
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -280,6 +283,60 @@ func TestHttpMethods(t *testing.T) {
 	request = c.Patch(types.JSONPatchType)
 	if request == nil {
 		t.Errorf("Patch : Object returned should not be nil")
+	}
+}
+
+func TestHttpProxy(t *testing.T) {
+	testServer, fh, _ := testServerEnv(t, 200)
+	defer testServer.Close()
+
+	testProxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		to, err := url.Parse(req.RequestURI)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		req.RequestURI = ""
+		req.URL = to
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		w.WriteHeader(resp.StatusCode)
+		if _, err := io.Copy(w, resp.Body); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+	}))
+	defer testProxyServer.Close()
+
+	t.Logf(testProxyServer.URL)
+
+	c, err := RESTClientFor(&Config{
+		Host: testServer.URL,
+		ContentConfig: ContentConfig{
+			GroupVersion:         &v1.SchemeGroupVersion,
+			NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		},
+		ProxyURL: testProxyServer.URL,
+		Username: "user",
+		Password: "pass",
+	})
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	request := c.Get()
+	if request == nil {
+		t.Fatalf("Get: Object returned should not be nil")
+	}
+
+	b, err := request.DoRaw()
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if got, want := string(b), fh.ResponseBody; !cmp.Equal(got, want) {
+		t.Errorf("unexpected body: %v", cmp.Diff(want, got))
 	}
 }
 

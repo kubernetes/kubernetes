@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/url"
 )
 
 // Config holds various options for establishing a transport.
@@ -68,6 +69,13 @@ type Config struct {
 
 	// Dial specifies the dial function for creating unencrypted TCP connections.
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
+
+	// ProxyURL is the URL to the proxy to be used for all requests made by this
+	// transport. URLs with "http", "https", and "socks5" schemes are supported.
+	// The scheme is defaulted to "http" if no shceme is provided in the URL.
+	// This configuration takes priority of http_proxy and https_proxy
+	// environment variables.
+	ProxyURL *url.URL
 }
 
 // ImpersonationConfig has all the available impersonation options
