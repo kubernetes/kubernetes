@@ -13,6 +13,7 @@ go_library(
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/gogo/protobuf/protoc-gen-gogo/descriptor:go_default_library",
+        "//vendor/github.com/gogo/protobuf/protoc-gen-gogo/generator/internal/remap:go_default_library",
         "//vendor/github.com/gogo/protobuf/protoc-gen-gogo/plugin:go_default_library",
     ],
 )
@@ -26,7 +27,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/gogo/protobuf/protoc-gen-gogo/generator/internal/remap:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

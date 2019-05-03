@@ -35,22 +35,39 @@
 package proto
 
 import (
+	"fmt"
 	"log"
 	"reflect"
 	"strings"
 )
 
 // Clone returns a deep copy of a protocol buffer.
-func Clone(pb Message) Message {
-	in := reflect.ValueOf(pb)
+func Clone(src Message) Message {
+	in := reflect.ValueOf(src)
 	if in.IsNil() {
-		return pb
+		return src
 	}
-
 	out := reflect.New(in.Type().Elem())
-	// out is empty so a merge is a deep copy.
-	mergeStruct(out.Elem(), in.Elem())
-	return out.Interface().(Message)
+	dst := out.Interface().(Message)
+	Merge(dst, src)
+	return dst
+}
+
+// Merger is the interface representing objects that can merge messages of the same type.
+type Merger interface {
+	// Merge merges src into this message.
+	// Required and optional fields that are set in src will be set to that value in dst.
+	// Elements of repeated fields will be appended.
+	//
+	// Merge may panic if called with a different argument type than the receiver.
+	Merge(src Message)
+}
+
+// generatedMerger is the custom merge method that generated protos will have.
+// We must add this method since a generate Merge method will conflict with
+// many existing protos that have a Merge data field already defined.
+type generatedMerger interface {
+	XXX_Merge(src Message)
 }
 
 // Merge merges src into dst.
@@ -58,17 +75,24 @@ func Clone(pb Message) Message {
 // Elements of repeated fields will be appended.
 // Merge panics if src and dst are not the same type, or if dst is nil.
 func Merge(dst, src Message) {
+	if m, ok := dst.(Merger); ok {
+		m.Merge(src)
+		return
+	}
+
 	in := reflect.ValueOf(src)
 	out := reflect.ValueOf(dst)
 	if out.IsNil() {
 		panic("proto: nil destination")
 	}
 	if in.Type() != out.Type() {
-		// Explicit test prior to mergeStruct so that mistyped nils will fail
-		panic("proto: type mismatch")
+		panic(fmt.Sprintf("proto.Merge(%T, %T) type mismatch", dst, src))
 	}
 	if in.IsNil() {
-		// Merging nil into non-nil is a quiet no-op
+		return // Merge from nil src is a noop
+	}
+	if m, ok := dst.(generatedMerger); ok {
+		m.XXX_Merge(src)
 		return
 	}
 	mergeStruct(out.Elem(), in.Elem())
@@ -89,7 +113,7 @@ func mergeStruct(out, in reflect.Value) {
 		bIn := emIn.GetExtensions()
 		bOut := emOut.GetExtensions()
 		*bOut = append(*bOut, *bIn...)
-	} else if emIn, ok := extendable(in.Addr().Interface()); ok {
+	} else if emIn, err := extendable(in.Addr().Interface()); err == nil {
 		emOut, _ := extendable(out.Addr().Interface())
 		mIn, muIn := emIn.extensionsRead()
 		if mIn != nil {

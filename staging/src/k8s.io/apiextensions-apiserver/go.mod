@@ -15,7 +15,7 @@ require (
 	github.com/go-openapi/spec v0.17.2
 	github.com/go-openapi/strfmt v0.17.0
 	github.com/go-openapi/validate v0.18.0
-	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
+	github.com/gogo/protobuf v0.0.0-20190410021324-765b5b8d2dfc
 	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
@@ -39,6 +39,7 @@ require (
 )
 
 replace (
+	github.com/gogo/protobuf => github.com/apelisse/protobuf v0.0.0-20190410021324-765b5b8d2dfc
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9

@@ -149,6 +149,47 @@ func (p *stringer) Generate(file *generator.FileDescriptor) {
 		p.Out()
 		p.P(`}`)
 		for _, field := range message.Field {
+			if p.IsMap(field) || !field.IsRepeated() {
+				continue
+			}
+			if (field.IsMessage() && !gogoproto.IsCustomType(field)) || p.IsGroup(field) {
+				nullable := gogoproto.IsNullable(field)
+				desc := p.ObjectNamed(field.GetTypeName())
+				msgname := p.TypeName(desc)
+				msgnames := strings.Split(msgname, ".")
+				typeName := msgnames[len(msgnames)-1]
+				fieldMessageDesc := file.GetMessage(msgname)
+				gogoStringer := false
+				if fieldMessageDesc != nil {
+					gogoStringer = gogoproto.IsStringer(file.FileDescriptorProto, fieldMessageDesc)
+				}
+				fieldname := p.GetFieldName(message, field)
+				stringfunc := fmtPkg.Use() + `.Sprintf("%v", f)`
+				if gogoStringer {
+					stringfunc = `f.String()`
+				}
+				repeatedName := `repeatedStringFor` + fieldname
+				if nullable {
+					p.P(repeatedName, ` := "[]*`, typeName, `{"`)
+				} else {
+					p.P(repeatedName, ` := "[]`, typeName, `{"`)
+				}
+
+				p.P(`for _, f := range `, `this.`, fieldname, ` {`)
+				p.In()
+				if nullable {
+					p.P(repeatedName, " += ", stringsPkg.Use(), `.Replace(`, stringfunc, `, "`, typeName, `","`, msgname, `"`, ", 1)", ` + ","`)
+				} else if gogoStringer {
+					p.P(repeatedName, " += ", stringsPkg.Use(), `.Replace(`, stringsPkg.Use(), `.Replace(`, stringfunc, `, "`, typeName, `","`, msgname, `"`, ", 1),`&`,``,1)", ` + ","`)
+				} else {
+					p.P(repeatedName, " += ", stringfunc, ` + ","`)
+				}
+				p.Out()
+				p.P(`}`)
+				p.P(repeatedName, ` += "}"`)
+			}
+		}
+		for _, field := range message.Field {
 			if !p.IsMap(field) {
 				continue
 			}
@@ -208,12 +249,22 @@ func (p *stringer) Generate(file *generator.FileDescriptor) {
 				msgname := p.TypeName(desc)
 				msgnames := strings.Split(msgname, ".")
 				typeName := msgnames[len(msgnames)-1]
-				if nullable {
-					p.P("`", fieldname, ":`", ` + `, stringsPkg.Use(), `.Replace(`, fmtPkg.Use(), `.Sprintf("%v", this.`, fieldname, `), "`, typeName, `","`, msgname, `"`, ", 1) + `,", "`,")
+				fieldMessageDesc := file.GetMessage(msgname)
+				gogoStringer := false
+				if fieldMessageDesc != nil {
+					gogoStringer = gogoproto.IsStringer(file.FileDescriptorProto, fieldMessageDesc)
+				}
+				stringfunc := fmtPkg.Use() + `.Sprintf("%v", this.` + fieldname + `)`
+				if gogoStringer {
+					stringfunc = `this.` + fieldname + `.String()`
+				}
+				if nullable && !repeated {
+					p.P("`", fieldname, ":`", ` + `, stringsPkg.Use(), `.Replace(`, stringfunc, `, "`, typeName, `","`, msgname, `"`, ", 1) + `,", "`,")
 				} else if repeated {
-					p.P("`", fieldname, ":`", ` + `, stringsPkg.Use(), `.Replace(`, stringsPkg.Use(), `.Replace(`, fmtPkg.Use(), `.Sprintf("%v", this.`, fieldname, `), "`, typeName, `","`, msgname, `"`, ", 1),`&`,``,1) + `,", "`,")
+					repeatedName := `repeatedStringFor` + fieldname
+					p.P("`", fieldname, ":`", ` + `, repeatedName, " + `,", "`,")
 				} else {
-					p.P("`", fieldname, ":`", ` + `, stringsPkg.Use(), `.Replace(`, stringsPkg.Use(), `.Replace(this.`, fieldname, `.String(), "`, typeName, `","`, msgname, `"`, ", 1),`&`,``,1) + `,", "`,")
+					p.P("`", fieldname, ":`", ` + `, stringsPkg.Use(), `.Replace(`, stringsPkg.Use(), `.Replace(`, stringfunc, `, "`, typeName, `","`, msgname, `"`, ", 1),`&`,``,1) + `,", "`,")
 				}
 			} else {
 				if nullable && !repeated && !proto3 {
