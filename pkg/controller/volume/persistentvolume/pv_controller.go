@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+		http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -1468,49 +1468,6 @@ func (ctrl *PersistentVolumeController) getCSINameFromIntreeName(pluginName stri
 		return ctrl.csiNameFromIntreeNameHook(pluginName)
 	}
 	return csitranslation.GetCSINameFromInTreeName(pluginName)
-}
-
-// provisionClaimOperationCSI provisions a volume using external provisioner async-ly
-// This method will be running in a standalone go-routine scheduled in "provisionClaim"
-func (ctrl *PersistentVolumeController) provisionClaimOperationCSI(
-	claim *v1.PersistentVolumeClaim,
-	plugin vol.ProvisionableVolumePlugin,
-	storageClass *storage.StorageClass) (string, error) {
-	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
-	klog.V(4).Infof("provisionClaimOperationCSI [%s] started, class: %q", claimToClaimKey(claim), claimClass)
-	// pluginName is not set here to align with existing behavior
-	// of not setting pluginName for external provisioners (including CSI)
-	// Set provisionerName to CSI plugin name by setClaimProvisioner
-	var err error
-	provisionerName := storageClass.Provisioner
-	if plugin != nil {
-		// update the provisioner name to use the CSI in-tree name
-		provisionerName, err = ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
-		if err != nil {
-			strerr := fmt.Sprintf("error getting CSI name for In tree plugin %s: %v", storageClass.Provisioner, err)
-			klog.V(2).Infof("%s", strerr)
-			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
-			return provisionerName, err
-		}
-	} else {
-		fmt.Println("$$$ external CSI driver")
-	}
-	// Add provisioner annotation so external provisioners know when to start
-	newClaim, err := ctrl.setClaimProvisioner(claim, provisionerName)
-	if err != nil {
-		// Save failed, the controller will retry in the next sync
-		klog.V(2).Infof("error saving claim %s: %v", claimToClaimKey(claim), err)
-		return provisionerName, err
-	}
-	claim = newClaim
-	msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", provisionerName)
-	// External provisioner has been requested for provisioning the volume
-	// Report an event and wait for external provisioner to finish
-	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ExternalProvisioning, msg)
-	klog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
-	// return provisioner name here for metric reporting
-	fmt.Println("$$$ using CSI plugin", provisionerName)
-	return provisionerName, nil
 }
 
 // provisionClaimOperationCSI provisions a volume using external provisioner async-ly
