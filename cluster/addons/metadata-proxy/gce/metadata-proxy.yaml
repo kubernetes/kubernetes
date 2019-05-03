@@ -48,7 +48,7 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: metadata-proxy
-        image: k8s.gcr.io/metadata-proxy:v0.1.11
+        image: k8s.gcr.io/metadata-proxy:v0.1.12
         securityContext:
           privileged: true
         # Request and limit resources to get guaranteed QoS.
