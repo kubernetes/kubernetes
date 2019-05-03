@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package metrics
 
 import (
 	"bytes"
 	"github.com/blang/semver"
 	"github.com/prometheus/common/expfmt"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"testing"
 )
 
 func TestCounter(t *testing.T) {
-	v115 := semver.MustParse("1.15.0")
 	v114 := semver.MustParse("1.14.0")
+	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
 		*CounterOpts
-		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
@@ -42,7 +42,6 @@ func TestCounter(t *testing.T) {
 				StabilityLevel: ALPHA,
 				Help:           "counter help",
 			},
-			registryVersion:     &v115,
 			expectedMetricCount: 1,
 			expectedHelp:        "[ALPHA] counter help",
 		},
@@ -56,7 +55,6 @@ func TestCounter(t *testing.T) {
 				StabilityLevel:    ALPHA,
 				DeprecatedVersion: &v115,
 			},
-			registryVersion:     &v115,
 			expectedMetricCount: 1,
 			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) counter help",
 		},
@@ -70,14 +68,17 @@ func TestCounter(t *testing.T) {
 				StabilityLevel:    ALPHA,
 				DeprecatedVersion: &v114,
 			},
-			registryVersion:     &v115,
 			expectedMetricCount: 0,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(*test.registryVersion)
+			registry := newKubeRegistry(&apimachineryversion.Info{
+				Major:      "1",
+				Minor:      "15",
+				GitVersion: "v1.15.0-alpha-1.12345",
+			})
 			c := NewCounter(test.CounterOpts)
 			registry.MustRegister(c)
 
@@ -141,7 +142,6 @@ func TestCounterVec(t *testing.T) {
 				Help:      "counter help",
 			},
 			labels:                    []string{"label_a", "label_b"},
-			registryVersion:           &v115,
 			expectedMetricFamilyCount: 1,
 			expectedHelp:              "counter help",
 		},
@@ -155,7 +155,6 @@ func TestCounterVec(t *testing.T) {
 				DeprecatedVersion: &v115,
 			},
 			labels:                    []string{"label_a", "label_b"},
-			registryVersion:           &v115,
 			expectedMetricFamilyCount: 1,
 			expectedHelp:              "(Deprecated since 1.15.0) counter help",
 		},
@@ -169,7 +168,6 @@ func TestCounterVec(t *testing.T) {
 				DeprecatedVersion: &v114,
 			},
 			labels:                    []string{"label_a", "label_b"},
-			registryVersion:           &v115,
 			expectedMetricFamilyCount: 0,
 			expectedHelp:              "counter help",
 		},
@@ -177,7 +175,11 @@ func TestCounterVec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(*test.registryVersion)
+			registry := newKubeRegistry(&apimachineryversion.Info{
+				Major:      "1",
+				Minor:      "15",
+				GitVersion: "v1.15.0-alpha-1.12345",
+			})
 			c := NewCounterVec(test.CounterOpts, test.labels)
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Inc()

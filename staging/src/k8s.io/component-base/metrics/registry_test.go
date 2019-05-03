@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package metrics
 
 import (
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"testing"
 )
 
@@ -116,7 +117,11 @@ func TestRegister(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(*test.registryVersion)
+			registry := newKubeRegistry(&apimachineryversion.Info{
+				Major:      "1",
+				Minor:      "15",
+				GitVersion: "v1.15.0-alpha-1.12345",
+			})
 			for i, m := range test.metrics {
 				err := registry.Register(m)
 				if err != test.expectedErrors[i] && err.Error() != test.expectedErrors[i].Error() {
@@ -183,7 +188,11 @@ func TestMustRegister(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(*test.registryVersion)
+			registry := newKubeRegistry(&apimachineryversion.Info{
+				Major:      "1",
+				Minor:      "15",
+				GitVersion: "v1.15.0-alpha-1.12345",
+			})
 			for i, m := range test.metrics {
 				if test.expectedPanics[i] {
 					assert.Panics(t,

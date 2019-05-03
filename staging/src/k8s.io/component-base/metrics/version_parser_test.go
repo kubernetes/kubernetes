@@ -14,27 +14,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package metrics
 
 import (
-	"fmt"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"regexp"
+	"testing"
 )
 
-const (
-	versionRegexpString = `^v(\d+\.\d+\.\d+)`
-)
-
-var (
-	versionRe = regexp.MustCompile(versionRegexpString)
-)
-
-func parseVersion(ver apimachineryversion.Info) (*string, error) {
-	matches := versionRe.FindAllStringSubmatch(ver.String(), -1)
-
-	if len(matches) != 1 {
-		return nil, fmt.Errorf("version string \"%v\" doesn't match expected regular expression: \"%v\"", ver.String(), versionRe.String())
+func TestVersionParsing(t *testing.T) {
+	var tests = []struct {
+		desc            string
+		versionString   string
+		expectedVersion string
+	}{
+		{
+			"v1.15.0-alpha-1.12345",
+			"v1.15.0-alpha-1.12345",
+			"1.15.0",
+		},
+		{
+			"Parse out defaulted string",
+			"v0.0.0-master",
+			"0.0.0",
+		},
 	}
-	return &matches[0][1], nil
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			version := apimachineryversion.Info{
+				GitVersion: test.versionString,
+			}
+			parsedV := parseVersion(version)
+			if test.expectedVersion != parsedV.String() {
+				t.Errorf("Got %v, wanted %v", parsedV.String(), test.expectedVersion)
+			}
+		})
+	}
 }
