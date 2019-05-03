@@ -190,6 +190,11 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil)
 }
 
+const (
+	unknown = iota
+	container = iota
+	initContainer = iota
+)
 func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
@@ -208,7 +213,7 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 	}
 
 	// Find the container to update.
-	containerStatus, _, ok := findContainerStatus(&oldStatus.status, containerID.String())
+	containerStatus, _, ok, containerType := findContainerStatus(&oldStatus.status, containerID.String(), unknown)
 	if !ok {
 		klog.Warningf("Container readiness changed for unknown container: %q - %q",
 			format.Pod(pod), containerID.String())
@@ -223,7 +228,7 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 
 	// Make sure we're not updating the cached version.
 	status := *oldStatus.status.DeepCopy()
-	containerStatus, _, _ = findContainerStatus(&status, containerID.String())
+	containerStatus, _, _, _ = findContainerStatus(&status, containerID.String(), containerType)
 	containerStatus.Ready = ready
 
 	// updateConditionFunc updates the corresponding type of condition
@@ -247,21 +252,24 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 	m.updateStatusInternal(pod, status, false)
 }
 
-func findContainerStatus(status *v1.PodStatus, containerID string) (containerStatus *v1.ContainerStatus, init bool, ok bool) {
+func findContainerStatus(status *v1.PodStatus, containerID string, containerType int) (containerStatus *v1.ContainerStatus, init bool, ok bool, theType int) {
 	// Find the container to update.
-	for i, c := range status.ContainerStatuses {
-		if c.ContainerID == containerID {
-			return &status.ContainerStatuses[i], false, true
+	if (containerType != initContainer) {
+		for i, c := range status.ContainerStatuses {
+			if c.ContainerID == containerID {
+				return &status.ContainerStatuses[i], false, true, container
+			}
 		}
 	}
 
-	for i, c := range status.InitContainerStatuses {
-		if c.ContainerID == containerID {
-			return &status.InitContainerStatuses[i], true, true
+	if (containerType != container) {
+		for i, c := range status.InitContainerStatuses {
+			if c.ContainerID == containerID {
+				return &status.InitContainerStatuses[i], true, true, initContainer
+			}
 		}
 	}
-
-	return nil, false, false
+	return nil, false, false, unknown
 
 }
 
