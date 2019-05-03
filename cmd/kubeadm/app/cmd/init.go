@@ -97,7 +97,6 @@ type initOptions struct {
 	bto                     *options.BootstrapTokenOptions
 	externalcfg             *kubeadmapiv1beta2.InitConfiguration
 	uploadCerts             bool
-	certificateKey          string
 	skipCertificateKeyPrint bool
 }
 
@@ -119,7 +118,6 @@ type initData struct {
 	client                  clientset.Interface
 	outputWriter            io.Writer
 	uploadCerts             bool
-	certificateKey          string
 	skipCertificateKeyPrint bool
 }
 
@@ -231,6 +229,10 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfig
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)
+	flagSet.StringVar(
+		&cfg.CertificateKey, options.CertificateKey, "",
+		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret.",
+	)
 	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 }
@@ -254,10 +256,6 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 	flagSet.BoolVar(
 		&initOptions.uploadCerts, options.UploadCerts, initOptions.uploadCerts,
 		"Upload control-plane certificates to the kubeadm-certs Secret.",
-	)
-	flagSet.StringVar(
-		&initOptions.certificateKey, options.CertificateKey, "",
-		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret.",
 	)
 	flagSet.BoolVar(
 		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, initOptions.skipCertificateKeyPrint,
@@ -387,7 +385,6 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		externalCA:              externalCA,
 		outputWriter:            out,
 		uploadCerts:             options.uploadCerts,
-		certificateKey:          options.certificateKey,
 		skipCertificateKeyPrint: options.skipCertificateKeyPrint,
 	}, nil
 }
@@ -399,12 +396,12 @@ func (d *initData) UploadCerts() bool {
 
 // CertificateKey returns the key used to encrypt the certs.
 func (d *initData) CertificateKey() string {
-	return d.certificateKey
+	return d.cfg.CertificateKey
 }
 
 // SetCertificateKey set the key used to encrypt the certs.
 func (d *initData) SetCertificateKey(key string) {
-	d.certificateKey = key
+	d.cfg.CertificateKey = key
 }
 
 // SkipCertificateKeyPrint returns the skipCertificateKeyPrint flag.
@@ -518,7 +515,7 @@ func (d *initData) Tokens() []string {
 }
 
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {
-	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(adminKubeConfigPath, token, i.certificateKey, i.skipTokenPrint, i.skipCertificateKeyPrint)
+	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(adminKubeConfigPath, token, i.CertificateKey(), i.skipTokenPrint, i.skipCertificateKeyPrint)
 	if err != nil {
 		return err
 	}

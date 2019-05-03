@@ -128,7 +128,6 @@ type joinOptions struct {
 	controlPlane          bool
 	ignorePreflightErrors []string
 	externalcfg           *kubeadmapiv1beta2.JoinConfiguration
-	certificateKey        string
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -143,7 +142,6 @@ type joinData struct {
 	clientSet             *clientset.Clientset
 	ignorePreflightErrors sets.String
 	outputWriter          io.Writer
-	certificateKey        string
 }
 
 // NewCmdJoin returns "kubeadm join" command.
@@ -221,6 +219,10 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.JoinConfig
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)
+	flagSet.StringVar(
+		&cfg.ControlPlane.CertificateKey, options.CertificateKey, "",
+		"Use this key to decrypt the certificate secrets uploaded by init.",
+	)
 	// add control plane endpoint flags to the specified flagset
 	flagSet.StringVar(
 		&cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress,
@@ -272,10 +274,6 @@ func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 	flagSet.BoolVar(
 		&joinOptions.controlPlane, options.ControlPlane, joinOptions.controlPlane,
 		"Create a new control plane instance on this node",
-	)
-	flagSet.StringVar(
-		&joinOptions.certificateKey, options.CertificateKey, "",
-		"Use this key to decrypt the certificate secrets uploaded by init.",
 	)
 }
 
@@ -404,13 +402,15 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		tlsBootstrapCfg:       tlsBootstrapCfg,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		outputWriter:          out,
-		certificateKey:        opt.certificateKey,
 	}, nil
 }
 
 // CertificateKey returns the key used to encrypt the certs.
 func (j *joinData) CertificateKey() string {
-	return j.certificateKey
+	if j.cfg.ControlPlane != nil {
+		return j.cfg.ControlPlane.CertificateKey
+	}
+	return ""
 }
 
 // Cfg returns the JoinConfiguration.
