@@ -227,6 +227,11 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 			validationErrors = append(validationErrors, fmt.Errorf("no server found for cluster %q", clusterName))
 		}
 	}
+	if proxyURL := clusterInfo.ProxyURL; proxyURL != "" {
+		if _, err := parseProxyURL(proxyURL); err != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("invalid 'proxy-url' %q for cluster %q: %v", proxyURL, clusterName, err))
+		}
+	}
 	// Make sure CA data and CA file aren't both specified
 	if len(clusterInfo.CertificateAuthority) != 0 && len(clusterInfo.CertificateAuthorityData) != 0 {
 		validationErrors = append(validationErrors, fmt.Errorf("certificate-authority-data and certificate-authority are both specified for %v. certificate-authority-data will override.", clusterName))

@@ -237,6 +237,7 @@ func autoConvert_v1_Cluster_To_api_Cluster(in *Cluster, out *api.Cluster, s conv
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
 	out.CertificateAuthority = in.CertificateAuthority
 	out.CertificateAuthorityData = *(*[]byte)(unsafe.Pointer(&in.CertificateAuthorityData))
+	out.ProxyURL = in.ProxyURL
 	if err := Convert_Slice_v1_NamedExtension_To_Map_string_To_runtime_Object(&in.Extensions, &out.Extensions, s); err != nil {
 		return err
 	}
@@ -255,6 +256,7 @@ func autoConvert_api_Cluster_To_v1_Cluster(in *api.Cluster, out *Cluster, s conv
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
 	out.CertificateAuthority = in.CertificateAuthority
 	out.CertificateAuthorityData = *(*[]byte)(unsafe.Pointer(&in.CertificateAuthorityData))
+	out.ProxyURL = in.ProxyURL
 	if err := Convert_Map_string_To_runtime_Object_To_Slice_v1_NamedExtension(&in.Extensions, &out.Extensions, s); err != nil {
 		return err
 	}
