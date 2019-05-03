@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -1223,6 +1223,11 @@ func TestValidateAllowedVolumes(t *testing.T) {
 	for i := 0; i < val.NumField(); i++ {
 		// reflectively create the volume source
 		fieldVal := val.Type().Field(i)
+
+		// Do not consider the discriminator
+		if fieldVal.Name == "VolumeSourceType" {
+			continue
+		}
 
 		t.Run(fieldVal.Name, func(t *testing.T) {
 			volumeSource := api.VolumeSource{}

@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -629,6 +629,11 @@ func TestAdmitVolumes(t *testing.T) {
 	for i := 0; i < val.NumField(); i++ {
 		// reflectively create the volume source
 		fieldVal := val.Type().Field(i)
+
+		// Do not consider the discriminator
+		if fieldVal.Name == "VolumeSourceType" {
+			continue
+		}
 
 		volumeSource := kapi.VolumeSource{}
 		volumeSourceVolume := reflect.New(fieldVal.Type.Elem())

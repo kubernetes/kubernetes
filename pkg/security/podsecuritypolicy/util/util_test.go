@@ -35,6 +35,11 @@ func TestVolumeSourceFSTypeDrift(t *testing.T) {
 	for i := 0; i < val.NumField(); i++ {
 		fieldVal := val.Type().Field(i)
 
+		// Do not consider the discriminator
+		if fieldVal.Name == "VolumeSourceType" {
+			continue
+		}
+
 		volumeSource := api.VolumeSource{}
 		volumeSourceVolume := reflect.New(fieldVal.Type.Elem())
 
