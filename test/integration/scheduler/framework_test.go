@@ -30,14 +30,20 @@ import (
 // TesterPlugin is common ancestor for a test plugin that allows injection of
 // failures and some other test functionalities.
 type TesterPlugin struct {
-	numReserveCalled int
-	numPrebindCalled int
-	failReserve      bool
-	failPrebind      bool
-	rejectPrebind    bool
+	numReserveCalled  int
+	numUnreseveCalled int
+	numPrebindCalled  int
+	failReserve       bool
+	failUnreserve     bool
+	failPrebind       bool
+	rejectPrebind     bool
 }
 
 type ReservePlugin struct {
+	TesterPlugin
+}
+
+type UnreservePlugin struct {
 	TesterPlugin
 }
 
@@ -46,12 +52,16 @@ type PrebindPlugin struct {
 }
 
 const (
-	reservePluginName = "reserve-plugin"
-	prebindPluginName = "prebind-plugin"
+	reservePluginName   = "reserve-plugin"
+	unreservePluginName = "unreserve-plugin"
+	prebindPluginName   = "prebind-plugin"
 )
 
 var _ = framework.ReservePlugin(&ReservePlugin{})
+var _ = framework.ReservePlugin(&UnreservePlugin{})
 var _ = framework.PrebindPlugin(&PrebindPlugin{})
+
+var resPlugin = &ReservePlugin{}
 
 // Name returns name of the plugin.
 func (rp *ReservePlugin) Name() string {
@@ -68,13 +78,34 @@ func (rp *ReservePlugin) Reserve(pc *framework.PluginContext, pod *v1.Pod, nodeN
 	return nil
 }
 
-var resPlugin = &ReservePlugin{}
-var pbdPlugin = &PrebindPlugin{}
-
 // NewReservePlugin is the factory for reserve plugin.
 func NewReservePlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return resPlugin, nil
 }
+
+var unresPlugin = &UnreservePlugin{}
+
+// Name returns name of the plugin.
+func (up *UnreservePlugin) Name() string {
+	return unreservePluginName
+}
+
+// Unreserve is a test function that returns an error or nil, depending on the
+// value of "failReserve".
+func (up *UneservePlugin) Unreserve(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+	up.numUnreserveCalled++
+	if up.failUnreserve {
+		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+	}
+	return nil
+}
+
+// NewUnreservePlugin is the factory for reserve plugin.
+func NewUnreservePlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return unresPlugin, nil
+}
+
+var pbdPlugin = &PrebindPlugin{}
 
 // Name returns name of the plugin.
 func (pp *PrebindPlugin) Name() string {
@@ -137,6 +168,77 @@ func TestReservePlugin(t *testing.T) {
 
 		if resPlugin.numReserveCalled == 0 {
 			t.Errorf("Expected the reserve plugin to be called.")
+		}
+
+		cleanupPods(cs, t, []*v1.Pod{pod})
+	}
+}
+
+// TestUnreservePlugin tests invocation of unreserve plugin
+func TestUnreservePlugin(t *testing.T) {
+	registry := framework.Registry{
+		unreservePluginName: NewUnreservePlugin,
+		prebindPluginName:   NewPrebindPlugin,
+	}
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerWithOptions(t,
+		initTestMaster(t, "unreserve-plugin", nil),
+		false, nil, registry, false, time.Second)
+	defer cleanupTest(t, context)
+
+	cs := context.clientSet
+	// Add a few nodes.
+	_, err := createNodes(cs, "test-node", nil, 2)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
+	}
+
+	tests := []struct {
+		unreserveFail bool
+		prebindReject bool
+	}{
+		{
+			unreserveFail: false,
+			prebindReject: false,
+		},
+		{
+			unreserveFail: true,
+			prebindReject: false,
+		},
+		{
+			unreserveFail: false,
+			prebindReject: true,
+		},
+		{
+			unreserveFail: true,
+			prebindReject: true,
+		},
+	}
+
+	for i, test := range tests {
+		pbdPlugin.rejectPrebind = test.prebindReject
+		unresPlugin.failUnreserve = test.unreserveFail
+
+		// Create a best effort pod.
+		pod, err := createPausePod(cs,
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+		if err != nil {
+			t.Errorf("Error while creating a test pod: %v", err)
+		}
+
+		if fail {
+			if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(cs, pod.Namespace, pod.Name)); err != nil {
+				t.Errorf("Didn't expected the pod to be scheduled. error: %v", err)
+			}
+		} else {
+			if err = waitForPodToSchedule(cs, pod); err != nil {
+				t.Errorf("Expected the pod to be scheduled. error: %v", err)
+			}
+		}
+
+		if unresPlugin.numUnreserveCalled == 0 {
+			t.Errorf("Expected the unreserve plugin to be called.")
 		}
 
 		cleanupPods(cs, t, []*v1.Pod{pod})

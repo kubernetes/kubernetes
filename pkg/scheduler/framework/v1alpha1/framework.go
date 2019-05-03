@@ -33,6 +33,7 @@ type framework struct {
 	plugins          map[string]Plugin // a map of initialized plugins. Plugin name:plugin instance.
 	reservePlugins   []ReservePlugin
 	prebindPlugins   []PrebindPlugin
+	unreservePlugins []UnreservePlugin
 }
 
 var _ = Framework(&framework{})
@@ -98,6 +99,22 @@ func (f *framework) RunReservePlugins(
 		status := pl.Reserve(pc, pod, nodeName)
 		if !status.IsSuccess() {
 			msg := fmt.Sprintf("error while running %v reserve plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			klog.Error(msg)
+			return NewStatus(Error, msg)
+		}
+	}
+	return nil
+}
+
+// RunUnreservePlugins runs the set of configured unreserve plugins. If any of these
+// plugins returns an error, it does not continue running the remaining ones and
+// returns the error.
+func (f *framework) RunUnreservePlugins(
+	pc *PluginContext, pod *v1.Pod, nodeName string) *Status {
+	for _, pl := range f.unreservePlugins {
+		status := pl.Unreserve(pc, pod, nodeName)
+		if !status.IsSuccess() {
+			msg := fmt.Sprintf("error while running %v unreserve plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
 			return NewStatus(Error, msg)
 		}
