@@ -79,7 +79,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := c.CoreV1().Services(ns).Create(headlessService)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 
 		ginkgo.AfterEach(func() {
@@ -100,7 +100,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.PauseNewPods(ss)
 
 			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
 			sst.Saturate(ss)
@@ -143,7 +143,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			ss.Kind = kind
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
@@ -226,7 +226,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.PauseNewPods(ss)
 
 			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			sst.WaitForRunning(1, 0, ss)
 
@@ -294,7 +294,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}(),
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
@@ -318,7 +318,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating a new revision")
 			ss = sst.WaitForStatus(ss)
@@ -365,7 +365,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					}(),
 				}
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			ss, pods = sst.WaitForPartitionedRollingUpdate(ss)
 			for i := range pods.Items {
 				if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
@@ -446,7 +446,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}(),
 					}
 				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err)
 				ss, pods = sst.WaitForPartitionedRollingUpdate(ss)
 				for i := range pods.Items {
 					if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
@@ -498,7 +498,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Type: apps.OnDeleteStatefulSetStrategyType,
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
@@ -538,7 +538,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating a new revision")
 			ss = sst.WaitForStatus(ss)
@@ -580,14 +580,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHTTPProbe(ss)
 			ss, err = c.AppsV1().StatefulSets(ns).Create(ss)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
@@ -618,13 +618,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 				return len(expectedOrder) == 0, nil
 
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Scale down will halt with unhealthy stateful pod")
 			watcher, err = f.ClientSet.CoreV1().Pods(ns).Watch(metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			sst.BreakHTTPProbe(ss)
 			sst.WaitForStatusReadyReplicas(ss, 0)
@@ -651,7 +651,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				return len(expectedOrder) == 0, nil
 
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 
 		/*
@@ -668,7 +668,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
@@ -794,7 +794,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 			ss = sst.WaitForStatus(ss)
 
@@ -1089,7 +1089,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 	sst := framework.NewStatefulSetTester(c)
 	sst.SetHTTPProbe(ss)
 	ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 	ss = sst.WaitForStatus(ss)
 	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
@@ -1107,7 +1107,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 	}
 	sst.SortStatefulPods(pods)
 	err = sst.BreakPodHTTPProbe(ss, &pods.Items[1])
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
 	newImage := NewNginxImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
@@ -1117,7 +1117,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 	ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = newImage
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating a new revision")
 	ss = sst.WaitForStatus(ss)
@@ -1129,7 +1129,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 	pods = sst.GetPodList(ss)
 	sst.SortStatefulPods(pods)
 	err = sst.RestorePodHTTPProbe(ss, &pods.Items[1])
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ss, pods = sst.WaitForPodReady(ss, pods.Items[1].Name)
 	ss, pods = sst.WaitForRollingUpdate(ss)
 	gomega.Expect(ss.Status.CurrentRevision).To(gomega.Equal(updateRevision),
@@ -1155,14 +1155,14 @@ func rollbackTest(c clientset.Interface, ns string, ss *apps.StatefulSet) {
 
 	ginkgo.By("Rolling back to a previous revision")
 	err = sst.BreakPodHTTPProbe(ss, &pods.Items[1])
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
 	priorRevision := currentRevision
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = oldImage
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ss = sst.WaitForStatus(ss)
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	gomega.Expect(currentRevision).NotTo(gomega.Equal(updateRevision),
