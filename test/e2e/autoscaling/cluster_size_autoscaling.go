@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	schedulerapi "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

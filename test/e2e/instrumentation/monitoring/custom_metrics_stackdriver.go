@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"golang.org/x/oauth2/google"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 
 	"github.com/onsi/ginkgo"
@@ -28,7 +29,6 @@ import (
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	gcm "google.golang.org/api/monitoring/v3"
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
