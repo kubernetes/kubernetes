@@ -195,6 +195,7 @@ const (
 	container     = iota
 	initContainer = iota
 )
+
 func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
