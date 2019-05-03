@@ -250,11 +250,9 @@ type PersistentVolumeController struct {
 }
 
 type operationTimestamps struct {
-	provisionerName     string
-	provisionStartTs    time.Time
-	provisionCompleteTs time.Time
-	deleteStartTs       time.Time
-	deleteCompleteTs    time.Time
+	provisionerName  string
+	provisionStartTs time.Time
+	deleteStartTs    time.Time
 }
 
 func newOperationTimestamps(provisioner string) operationTimestamps {
