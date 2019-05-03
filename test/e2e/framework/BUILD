@@ -151,6 +151,7 @@ filegroup(
         "//test/e2e/framework/lifecycle:all-srcs",
         "//test/e2e/framework/log:all-srcs",
         "//test/e2e/framework/metrics:all-srcs",
+        "//test/e2e/framework/networking:all-srcs",
         "//test/e2e/framework/podlogs:all-srcs",
         "//test/e2e/framework/providers/aws:all-srcs",
         "//test/e2e/framework/providers/azure:all-srcs",

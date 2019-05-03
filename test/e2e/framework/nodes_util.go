@@ -18,6 +18,7 @@ package framework
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
@@ -374,4 +375,15 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 // DeleteNodeOnCloudProvider deletes the specified node.
 func DeleteNodeOnCloudProvider(node *v1.Node) error {
 	return TestContext.CloudConfig.Provider.DeleteNode(node)
+}
+
+// shuffleNodes copies nodes from the specified slice into a copy in random
+// order. It returns a new slice.
+func shuffleNodes(nodes []v1.Node) []v1.Node {
+	shuffled := make([]v1.Node, len(nodes))
+	perm := rand.Perm(len(nodes))
+	for i, j := range perm {
+		shuffled[j] = nodes[i]
+	}
+	return shuffled
 }

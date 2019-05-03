@@ -19,6 +19,7 @@ package windows
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/networking"
 
 	"github.com/onsi/ginkgo"
 )
@@ -46,7 +47,7 @@ var _ = ginkgo.Describe("[sig-network] [sig-windows] Networking", func() {
 			The kubectl exec on the webserver container MUST reach a http port on the each of service proxy endpoints in the cluster and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 		*/
 		ginkgo.It("should function for intra-pod communication: http", func() {
-			config := framework.NewCoreNetworkingTestConfig(f, false)
+			config := networking.NewCoreNetworkingTestConfig(f, false)
 			for _, endpointPod := range config.EndpointPods {
 				config.DialFromTestContainer("http", endpointPod.Status.PodIP, framework.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
@@ -59,7 +60,7 @@ var _ = ginkgo.Describe("[sig-network] [sig-windows] Networking", func() {
 			The kubectl exec on the webserver container MUST reach a udp port on the each of service proxy endpoints in the cluster and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 		*/
 		ginkgo.It("should function for intra-pod communication: udp", func() {
-			config := framework.NewCoreNetworkingTestConfig(f, false)
+			config := networking.NewCoreNetworkingTestConfig(f, false)
 			for _, endpointPod := range config.EndpointPods {
 				config.DialFromTestContainer("udp", endpointPod.Status.PodIP, framework.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
@@ -72,7 +73,7 @@ var _ = ginkgo.Describe("[sig-network] [sig-windows] Networking", func() {
 			The kubectl exec on the webserver container MUST reach a http port on the each of service proxy endpoints in the cluster using a http post(protocol=tcp)  and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 		*/
 		ginkgo.It("should function for node-pod communication: http", func() {
-			config := framework.NewCoreNetworkingTestConfig(f, false)
+			config := networking.NewCoreNetworkingTestConfig(f, false)
 			for _, endpointPod := range config.EndpointPods {
 				config.DialFromNode("http", endpointPod.Status.PodIP, framework.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
@@ -85,7 +86,7 @@ var _ = ginkgo.Describe("[sig-network] [sig-windows] Networking", func() {
 			The kubectl exec on the webserver container MUST reach a http port on the each of service proxy endpoints in the cluster using a http post(protocol=udp)  and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
 		*/
 		ginkgo.It("should function for node-pod communication: udp", func() {
-			config := framework.NewCoreNetworkingTestConfig(f, false)
+			config := networking.NewCoreNetworkingTestConfig(f, false)
 			for _, endpointPod := range config.EndpointPods {
 				config.DialFromNode("udp", endpointPod.Status.PodIP, framework.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
