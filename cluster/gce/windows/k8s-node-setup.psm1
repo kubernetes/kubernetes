@@ -1079,6 +1079,22 @@ function Configure-Dockerd {
 $STACKDRIVER_VERSION = 'v1-9'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 
+
+# Restart the Stackdriver logging agent
+# `Restart-Service StackdriverLogging` may fail because StackdriverLogging
+# sometimes is unstoppable, so we work around it by killing the processes.
+function Restart-StackdriverLoggingAgent {
+  Stop-Service -NoWait StackdriverLogging
+  # TODO: check periodically to lower the wait time
+  Start-Sleep 10
+  if ((Get-service StackdriverLogging).Status -ne 'Stopped') {
+    # Force kill the processes.
+    Stop-Process -Force -PassThru -Id (Get-WmiObject win32_process |
+      Where CommandLine -Like '*Stackdriver/logging*').ProcessId
+  }
+  Start-Service StackdriverLogging
+}
+
 # Install and start the Stackdriver logging agent according to
 # https://cloud.google.com/logging/docs/agent/installation.
 # TODO(yujuhong): Update to a newer Stackdriver agent once it is released to
@@ -1105,7 +1121,7 @@ function InstallAndStart-LoggingAgent {
                 "Stackdriver logging agent is already installed")
     # Restart-Service restarts a running service or starts a not-running
     # service.
-    Restart-Service StackdriverLogging
+    Restart-StackdriverLoggingAgent
     return
   }
 
@@ -1136,7 +1152,7 @@ function InstallAndStart-LoggingAgent {
       -Encoding ASCII
 
   # Restart the service to pick up the new configurations.
-  Restart-Service StackdriverLogging
+  Restart-StackdriverLoggingAgent
   Remove-Item -Force -Recurse $tmp_dir
 }
 
