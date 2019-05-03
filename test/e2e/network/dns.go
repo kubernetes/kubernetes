@@ -21,10 +21,11 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -373,9 +374,9 @@ var _ = SIGDescribe("DNS", func() {
 		})
 		testServerPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testServerPod)
 		Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testServerPod.Name)
-		framework.Logf("Created pod %v", testServerPod)
+		e2elog.Logf("Created pod %v", testServerPod)
 		defer func() {
-			framework.Logf("Deleting pod %s...", testServerPod.Name)
+			e2elog.Logf("Deleting pod %s...", testServerPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("Failed to delete pod %s: %v", testServerPod.Name, err)
 			}
@@ -386,7 +387,7 @@ var _ = SIGDescribe("DNS", func() {
 		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(testServerPod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "failed to get pod %v", testServerPod.Name)
 		testServerIP := testServerPod.Status.PodIP
-		framework.Logf("testServerIP is %s", testServerIP)
+		e2elog.Logf("testServerIP is %s", testServerIP)
 
 		By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
 		testUtilsPod := generateDNSUtilsPod()
@@ -404,9 +405,9 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testUtilsPod)
 		Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testUtilsPod.Name)
-		framework.Logf("Created pod %v", testUtilsPod)
+		e2elog.Logf("Created pod %v", testUtilsPod)
 		defer func() {
-			framework.Logf("Deleting pod %s...", testUtilsPod.Name)
+			e2elog.Logf("Deleting pod %s...", testUtilsPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testUtilsPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("Failed to delete pod %s: %v", testUtilsPod.Name, err)
 			}
@@ -445,12 +446,12 @@ var _ = SIGDescribe("DNS", func() {
 				CaptureStderr: true,
 			})
 			if err != nil {
-				framework.Logf("Failed to execute dig command, stdout:%v, stderr: %v, err: %v", stdout, stderr, err)
+				e2elog.Logf("Failed to execute dig command, stdout:%v, stderr: %v, err: %v", stdout, stderr, err)
 				return false, nil
 			}
 			res := strings.Split(stdout, "\n")
 			if len(res) != 1 || res[0] != testInjectedIP {
-				framework.Logf("Expect command `%v` to return %s, got: %v", cmd, testInjectedIP, res)
+				e2elog.Logf("Expect command `%v` to return %s, got: %v", cmd, testInjectedIP, res)
 				return false, nil
 			}
 			return true, nil

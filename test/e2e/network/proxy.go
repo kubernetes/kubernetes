@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/endpoints"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -208,7 +209,7 @@ var _ = SIGDescribe("Proxy", func() {
 				errs = append(errs, s)
 			}
 			d := time.Since(start)
-			framework.Logf("setup took %v, starting test cases", d)
+			e2elog.Logf("setup took %v, starting test cases", d)
 			numberTestCases := len(expectations)
 			totalAttempts := numberTestCases * proxyAttempts
 			By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
@@ -247,9 +248,9 @@ var _ = SIGDescribe("Proxy", func() {
 			if len(errs) != 0 {
 				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
 				if err != nil {
-					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
+					e2elog.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {
-					framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
+					e2elog.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
 				framework.Failf(strings.Join(errs, "\n"))
@@ -269,9 +270,9 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
-		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
+		e2elog.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
 	} else {
-		framework.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
+		e2elog.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
 	}
 	return
 }
@@ -303,7 +304,7 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 	for i := 0; i < proxyAttempts; i++ {
 		_, status, d, err := doProxy(f, prefix+node+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
-			framework.Logf("Failed proxying node logs due to service unavailable: %v", err)
+			e2elog.Logf("Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)
 			serviceUnavailableErrors++
 		} else {
@@ -313,7 +314,7 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 		}
 	}
 	if serviceUnavailableErrors > 0 {
-		framework.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
+		e2elog.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
 	}
 	maxFailures := int(math.Floor(0.1 * float64(proxyAttempts)))
 	Expect(serviceUnavailableErrors).To(BeNumerically("<", maxFailures))

@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -156,7 +157,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		err = wait.Poll(itv, dur, func() (bool, error) {
 			_, err = c.CoreV1().Secrets(ns).Get(secret.Name, metav1.GetOptions{})
 			if err != nil {
-				framework.Logf("Failed to get secret %v, err: %v", secret.Name, err)
+				e2elog.Logf("Failed to get secret %v, err: %v", secret.Name, err)
 				return false, nil
 			}
 			return true, nil

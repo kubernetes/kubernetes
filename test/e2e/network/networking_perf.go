@@ -24,8 +24,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -110,8 +111,8 @@ func networkingIPerfTest(isIPv6 bool) {
 			numClient,
 		)
 
-		framework.Logf("Reading all perf results to stdout.")
-		framework.Logf("date,cli,cliPort,server,serverPort,id,interval,transferBits,bandwidthBits")
+		e2elog.Logf("Reading all perf results to stdout.")
+		e2elog.Logf("date,cli,cliPort,server,serverPort,id,interval,transferBits,bandwidthBits")
 
 		// Calculate expected number of clients based on total nodes.
 		expectedCli := func() int {
@@ -142,7 +143,7 @@ func networkingIPerfTest(isIPv6 bool) {
 				func(p v1.Pod) {
 					resultS, err := framework.LookForStringInLog(f.Namespace.Name, p.Name, "iperf-client", "0-", 1*time.Second)
 					if err == nil {
-						framework.Logf(resultS)
+						e2elog.Logf(resultS)
 						iperfResults.Add(NewIPerf(resultS))
 					} else {
 						framework.Failf("Unexpected error, %v when running forEach on the pods.", err)
@@ -154,7 +155,7 @@ func networkingIPerfTest(isIPv6 bool) {
 		fmt.Println("[end] Node,Bandwidth CSV")
 
 		for ipClient, bandwidth := range iperfResults.BandwidthMap {
-			framework.Logf("%v had bandwidth %v.  Ratio to expected (%v) was %f", ipClient, bandwidth, expectedBandwidth, float64(bandwidth)/float64(expectedBandwidth))
+			e2elog.Logf("%v had bandwidth %v.  Ratio to expected (%v) was %f", ipClient, bandwidth, expectedBandwidth, float64(bandwidth)/float64(expectedBandwidth))
 		}
 	})
 }

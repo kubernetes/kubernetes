@@ -38,6 +38,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -90,7 +91,7 @@ var _ = SIGDescribe("Services", func() {
 			framework.DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {
-			framework.Logf("cleaning load balancer resource for %s", lb)
+			e2elog.Logf("cleaning load balancer resource for %s", lb)
 			framework.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
@@ -256,7 +257,7 @@ var _ = SIGDescribe("Services", func() {
 				framework.Skipf("The test doesn't work with kube-proxy in userspace mode")
 			}
 		} else {
-			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
+			e2elog.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
 		}
 
 		serviceName := "sourceip-test"
@@ -268,12 +269,12 @@ var _ = SIGDescribe("Services", func() {
 		tcpService := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
 		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
 		defer func() {
-			framework.Logf("Cleaning up the sourceip test service")
+			e2elog.Logf("Cleaning up the sourceip test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred(), "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
 		serviceIp := tcpService.Spec.ClusterIP
-		framework.Logf("sourceip-test cluster ip: %s", serviceIp)
+		e2elog.Logf("sourceip-test cluster ip: %s", serviceIp)
 
 		By("Picking multiple nodes")
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
@@ -289,7 +290,7 @@ var _ = SIGDescribe("Services", func() {
 		serverPodName := "echoserver-sourceip"
 		jig.LaunchEchoserverPodOnNode(f, node1.Name, serverPodName)
 		defer func() {
-			framework.Logf("Cleaning up the echo server pod")
+			e2elog.Logf("Cleaning up the echo server pod")
 			err := cs.CoreV1().Pods(ns).Delete(serverPodName, nil)
 			Expect(err).NotTo(HaveOccurred(), "failed to delete pod: %s on node: %s", serverPodName, node1.Name)
 		}()
@@ -521,13 +522,13 @@ var _ = SIGDescribe("Services", func() {
 
 		serviceName := "mutability-test"
 		ns1 := f.Namespace.Name // LB1 in ns1 on TCP
-		framework.Logf("namespace for TCP test: %s", ns1)
+		e2elog.Logf("namespace for TCP test: %s", ns1)
 
 		By("creating a second namespace")
 		namespacePtr, err := f.CreateNamespace("services", nil)
 		Expect(err).NotTo(HaveOccurred(), "failed to create namespace")
 		ns2 := namespacePtr.Name // LB2 in ns2 on UDP
-		framework.Logf("namespace for UDP test: %s", ns2)
+		e2elog.Logf("namespace for UDP test: %s", ns2)
 
 		jig := framework.NewServiceTestJig(cs, serviceName)
 		nodeIP := framework.PickNodeIP(jig.Client) // for later
@@ -548,7 +549,7 @@ var _ = SIGDescribe("Services", func() {
 			framework.Failf("expected to use the same port for TCP and UDP")
 		}
 		svcPort := int(tcpService.Spec.Ports[0].Port)
-		framework.Logf("service port (TCP and UDP): %d", svcPort)
+		e2elog.Logf("service port (TCP and UDP): %d", svcPort)
 
 		By("creating a pod to be part of the TCP service " + serviceName)
 		jig.RunOrFail(ns1, nil)
@@ -564,7 +565,7 @@ var _ = SIGDescribe("Services", func() {
 		})
 		jig.SanityCheckService(tcpService, v1.ServiceTypeNodePort)
 		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
-		framework.Logf("TCP node port: %d", tcpNodePort)
+		e2elog.Logf("TCP node port: %d", tcpNodePort)
 
 		By("changing the UDP service to type=NodePort")
 		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *v1.Service) {
@@ -572,7 +573,7 @@ var _ = SIGDescribe("Services", func() {
 		})
 		jig.SanityCheckService(udpService, v1.ServiceTypeNodePort)
 		udpNodePort := int(udpService.Spec.Ports[0].NodePort)
-		framework.Logf("UDP node port: %d", udpNodePort)
+		e2elog.Logf("UDP node port: %d", udpNodePort)
 
 		By("hitting the TCP service's NodePort")
 		jig.TestReachableHTTP(nodeIP, tcpNodePort, framework.KubeProxyLagTimeout)
@@ -597,7 +598,7 @@ var _ = SIGDescribe("Services", func() {
 				if staticIPName != "" {
 					// Release GCE static IP - this is not kube-managed and will not be automatically released.
 					if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
-						framework.Logf("failed to release static IP %s: %v", staticIPName, err)
+						e2elog.Logf("failed to release static IP %s: %v", staticIPName, err)
 					}
 				}
 			}()
@@ -606,7 +607,7 @@ var _ = SIGDescribe("Services", func() {
 			Expect(err).NotTo(HaveOccurred(), "failed to get region address: %s", staticIPName)
 
 			requestedIP = reservedAddr.Address
-			framework.Logf("Allocated static load balancer IP: %s", requestedIP)
+			e2elog.Logf("Allocated static load balancer IP: %s", requestedIP)
 		}
 
 		By("changing the TCP service to type=LoadBalancer")
@@ -637,7 +638,7 @@ var _ = SIGDescribe("Services", func() {
 			framework.Failf("unexpected TCP Status.LoadBalancer.Ingress (expected %s, got %s)", requestedIP, framework.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
 		}
 		tcpIngressIP := framework.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
-		framework.Logf("TCP load balancer: %s", tcpIngressIP)
+		e2elog.Logf("TCP load balancer: %s", tcpIngressIP)
 
 		if framework.ProviderIs("gce", "gke") {
 			// Do this as early as possible, which overrides the `defer` above.
@@ -667,7 +668,7 @@ var _ = SIGDescribe("Services", func() {
 				framework.Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
 			}
 			udpIngressIP = framework.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0])
-			framework.Logf("UDP load balancer: %s", udpIngressIP)
+			e2elog.Logf("UDP load balancer: %s", udpIngressIP)
 
 			By("verifying that TCP and UDP use different load balancers")
 			if tcpIngressIP == udpIngressIP {
@@ -702,7 +703,7 @@ var _ = SIGDescribe("Services", func() {
 		if framework.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]) != tcpIngressIP {
 			framework.Failf("TCP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", tcpIngressIP, framework.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
 		}
-		framework.Logf("TCP node port: %d", tcpNodePort)
+		e2elog.Logf("TCP node port: %d", tcpNodePort)
 
 		By("changing the UDP service's NodePort")
 		udpService = jig.ChangeServiceNodePortOrFail(ns2, udpService.Name, udpNodePort)
@@ -719,7 +720,7 @@ var _ = SIGDescribe("Services", func() {
 		if loadBalancerSupportsUDP && framework.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
 			framework.Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, framework.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
 		}
-		framework.Logf("UDP node port: %d", udpNodePort)
+		e2elog.Logf("UDP node port: %d", udpNodePort)
 
 		By("hitting the TCP service's new NodePort")
 		jig.TestReachableHTTP(nodeIP, tcpNodePort, framework.KubeProxyLagTimeout)
@@ -779,7 +780,7 @@ var _ = SIGDescribe("Services", func() {
 			framework.Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, framework.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
 		}
 
-		framework.Logf("service port (TCP and UDP): %d", svcPort)
+		e2elog.Logf("service port (TCP and UDP): %d", svcPort)
 
 		By("hitting the TCP service's NodePort")
 		jig.TestReachableHTTP(nodeIP, tcpNodePort, framework.KubeProxyLagTimeout)
@@ -876,13 +877,13 @@ var _ = SIGDescribe("Services", func() {
 		By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
 		tcpService := jig.CreateTCPServiceOrFail(ns, nil)
 		defer func() {
-			framework.Logf("Cleaning up the updating NodePorts test service")
+			e2elog.Logf("Cleaning up the updating NodePorts test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred(), "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
 		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
 		svcPort := int(tcpService.Spec.Ports[0].Port)
-		framework.Logf("service port TCP: %d", svcPort)
+		e2elog.Logf("service port TCP: %d", svcPort)
 
 		// Change the services to NodePort and add a UDP port.
 
@@ -911,7 +912,7 @@ var _ = SIGDescribe("Services", func() {
 				framework.Failf("new service failed to allocate NodePort for Port %s", port.Name)
 			}
 
-			framework.Logf("new service allocates NodePort %d for Port %s", port.NodePort, port.Name)
+			e2elog.Logf("new service allocates NodePort %d for Port %s", port.NodePort, port.Name)
 		}
 	})
 
@@ -923,7 +924,7 @@ var _ = SIGDescribe("Services", func() {
 		By("creating a service " + serviceName + " with the type=ExternalName in namespace " + ns)
 		externalNameService := jig.CreateExternalNameServiceOrFail(ns, nil)
 		defer func() {
-			framework.Logf("Cleaning up the ExternalName to ClusterIP test service")
+			e2elog.Logf("Cleaning up the ExternalName to ClusterIP test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred(), "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
@@ -947,7 +948,7 @@ var _ = SIGDescribe("Services", func() {
 		By("creating a service " + serviceName + " with the type=ExternalName in namespace " + ns)
 		externalNameService := jig.CreateExternalNameServiceOrFail(ns, nil)
 		defer func() {
-			framework.Logf("Cleaning up the ExternalName to NodePort test service")
+			e2elog.Logf("Cleaning up the ExternalName to NodePort test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred(), "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
@@ -971,7 +972,7 @@ var _ = SIGDescribe("Services", func() {
 		By("creating a service " + serviceName + " with the type=ClusterIP in namespace " + ns)
 		clusterIPService := jig.CreateTCPServiceOrFail(ns, nil)
 		defer func() {
-			framework.Logf("Cleaning up the ClusterIP to ExternalName test service")
+			e2elog.Logf("Cleaning up the ClusterIP to ExternalName test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred(), "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
@@ -995,7 +996,7 @@ var _ = SIGDescribe("Services", func() {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
 		defer func() {
-			framework.Logf("Cleaning up the NodePort to ExternalName test service")
+			e2elog.Logf("Cleaning up the NodePort to ExternalName test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred(), "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
@@ -1226,7 +1227,7 @@ var _ = SIGDescribe("Services", func() {
 			var err error
 			stdout, err = framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 			if err != nil {
-				framework.Logf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
+				e2elog.Logf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
 				return false, nil
 			}
 			return true, nil
@@ -1318,7 +1319,7 @@ var _ = SIGDescribe("Services", func() {
 			var err error
 			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
-				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
+				e2elog.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
 			}
 			return true, nil
@@ -1341,7 +1342,7 @@ var _ = SIGDescribe("Services", func() {
 			var err error
 			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
-				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
+				e2elog.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
 			}
 			return true, nil
@@ -1361,7 +1362,7 @@ var _ = SIGDescribe("Services", func() {
 			var err error
 			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
-				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
+				e2elog.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
 			}
 			return true, nil
@@ -1375,13 +1376,13 @@ var _ = SIGDescribe("Services", func() {
 		podClient := t.Client.CoreV1().Pods(f.Namespace.Name)
 		pods, err := podClient.List(options)
 		if err != nil {
-			framework.Logf("warning: error retrieving pods: %s", err)
+			e2elog.Logf("warning: error retrieving pods: %s", err)
 		} else {
 			for _, pod := range pods.Items {
 				var gracePeriodSeconds int64 = 0
 				err := podClient.Delete(pod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriodSeconds})
 				if err != nil {
-					framework.Logf("warning: error force deleting pod '%s': %s", pod.Name, err)
+					e2elog.Logf("warning: error force deleting pod '%s': %s", pod.Name, err)
 				}
 			}
 		}
@@ -1504,25 +1505,25 @@ var _ = SIGDescribe("Services", func() {
 		// ILBs are not accessible from the test orchestrator, so it's necessary to use
 		//  a pod to test the service.
 		By("hitting the internal load balancer from pod")
-		framework.Logf("creating pod with host network")
+		e2elog.Logf("creating pod with host network")
 		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec")
 
-		framework.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
+		e2elog.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
 		tcpIngressIP := framework.GetIngressPoint(lbIngress)
 		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
 			cmd := fmt.Sprintf(`curl -m 5 'http://%v:%v/echo?msg=hello'`, tcpIngressIP, svcPort)
 			stdout, err := framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 			if err != nil {
-				framework.Logf("error curling; stdout: %v. err: %v", stdout, err)
+				e2elog.Logf("error curling; stdout: %v. err: %v", stdout, err)
 				return false, nil
 			}
 
 			if !strings.Contains(stdout, "hello") {
-				framework.Logf("Expected output to contain 'hello', got %q; retrying...", stdout)
+				e2elog.Logf("Expected output to contain 'hello', got %q; retrying...", stdout)
 				return false, nil
 			}
 
-			framework.Logf("Successful curl; stdout: %v", stdout)
+			e2elog.Logf("Successful curl; stdout: %v", stdout)
 			return true, nil
 		}); pollErr != nil {
 			framework.Failf("Failed to hit ILB IP, err: %v", pollErr)
@@ -1532,7 +1533,7 @@ var _ = SIGDescribe("Services", func() {
 		svc = jig.UpdateServiceOrFail(namespace, serviceName, func(svc *v1.Service) {
 			disableILB(svc)
 		})
-		framework.Logf("Waiting up to %v for service %q to have an external LoadBalancer", createTimeout, serviceName)
+		e2elog.Logf("Waiting up to %v for service %q to have an external LoadBalancer", createTimeout, serviceName)
 		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
 			svc, err := jig.Client.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
 			if err != nil {
@@ -1548,7 +1549,7 @@ var _ = SIGDescribe("Services", func() {
 		Expect(isInternalEndpoint(lbIngress)).To(BeFalse())
 
 		By("hitting the external load balancer")
-		framework.Logf("Waiting up to %v for service %q's external LB to respond to requests", createTimeout, serviceName)
+		e2elog.Logf("Waiting up to %v for service %q's external LB to respond to requests", createTimeout, serviceName)
 		tcpIngressIP = framework.GetIngressPoint(lbIngress)
 		jig.TestReachableHTTP(tcpIngressIP, svcPort, framework.LoadBalancerLagTimeoutDefault)
 
@@ -1561,7 +1562,7 @@ var _ = SIGDescribe("Services", func() {
 				svc.Spec.LoadBalancerIP = internalStaticIP
 				enableILB(svc)
 			})
-			framework.Logf("Waiting up to %v for service %q to have an internal LoadBalancer", createTimeout, serviceName)
+			e2elog.Logf("Waiting up to %v for service %q to have an internal LoadBalancer", createTimeout, serviceName)
 			if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
 				svc, err := jig.Client.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
 				if err != nil {
@@ -1644,10 +1645,10 @@ var _ = SIGDescribe("Services", func() {
 		if pollErr := wait.PollImmediate(pollInterval, framework.LoadBalancerCreateTimeoutDefault, func() (bool, error) {
 			hc, err := gceCloud.GetHTTPHealthCheck(hcName)
 			if err != nil {
-				framework.Logf("Failed to get HttpHealthCheck(%q): %v", hcName, err)
+				e2elog.Logf("Failed to get HttpHealthCheck(%q): %v", hcName, err)
 				return false, err
 			}
-			framework.Logf("hc.CheckIntervalSec = %v", hc.CheckIntervalSec)
+			e2elog.Logf("hc.CheckIntervalSec = %v", hc.CheckIntervalSec)
 			return hc.CheckIntervalSec == gceHcCheckIntervalSeconds, nil
 		}); pollErr != nil {
 			framework.Failf("Health check %q does not reconcile its check interval to %d.", hcName, gceHcCheckIntervalSeconds)
@@ -1814,7 +1815,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		serviceAddress := net.JoinHostPort(serviceName, strconv.Itoa(port))
-		framework.Logf("waiting up to %v wget %v", framework.KubeProxyEndpointLagTimeout, serviceAddress)
+		e2elog.Logf("waiting up to %v wget %v", framework.KubeProxyEndpointLagTimeout, serviceAddress)
 		cmd := fmt.Sprintf(`wget -T 3 -qO- %v`, serviceAddress)
 
 		By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
@@ -1824,10 +1825,10 @@ var _ = SIGDescribe("Services", func() {
 
 			if err != nil {
 				if strings.Contains(strings.ToLower(err.Error()), expectedErr) {
-					framework.Logf("error contained '%s', as expected: %s", expectedErr, err.Error())
+					e2elog.Logf("error contained '%s', as expected: %s", expectedErr, err.Error())
 					return true, nil
 				} else {
-					framework.Logf("error didn't contain '%s', keep trying: %s", expectedErr, err.Error())
+					e2elog.Logf("error didn't contain '%s', keep trying: %s", expectedErr, err.Error())
 					return false, nil
 				}
 			} else {
@@ -1863,7 +1864,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 			framework.DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {
-			framework.Logf("cleaning load balancer resource for %s", lb)
+			e2elog.Logf("cleaning load balancer resource for %s", lb)
 			framework.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
@@ -1898,7 +1899,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		By("reading clientIP using the TCP service's service port via its external VIP")
 		content := jig.GetHTTPContent(ingressIP, svcTCPPort, framework.KubeProxyLagTimeout, "/clientip")
 		clientIP := content.String()
-		framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
+		e2elog.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
 
 		By("checking if Source IP is preserved")
 		if strings.HasPrefix(clientIP, "10.") {
@@ -1925,7 +1926,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 			By(fmt.Sprintf("reading clientIP using the TCP service's NodePort, on node %v: %v%v%v", nodeName, nodeIP, tcpNodePort, path))
 			content := jig.GetHTTPContent(nodeIP, tcpNodePort, framework.KubeProxyLagTimeout, path)
 			clientIP := content.String()
-			framework.Logf("ClientIP detected by target pod using NodePort is %s", clientIP)
+			e2elog.Logf("ClientIP detected by target pod using NodePort is %s", clientIP)
 			if strings.HasPrefix(clientIP, "10.") {
 				framework.Failf("Source IP was NOT preserved")
 			}
@@ -1989,7 +1990,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 				expectedSuccess := nodes.Items[n].Name == endpointNodeName
 				port := strconv.Itoa(healthCheckNodePort)
 				ipPort := net.JoinHostPort(publicIP, port)
-				framework.Logf("Health checking %s, http://%s%s, expectedSuccess %v", nodes.Items[n].Name, ipPort, path, expectedSuccess)
+				e2elog.Logf("Health checking %s, http://%s%s, expectedSuccess %v", nodes.Items[n].Name, ipPort, path, expectedSuccess)
 				Expect(jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, framework.KubeProxyEndpointLagTimeout, expectedSuccess, threshold)).NotTo(HaveOccurred())
 			}
 			framework.ExpectNoError(framework.DeleteRCAndWaitForGC(f.ClientSet, namespace, serviceName))
@@ -2027,7 +2028,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		execPod, err := f.ClientSet.CoreV1().Pods(namespace).Get(execPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		framework.Logf("Waiting up to %v wget %v", framework.KubeProxyLagTimeout, path)
+		e2elog.Logf("Waiting up to %v wget %v", framework.KubeProxyLagTimeout, path)
 		cmd := fmt.Sprintf(`wget -T 30 -qO- %v`, path)
 
 		var srcIP string
@@ -2035,7 +2036,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		if pollErr := wait.PollImmediate(framework.Poll, framework.LoadBalancerCreateTimeoutDefault, func() (bool, error) {
 			stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
-				framework.Logf("got err: %v, retry until timeout", err)
+				e2elog.Logf("got err: %v, retry until timeout", err)
 				return false, nil
 			}
 			srcIP = strings.TrimSpace(strings.Split(stdout, ":")[0])
@@ -2154,12 +2155,12 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 })
 
 func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeName, serviceIP string, servicePort int) (string, string) {
-	framework.Logf("Creating an exec pod on node %v", nodeName)
+	e2elog.Logf("Creating an exec pod on node %v", nodeName)
 	execPodName := framework.CreateExecPodOrFail(f.ClientSet, ns, fmt.Sprintf("execpod-sourceip-%s", nodeName), func(pod *v1.Pod) {
 		pod.Spec.NodeName = nodeName
 	})
 	defer func() {
-		framework.Logf("Cleaning up the exec pod")
+		e2elog.Logf("Cleaning up the exec pod")
 		err := c.CoreV1().Pods(ns).Delete(execPodName, nil)
 		Expect(err).NotTo(HaveOccurred(), "failed to delete pod: %s", execPodName)
 	}()
@@ -2169,17 +2170,17 @@ func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeNam
 	var stdout string
 	serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 	timeout := 2 * time.Minute
-	framework.Logf("Waiting up to %v wget %s", timeout, serviceIPPort)
+	e2elog.Logf("Waiting up to %v wget %s", timeout, serviceIPPort)
 	cmd := fmt.Sprintf(`wget -T 30 -qO- %s | grep client_address`, serviceIPPort)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		stdout, err = framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
-			framework.Logf("got err: %v, retry until timeout", err)
+			e2elog.Logf("got err: %v, retry until timeout", err)
 			continue
 		}
 		// Need to check output because wget -q might omit the error.
 		if strings.TrimSpace(stdout) == "" {
-			framework.Logf("got empty stdout, retry until timeout")
+			e2elog.Logf("got empty stdout, retry until timeout")
 			continue
 		}
 		break
@@ -2237,7 +2238,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 
 	execPodName := framework.CreateExecPodOrFail(cs, ns, "execpod-affinity", nil)
 	defer func() {
-		framework.Logf("Cleaning up the exec pod")
+		e2elog.Logf("Cleaning up the exec pod")
 		err := cs.CoreV1().Pods(ns).Delete(execPodName, nil)
 		Expect(err).NotTo(HaveOccurred(), "failed to delete pod: %s in namespace: %s", execPodName, ns)
 	}()
@@ -2283,10 +2284,10 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 	jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 	defer func() {
 		podNodePairs, err := framework.PodNodePairs(cs, ns)
-		framework.Logf("[pod,node] pairs: %+v; err: %v", podNodePairs, err)
+		e2elog.Logf("[pod,node] pairs: %+v; err: %v", podNodePairs, err)
 		framework.StopServeHostnameService(cs, ns, serviceName)
 		lb := cloudprovider.DefaultLoadBalancerName(svc)
-		framework.Logf("cleaning load balancer resource for %s", lb)
+		e2elog.Logf("cleaning load balancer resource for %s", lb)
 		framework.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 	}()
 	ingressIP := framework.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
