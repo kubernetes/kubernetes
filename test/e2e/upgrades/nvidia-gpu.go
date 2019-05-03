@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/gpu"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -89,7 +90,7 @@ func (t *NvidiaGPUUpgradeTest) startJob(f *framework.Framework) {
 	ns := f.Namespace.Name
 	_, err := jobutil.CreateJob(f.ClientSet, ns, testJob)
 	framework.ExpectNoError(err)
-	framework.Logf("Created job %v", testJob)
+	e2elog.Logf("Created job %v", testJob)
 	ginkgo.By("Waiting for gpu job pod start")
 	err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, ns, testJob.Name, 1)
 	framework.ExpectNoError(err)
@@ -105,11 +106,11 @@ func (t *NvidiaGPUUpgradeTest) verifyJobPodSuccess(f *framework.Framework) {
 	pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, "cuda-add")
 	framework.ExpectNoError(err)
 	createdPod := pods.Items[0].Name
-	framework.Logf("Created pod %v", createdPod)
+	e2elog.Logf("Created pod %v", createdPod)
 	f.PodClient().WaitForSuccess(createdPod, 5*time.Minute)
 	logs, err := framework.GetPodLogs(f.ClientSet, ns, createdPod, "vector-addition")
 	framework.ExpectNoError(err, "Should be able to get pod logs")
-	framework.Logf("Got pod logs: %v", logs)
+	e2elog.Logf("Got pod logs: %v", logs)
 	regex := regexp.MustCompile("PASSED")
 	gomega.Expect(regex.MatchString(logs)).To(gomega.BeTrue())
 }

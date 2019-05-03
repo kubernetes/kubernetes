@@ -26,7 +26,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +40,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -68,14 +69,14 @@ func testHostIP(podClient *framework.PodClient, pod *v1.Pod) {
 		p, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to get pod %q", pod.Name)
 		if p.Status.HostIP != "" {
-			framework.Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
+			e2elog.Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
 			break
 		}
 		if time.Since(t) >= hostIPTimeout {
 			framework.Failf("Gave up waiting for hostIP of pod %s after %v seconds",
 				p.Name, time.Since(t).Seconds())
 		}
-		framework.Logf("Retrying to get the hostIP of pod %s", p.Name)
+		e2elog.Logf("Retrying to get the hostIP of pod %s", p.Name)
 		time.Sleep(5 * time.Second)
 	}
 }
@@ -117,13 +118,13 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 		status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, containerName)
 		if !ok {
-			framework.Logf("getRestartDelay: status missing")
+			e2elog.Logf("getRestartDelay: status missing")
 			continue
 		}
 
 		// the only case this happens is if this is the first time the Pod is running and there is no "Last State".
 		if status.LastTerminationState.Terminated == nil {
-			framework.Logf("Container's last state is not \"Terminated\".")
+			e2elog.Logf("Container's last state is not \"Terminated\".")
 			continue
 		}
 
@@ -150,7 +151,7 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 			} else {
 				startedAt = status.LastTerminationState.Terminated.StartedAt.Time
 			}
-			framework.Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, previousFinishedAt, startedAt, startedAt.Sub(previousFinishedAt))
+			e2elog.Logf("getRestartDelay: restartCount = %d, finishedAt=%s restartedAt=%s (%s)", status.RestartCount, previousFinishedAt, startedAt, startedAt.Sub(previousFinishedAt))
 			return startedAt.Sub(previousFinishedAt), nil
 		}
 	}
@@ -232,10 +233,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 				if err == nil {
 					select {
 					case listCompleted <- true:
-						framework.Logf("observed the pod list")
+						e2elog.Logf("observed the pod list")
 						return podList, err
 					default:
-						framework.Logf("channel blocked")
+						e2elog.Logf("channel blocked")
 					}
 				}
 				return podList, err
@@ -288,7 +289,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		gomega.Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
 			podList, err := framework.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 			if err != nil {
-				framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
+				e2elog.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
 				return false, nil
 			}
 			for _, kubeletPod := range podList.Items {
@@ -296,12 +297,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 					continue
 				}
 				if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
-					framework.Logf("deletion has not yet been observed")
+					e2elog.Logf("deletion has not yet been observed")
 					return false, nil
 				}
 				return true, nil
 			}
-			framework.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
+			e2elog.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
 			return true, nil
 		})).NotTo(gomega.HaveOccurred(), "kubelet never observed the termination notice")
 
@@ -317,7 +318,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 					lastPod = event.Object.(*v1.Pod)
 					deleted = true
 				case watch.Error:
-					framework.Logf("received a watch error: %v", event.Object)
+					e2elog.Logf("received a watch error: %v", event.Object)
 					framework.Failf("watch closed with error")
 				}
 			case <-timer:
@@ -389,7 +390,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		pods, err = podClient.List(options)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pods")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
-		framework.Logf("Pod update OK")
+		e2elog.Logf("Pod update OK")
 	})
 
 	/*
@@ -801,7 +802,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				podReady := podClient.PodIsReady(podName)
 				res := expectReady == podReady
 				if !res {
-					framework.Logf("Expect the Ready condition of pod %q to be %v, but got %v", podName, expectReady, podReady)
+					e2elog.Logf("Expect the Ready condition of pod %q to be %v, but got %v", podName, expectReady, podReady)
 				}
 				return res, nil
 			})).NotTo(gomega.HaveOccurred())

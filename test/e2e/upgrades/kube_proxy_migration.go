@@ -21,12 +21,13 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -104,12 +105,12 @@ func (t *KubeProxyDowngradeTest) Teardown(f *framework.Framework) {
 }
 
 func waitForKubeProxyStaticPodsRunning(c clientset.Interface) error {
-	framework.Logf("Waiting up to %v for kube-proxy static pods running", defaultTestTimeout)
+	e2elog.Logf("Waiting up to %v for kube-proxy static pods running", defaultTestTimeout)
 
 	condition := func() (bool, error) {
 		pods, err := getKubeProxyStaticPods(c)
 		if err != nil {
-			framework.Logf("Failed to get kube-proxy static pods: %v", err)
+			e2elog.Logf("Failed to get kube-proxy static pods: %v", err)
 			return false, nil
 		}
 
@@ -121,7 +122,7 @@ func waitForKubeProxyStaticPodsRunning(c clientset.Interface) error {
 			}
 		}
 		if numberkubeProxyPods != numberSchedulableNodes {
-			framework.Logf("Expect %v kube-proxy static pods running, got %v running, %v in total", numberSchedulableNodes, numberkubeProxyPods, len(pods.Items))
+			e2elog.Logf("Expect %v kube-proxy static pods running, got %v running, %v in total", numberSchedulableNodes, numberkubeProxyPods, len(pods.Items))
 			return false, nil
 		}
 		return true, nil
@@ -134,17 +135,17 @@ func waitForKubeProxyStaticPodsRunning(c clientset.Interface) error {
 }
 
 func waitForKubeProxyStaticPodsDisappear(c clientset.Interface) error {
-	framework.Logf("Waiting up to %v for kube-proxy static pods disappear", defaultTestTimeout)
+	e2elog.Logf("Waiting up to %v for kube-proxy static pods disappear", defaultTestTimeout)
 
 	condition := func() (bool, error) {
 		pods, err := getKubeProxyStaticPods(c)
 		if err != nil {
-			framework.Logf("Failed to get kube-proxy static pods: %v", err)
+			e2elog.Logf("Failed to get kube-proxy static pods: %v", err)
 			return false, nil
 		}
 
 		if len(pods.Items) != 0 {
-			framework.Logf("Expect kube-proxy static pods to disappear, got %v pods", len(pods.Items))
+			e2elog.Logf("Expect kube-proxy static pods to disappear, got %v pods", len(pods.Items))
 			return false, nil
 		}
 		return true, nil
@@ -157,24 +158,24 @@ func waitForKubeProxyStaticPodsDisappear(c clientset.Interface) error {
 }
 
 func waitForKubeProxyDaemonSetRunning(c clientset.Interface) error {
-	framework.Logf("Waiting up to %v for kube-proxy DaemonSet running", defaultTestTimeout)
+	e2elog.Logf("Waiting up to %v for kube-proxy DaemonSet running", defaultTestTimeout)
 
 	condition := func() (bool, error) {
 		daemonSets, err := getKubeProxyDaemonSet(c)
 		if err != nil {
-			framework.Logf("Failed to get kube-proxy DaemonSet: %v", err)
+			e2elog.Logf("Failed to get kube-proxy DaemonSet: %v", err)
 			return false, nil
 		}
 
 		if len(daemonSets.Items) != 1 {
-			framework.Logf("Expect only one kube-proxy DaemonSet, got %v", len(daemonSets.Items))
+			e2elog.Logf("Expect only one kube-proxy DaemonSet, got %v", len(daemonSets.Items))
 			return false, nil
 		}
 
 		numberSchedulableNodes := len(framework.GetReadySchedulableNodesOrDie(c).Items)
 		numberkubeProxyPods := int(daemonSets.Items[0].Status.NumberAvailable)
 		if numberkubeProxyPods != numberSchedulableNodes {
-			framework.Logf("Expect %v kube-proxy DaemonSet pods running, got %v", numberSchedulableNodes, numberkubeProxyPods)
+			e2elog.Logf("Expect %v kube-proxy DaemonSet pods running, got %v", numberSchedulableNodes, numberkubeProxyPods)
 			return false, nil
 		}
 		return true, nil
@@ -187,17 +188,17 @@ func waitForKubeProxyDaemonSetRunning(c clientset.Interface) error {
 }
 
 func waitForKubeProxyDaemonSetDisappear(c clientset.Interface) error {
-	framework.Logf("Waiting up to %v for kube-proxy DaemonSet disappear", defaultTestTimeout)
+	e2elog.Logf("Waiting up to %v for kube-proxy DaemonSet disappear", defaultTestTimeout)
 
 	condition := func() (bool, error) {
 		daemonSets, err := getKubeProxyDaemonSet(c)
 		if err != nil {
-			framework.Logf("Failed to get kube-proxy DaemonSet: %v", err)
+			e2elog.Logf("Failed to get kube-proxy DaemonSet: %v", err)
 			return false, nil
 		}
 
 		if len(daemonSets.Items) != 0 {
-			framework.Logf("Expect kube-proxy DaemonSet to disappear, got %v DaemonSet", len(daemonSets.Items))
+			e2elog.Logf("Expect kube-proxy DaemonSet to disappear, got %v DaemonSet", len(daemonSets.Items))
 			return false, nil
 		}
 		return true, nil

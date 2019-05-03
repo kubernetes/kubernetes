@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -100,13 +101,13 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 			return false, nil
 		}
 		if _, err := t.countNames(); err != nil {
-			framework.Logf("Service endpoint is up but isn't responding")
+			e2elog.Logf("Service endpoint is up but isn't responding")
 			return false, nil
 		}
 		return true, nil
 	})
 	framework.ExpectNoError(err)
-	framework.Logf("Service endpoint is up")
+	e2elog.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 names to the database")
 	gomega.Expect(t.addName(strconv.Itoa(t.nextWrite))).NotTo(gomega.HaveOccurred())
@@ -126,7 +127,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	go wait.Until(func() {
 		_, err := t.countNames()
 		if err != nil {
-			framework.Logf("Error while trying to read data: %v", err)
+			e2elog.Logf("Error while trying to read data: %v", err)
 			readFailure++
 		} else {
 			readSuccess++
@@ -136,7 +137,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	wait.Until(func() {
 		err := t.addName(strconv.Itoa(t.nextWrite))
 		if err != nil {
-			framework.Logf("Error while trying to write data: %v", err)
+			e2elog.Logf("Error while trying to write data: %v", err)
 			writeFailure++
 		} else {
 			writeSuccess++
@@ -144,10 +145,10 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	}, framework.Poll, done)
 
 	t.successfulWrites = writeSuccess
-	framework.Logf("Successful reads: %d", readSuccess)
-	framework.Logf("Successful writes: %d", writeSuccess)
-	framework.Logf("Failed reads: %d", readFailure)
-	framework.Logf("Failed writes: %d", writeFailure)
+	e2elog.Logf("Successful reads: %d", readSuccess)
+	e2elog.Logf("Successful writes: %d", writeSuccess)
+	e2elog.Logf("Failed reads: %d", readFailure)
+	e2elog.Logf("Failed writes: %d", writeFailure)
 
 	// TODO: Not sure what the ratio defining a successful test run should be. At time of writing the
 	// test, failures only seem to happen when a race condition occurs (read/write starts, doesn't
