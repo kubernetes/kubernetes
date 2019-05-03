@@ -36,13 +36,13 @@ import (
 
 const (
 	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
-	MinShares     = 2
-	SharesPerCPU  = 1024
-	MilliCPUToCPU = 1000
+	minShares     = 2
+	sharesPerCPU  = 1024
+	milliCPUToCPU = 1000
 
 	// 100000 is equivalent to 100ms
-	QuotaPeriod    = 100000
-	MinQuotaPeriod = 1000
+	quotaPeriod    = 100000
+	minQuotaPeriod = 1000
 )
 
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.
@@ -59,15 +59,15 @@ func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
-		period = QuotaPeriod
+		period = quotaPeriod
 	}
 
 	// we then convert your milliCPU to a value normalized over a period
-	quota = (milliCPU * period) / MilliCPUToCPU
+	quota = (milliCPU * period) / milliCPUToCPU
 
 	// quota needs to be a minimum of 1ms.
-	if quota < MinQuotaPeriod {
-		quota = MinQuotaPeriod
+	if quota < minQuotaPeriod {
+		quota = minQuotaPeriod
 	}
 	return
 }
@@ -78,12 +78,12 @@ func MilliCPUToShares(milliCPU int64) uint64 {
 		// Docker converts zero milliCPU to unset, which maps to kernel default
 		// for unset: 1024. Return 2 here to really match kernel default for
 		// zero milliCPU.
-		return MinShares
+		return minShares
 	}
 	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
-	shares := (milliCPU * SharesPerCPU) / MilliCPUToCPU
-	if shares < MinShares {
-		return MinShares
+	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
+	if shares < minShares {
+		return minShares
 	}
 	return uint64(shares)
 }
@@ -160,22 +160,22 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 	// build the result
 	result := &ResourceConfig{}
 	if qosClass == v1.PodQOSGuaranteed {
-		result.CpuShares = &cpuShares
-		result.CpuQuota = &cpuQuota
-		result.CpuPeriod = &cpuPeriod
+		result.CPUShares = &cpuShares
+		result.CPUQuota = &cpuQuota
+		result.CPUPeriod = &cpuPeriod
 		result.Memory = &memoryLimits
 	} else if qosClass == v1.PodQOSBurstable {
-		result.CpuShares = &cpuShares
+		result.CPUShares = &cpuShares
 		if cpuLimitsDeclared {
-			result.CpuQuota = &cpuQuota
-			result.CpuPeriod = &cpuPeriod
+			result.CPUQuota = &cpuQuota
+			result.CPUPeriod = &cpuPeriod
 		}
 		if memoryLimitsDeclared {
 			result.Memory = &memoryLimits
 		}
 	} else {
-		shares := uint64(MinShares)
-		result.CpuShares = &shares
+		shares := uint64(minShares)
+		result.CPUShares = &shares
 	}
 	result.HugePageLimit = hugePageLimits
 	return result
@@ -219,7 +219,7 @@ func getCgroupProcs(dir string) ([]int, error) {
 	defer f.Close()
 
 	s := bufio.NewScanner(f)
-	out := []int{}
+	var out []int
 	for s.Scan() {
 		if t := s.Text(); t != "" {
 			pid, err := strconv.Atoi(t)

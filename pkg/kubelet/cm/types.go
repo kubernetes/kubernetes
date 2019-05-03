@@ -25,12 +25,12 @@ import (
 type ResourceConfig struct {
 	// Memory limit (in bytes).
 	Memory *int64
-	// CPU shares (relative weight vs. other containers).
-	CpuShares *uint64
-	// CPU hardcap limit (in usecs). Allowed cpu time in a given period.
-	CpuQuota *int64
-	// CPU quota period.
-	CpuPeriod *uint64
+	// CPUShares are the CPU shares (relative weight vs. other containers).
+	CPUShares *uint64
+	// CPUQuota is the hardcap limit (in usecs). Allowed CPU time in a given period.
+	CPUQuota *int64
+	// CPUPeriod of the quota.
+	CPUPeriod *uint64
 	// HugePageLimit map from page size (in bytes) to limit (in bytes)
 	HugePageLimit map[int64]int64
 	// Maximum number of pids
@@ -41,6 +41,9 @@ type ResourceConfig struct {
 // It is specified as a list of strings from its individual components, such as:
 // {"kubepods", "burstable", "pod1234-abcd-5678-efgh"}
 type CgroupName []string
+
+// RootCgroupName is the root cgroup name.
+var RootCgroupName = CgroupName([]string{})
 
 // CgroupConfig holds the cgroup configuration information.
 // This is common object which is used to specify
@@ -86,8 +89,8 @@ type CgroupManager interface {
 	Name(name CgroupName) string
 	// CgroupName converts the literal cgroupfs name on the host to an internal identifier.
 	CgroupName(name string) CgroupName
-	// Pids scans through all subsystems to find pids associated with specified cgroup.
-	Pids(name CgroupName) []int
+	// PIDs scans through all subsystems to find pids associated with specified cgroup.
+	PIDs(name CgroupName) []int
 	// ReduceCPULimits reduces the CPU CFS values to the minimum amount of shares.
 	ReduceCPULimits(cgroupName CgroupName) error
 	// GetResourceStats returns statistics of the specified cgroup as read from the cgroup fs.

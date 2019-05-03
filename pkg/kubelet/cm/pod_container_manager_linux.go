@@ -148,7 +148,7 @@ func (m *podContainerManagerImpl) killOnePid(pid int) error {
 // Scan through the whole cgroup directory and kill all processes either
 // attached to the pod cgroup or to a container cgroup under the pod cgroup
 func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName) error {
-	pidsToKill := m.cgroupManager.Pids(podCgroup)
+	pidsToKill := m.cgroupManager.PIDs(podCgroup)
 	// No pids charged to the terminated pod cgroup return
 	if len(pidsToKill) == 0 {
 		return nil

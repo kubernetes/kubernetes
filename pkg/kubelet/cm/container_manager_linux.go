@@ -67,11 +67,13 @@ import (
 )
 
 const (
-	// The percent of the machine memory capacity. The value is used to calculate
-	// docker memory resource container's hardlimit to workaround docker memory
-	// leakage issue. Please see kubernetes/issues/9881 for more detail.
+	// DockerMemoryLimitThresholdPercent is a percentage of the machine memory
+	// capacity. The value is used to calculate docker memory resource container's
+	// hardlimit to workaround docker memory leakage issue.
+	// Please see kubernetes/issues/9881 for more detail.
 	DockerMemoryLimitThresholdPercent = 70
-	// The minimum memory limit allocated to docker container: 150Mi
+	// MinDockerMemoryLimit is the minimum memory limit allocated to docker
+	// container: 150Mi
 	MinDockerMemoryLimit = 150 * 1024 * 1024
 
 	dockerProcessName     = "docker"
@@ -135,7 +137,7 @@ type containerManagerImpl struct {
 	// Event recorder interface.
 	recorder record.EventRecorder
 	// Interface for QoS cgroup management
-	qosContainerManager QOSContainerManager
+	qosContainerManager qosContainerManager
 	// Interface for exporting and allocating devices reported by device plugins.
 	deviceManager devicemanager.Manager
 	// Interface for CPU affinity management.
@@ -201,6 +203,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 	return f, nil
 }
 
+// NewContainerManager creates a new ContainerManager for linux systems.
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
@@ -269,7 +272,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	klog.Infof("Creating Container Manager object based on Node Config: %+v", nodeConfig)
 
-	qosContainerManager, err := NewQOSContainerManager(subsystems, cgroupRoot, nodeConfig, cgroupManager)
+	qosContainerManager, err := newQOSContainerManager(subsystems, cgroupRoot, nodeConfig, cgroupManager)
 	if err != nil {
 		return nil, err
 	}
@@ -366,17 +369,17 @@ func createManager(containerName string) *fs.Manager {
 	}
 }
 
-type KernelTunableBehavior string
+type kernelTunableBehavior string
 
 const (
-	KernelTunableWarn   KernelTunableBehavior = "warn"
-	KernelTunableError  KernelTunableBehavior = "error"
-	KernelTunableModify KernelTunableBehavior = "modify"
+	kernelTunableWarn   kernelTunableBehavior = "warn"
+	kernelTunableError  kernelTunableBehavior = "error"
+	kernelTunableModify kernelTunableBehavior = "modify"
 )
 
 // setupKernelTunables validates kernel tunable flags are set as expected
 // depending upon the specified option, it will either warn, error, or modify the kernel tunable flags
-func setupKernelTunables(option KernelTunableBehavior) error {
+func setupKernelTunables(option kernelTunableBehavior) error {
 	desiredState := map[string]int{
 		utilsysctl.VMOvercommitMemory: utilsysctl.VMOvercommitMemoryAlways,
 		utilsysctl.VMPanicOnOOM:       utilsysctl.VMPanicOnOOMInvokeOOMKiller,
@@ -400,11 +403,11 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 		}
 
 		switch option {
-		case KernelTunableError:
-			errList = append(errList, fmt.Errorf("Invalid kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val))
-		case KernelTunableWarn:
+		case kernelTunableError:
+			errList = append(errList, fmt.Errorf("invalid kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val))
+		case kernelTunableWarn:
 			klog.V(2).Infof("Invalid kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val)
-		case KernelTunableModify:
+		case kernelTunableModify:
 			klog.V(2).Infof("Updating kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val)
 			err = sysctl.SetSysctl(flag, expectedValue)
 			if err != nil {
@@ -423,9 +426,9 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 	if !f.cpuHardcapping {
 		cm.status.SoftRequirements = fmt.Errorf("CPU hardcapping unsupported")
 	}
-	b := KernelTunableModify
+	b := kernelTunableModify
 	if cm.GetNodeConfig().ProtectKernelDefaults {
-		b = KernelTunableError
+		b = kernelTunableError
 	}
 	if err := setupKernelTunables(b); err != nil {
 		return err
@@ -737,7 +740,8 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 	return []int{}, err
 }
 
-// Ensures that the Docker daemon is in the desired container.
+// EnsureDockerInContainer ensures that the Docker daemon is in the desired
+// container.
 // Temporarily export the function to be used by dockershim.
 // TODO(yujuhong): Move this function to dockershim once kubelet migrates to
 // dockershim as the default.

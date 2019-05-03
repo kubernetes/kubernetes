@@ -25,13 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
+// InternalContainerLifecycle handles container lifecycle events.
 type InternalContainerLifecycle interface {
 	PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error
 	PreStopContainer(containerID string) error
 	PostStopContainer(containerID string) error
 }
 
-// Implements InternalContainerLifecycle interface.
 type internalContainerLifecycleImpl struct {
 	cpuManager      cpumanager.Manager
 	topologyManager topologymanager.Manager

@@ -38,11 +38,12 @@ import (
 	"strings"
 )
 
+// ActivePodsFunc returns the active pods.
 type ActivePodsFunc func() []*v1.Pod
 
-// Manages the containers running on a machine.
+// ContainerManager manages the containers running on a machine.
 type ContainerManager interface {
-	// Runs the container manager's housekeeping.
+	// Start starts the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
 	Start(*v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService) error
@@ -114,6 +115,7 @@ type ContainerManager interface {
 	GetTopologyPodAdmitHandler() topologymanager.Manager
 }
 
+// NodeConfig is the node configuration.
 type NodeConfig struct {
 	RuntimeCgroupsName    string
 	SystemCgroupsName     string
@@ -134,17 +136,26 @@ type NodeConfig struct {
 	ExperimentalTopologyManagerPolicy     string
 }
 
+// NodeAllocatableConfig is the configuration of the Node Allocatable.
+// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md)
+// doc for more information.
 type NodeAllocatableConfig struct {
-	KubeReservedCgroupName   string
+	// KubeReservedCgroupName is the cgroup for the kube-reserved resources.
+	KubeReservedCgroupName string
+	// SystemReservedCgroupName is the cgroup for the system-reserved resources.
 	SystemReservedCgroupName string
-	EnforceNodeAllocatable   sets.String
-	KubeReserved             v1.ResourceList
-	SystemReserved           v1.ResourceList
-	HardEvictionThresholds   []evictionapi.Threshold
+	// EnforceNodeAllocatable is the set of node allocatable enforcements.
+	EnforceNodeAllocatable sets.String
+	// KubeReserved defines the kube-reserved resources.
+	KubeReserved v1.ResourceList
+	// SystemReserved defines the system-reserved resources.
+	SystemReserved         v1.ResourceList
+	HardEvictionThresholds []evictionapi.Threshold
 }
 
+// Status is the internal status of the ContainerManager.
 type Status struct {
-	// Any soft requirements that were unsatisfied.
+	// SoftRequirements indicates any soft requirements that were unsatisfied.
 	SoftRequirements error
 }
 

@@ -41,7 +41,7 @@ const (
 	periodicQOSCgroupUpdateInterval = 1 * time.Minute
 )
 
-type QOSContainerManager interface {
+type qosContainerManager interface {
 	Start(func() v1.ResourceList, ActivePodsFunc) error
 	GetQOSContainersInfo() QOSContainersInfo
 	UpdateCgroups() error
@@ -59,7 +59,7 @@ type qosContainerManagerImpl struct {
 	qosReserved        map[v1.ResourceName]int64
 }
 
-func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
+func newQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (qosContainerManager, error) {
 	if !nodeConfig.CgroupsPerQOS {
 		return &qosContainerManagerNoop{
 			cgroupRoot: cgroupRoot,
@@ -97,8 +97,8 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 		resourceParameters := &ResourceConfig{}
 		// the BestEffort QoS class has a statically configured minShares value
 		if qosClass == v1.PodQOSBestEffort {
-			minShares := uint64(MinShares)
-			resourceParameters.CpuShares = &minShares
+			minShares := uint64(minShares)
+			resourceParameters.CPUShares = &minShares
 		}
 
 		// containerConfig object stores the cgroup specifications
@@ -183,12 +183,12 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	}
 
 	// make sure best effort is always 2 shares
-	bestEffortCPUShares := uint64(MinShares)
-	configs[v1.PodQOSBestEffort].ResourceParameters.CpuShares = &bestEffortCPUShares
+	bestEffortCPUShares := uint64(minShares)
+	configs[v1.PodQOSBestEffort].ResourceParameters.CPUShares = &bestEffortCPUShares
 
 	// set burstable shares based on current observe state
 	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
-	configs[v1.PodQOSBurstable].ResourceParameters.CpuShares = &burstableCPUShares
+	configs[v1.PodQOSBurstable].ResourceParameters.CPUShares = &burstableCPUShares
 	return nil
 }
 
@@ -339,7 +339,7 @@ type qosContainerManagerNoop struct {
 	cgroupRoot CgroupName
 }
 
-var _ QOSContainerManager = &qosContainerManagerNoop{}
+var _ qosContainerManager = &qosContainerManagerNoop{}
 
 func (m *qosContainerManagerNoop) GetQOSContainersInfo() QOSContainersInfo {
 	return QOSContainersInfo{}

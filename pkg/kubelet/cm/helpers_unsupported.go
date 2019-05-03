@@ -23,14 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-const (
-	MinShares     = 0
-	SharesPerCPU  = 0
-	MilliCPUToCPU = 0
-
-	MinQuotaPeriod = 0
-)
-
 // MilliCPUToQuota converts milliCPU and period to CFS quota values.
 func MilliCPUToQuota(milliCPU, period int64) int64 {
 	return 0
@@ -48,10 +40,6 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64) *
 
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
 func GetCgroupSubsystems() (*CgroupSubsystems, error) {
-	return nil, nil
-}
-
-func getCgroupProcs(dir string) ([]int, error) {
 	return nil, nil
 }
 

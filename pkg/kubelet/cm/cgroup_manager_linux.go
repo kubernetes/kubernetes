@@ -50,8 +50,6 @@ const (
 	systemdSuffix string = ".slice"
 )
 
-var RootCgroupName = CgroupName([]string{})
-
 // NewCgroupName composes a new cgroup name.
 // Use RootCgroupName as base to start at the root.
 // This function does some basic check for invalid characters at the name.
@@ -78,7 +76,7 @@ func unescapeSystemdCgroupName(part string) string {
 	return strings.Replace(part, "_", "-", -1)
 }
 
-// cgroupName.ToSystemd converts the internal cgroup name to a systemd name.
+// ToSystemd converts the internal cgroup name to a systemd name.
 // For example, the name {"kubepods", "burstable", "pod1234-abcd-5678-efgh"} becomes
 // "/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod1234_abcd_5678_efgh.slice"
 // This function always expands the systemd name into the cgroupfs form. If only
@@ -101,21 +99,24 @@ func (cgroupName CgroupName) ToSystemd() string {
 	return result
 }
 
+// ParseSystemdToCgroupName parses a systemd cgroup name into the internal name.
 func ParseSystemdToCgroupName(name string) CgroupName {
 	driverName := path.Base(name)
 	driverName = strings.TrimSuffix(driverName, systemdSuffix)
 	parts := strings.Split(driverName, "-")
-	result := []string{}
+	var result CgroupName
 	for _, part := range parts {
 		result = append(result, unescapeSystemdCgroupName(part))
 	}
 	return CgroupName(result)
 }
 
+// ToCgroupfs converts the internal cgroup name to a cgroupfs name.
 func (cgroupName CgroupName) ToCgroupfs() string {
 	return "/" + path.Join(cgroupName...)
 }
 
+// ParseCgroupfsToCgroupName parses a cgroupfs name into the internal name.
 func ParseCgroupfsToCgroupName(name string) CgroupName {
 	components := strings.Split(strings.TrimPrefix(name, "/"), "/")
 	if len(components) == 1 && components[0] == "" {
@@ -124,6 +125,7 @@ func ParseCgroupfsToCgroupName(name string) CgroupName {
 	return CgroupName(components)
 }
 
+// IsSystemdStyleName returns true if the cgroup name is in systemd format.
 func IsSystemdStyleName(name string) bool {
 	return strings.HasSuffix(name, systemdSuffix)
 }
@@ -161,7 +163,7 @@ func (l *libcontainerAdapter) newManager(cgroups *libcontainerconfigs.Cgroup, pa
 	return nil, fmt.Errorf("invalid cgroup manager configuration")
 }
 
-// CgroupSubsystems holds information about the mounted cgroup subsystems
+// CgroupSubsystems holds information about the mounted cgroup subsystems.
 type CgroupSubsystems struct {
 	// Cgroup subsystem mounts.
 	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
@@ -187,7 +189,7 @@ type cgroupManagerImpl struct {
 // Make sure that cgroupManagerImpl implements the CgroupManager interface
 var _ CgroupManager = &cgroupManagerImpl{}
 
-// NewCgroupManager is a factory method that returns a CgroupManager
+// NewCgroupManager is a factory method that returns a CgroupManager for linux systems.
 func NewCgroupManager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
 	managerType := libcontainerCgroupfs
 	if cgroupDriver == string(libcontainerSystemd) {
@@ -367,14 +369,14 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	if resourceConfig.Memory != nil {
 		resources.Memory = *resourceConfig.Memory
 	}
-	if resourceConfig.CpuShares != nil {
-		resources.CpuShares = *resourceConfig.CpuShares
+	if resourceConfig.CPUShares != nil {
+		resources.CpuShares = *resourceConfig.CPUShares
 	}
-	if resourceConfig.CpuQuota != nil {
-		resources.CpuQuota = *resourceConfig.CpuQuota
+	if resourceConfig.CPUQuota != nil {
+		resources.CpuQuota = *resourceConfig.CPUQuota
 	}
-	if resourceConfig.CpuPeriod != nil {
-		resources.CpuPeriod = *resourceConfig.CpuPeriod
+	if resourceConfig.CPUPeriod != nil {
+		resources.CpuPeriod = *resourceConfig.CPUPeriod
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
 		if resourceConfig.PidsLimit != nil {
@@ -492,7 +494,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 }
 
 // Scans through all subsystems to find pids associated with specified cgroup.
-func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
+func (m *cgroupManagerImpl) PIDs(name CgroupName) []int {
 	// we need the driver specific name
 	cgroupFsName := m.Name(name)
 
@@ -507,7 +509,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 			// do nothing, continue
 			continue
 		}
-		// Get a list of pids that are still charged to the pod's cgroup
+		// Get a list of PIDs that are still charged to the pod's cgroup
 		pids, err = getCgroupProcs(dir)
 		if err != nil {
 			continue
@@ -543,10 +545,10 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 
 // ReduceCPULimits reduces the cgroup's cpu shares to the lowest possible value
 func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName CgroupName) error {
-	// Set lowest possible CpuShares value for the cgroup
-	minimumCPUShares := uint64(MinShares)
+	// Set lowest possible CPUShares value for the cgroup
+	minimumCPUShares := uint64(minShares)
 	resources := &ResourceConfig{
-		CpuShares: &minimumCPUShares,
+		CPUShares: &minimumCPUShares,
 	}
 	containerConfig := &CgroupConfig{
 		Name:               cgroupName,

@@ -121,10 +121,13 @@ func (cm *containerManagerStub) GetTopologyPodAdmitHandler() topologymanager.Man
 	return nil
 }
 
+// NewStubContainerManager returns a new stub ContainerManager.
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }
 
+// NewStubContainerManagerWithExtendedResource returns a new stub ContainerManager that resets
+// extended resource capacity.
 func NewStubContainerManagerWithExtendedResource(shouldResetExtendedResourceCapacity bool) ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: shouldResetExtendedResourceCapacity}
 }
