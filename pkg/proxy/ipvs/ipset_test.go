@@ -207,7 +207,7 @@ func TestSyncIPSetEntries(t *testing.T) {
 		if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		for _, entry := range testCases[i].expectedEntries {
+		for _, entry := range testCases[i].currentEntries {
 			set.handle.AddEntry(entry, testCases[i].set, true)
 		}
 
