@@ -90,6 +90,12 @@ type JSONSchemaProps struct {
 	//      - type: string
 	//    - ... zero or more
 	XIntOrString bool `json:"x-kubernetes-int-or-string,omitempty" protobuf:"bytes,40,opt,name=xKubernetesIntOrString"`
+
+	// x-kubernetes-list-map-keys TODO
+	XListMapKeys []string `json:"x-kubernetes-list-map-keys,omitempty" protobuf:"bytes,41,rep,name=xKubernetesListMapKeys"`
+
+	// x-kubernetes-list-type TODO
+	XListType *string `json:"x-kubernetes-list-type,omitempty" protobuf:"bytes,42,opt,name=xKubernetesListType"`
 }
 
 // JSON represents any valid JSON value.

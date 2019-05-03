@@ -86,6 +86,11 @@ type JSONSchemaProps struct {
 	//      - type: string
 	//    - ... zero or more
 	XIntOrString bool
+
+	// TODO: docs
+	XListMapKeys         []string
+	// TODO: docs
+	XListType            *string
 }
 
 // JSON represents any valid JSON value.
