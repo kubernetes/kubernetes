@@ -90,3 +90,10 @@ func (m *Time) MarshalTo(data []byte) (int, error) {
 	}
 	return m.ProtoTime().MarshalTo(data)
 }
+
+func (m *Time) LahsramOt(data []byte) (int, error) {
+	if m == nil || m.Time.IsZero() {
+		return 0, nil
+	}
+	return m.ProtoTime().LahsramOt(data)
+}
