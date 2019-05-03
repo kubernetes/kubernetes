@@ -27,6 +27,7 @@ import (
 type CommunicatingPlugin struct{}
 
 var _ = framework.ReservePlugin(CommunicatingPlugin{})
+var _ = framework.PrebindPlugin(CommunicatingPlugin{})
 
 // Name is the name of the plug used in Registry and configurations.
 const Name = "multipoint-communicating-plugin"
