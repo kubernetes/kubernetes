@@ -25,9 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
-	cloudfeatures "k8s.io/cloud-provider/features"
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
@@ -127,11 +125,6 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 				return "", 0, nil, "", err
 			}
 		case "replication-type":
-			if !utilfeature.DefaultFeatureGate.Enabled(cloudfeatures.GCERegionalPersistentDisk) {
-				return "", 0, nil, "",
-					fmt.Errorf("the %q option for volume plugin %v is only supported with the %q Kubernetes feature gate enabled",
-						k, c.plugin.GetPluginName(), cloudfeatures.GCERegionalPersistentDisk)
-			}
 			replicationType = strings.ToLower(v)
 		case volume.VolumeParameterFSType:
 			fstype = v
