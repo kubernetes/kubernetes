@@ -23,7 +23,12 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-APIROOTS=$(git grep --files-with-matches -e '// +k8s:protobuf-gen=package' cmd pkg staging | xargs -n 1 dirname | sort | uniq)
+APIROOTS=$({
+  # gather the packages explicitly requesting generation
+  git grep --files-with-matches -e '// +k8s:protobuf-gen=package' cmd pkg staging | xargs -n 1 dirname
+  # add the root apimachinery pkg containing implicitly generated files (--apimachinery-packages)
+  echo staging/src/k8s.io/apimachinery/pkg
+} | sort | uniq)
 
 _tmp="${KUBE_ROOT}/_tmp"
 
@@ -39,7 +44,7 @@ for APIROOT in ${APIROOTS}; do
   cp -a "${KUBE_ROOT}/${APIROOT}"/* "${_tmp}/${APIROOT}/"
 done
 
-KUBE_VERBOSE=3 "${KUBE_ROOT}/hack/update-generated-protobuf.sh"
+#KUBE_VERBOSE=3 "${KUBE_ROOT}/hack/update-generated-protobuf.sh"
 for APIROOT in ${APIROOTS}; do
   TMP_APIROOT="${_tmp}/${APIROOT}"
   echo "diffing ${APIROOT} against freshly generated protobuf"
