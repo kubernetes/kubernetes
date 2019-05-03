@@ -43,6 +43,10 @@ run_daemonset_tests() {
   kubectl set resources daemonsets/bind "${kube_flags[@]:?}" --limits=cpu=200m,memory=512Mi
   kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field:?}}}" '4'
 
+  # Rollout restart should change generation
+  kubectl rollout restart daemonset/bind "${kube_flags[@]}"
+  kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '5'
+
   # Clean up
   kubectl delete -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]:?}"
 
@@ -487,6 +491,10 @@ run_stateful_set_tests() {
   # doesn't start  the scheduler, so pet-0 will block all others.
   # TODO: test robust scaling in an e2e.
   wait-for-pods-with-label "app=nginx-statefulset" "nginx-0"
+
+  # Rollout restart should change generation
+  kubectl rollout restart statefulset nginx "${kube_flags[@]}"
+  kube::test::get_object_assert 'statefulset nginx' "{{$statefulset_observed_generation}}" '3'
 
   ### Clean up
   kubectl delete -f hack/testdata/rollingupdate-statefulset.yaml "${kube_flags[@]:?}"

@@ -54,11 +54,14 @@ var (
 	restartLong = templates.LongDesc(`
 		Restart a resource.
 
-	        A deployment with the "RolloutStrategy" will be rolling restarted.`)
+	        Resource will be rollout restarted.`)
 
 	restartExample = templates.Examples(`
 		# Restart a deployment
-		kubectl rollout restart deployment/nginx`)
+		kubectl rollout restart deployment/nginx
+
+		# Restart a daemonset
+		kubectl rollout restart daemonset/abc`)
 )
 
 // NewRolloutRestartOptions returns an initialized RestartOptions instance
@@ -73,7 +76,7 @@ func NewRolloutRestartOptions(streams genericclioptions.IOStreams) *RestartOptio
 func NewCmdRolloutRestart(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutRestartOptions(streams)
 
-	validArgs := []string{"deployment"}
+	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
 	cmd := &cobra.Command{
 		Use:                   "restart RESOURCE",
