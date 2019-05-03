@@ -60,8 +60,12 @@ func (f *azureFileClient) createFileShare(accountName, accountKey, name string, 
 	}
 	share := fileClient.GetShareReference(name)
 	share.Properties.Quota = sizeGiB
-	if err = share.Create(nil); err != nil {
+	newlyCreated, err := share.CreateIfNotExists(nil)
+	if err != nil {
 		return fmt.Errorf("failed to create file share, err: %v", err)
+	}
+	if !newlyCreated {
+		klog.V(2).Infof("file share(%s) under account(%s) already exists", name, accountName)
 	}
 	return nil
 }
