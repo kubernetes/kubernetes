@@ -191,8 +191,8 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 }
 
 const (
-	unknown = iota
-	container = iota
+	unknown       = iota
+	container     = iota
 	initContainer = iota
 )
 func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
@@ -254,7 +254,7 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 
 func findContainerStatus(status *v1.PodStatus, containerID string, containerType int) (containerStatus *v1.ContainerStatus, init bool, ok bool, theType int) {
 	// Find the container to update.
-	if (containerType != initContainer) {
+	if containerType != initContainer {
 		for i, c := range status.ContainerStatuses {
 			if c.ContainerID == containerID {
 				return &status.ContainerStatuses[i], false, true, container
@@ -262,7 +262,7 @@ func findContainerStatus(status *v1.PodStatus, containerID string, containerType
 		}
 	}
 
-	if (containerType != container) {
+	if containerType != container {
 		for i, c := range status.InitContainerStatuses {
 			if c.ContainerID == containerID {
 				return &status.InitContainerStatuses[i], true, true, initContainer
