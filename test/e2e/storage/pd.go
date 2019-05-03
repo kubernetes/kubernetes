@@ -29,7 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -146,7 +147,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 					By("deleting the fmtPod")
 					framework.ExpectNoError(podClient.Delete(fmtPod.Name, metav1.NewDeleteOptions(0)), "Failed to delete fmtPod")
-					framework.Logf("deleted fmtPod %q", fmtPod.Name)
+					e2elog.Logf("deleted fmtPod %q", fmtPod.Name)
 					By("waiting for PD to detach")
 					framework.ExpectNoError(waitForPDDetach(diskName, host0Name))
 				}
@@ -158,7 +159,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				defer func() {
 					// Teardown should do nothing unless test failed
 					By("defer: cleaning up PD-RW test environment")
-					framework.Logf("defer cleanup errors can usually be ignored")
+					e2elog.Logf("defer cleanup errors can usually be ignored")
 					if fmtPod != nil {
 						podClient.Delete(fmtPod.Name, podDelOpt)
 					}
@@ -171,7 +172,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				_, err = podClient.Create(host0Pod)
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
-				framework.Logf("host0Pod: %q, node0: %q", host0Pod.Name, host0Name)
+				e2elog.Logf("host0Pod: %q, node0: %q", host0Pod.Name, host0Name)
 
 				var containerName, testFile, testFileContents string
 				if !readOnly {
@@ -180,36 +181,36 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					testFile = "/testpd1/tracker"
 					testFileContents = fmt.Sprintf("%v", mathrand.Int())
 					framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-					framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
+					e2elog.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 					By("verifying PD is present in node0's VolumeInUse list")
 					framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* shouldExist */))
 					By("deleting host0Pod") // delete this pod before creating next pod
 					framework.ExpectNoError(podClient.Delete(host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
-					framework.Logf("deleted host0Pod %q", host0Pod.Name)
+					e2elog.Logf("deleted host0Pod %q", host0Pod.Name)
 				}
 
 				By("creating host1Pod on node1")
 				_, err = podClient.Create(host1Pod)
 				framework.ExpectNoError(err, "Failed to create host1Pod")
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
-				framework.Logf("host1Pod: %q, node1: %q", host1Pod.Name, host1Name)
+				e2elog.Logf("host1Pod: %q, node1: %q", host1Pod.Name, host1Name)
 
 				if readOnly {
 					By("deleting host0Pod")
 					framework.ExpectNoError(podClient.Delete(host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
-					framework.Logf("deleted host0Pod %q", host0Pod.Name)
+					e2elog.Logf("deleted host0Pod %q", host0Pod.Name)
 				} else {
 					By("verifying PD contents in host1Pod")
 					verifyPDContentsViaContainer(f, host1Pod.Name, containerName, map[string]string{testFile: testFileContents})
-					framework.Logf("verified PD contents in pod %q", host1Pod.Name)
+					e2elog.Logf("verified PD contents in pod %q", host1Pod.Name)
 					By("verifying PD is removed from node0")
 					framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, false /* shouldExist */))
-					framework.Logf("PD %q removed from node %q's VolumeInUse list", diskName, host1Pod.Name)
+					e2elog.Logf("PD %q removed from node %q's VolumeInUse list", diskName, host1Pod.Name)
 				}
 
 				By("deleting host1Pod")
 				framework.ExpectNoError(podClient.Delete(host1Pod.Name, podDelOpt), "Failed to delete host1Pod")
-				framework.Logf("deleted host1Pod %q", host1Pod.Name)
+				e2elog.Logf("deleted host1Pod %q", host1Pod.Name)
 
 				By("Test completed successfully, waiting for PD to detach from both nodes")
 				waitForPDDetach(diskName, host0Name)
@@ -258,7 +259,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				defer func() {
 					// Teardown should do nothing unless test failed.
 					By("defer: cleaning up PD-RW test environment")
-					framework.Logf("defer cleanup errors can usually be ignored")
+					e2elog.Logf("defer cleanup errors can usually be ignored")
 					if host0Pod != nil {
 						podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
 					}
@@ -268,7 +269,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				}()
 
 				for i := 0; i < t.repeatCnt; i++ { // "rapid" repeat loop
-					framework.Logf("PD Read/Writer Iteration #%v", i)
+					e2elog.Logf("PD Read/Writer Iteration #%v", i)
 					By(fmt.Sprintf("creating host0Pod with %d containers on node0", numContainers))
 					host0Pod = testPDPod(diskNames, host0Name, false /* readOnly */, numContainers)
 					_, err = podClient.Create(host0Pod)
@@ -285,7 +286,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 						testFileContents := fmt.Sprintf("%v", mathrand.Int())
 						fileAndContentToVerify[testFile] = testFileContents
 						framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-						framework.Logf("wrote %q to file %q in pod %q (container %q) on node %q", testFileContents, testFile, host0Pod.Name, containerName, host0Name)
+						e2elog.Logf("wrote %q to file %q in pod %q (container %q) on node %q", testFileContents, testFile, host0Pod.Name, containerName, host0Name)
 					}
 
 					By("verifying PD contents via a container")
@@ -346,7 +347,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 				defer func() {
 					By("defer: cleaning up PD-RW test env")
-					framework.Logf("defer cleanup errors can usually be ignored")
+					e2elog.Logf("defer cleanup errors can usually be ignored")
 					By("defer: delete host0Pod")
 					podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
 					By("defer: detach and delete PDs")
@@ -379,7 +380,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				testFile := "/testpd1/tracker"
 				testFileContents := fmt.Sprintf("%v", mathrand.Int())
 				framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-				framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
+				e2elog.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 
 				By("verifying PD is present in node0's VolumeInUse list")
 				framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
@@ -456,17 +457,17 @@ func verifyPDContentsViaContainer(f *framework.Framework, podName, containerName
 			v, err := f.ReadFileViaContainer(podName, containerName, filePath)
 			value = v
 			if err != nil {
-				framework.Logf("Error reading file: %v", err)
+				e2elog.Logf("Error reading file: %v", err)
 			}
 			framework.ExpectNoError(err)
-			framework.Logf("Read file %q with content: %v (iteration %d)", filePath, v, i)
+			e2elog.Logf("Read file %q with content: %v (iteration %d)", filePath, v, i)
 			if strings.TrimSpace(v) != strings.TrimSpace(expectedContents) {
-				framework.Logf("Warning: read content <%q> does not match execpted content <%q>.", v, expectedContents)
+				e2elog.Logf("Warning: read content <%q> does not match execpted content <%q>.", v, expectedContents)
 				size, err := f.CheckFileSizeViaContainer(podName, containerName, filePath)
 				if err != nil {
-					framework.Logf("Error checking file size: %v", err)
+					e2elog.Logf("Error checking file size: %v", err)
 				}
-				framework.Logf("Check file %q size: %q", filePath, size)
+				e2elog.Logf("Check file %q size: %q", filePath, size)
 			} else {
 				break
 			}
@@ -487,7 +488,7 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 				// PD already detached, ignore error.
 				return nil
 			}
-			framework.Logf("Error detaching PD %q: %v", pdName, err)
+			e2elog.Logf("Error detaching PD %q: %v", pdName, err)
 		}
 		return err
 
@@ -580,7 +581,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 // Waits for specified PD to detach from specified hostName
 func waitForPDDetach(diskName string, nodeName types.NodeName) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
-		framework.Logf("Waiting for GCE PD %q to detach from node %q.", diskName, nodeName)
+		e2elog.Logf("Waiting for GCE PD %q to detach from node %q.", diskName, nodeName)
 		gceCloud, err := gce.GetGCECloud()
 		if err != nil {
 			return err
@@ -588,15 +589,15 @@ func waitForPDDetach(diskName string, nodeName types.NodeName) error {
 		for start := time.Now(); time.Since(start) < gcePDDetachTimeout; time.Sleep(gcePDDetachPollTime) {
 			diskAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
 			if err != nil {
-				framework.Logf("Error waiting for PD %q to detach from node %q. 'DiskIsAttached(...)' failed with %v", diskName, nodeName, err)
+				e2elog.Logf("Error waiting for PD %q to detach from node %q. 'DiskIsAttached(...)' failed with %v", diskName, nodeName, err)
 				return err
 			}
 			if !diskAttached {
 				// Specified disk does not appear to be attached to specified node
-				framework.Logf("GCE PD %q appears to have successfully detached from %q.", diskName, nodeName)
+				e2elog.Logf("GCE PD %q appears to have successfully detached from %q.", diskName, nodeName)
 				return nil
 			}
-			framework.Logf("Waiting for GCE PD %q to detach from %q.", diskName, nodeName)
+			e2elog.Logf("Waiting for GCE PD %q to detach from %q.", diskName, nodeName)
 		}
 		return fmt.Errorf("Gave up waiting for GCE PD %q to detach from %q after %v", diskName, nodeName, gcePDDetachTimeout)
 	}
@@ -605,7 +606,7 @@ func waitForPDDetach(diskName string, nodeName types.NodeName) error {
 
 func detachAndDeletePDs(diskName string, hosts []types.NodeName) {
 	for _, host := range hosts {
-		framework.Logf("Detaching GCE PD %q from node %q.", diskName, host)
+		e2elog.Logf("Detaching GCE PD %q from node %q.", diskName, host)
 		detachPD(host, diskName)
 		By(fmt.Sprintf("Waiting for PD %q to detach from %q", diskName, host))
 		waitForPDDetach(diskName, host)
@@ -624,11 +625,11 @@ func waitForPDInVolumesInUse(
 	if !shouldExist {
 		logStr = "to NOT contain"
 	}
-	framework.Logf("Waiting for node %s's VolumesInUse Status %s PD %q", nodeName, logStr, diskName)
+	e2elog.Logf("Waiting for node %s's VolumesInUse Status %s PD %q", nodeName, logStr, diskName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(nodeStatusPollTime) {
 		nodeObj, err := nodeClient.Get(string(nodeName), metav1.GetOptions{})
 		if err != nil || nodeObj == nil {
-			framework.Logf("Failed to fetch node object %q from API server. err=%v", nodeName, err)
+			e2elog.Logf("Failed to fetch node object %q from API server. err=%v", nodeName, err)
 			continue
 		}
 		exists := false
@@ -636,14 +637,14 @@ func waitForPDInVolumesInUse(
 			volumeInUseStr := string(volumeInUse)
 			if strings.Contains(volumeInUseStr, diskName) {
 				if shouldExist {
-					framework.Logf("Found PD %q in node %q's VolumesInUse Status: %q", diskName, nodeName, volumeInUseStr)
+					e2elog.Logf("Found PD %q in node %q's VolumesInUse Status: %q", diskName, nodeName, volumeInUseStr)
 					return nil
 				}
 				exists = true
 			}
 		}
 		if !shouldExist && !exists {
-			framework.Logf("Verified PD %q does not exist in node %q's VolumesInUse Status.", diskName, nodeName)
+			e2elog.Logf("Verified PD %q does not exist in node %q's VolumesInUse Status.", diskName, nodeName)
 			return nil
 		}
 	}

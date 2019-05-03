@@ -37,6 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	csilib "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/podlogs"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -193,13 +194,13 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 
 	switch volType {
 	case testpatterns.InlineVolume:
-		framework.Logf("Creating resource for inline volume")
+		e2elog.Logf("Creating resource for inline volume")
 		if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
 			r.volSource = iDriver.GetVolumeSource(false, fsType, r.volume)
 			r.volType = dInfo.Name
 		}
 	case testpatterns.PreprovisionedPV:
-		framework.Logf("Creating resource for pre-provisioned PV")
+		e2elog.Logf("Creating resource for pre-provisioned PV")
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
 			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, fsType, r.volume)
 			if pvSource != nil {
@@ -208,7 +209,7 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			r.volType = fmt.Sprintf("%s-preprovisionedPV", dInfo.Name)
 		}
 	case testpatterns.DynamicPV:
-		framework.Logf("Creating resource for dynamic PV")
+		e2elog.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 			claimSize := dDriver.GetClaimSize()
 			r.sc = dDriver.GetDynamicProvisionStorageClass(r.config, fsType)
@@ -302,7 +303,7 @@ func createVolumeSourceWithPVCPV(
 		pvcConfig.VolumeMode = &volMode
 	}
 
-	framework.Logf("Creating PVC and PV")
+	e2elog.Logf("Creating PVC and PV")
 	pv, pvc, err := framework.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
 
@@ -522,7 +523,7 @@ func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
 	framework.ExpectNoError(err, "Error getting c-m metrics : %v", err)
 	totOps := getVolumeOpsFromMetricsForPlugin(metrics.Metrics(controllerMetrics), pluginName)
 
-	framework.Logf("Node name not specified for getVolumeOpCounts, falling back to listing nodes from API Server")
+	e2elog.Logf("Node name not specified for getVolumeOpCounts, falling back to listing nodes from API Server")
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "Error listing nodes: %v", err)
 	if len(nodes.Items) <= nodeLimit {
@@ -535,7 +536,7 @@ func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
 			totOps = addOpCounts(totOps, getVolumeOpsFromMetricsForPlugin(metrics.Metrics(nodeMetrics), pluginName))
 		}
 	} else {
-		framework.Logf("Skipping operation metrics gathering from nodes in getVolumeOpCounts, greater than %v nodes", nodeLimit)
+		e2elog.Logf("Skipping operation metrics gathering from nodes in getVolumeOpCounts, greater than %v nodes", nodeLimit)
 	}
 
 	return totOps
@@ -561,7 +562,7 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCo
 		var migratedOps opCounts
 		csiName, err := csilib.GetCSINameFromInTreeName(pluginName)
 		if err != nil {
-			framework.Logf("Could not find CSI Name for in-tree plugin %v", pluginName)
+			e2elog.Logf("Could not find CSI Name for in-tree plugin %v", pluginName)
 			migratedOps = opCounts{}
 		} else {
 			csiName = "kubernetes.io/csi:" + csiName
@@ -570,7 +571,7 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCo
 		return getVolumeOpCounts(cs, pluginName), migratedOps
 	} else {
 		// Not an in-tree driver
-		framework.Logf("Test running for native CSI Driver, not checking metrics")
+		e2elog.Logf("Test running for native CSI Driver, not checking metrics")
 		return opCounts{}, opCounts{}
 	}
 }
@@ -602,7 +603,7 @@ func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, 
 		// may not do any volume operations and therefore not emit any metrics
 	} else {
 		// In-tree plugin is not migrated
-		framework.Logf("In-tree plugin %v is not migrated, not validating any metrics", pluginName)
+		e2elog.Logf("In-tree plugin %v is not migrated, not validating any metrics", pluginName)
 
 		// We don't check in-tree plugin metrics because some negative test
 		// cases may not do any volume operations and therefore not emit any
