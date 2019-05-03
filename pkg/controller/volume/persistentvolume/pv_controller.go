@@ -345,7 +345,10 @@ func (ctrl *PersistentVolumeController) recordCSIMetric(opName string, claim *v1
 		// in this case, an entry has not been created yet by either provisionClaim or deleteVolume
 		// there are two scenarios:
 		// 1. volume already existed, thus syncUnboundClaim will *NOT* call provisionClaim
-		//    rather just bind it to a PVC, in this case, as the latency will not be
+		//    rather just bind it to a PVC, in this case, as the latency will not be reported
+		//    as it does not make much sense (will be 0). For this situation, a possible improvement
+		//    could be instead using claim's creationTimestamp in metadata, however will bring
+		//    in-consistency. Ignoring here for now
 		// 2. the plugin.IsMigratedToCSI() == false, thus provisionClaim will *NOT* create
 		//    an entry for metric recording, in this case, return directly
 		//
