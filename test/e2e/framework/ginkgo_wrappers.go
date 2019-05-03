@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package ginkgowrapper wraps Ginkgo Fail and Skip functions to panic
-// with structured data instead of a constant string.
-package ginkgowrapper
+package framework
 
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"regexp"
 	"runtime"
 	"runtime/debug"
@@ -67,6 +66,14 @@ func Fail(message string, callerSkip ...int) {
 	ginkgo.Fail(message, skip)
 }
 
+// FailfWithOffset calls "Fail" and logs the error at "offset" levels above its caller
+// (for example, for call chain f -> g -> FailfWithOffset(1, ...) error would be logged for "f").
+func FailfWithOffset(offset int, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	log("INFO", msg)
+	Fail(nowStamp()+": "+msg, 1+offset)
+}
+
 // SkipPanic is the value that will be panicked from Skip.
 type SkipPanic struct {
 	Message        string // The failure message passed to Fail
@@ -103,6 +110,12 @@ func Skip(message string, callerSkip ...int) {
 	}()
 
 	ginkgo.Skip(message, skip)
+}
+
+func skipInternalf(caller int, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	log("INFO", msg)
+	Skip(msg, caller+1)
 }
 
 // ginkgo adds a lot of test running infrastructure to the stack, so

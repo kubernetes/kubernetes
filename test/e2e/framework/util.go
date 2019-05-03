@@ -249,10 +249,9 @@ func log(level string, format string, args ...interface{}) {
 	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
-func skipInternalf(caller int, format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
-	log("INFO", msg)
-	ginkgowrapper.Skip(msg, caller+1)
+// Failf logs the fail info.
+func Failf(format string, args ...interface{}) {
+	FailfWithOffset(1, format, args...)
 }
 
 // Skipf skips with information about why the test is being skipped.

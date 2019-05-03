@@ -11,6 +11,7 @@ go_library(
         "flake_reporting_util.go",
         "framework.go",
         "get-kubemark-resource-usage.go",
+        "ginkgo_wrappers.go",
         "google_compute.go",
         "kubelet_stats.go",
         "log_size_monitoring.go",
