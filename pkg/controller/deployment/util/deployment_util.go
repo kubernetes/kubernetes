@@ -267,8 +267,12 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 		if len(oldRevisions[0]) == 0 {
 			newRS.Annotations[RevisionHistoryAnnotation] = oldRevision
 		} else {
-			oldRevisions = append(oldRevisions, oldRevision)
-			newRS.Annotations[RevisionHistoryAnnotation] = strings.Join(oldRevisions, ",")
+			if len(revisionHistoryAnnotation) + len(oldRevision) < 262144 {
+				oldRevisions = append(oldRevisions, oldRevision)
+				newRS.Annotations[RevisionHistoryAnnotation] = strings.Join(oldRevisions, ",")
+			} else {
+				klog.Warningf("Not appending revision due to length limit of 262144 reached")
+			}
 		}
 	}
 	// If the new replica set is about to be created, we need to add replica annotations to it.
