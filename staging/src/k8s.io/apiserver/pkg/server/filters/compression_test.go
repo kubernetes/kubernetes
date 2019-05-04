@@ -76,7 +76,7 @@ func TestCompression(t *testing.T) {
 			if response.StatusCode != 200 {
 				t.Fatalf("unexpected response: %#v", response)
 			}
-			if test.encoding == "gzip" { //&& !test.watch {
+			if test.encoding == "gzip" && !test.watch {
 				if response.Header.Get("Content-Encoding") != "gzip" {
 					t.Errorf("expected response header Content-Encoding to be set to \"gzip\": %#v", response)
 				}

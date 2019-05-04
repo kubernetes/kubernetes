@@ -20,20 +20,28 @@ import (
 	"net/http"
 
 	restful "github.com/emicklei/go-restful"
+
+	"k8s.io/apiserver/pkg/endpoints/request"
+	handlers "k8s.io/apiserver/third_party/gorilla-handlers"
 )
 
 // WithCompression wraps an http.Handler with the Compression Handler
 func WithCompression(handler http.Handler) http.Handler {
-	// TODO: handler has to do the following:
-	// * handle watch flushes by closing and reopening (gzip(a) +  gzip(b) == gzip(a+b))
-	// * verify no unanticipated behavional change
-	return CompressHandler(handler)
+	withCompression := handlers.CompressHandler(handler)
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		if info, ok := request.RequestInfoFrom(ctx); !ok || !info.IsResourceRequest || info.Verb == "watch" {
+			handler.ServeHTTP(w, req)
+			return
+		}
+		withCompression.ServeHTTP(w, req)
+	})
 }
 
 // RestfulWithCompression wraps WithCompression to be compatible with go-restful
 func RestfulWithCompression(function restful.RouteFunction) restful.RouteFunction {
 	return restful.RouteFunction(func(request *restful.Request, response *restful.Response) {
-		handler := CompressHandler(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		handler := handlers.CompressHandler(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			response.ResponseWriter = w
 			request.Request = req
 			function(request, response)
