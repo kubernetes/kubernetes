@@ -50,6 +50,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit:all-srcs",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator:all-srcs",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook:all-srcs",
+        "//staging/src/k8s.io/apiserver/third_party/gorilla-handlers:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

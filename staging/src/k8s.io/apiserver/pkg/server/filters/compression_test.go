@@ -35,66 +35,72 @@ func TestCompression(t *testing.T) {
 		encoding string
 		watch    bool
 	}{
-		{"", false},
-		{"gzip", true},
-		{"gzip", false},
+		{encoding: "", watch: false},
+		{encoding: "gzip", watch: true},
+		{encoding: "gzip", watch: false},
 	}
 
-	responseData := []byte("1234")
+	responseData := bytes.Repeat([]byte("1234"), 1024*2)
 
 	for _, test := range tests {
-		handler := WithCompression(
-			http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.Write(responseData)
-			}),
-		)
-		handler = filters.WithRequestInfo(handler, newTestRequestInfoResolver())
-		server := httptest.NewServer(handler)
-		defer server.Close()
-		client := http.Client{
-			Transport: &http.Transport{
-				DisableCompression: true,
-			},
-		}
+		t.Run("", func(t *testing.T) {
+			handler := WithCompression(
+				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					w.Write(responseData)
+				}),
+			)
+			handler = filters.WithRequestInfo(handler, newTestRequestInfoResolver())
+			server := httptest.NewServer(handler)
+			defer server.Close()
+			client := http.Client{
+				Transport: &http.Transport{
+					DisableCompression: true,
+				},
+			}
 
-		url := server.URL + "/api/v1/pods"
-		if test.watch {
-			url = url + "?watch=1"
-		}
-		request, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		request.Header.Set("Accept-Encoding", test.encoding)
-		response, err := client.Do(request)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		var reader io.Reader
-		if test.encoding == "gzip" && !test.watch {
-			if response.Header.Get("Content-Encoding") != "gzip" {
-				t.Fatal("expected response header Content-Encoding to be set to \"gzip\"")
+			url := server.URL + "/api/v1/pods"
+			if test.watch {
+				url = url + "?watch=1"
 			}
-			if response.Header.Get("Vary") != "Accept-Encoding" {
-				t.Fatal("expected response header Vary to be set to \"Accept-Encoding\"")
+			request, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
-			reader, err = gzip.NewReader(response.Body)
+			request.Header.Set("Accept-Encoding", test.encoding)
+			response, err := client.Do(request)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			defer response.Body.Close()
+			var reader io.Reader
+			if response.StatusCode != 200 {
+				t.Fatalf("unexpected response: %#v", response)
+			}
+			if test.encoding == "gzip" { //&& !test.watch {
+				if response.Header.Get("Content-Encoding") != "gzip" {
+					t.Errorf("expected response header Content-Encoding to be set to \"gzip\": %#v", response)
+				}
+				if response.Header.Get("Vary") != "Accept-Encoding" {
+					t.Errorf("expected response header Vary to be set to \"Accept-Encoding\": %#v", response)
+				}
+				reader, err = gzip.NewReader(response.Body)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			} else {
+				if response.Header.Get("Content-Encoding") == "gzip" {
+					t.Errorf("expected response header Content-Encoding not to be set")
+				}
+				reader = response.Body
+			}
+			body, err := ioutil.ReadAll(reader)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-		} else {
-			if response.Header.Get("Content-Encoding") == "gzip" {
-				t.Fatal("expected response header Content-Encoding not to be set")
+			if !bytes.Equal(body, responseData) {
+				t.Fatalf("Expected response body %s to equal %s", body, responseData)
 			}
-			reader = response.Body
-		}
-		body, err := ioutil.ReadAll(reader)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !bytes.Equal(body, responseData) {
-			t.Fatalf("Expected response body %s to equal %s", body, responseData)
-		}
+		})
 	}
 }
 

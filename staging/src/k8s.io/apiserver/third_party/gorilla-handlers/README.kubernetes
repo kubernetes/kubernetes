@@ -1,0 +1,8 @@
+This package is forked from gorilla/handlers to add detection of double gzip encoding from
+https://github.com/gorilla/handlers/pull/157.
+
+Original source is located at:
+
+https://github.com/gorilla/handlers/blob/e1b2144f2167de0e1042d1d35e5cba5119d4fb5d/LICENSE
+https://github.com/gorilla/handlers/blob/e1b2144f2167de0e1042d1d35e5cba5119d4fb5d/compress.go
+https://github.com/gorilla/handlers/blob/e1b2144f2167de0e1042d1d35e5cba5119d4fb5d/compress_test.go
