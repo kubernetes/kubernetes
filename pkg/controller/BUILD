@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "barrier_test.go",
         "controller_ref_manager_test.go",
         "controller_utils_test.go",
     ],
@@ -29,6 +30,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
@@ -42,6 +44,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "barrier.go",
         "client_builder.go",
         "client_builder_dynamic.go",
         "controller_ref_manager.go",

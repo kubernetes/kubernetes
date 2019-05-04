@@ -44,14 +44,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
+	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/integer"
-
-	"k8s.io/klog"
 )
 
 const (
@@ -66,20 +65,7 @@ const (
 	// 500 pods. Just creation is limited to 20qps, and watching happens with ~10-30s
 	// latency/pod at the scale of 3000 pods over 100 nodes.
 	ExpectationsTimeout = 5 * time.Minute
-	// When batching pod creates, SlowStartInitialBatchSize is the size of the
-	// initial batch.  The size of each successive batch is twice the size of
-	// the previous batch.  For example, for a value of 1, batch sizes would be
-	// 1, 2, 4, 8, ...  and for a value of 10, batch sizes would be
-	// 10, 20, 40, 80, ...  Setting the value higher means that quota denials
-	// will result in more doomed API calls and associated event spam.  Setting
-	// the value lower will result in more API call round trip periods for
-	// large batches.
-	//
-	// Given a number of pods to start "N":
-	// The number of doomed calls per sync once quota is exceeded is given by:
-	//      min(N,SlowStartInitialBatchSize)
-	// The number of batches is given by:
-	//      1+floor(log_2(ceil(N/SlowStartInitialBatchSize)))
+	// SlowStartInitialBatchSize is deprecated. Use the TaskBarrier.
 	SlowStartInitialBatchSize = 1
 )
 
