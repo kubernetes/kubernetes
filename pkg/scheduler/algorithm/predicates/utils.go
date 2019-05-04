@@ -170,6 +170,18 @@ func (s *nodeSelectorWrapper) in(key string, vals []string) *nodeSelectorWrapper
 	return s
 }
 
+func (s *nodeSelectorWrapper) notIn(key string, vals []string) *nodeSelectorWrapper {
+	expression := v1.NodeSelectorRequirement{
+		Key:      key,
+		Operator: v1.NodeSelectorOpNotIn,
+		Values:   vals,
+	}
+	selectorTerm := v1.NodeSelectorTerm{}
+	selectorTerm.MatchExpressions = append(selectorTerm.MatchExpressions, expression)
+	s.NodeSelectorTerms = append(s.NodeSelectorTerms, selectorTerm)
+	return s
+}
+
 func (s *nodeSelectorWrapper) obj() *v1.NodeSelector {
 	return &s.NodeSelector
 }
@@ -260,7 +272,7 @@ func (p *podWrapper) nodeSelector(m map[string]string) *podWrapper {
 	return p
 }
 
-// particular represents HARD node affinity
+// represents HARD node affinity in particular
 func (p *podWrapper) nodeAffinityIn(key string, vals []string) *podWrapper {
 	if p.Spec.Affinity == nil {
 		p.Spec.Affinity = &v1.Affinity{}
@@ -273,7 +285,19 @@ func (p *podWrapper) nodeAffinityIn(key string, vals []string) *podWrapper {
 	return p
 }
 
-func (p *podWrapper) spreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintResponse, selector *metav1.LabelSelector) *podWrapper {
+func (p *podWrapper) nodeAffinityNotIn(key string, vals []string) *podWrapper {
+	if p.Spec.Affinity == nil {
+		p.Spec.Affinity = &v1.Affinity{}
+	}
+	if p.Spec.Affinity.NodeAffinity == nil {
+		p.Spec.Affinity.NodeAffinity = &v1.NodeAffinity{}
+	}
+	nodeSelector := makeNodeSelector().notIn(key, vals).obj()
+	p.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeSelector
+	return p
+}
+
+func (p *podWrapper) spreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintAction, selector *metav1.LabelSelector) *podWrapper {
 	c := v1.TopologySpreadConstraint{
 		MaxSkew:           int32(maxSkew),
 		TopologyKey:       tpKey,

@@ -19,6 +19,7 @@ package predicates
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 
 	"k8s.io/klog"
@@ -33,9 +34,6 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
-
-// MaxInt32 is the maximum value of int32
-const MaxInt32 = int32(^uint32(0) >> 1)
 
 // PredicateMetadata interface represents anything that can access a predicate metadata.
 type PredicateMetadata interface {
@@ -69,19 +67,15 @@ type topologyPairsMaps struct {
 	podToTopologyPairs map[string]topologyPairSet
 }
 
-// topologyPairsPodSpreadMap combines []int32 and topologyPairsMaps to represent
-// (1) how existing pods match incoming pod on its spread constraints
-// (2) minimum match number of each hard spread constraint
+// topologyPairsPodSpreadMap combines topologyKeyToMinPodsMap and topologyPairsMaps
+// to represent:
+// (1) minimum number of pods matched on the spread constraints.
+// (2) how existing pods match incoming pod on its spread constraints.
 type topologyPairsPodSpreadMap struct {
-	minMatches []int32
+	// This map is keyed with a topology key, and valued with minimum number
+	// of pods matched on that topology domain.
+	topologyKeyToMinPodsMap map[string]int32
 	*topologyPairsMaps
-}
-
-func newTopologyPairsPodSpreadMap() *topologyPairsPodSpreadMap {
-	return &topologyPairsPodSpreadMap{
-		// minMatches will be initilized with proper size later
-		topologyPairsMaps: newTopologyPairsMaps(),
-	}
 }
 
 // NOTE: When new fields are added/removed or logic is changed, please make sure that
@@ -109,7 +103,7 @@ type predicateMetadata struct {
 	// which should be accounted only by the extenders. This set is synthesized
 	// from scheduler extender configuration and does not change per pod.
 	ignoredExtendedResources sets.String
-	// Similar like map for pod (anti-)affinity, but impose additional min matches info
+	// Similar to the map for pod (anti-)affinity, but imposes additional min matches info
 	// to describe mininum match number on each topology spread constraint
 	topologyPairsPodSpreadMap *topologyPairsPodSpreadMap
 }
@@ -158,7 +152,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	if pod == nil {
 		return nil
 	}
-	// existingPodSpreadConstraintsMap represents how existing pods matches "pod"
+	// existingPodSpreadConstraintsMap represents how existing pods match "pod"
 	// on its spread constraints
 	existingPodSpreadConstraintsMap, err := getTPMapMatchingSpreadConstraints(pod, nodeNameToInfoMap)
 	if err != nil {
@@ -211,7 +205,10 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 	var lock sync.Mutex
 	var firstError error
 
-	topologyPairsPodSpreadMap := newTopologyPairsPodSpreadMap()
+	topologyPairsPodSpreadMap := &topologyPairsPodSpreadMap{
+		// topologyKeyToMinPodsMap will be initilized with proper size later.
+		topologyPairsMaps: newTopologyPairsMaps(),
+	}
 
 	appendTopologyPairsMaps := func(toAppend *topologyPairsMaps) {
 		lock.Lock()
@@ -288,20 +285,15 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 	}
 
 	// calculate min match for each topology pair
-	topologyPairsPodSpreadMap.minMatches = make([]int32, len(constraints))
-	tpKeyIdx := make(map[string]int)
-	for i, constraint := range constraints {
-		tpKeyIdx[constraint.TopologyKey] = i
-		topologyPairsPodSpreadMap.minMatches[i] = MaxInt32
+	topologyPairsPodSpreadMap.topologyKeyToMinPodsMap = make(map[string]int32, len(constraints))
+	for _, constraint := range constraints {
+		topologyPairsPodSpreadMap.topologyKeyToMinPodsMap[constraint.TopologyKey] = math.MaxInt32
 	}
 	for pair, podSet := range topologyPairsPodSpreadMap.topologyPairToPods {
-		idx := tpKeyIdx[pair.key]
-		// short circuit if we see 0 as min match of the topologyKey
-		if topologyPairsPodSpreadMap.minMatches[idx] == 0 {
-			continue
-		}
-		if l := int32(len(podSet)); l < topologyPairsPodSpreadMap.minMatches[idx] {
-			topologyPairsPodSpreadMap.minMatches[idx] = l
+		// TODO(Huang-Wei): short circuit all portions of <topologyKey: any value>
+		// if we see 0 as min match of the topologyKey
+		if l := int32(len(podSet)); l < topologyPairsPodSpreadMap.topologyKeyToMinPodsMap[pair.key] {
+			topologyPairsPodSpreadMap.topologyKeyToMinPodsMap[pair.key] = l
 		}
 	}
 	return topologyPairsPodSpreadMap, nil
@@ -333,12 +325,13 @@ func podLabelsMatchesSpreadConstraints(podLabels map[string]string, constraints 
 	if len(constraints) == 0 {
 		return false, nil
 	}
+	podLabelSet := labels.Set(podLabels)
 	for _, constraint := range constraints {
 		selector, err := metav1.LabelSelectorAsSelector(constraint.LabelSelector)
 		if err != nil {
 			return false, err
 		}
-		if !selector.Matches(labels.Set(podLabels)) {
+		if !selector.Matches(podLabelSet) {
 			return false, nil
 		}
 	}
@@ -407,8 +400,13 @@ func (podSpreadMap *topologyPairsPodSpreadMap) clone() *topologyPairsPodSpreadMa
 	if podSpreadMap == nil {
 		return nil
 	}
-	copy := newTopologyPairsPodSpreadMap()
-	copy.minMatches = append([]int32(nil), podSpreadMap.minMatches...)
+	copy := &topologyPairsPodSpreadMap{
+		topologyKeyToMinPodsMap: make(map[string]int32),
+		topologyPairsMaps:       newTopologyPairsMaps(),
+	}
+	for key, minMatched := range podSpreadMap.topologyKeyToMinPodsMap {
+		copy.topologyKeyToMinPodsMap[key] = minMatched
+	}
 	copy.topologyPairsMaps.appendMaps(podSpreadMap.topologyPairsMaps)
 	return copy
 }

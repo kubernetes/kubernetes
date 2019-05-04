@@ -512,7 +512,7 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 			},
 		},
 		topologyPairsPodSpreadMap: &topologyPairsPodSpreadMap{
-			minMatches: []int32{1},
+			topologyKeyToMinPodsMap: map[string]int32{"name": 1},
 			topologyPairsMaps: &topologyPairsMaps{
 				topologyPairToPods: map[topologyPair]podSet{
 					{key: "name", value: "nodeA"}: {
@@ -948,11 +948,11 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 			injectPodPointers: map[topologyPair][]int{
 				// denotes no existing pod is matched on this zone pair, but still needed to be
 				// calculated if incoming pod matches its own spread constraints
-				{key: "zone", value: "zone1"}: []int{},
-				{key: "zone", value: "zone2"}: []int{},
+				{key: "zone", value: "zone1"}: {},
+				{key: "zone", value: "zone2"}: {},
 			},
 			want: &topologyPairsPodSpreadMap{
-				minMatches: []int32{0},
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 0},
 				topologyPairsMaps: &topologyPairsMaps{
 					podToTopologyPairs: make(map[string]topologyPairSet),
 				},
@@ -978,12 +978,12 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 			},
 			injectPodPointers: map[topologyPair][]int{
 				// denotes existingPods[0,1,2]
-				{key: "zone", value: "zone1"}: []int{0, 1, 2},
+				{key: "zone", value: "zone1"}: {0, 1, 2},
 				// denotes existingPods[3,4]
-				{key: "zone", value: "zone2"}: []int{3, 4},
+				{key: "zone", value: "zone2"}: {3, 4},
 			},
 			want: &topologyPairsPodSpreadMap{
-				minMatches: []int32{2},
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 2},
 				topologyPairsMaps: &topologyPairsMaps{
 					podToTopologyPairs: map[string]topologyPairSet{
 						"p-a1_": newPairSet("zone", "zone1"),
@@ -1014,11 +1014,11 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
-				{key: "zone", value: "zone1"}: []int{0, 2},
-				{key: "zone", value: "zone2"}: []int{4},
+				{key: "zone", value: "zone1"}: {0, 2},
+				{key: "zone", value: "zone2"}: {4},
 			},
 			want: &topologyPairsPodSpreadMap{
-				minMatches: []int32{1},
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 1},
 				topologyPairsMaps: &topologyPairsMaps{
 					podToTopologyPairs: map[string]topologyPairSet{
 						"p-a1_": newPairSet("zone", "zone1"),
@@ -1050,15 +1050,15 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				makePod().name("p-y4").node("node-y").label("foo", "").obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
-				{key: "zone", value: "zone1"}:  []int{0, 1, 2},
-				{key: "zone", value: "zone2"}:  []int{3, 4, 5, 6},
-				{key: "node", value: "node-a"}: []int{0, 1},
-				{key: "node", value: "node-b"}: []int{2},
-				{key: "node", value: "node-x"}: []int{},
-				{key: "node", value: "node-y"}: []int{3, 4, 5, 6},
+				{key: "zone", value: "zone1"}:  {0, 1, 2},
+				{key: "zone", value: "zone2"}:  {3, 4, 5, 6},
+				{key: "node", value: "node-a"}: {0, 1},
+				{key: "node", value: "node-b"}: {2},
+				{key: "node", value: "node-x"}: {},
+				{key: "node", value: "node-y"}: {3, 4, 5, 6},
 			},
 			want: &topologyPairsPodSpreadMap{
-				minMatches: []int32{3, 0},
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 3, "node": 0},
 				topologyPairsMaps: &topologyPairsMaps{
 					podToTopologyPairs: map[string]topologyPairSet{
 						"p-a1_": newPairSet("zone", "zone1", "node", "node-a"),
@@ -1095,14 +1095,14 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				makePod().name("p-y4").node("node-y").label("foo", "").obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
-				{key: "zone", value: "zone1"}:  []int{0, 1, 2},
-				{key: "zone", value: "zone2"}:  []int{3, 4, 5, 6},
-				{key: "node", value: "node-a"}: []int{0, 1},
-				{key: "node", value: "node-b"}: []int{2},
-				{key: "node", value: "node-y"}: []int{3, 4, 5, 6},
+				{key: "zone", value: "zone1"}:  {0, 1, 2},
+				{key: "zone", value: "zone2"}:  {3, 4, 5, 6},
+				{key: "node", value: "node-a"}: {0, 1},
+				{key: "node", value: "node-b"}: {2},
+				{key: "node", value: "node-y"}: {3, 4, 5, 6},
 			},
 			want: &topologyPairsPodSpreadMap{
-				minMatches: []int32{3, 1},
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 3, "node": 1},
 				topologyPairsMaps: &topologyPairsMaps{
 					podToTopologyPairs: map[string]topologyPairSet{
 						"p-a1_": newPairSet("zone", "zone1", "node", "node-a"),
@@ -1137,14 +1137,14 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				makePod().name("p-y4").node("node-y").label("foo", "").label("bar", "").obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
-				{key: "zone", value: "zone1"}:  []int{1},
-				{key: "zone", value: "zone2"}:  []int{4, 6},
-				{key: "node", value: "node-a"}: []int{1},
-				{key: "node", value: "node-b"}: []int{},
-				{key: "node", value: "node-y"}: []int{4, 6},
+				{key: "zone", value: "zone1"}:  {1},
+				{key: "zone", value: "zone2"}:  {4, 6},
+				{key: "node", value: "node-a"}: {1},
+				{key: "node", value: "node-b"}: {},
+				{key: "node", value: "node-y"}: {4, 6},
 			},
 			want: &topologyPairsPodSpreadMap{
-				minMatches: []int32{1, 0},
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 1, "node": 0},
 				topologyPairsMaps: &topologyPairsMaps{
 					podToTopologyPairs: map[string]topologyPairSet{
 						"p-a2_": newPairSet("zone", "zone1", "node", "node-a"),
@@ -1157,7 +1157,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 		{
 			name: "two spreadConstraints, and with podAffinity",
 			pod: makePod().name("p").label("foo", "").
-				nodeAffinityIn("node", []string{"node-a", "node-b", "node-y"}). // exclude node-x
+				nodeAffinityNotIn("node", []string{"node-x"}). // exclude node-x
 				spreadConstraint(1, "zone", hardSpread, makeLabelSelector().exists("foo").obj()).
 				spreadConstraint(1, "node", hardSpread, makeLabelSelector().exists("foo").obj()).
 				obj(),
@@ -1177,14 +1177,14 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				makePod().name("p-y4").node("node-y").label("foo", "").obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
-				{key: "zone", value: "zone1"}:  []int{0, 1, 2},
-				{key: "zone", value: "zone2"}:  []int{3, 4, 5, 6},
-				{key: "node", value: "node-a"}: []int{0, 1},
-				{key: "node", value: "node-b"}: []int{2},
-				{key: "node", value: "node-y"}: []int{3, 4, 5, 6},
+				{key: "zone", value: "zone1"}:  {0, 1, 2},
+				{key: "zone", value: "zone2"}:  {3, 4, 5, 6},
+				{key: "node", value: "node-a"}: {0, 1},
+				{key: "node", value: "node-b"}: {2},
+				{key: "node", value: "node-y"}: {3, 4, 5, 6},
 			},
 			want: &topologyPairsPodSpreadMap{
-				minMatches: []int32{3, 1},
+				topologyKeyToMinPodsMap: map[string]int32{"zone": 3, "node": 1},
 				topologyPairsMaps: &topologyPairsMaps{
 					podToTopologyPairs: map[string]topologyPairSet{
 						"p-a1_": newPairSet("zone", "zone1", "node", "node-a"),
