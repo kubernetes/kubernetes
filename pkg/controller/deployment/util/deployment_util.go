@@ -267,7 +267,7 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 		if len(oldRevisions[0]) == 0 {
 			newRS.Annotations[RevisionHistoryAnnotation] = oldRevision
 		} else {
-			if len(revisionHistoryAnnotation) + len(oldRevision) < 262144 {
+			if len(revisionHistoryAnnotation)+len(oldRevision) < 262144 {
 				oldRevisions = append(oldRevisions, oldRevision)
 				newRS.Annotations[RevisionHistoryAnnotation] = strings.Join(oldRevisions, ",")
 			} else {
