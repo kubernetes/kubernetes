@@ -36,6 +36,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -202,7 +203,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 	It("should audit API calls to create, get, update, patch, delete, list, watch deployments.", func() {
 		podLabels := map[string]string{"name": "audit-deployment-pod"}
-		d := framework.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), apps.RecreateDeploymentStrategyType)
+		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), apps.RecreateDeploymentStrategyType)
 
 		_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(d)
 		framework.ExpectNoError(err, "failed to create audit-deployment")

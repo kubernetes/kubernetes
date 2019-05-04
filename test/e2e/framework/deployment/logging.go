@@ -19,11 +19,14 @@ package deployment
 import (
 	apps "k8s.io/api/apps/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-// UpdateDeploymentWithRetries updates the specified deployment with retries.
-func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*apps.Deployment, error) {
-	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, framework.Logf, framework.Poll, framework.PollShortTimeout)
+func logReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet) {
+	testutils.LogReplicaSetsOfDeployment(deployment, allOldRSs, newRS, e2elog.Logf)
+}
+
+func logPodsOfDeployment(c clientset.Interface, deployment *apps.Deployment, rsList []*apps.ReplicaSet) {
+	testutils.LogPodsOfDeployment(c, deployment, rsList, e2elog.Logf)
 }

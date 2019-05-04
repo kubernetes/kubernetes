@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -93,12 +94,12 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		volumePath := pvs[0].Spec.VsphereVolume.VolumePath
 
 		By("Creating a Deployment")
-		deployment, err := framework.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
+		deployment, err := e2edeploy.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
 		defer client.AppsV1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
 
 		By("Get pod from the deployement")
-		podList, err := framework.GetPodsForDeployment(client, deployment)
+		podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod from the deployement with err: %v", err))
 		Expect(podList.Items).NotTo(BeEmpty())
 		pod := podList.Items[0]
@@ -178,7 +179,7 @@ func waitForPodToFailover(client clientset.Interface, deployment *apps.Deploymen
 
 // getNodeForDeployment returns node name for the Deployment
 func getNodeForDeployment(client clientset.Interface, deployment *apps.Deployment) (string, error) {
-	podList, err := framework.GetPodsForDeployment(client, deployment)
+	podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
 	if err != nil {
 		return "", err
 	}
