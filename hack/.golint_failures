@@ -107,6 +107,8 @@ pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
 pkg/controller/volume/persistentvolume/options
+pkg/controller/volume/persistentvolume/testing
+pkg/controller/volume/scheduling
 pkg/credentialprovider
 pkg/credentialprovider/gcp
 pkg/features

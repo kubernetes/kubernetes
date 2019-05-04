@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package persistentvolume
+package scheduling
 
 import (
 	"fmt"
@@ -32,6 +32,7 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -211,7 +212,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 
 		// Filter out claims to provision
 		for _, claim := range claimsToBind {
-			if selectedNode, ok := claim.Annotations[annSelectedNode]; ok {
+			if selectedNode, ok := claim.Annotations[pvutil.AnnSelectedNode]; ok {
 				if selectedNode != node.Name {
 					// Fast path, skip unmatched node
 					return false, boundVolumesSatisfied, nil
@@ -274,7 +275,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	// Assume PV
 	newBindings := []*bindingInfo{}
 	for _, binding := range claimsToBind {
-		newPV, dirty, err := GetBindVolumeToClaim(binding.pv, binding.pvc)
+		newPV, dirty, err := pvutil.GetBindVolumeToClaim(binding.pv, binding.pvc)
 		klog.V(5).Infof("AssumePodVolumes: GetBindVolumeToClaim for pod %q, PV %q, PVC %q.  newPV %p, dirty %v, err: %v",
 			podName,
 			binding.pv.Name,
@@ -303,7 +304,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 		// The claims from method args can be pointing to watcher cache. We must not
 		// modify these, therefore create a copy.
 		claimClone := claim.DeepCopy()
-		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annSelectedNode, nodeName)
+		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnSelectedNode, nodeName)
 		err = b.pvcCache.Assume(claimClone)
 		if err != nil {
 			b.revertAssumedPVs(newBindings)
@@ -511,7 +512,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		if pvc.Annotations == nil {
 			return false, fmt.Errorf("selectedNode annotation reset for PVC %q", pvc.Name)
 		}
-		selectedNode := pvc.Annotations[annSelectedNode]
+		selectedNode := pvc.Annotations[pvutil.AnnSelectedNode]
 		if selectedNode != pod.Spec.NodeName {
 			return false, fmt.Errorf("selectedNode annotation value %q not set to scheduled node %q", selectedNode, pod.Spec.NodeName)
 		}
@@ -582,7 +583,7 @@ func (b *volumeBinder) isPVCBound(namespace, pvcName string) (bool, *v1.Persiste
 }
 
 func (b *volumeBinder) isPVCFullyBound(pvc *v1.PersistentVolumeClaim) bool {
-	return pvc.Spec.VolumeName != "" && metav1.HasAnnotation(pvc.ObjectMeta, annBindCompleted)
+	return pvc.Spec.VolumeName != "" && metav1.HasAnnotation(pvc.ObjectMeta, pvutil.AnnBindCompleted)
 }
 
 // arePodVolumesBound returns true if all volumes are fully bound
@@ -614,7 +615,7 @@ func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 		if volumeBound {
 			boundClaims = append(boundClaims, pvc)
 		} else {
-			delayBindingMode, err := IsDelayBindingMode(pvc, b.classLister)
+			delayBindingMode, err := pvutil.IsDelayBindingMode(pvc, b.classLister)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -674,7 +675,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 		pvcName := getPVCName(pvc)
 
 		// Find a matching PV
-		pv, err := findMatchingVolume(pvc, allPVs, node, chosenPVs, true)
+		pv, err := pvutil.FindMatchingVolume(pvc, allPVs, node, chosenPVs, true)
 		if err != nil {
 			return false, nil, nil, err
 		}
@@ -717,7 +718,7 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 			return false, nil, fmt.Errorf("failed to find storage class %q", className)
 		}
 		provisioner := class.Provisioner
-		if provisioner == "" || provisioner == notSupportedProvisioner {
+		if provisioner == "" || provisioner == pvutil.NotSupportedProvisioner {
 			klog.V(4).Infof("storage class %q of claim %q does not support dynamic provisioning", className, pvcName)
 			return false, nil, nil
 		}
@@ -774,4 +775,8 @@ func (a byPVCSize) Less(i, j int) bool {
 	jSize := a[j].Spec.Resources.Requests[v1.ResourceStorage]
 	// return true if iSize is less than jSize
 	return iSize.Cmp(jSize) == -1
+}
+
+func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
+	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
 }

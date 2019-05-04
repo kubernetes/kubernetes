@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.
@@ -91,11 +92,9 @@ func TestDeleteSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Delete the volume before delete operation starts
-				reactor.lock.Lock()
-				delete(reactor.volumes, "volume8-6")
-				reactor.lock.Unlock()
+				reactor.DeleteVolume("volume8-6")
 			}),
 		},
 		{
@@ -108,16 +107,12 @@ func TestDeleteSync(t *testing.T) {
 			noclaims,
 			newClaimArray("claim8-7", "uid8-7", "10Gi", "volume8-7", v1.ClaimBound, nil),
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
-				reactor.lock.Lock()
-				defer reactor.lock.Unlock()
+			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationDelete, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Bind the volume to resurrected claim (this should never
 				// happen)
 				claim := newClaim("claim8-7", "uid8-7", "10Gi", "volume8-7", v1.ClaimBound, nil)
-				reactor.claims[claim.Name] = claim
+				reactor.AddClaimBoundToVolume(claim)
 				ctrl.claims.Add(claim)
-				volume := reactor.volumes["volume8-7"]
-				volume.Status.Phase = v1.VolumeBound
 			}),
 		},
 		{
@@ -141,7 +136,7 @@ func TestDeleteSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			noevents, noerrors,
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				// Inject external deleter annotation
 				test.initialVolumes[0].Annotations[annDynamicallyProvisioned] = "external.io/test"
 				test.expectedVolumes[0].Annotations[annDynamicallyProvisioned] = "external.io/test"
@@ -184,7 +179,7 @@ func TestDeleteSync(t *testing.T) {
 			newClaimArray("claim8-12", "uid8-12", "10Gi", "volume8-12-2", v1.ClaimBound, nil),
 			newClaimArray("claim8-12", "uid8-12", "10Gi", "volume8-12-2", v1.ClaimBound, nil),
 			noevents, noerrors,
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				// Inject external deleter annotation
 				test.initialVolumes[0].Annotations[annDynamicallyProvisioned] = "external.io/test"
 				test.expectedVolumes[0].Annotations[annDynamicallyProvisioned] = "external.io/test"

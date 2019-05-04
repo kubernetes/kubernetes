@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package persistentvolume
+package scheduling
 
 import (
 	"fmt"
@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 )
 
 func makePV(name, version, storageClass string) *v1.PersistentVolume {
@@ -456,7 +457,7 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 
 	// Assume PVC
 	newPVC := pvc.DeepCopy()
-	newPVC.Annotations[annSelectedNode] = "test-node"
+	newPVC.Annotations[pvutil.AnnSelectedNode] = "test-node"
 	if err := cache.Assume(newPVC); err != nil {
 		t.Fatalf("failed to assume PVC: %v", err)
 	}
