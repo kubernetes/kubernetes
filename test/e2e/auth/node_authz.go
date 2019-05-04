@@ -52,24 +52,24 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		ns = f.Namespace.Name
 
 		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to list nodes in namespace: %s", ns)
+		framework.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
 		Expect(len(nodeList.Items)).NotTo(Equal(0))
 		nodeName = nodeList.Items[0].Name
 		asUser = NodeNamePrefix + nodeName
 		saName := "default"
 		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(saName, metav1.GetOptions{})
 		Expect(len(sa.Secrets)).NotTo(Equal(0))
-		Expect(err).NotTo(HaveOccurred(), "failed to retrieve service account (%s:%s)", ns, saName)
+		framework.ExpectNoError(err, "failed to retrieve service account (%s:%s)", ns, saName)
 		defaultSaSecret = sa.Secrets[0].Name
 		By("Creating a kubernetes client that impersonates a node")
 		config, err := framework.LoadConfig()
-		Expect(err).NotTo(HaveOccurred(), "failed to load kubernetes client config")
+		framework.ExpectNoError(err, "failed to load kubernetes client config")
 		config.Impersonate = restclient.ImpersonationConfig{
 			UserName: asUser,
 			Groups:   []string{NodesGroup},
 		}
 		c, err = clientset.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred(), "failed to create Clientset for the given config: %+v", *config)
+		framework.ExpectNoError(err, "failed to create Clientset for the given config: %+v", *config)
 
 	})
 	It("Getting a non-existent secret should exit with the Forbidden error, not a NotFound error", func() {
@@ -99,7 +99,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			},
 		}
 		_, err := f.ClientSet.CoreV1().ConfigMaps(ns).Create(configmap)
-		Expect(err).NotTo(HaveOccurred(), "failed to create configmap (%s:%s) %+v", ns, configmap.Name, *configmap)
+		framework.ExpectNoError(err, "failed to create configmap (%s:%s) %+v", ns, configmap.Name, *configmap)
 		_, err = c.CoreV1().ConfigMaps(ns).Get(configmap.Name, metav1.GetOptions{})
 		Expect(apierrors.IsForbidden(err)).Should(Equal(true))
 	})
@@ -116,7 +116,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			},
 		}
 		_, err := f.ClientSet.CoreV1().Secrets(ns).Create(secret)
-		Expect(err).NotTo(HaveOccurred(), "failed to create secret (%s:%s)", ns, secret.Name)
+		framework.ExpectNoError(err, "failed to create secret (%s:%s)", ns, secret.Name)
 
 		By("Node should not get the secret")
 		_, err = c.CoreV1().Secrets(ns).Get(secret.Name, metav1.GetOptions{})
@@ -149,7 +149,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 		}
 
 		_, err = f.ClientSet.CoreV1().Pods(ns).Create(pod)
-		Expect(err).NotTo(HaveOccurred(), "failed to create pod (%s:%s)", ns, pod.Name)
+		framework.ExpectNoError(err, "failed to create pod (%s:%s)", ns, pod.Name)
 
 		By("The node should able to access the secret")
 		itv := framework.Poll
@@ -162,7 +162,7 @@ var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
 			}
 			return true, nil
 		})
-		Expect(err).NotTo(HaveOccurred(), "failed to get secret after trying every %v for %v (%s:%s)", itv, dur, ns, secret.Name)
+		framework.ExpectNoError(err, "failed to get secret after trying every %v for %v (%s:%s)", itv, dur, ns, secret.Name)
 	})
 
 	It("A node shouldn't be able to create another node", func() {
