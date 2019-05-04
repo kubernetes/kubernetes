@@ -270,6 +270,7 @@ func (dc *DisruptionController) getPodReplicationController(pod *v1.Pod) (*contr
 	}
 	rc, err := dc.rcLister.ReplicationControllers(pod.Namespace).Get(controllerRef.Name)
 	if err != nil {
+		klog.Warningf("error retrieving ReplicationController %v", err)
 		// The only possible error is NotFound, which is ok here.
 		return nil, nil
 	}
@@ -588,7 +589,7 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 			var controllerNScale *controllerAndScale
 			controllerNScale, err = finder(pod)
 			if err != nil {
-				return
+				continue
 			}
 			if controllerNScale != nil {
 				controllerScale[controllerNScale.UID] = controllerNScale.scale
