@@ -116,39 +116,6 @@ import (
 // claims at the same time. The controller must recover from any conflicts
 // that may arise from these conditions.
 
-// annBindCompleted annotation applies to PVCs. It indicates that the lifecycle
-// of the PVC has passed through the initial setup. This information changes how
-// we interpret some observations of the state of the objects. Value of this
-// annotation does not matter.
-const annBindCompleted = "pv.kubernetes.io/bind-completed"
-
-// annBoundByController annotation applies to PVs and PVCs. It indicates that
-// the binding (PV->PVC or PVC->PV) was installed by the controller. The
-// absence of this annotation means the binding was done by the user (i.e.
-// pre-bound). Value of this annotation does not matter.
-// External PV binders must bind PV the same way as PV controller, otherwise PV
-// controller may not handle it correctly.
-const annBoundByController = "pv.kubernetes.io/bound-by-controller"
-
-// This annotation is added to a PV that has been dynamically provisioned by
-// Kubernetes. Its value is name of volume plugin that created the volume.
-// It serves both user (to show where a PV comes from) and Kubernetes (to
-// recognize dynamically provisioned PVs in its decisions).
-const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
-
-// This annotation is added to a PVC that is supposed to be dynamically
-// provisioned. Its value is name of volume plugin that is supposed to provision
-// a volume for this PVC.
-const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
-
-// This annotation is added to a PVC that has been triggered by scheduler to
-// be dynamically provisioned. Its value is the name of the selected node.
-const annSelectedNode = "volume.kubernetes.io/selected-node"
-
-// If the provisioner name in a storage class is set to "kubernetes.io/no-provisioner",
-// then dynamic provisioning is not supported by the storage.
-const notSupportedProvisioner = "kubernetes.io/no-provisioner"
-
 // CloudVolumeCreatedForClaimNamespaceTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 // with namespace of a persistent volume claim used to create this volume.
 const CloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
@@ -247,7 +214,7 @@ type PersistentVolumeController struct {
 func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClaim) error {
 	klog.V(4).Infof("synchronizing PersistentVolumeClaim[%s]: %s", claimToClaimKey(claim), getClaimStatusForLogging(claim))
 
-	if !metav1.HasAnnotation(claim.ObjectMeta, annBindCompleted) {
+	if !metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBindCompleted) {
 		return ctrl.syncUnboundClaim(claim)
 	} else {
 		return ctrl.syncBoundClaim(claim)
@@ -295,9 +262,9 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 func (ctrl *PersistentVolumeController) isDelayBindingProvisioning(claim *v1.PersistentVolumeClaim) bool {
 	// When feature VolumeScheduling enabled,
 	// Scheduler signal to the PV controller to start dynamic
-	// provisioning by setting the "annSelectedNode" annotation
+	// provisioning by setting the "AnnSelectedNode" annotation
 	// in the PVC
-	_, ok := claim.Annotations[annSelectedNode]
+	_, ok := claim.Annotations[pvutil.AnnSelectedNode]
 	return ok
 }
 
@@ -422,7 +389,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			} else {
 				// User asked for a PV that is claimed by someone else
 				// OBSERVATION: pvc is "Pending", pv is "Bound"
-				if !metav1.HasAnnotation(claim.ObjectMeta, annBoundByController) {
+				if !metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBoundByController) {
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim by user, will retry later", claimToClaimKey(claim))
 					// User asked for a specific PV, retry later
 					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
@@ -431,7 +398,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 					return nil
 				} else {
 					// This should never happen because someone had to remove
-					// annBindCompleted annotation on the claim.
+					// AnnBindCompleted annotation on the claim.
 					klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim %q by controller, THIS SHOULD NEVER HAPPEN", claimToClaimKey(claim), claimrefToClaimKey(volume.Spec.ClaimRef))
 					return fmt.Errorf("Invalid binding of claim %q to volume %q: volume already claimed by %q", claimToClaimKey(claim), claim.Spec.VolumeName, claimrefToClaimKey(volume.Spec.ClaimRef))
 				}
@@ -443,7 +410,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 // syncBoundClaim is the main controller method to decide what to do with a
 // bound claim.
 func (ctrl *PersistentVolumeController) syncBoundClaim(claim *v1.PersistentVolumeClaim) error {
-	// HasAnnotation(pvc, annBindCompleted)
+	// HasAnnotation(pvc, pvutil.AnnBindCompleted)
 	// This PVC has previously been bound
 	// OBSERVATION: pvc is not "Pending"
 	// [Unit test set 3]
@@ -543,7 +510,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 		if err != nil {
 			return err
 		}
-		if !found && metav1.HasAnnotation(volume.ObjectMeta, annBoundByController) {
+		if !found && metav1.HasAnnotation(volume.ObjectMeta, pvutil.AnnBoundByController) {
 			// If PV is bound by external PV binder (e.g. kube-scheduler), it's
 			// possible on heavy load that corresponding PVC is not synced to
 			// controller local cache yet. So we need to double-check PVC in
@@ -622,7 +589,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 				return nil
 			}
 
-			if metav1.HasAnnotation(volume.ObjectMeta, annBoundByController) {
+			if metav1.HasAnnotation(volume.ObjectMeta, pvutil.AnnBoundByController) {
 				// The binding is not completed; let PVC sync handle it
 				klog.V(4).Infof("synchronizing PersistentVolume[%s]: volume not bound yet, waiting for syncClaim to fix it", volume.Name)
 			} else {
@@ -649,7 +616,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			return nil
 		} else {
 			// Volume is bound to a claim, but the claim is bound elsewhere
-			if metav1.HasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) && volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
+			if metav1.HasAnnotation(volume.ObjectMeta, pvutil.AnnDynamicallyProvisioned) && volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
 				// This volume was dynamically provisioned for this claim. The
 				// claim got bound elsewhere, and thus this volume is not
 				// needed. Delete it.
@@ -673,7 +640,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			} else {
 				// Volume is bound to a claim, but the claim is bound elsewhere
 				// and it's not dynamically provisioned.
-				if metav1.HasAnnotation(volume.ObjectMeta, annBoundByController) {
+				if metav1.HasAnnotation(volume.ObjectMeta, pvutil.AnnBoundByController) {
 					// This is part of the normal operation of the controller; the
 					// controller tried to use this volume for a claim but the claim
 					// was fulfilled by another volume. We did this; fix it.
@@ -908,15 +875,15 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *v1.PersistentVo
 		// Bind the claim to the volume
 		claimClone.Spec.VolumeName = volume.Name
 
-		// Set annBoundByController if it is not set yet
-		if !metav1.HasAnnotation(claimClone.ObjectMeta, annBoundByController) {
-			metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annBoundByController, "yes")
+		// Set AnnBoundByController if it is not set yet
+		if !metav1.HasAnnotation(claimClone.ObjectMeta, pvutil.AnnBoundByController) {
+			metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnBoundByController, "yes")
 		}
 	}
 
-	// Set annBindCompleted if it is not set yet
-	if !metav1.HasAnnotation(claimClone.ObjectMeta, annBindCompleted) {
-		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annBindCompleted, "yes")
+	// Set AnnBindCompleted if it is not set yet
+	if !metav1.HasAnnotation(claimClone.ObjectMeta, pvutil.AnnBindCompleted) {
+		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnBindCompleted, "yes")
 		dirty = true
 	}
 
@@ -995,10 +962,10 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume
 	// Save the PV only when any modification is necessary.
 	volumeClone := volume.DeepCopy()
 
-	if metav1.HasAnnotation(volume.ObjectMeta, annBoundByController) {
+	if metav1.HasAnnotation(volume.ObjectMeta, pvutil.AnnBoundByController) {
 		// The volume was bound by the controller.
 		volumeClone.Spec.ClaimRef = nil
-		delete(volumeClone.Annotations, annBoundByController)
+		delete(volumeClone.Annotations, pvutil.AnnBoundByController)
 		if len(volumeClone.Annotations) == 0 {
 			// No annotations look better than empty annotation map (and it's easier
 			// to test).
@@ -1469,7 +1436,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 	}
 
 	var selectedNode *v1.Node = nil
-	if nodeName, ok := claim.Annotations[annSelectedNode]; ok {
+	if nodeName, ok := claim.Annotations[pvutil.AnnSelectedNode]; ok {
 		selectedNode, err = ctrl.NodeLister.Get(nodeName)
 		if err != nil {
 			strerr := fmt.Sprintf("Failed to get target node: %v", err)
@@ -1506,9 +1473,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 	volume.Status.Phase = v1.VolumeBound
 	volume.Spec.StorageClassName = claimClass
 
-	// Add annBoundByController (used in deleting the volume)
-	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
-	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
+	// Add AnnBoundByController (used in deleting the volume)
+	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, pvutil.AnnBoundByController, "yes")
+	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, pvutil.AnnDynamicallyProvisioned, plugin.GetPluginName())
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
@@ -1581,9 +1548,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 }
 
 // rescheduleProvisioning signal back to the scheduler to retry dynamic provisioning
-// by removing the annSelectedNode annotation
+// by removing the AnnSelectedNode annotation
 func (ctrl *PersistentVolumeController) rescheduleProvisioning(claim *v1.PersistentVolumeClaim) {
-	if _, ok := claim.Annotations[annSelectedNode]; !ok {
+	if _, ok := claim.Annotations[pvutil.AnnSelectedNode]; !ok {
 		// Provisioning not triggered by the scheduler, skip
 		return
 	}
@@ -1591,10 +1558,10 @@ func (ctrl *PersistentVolumeController) rescheduleProvisioning(claim *v1.Persist
 	// The claim from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
 	newClaim := claim.DeepCopy()
-	delete(newClaim.Annotations, annSelectedNode)
+	delete(newClaim.Annotations, pvutil.AnnSelectedNode)
 	// Try to update the PVC object
 	if _, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(newClaim.Namespace).Update(newClaim); err != nil {
-		klog.V(4).Infof("Failed to delete annotation 'annSelectedNode' for PersistentVolumeClaim %q: %v", claimToClaimKey(newClaim), err)
+		klog.V(4).Infof("Failed to delete annotation 'pvutil.AnnSelectedNode' for PersistentVolumeClaim %q: %v", claimToClaimKey(newClaim), err)
 		return
 	}
 	if _, err := ctrl.storeClaimUpdate(newClaim); err != nil {
@@ -1669,8 +1636,8 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *v1.Persis
 func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *v1.PersistentVolume) (vol.DeletableVolumePlugin, error) {
 	// Find a plugin. Try to find the same plugin that provisioned the volume
 	var plugin vol.DeletableVolumePlugin
-	if metav1.HasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
-		provisionPluginName := volume.Annotations[annDynamicallyProvisioned]
+	if metav1.HasAnnotation(volume.ObjectMeta, pvutil.AnnDynamicallyProvisioned) {
+		provisionPluginName := volume.Annotations[pvutil.AnnDynamicallyProvisioned]
 		if provisionPluginName != "" {
 			plugin, err := ctrl.volumePluginMgr.FindDeletablePluginByName(provisionPluginName)
 			if err != nil {
