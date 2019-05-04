@@ -24,6 +24,7 @@ limitations under the License.
 package queue
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -43,7 +44,7 @@ import (
 )
 
 var (
-	queueClosed = "scheduling queue is closed"
+	errQueueClosed = errors.New("scheduling queue is closed")
 )
 
 // If the pod stays in unschedulableQ longer than the unschedulableQTimeInterval,
@@ -104,7 +105,6 @@ func NominatedNodeName(pod *v1.Pod) string {
 // is called unschedulableQ. The third queue holds pods that are moved from
 // unschedulable queues and will be moved to active queue when backoff are completed.
 type PriorityQueue struct {
-	stop  <-chan struct{}
 	clock util.Clock
 	// podBackoff tracks backoff for pods attempting to be rescheduled
 	podBackoff *PodBackoffMap
@@ -174,7 +174,6 @@ func NewPriorityQueue(stop <-chan struct{}) *PriorityQueue {
 func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock) *PriorityQueue {
 	pq := &PriorityQueue{
 		clock:            clock,
-		stop:             stop,
 		podBackoff:       NewPodBackoffMap(1*time.Second, 10*time.Second),
 		activeQ:          util.NewHeapWithRecorder(podInfoKeyFunc, activeQComp, metrics.NewActivePodsRecorder()),
 		unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
@@ -184,15 +183,15 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock) *Priority
 	pq.cond.L = &pq.lock
 	pq.podBackoffQ = util.NewHeapWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
 
-	pq.run()
+	pq.run(stop)
 
 	return pq
 }
 
 // run starts the goroutine to pump from podBackoffQ to activeQ
-func (p *PriorityQueue) run() {
-	go wait.Until(p.flushBackoffQCompleted, 1.0*time.Second, p.stop)
-	go wait.Until(p.flushUnschedulableQLeftover, 30*time.Second, p.stop)
+func (p *PriorityQueue) run(stop <-chan struct{}) {
+	go wait.Until(p.flushBackoffQCompleted, 1.0*time.Second, stop)
+	go wait.Until(p.flushUnschedulableQLeftover, 30*time.Second, stop)
 }
 
 // Add adds a pod to the active queue. It should be called only when a new pod
@@ -391,7 +390,7 @@ func (p *PriorityQueue) Pop() (*v1.Pod, error) {
 		// When Close() is called, the p.closed is set and the condition is broadcast,
 		// which causes this loop to continue and return from the Pop().
 		if p.closed {
-			return nil, fmt.Errorf(queueClosed)
+			return nil, errQueueClosed
 		}
 		p.cond.Wait()
 	}
