@@ -54,13 +54,11 @@ import (
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
@@ -181,10 +179,6 @@ type Config struct {
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc apirequest.LongRunningRequestCheck
 
-	// EnableAPIResponseCompression indicates whether API Responses should support compression
-	// if the client requests it via Accept-Encoding
-	EnableAPIResponseCompression bool
-
 	// MergedResourceConfig indicates which groupVersion enabled and its resources enabled/disabled.
 	// This is composed of genericapiserver defaultAPIResourceConfig and those parsed from flags.
 	// If not specify any in flags, then genericapiserver will only enable defaultAPIResourceConfig.
@@ -298,8 +292,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// proto when persisted in etcd. Assuming the upper bound of
 		// the size ratio is 10:1, we set 100MB as the largest request
 		// body size to be accepted and decoded in a write request.
-		MaxRequestBodyBytes:          int64(100 * 1024 * 1024),
-		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
+		MaxRequestBodyBytes: int64(100 * 1024 * 1024),
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
@@ -511,9 +504,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
 
-		enableAPIResponseCompression: c.EnableAPIResponseCompression,
-		maxRequestBodyBytes:          c.MaxRequestBodyBytes,
-		healthzClock:                 clock.RealClock{},
+		maxRequestBodyBytes: c.MaxRequestBodyBytes,
+		healthzClock:        clock.RealClock{},
 	}
 
 	for {

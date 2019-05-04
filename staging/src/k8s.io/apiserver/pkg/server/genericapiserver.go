@@ -493,10 +493,9 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 
 		EquivalentResourceRegistry: s.EquivalentResourceRegistry,
 
-		Admit:                        s.admissionControl,
-		MinRequestTimeout:            s.minRequestTimeout,
-		EnableAPIResponseCompression: s.enableAPIResponseCompression,
-		Authorizer:                   s.Authorizer,
+		Admit:             s.admissionControl,
+		MinRequestTimeout: s.minRequestTimeout,
+		Authorizer:        s.Authorizer,
 	}
 }
 
