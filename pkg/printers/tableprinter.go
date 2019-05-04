@@ -21,6 +21,7 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/liggitt/tabwriter"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -28,10 +29,24 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/duration"
 )
 
 var _ ResourcePrinter = &HumanReadablePrinter{}
-var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
+
+var (
+	defaultHandlerEntry = &handlerEntry{
+		columnDefinitions: objectMetaColumnDefinitions,
+		printFunc:         reflect.ValueOf(printObjectMeta),
+	}
+
+	objectMetaColumnDefinitions = []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+
+	withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print cluster name too.
+)
 
 // NewTablePrinter creates a printer suitable for calling PrintObj().
 // TODO(seans3): Change return type to ResourcePrinter interface once we no longer need
@@ -104,23 +119,18 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	}
 
 	// Case 3: Could not find print handler for "obj"; use the default print handler.
-	// print with the default handler if set, and use the columns from the last time
-	if h.defaultHandler != nil {
-		includeHeaders := h.lastType != h.defaultHandler && !h.options.NoHeaders
+	// Print with the default handler, and use the columns from the last time
+	includeHeaders := h.lastType != defaultHandlerEntry && !h.options.NoHeaders
 
-		if h.lastType != nil && h.lastType != h.defaultHandler && !h.options.NoHeaders {
-			fmt.Fprintln(output)
-		}
-
-		if err := printRowsForHandlerEntry(output, h.defaultHandler, obj, h.options, includeHeaders); err != nil {
-			return err
-		}
-		h.lastType = h.defaultHandler
-		return nil
+	if h.lastType != nil && h.lastType != defaultHandlerEntry && !h.options.NoHeaders {
+		fmt.Fprintln(output)
 	}
 
-	// we failed all reasonable printing efforts, report failure
-	return fmt.Errorf("error: unknown type %#v", obj)
+	if err := printRowsForHandlerEntry(output, defaultHandlerEntry, obj, h.options, includeHeaders); err != nil {
+		return err
+	}
+	h.lastType = defaultHandlerEntry
+	return nil
 }
 
 // PrintTable prints a table to the provided output respecting the filtering rules for options
@@ -383,4 +393,44 @@ func appendLabelCells(values []interface{}, itemLabels map[string]string, opts P
 		values = append(values, labels.FormatLabels(itemLabels))
 	}
 	return values
+}
+
+func printObjectMeta(obj runtime.Object, options PrintOptions) ([]metav1beta1.TableRow, error) {
+	if meta.IsListType(obj) {
+		rows := make([]metav1beta1.TableRow, 0, 16)
+		err := meta.EachListItem(obj, func(obj runtime.Object) error {
+			nestedRows, err := printObjectMeta(obj, options)
+			if err != nil {
+				return err
+			}
+			rows = append(rows, nestedRows...)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return rows, nil
+	}
+
+	rows := make([]metav1beta1.TableRow, 0, 1)
+	m, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, m.GetName(), translateTimestampSince(m.GetCreationTimestamp()))
+	rows = append(rows, row)
+	return rows, nil
+}
+
+// translateTimestampSince returns the elapsed time since timestamp in
+// human-readable approximation.
+func translateTimestampSince(timestamp metav1.Time) string {
+	if timestamp.IsZero() {
+		return "<unknown>"
+	}
+
+	return duration.HumanDuration(time.Since(timestamp.Time))
 }

@@ -37,7 +37,6 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -468,48 +467,6 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(volumeAttachmentColumnDefinitions, printVolumeAttachment)
 	h.TableHandler(volumeAttachmentColumnDefinitions, printVolumeAttachmentList)
-
-	AddDefaultHandlers(h)
-}
-
-// AddDefaultHandlers adds handlers that can work with most Kubernetes objects.
-func AddDefaultHandlers(h printers.PrintHandler) {
-	// types without defined columns
-	objectMetaColumnDefinitions := []metav1beta1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-	}
-	h.DefaultTableHandler(objectMetaColumnDefinitions, printObjectMeta)
-}
-
-func printObjectMeta(obj runtime.Object, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
-	if meta.IsListType(obj) {
-		rows := make([]metav1beta1.TableRow, 0, 16)
-		err := meta.EachListItem(obj, func(obj runtime.Object) error {
-			nestedRows, err := printObjectMeta(obj, options)
-			if err != nil {
-				return err
-			}
-			rows = append(rows, nestedRows...)
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		return rows, nil
-	}
-
-	rows := make([]metav1beta1.TableRow, 0, 1)
-	m, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, err
-	}
-	row := metav1beta1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-	row.Cells = append(row.Cells, m.GetName(), translateTimestampSince(m.GetCreationTimestamp()))
-	rows = append(rows, row)
-	return rows, nil
 }
 
 // Pass ports=nil for all ports.
