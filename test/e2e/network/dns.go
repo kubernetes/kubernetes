@@ -85,7 +85,7 @@ var _ = SIGDescribe("DNS", func() {
 				namesToResolve = append(namesToResolve, "metadata")
 			}
 		}
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
@@ -153,9 +153,9 @@ var _ = SIGDescribe("DNS", func() {
 		// TODO: Create more endpoints and ensure that multiple A records are returned
 		// for headless service.
 		namesToResolve := []string{
-			fmt.Sprintf("%s.%s.svc.cluster.local", headlessService.Name, f.Namespace.Name),
-			fmt.Sprintf("_http._tcp.%s.%s.svc.cluster.local", headlessService.Name, f.Namespace.Name),
-			fmt.Sprintf("_http._tcp.%s.%s.svc.cluster.local", regularService.Name, f.Namespace.Name),
+			fmt.Sprintf("%s.%s.svc.%s", headlessService.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("_http._tcp.%s.%s.svc.%s", headlessService.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+			fmt.Sprintf("_http._tcp.%s.%s.svc.%s", regularService.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 		}
 
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
