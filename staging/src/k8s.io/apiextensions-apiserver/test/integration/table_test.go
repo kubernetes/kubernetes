@@ -148,8 +148,10 @@ func TestTableGet(t *testing.T) {
 		codecs := serializer.NewCodecFactory(scheme)
 		parameterCodec := runtime.NewParameterCodec(scheme)
 		metav1.AddToGroupVersion(scheme, gv)
-		scheme.AddKnownTypes(gv, &metav1beta1.Table{}, &metav1beta1.TableOptions{})
+		scheme.AddKnownTypes(gv, &metav1beta1.TableOptions{})
+		scheme.AddKnownTypes(gv, &metav1.TableOptions{})
 		scheme.AddKnownTypes(metav1beta1.SchemeGroupVersion, &metav1beta1.Table{}, &metav1beta1.TableOptions{})
+		scheme.AddKnownTypes(metav1.SchemeGroupVersion, &metav1.Table{}, &metav1.TableOptions{})
 
 		crConfig := *config
 		crConfig.GroupVersion = &gv

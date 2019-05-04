@@ -113,7 +113,4 @@ func AddMetaToScheme(scheme *runtime.Scheme) error {
 	return scheme.AddConversionFuncs(
 		Convert_Slice_string_To_v1_IncludeObjectPolicy,
 	)
-
-	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	//scheme.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...)
 }
