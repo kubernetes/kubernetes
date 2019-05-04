@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -532,7 +531,6 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				extenders = append(extenders, &test.extenders[ii])
 			}
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
-			fwk, _ := framework.NewFramework(EmptyPluginRegistry, nil)
 			for _, name := range test.nodes {
 				cache.AddNode(createNode(name))
 			}
@@ -544,7 +542,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				predicates.EmptyPredicateMetadataProducer,
 				test.prioritizers,
 				priorities.EmptyPriorityMetadataProducer,
-				fwk,
+				emptyFramework,
 				extenders,
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},
