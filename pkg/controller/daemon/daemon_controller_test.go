@@ -231,7 +231,6 @@ type fakePodControl struct {
 	podStore     cache.Store
 	podIDMap     map[string]*v1.Pod
 	expectations controller.ControllerExpectationsInterface
-	dsc          *daemonSetsController
 }
 
 func newFakePodControl() *fakePodControl {
@@ -361,19 +360,16 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	podControl := newFakePodControl()
 	dsc.podControl = podControl
 	podControl.podStore = informerFactory.Core().V1().Pods().Informer().GetStore()
+	podControl.expectations = dsc.expectations
 
-	newDsc := &daemonSetsController{
+	return &daemonSetsController{
 		dsc,
 		informerFactory.Apps().V1().DaemonSets().Informer().GetStore(),
 		informerFactory.Apps().V1().ControllerRevisions().Informer().GetStore(),
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Nodes().Informer().GetStore(),
 		fakeRecorder,
-	}
-
-	podControl.expectations = newDsc.expectations
-
-	return newDsc, podControl, clientset, nil
+	}, podControl, clientset, nil
 }
 
 func resetCounters(manager *daemonSetsController) {
@@ -384,14 +380,15 @@ func resetCounters(manager *daemonSetsController) {
 }
 
 func validateSyncDaemonSets(t *testing.T, manager *daemonSetsController, fakePodControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
+	t.Helper()
 	if len(fakePodControl.Templates) != expectedCreates {
-		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.Templates))
+		t.Errorf("Unexpected number of creates.  got=%d, want=%d", len(fakePodControl.Templates), expectedCreates)
 	}
 	if len(fakePodControl.DeletePodName) != expectedDeletes {
-		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.DeletePodName))
+		t.Errorf("Unexpected number of deletes: got=%d, want=%d", len(fakePodControl.DeletePodName), expectedDeletes)
 	}
 	if len(manager.fakeRecorder.Events) != expectedEvents {
-		t.Errorf("Unexpected number of events.  Expected %d, saw %d\n", expectedEvents, len(manager.fakeRecorder.Events))
+		t.Errorf("Unexpected number of events: got=%d, want=%d", len(manager.fakeRecorder.Events), expectedEvents)
 	}
 	// Every Pod created should have a ControllerRef.
 	if got, want := len(fakePodControl.ControllerRefs), expectedCreates; got != want {
@@ -412,9 +409,11 @@ func validateSyncDaemonSets(t *testing.T, manager *daemonSetsController, fakePod
 }
 
 func syncAndValidateDaemonSets(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
+	t.Helper()
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		t.Errorf("Could not get key for daemon.")
+		return
 	}
 	manager.syncHandler(key)
 	validateSyncDaemonSets(t, manager, podControl, expectedCreates, expectedDeletes, expectedEvents)
@@ -576,10 +575,7 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 			addNodes(manager.nodeStore, 0, podControl.FakePodControl.CreateLimit*10, nil)
 			manager.dsStore.Add(ds)
 			syncAndValidateDaemonSets(t, manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
-			expectedLimit := 0
-			for pass := uint8(0); expectedLimit <= podControl.FakePodControl.CreateLimit; pass++ {
-				expectedLimit += controller.SlowStartInitialBatchSize << pass
-			}
+			expectedLimit := podControl.FakePodControl.CreateLimit * 3
 			if podControl.FakePodControl.CreateCallCount > expectedLimit {
 				t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", podControl.FakePodControl.CreateLimit*2, podControl.FakePodControl.CreateCallCount)
 			}
