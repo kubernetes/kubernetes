@@ -687,7 +687,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 			obj := reactor.PopChange()
 			if obj == nil {
 				// Nothing was changed, should we exit?
-				if firstSync || reactor.ChangedSinceLastSync() > 0 {
+				if firstSync || reactor.GetChangeCount() > 0 {
 					// There were some changes after the last "periodic sync".
 					// Simulate "periodic sync" of everything (until it produces
 					// no changes).
@@ -711,7 +711,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				ctrl.claims.Update(claim)
 				err = ctrl.syncClaim(claim)
 				if err != nil {
-					if err == pvtesting.VersionConflictError {
+					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
 						klog.V(4).Infof("test intentionaly ignores version error.")
 					} else {
@@ -728,7 +728,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				ctrl.volumes.store.Update(volume)
 				err = ctrl.syncVolume(volume)
 				if err != nil {
-					if err == pvtesting.VersionConflictError {
+					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
 						klog.V(4).Infof("test intentionaly ignores version error.")
 					} else {

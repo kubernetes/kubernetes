@@ -22,7 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-// podBindingCache stores PV binding decisions per pod per node.
+// PodBindingCache stores PV binding decisions per pod per node.
 // Pod entries are removed when the Pod is deleted or updated to
 // no longer be schedulable.
 type PodBindingCache interface {
@@ -69,6 +69,7 @@ type nodeDecision struct {
 	provisionings []*v1.PersistentVolumeClaim
 }
 
+// NewPodBindingCache creates a pod binding cache.
 func NewPodBindingCache() PodBindingCache {
 	return &podBindingCache{bindingDecisions: map[string]nodeDecisions{}}
 }
