@@ -17,6 +17,7 @@ limitations under the License.
 package oom
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,12 +26,40 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
-func TestBasic(t *testing.T) {
-	fakeRecorder := &record.FakeRecorder{}
-	node := &v1.ObjectReference{}
-	oomWatcher := NewOOMWatcher(fakeRecorder)
-	assert.NoError(t, oomWatcher.Start(node))
+var oomWatcherRequiredFiles = []string{
+	"/dev/kmsg",
+}
 
-	// TODO: Improve this test once cadvisor exports events.EventChannel as an interface
-	// and thereby allow using a mock version of cadvisor.
+func TestBasicIfPossible(t *testing.T) {
+	if requiredAccessibleFilesToRunTest() {
+		fakeRecorder := &record.FakeRecorder{}
+		node := &v1.ObjectReference{}
+		oomWatcher := NewOOMWatcher(fakeRecorder)
+		assert.NoError(t, oomWatcher.Start(node))
+		// TODO: Improve this test once cadvisor exports events.EventChannel as an interface
+		// and thereby allow using a mock version of cadvisor.
+	} else {
+		t.Logf("Skipping test as required files don't exist or we don't have access to them.")
+		assert.True(t, true)
+	}
+}
+
+func requiredAccessibleFilesToRunTest() bool {
+	passesFileCheck := true
+
+	for _, fileName := range oomWatcherRequiredFiles {
+		if _, err := os.Stat(fileName); os.IsNotExist(err) {
+			passesFileCheck = false
+		}
+
+		file, err := os.OpenFile(fileName, os.O_RDONLY, 0666)
+		if err != nil {
+			if os.IsPermission(err) {
+				passesFileCheck = false
+			}
+		}
+		file.Close()
+	}
+
+	return passesFileCheck
 }
