@@ -508,6 +508,9 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 			// do nothing, continue
 			continue
 		}
+		if err != nil {
+			continue
+		}
 		// Get a list of pids that are still charged to the pod's cgroup
 		pids, err = getCgroupProcs(dir)
 		if err != nil {
