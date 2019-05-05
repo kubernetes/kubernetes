@@ -199,27 +199,6 @@ func (f *FakePVControllerSource) List(options metav1.ListOptions) (runtime.Objec
 	return listObj, nil
 }
 
-// List returns a list object, with its resource version set.
-func (f *FakePVCControllerSource) List(options metav1.ListOptions) (runtime.Object, error) {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	list, err := f.FakeControllerSource.getListItemsLocked()
-	if err != nil {
-		return nil, err
-	}
-	listObj := &v1.PersistentVolumeClaimList{}
-	if err := meta.SetList(listObj, list); err != nil {
-		return nil, err
-	}
-	listAccessor, err := meta.ListAccessor(listObj)
-	if err != nil {
-		return nil, err
-	}
-	resourceVersion := len(f.changes)
-	listAccessor.SetResourceVersion(strconv.Itoa(resourceVersion))
-	return listObj, nil
-}
-
 // Watch returns a watch, which will be pre-populated with all changes
 // after resourceVersion.
 func (f *FakeControllerSource) Watch(options metav1.ListOptions) (watch.Interface, error) {
