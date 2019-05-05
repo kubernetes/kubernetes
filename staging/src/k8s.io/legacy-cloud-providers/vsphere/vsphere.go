@@ -609,7 +609,7 @@ func (vs *VSphere) getVSphereInstanceForServer(vcServer string, ctx context.Cont
 	vsphereIns, ok := vs.vsphereInstanceMap[vcServer]
 	if !ok {
 		klog.Errorf("cannot find vcServer %q in cache. VC not found!!!", vcServer)
-		return nil, errors.New(fmt.Sprintf("Cannot find node %q in vsphere configuration map", vcServer))
+		return nil, fmt.Errorf("cannot find node %q in vsphere configuration map", vcServer)
 	}
 	// Ensure client is logged in and session is valid
 	err := vs.nodeManager.vcConnect(ctx, vsphereIns)
