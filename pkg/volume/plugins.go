@@ -35,7 +35,7 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -649,20 +649,12 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 
 	matchedPluginNames := []string{}
 	matches := []VolumePlugin{}
-	for k, v := range pm.plugins {
-		if v.CanSupport(spec) {
-			matchedPluginNames = append(matchedPluginNames, k)
-			matches = append(matches, v)
-		}
-	}
+
+	matchedPluginNames, matches = matchPlugins(pm.plugins, spec, matchedPluginNames, matches)
 
 	pm.refreshProbedPlugins()
-	for _, plugin := range pm.probedPlugins {
-		if plugin.CanSupport(spec) {
-			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
-			matches = append(matches, plugin)
-		}
-	}
+
+	matchedPluginNames, matches = matchPlugins(pm.probedPlugins, spec, matchedPluginNames, matches)
 
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("no volume plugin matched")
@@ -1101,6 +1093,18 @@ func ValidateRecyclerPodTemplate(pod *v1.Pod) error {
 		return fmt.Errorf("does not contain any volume(s)")
 	}
 	return nil
+}
+
+// matchPlugins finds the matched plugin for the spec.
+func matchPlugins(plugins map[string]VolumePlugin, spec *Spec, matchedPluginNames []string,
+	matches []VolumePlugin) ([]string, []VolumePlugin) {
+	for k, v := range plugins {
+		if v.CanSupport(spec) {
+			matchedPluginNames = append(matchedPluginNames, k)
+			matches = append(matches, v)
+		}
+	}
+	return matchedPluginNames, matches
 }
 
 type dummyPluginProber struct{}
