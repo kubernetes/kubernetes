@@ -145,7 +145,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		rsCopy := existingNewRS.DeepCopy()
 
 		// Set existing new replica set's annotation
-		annotationsUpdated := deploymentutil.SetNewReplicaSetAnnotations(d, rsCopy, newRevision, true)
+		annotationsUpdated := deploymentutil.SetNewReplicaSetAnnotations(d, rsCopy, newRevision, true, 262144)
 		minReadySecondsNeedsUpdate := rsCopy.Spec.MinReadySeconds != d.Spec.MinReadySeconds
 		if annotationsUpdated || minReadySecondsNeedsUpdate {
 			rsCopy.Spec.MinReadySeconds = d.Spec.MinReadySeconds
@@ -209,7 +209,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 
 	*(newRS.Spec.Replicas) = newReplicasCount
 	// Set new replica set's annotation
-	deploymentutil.SetNewReplicaSetAnnotations(d, &newRS, newRevision, false)
+	deploymentutil.SetNewReplicaSetAnnotations(d, &newRS, newRevision, false, 262144)
 	// Create the new ReplicaSet. If it already exists, then we need to check for possible
 	// hash collisions. If there is any other error, we need to report it in the status of
 	// the Deployment.
