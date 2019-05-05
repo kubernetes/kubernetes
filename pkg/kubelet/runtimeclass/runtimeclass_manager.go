@@ -35,6 +35,10 @@ type Manager struct {
 func NewManager(client clientset.Interface) *Manager {
 	const resyncPeriod = 0
 
+	if client == nil {
+	    return nil
+	}
+
 	factory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	lister := factory.Node().V1beta1().RuntimeClasses().Lister()
 
