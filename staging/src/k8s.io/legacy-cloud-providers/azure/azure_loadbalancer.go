@@ -1177,14 +1177,6 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		err := az.CreateOrUpdateSecurityGroup(service, sg)
 		if err != nil {
 			klog.V(2).Infof("ensure(%s) abort backoff: sg(%s) - updating", serviceName, *sg.Name)
-			// TODO (Nov 2017): remove when augmented security rules are out of preview
-			// we could try to parse the response but it's not worth it for bridging a preview
-			errorDescription := err.Error()
-			if strings.Contains(errorDescription, "SubscriptionNotRegisteredForFeature") && strings.Contains(errorDescription, "Microsoft.Network/AllowAccessRuleExtendedProperties") {
-				sharedRuleError := fmt.Errorf("Shared security rules are not available in this Azure region. Details: %v", errorDescription)
-				return nil, sharedRuleError
-			}
-			// END TODO
 			return nil, err
 		}
 		klog.V(10).Infof("CreateOrUpdateSecurityGroup(%q): end", *sg.Name)
