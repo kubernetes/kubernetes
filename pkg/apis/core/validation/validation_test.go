@@ -7076,6 +7076,49 @@ func TestValidatePod(t *testing.T) {
 				},
 			}),
 		},
+		{ // Serialized pod anti affinity with different numeric Operators in affinity requirements in annotations.
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: validPodSpec(&core.Affinity{
+				PodAntiAffinity: &core.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+						{
+							LabelSelector: &core.PodSelector{
+								MatchExpressions: []core.NumericAwareSelectorRequirement{
+									{
+										Key:      "key2",
+										Operator: core.LabelSelectorOpNumericallyGreaterthan,
+										Values:   []string{"5"},
+									},
+								},
+							},
+							TopologyKey: "zone",
+							Namespaces:  []string{"ns"},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+						{
+							Weight: 10,
+							PodAffinityTerm: core.PodAffinityTerm{
+								LabelSelector: &core.PodSelector{
+									MatchExpressions: []core.NumericAwareSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: core.LabelSelectorOpNumericallyLessthan,
+											Values:   []string{"7"},
+										},
+									},
+								},
+								Namespaces:  []string{"ns"},
+								TopologyKey: "region",
+							},
+						},
+					},
+				},
+			}),
+		},
 		{ // Serialized pod anti affinity with different Label Operators in affinity requirements in annotations.
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
@@ -7818,6 +7861,95 @@ func TestValidatePod(t *testing.T) {
 												Key:      "key2",
 												Operator: core.LabelSelectorOpNotIn,
 												Values:   []string{"value1", "value2"},
+											},
+										},
+									},
+									Namespaces: []string{"ns"},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid soft pod anti-affinity, more than one values is not allowed for soft pod anti-affinity when Operator is `Gt` or `Lt`": {
+			expectedError: "must be specified single value when `operator` is 'Lt' or 'Gt'",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &core.PodSelector{
+										MatchExpressions: []core.NumericAwareSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: core.LabelSelectorOpNumericallyGreaterthan,
+												Values:   []string{"value1", "value2"},
+											},
+										},
+									},
+									Namespaces: []string{"ns"},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid soft pod anti-affinity,  not specified single value is not allowed for soft pod anti-affinity when Operator is `Gt` or `Lt`": {
+			expectedError: "must be specified single value when `operator` is 'Lt' or 'Gt'",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &core.PodSelector{
+										MatchExpressions: []core.NumericAwareSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: core.LabelSelectorOpNumericallyGreaterthan,
+											},
+										},
+									},
+									Namespaces: []string{"ns"},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid soft pod anti-affinity, non-interger not allowed for soft pod anti-affinity when Operator is `Gt` or `Lt`": {
+			expectedError: "for 'Gt', 'Lt' operators, the value must be an integer",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &core.PodSelector{
+										MatchExpressions: []core.NumericAwareSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: core.LabelSelectorOpNumericallyGreaterthan,
+												Values:   []string{"value1"},
 											},
 										},
 									},
