@@ -216,6 +216,13 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 			eventType := v1.EventTypeNormal
 			if err != nil {
 				eventType = v1.EventTypeWarning
+			} else {
+				// Do not log and record the event when we can not found the plugin
+				// and the StorageClassName is not set at the same time.
+				// See https://github.com/kubernetes/kubernetes/issues/77404
+				if len(pv.Spec.StorageClassName) == 0 {
+					return
+				}
 			}
 			expc.recorder.Event(newPVC, eventType, events.ExternalExpanding,
 				fmt.Sprintf("Ignoring the PVC: %v.", err))
