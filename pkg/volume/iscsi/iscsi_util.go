@@ -418,9 +418,9 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			}
 
 			if exist := waitForPathToExist(&devicePath, multipathDeviceTimeout, iscsiTransport); !exist {
-				klog.Errorf("Could not attach disk: Timeout after 10s")
+				klog.Errorf("Could not attach disk: Timeout after %ds", multipathDeviceTimeout)
 				// update last error
-				lastErr = fmt.Errorf("Could not attach disk: Timeout after 10s")
+				lastErr = fmt.Errorf("Could not attach disk: Timeout after %ds", multipathDeviceTimeout)
 				continue
 			} else {
 				devicePaths[tp] = devicePath
