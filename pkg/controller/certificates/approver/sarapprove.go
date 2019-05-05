@@ -20,11 +20,11 @@ package approver
 import (
 	"crypto/x509"
 	"fmt"
-	"reflect"
 	"strings"
 
 	authorization "k8s.io/api/authorization/v1beta1"
 	capi "k8s.io/api/certificates/v1beta1"
+	setutil "k8s.io/apimachinery/pkg/util/sets"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	k8s_certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
@@ -169,7 +169,7 @@ var kubeletClientUsages = []capi.KeyUsage{
 }
 
 func isNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {
-	if !reflect.DeepEqual([]string{"system:nodes"}, x509cr.Subject.Organization) {
+	if !setutil.NewString(x509cr.Subject.Organization...).Has("system:nodes") {
 		return false
 	}
 	if (len(x509cr.DNSNames) > 0) || (len(x509cr.EmailAddresses) > 0) || (len(x509cr.IPAddresses) > 0) {
