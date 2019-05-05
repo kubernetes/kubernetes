@@ -22,12 +22,13 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -101,7 +102,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 	})
 
 	AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
+		e2elog.Logf("AfterEach: Cleaning up resources for mounted volume resize")
 
 		if c != nil {
 			if errs := framework.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {

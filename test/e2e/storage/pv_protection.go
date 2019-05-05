@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -89,7 +90,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	})
 
 	AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up test resources.")
+		e2elog.Logf("AfterEach: Cleaning up test resources.")
 		if errs := framework.PVPVCCleanup(client, nameSpace, pv, pvc); len(errs) > 0 {
 			framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 		}
