@@ -99,16 +99,16 @@ func (t *TriggerTimeTracker) ComputeEndpointsLastChangeTriggerTime(
 	// minChangedTriggerTime is the min trigger time of all trigger times that have changed since the
 	// last sync.
 	var minChangedTriggerTime time.Time
-	// TODO(mm4tt): If memory allocation / GC performance impact of recreating map in every call
-	// turns out to be too expensive, we should consider rewriting this to reuse the existing map.
-	podTriggerTimes := make(map[string]time.Time)
 	for _, pod := range pods {
 		if podTriggerTime := getPodTriggerTime(pod); !podTriggerTime.IsZero() {
-			podTriggerTimes[pod.Name] = podTriggerTime
+			if state.lastPodTriggerTimes == nil {
+				state.lastPodTriggerTimes = make(map[string]time.Time)
+			}
 			if podTriggerTime.After(state.lastPodTriggerTimes[pod.Name]) {
 				// Pod trigger time has changed since the last sync, update minChangedTriggerTime.
 				minChangedTriggerTime = min(minChangedTriggerTime, podTriggerTime)
 			}
+			state.lastPodTriggerTimes[pod.Name] = podTriggerTime
 		}
 	}
 	serviceTriggerTime := getServiceTriggerTime(service)
@@ -117,7 +117,6 @@ func (t *TriggerTimeTracker) ComputeEndpointsLastChangeTriggerTime(
 		minChangedTriggerTime = min(minChangedTriggerTime, serviceTriggerTime)
 	}
 
-	state.lastPodTriggerTimes = podTriggerTimes
 	state.lastServiceTriggerTime = serviceTriggerTime
 
 	if !wasKnown {
