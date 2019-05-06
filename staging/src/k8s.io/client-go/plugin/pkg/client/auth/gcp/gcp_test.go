@@ -129,15 +129,28 @@ func Test_isCmdTokenSource(t *testing.T) {
 	}
 }
 
-func Test_tokenSource_cmd(t *testing.T) {
-	if _, err := tokenSource(true, map[string]string{}); err == nil {
-		t.Fatalf("expected error, cmd-args not present in config")
+func Test_isServiceAcctCredTokenSource(t *testing.T) {
+	c1 := map[string]string{"service-acct": "foo"}
+	if v := isServiceAcctCredTokenSource(c1); !v {
+		t.Fatalf("service-acct present in config (%+v), but got %v", c1, v)
 	}
 
-	c := map[string]string{
+	c2 := map[string]string{"service-account": "foo bar"}
+	if v := isServiceAcctCredTokenSource(c2); v {
+		t.Fatalf("service-acct not present in config (%+v), but got %v", c2, v)
+	}
+}
+
+func Test_tokenSource_cmd(t *testing.T) {
+	c1 := map[string]string{"cmd-path": ""}
+	if _, err := tokenSource(c1); err == nil {
+		t.Fatalf("expected error, cmd-path value was empty string")
+	}
+
+	c2 := map[string]string{
 		"cmd-path": "foo",
 		"cmd-args": "bar"}
-	ts, err := tokenSource(true, c)
+	ts, err := tokenSource(c2)
 	if err != nil {
 		t.Fatalf("failed to return cmd token source: %+v", err)
 	}
@@ -153,7 +166,7 @@ func Test_tokenSource_cmdCannotBeUsedWithScopes(t *testing.T) {
 	c := map[string]string{
 		"cmd-path": "foo",
 		"scopes":   "A,B"}
-	if _, err := tokenSource(true, c); err == nil {
+	if _, err := tokenSource(c); err == nil {
 		t.Fatal("expected error when scopes is used with cmd-path")
 	}
 }
@@ -169,7 +182,7 @@ func Test_tokenSource_applicationDefaultCredentials_fails(t *testing.T) {
 
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", fakeTokenFile.Name())
 	defer os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
-	if _, err := tokenSource(false, map[string]string{}); err == nil {
+	if _, err := tokenSource(map[string]string{}); err == nil {
 		t.Fatalf("expected error because specified ADC token file is not a JSON")
 	}
 }
@@ -187,7 +200,7 @@ func Test_tokenSource_applicationDefaultCredentials(t *testing.T) {
 
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", fakeTokenFile.Name())
 	defer os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
-	ts, err := tokenSource(false, map[string]string{})
+	ts, err := tokenSource(map[string]string{})
 	if err != nil {
 		t.Fatalf("failed to get a token source: %+v", err)
 	}
