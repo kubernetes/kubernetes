@@ -148,7 +148,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 	errs := []error{}
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
-	if err := kubeletphase.DownloadConfig(client, newK8sVer, kubeletDir); err != nil {
+	if err := kubeletphase.DownloadConfig(client, newK8sVer, &cfg.NodeRegistration, kubeletDir); err != nil {
 		// Tolerate the error being NotFound when dryrunning, as there is a pretty common scenario: the dryrun process
 		// *would* post the new kubelet-config-1.X configmap that doesn't exist now when we're trying to download it
 		// again.

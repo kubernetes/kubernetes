@@ -26,10 +26,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -38,9 +41,9 @@ import (
 
 // WriteConfigToDisk writes the kubelet config object down to a file
 // Used at "kubeadm init" and "kubeadm upgrade" time
-func WriteConfigToDisk(kubeletConfig *kubeletconfig.KubeletConfiguration, kubeletDir string) error {
+func WriteConfigToDisk(kubeletConfig *kubeletconfig.KubeletConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, kubeletDir string) error {
 
-	kubeletBytes, err := getConfigBytes(kubeletConfig)
+	kubeletBytes, err := getConfigBytes(buildDynamicDefaults(kubeletConfig, nodeReg))
 	if err != nil {
 		return err
 	}
@@ -124,9 +127,55 @@ func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Ve
 	})
 }
 
-// DownloadConfig downloads the kubelet configuration from a ConfigMap and writes it to disk.
+// DownloadAndMergeConfig downloads the kubelet configuration from a ConfigMap, merge with the local one and writes it to disk.
+// Used at "kubeadm upgrade" time
+func DownloadAndMergeConfig(client clientset.Interface, kubeletVersion *version.Version, kubeletDir string) error {
+
+	kubeletConfig, err := fetchConfigFromConfigMap(client, kubeletVersion, kubeletDir)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := getConfigFromFile(kubeletDir)
+	if err != nil {
+		klog.Warningf("getConfigFromFile encounters an error, will not merge to new kubelet config")
+	} else {
+		oldKubeletConfig, ok := cfg.(*kubeletconfig.KubeletConfiguration)
+		if !ok {
+			klog.Warningf("getConfigFromFile gets an invalid kubelet config, will not merge to new kubelet config")
+		} else {
+			kubeletConfig.CgroupDriver = oldKubeletConfig.CgroupDriver
+			kubeletConfig.ResolverConfig = oldKubeletConfig.ResolverConfig
+		}
+	}
+
+	kubeletBytes, err := getConfigBytes(kubeletConfig)
+	if err != nil {
+		return err
+	}
+
+	return writeConfigBytesToDisk(kubeletBytes, kubeletDir)
+}
+
+// DownloadConfig downloads the kubelet configuration from a ConfigMap, re-build it with OS settings and writes it to disk.
 // Used at "kubeadm join" time
-func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version, kubeletDir string) error {
+func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version, nodeReg *kubeadmapi.NodeRegistrationOptions, kubeletDir string) error {
+
+	kubeletConfig, err := fetchConfigFromConfigMap(client, kubeletVersion, kubeletDir)
+	if err != nil {
+		return err
+	}
+
+	kubeletBytes, err := getConfigBytes(buildDynamicDefaults(kubeletConfig, nodeReg))
+	if err != nil {
+		return err
+	}
+
+	return writeConfigBytesToDisk(kubeletBytes, kubeletDir)
+}
+
+// fetchConfigFromConfigMap returns the kubelet configuration from a ConfigMap
+func fetchConfigFromConfigMap(client clientset.Interface, kubeletVersion *version.Version, kubeletDir string) (*kubeletconfig.KubeletConfiguration, error) {
 
 	// Download the ConfigMap from the cluster based on what version the kubelet is
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(kubeletVersion)
@@ -134,17 +183,35 @@ func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version,
 	fmt.Printf("[kubelet-start] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
 		configMapName, metav1.NamespaceSystem)
 
-	kubeletCfg, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, configMapName)
-	// If the ConfigMap wasn't found and the kubelet version is v1.10.x, where we didn't support the config file yet
-	// just return, don't error out
-	if apierrors.IsNotFound(err) && kubeletVersion.Minor() == 10 {
-		return nil
-	}
+	cfg, err := componentconfigs.GetFromKubeletConfigMap(client, kubeletVersion)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return writeConfigBytesToDisk([]byte(kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey]), kubeletDir)
+	kubeletConfig, ok := cfg.(*kubeletconfig.KubeletConfiguration)
+	if !ok {
+		return nil, errors.New("received an invalid KubeletConfiguration")
+	}
+
+	return kubeletConfig, nil
+}
+
+// getConfigFromFile returns the pointer of the ComponentConfig API object read from the kubelet config file
+func getConfigFromFile(kubeletDir string) (runtime.Object, error) {
+	filename := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
+	kubeletConfigBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decodes the kubeletConfigData into the internal component config
+	obj := &kubeletconfig.KubeletConfiguration{}
+	err = runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), kubeletConfigBytes, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	return obj, nil
 }
 
 // configMapRBACName returns the name for the Role/RoleBinding for the kubelet config configmap for the right branch of k8s

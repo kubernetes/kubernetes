@@ -131,7 +131,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 	kubeletphase.TryStopKubelet()
 
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
-	if err := kubeletphase.DownloadConfig(bootstrapClient, kubeletVersion, kubeadmconstants.KubeletRunDirectory); err != nil {
+	if err := kubeletphase.DownloadConfig(bootstrapClient, kubeletVersion, &initCfg.NodeRegistration, kubeadmconstants.KubeletRunDirectory); err != nil {
 		return err
 	}
 

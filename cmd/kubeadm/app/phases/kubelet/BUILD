@@ -4,6 +4,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "config.go",
+        "config_unix.go",
+        "config_windows.go",
         "dynamic.go",
         "flags.go",
         "kubelet.go",
@@ -12,6 +14,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
         "//cmd/kubeadm/app/componentconfigs:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/images:go_default_library",
@@ -20,17 +23,57 @@ go_library(
         "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/node:go_default_library",
-        "//pkg/util/procfs:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/util/procfs:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//pkg/util/procfs:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//pkg/util/procfs:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//pkg/util/procfs:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/util/procfs:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//pkg/util/procfs:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//pkg/util/procfs:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//pkg/util/procfs:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//pkg/util/procfs:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//pkg/util/procfs:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(

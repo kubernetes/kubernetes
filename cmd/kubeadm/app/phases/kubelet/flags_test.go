@@ -118,8 +118,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 						},
 					},
 				},
-				execer:          errCgroupExecer,
-				pidOfFunc:       binaryNotRunningPidOfFunc,
 				defaultHostname: "foo",
 			},
 			expected: map[string]string{
@@ -133,45 +131,11 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					CRISocket: "/var/run/dockershim.sock",
 					Name:      "override-name",
 				},
-				execer:          errCgroupExecer,
-				pidOfFunc:       binaryNotRunningPidOfFunc,
 				defaultHostname: "default",
 			},
 			expected: map[string]string{
 				"network-plugin":    "cni",
 				"hostname-override": "override-name",
-			},
-		},
-		{
-			name: "systemd cgroup driver",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/dockershim.sock",
-					Name:      "foo",
-				},
-				execer:          systemdCgroupExecer,
-				pidOfFunc:       binaryNotRunningPidOfFunc,
-				defaultHostname: "foo",
-			},
-			expected: map[string]string{
-				"network-plugin": "cni",
-				"cgroup-driver":  "systemd",
-			},
-		},
-		{
-			name: "cgroupfs cgroup driver",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/dockershim.sock",
-					Name:      "foo",
-				},
-				execer:          cgroupfsCgroupExecer,
-				pidOfFunc:       binaryNotRunningPidOfFunc,
-				defaultHostname: "foo",
-			},
-			expected: map[string]string{
-				"network-plugin": "cni",
-				"cgroup-driver":  "cgroupfs",
 			},
 		},
 		{
@@ -181,8 +145,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					CRISocket: "/var/run/containerd.sock",
 					Name:      "foo",
 				},
-				execer:          cgroupfsCgroupExecer,
-				pidOfFunc:       binaryNotRunningPidOfFunc,
 				defaultHostname: "foo",
 			},
 			expected: map[string]string{
@@ -210,31 +172,12 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					},
 				},
 				registerTaintsUsingFlags: true,
-				execer:                   cgroupfsCgroupExecer,
-				pidOfFunc:                binaryNotRunningPidOfFunc,
 				defaultHostname:          "foo",
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
 				"container-runtime-endpoint": "/var/run/containerd.sock",
 				"register-with-taints":       "foo=bar:baz,key=val:eff",
-			},
-		},
-		{
-			name: "systemd-resolved running",
-			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "/var/run/containerd.sock",
-					Name:      "foo",
-				},
-				execer:          cgroupfsCgroupExecer,
-				pidOfFunc:       binaryRunningPidOfFunc,
-				defaultHostname: "foo",
-			},
-			expected: map[string]string{
-				"container-runtime":          "remote",
-				"container-runtime-endpoint": "/var/run/containerd.sock",
-				"resolv-conf":                "/run/systemd/resolve/resolv.conf",
 			},
 		},
 		{
@@ -245,13 +188,10 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					Name:      "foo",
 				},
 				pauseImage:      "gcr.io/pause:3.1",
-				execer:          cgroupfsCgroupExecer,
-				pidOfFunc:       binaryNotRunningPidOfFunc,
 				defaultHostname: "foo",
 			},
 			expected: map[string]string{
 				"network-plugin":            "cni",
-				"cgroup-driver":             "cgroupfs",
 				"pod-infra-container-image": "gcr.io/pause:3.1",
 			},
 		},

@@ -30,8 +30,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/util/procfs"
-	utilsexec "k8s.io/utils/exec"
 )
 
 type kubeletFlagsOpts struct {
@@ -39,8 +37,6 @@ type kubeletFlagsOpts struct {
 	featureGates             map[string]bool
 	pauseImage               string
 	registerTaintsUsingFlags bool
-	execer                   utilsexec.Interface
-	pidOfFunc                func(string) ([]int, error)
 	defaultHostname          string
 }
 
@@ -57,8 +53,6 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 		featureGates:             cfg.FeatureGates,
 		pauseImage:               images.GetPauseImage(cfg),
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
-		execer:                   utilsexec.New(),
-		pidOfFunc:                procfs.PidOf,
 		defaultHostname:          hostName,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
@@ -76,12 +70,6 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	if opts.nodeRegOpts.CRISocket == constants.DefaultDockerCRISocket {
 		// These flags should only be set when running docker
 		kubeletFlags["network-plugin"] = "cni"
-		driver, err := kubeadmutil.GetCgroupDriverDocker(opts.execer)
-		if err != nil {
-			klog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
-		} else {
-			kubeletFlags["cgroup-driver"] = driver
-		}
 		if opts.pauseImage != "" {
 			kubeletFlags["pod-infra-container-image"] = opts.pauseImage
 		}
@@ -99,18 +87,11 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["register-with-taints"] = strings.Join(taintStrs, ",")
 	}
 
-	if pids, _ := opts.pidOfFunc("systemd-resolved"); len(pids) > 0 {
-		// procfs.PidOf only returns an error if the regex is empty or doesn't compile, so we can ignore it
-		kubeletFlags["resolv-conf"] = "/run/systemd/resolve/resolv.conf"
-	}
-
 	// Make sure the node name we're passed will work with Kubelet
 	if opts.nodeRegOpts.Name != "" && opts.nodeRegOpts.Name != opts.defaultHostname {
 		klog.V(1).Infof("setting kubelet hostname-override to %q", opts.nodeRegOpts.Name)
 		kubeletFlags["hostname-override"] = opts.nodeRegOpts.Name
 	}
-
-	// TODO: Conditionally set `--cgroup-driver` to either `systemd` or `cgroupfs` for CRI other than Docker
 
 	return kubeletFlags
 }

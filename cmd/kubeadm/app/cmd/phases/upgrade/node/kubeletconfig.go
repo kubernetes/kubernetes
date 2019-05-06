@@ -93,7 +93,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		}
 
 		// TODO: Checkpoint the current configuration first so that if something goes wrong it can be recovered
-		if err := kubeletphase.DownloadConfig(client, kubeletVersion, kubeletDir); err != nil {
+		if err := kubeletphase.DownloadAndMergeConfig(client, kubeletVersion, kubeletDir); err != nil {
 			return err
 		}
 

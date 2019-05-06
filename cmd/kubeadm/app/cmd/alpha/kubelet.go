@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/version"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -93,7 +95,7 @@ func newCmdKubeletConfig() *cobra.Command {
 
 // newCmdKubeletConfigDownload calls cobra.Command for downloading the kubelet configuration from the kubelet-config-1.X ConfigMap in the cluster
 func newCmdKubeletConfigDownload() *cobra.Command {
-	var kubeletVersionStr string
+	var kubeletVersionStr, criSocketStr string
 	// TODO: Be smarter about this and be able to load multiple kubeconfig files in different orders of precedence
 	kubeConfigFile := constants.GetKubeletKubeConfigPath()
 
@@ -109,14 +111,32 @@ func newCmdKubeletConfigDownload() *cobra.Command {
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			err = kubeletphase.DownloadConfig(client, kubeletVersion, constants.KubeletRunDirectory)
+			criSocket, err := getCRISocket(criSocketStr)
+			if err != nil {
+				kubeadmutil.CheckErr(err)
+			}
+
+			nodeReg := kubeadmapi.NodeRegistrationOptions{
+				CRISocket: criSocket,
+			}
+
+			err = kubeletphase.DownloadConfig(client, kubeletVersion, &nodeReg, constants.KubeletRunDirectory)
 			kubeadmutil.CheckErr(err)
 		},
 	}
 
 	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
+	cmdutil.AddCRISocketFlag(cmd.Flags(), &criSocketStr)
 	cmd.Flags().StringVar(&kubeletVersionStr, "kubelet-version", kubeletVersionStr, "The desired version for the kubelet. Defaults to being autodetected from 'kubelet --version'.")
 	return cmd
+}
+
+func getCRISocket(criSocketStr string) (string, error) {
+	if len(criSocketStr) > 0 {
+		return criSocketStr, nil
+	}
+
+	return kubeadmruntime.DetectCRISocket()
 }
 
 func getKubeletVersion(kubeletVersionStr string) (*version.Version, error) {
