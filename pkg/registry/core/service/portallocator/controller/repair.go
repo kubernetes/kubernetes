@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
@@ -197,7 +196,7 @@ func (c *Repair) runOnce() error {
 	return nil
 }
 
-func collectServiceNodePorts(service *corev1.Service) []int {
+func collectServiceNodePorts(service *v1.Service) []int {
 	servicePorts := []int{}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
