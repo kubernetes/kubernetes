@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 	"k8s.io/client-go/rest"
@@ -96,7 +95,7 @@ func cleanupCronJobs(t *testing.T, cjClient clientbatchv1beta1.CronJobInterface,
 	}
 }
 
-func validateJobAndPod(t *testing.T, clientSet kubernetes.Interface, namespace string) {
+func validateJobAndPod(t *testing.T, clientSet clientset.Interface, namespace string) {
 	if err := wait.PollImmediate(1*time.Second, 120*time.Second, func() (bool, error) {
 		jobs, err := clientSet.BatchV1().Jobs(namespace).List(metav1.ListOptions{})
 		if err != nil {

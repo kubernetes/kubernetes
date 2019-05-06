@@ -45,7 +45,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	dynamic "k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -65,7 +64,7 @@ type testContext struct {
 	admissionHolder *holder
 
 	client    dynamic.Interface
-	clientset kubernetes.Interface
+	clientset clientset.Interface
 	verb      string
 	gvr       schema.GroupVersionResource
 	resource  metav1.APIResource
