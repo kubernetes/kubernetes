@@ -481,7 +481,7 @@ func TestProvisionMultiSync(t *testing.T) {
 				newClaimArray("claim12-2", "uid12-2", "1Gi", "pvc-uid12-2", v1.ClaimBound, &classExternal, annBoundByController, annBindCompleted)),
 			[]string{"Normal ExternalProvisioning"},
 			noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Create a volume before syncClaim tries to bind a PV to PVC
 				// This simulates external provisioner creating a volume while the controller
 				// is waiting for a volume to bind to the existed claim
@@ -489,12 +489,10 @@ func TestProvisionMultiSync(t *testing.T) {
 				// should issue an ExternalProvisioning event to signal that some external provisioner
 				// is working on provisioning the PV, also add the operation start timestamp into local cache
 				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
-				reactor.lock.Lock()
-				defer reactor.lock.Unlock()
 				if _, exists := ctrl.operationTimestamps.Get("default/claim12-2"); exists {
 					volume := newVolume("pvc-uid12-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal)
 					ctrl.volumes.store.Add(volume) // add the volume to controller
-					reactor.volumes[volume.Name] = volume
+					reactor.AddVolume(volume)
 				}
 			}),
 		},
@@ -520,7 +518,7 @@ func TestProvisionMultiSync(t *testing.T) {
 				newClaimArray("claim12-4", "uid12-4", "1Gi", "pvc-uid12-4", v1.ClaimBound, &classExternal, annBoundByController, annBindCompleted)),
 			[]string{"Normal ExternalProvisioning"},
 			noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Create a volume before syncClaim tries to bind a PV to PVC
 				// This simulates external provisioner creating a volume while the controller
 				// is waiting for a volume to bind to the existed claim
@@ -528,12 +526,10 @@ func TestProvisionMultiSync(t *testing.T) {
 				// should issue an ExternalProvisioning event to signal that some external provisioner
 				// is working on provisioning the PV, also add the operation start timestamp into local cache
 				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
-				reactor.lock.Lock()
-				defer reactor.lock.Unlock()
 				if _, exists := ctrl.operationTimestamps.Get("default/claim12-4"); exists {
 					volume := newVolume("pvc-uid12-4", "1Gi", "uid12-4", "claim12-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, annBoundByController)
 					ctrl.volumes.store.Add(volume) // add the volume to controller
-					reactor.volumes[volume.Name] = volume
+					reactor.AddVolume(volume)
 				}
 			}),
 		},
