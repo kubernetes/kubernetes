@@ -202,8 +202,8 @@ func upgradeComponent(component string, renewCerts bool, waiter apiclient.Waiter
 	// if certificate renewal should be performed
 	if renewCerts {
 		// renew all the certificates used by the current component
-		if err := renewCertsByComponent(cfg, component); err != nil {
-			return errors.Wrapf(err, "failed to renew certificates for component %q", component)
+		if err := renewCertsByComponent(cfg, constants.KubernetesDir, component); err != nil {
+			return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to renew certificates for component %q", component), pathMgr, recoverEtcd)
 		}
 	}
 
@@ -450,6 +450,14 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 		}
 	}
 
+	if renewCerts {
+		// renew the certificate embedded in the admin.conf file
+		err := renewEmbeddedCertsByName(cfg, constants.KubernetesDir, constants.AdminKubeConfigFileName)
+		if err != nil {
+			return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to upgrade the %s certificates", constants.AdminKubeConfigFileName), pathMgr, false)
+		}
+	}
+
 	// Remove the temporary directories used on a best-effort (don't fail if the calls error out)
 	// The calls are set here by design; we should _not_ use "defer" above as that would remove the directories
 	// even in the "fail and rollback" case, where we want the directories preserved for the user.
@@ -495,7 +503,7 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 
 // renewCertsByComponent takes charge of renewing certificates used by a specific component before
 // the static pod of the component is upgraded
-func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, component string) error {
+func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, kubernetesDir, component string) error {
 	// if the cluster is using a local etcd
 	if cfg.Etcd.Local != nil {
 		if component == constants.Etcd || component == constants.KubeAPIServer {
@@ -576,5 +584,42 @@ func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, component string) 
 			}
 		}
 	}
+	if component == constants.KubeControllerManager {
+		// renew the certificate embedded in the controller-manager.conf file
+		err := renewEmbeddedCertsByName(cfg, kubernetesDir, constants.ControllerManagerKubeConfigFileName)
+		if err != nil {
+			return errors.Wrapf(err, "failed to upgrade the %s certificates", constants.ControllerManagerKubeConfigFileName)
+		}
+	}
+	if component == constants.KubeScheduler {
+		// renew the certificate embedded in the scheduler.conf file
+		err := renewEmbeddedCertsByName(cfg, kubernetesDir, constants.SchedulerKubeConfigFileName)
+		if err != nil {
+			return errors.Wrapf(err, "failed to upgrade the %s certificates", constants.SchedulerKubeConfigFileName)
+		}
+	}
+	return nil
+}
+
+func renewEmbeddedCertsByName(cfg *kubeadmapi.InitConfiguration, kubernetesDir, kubeConfigFile string) error {
+	// Checks if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
+	// if not, then CA is managed by kubeadm, so it is possible to renew all the certificates signed by ca
+	// and used by the apis server (the apiserver certificate and the apiserver-kubelet-client certificate)
+	externalCA, _ := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
+	if !externalCA {
+		// try to load ca
+		caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.CertificatesDir, certsphase.KubeadmCertRootCA.BaseName)
+		if err != nil {
+			return errors.Wrapf(err, "failed to upgrade the %s certificates", kubeConfigFile)
+		}
+		// create a renewer for certificates signed by CA
+		renewer := renewal.NewFileRenewal(caCert, caKey)
+		// renew the certificate embedded in the controller-manager.conf file
+		fmt.Printf("[upgrade/staticpods] Renewing certificate embedded in %q \n", kubeConfigFile)
+		if err := renewal.RenewEmbeddedClientCert(kubernetesDir, kubeConfigFile, renewer); err != nil {
+			return errors.Wrapf(err, "failed to renew certificate embedded in %s", kubeConfigFile)
+		}
+	}
+
 	return nil
 }
