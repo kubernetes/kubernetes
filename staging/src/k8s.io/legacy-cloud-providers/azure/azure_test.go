@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/legacy-cloud-providers/azure/auth"
 
@@ -855,6 +856,25 @@ func TestReconcileSecurityWithSourceRanges(t *testing.T) {
 	validateSecurityGroup(t, sg, svc)
 }
 
+func TestReconcileSecurityGroupEtagMismatch(t *testing.T) {
+	az := getTestCloud()
+
+	sg := getTestSecurityGroup(az)
+	cachedSG := *sg
+	cachedSG.Etag = to.StringPtr("1111111-0000-0000-0000-000000000000")
+	az.nsgCache.Set(to.String(sg.Name), &cachedSG)
+
+	svc1 := getTestService("servicea", v1.ProtocolTCP, 80)
+	clusterResources := getClusterResources(az, 1, 1)
+	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true)
+	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc1, lb)
+
+	newSG, err := az.reconcileSecurityGroup(testClusterName, &svc1, &lbStatus.Ingress[0].IP, true /* wantLb */)
+	assert.Nil(t, newSG)
+	assert.NotNil(t, err)
+	assert.Equal(t, err, errPreconditionFailedEtagMismatch)
+}
+
 func TestReconcilePublicIPWithNewService(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
@@ -958,6 +978,7 @@ func getTestCloud() (az *Cloud) {
 		nodeResourceGroups: map[string]string{},
 		unmanagedNodes:     sets.NewString(),
 		routeCIDRs:         map[string]string{},
+		eventRecorder:      &record.FakeRecorder{},
 	}
 	az.DisksClient = newFakeDisksClient()
 	az.InterfacesClient = newFakeAzureInterfacesClient()
@@ -1186,6 +1207,7 @@ func getTestSecurityGroup(az *Cloud, services ...v1.Service) *network.SecurityGr
 
 	sg := network.SecurityGroup{
 		Name: &az.SecurityGroupName,
+		Etag: to.StringPtr("0000000-0000-0000-0000-000000000000"),
 		SecurityGroupPropertiesFormat: &network.SecurityGroupPropertiesFormat{
 			SecurityRules: &rules,
 		},
@@ -1197,7 +1219,8 @@ func getTestSecurityGroup(az *Cloud, services ...v1.Service) *network.SecurityGr
 		ctx,
 		az.ResourceGroup,
 		az.SecurityGroupName,
-		sg)
+		sg,
+		"")
 
 	return &sg
 }

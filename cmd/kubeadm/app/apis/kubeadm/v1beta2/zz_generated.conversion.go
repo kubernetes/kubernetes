@@ -671,6 +671,7 @@ func autoConvert_v1beta2_InitConfiguration_To_kubeadm_InitConfiguration(in *Init
 	if err := Convert_v1beta2_APIEndpoint_To_kubeadm_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
 		return err
 	}
+	out.CertificateKey = in.CertificateKey
 	return nil
 }
 
@@ -690,6 +691,7 @@ func autoConvert_kubeadm_InitConfiguration_To_v1beta2_InitConfiguration(in *kube
 	if err := Convert_kubeadm_APIEndpoint_To_v1beta2_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
 		return err
 	}
+	out.CertificateKey = in.CertificateKey
 	return nil
 }
 
@@ -736,6 +738,7 @@ func autoConvert_v1beta2_JoinControlPlane_To_kubeadm_JoinControlPlane(in *JoinCo
 	if err := Convert_v1beta2_APIEndpoint_To_kubeadm_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
 		return err
 	}
+	out.CertificateKey = in.CertificateKey
 	return nil
 }
 
@@ -748,6 +751,7 @@ func autoConvert_kubeadm_JoinControlPlane_To_v1beta2_JoinControlPlane(in *kubead
 	if err := Convert_kubeadm_APIEndpoint_To_v1beta2_APIEndpoint(&in.LocalAPIEndpoint, &out.LocalAPIEndpoint, s); err != nil {
 		return err
 	}
+	out.CertificateKey = in.CertificateKey
 	return nil
 }
 

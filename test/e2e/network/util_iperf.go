@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 type IPerfResults struct {
@@ -56,7 +57,7 @@ func (i *IPerfResults) Add(ipr *IPerfResult) {
 // ToTSV exports an easily readable tab delimited format of all IPerfResults.
 func (i *IPerfResults) ToTSV() string {
 	if len(i.BandwidthMap) < 1 {
-		framework.Logf("Warning: no data in bandwidth map")
+		e2elog.Logf("Warning: no data in bandwidth map")
 	}
 
 	var buffer bytes.Buffer

@@ -23,13 +23,14 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -221,7 +222,7 @@ func expandPVCSize(origPVC *v1.PersistentVolumeClaim, size resource.Quantity, c 
 		if err == nil {
 			return true, nil
 		}
-		framework.Logf("Error updating pvc %s with %v", pvcName, err)
+		e2elog.Logf("Error updating pvc %s with %v", pvcName, err)
 		return false, nil
 	})
 	return updatedPVC, waitErr

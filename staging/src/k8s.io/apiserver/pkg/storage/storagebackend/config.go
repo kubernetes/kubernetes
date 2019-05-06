@@ -72,6 +72,7 @@ type Config struct {
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 	return &Config{
+		Paging:             true,
 		Prefix:             prefix,
 		Codec:              codec,
 		CompactionInterval: DefaultCompactInterval,

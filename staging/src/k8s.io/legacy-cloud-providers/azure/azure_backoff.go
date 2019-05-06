@@ -22,6 +22,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
+	"github.com/Azure/go-autorest/autorest/to"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -146,7 +147,7 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.ResourceGroup, *sg.Name, sg)
+		resp, err := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.ResourceGroup, *sg.Name, sg, to.String(sg.Etag))
 		klog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
 		if err == nil {
 			if isSuccessHTTPResponse(resp) {
@@ -155,6 +156,11 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 			} else if resp != nil {
 				return fmt.Errorf("HTTP response %q", resp.Status)
 			}
+		}
+
+		// Invalidate the cache because ETAG precondition mismatch.
+		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
+			az.nsgCache.Delete(*sg.Name)
 		}
 		return err
 	}
@@ -168,14 +174,20 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(service *v1.Service, sg network.Secur
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.ResourceGroup, *sg.Name, sg)
+		resp, err := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.ResourceGroup, *sg.Name, sg, to.String(sg.Etag))
 		klog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
-		done, err := az.processHTTPRetryResponse(service, "CreateOrUpdateSecurityGroup", resp, err)
+		done, retryError := az.processHTTPRetryResponse(service, "CreateOrUpdateSecurityGroup", resp, err)
 		if done && err == nil {
 			// Invalidate the cache right after updating
 			az.nsgCache.Delete(*sg.Name)
 		}
-		return done, err
+
+		// Invalidate the cache and abort backoff because ETAG precondition mismatch.
+		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
+			az.nsgCache.Delete(*sg.Name)
+			return true, err
+		}
+		return done, retryError
 	})
 }
 
@@ -538,15 +550,20 @@ func isSuccessHTTPResponse(resp *http.Response) bool {
 }
 
 func shouldRetryHTTPRequest(resp *http.Response, err error) bool {
-	if err != nil {
-		return true
-	}
-
 	if resp != nil {
-		// HTTP 4xx or 5xx suggests we should retry
+		// HTTP 412 (StatusPreconditionFailed) means etag mismatch, hence we shouldn't retry.
+		if resp.StatusCode == http.StatusPreconditionFailed {
+			return false
+		}
+
+		// HTTP 4xx (except 412) or 5xx suggests we should retry.
 		if 399 < resp.StatusCode && resp.StatusCode < 600 {
 			return true
 		}
+	}
+
+	if err != nil {
+		return true
 	}
 
 	return false

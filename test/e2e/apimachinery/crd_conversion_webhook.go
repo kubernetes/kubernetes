@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
@@ -254,9 +255,9 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 	deployment, err := client.AppsV1().Deployments(namespace).Create(d)
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentCRDName, namespace)
 	ginkgo.By("Wait for the deployment to be ready")
-	err = framework.WaitForDeploymentRevisionAndImage(client, namespace, deploymentCRDName, "1", image)
+	err = e2edeploy.WaitForDeploymentRevisionAndImage(client, namespace, deploymentCRDName, "1", image)
 	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s in %s to complete", image, deploymentName, namespace)
-	err = framework.WaitForDeploymentComplete(client, deployment)
+	err = e2edeploy.WaitForDeploymentComplete(client, deployment)
 	framework.ExpectNoError(err, "waiting for the deployment status valid", image, deploymentCRDName, namespace)
 
 	ginkgo.By("Deploying the webhook service")

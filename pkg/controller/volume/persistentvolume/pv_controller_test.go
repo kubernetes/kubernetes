@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
+	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 )
 
 var (
@@ -60,9 +61,9 @@ func TestControllerSync(t *testing.T) {
 			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, annBoundByController, annBindCompleted),
 			noevents, noerrors,
 			// Custom test function that generates an add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				claim := newClaim("claim5-2", "uid5-2", "1Gi", "", v1.ClaimPending, nil)
-				reactor.addClaimEvent(claim)
+				reactor.AddClaimEvent(claim)
 				return nil
 			},
 		},
@@ -75,10 +76,10 @@ func TestControllerSync(t *testing.T) {
 			noclaims,
 			noevents, noerrors,
 			// Custom test function that generates a delete event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
-				reactor.deleteClaimEvent(claim)
+				reactor.DeleteClaimEvent(claim)
 				return nil
 			},
 		},
@@ -91,10 +92,10 @@ func TestControllerSync(t *testing.T) {
 			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimLost, nil, annBoundByController, annBindCompleted),
 			[]string{"Warning ClaimLost"}, noerrors,
 			// Custom test function that generates a delete event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				obj := ctrl.volumes.store.List()[0]
 				volume := obj.(*v1.PersistentVolume)
-				reactor.deleteVolumeEvent(volume)
+				reactor.DeleteVolumeEvent(volume)
 				return nil
 			},
 		},
@@ -120,13 +121,13 @@ func TestControllerSync(t *testing.T) {
 
 		reactor := newVolumeReactor(client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
-			reactor.claims[claim.Name] = claim
+			reactor.AddClaim(claim)
 			go func(claim *v1.PersistentVolumeClaim) {
 				fakeClaimWatch.Add(claim)
 			}(claim)
 		}
 		for _, volume := range test.initialVolumes {
-			reactor.volumes[volume.Name] = volume
+			reactor.AddVolume(volume)
 			go func(volume *v1.PersistentVolume) {
 				fakeVolumeWatch.Add(volume)
 			}(volume)
@@ -148,7 +149,7 @@ func TestControllerSync(t *testing.T) {
 		klog.V(4).Infof("controller synced, starting test")
 
 		// Call the tested function
-		err = test.test(ctrl, reactor, test)
+		err = test.test(ctrl, reactor.VolumeReactor, test)
 		if err != nil {
 			t.Errorf("Test %q initial test call failed: %v", test.name, err)
 		}
@@ -162,7 +163,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		close(stopCh)
 
-		evaluateTestResults(ctrl, reactor, test, t)
+		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
 	}
 }
 

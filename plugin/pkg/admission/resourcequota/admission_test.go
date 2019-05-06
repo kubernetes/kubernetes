@@ -2200,7 +2200,7 @@ func TestAdmitZeroDeltaUsageWithoutCoveringQuota(t *testing.T) {
 		LimitedResources: []resourcequotaapi.LimitedResource{
 			{
 				Resource:      "services",
-				MatchContains: []string{"services"},
+				MatchContains: []string{"services.loadbalancers"},
 			},
 		},
 	}
@@ -2227,8 +2227,8 @@ func TestAdmitZeroDeltaUsageWithoutCoveringQuota(t *testing.T) {
 	}
 }
 
-// TestAdmitRejectDeltaUsageWithoutCoveringQuota verifies that resource quota is required for non zero delta requests.
-func TestAdmitRejectDeltaUsageWithoutCoveringQuota(t *testing.T) {
+// TestAdmitRejectIncreaseUsageWithoutCoveringQuota verifies that resource quota is required for delta requests that increase usage.
+func TestAdmitRejectIncreaseUsageWithoutCoveringQuota(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -2243,7 +2243,53 @@ func TestAdmitRejectDeltaUsageWithoutCoveringQuota(t *testing.T) {
 		LimitedResources: []resourcequotaapi.LimitedResource{
 			{
 				Resource:      "services",
-				MatchContains: []string{"services"},
+				MatchContains: []string{"services.loadbalancers"},
+			},
+		},
+	}
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration.IgnoredResources(), generic.NewRegistry(quotaConfiguration.Evaluators()), nil, config, 5, stopCh)
+
+	handler := &QuotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+
+	existingService := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "service", Namespace: "test", ResourceVersion: "1"},
+		Spec: api.ServiceSpec{
+			Type:  api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{{Port: 1234}},
+		},
+	}
+	newService := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "service", Namespace: "test"},
+		Spec:       api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
+	}
+
+	err := handler.Validate(admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, false, nil), nil)
+	if err == nil {
+		t.Errorf("Expected an error for consuming a limited resource without quota.")
+	}
+}
+
+// TestAdmitAllowDecreaseUsageWithoutCoveringQuota verifies that resource quota is not required for delta requests that decrease usage.
+func TestAdmitAllowDecreaseUsageWithoutCoveringQuota(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+
+	// disable services unless there is a covering quota.
+	config := &resourcequotaapi.Configuration{
+		LimitedResources: []resourcequotaapi.LimitedResource{
+			{
+				Resource:      "services",
+				MatchContains: []string{"services.loadbalancers"},
 			},
 		},
 	}
@@ -2268,7 +2314,7 @@ func TestAdmitRejectDeltaUsageWithoutCoveringQuota(t *testing.T) {
 	}
 
 	err := handler.Validate(admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, corev1.Resource("services").WithVersion("version"), "", admission.Update, false, nil), nil)
-	if err == nil {
-		t.Errorf("Expected an error for consuming a limited resource without quota.")
+	if err != nil {
+		t.Errorf("Expected no error for decreasing a limited resource without quota, got %v", err)
 	}
 }

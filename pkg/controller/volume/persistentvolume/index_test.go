@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -773,7 +774,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
+				NodeAffinity:     pvutil.GetVolumeNodeAffinity("key1", "value1"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -797,7 +798,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
+				NodeAffinity:     pvutil.GetVolumeNodeAffinity("key1", "value1"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -822,7 +823,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 				},
 				StorageClassName: classWait,
 				ClaimRef:         &v1.ObjectReference{Name: "claim02", Namespace: "myns"},
-				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
+				NodeAffinity:     pvutil.GetVolumeNodeAffinity("key1", "value1"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -846,7 +847,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     getVolumeNodeAffinity("key1", "value3"),
+				NodeAffinity:     pvutil.GetVolumeNodeAffinity("key1", "value3"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -870,7 +871,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     getVolumeNodeAffinity("key1", "value4"),
+				NodeAffinity:     pvutil.GetVolumeNodeAffinity("key1", "value4"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -894,7 +895,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     getVolumeNodeAffinity("key1", "value4"),
+				NodeAffinity:     pvutil.GetVolumeNodeAffinity("key1", "value4"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -918,7 +919,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     getVolumeNodeAffinity("key1", "value4"),
+				NodeAffinity:     pvutil.GetVolumeNodeAffinity("key1", "value4"),
 				VolumeMode:       &fs,
 			},
 			Status: v1.PersistentVolumeStatus{
@@ -942,7 +943,7 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 				StorageClassName: classWait,
-				NodeAffinity:     getVolumeNodeAffinity("key1", "value4"),
+				NodeAffinity:     pvutil.GetVolumeNodeAffinity("key1", "value4"),
 				VolumeMode:       &fs,
 			},
 		},
@@ -964,24 +965,6 @@ func testVolume(name, size string) *v1.PersistentVolume {
 		},
 		Status: v1.PersistentVolumeStatus{
 			Phase: v1.VolumeAvailable,
-		},
-	}
-}
-
-func getVolumeNodeAffinity(key string, value string) *v1.VolumeNodeAffinity {
-	return &v1.VolumeNodeAffinity{
-		Required: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      key,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{value},
-						},
-					},
-				},
-			},
 		},
 	}
 }
@@ -1163,7 +1146,7 @@ func TestVolumeModeCheck(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
-			expectedMismatch, err := checkVolumeModeMismatches(&scenario.pvc.Spec, &scenario.vol.Spec)
+			expectedMismatch, err := pvutil.CheckVolumeModeMismatches(&scenario.pvc.Spec, &scenario.vol.Spec)
 			if err != nil {
 				t.Errorf("Unexpected failure for checkVolumeModeMismatches: %v", err)
 			}
@@ -1608,7 +1591,7 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		volume, err := findMatchingVolume(scenario.claim, volumes, scenario.node, scenario.excludedVolumes, true)
+		volume, err := pvutil.FindMatchingVolume(scenario.claim, volumes, scenario.node, scenario.excludedVolumes, true)
 		if err != nil {
 			t.Errorf("Unexpected error matching volume by claim: %v", err)
 		}
@@ -1662,7 +1645,7 @@ func TestCheckAccessModes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		result := checkAccessModes(scenario.claim, volume)
+		result := pvutil.CheckAccessModes(scenario.claim, volume)
 		if result != scenario.shouldSucceed {
 			t.Errorf("Test %q failed: Expected %v, got %v", name, scenario.shouldSucceed, result)
 		}

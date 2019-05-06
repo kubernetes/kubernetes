@@ -1,5 +1,6 @@
 CACertPath: /etc/kubernetes/pki/ca.crt
 ControlPlane:
+  CertificateKey: ""
   LocalAPIEndpoint:
     AdvertiseAddress: 192.168.2.2
     BindPort: 6443

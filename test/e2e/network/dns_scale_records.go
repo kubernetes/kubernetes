@@ -22,11 +22,12 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -66,7 +67,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 			defer GinkgoRecover()
 			framework.ExpectNoError(testutils.CreateServiceWithRetries(f.ClientSet, services[i].Namespace, services[i]))
 		}
-		framework.Logf("Creating %v test services", maxServicesPerCluster)
+		e2elog.Logf("Creating %v test services", maxServicesPerCluster)
 		workqueue.ParallelizeUntil(context.TODO(), parallelCreateServiceWorkers, len(services), createService)
 		dnsTest := dnsTestCommon{
 			f:  f,
@@ -75,7 +76,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 		}
 		dnsTest.createUtilPodLabel("e2e-dns-scale-records")
 		defer dnsTest.deleteUtilPod()
-		framework.Logf("Querying %v%% of service records", checkServicePercent*100)
+		e2elog.Logf("Querying %v%% of service records", checkServicePercent*100)
 		for i := 0; i < len(services); i++ {
 			if i%(1/checkServicePercent) != 0 {
 				continue
@@ -84,7 +85,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 			svc, err := f.ClientSet.CoreV1().Services(s.Namespace).Get(s.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			qname := fmt.Sprintf("%v.%v.svc.%v", s.Name, s.Namespace, framework.TestContext.ClusterDNSDomain)
-			framework.Logf("Querying %v expecting %v", qname, svc.Spec.ClusterIP)
+			e2elog.Logf("Querying %v expecting %v", qname, svc.Spec.ClusterIP)
 			dnsTest.checkDNSRecordFrom(
 				qname,
 				func(actual []string) bool {

@@ -882,13 +882,12 @@ func WaitForPersistentVolumePhase(phase v1.PersistentVolumePhase, c clientset.In
 		if err != nil {
 			Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 			continue
-		} else {
-			if pv.Status.Phase == phase {
-				Logf("PersistentVolume %s found and phase=%s (%v)", pvName, phase, time.Since(start))
-				return nil
-			}
-			Logf("PersistentVolume %s found but phase is %s instead of %s.", pvName, pv.Status.Phase, phase)
 		}
+		if pv.Status.Phase == phase {
+			Logf("PersistentVolume %s found and phase=%s (%v)", pvName, phase, time.Since(start))
+			return nil
+		}
+		Logf("PersistentVolume %s found but phase is %s instead of %s.", pvName, pv.Status.Phase, phase)
 	}
 	return fmt.Errorf("PersistentVolume %s not in phase %s within %v", pvName, phase, timeout)
 }
@@ -901,13 +900,12 @@ func WaitForStatefulSetReplicasReady(statefulSetName, ns string, c clientset.Int
 		if err != nil {
 			Logf("Get StatefulSet %s failed, ignoring for %v: %v", statefulSetName, Poll, err)
 			continue
-		} else {
-			if sts.Status.ReadyReplicas == *sts.Spec.Replicas {
-				Logf("All %d replicas of StatefulSet %s are ready. (%v)", sts.Status.ReadyReplicas, statefulSetName, time.Since(start))
-				return nil
-			}
-			Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
 		}
+		if sts.Status.ReadyReplicas == *sts.Spec.Replicas {
+			Logf("All %d replicas of StatefulSet %s are ready. (%v)", sts.Status.ReadyReplicas, statefulSetName, time.Since(start))
+			return nil
+		}
+		Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
 	}
 	return fmt.Errorf("StatefulSet %s still has unready pods within %v", statefulSetName, timeout)
 }
@@ -920,13 +918,12 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 		if err == nil {
 			Logf("PersistentVolume %s found and phase=%s (%v)", pvName, pv.Status.Phase, time.Since(start))
 			continue
-		} else {
-			if apierrs.IsNotFound(err) {
-				Logf("PersistentVolume %s was removed", pvName)
-				return nil
-			}
-			Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 		}
+		if apierrs.IsNotFound(err) {
+			Logf("PersistentVolume %s was removed", pvName)
+			return nil
+		}
+		Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 	}
 	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
 }
@@ -950,16 +947,15 @@ func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c c
 			if err != nil {
 				Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, Poll, err)
 				continue
-			} else {
-				if pvc.Status.Phase == phase {
-					Logf("PersistentVolumeClaim %s found and phase=%s (%v)", pvcName, phase, time.Since(start))
-					if matchAny {
-						return nil
-					}
-				} else {
-					Logf("PersistentVolumeClaim %s found but phase is %s instead of %s.", pvcName, pvc.Status.Phase, phase)
-					phaseFoundInAllClaims = false
+			}
+			if pvc.Status.Phase == phase {
+				Logf("PersistentVolumeClaim %s found and phase=%s (%v)", pvcName, phase, time.Since(start))
+				if matchAny {
+					return nil
 				}
+			} else {
+				Logf("PersistentVolumeClaim %s found but phase is %s instead of %s.", pvcName, pvc.Status.Phase, phase)
+				phaseFoundInAllClaims = false
 			}
 		}
 		if phaseFoundInAllClaims {
@@ -3513,41 +3509,37 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 				if wantTrue {
 					if (cond.Status == v1.ConditionTrue) && !hasNodeControllerTaints {
 						return true
-					} else {
-						msg := ""
-						if !hasNodeControllerTaints {
-							msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-								conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-						} else {
-							msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
-								conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
-						}
-						if !silent {
-							Logf(msg)
-						}
-						return false
 					}
-				} else {
-					// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
-					if cond.Status != v1.ConditionTrue {
-						return true
-					}
-					if !silent {
-						Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+					msg := ""
+					if !hasNodeControllerTaints {
+						msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
 							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+					}
+					msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
+						conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
+					if !silent {
+						Logf(msg)
 					}
 					return false
 				}
-			}
-			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
-				return true
-			} else {
+				// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
+				if cond.Status != v1.ConditionTrue {
+					return true
+				}
 				if !silent {
 					Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
 						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
 				}
 				return false
 			}
+			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
+				return true
+			}
+			if !silent {
+				Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+			}
+			return false
 		}
 
 	}

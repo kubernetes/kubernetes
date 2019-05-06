@@ -122,3 +122,12 @@ func (t *timedCache) Delete(key string) error {
 		key: key,
 	})
 }
+
+// Set sets the data cache for the key.
+// It is only used for testing.
+func (t *timedCache) Set(key string, data interface{}) {
+	t.store.Add(&cacheEntry{
+		key:  key,
+		data: data,
+	})
+}

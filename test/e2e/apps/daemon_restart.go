@@ -37,7 +37,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 // This test primarily checks 2 things:
@@ -115,7 +114,7 @@ func (r *RestartDaemonConfig) waitUp() {
 func (r *RestartDaemonConfig) kill() {
 	framework.Logf("Killing %v", r)
 	_, err := framework.NodeExec(r.nodeName, fmt.Sprintf("pgrep %v | xargs -I {} sudo kill {}", r.daemonName))
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 }
 
 // Restart checks if the daemon is up, kills it, and waits till it comes back up
@@ -208,7 +207,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 			Replicas:    numPods,
 			CreatedPods: &[]*v1.Pod{},
 		}
-		gomega.Expect(framework.RunRC(config)).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(framework.RunRC(config))
 		replacePods(*config.CreatedPods, existingPods)
 
 		stopCh = make(chan struct{})

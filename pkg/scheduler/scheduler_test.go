@@ -37,15 +37,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	corelister "k8s.io/client-go/listers/core/v1"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
@@ -144,8 +143,8 @@ func PredicateOne(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *sche
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (api.HostPriorityList, error) {
-	return []api.HostPriority{}, nil
+func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+	return []schedulerapi.HostPriority{}, nil
 }
 
 type mockScheduler struct {
@@ -194,7 +193,7 @@ func TestSchedulerCreation(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
-		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
+		eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "scheduler"}),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
 		EmptyPluginRegistry,
@@ -302,8 +301,8 @@ func TestScheduler(t *testing.T) {
 					return item.sendPod
 				},
 				Framework:    fwk,
-				Recorder:     eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
-				VolumeBinder: volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
+				Recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "scheduler"}),
+				VolumeBinder: volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 			})
 			called := make(chan struct{})
 			events := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
@@ -654,7 +653,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 		false,
 		false,
-		api.DefaultPercentageOfNodesToScore,
+		schedulerapi.DefaultPercentageOfNodesToScore,
 	)
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
@@ -679,7 +678,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		PodConditionUpdater: fakePodConditionUpdater{},
 		PodPreemptor:        fakePodPreemptor{},
 		Framework:           framework,
-		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
+		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 	}
 
 	if recorder != nil {
@@ -707,7 +706,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 		false,
 		false,
-		api.DefaultPercentageOfNodesToScore,
+		schedulerapi.DefaultPercentageOfNodesToScore,
 	)
 	bindingChan := make(chan *v1.Binding, 2)
 
@@ -736,7 +735,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		PodPreemptor:        fakePodPreemptor{},
 		StopEverything:      stop,
 		Framework:           framework,
-		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
+		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 	})
 
 	return sched, bindingChan
@@ -760,7 +759,7 @@ func setupTestSchedulerWithVolumeBinding(fakeVolumeBinder *volumebinder.VolumeBi
 		predicates.CheckVolumeBindingPred: predicates.NewVolumeBindingPredicate(fakeVolumeBinder),
 	}
 
-	recorder := broadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "scheduler"})
 	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, predicateMap, recorder)
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
@@ -794,11 +793,11 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		expectAssumeCalled bool
 		expectBindCalled   bool
 		eventReason        string
-		volumeBinderConfig *persistentvolume.FakeVolumeBinderConfig
+		volumeBinderConfig *volumescheduling.FakeVolumeBinderConfig
 	}{
 		{
 			name: "all bound",
-			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
 				AllBound:             true,
 				FindUnboundSatsified: true,
 				FindBoundSatsified:   true,
@@ -809,7 +808,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "bound/invalid pv affinity",
-			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
 				AllBound:             true,
 				FindUnboundSatsified: true,
 				FindBoundSatsified:   false,
@@ -819,7 +818,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "unbound/no matches",
-			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
 				FindUnboundSatsified: false,
 				FindBoundSatsified:   true,
 			},
@@ -828,7 +827,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "bound and unbound unsatisfied",
-			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
 				FindUnboundSatsified: false,
 				FindBoundSatsified:   false,
 			},
@@ -837,7 +836,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "unbound/found matches/bind succeeds",
-			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
 				FindUnboundSatsified: true,
 				FindBoundSatsified:   true,
 			},
@@ -848,7 +847,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "predicate error",
-			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
 				FindErr: findErr,
 			},
 			eventReason: "FailedScheduling",
@@ -856,7 +855,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "assume error",
-			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
 				FindUnboundSatsified: true,
 				FindBoundSatsified:   true,
 				AssumeErr:            assumeErr,
@@ -867,7 +866,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		},
 		{
 			name: "bind error",
-			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+			volumeBinderConfig: &volumescheduling.FakeVolumeBinderConfig{
 				FindUnboundSatsified: true,
 				FindBoundSatsified:   true,
 				BindErr:              bindErr,
@@ -883,7 +882,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 		t.Run(item.name, func(t *testing.T) {
 			stop := make(chan struct{})
 			fakeVolumeBinder := volumebinder.NewFakeVolumeBinder(item.volumeBinderConfig)
-			internalBinder, ok := fakeVolumeBinder.Binder.(*persistentvolume.FakeVolumeBinder)
+			internalBinder, ok := fakeVolumeBinder.Binder.(*volumescheduling.FakeVolumeBinder)
 			if !ok {
 				t.Fatalf("Failed to get fake volume binder")
 			}

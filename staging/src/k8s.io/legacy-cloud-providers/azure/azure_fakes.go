@@ -36,6 +36,10 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
+var (
+	errPreconditionFailedEtagMismatch = fmt.Errorf("PreconditionFailedEtagMismatch")
+)
+
 type fakeAzureLBClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]network.LoadBalancer
@@ -417,12 +421,20 @@ func newFakeAzureNSGClient() *fakeAzureNSGClient {
 	return fNSG
 }
 
-func (fNSG *fakeAzureNSGClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup) (resp *http.Response, err error) {
+func (fNSG *fakeAzureNSGClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, parameters network.SecurityGroup, etag string) (resp *http.Response, err error) {
 	fNSG.mutex.Lock()
 	defer fNSG.mutex.Unlock()
 
 	if _, ok := fNSG.FakeStore[resourceGroupName]; !ok {
 		fNSG.FakeStore[resourceGroupName] = make(map[string]network.SecurityGroup)
+	}
+
+	if nsg, ok := fNSG.FakeStore[resourceGroupName][networkSecurityGroupName]; ok {
+		if etag != "" && to.String(nsg.Etag) != "" && etag != to.String(nsg.Etag) {
+			return &http.Response{
+				StatusCode: http.StatusPreconditionFailed,
+			}, errPreconditionFailedEtagMismatch
+		}
 	}
 	fNSG.FakeStore[resourceGroupName][networkSecurityGroupName] = parameters
 

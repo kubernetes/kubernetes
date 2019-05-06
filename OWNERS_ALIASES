@@ -209,6 +209,7 @@ aliases:
     - dcbw
     - dnardo
     - freehan
+    - johnbelamaric
     - mrhohn
     - nicksardo
     - thockin
@@ -219,10 +220,12 @@ aliases:
     - dcbw
     - dnardo
     - freehan
+    - johnbelamaric
     - mrhohn
     - nicksardo
     - thockin
     - rramkumar1
+    - cmluciano
   sig-apps-approvers:
     - kow3ns
     - janetkuo

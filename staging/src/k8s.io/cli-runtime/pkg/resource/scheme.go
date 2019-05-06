@@ -41,11 +41,13 @@ func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtim
 		return nil, nil, err
 	}
 
-	if _, ok := obj.(*metav1.Status); !ok && strings.ToLower(gvk.Kind) == "status" {
-		obj = &metav1.Status{}
-		err := json.Unmarshal(data, obj)
-		if err != nil {
-			return nil, nil, err
+	if strings.ToLower(gvk.Kind) == "status" && gvk.Version == "v1" && (gvk.Group == "" || gvk.Group == "meta.k8s.io") {
+		if _, ok := obj.(*metav1.Status); !ok {
+			obj = &metav1.Status{}
+			err := json.Unmarshal(data, obj)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 

@@ -2120,7 +2120,7 @@ func describeCronJob(cronJob *batchv1beta1.CronJob, events *corev1.EventList) (s
 		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
 		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
 		if cronJob.Spec.SuccessfulJobsHistoryLimit != nil {
-			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", cronJob.Spec.SuccessfulJobsHistoryLimit)
+			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", *cronJob.Spec.SuccessfulJobsHistoryLimit)
 		} else {
 			w.Write(LEVEL_0, "Successful Job History Limit:\t<unset>\n")
 		}

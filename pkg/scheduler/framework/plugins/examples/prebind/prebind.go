@@ -50,6 +50,6 @@ func (sr StatelessPrebindExample) Prebind(pc *framework.PluginContext, pod *v1.P
 }
 
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, _ framework.Framework) (framework.Plugin, error) {
+func New(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return &StatelessPrebindExample{}, nil
 }

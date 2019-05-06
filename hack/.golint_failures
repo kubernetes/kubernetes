@@ -107,6 +107,8 @@ pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
 pkg/controller/volume/persistentvolume/options
+pkg/controller/volume/persistentvolume/testing
+pkg/controller/volume/scheduling
 pkg/credentialprovider
 pkg/credentialprovider/gcp
 pkg/features
@@ -129,13 +131,11 @@ pkg/kubectl/cmd/exec
 pkg/kubectl/cmd/explain
 pkg/kubectl/cmd/expose
 pkg/kubectl/cmd/get
-pkg/kubectl/cmd/help
 pkg/kubectl/cmd/label
 pkg/kubectl/cmd/logs
 pkg/kubectl/cmd/patch
 pkg/kubectl/cmd/plugin
 pkg/kubectl/cmd/portforward
-pkg/kubectl/cmd/proxy
 pkg/kubectl/cmd/replace
 pkg/kubectl/cmd/rollingupdate
 pkg/kubectl/cmd/rollout
@@ -146,7 +146,6 @@ pkg/kubectl/cmd/taint
 pkg/kubectl/cmd/testing
 pkg/kubectl/cmd/top
 pkg/kubectl/cmd/util
-pkg/kubectl/cmd/util/openapi
 pkg/kubectl/cmd/wait
 pkg/kubectl/describe/versioned
 pkg/kubectl/generate

@@ -26,7 +26,11 @@ import (
 
 	"github.com/pmezard/go-difflib/difflib"
 
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"sigs.k8s.io/yaml"
 )
 
 func diff(expected, actual []byte) string {
@@ -279,6 +283,83 @@ apiVersion: foo.k8s.io/v1
 			actual := consistentOrderByteSlice(rt.in)
 			if !reflect.DeepEqual(rt.expected, actual) {
 				t2.Errorf("the expected and actual output differs.\n\texpected: %s\n\tout: %s\n", rt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestDefaultTaintsMarshaling(t *testing.T) {
+	tests := []struct {
+		desc             string
+		cfg              kubeadmapiv1beta2.InitConfiguration
+		expectedTaintCnt int
+	}{
+		{
+			desc: "Uninitialized nodeRegistration field produces a single taint (the master one)",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+			},
+			expectedTaintCnt: 1,
+		},
+		{
+			desc: "Uninitialized taints field produces a single taint (the master one)",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{},
+			},
+			expectedTaintCnt: 1,
+		},
+		{
+			desc: "Forsing taints to an empty slice produces no taints",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+					Taints: []v1.Taint{},
+				},
+			},
+			expectedTaintCnt: 0,
+		},
+		{
+			desc: "Custom taints are used",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+					Taints: []v1.Taint{
+						{Key: "taint1"},
+						{Key: "taint2"},
+					},
+				},
+			},
+			expectedTaintCnt: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			b, err := yaml.Marshal(tc.cfg)
+			if err != nil {
+				t.Fatalf("unexpected error while marshalling to YAML: %v", err)
+			}
+
+			cfg, err := BytesToInitConfiguration(b)
+			if err != nil {
+				t.Fatalf("unexpected error of BytesToInitConfiguration: %v\nconfig: %s", err, string(b))
+			}
+
+			if tc.expectedTaintCnt != len(cfg.NodeRegistration.Taints) {
+				t.Fatalf("unexpected taints count\nexpected: %d\ngot: %d\ntaints: %v", tc.expectedTaintCnt, len(cfg.NodeRegistration.Taints), cfg.NodeRegistration.Taints)
 			}
 		})
 	}

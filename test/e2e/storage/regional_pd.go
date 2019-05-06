@@ -39,6 +39,7 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -177,7 +178,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	_, err := c.StorageV1().StorageClasses().Create(class)
 	framework.ExpectNoError(err)
 	defer func() {
-		framework.Logf("deleting storage class %s", class.Name)
+		e2elog.Logf("deleting storage class %s", class.Name)
 		framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(class.Name, nil),
 			"Error deleting StorageClass %s", class.Name)
 	}()
@@ -189,19 +190,19 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	framework.ExpectNoError(err)
 
 	defer func() {
-		framework.Logf("deleting statefulset%q/%q", statefulSet.Namespace, statefulSet.Name)
+		e2elog.Logf("deleting statefulset%q/%q", statefulSet.Namespace, statefulSet.Name)
 		// typically this claim has already been deleted
 		framework.ExpectNoError(c.AppsV1().StatefulSets(ns).Delete(statefulSet.Name, nil /* options */),
 			"Error deleting StatefulSet %s", statefulSet.Name)
 
-		framework.Logf("deleting claims in namespace %s", ns)
+		e2elog.Logf("deleting claims in namespace %s", ns)
 		pvc := getPVC(c, ns, regionalPDLabels)
 		framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil),
 			"Error deleting claim %s.", pvc.Name)
 		if pvc.Spec.VolumeName != "" {
 			err = framework.WaitForPersistentVolumeDeleted(c, pvc.Spec.VolumeName, framework.Poll, pvDeletionTimeout)
 			if err != nil {
-				framework.Logf("WARNING: PV %s is not yet deleted, and subsequent tests may be affected.", pvc.Spec.VolumeName)
+				e2elog.Logf("WARNING: PV %s is not yet deleted, and subsequent tests may be affected.", pvc.Spec.VolumeName)
 			}
 		}
 	}()
@@ -230,7 +231,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	removeTaintFunc := addTaint(c, ns, nodesInZone.Items, podZone)
 
 	defer func() {
-		framework.Logf("removing previously added node taints")
+		e2elog.Logf("removing previously added node taints")
 		removeTaintFunc()
 	}()
 
@@ -246,7 +247,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 		otherZone = cloudZones[0]
 	}
 	err = wait.PollImmediate(framework.Poll, statefulSetReadyTimeout, func() (bool, error) {
-		framework.Logf("checking whether new pod is scheduled in zone %q", otherZone)
+		e2elog.Logf("checking whether new pod is scheduled in zone %q", otherZone)
 		pod = getPod(c, ns, regionalPDLabels)
 		nodeName = pod.Spec.NodeName
 		node, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})

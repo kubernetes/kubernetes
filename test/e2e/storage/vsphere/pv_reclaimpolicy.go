@@ -22,11 +22,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -129,7 +130,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 
 			By("Verify the volume is accessible and available in the pod")
 			verifyVSphereVolumesAccessible(c, pod, []*v1.PersistentVolume{pv})
-			framework.Logf("Verified that Volume is accessible in the POD after deleting PV claim")
+			e2elog.Logf("Verified that Volume is accessible in the POD after deleting PV claim")
 
 			By("Deleting the Pod")
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "Failed to delete pod ", pod.Name)
@@ -175,7 +176,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			pvc = nil
 
 			By("Verify PV is retained")
-			framework.Logf("Waiting for PV %v to become Released", pv.Name)
+			e2elog.Logf("Waiting for PV %v to become Released", pv.Name)
 			err = framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 3*time.Second, 300*time.Second)
 			framework.ExpectNoError(err)
 			framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)

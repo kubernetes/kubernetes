@@ -11,3 +11,4 @@ kind: JoinConfiguration
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
   name: thegopher
+  taints: null

@@ -127,7 +127,7 @@ github.com/bazelbuild/buildtools/file
 github.com/bazelbuild/buildtools/lang
 github.com/bazelbuild/buildtools/tables
 github.com/bazelbuild/buildtools/wspace
-# github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 => github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
+# github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 => github.com/beorn7/perks v0.0.0-20160229213445-3ac7bf7a47d1
 github.com/beorn7/perks/quantile
 # github.com/blang/semver v3.5.0+incompatible => github.com/blang/semver v3.5.0+incompatible
 github.com/blang/semver
@@ -183,7 +183,7 @@ github.com/containernetworking/cni/pkg/types/current
 github.com/containernetworking/cni/pkg/version
 # github.com/coreos/bbolt v1.3.1-coreos.6 => github.com/coreos/bbolt v1.3.1-coreos.6
 github.com/coreos/bbolt
-# github.com/coreos/etcd v3.3.10+incompatible => github.com/coreos/etcd v3.3.10+incompatible
+# github.com/coreos/etcd v3.3.13+incompatible => github.com/coreos/etcd v3.3.13+incompatible
 github.com/coreos/etcd/alarm
 github.com/coreos/etcd/auth
 github.com/coreos/etcd/auth/authpb
@@ -767,8 +767,6 @@ github.com/stretchr/testify/require
 github.com/syndtr/gocapability/capability
 # github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8 => github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8
 github.com/tmc/grpc-websocket-proxy/wsproxy
-# github.com/ugorji/go v0.0.0-20171019201919-bdcc60b419d1 => github.com/ugorji/go v0.0.0-20171019201919-bdcc60b419d1
-github.com/ugorji/go/codec
 # github.com/vishvananda/netlink v0.0.0-20171020171820-b2de5d10e38e => github.com/vishvananda/netlink v0.0.0-20171020171820-b2de5d10e38e
 github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl

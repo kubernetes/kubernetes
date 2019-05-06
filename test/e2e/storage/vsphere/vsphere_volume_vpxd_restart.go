@@ -24,11 +24,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -105,7 +106,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 				pods         []*v1.Pod
 			)
 
-			framework.Logf("Testing for nodes on vCenter host: %s", vcHost)
+			e2elog.Logf("Testing for nodes on vCenter host: %s", vcHost)
 
 			for i, node := range nodes {
 				By(fmt.Sprintf("Creating test vsphere volume %d", i))

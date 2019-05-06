@@ -35,6 +35,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzLocalEtcd,
 		fuzzNetworking,
 		fuzzJoinConfiguration,
+		fuzzJoinControlPlane,
 	}
 }
 
@@ -81,6 +82,9 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			Usages: []string{"foo"},
 		},
 	}
+
+	// Pin values for fields that are not present in v1beta1
+	obj.CertificateKey = ""
 }
 
 func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {
@@ -134,4 +138,11 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 		TLSBootstrapToken: "qux",
 		Timeout:           &metav1.Duration{Duration: 1234},
 	}
+}
+
+func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pin values for fields that are not present in v1beta1
+	obj.CertificateKey = ""
 }

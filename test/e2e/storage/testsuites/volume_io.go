@@ -30,10 +30,11 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -277,7 +278,7 @@ func deleteFile(pod *v1.Pod, fpath string) {
 	_, err := utils.PodExec(pod, fmt.Sprintf("rm -f %s", fpath))
 	if err != nil {
 		// keep going, the test dir will be deleted when the volume is unmounted
-		framework.Logf("unable to delete test file %s: %v\nerror ignored, continuing test", fpath, err)
+		e2elog.Logf("unable to delete test file %s: %v\nerror ignored, continuing test", fpath, err)
 	}
 }
 
@@ -309,12 +310,12 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config volume.
 		By(fmt.Sprintf("deleting client pod %q...", clientPod.Name))
 		e := framework.DeletePodWithWait(f, cs, clientPod)
 		if e != nil {
-			framework.Logf("client pod failed to delete: %v", e)
+			e2elog.Logf("client pod failed to delete: %v", e)
 			if err == nil { // delete err is returned if err is not set
 				err = e
 			}
 		} else {
-			framework.Logf("sleeping a bit so kubelet can unmount and detach the volume")
+			e2elog.Logf("sleeping a bit so kubelet can unmount and detach the volume")
 			time.Sleep(volume.PodCleanupTimeout)
 		}
 	}()

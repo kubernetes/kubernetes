@@ -486,7 +486,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
 	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
-	cloudfeatures.GCERegionalPersistentDisk:     {Default: true, PreRelease: utilfeature.GA},
+	cloudfeatures.GCERegionalPersistentDisk:     {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.17
 	CSIMigration:                                {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationAWS:                             {Default: false, PreRelease: utilfeature.Alpha},
