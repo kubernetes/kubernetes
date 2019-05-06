@@ -46,7 +46,7 @@ func TestVolumeStats(t *testing.T) {
 	}{
 
 		{
-			name:           "when nodeVolumeStats=on, DevicePath=on, DeviceMountPath=on",
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on",
 			volumeStatsSet: true,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
@@ -57,7 +57,7 @@ func TestVolumeStats(t *testing.T) {
 		},
 
 		{
-			name:           "when nodeVolumeStats=off, DevicePath=on, DeviceMountPath=on",
+			name:           "when nodeVolumeStats=off, VolumeID=on, DeviceMountPath=on",
 			volumeStatsSet: false,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
@@ -68,7 +68,7 @@ func TestVolumeStats(t *testing.T) {
 		},
 
 		{
-			name:           "when nodeVolumeStats=on, DevicePath=off, DeviceMountPath=on",
+			name:           "when nodeVolumeStats=on, VolumeID=off, DeviceMountPath=on",
 			volumeStatsSet: true,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
@@ -79,7 +79,7 @@ func TestVolumeStats(t *testing.T) {
 		},
 
 		{
-			name:           "when nodeVolumeStats=on, DevicePath=on, DeviceMountPath=off",
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=off",
 			volumeStatsSet: true,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
@@ -89,7 +89,7 @@ func TestVolumeStats(t *testing.T) {
 			success: false,
 		},
 		{
-			name:           "when nodeVolumeStats=on, DevicePath=on, DeviceMountPath=off",
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=off",
 			volumeStatsSet: true,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
