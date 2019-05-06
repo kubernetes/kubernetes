@@ -313,10 +313,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingC
 	// it to unschedulableQ.
 	if p.moveRequestCycle >= podSchedulingCycle {
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
-			// TODO: Delete this klog call and log returned errors at the call site.
-			err = fmt.Errorf("error adding pod %v to the backoff queue: %v", pod.Name, err)
-			klog.Error(err)
-			return err
+			return fmt.Errorf("error adding pod %v to the backoff queue: %v", pod.Name, err)
 		}
 	} else {
 		p.unschedulableQ.addOrUpdate(pInfo)
