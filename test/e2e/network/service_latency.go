@@ -177,7 +177,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 		select {
 		case e := <-errs:
 			e2elog.Logf("Got error: %v", e)
-			errCount += 1
+			errCount++
 		case d := <-durations:
 			output = append(output, d)
 		}
