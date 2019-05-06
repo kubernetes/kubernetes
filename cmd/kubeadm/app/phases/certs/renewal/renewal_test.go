@@ -17,11 +17,13 @@ limitations under the License.
 package renewal
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -31,8 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fakecerts "k8s.io/client-go/kubernetes/typed/certificates/v1beta1/fake"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
@@ -186,6 +191,7 @@ func TestCertToConfig(t *testing.T) {
 }
 
 func TestRenewExistingCert(t *testing.T) {
+	// creates a CA, a certificate, and save it to a file
 	cfg := &certutil.Config{
 		CommonName:   "test-common-name",
 		Organization: []string{"sig-cluster-lifecycle"},
@@ -214,19 +220,134 @@ func TestRenewExistingCert(t *testing.T) {
 		t.Fatalf("couldn't write out certificate")
 	}
 
+	// makes some time pass
+	time.Sleep(1 * time.Second)
+
+	// renew the certificate
 	renewer := NewFileRenewal(caCert, caKey)
 
 	if err := RenewExistingCert(dir, "server", renewer); err != nil {
 		t.Fatalf("couldn't renew certificate: %v", err)
 	}
 
+	// reads the renewed certificate
 	newCert, err := pkiutil.TryLoadCertFromDisk(dir, "server")
 	if err != nil {
 		t.Fatalf("couldn't load created certificate: %v", err)
 	}
 
+	// check the new certificate is changed, has an newer expiration date, but preserve all the
+	// other attributes
+
 	if newCert.SerialNumber.Cmp(cert.SerialNumber) == 0 {
 		t.Fatal("expected new certificate, but renewed certificate has same serial number")
+	}
+
+	if !newCert.NotAfter.After(cert.NotAfter) {
+		t.Fatalf("expected new certificate with updated expiration, but renewed certificate has the same serial number: saw %s, expected greather than %s", newCert.NotAfter, cert.NotAfter)
+	}
+
+	certtestutil.AssertCertificateIsSignedByCa(t, newCert, caCert)
+	certtestutil.AssertCertificateHasClientAuthUsage(t, newCert)
+	certtestutil.AssertCertificateHasOrganizations(t, newCert, cfg.Organization...)
+	certtestutil.AssertCertificateHasCommonName(t, newCert, cfg.CommonName)
+	certtestutil.AssertCertificateHasDNSNames(t, newCert, cfg.AltNames.DNSNames...)
+	certtestutil.AssertCertificateHasIPAddresses(t, newCert, cfg.AltNames.IPs...)
+}
+
+func TestRenewEmbeddedClientCert(t *testing.T) {
+	// creates a CA, a client certificate, and then embeds it into a kubeconfig file
+	caCertCfg := &certutil.Config{CommonName: "kubernetes"}
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(caCertCfg)
+	if err != nil {
+		t.Fatalf("couldn't create CA: %v", err)
+	}
+
+	cfg := &certutil.Config{
+		CommonName:   "test-common-name",
+		Organization: []string{"sig-cluster-lifecycle"},
+		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		AltNames: certutil.AltNames{
+			IPs:      []net.IP{net.ParseIP("10.100.0.1")},
+			DNSNames: []string{"test-domain.space"},
+		},
+	}
+	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, cfg)
+	if err != nil {
+		t.Fatalf("couldn't generate certificate: %v", err)
+	}
+
+	encodedClientKey, err := keyutil.MarshalPrivateKeyToPEM(key)
+	if err != nil {
+		t.Fatalf("failed to marshal private key to PEM: %v", err)
+	}
+
+	certificateAuthorityData := pkiutil.EncodeCertPEM(caCert)
+
+	config := kubeconfigutil.CreateWithCerts(
+		"https://localhost:1234",
+		"kubernetes-test",
+		"user-test",
+		certificateAuthorityData,
+		encodedClientKey,
+		pkiutil.EncodeCertPEM(cert),
+	)
+
+	dir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(dir)
+
+	kubeconfigPath := filepath.Join(dir, "k.conf")
+
+	if err := clientcmd.WriteToFile(*config, kubeconfigPath); err != nil {
+		t.Fatalf("couldn't write out certificate")
+	}
+
+	// makes some time pass
+	time.Sleep(1 * time.Second)
+
+	// renew the embedded certificate
+	renewer := NewFileRenewal(caCert, caKey)
+
+	if err := RenewEmbeddedClientCert(dir, "k.conf", renewer); err != nil {
+		t.Fatalf("couldn't renew embedded certificate: %v", err)
+	}
+
+	// reads the kubeconfig file and gets the renewed certificate
+	newConfig, err := clientcmd.LoadFromFile(kubeconfigPath)
+	if err != nil {
+		t.Fatalf("failed to load kubeconfig file %s: %v", kubeconfigPath, err)
+	}
+
+	if newConfig.Contexts[config.CurrentContext].Cluster != "kubernetes-test" {
+		t.Fatalf("invalid cluster. expected kubernetes-test, saw %s", newConfig.Contexts[config.CurrentContext].Cluster)
+	}
+
+	cluster := newConfig.Clusters["kubernetes-test"]
+	if !bytes.Equal(cluster.CertificateAuthorityData, certificateAuthorityData) {
+		t.Fatalf("invalid cluster. CertificateAuthorityData does not contain expected value")
+	}
+
+	if newConfig.Contexts[config.CurrentContext].AuthInfo != "user-test" {
+		t.Fatalf("invalid AuthInfo. expected user-test, saw %s", newConfig.Contexts[config.CurrentContext].AuthInfo)
+	}
+
+	authInfo := newConfig.AuthInfos["user-test"]
+
+	newCerts, err := certutil.ParseCertsPEM(authInfo.ClientCertificateData)
+	if err != nil {
+		t.Fatalf("couldn't load created certificate: %v", err)
+	}
+
+	// check the new certificate is changed, has an newer expiration date, but preserve all the
+	// other attributes
+
+	newCert := newCerts[0]
+	if newCert.SerialNumber.Cmp(cert.SerialNumber) == 0 {
+		t.Fatal("expected new certificate, but renewed certificate has same serial number")
+	}
+
+	if !newCert.NotAfter.After(cert.NotAfter) {
+		t.Fatalf("expected new certificate with updated expiration, but renewed certificate has same serial number: saw %s, expected greather than %s", newCert.NotAfter, cert.NotAfter)
 	}
 
 	certtestutil.AssertCertificateIsSignedByCa(t, newCert, caCert)
