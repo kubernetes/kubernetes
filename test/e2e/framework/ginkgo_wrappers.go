@@ -26,9 +26,14 @@ import (
 	"strings"
 
 	"github.com/onsi/ginkgo"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
-)
 
 // FailurePanic is the value that will be panicked from Fail.
 type FailurePanic struct {
@@ -254,6 +259,26 @@ func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVers
 		}
 		Failf("Unexpected error getting %v: %v", gvr, err)
 	}
+}
+
+// RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
+func RunIfContainerRuntimeIs(runtimes ...string) {
+	for _, runtime := range runtimes {
+		if runtime == TestContext.ContainerRuntime {
+			return
+		}
+	}
+	skipInternalf(1, "Skipped because container runtime %q is not in %s", TestContext.ContainerRuntime, runtimes)
+}
+
+// RunIfSystemSpecNameIs runs if the system spec name is included in the names.
+func RunIfSystemSpecNameIs(names ...string) {
+	for _, name := range names {
+		if name == TestContext.SystemSpecName {
+			return
+		}
+	}
+	skipInternalf(1, "Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
 }
 
 func skipInternalf(caller int, format string, args ...interface{}) {

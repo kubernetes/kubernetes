@@ -253,26 +253,6 @@ func log(level string, format string, args ...interface{}) {
 	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
-// RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
-func RunIfContainerRuntimeIs(runtimes ...string) {
-	for _, runtime := range runtimes {
-		if runtime == TestContext.ContainerRuntime {
-			return
-		}
-	}
-	skipInternalf(1, "Skipped because container runtime %q is not in %s", TestContext.ContainerRuntime, runtimes)
-}
-
-// RunIfSystemSpecNameIs runs if the system spec name is included in the names.
-func RunIfSystemSpecNameIs(names ...string) {
-	for _, name := range names {
-		if name == TestContext.SystemSpecName {
-			return
-		}
-	}
-	skipInternalf(1, "Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
-}
-
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
