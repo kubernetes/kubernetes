@@ -16,10 +16,10 @@ SRCS=controller
 ARCH ?= amd64
 TARGET ?= $(CURDIR)
 GOLANG_VERSION ?= latest
-SRC_DIR = resource-consumer/$(notdir $(shell pwd))
+SRC_DIR = $(notdir $(shell pwd))
 export
 
 bin:
-	../../image-util.sh bin $(SRCS)
+	../image-util.sh bin $(SRCS)
 
 .PHONY: bin
