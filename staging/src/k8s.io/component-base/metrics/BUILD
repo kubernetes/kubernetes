@@ -53,6 +53,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:all-srcs",
+    ],
     tags = ["automanaged"],
 )

@@ -32,7 +32,7 @@ method call depending on whether the metric is deprecated or not.
 */
 type KubeCollector interface {
 	Collector
-	LazyMetric
+	lazyKubeMetric
 	DeprecatedVersion() *semver.Version
 	// Each collector metric should provide an initialization function
 	// for both deprecated and non-deprecated variants of a metric. This
@@ -43,11 +43,11 @@ type KubeCollector interface {
 }
 
 /*
-LazyMetric defines our registration functionality. LazyMetric objects are expected
+lazyKubeMetric defines our metric registration interface. lazyKubeMetric objects are expected
 to lazily instantiate metrics (i.e defer metric instantiation until when
 the Create() function is explicitly called).
 */
-type LazyMetric interface {
+type lazyKubeMetric interface {
 	Create(*semver.Version) bool
 	IsCreated() bool
 	IsHidden() bool
@@ -55,7 +55,7 @@ type LazyMetric interface {
 }
 
 /*
-lazyMetric implements LazyMetric. A lazy metric is lazy because it waits until metric
+lazyMetric implements lazyKubeMetric. A lazy metric is lazy because it waits until metric
 registration time before instantiation. Add it as an anonymous field to a struct that
 implements KubeCollector to get deferred registration behavior. You must call lazyInit
 with the KubeCollector itself as an argument.

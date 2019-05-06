@@ -74,7 +74,7 @@ func TestCounter(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(&apimachineryversion.Info{
+			registry := NewKubeRegistry(&apimachineryversion.Info{
 				Major:      "1",
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
@@ -175,7 +175,7 @@ func TestCounterVec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := newKubeRegistry(&apimachineryversion.Info{
+			registry := NewKubeRegistry(&apimachineryversion.Info{
 				Major:      "1",
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",

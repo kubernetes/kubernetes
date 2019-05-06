@@ -14,44 +14,54 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metrics
+package legacyregistry
 
 import (
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	"k8s.io/component-base/metrics"
 	"testing"
+
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
+
+func init() {
+	SetRegistryFactoryVersion(&apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+}
 
 var (
 	v115         = semver.MustParse("1.15.0")
 	v114         = semver.MustParse("1.14.0")
-	alphaCounter = NewCounter(
-		&CounterOpts{
+	alphaCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
 			Namespace:      "some_namespace",
 			Name:           "test_counter_name",
 			Subsystem:      "subsystem",
-			StabilityLevel: ALPHA,
+			StabilityLevel: metrics.ALPHA,
 			Help:           "counter help",
 		},
 	)
-	alphaDeprecatedCounter = NewCounter(
-		&CounterOpts{
+	alphaDeprecatedCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
 			Namespace:         "some_namespace",
 			Name:              "test_alpha_dep_counter",
 			Subsystem:         "subsystem",
-			StabilityLevel:    ALPHA,
+			StabilityLevel:    metrics.ALPHA,
 			Help:              "counter help",
 			DeprecatedVersion: &v115,
 		},
 	)
-	alphaHiddenCounter = NewCounter(
-		&CounterOpts{
+	alphaHiddenCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
 			Namespace:         "some_namespace",
 			Name:              "test_alpha_hidden_counter",
 			Subsystem:         "subsystem",
-			StabilityLevel:    ALPHA,
+			StabilityLevel:    metrics.ALPHA,
 			Help:              "counter help",
 			DeprecatedVersion: &v114,
 		},
@@ -61,7 +71,7 @@ var (
 func TestRegister(t *testing.T) {
 	var tests = []struct {
 		desc                    string
-		metrics                 []*Counter
+		metrics                 []*metrics.Counter
 		registryVersion         *semver.Version
 		expectedErrors          []error
 		expectedIsCreatedValues []bool
@@ -69,52 +79,21 @@ func TestRegister(t *testing.T) {
 		expectedIsHidden        []bool
 	}{
 		{
-			desc:                    "test alpha metric",
-			metrics:                 []*Counter{alphaCounter},
-			registryVersion:         &v115,
-			expectedErrors:          []error{nil},
-			expectedIsCreatedValues: []bool{true},
-			expectedIsDeprecated:    []bool{false},
-			expectedIsHidden:        []bool{false},
-		},
-		{
 			desc:                    "test registering same metric multiple times",
-			metrics:                 []*Counter{alphaCounter, alphaCounter},
-			registryVersion:         &v115,
+			metrics:                 []*metrics.Counter{alphaCounter, alphaCounter},
 			expectedErrors:          []error{nil, prometheus.AlreadyRegisteredError{}},
 			expectedIsCreatedValues: []bool{true, true},
 			expectedIsDeprecated:    []bool{false, false},
 			expectedIsHidden:        []bool{false, false},
 		},
-		{
-			desc:                    "test alpha deprecated metric",
-			metrics:                 []*Counter{alphaDeprecatedCounter},
-			registryVersion:         &v115,
-			expectedErrors:          []error{nil},
-			expectedIsCreatedValues: []bool{true},
-			expectedIsDeprecated:    []bool{true},
-			expectedIsHidden:        []bool{false},
-		},
-		{
-			desc:                    "test alpha hidden metric",
-			metrics:                 []*Counter{alphaHiddenCounter},
-			registryVersion:         &v115,
-			expectedErrors:          []error{nil},
-			expectedIsCreatedValues: []bool{false},
-			expectedIsDeprecated:    []bool{true},
-			expectedIsHidden:        []bool{true},
-		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := NewKubeRegistry(&apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
+			//t.Errorf("len %v - %v\n", len(test.metrics), len(test.expectedErrors))
 			for i, m := range test.metrics {
-				err := registry.Register(m)
+				//t.Errorf("m %v\n", m)
+				err := Register(m)
 				if err != test.expectedErrors[i] && err.Error() != test.expectedErrors[i].Error() {
 					t.Errorf("Got unexpected error %v, wanted %v", err, test.expectedErrors[i])
 				}
@@ -135,64 +114,82 @@ func TestRegister(t *testing.T) {
 func TestMustRegister(t *testing.T) {
 	var tests = []struct {
 		desc            string
-		metrics         []*Counter
+		metrics         []*metrics.Counter
 		registryVersion *semver.Version
 		expectedPanics  []bool
 	}{
 		{
-			desc:            "test alpha metric",
-			metrics:         []*Counter{alphaCounter},
-			registryVersion: &v115,
-			expectedPanics:  []bool{false},
+			desc:           "test must registering same deprecated metric",
+			metrics:        []*metrics.Counter{alphaDeprecatedCounter, alphaDeprecatedCounter},
+			expectedPanics: []bool{false, true},
 		},
 		{
-			desc:            "test registering same metric multiple times",
-			metrics:         []*Counter{alphaCounter, alphaCounter},
-			registryVersion: &v115,
-			expectedPanics:  []bool{false, true},
-		},
-		{
-			desc:            "test alpha deprecated metric",
-			metrics:         []*Counter{alphaDeprecatedCounter},
-			registryVersion: &v115,
-			expectedPanics:  []bool{false},
-		},
-		{
-			desc:            "test must registering same deprecated metric",
-			metrics:         []*Counter{alphaDeprecatedCounter, alphaDeprecatedCounter},
-			registryVersion: &v115,
-			expectedPanics:  []bool{false, true},
-		},
-		{
-			desc:            "test alpha hidden metric",
-			metrics:         []*Counter{alphaHiddenCounter},
-			registryVersion: &v115,
-			expectedPanics:  []bool{false},
-		},
-		{
-			desc:            "test must registering same hidden metric",
-			metrics:         []*Counter{alphaHiddenCounter, alphaHiddenCounter},
-			registryVersion: &v115,
-			expectedPanics:  []bool{false, false}, // hidden metrics no-opt
+			desc:           "test alpha hidden metric",
+			metrics:        []*metrics.Counter{alphaHiddenCounter},
+			expectedPanics: []bool{false},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			registry := NewKubeRegistry(&apimachineryversion.Info{
-				Major:      "1",
-				Minor:      "15",
-				GitVersion: "v1.15.0-alpha-1.12345",
-			})
 			for i, m := range test.metrics {
 				if test.expectedPanics[i] {
 					assert.Panics(t,
-						func() { registry.MustRegister(m) },
+						func() { MustRegister(m) },
 						"Did not panic even though we expected it.")
 				} else {
-					registry.MustRegister(m)
+					MustRegister(m)
 				}
 			}
 		})
 	}
+}
+
+func TestDeferredRegister(t *testing.T) {
+	// reset the global registry for this test.
+	globalRegistryFactory = metricsRegistryFactory{
+		registerQueue:     make([]metrics.KubeCollector, 0),
+		mustRegisterQueue: make([]metrics.KubeCollector, 0),
+	}
+	var err error
+	err = Register(alphaDeprecatedCounter)
+	if err != nil {
+		t.Errorf("Got err == %v, expected no error", err)
+	}
+	err = Register(alphaDeprecatedCounter)
+	if err != nil {
+		t.Errorf("Got err == %v, expected no error", err)
+	}
+	// set the global registry version
+	errs := SetRegistryFactoryVersion(&apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	if len(errs) != 1 {
+		t.Errorf("Got %d errs, expected 1", len(errs))
+		for _, err := range errs {
+			t.Logf("\t Got %v", err)
+		}
+	}
+}
+
+func TestDeferredMustRegister(t *testing.T) {
+	// reset the global registry for this test.
+	globalRegistryFactory = metricsRegistryFactory{
+		registerQueue:     make([]metrics.KubeCollector, 0),
+		mustRegisterQueue: make([]metrics.KubeCollector, 0),
+	}
+	MustRegister(alphaDeprecatedCounter)
+
+	MustRegister(alphaDeprecatedCounter)
+	assert.Panics(t,
+		func() {
+			SetRegistryFactoryVersion(&apimachineryversion.Info{
+				Major:      "1",
+				Minor:      "15",
+				GitVersion: "v1.15.0-alpha-1.12345",
+			})
+		},
+		"Did not panic even though we expected it.")
 }

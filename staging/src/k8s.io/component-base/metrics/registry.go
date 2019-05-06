@@ -21,27 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"sync"
 )
-
-var globalRegistryFactory = metricsRegistryFactory{
-	globalRegistry: &noopKubeRegistry{},
-}
-
-// NewKubeRegistry creates a new kubernetes metric registry, loading in the kubernetes
-// version information available to the binary.
-func (r metricsRegistryFactory) newKubeRegistry() KubeRegistry {
-	if r.kubeVersion == nil {
-		return noopKubeRegistry{}
-	}
-	return newKubeRegistry(r.kubeVersion)
-}
-
-type metricsRegistryFactory struct {
-	globalRegistry KubeRegistry
-	kubeVersion    *apimachineryversion.Info
-	setVersionOnce sync.Once
-}
 
 // KubeRegistry is an interface which implements a subset of prometheus.Registerer and
 // prometheus.Gatherer interfaces
@@ -58,28 +38,6 @@ type KubeRegistry interface {
 type kubeRegistry struct {
 	PromRegistry
 	version semver.Version
-}
-
-// SetRegistryFactoryVersion sets the kubernetes version information for all
-// subsequent metrics registry initializations. Only the first call has an effect.
-// If a version is not set, then metrics registry creation will no-opt
-func SetRegistryFactoryVersion(ver *apimachineryversion.Info) {
-	globalRegistryFactory.setVersionOnce.Do(func() {
-		globalRegistryFactory.globalRegistry = newKubeRegistry(ver)
-		globalRegistryFactory.kubeVersion = ver
-	})
-}
-
-// Register registers a collectable metric, but it uses a global registry.
-func Register(c KubeCollector) error {
-	return globalRegistryFactory.globalRegistry.Register(c)
-}
-
-// MustRegister works like Register but registers any number of
-// Collectors and panics upon the first registration that causes an
-// error.
-func MustRegister(cs ...KubeCollector) {
-	globalRegistryFactory.globalRegistry.MustRegister(cs...)
 }
 
 // Register registers a new Collector to be included in metrics
@@ -128,27 +86,11 @@ func (kr *kubeRegistry) Gather() ([]*dto.MetricFamily, error) {
 	return kr.PromRegistry.Gather()
 }
 
-// NewKubeRegistry creates a new kubernetes metric registry, loading in the kubernetes
-// version information available to the binary.
-func NewKubeRegistry() KubeRegistry {
-	return globalRegistryFactory.newKubeRegistry()
-}
-
-// newKubeRegistry creates a new vanilla Registry without any Collectors
+// NewKubeRegistry creates a new vanilla Registry without any Collectors
 // pre-registered.
-func newKubeRegistry(v *apimachineryversion.Info) KubeRegistry {
+func NewKubeRegistry(v *apimachineryversion.Info) KubeRegistry {
 	return &kubeRegistry{
 		PromRegistry: prometheus.NewRegistry(),
 		version:      parseVersion(*v),
 	}
 }
-
-// noop registry
-var noopRegistry = &noopKubeRegistry{}
-
-type noopKubeRegistry struct{}
-
-func (noopKubeRegistry) Register(KubeCollector) error         { return nil }
-func (noopKubeRegistry) MustRegister(...KubeCollector)        {}
-func (noopKubeRegistry) Unregister(KubeCollector) bool        { return false }
-func (noopKubeRegistry) Gather() ([]*dto.MetricFamily, error) { return nil, nil }
