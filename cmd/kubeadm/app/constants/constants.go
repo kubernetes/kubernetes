@@ -449,7 +449,7 @@ func AddSelfHostedPrefix(componentName string) string {
 
 // CreateTempDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp (not using /tmp as that would potentially be dangerous)
 func CreateTempDirForKubeadm(dirName string) (string, error) {
-	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
+	tempDir := path.Join("/tmp", KubernetesDir, TempDirForKubeadm)
 	// creates target folder if not already exists
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
 		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
