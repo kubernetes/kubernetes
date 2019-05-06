@@ -231,10 +231,8 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 			return
 		}
 		// Ensure current node's labels contains all topologyKeys in 'constraints'.
-		for _, constraint := range constraints {
-			if _, ok := node.Labels[constraint.TopologyKey]; !ok {
-				return
-			}
+		if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
+			return
 		}
 
 		nodeTopologyMaps := newTopologyPairsMaps()
@@ -319,6 +317,16 @@ func podMatchesSpreadConstraint(podLabelSet labels.Set, constraint v1.TopologySp
 	return true, nil
 }
 
+// check if ALL topology keys in spread constraints are present in node labels
+func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints []v1.TopologySpreadConstraint) bool {
+	for _, constraint := range constraints {
+		if _, ok := nodeLabels[constraint.TopologyKey]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // returns a pointer to a new topologyPairsMaps
 func newTopologyPairsMaps() *topologyPairsMaps {
 	return &topologyPairsMaps{topologyPairToPods: make(map[topologyPair]podSet),
@@ -372,6 +380,59 @@ func (m *topologyPairsMaps) clone() *topologyPairsMaps {
 	copy := newTopologyPairsMaps()
 	copy.appendMaps(m)
 	return copy
+}
+
+func (m *topologyPairsPodSpreadMap) addPod(addedPod, metapod *v1.Pod, node *v1.Node) error {
+	constraints := getHardTopologySpreadConstraints(metapod)
+	match, err := podMatchesAllSpreadConstraints(addedPod, metapod.Namespace, constraints)
+	if err != nil {
+		return err
+	}
+	if !match || !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
+		return nil
+	}
+
+	// records which topology key(s) needs to be updated
+	minMatchNeedingUpdate := make(map[string]struct{})
+	for _, constraint := range constraints {
+		pair := topologyPair{
+			key:   constraint.TopologyKey,
+			value: node.Labels[constraint.TopologyKey],
+		}
+		// it means current node is one of the critical paths of topologyKeyToMinPodsMap[TopologyKey]
+		if int32(len(m.topologyPairToPods[pair])) == m.topologyKeyToMinPodsMap[pair.key] {
+			minMatchNeedingUpdate[pair.key] = struct{}{}
+		}
+		m.addTopologyPair(pair, addedPod)
+	}
+	// no need to addTopologyPairWithoutPods b/c if a pair without pods must be present,
+	// it should have already been created earlier in removePod() phase
+
+	// In most cases, min match map doesn't need to be updated.
+	// But it's required to be updated when current node is the ONLY critical path which impacts
+	// the min match. With that said, in this case min match needs to be updated to min match + 1
+	if len(minMatchNeedingUpdate) != 0 {
+		// TODO(Huang-Wei): performance can be optimized.
+		// A possible solution is to record number of critical paths which co-impact the min match.
+		tempMinMatchMap := make(map[string]int32, len(minMatchNeedingUpdate))
+		for key := range minMatchNeedingUpdate {
+			tempMinMatchMap[key] = math.MaxInt32
+		}
+		for pair, podSet := range m.topologyPairToPods {
+			if _, ok := minMatchNeedingUpdate[pair.key]; !ok {
+				continue
+			}
+			if l := int32(len(podSet)); l < tempMinMatchMap[pair.key] {
+				tempMinMatchMap[pair.key] = l
+			}
+		}
+		for key, tempMin := range tempMinMatchMap {
+			if tempMin == m.topologyKeyToMinPodsMap[key]+1 {
+				m.topologyKeyToMinPodsMap[key] = tempMin
+			}
+		}
+	}
+	return nil
 }
 
 func (m *topologyPairsPodSpreadMap) removePod(deletedPod *v1.Pod) {
@@ -488,6 +549,12 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulernodei
 			}
 		}
 	}
+	// Update meta.topologyPairsPodSpreadMap if meta.pod has hard spread constraints
+	// and addedPod matches that
+	if err := meta.topologyPairsPodSpreadMap.addPod(addedPod, meta.pod, nodeInfo.Node()); err != nil {
+		return err
+	}
+
 	// If addedPod is in the same namespace as the meta.pod, update the list
 	// of matching pods if applicable.
 	if meta.serviceAffinityInUse && addedPod.Namespace == meta.pod.Namespace {
