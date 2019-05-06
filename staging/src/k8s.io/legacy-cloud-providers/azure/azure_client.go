@@ -32,6 +32,11 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 )
 
+const (
+	// The version number is taken from "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network".
+	azureNetworkAPIVersion = "2017-09-01"
+)
+
 // Helpers for rate limiting error/error channel creation
 func createRateLimitErr(isWrite bool, opName string) error {
 	opType := "read"
@@ -57,7 +62,7 @@ type InterfacesClient interface {
 
 // LoadBalancersClient defines needed functions for azure network.LoadBalancersClient
 type LoadBalancersClient interface {
-	CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer) (resp *http.Response, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, etag string) (resp *http.Response, err error)
 	Delete(ctx context.Context, resourceGroupName string, loadBalancerName string) (resp *http.Response, err error)
 	Get(ctx context.Context, resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, err error)
 	List(ctx context.Context, resourceGroupName string) (result []network.LoadBalancer, err error)
@@ -103,13 +108,13 @@ type VirtualMachineScaleSetVMsClient interface {
 
 // RoutesClient defines needed functions for azure network.RoutesClient
 type RoutesClient interface {
-	CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route) (resp *http.Response, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, etag string) (resp *http.Response, err error)
 	Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (resp *http.Response, err error)
 }
 
 // RouteTablesClient defines needed functions for azure network.RouteTablesClient
 type RouteTablesClient interface {
-	CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable) (resp *http.Response, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable, etag string) (resp *http.Response, err error)
 	Get(ctx context.Context, resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error)
 }
 
@@ -356,7 +361,7 @@ func newAzLoadBalancersClient(config *azClientConfig) *azLoadBalancersClient {
 	}
 }
 
-func (az *azLoadBalancersClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer) (resp *http.Response, err error) {
+func (az *azLoadBalancersClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, etag string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
 		err = createRateLimitErr(true, "LBCreateOrUpdate")
@@ -369,15 +374,48 @@ func (az *azLoadBalancersClient) CreateOrUpdate(ctx context.Context, resourceGro
 	}()
 
 	mc := newMetricContext("load_balancers", "create_or_update", resourceGroupName, az.client.SubscriptionID)
-	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, loadBalancerName, parameters)
-	mc.Observe(err)
+	req, err := az.createOrUpdatePreparer(ctx, resourceGroupName, loadBalancerName, parameters, etag)
 	if err != nil {
+		mc.Observe(err)
+		return nil, err
+	}
+
+	future, err := az.client.CreateOrUpdateSender(req)
+	if err != nil {
+		mc.Observe(err)
 		return future.Response(), err
 	}
 
 	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
+}
+
+// createOrUpdatePreparer prepares the CreateOrUpdate request.
+func (az *azLoadBalancersClient) createOrUpdatePreparer(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters network.LoadBalancer, etag string) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"loadBalancerName":  autorest.Encode("path", loadBalancerName),
+		"resourceGroupName": autorest.Encode("path", resourceGroupName),
+		"subscriptionId":    autorest.Encode("path", az.client.SubscriptionID),
+	}
+
+	queryParameters := map[string]interface{}{
+		"api-version": azureNetworkAPIVersion,
+	}
+
+	preparerDecorators := []autorest.PrepareDecorator{
+		autorest.AsContentType("application/json; charset=utf-8"),
+		autorest.AsPut(),
+		autorest.WithBaseURL(az.client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/loadBalancers/{loadBalancerName}", pathParameters),
+		autorest.WithJSON(parameters),
+		autorest.WithQueryParameters(queryParameters),
+	}
+	if etag != "" {
+		preparerDecorators = append(preparerDecorators, autorest.WithHeader("If-Match", autorest.String(etag)))
+	}
+	preparer := autorest.CreatePreparer(preparerDecorators...)
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
 }
 
 func (az *azLoadBalancersClient) Delete(ctx context.Context, resourceGroupName string, loadBalancerName string) (resp *http.Response, err error) {
@@ -752,9 +790,8 @@ func (az *azSecurityGroupsClient) createOrUpdatePreparer(ctx context.Context, re
 		"subscriptionId":           autorest.Encode("path", az.client.SubscriptionID),
 	}
 
-	const APIVersion = "2017-09-01"
 	queryParameters := map[string]interface{}{
-		"api-version": APIVersion,
+		"api-version": azureNetworkAPIVersion,
 	}
 
 	preparerDecorators := []autorest.PrepareDecorator{
@@ -1051,7 +1088,7 @@ func newAzRoutesClient(config *azClientConfig) *azRoutesClient {
 	}
 }
 
-func (az *azRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route) (resp *http.Response, err error) {
+func (az *azRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, etag string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
 		err = createRateLimitErr(true, "RouteCreateOrUpdate")
@@ -1064,7 +1101,13 @@ func (az *azRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName 
 	}()
 
 	mc := newMetricContext("routes", "create_or_update", resourceGroupName, az.client.SubscriptionID)
-	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, routeTableName, routeName, routeParameters)
+	req, err := az.createOrUpdatePreparer(ctx, resourceGroupName, routeTableName, routeName, routeParameters, etag)
+	if err != nil {
+		mc.Observe(err)
+		return nil, err
+	}
+
+	future, err := az.client.CreateOrUpdateSender(req)
 	if err != nil {
 		mc.Observe(err)
 		return future.Response(), err
@@ -1073,6 +1116,35 @@ func (az *azRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName 
 	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
+}
+
+// createOrUpdatePreparer prepares the CreateOrUpdate request.
+func (az *azRoutesClient) createOrUpdatePreparer(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, etag string) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"resourceGroupName": autorest.Encode("path", resourceGroupName),
+		"routeName":         autorest.Encode("path", routeName),
+		"routeTableName":    autorest.Encode("path", routeTableName),
+		"subscriptionId":    autorest.Encode("path", az.client.SubscriptionID),
+	}
+
+	queryParameters := map[string]interface{}{
+		"api-version": azureNetworkAPIVersion,
+	}
+
+	preparerDecorators := []autorest.PrepareDecorator{
+		autorest.AsContentType("application/json; charset=utf-8"),
+		autorest.AsPut(),
+		autorest.WithBaseURL(az.client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/routeTables/{routeTableName}/routes/{routeName}", pathParameters),
+		autorest.WithJSON(routeParameters),
+		autorest.WithQueryParameters(queryParameters),
+	}
+	if etag != "" {
+		preparerDecorators = append(preparerDecorators, autorest.WithHeader("If-Match", autorest.String(etag)))
+	}
+	preparer := autorest.CreatePreparer(preparerDecorators...)
+
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
 }
 
 func (az *azRoutesClient) Delete(ctx context.Context, resourceGroupName string, routeTableName string, routeName string) (resp *http.Response, err error) {
@@ -1124,7 +1196,7 @@ func newAzRouteTablesClient(config *azClientConfig) *azRouteTablesClient {
 	}
 }
 
-func (az *azRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable) (resp *http.Response, err error) {
+func (az *azRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable, etag string) (resp *http.Response, err error) {
 	/* Write rate limiting */
 	if !az.rateLimiterWriter.TryAccept() {
 		err = createRateLimitErr(true, "RouteTableCreateOrUpdate")
@@ -1137,15 +1209,48 @@ func (az *azRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroup
 	}()
 
 	mc := newMetricContext("route_tables", "create_or_update", resourceGroupName, az.client.SubscriptionID)
-	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, routeTableName, parameters)
-	mc.Observe(err)
+	req, err := az.createOrUpdatePreparer(ctx, resourceGroupName, routeTableName, parameters, etag)
 	if err != nil {
+		mc.Observe(err)
+		return nil, err
+	}
+
+	future, err := az.client.CreateOrUpdateSender(req)
+	if err != nil {
+		mc.Observe(err)
 		return future.Response(), err
 	}
 
 	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
+}
+
+// createOrUpdatePreparer prepares the CreateOrUpdate request.
+func (az *azRouteTablesClient) createOrUpdatePreparer(ctx context.Context, resourceGroupName string, routeTableName string, parameters network.RouteTable, etag string) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"resourceGroupName": autorest.Encode("path", resourceGroupName),
+		"routeTableName":    autorest.Encode("path", routeTableName),
+		"subscriptionId":    autorest.Encode("path", az.client.SubscriptionID),
+	}
+
+	queryParameters := map[string]interface{}{
+		"api-version": azureNetworkAPIVersion,
+	}
+	preparerDecorators := []autorest.PrepareDecorator{
+		autorest.AsContentType("application/json; charset=utf-8"),
+		autorest.AsPut(),
+		autorest.WithBaseURL(az.client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/routeTables/{routeTableName}", pathParameters),
+		autorest.WithJSON(parameters),
+		autorest.WithQueryParameters(queryParameters),
+	}
+	if etag != "" {
+		preparerDecorators = append(preparerDecorators, autorest.WithHeader("If-Match", autorest.String(etag)))
+	}
+	preparer := autorest.CreatePreparer(preparerDecorators...)
+
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
 }
 
 func (az *azRouteTablesClient) Get(ctx context.Context, resourceGroupName string, routeTableName string, expand string) (result network.RouteTable, err error) {
