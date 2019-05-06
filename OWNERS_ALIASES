@@ -289,6 +289,12 @@ aliases:
     - smarterclayton
     - thockin
 
+  sig-network-api-reviewers:
+    - caseydavenport
+    - cmluciano
+    - danwinship
+    - thockin
+
   sig-node-api-approvers:
     - smarterclayton
     - thockin
@@ -371,11 +377,7 @@ aliases:
   
   # sig-cluster-lifecycle-api-reviewers:
   #   - 
-  #   - 
-  
-  # sig-network-api-reviewers:
-  #   - 
-  #   - 
+  #   -
   
   # sig-node-api-reviewers:
   #   - 
