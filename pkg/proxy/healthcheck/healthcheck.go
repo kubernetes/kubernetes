@@ -342,6 +342,10 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if val := h.hs.lastUpdated.Load(); val != nil {
 		lastUpdated = val.(time.Time)
 	}
+	apiLastUpdated := time.Time{}
+	if val := h.hs.apiLastUpdated.Load(); val != nil {
+		apiLastUpdated = val.(time.Time)
+	}
 	currentTime := h.hs.clock.Now()
 
 	resp.Header().Set("Content-Type", "application/json")
