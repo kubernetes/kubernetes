@@ -83,6 +83,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/integration/apiserver/admissionwebhook:all-srcs",
         "//test/integration/apiserver/apply:all-srcs",
     ],
     tags = ["automanaged"],

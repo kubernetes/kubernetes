@@ -23,6 +23,7 @@ go_library(
         "//pkg/kubelet/apis/resourcemetrics/v1alpha1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/prober:go_default_library",
+        "//pkg/kubelet/server/metrics:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
@@ -105,6 +106,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/kubelet/server/metrics:all-srcs",
         "//pkg/kubelet/server/portforward:all-srcs",
         "//pkg/kubelet/server/remotecommand:all-srcs",
         "//pkg/kubelet/server/stats:all-srcs",

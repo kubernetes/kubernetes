@@ -55,6 +55,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -87,8 +88,9 @@ var _ testsuites.DynamicPVTestDriver = &nfsDriver{}
 func InitNFSDriver() testsuites.TestDriver {
 	return &nfsDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "nfs",
-			MaxFileSize: testpatterns.FileSizeLarge,
+			Name:             "nfs",
+			InTreePluginName: "kubernetes.io/nfs",
+			MaxFileSize:      testpatterns.FileSizeLarge,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -228,8 +230,9 @@ var _ testsuites.PreprovisionedPVTestDriver = &glusterFSDriver{}
 func InitGlusterFSDriver() testsuites.TestDriver {
 	return &glusterFSDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "gluster",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "gluster",
+			InTreePluginName: "kubernetes.io/glusterfs",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -309,15 +312,15 @@ func (v *glusterVolume) DeleteVolume() {
 
 	name := v.prefix + "-server"
 
-	framework.Logf("Deleting Gluster endpoints %q...", name)
+	e2elog.Logf("Deleting Gluster endpoints %q...", name)
 	err := cs.CoreV1().Endpoints(ns.Name).Delete(name, nil)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			framework.Failf("Gluster delete endpoints failed: %v", err)
 		}
-		framework.Logf("Gluster endpoints %q not found, assuming deleted", name)
+		e2elog.Logf("Gluster endpoints %q not found, assuming deleted", name)
 	}
-	framework.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
+	e2elog.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
 	err = framework.DeletePodWithWait(f, cs, v.serverPod)
 	if err != nil {
 		framework.Failf("Gluster server pod delete failed: %v", err)
@@ -345,9 +348,10 @@ var _ testsuites.PreprovisionedPVTestDriver = &iSCSIDriver{}
 func InitISCSIDriver() testsuites.TestDriver {
 	return &iSCSIDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "iscsi",
-			FeatureTag:  "[Feature:Volumes]",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "iscsi",
+			InTreePluginName: "kubernetes.io/iscsi",
+			FeatureTag:       "[Feature:Volumes]",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -457,9 +461,10 @@ var _ testsuites.PreprovisionedPVTestDriver = &rbdDriver{}
 func InitRbdDriver() testsuites.TestDriver {
 	return &rbdDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "rbd",
-			FeatureTag:  "[Feature:Volumes]",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "rbd",
+			InTreePluginName: "kubernetes.io/rbd",
+			FeatureTag:       "[Feature:Volumes]",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -584,9 +589,10 @@ var _ testsuites.PreprovisionedPVTestDriver = &cephFSDriver{}
 func InitCephFSDriver() testsuites.TestDriver {
 	return &cephFSDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "ceph",
-			FeatureTag:  "[Feature:Volumes]",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "ceph",
+			InTreePluginName: "kubernetes.io/cephfs",
+			FeatureTag:       "[Feature:Volumes]",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -683,8 +689,9 @@ var _ testsuites.InlineVolumeTestDriver = &hostPathDriver{}
 func InitHostPathDriver() testsuites.TestDriver {
 	return &hostPathDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "hostPath",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "hostPath",
+			InTreePluginName: "kubernetes.io/host-path",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -755,8 +762,9 @@ var _ testsuites.InlineVolumeTestDriver = &hostPathSymlinkDriver{}
 func InitHostPathSymlinkDriver() testsuites.TestDriver {
 	return &hostPathSymlinkDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "hostPathSymlink",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "hostPathSymlink",
+			InTreePluginName: "kubernetes.io/host-path",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -895,8 +903,9 @@ var _ testsuites.InlineVolumeTestDriver = &emptydirDriver{}
 func InitEmptydirDriver() testsuites.TestDriver {
 	return &emptydirDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "emptydir",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "emptydir",
+			InTreePluginName: "kubernetes.io/empty-dir",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -960,8 +969,9 @@ var _ testsuites.DynamicPVTestDriver = &cinderDriver{}
 func InitCinderDriver() testsuites.TestDriver {
 	return &cinderDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "cinder",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "cinder",
+			InTreePluginName: "kubernetes.io/cinder",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext3",
@@ -1048,7 +1058,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 	By("creating a test Cinder volume")
 	output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
 	outputString := string(output[:])
-	framework.Logf("cinder output:\n%s", outputString)
+	e2elog.Logf("cinder output:\n%s", outputString)
 	framework.ExpectNoError(err)
 
 	// Parse 'id'' from stdout. Expected format:
@@ -1068,7 +1078,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 		volumeID = fields[3]
 		break
 	}
-	framework.Logf("Volume ID: %s", volumeID)
+	e2elog.Logf("Volume ID: %s", volumeID)
 	Expect(volumeID).NotTo(Equal(""))
 	return &cinderVolume{
 		volumeName: volumeName,
@@ -1085,16 +1095,16 @@ func (v *cinderVolume) DeleteVolume() {
 	var err error
 	timeout := time.Second * 120
 
-	framework.Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
+	e2elog.Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
 		if err == nil {
-			framework.Logf("Cinder volume %s deleted", name)
+			e2elog.Logf("Cinder volume %s deleted", name)
 			return
 		}
-		framework.Logf("Failed to delete volume %s: %v", name, err)
+		e2elog.Logf("Failed to delete volume %s: %v", name, err)
 	}
-	framework.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
+	e2elog.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
 }
 
 // GCE
@@ -1129,6 +1139,7 @@ func InitGcePdDriver() testsuites.TestDriver {
 	return &gcePdDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:                 "gcepd",
+			InTreePluginName:     "kubernetes.io/gce-pd",
 			MaxFileSize:          testpatterns.FileSizeMedium,
 			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
@@ -1255,8 +1266,9 @@ var _ testsuites.DynamicPVTestDriver = &vSphereDriver{}
 func InitVSphereDriver() testsuites.TestDriver {
 	return &vSphereDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "vSphere",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "vSphere",
+			InTreePluginName: "kubernetes.io/vsphere-volume",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
@@ -1376,8 +1388,9 @@ var _ testsuites.DynamicPVTestDriver = &azureDriver{}
 func InitAzureDriver() testsuites.TestDriver {
 	return &azureDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "azure",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "azure",
+			InTreePluginName: "kubernetes.io/azure-file",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
@@ -1494,8 +1507,9 @@ var _ testsuites.DynamicPVTestDriver = &awsDriver{}
 func InitAwsDriver() testsuites.TestDriver {
 	return &awsDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "aws",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:             "aws",
+			InTreePluginName: "kubernetes.io/aws-ebs",
+			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext3",
@@ -1660,11 +1674,12 @@ func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func() test
 		}
 		return &localDriver{
 			driverInfo: testsuites.DriverInfo{
-				Name:            "local",
-				FeatureTag:      featureTag,
-				MaxFileSize:     maxFileSize,
-				SupportedFsType: supportedFsTypes,
-				Capabilities:    capabilities,
+				Name:             "local",
+				InTreePluginName: "kubernetes.io/local-volume",
+				FeatureTag:       featureTag,
+				MaxFileSize:      maxFileSize,
+				SupportedFsType:  supportedFsTypes,
+				Capabilities:     capabilities,
 			},
 			volumeType: volumeType,
 		}

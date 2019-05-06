@@ -32,7 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -50,8 +50,8 @@ import (
 
 var (
 	// placeholderToken is only set statically to make kubeadm not randomize the token on every run
-	placeholderToken = kubeadmapiv1beta1.BootstrapToken{
-		Token: &kubeadmapiv1beta1.BootstrapTokenString{
+	placeholderToken = kubeadmapiv1beta2.BootstrapToken{
+		Token: &kubeadmapiv1beta2.BootstrapTokenString{
 			ID:     "abcdef",
 			Secret: "0123456789abcdef",
 		},
@@ -176,14 +176,14 @@ func getSupportedComponentConfigAPIObjects() []string {
 }
 
 func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
-	return configutil.DefaultedInitConfiguration(&kubeadmapiv1beta1.InitConfiguration{
+	return configutil.DefaultedInitConfiguration(&kubeadmapiv1beta2.InitConfiguration{
 		// TODO: Probably move to getDefaultedClusterConfig?
-		LocalAPIEndpoint: kubeadmapiv1beta1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
-		ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+		ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
 			KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
 		},
-		BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{placeholderToken},
-		NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+		BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{placeholderToken},
+		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
 		},
 	})
@@ -199,15 +199,15 @@ func getDefaultInitConfigBytes() ([]byte, error) {
 }
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
-	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1beta1.JoinConfiguration{
-		Discovery: kubeadmapiv1beta1.Discovery{
-			BootstrapToken: &kubeadmapiv1beta1.BootstrapTokenDiscovery{
+	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1beta2.JoinConfiguration{
+		Discovery: kubeadmapiv1beta2.Discovery{
+			BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{
 				Token:                    placeholderToken.Token.String(),
 				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
 		},
-		NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
 		},
 	})
@@ -237,7 +237,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 
 			In other words, the output of this command is what kubeadm actually would read internally if you
 			submitted this file to "kubeadm init"
-		`), kubeadmapiv1beta1.SchemeGroupVersion, kubeadmapiv1beta1.SchemeGroupVersion),
+		`), kubeadmapiv1beta2.SchemeGroupVersion, kubeadmapiv1beta2.SchemeGroupVersion),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(oldCfgPath) == 0 {
 				kubeadmutil.CheckErr(errors.New("The --old-config flag is mandatory"))
@@ -336,7 +336,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 
 // NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiv1beta1.InitConfiguration{}
+	cfg := &kubeadmapiv1beta2.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 
 	var featureGatesString string
@@ -407,7 +407,7 @@ func NewCmdConfigImages(out io.Writer) *cobra.Command {
 
 // NewCmdConfigImagesPull returns the `kubeadm config images pull` command
 func NewCmdConfigImagesPull() *cobra.Command {
-	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
+	externalcfg := &kubeadmapiv1beta2.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -459,7 +459,7 @@ func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmap
 
 // NewCmdConfigImagesList returns the "kubeadm config images list" command
 func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
-	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
+	externalcfg := &kubeadmapiv1beta2.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -486,7 +486,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 }
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
-func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration) (*ImagesList, error) {
+func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta2.InitConfiguration) (*ImagesList, error) {
 	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not convert cfg to an internal cfg")
@@ -513,7 +513,7 @@ func (i *ImagesList) Run(out io.Writer) error {
 }
 
 // AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
-func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, cfgPath *string, featureGatesString *string) {
+func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfiguration, cfgPath *string, featureGatesString *string) {
 	options.AddKubernetesVersionFlag(flagSet, &cfg.ClusterConfiguration.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)

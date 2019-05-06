@@ -681,16 +681,15 @@ func (c *csiDriverClient) NodeSupportsNodeExpand(ctx context.Context) (bool, err
 
 		capabilities := resp.GetCapabilities()
 
-		nodeExpandSet := false
 		if capabilities == nil {
 			return false, nil
 		}
 		for _, capability := range capabilities {
 			if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_EXPAND_VOLUME {
-				nodeExpandSet = true
+				return true, nil
 			}
 		}
-		return nodeExpandSet, nil
+		return false, nil
 	} else if c.nodeV0ClientCreator != nil {
 		return false, nil
 	}

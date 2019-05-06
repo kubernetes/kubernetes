@@ -22,7 +22,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
@@ -36,7 +35,7 @@ type NetworkPolicy struct {
 	Spec NetworkPolicySpec
 }
 
-// Policy Type string describes the NetworkPolicy type
+// PolicyType describes the NetworkPolicy type
 // This type is beta-level in 1.8
 type PolicyType string
 
@@ -196,7 +195,6 @@ type NetworkPolicyList struct {
 	Items []NetworkPolicy
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Ingress is a collection of rules that allow inbound connections to reach the

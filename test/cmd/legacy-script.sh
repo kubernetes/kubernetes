@@ -38,6 +38,7 @@ source "${KUBE_ROOT}/test/cmd/create.sh"
 source "${KUBE_ROOT}/test/cmd/delete.sh"
 source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
+source "${KUBE_ROOT}/test/cmd/exec.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
 source "${KUBE_ROOT}/test/cmd/kubeadm.sh"
@@ -506,6 +507,16 @@ runTests() {
     record_command run_kubectl_old_print_tests
   fi
 
+  ################
+  # Kubectl exec #
+  ################
+
+  if kube::test::if_supports_resource "${pods}"; then
+    record_command run_kubectl_exec_pod_tests
+    if kube::test::if_supports_resource "${replicasets}" && kube::test::if_supports_resource "${configmaps}"; then
+      record_command run_kubectl_exec_resource_name_tests
+    fi
+  fi
 
   ######################
   # Create             #

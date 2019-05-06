@@ -65,7 +65,7 @@ for each follows.
 ### Go modules
 
 Dependency management tools are built into go 1.11+ in the form of [go modules](https://github.com/golang/go/wiki/Modules).
-These are used by the main Kubernetes repo (>= 1.15) and `client-go` (>= v12.0) to manage dependencies.
+These are used by the main Kubernetes repo (>= 1.15) and `client-go` (on master, and v12.0.0+ once released) to manage dependencies.
 When using `client-go` v12.0.0+ and go 1.11.4+, go modules are the recommended dependency management tool.
 
 If you are using go 1.11 or 1.12 and are working with a project located within `$GOPATH`,
@@ -83,10 +83,10 @@ go mod init
 ```
 
 Indicate which version of `client-go` your project requires.
-For `client-go` 12.0.0+, this is a single step:
+For `client-go` on master (and once version v12.0.0 is released), this is a single step:
 
 ```sh
-go get k8s.io/client-go@v12.0.0 # replace v12.0.0 with the required version
+go get k8s.io/client-go@master # or v12.0.0+ once released
 ```
 
 For `client-go` prior to v12.0.0, you also need to indicate the required versions of `k8s.io/api` and `k8s.io/apimachinery`:

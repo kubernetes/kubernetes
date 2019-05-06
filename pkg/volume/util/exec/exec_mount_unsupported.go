@@ -53,7 +53,7 @@ func (mounter *execMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-func (mounter *execMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+func (mounter *execMounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
 	return "", nil
 }
 

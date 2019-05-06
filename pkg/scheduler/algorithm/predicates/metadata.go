@@ -389,6 +389,8 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 		}
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	processNode := func(i int) {
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
@@ -400,12 +402,13 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 			existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, node)
 			if err != nil {
 				catchError(err)
+				cancel()
 				return
 			}
 			appendTopologyPairsMaps(existingPodTopologyMaps)
 		}
 	}
-	workqueue.ParallelizeUntil(context.TODO(), 16, len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
 	return topologyMaps, firstError
 }
 
@@ -454,6 +457,8 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 	}
 	antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	processNode := func(i int) {
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
@@ -479,6 +484,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 				if err != nil {
 					catchError(err)
+					cancel()
 					return
 				}
 				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
@@ -493,7 +499,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 			appendResult(node.Name, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps)
 		}
 	}
-	workqueue.ParallelizeUntil(context.TODO(), 16, len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
 	return topologyPairsAffinityPodsMaps, topologyPairsAntiAffinityPodsMaps, firstError
 }
 

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	"k8s.io/utils/pointer"
 )
 
 func TestValidatePodDisruptionBudgetSpec(t *testing.T) {
@@ -829,6 +831,7 @@ func TestValidatePSPRunAsUser(t *testing.T) {
 		})
 	}
 }
+
 func TestValidatePSPFSGroup(t *testing.T) {
 	var testCases = []struct {
 		name            string
@@ -853,7 +856,6 @@ func TestValidatePSPFSGroup(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestValidatePSPSupplementalGroup(t *testing.T) {
@@ -935,5 +937,88 @@ func TestValidatePSPSELinux(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestValidateRuntimeClassStrategy(t *testing.T) {
+	var testCases = []struct {
+		name         string
+		strategy     *policy.RuntimeClassStrategyOptions
+		expectErrors bool
+	}{{
+		name:     "nil strategy",
+		strategy: nil,
+	}, {
+		name:     "empty strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{},
+	}, {
+		name: "allow all strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"*"},
+		},
+	}, {
+		name: "valid defaulting & allow all",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName:  pointer.StringPtr("native"),
+			AllowedRuntimeClassNames: []string{"*"},
+		},
+	}, {
+		name: "valid defaulting & allow explicit",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName:  pointer.StringPtr("native"),
+			AllowedRuntimeClassNames: []string{"foo", "native", "sandboxed"},
+		},
+	}, {
+		name: "valid whitelisting",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"foo", "native", "sandboxed"},
+		},
+	}, {
+		name: "invalid default name",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName: pointer.StringPtr("foo bar"),
+		},
+		expectErrors: true,
+	}, {
+		name: "disallowed default",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName:  pointer.StringPtr("foo"),
+			AllowedRuntimeClassNames: []string{"native", "sandboxed"},
+		},
+		expectErrors: true,
+	}, {
+		name: "nothing allowed default",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName: pointer.StringPtr("foo"),
+		},
+		expectErrors: true,
+	}, {
+		name: "invalid whitelist name",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"native", "sandboxed", "foo*"},
+		},
+		expectErrors: true,
+	}, {
+		name: "duplicate whitelist names",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"native", "sandboxed", "native"},
+		},
+		expectErrors: true,
+	}, {
+		name: "allow all redundant whitelist",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"*", "sandboxed", "native"},
+		},
+		expectErrors: true,
+	}}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			errs := validateRuntimeClassStrategy(field.NewPath(""), test.strategy)
+			if test.expectErrors {
+				assert.NotEmpty(t, errs)
+			} else {
+				assert.Empty(t, errs)
+			}
+		})
+	}
 }

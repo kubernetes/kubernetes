@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/volume/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -1020,4 +1021,34 @@ func GetBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.
 	// Get the bound PV
 	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
 	return pv, err
+}
+
+// GetDefaultStorageClassName returns default storageClass or return error
+func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
+	list, err := c.StorageV1().StorageClasses().List(metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("Error listing storage classes: %v", err)
+	}
+	var scName string
+	for _, sc := range list.Items {
+		if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
+			if len(scName) != 0 {
+				return "", fmt.Errorf("Multiple default storage classes found: %q and %q", scName, sc.Name)
+			}
+			scName = sc.Name
+		}
+	}
+	if len(scName) == 0 {
+		return "", fmt.Errorf("No default storage class found")
+	}
+	Logf("Default storage class: %q", scName)
+	return scName, nil
+}
+
+// SkipIfNoDefaultStorageClass skips tests if no default SC can be found.
+func SkipIfNoDefaultStorageClass(c clientset.Interface) {
+	_, err := GetDefaultStorageClassName(c)
+	if err != nil {
+		Skipf("error finding default storageClass : %v", err)
+	}
 }

@@ -35,7 +35,6 @@ import (
 var csiTestDrivers = []func() testsuites.TestDriver{
 	drivers.InitHostPathCSIDriver,
 	drivers.InitGcePDCSIDriver,
-	drivers.InitGcePDExternalCSIDriver,
 	drivers.InitHostPathV0CSIDriver,
 	// Don't run tests with mock driver (drivers.InitMockCSIDriver), it does not provide persistent storage.
 }

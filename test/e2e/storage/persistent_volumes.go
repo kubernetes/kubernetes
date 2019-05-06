@@ -23,12 +23,13 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -150,7 +151,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		Context("with Single PV - PVC pairs", func() {
 			// Note: this is the only code where the pv is deleted.
 			AfterEach(func() {
-				framework.Logf("AfterEach: Cleaning up test resources.")
+				e2elog.Logf("AfterEach: Cleaning up test resources.")
 				if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
 					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
@@ -212,7 +213,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			var claims framework.PVCMap
 
 			AfterEach(func() {
-				framework.Logf("AfterEach: deleting %v PVCs and %v PVs...", len(claims), len(pvols))
+				e2elog.Logf("AfterEach: deleting %v PVCs and %v PVs...", len(claims), len(pvols))
 				errs := framework.PVPVCMapCleanup(c, ns, pvols, claims)
 				if len(errs) > 0 {
 					errmsg := []string{}
@@ -266,7 +267,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			})
 
 			AfterEach(func() {
-				framework.Logf("AfterEach: Cleaning up test resources.")
+				e2elog.Logf("AfterEach: Cleaning up test resources.")
 				if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
 					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
@@ -300,7 +301,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
-				framework.Logf("Pod exited without failure; the volume has been recycled.")
+				e2elog.Logf("Pod exited without failure; the volume has been recycled.")
 			})
 		})
 	})

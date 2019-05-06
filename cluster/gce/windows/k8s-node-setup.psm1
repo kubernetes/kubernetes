@@ -270,11 +270,13 @@ function Disable-WindowsDefender {
 # Creates directories where other functions in this module will read and write
 # data.
 # Note: C:\tmp is required for running certain kubernetes tests.
+#       C:\var\log is used by kubelet to stored container logs and also
+#       hard-coded in the fluentd/stackdriver config for log collection.
 function Create-Directories {
   Log-Output "Creating ${env:K8S_DIR} and its subdirectories."
   ForEach ($dir in ("${env:K8S_DIR}", "${env:NODE_DIR}", "${env:LOGS_DIR}",
     "${env:CNI_DIR}", "${env:CNI_CONFIG_DIR}", "${env:MANIFESTS_DIR}",
-    "${env:PKI_DIR}"), "C:\tmp") {
+    "${env:PKI_DIR}"), "C:\tmp", "C:\var\log") {
     mkdir -Force $dir
   }
 }
@@ -1056,11 +1058,42 @@ function Create-DockerRegistryKey {
   Remove-Item -Force -Recurse ${tmp_dir}
 }
 
+# Configure Docker daemon and restart the service.
+function Configure-Dockerd {
+  Set-Content "C:\ProgramData\docker\config\daemon.json" @'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "1m",
+    "max-file": "5"
+  }
+}
+'@
+
+ Restart-Service Docker
+}
+
 # TODO(pjh): move the Stackdriver logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
-$STACKDRIVER_VERSION = 'v1-8'
+$STACKDRIVER_VERSION = 'v1-9'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
+
+
+# Restart the Stackdriver logging agent
+# `Restart-Service StackdriverLogging` may fail because StackdriverLogging
+# sometimes is unstoppable, so we work around it by killing the processes.
+function Restart-StackdriverLoggingAgent {
+  Stop-Service -NoWait StackdriverLogging
+  # TODO: check periodically to lower the wait time
+  Start-Sleep 10
+  if ((Get-service StackdriverLogging).Status -ne 'Stopped') {
+    # Force kill the processes.
+    Stop-Process -Force -PassThru -Id (Get-WmiObject win32_process |
+      Where CommandLine -Like '*Stackdriver/logging*').ProcessId
+  }
+  Start-Service StackdriverLogging
+}
 
 # Install and start the Stackdriver logging agent according to
 # https://cloud.google.com/logging/docs/agent/installation.
@@ -1088,7 +1121,7 @@ function InstallAndStart-LoggingAgent {
                 "Stackdriver logging agent is already installed")
     # Restart-Service restarts a running service or starts a not-running
     # service.
-    Restart-Service StackdriverLogging
+    Restart-StackdriverLoggingAgent
     return
   }
 
@@ -1119,13 +1152,10 @@ function InstallAndStart-LoggingAgent {
       -Encoding ASCII
 
   # Restart the service to pick up the new configurations.
-  Restart-Service StackdriverLogging
+  Restart-StackdriverLoggingAgent
   Remove-Item -Force -Recurse $tmp_dir
 }
 
-# TODO(yujuhong):
-#   - Collect kubelet/kube-proxy logs.
-#   - Add tag for kubernetes node name.
 $FLUENTD_CONFIG = @'
 # This configuration file for Fluentd is used to watch changes to kubernetes
 # container logs in the directory /var/lib/docker/containers/ and submit the
@@ -1184,6 +1214,34 @@ $FLUENTD_CONFIG = @'
   read_from_head true
 </source>
 
+# Example:
+# I0204 07:32:30.020537    3368 server.go:1048] POST /stats/container/: (13.972191ms) 200 [[Go-http-client/1.1] 10.244.1.3:40537]
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^\w\d{4}/
+  format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+  time_format %m%d %H:%M:%S.%N
+  path /etc/kubernetes/logs/kubelet.log
+  pos_file /etc/kubernetes/logs/gcp-kubelet.log.pos
+  tag kubelet
+</source>
+
+# Example:
+# I1118 21:26:53.975789       6 proxier.go:1096] Port "nodePort for kube-system/default-http-backend:http" (:31429/tcp) was open before and is still needed
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^\w\d{4}/
+  format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+  time_format %m%d %H:%M:%S.%N
+  path /etc/kubernetes/logs/kube-proxy.log
+  pos_file /etc/kubernetes/logs/gcp-kube-proxy.log.pos
+  tag kube-proxy
+</source>
+
 <match reform.**>
   @type record_reformer
   enable_ruby true
@@ -1203,7 +1261,54 @@ $FLUENTD_CONFIG = @'
   tag ${if record['stream'] == 'stderr' then 'raw.stderr' else 'raw.stdout' end}
   remove_keys stream,log
 </match>
-'@
+
+# TODO: detect exceptions and forward them as one log entry using the
+# detect_exceptions plugin
+
+# This section is exclusive for k8s_container logs. These logs come with
+# 'raw.stderr' or 'raw.stdout' tags.
+<match {raw.stderr,raw.stdout}>
+  @type google_cloud
+  # Try to detect JSON formatted log entries.
+  detect_json true
+  # Allow log entries from multiple containers to be sent in the same request.
+  split_logs_by_tag false
+  # Set the buffer type to file to improve the reliability and reduce the memory consumption
+  buffer_type file
+  buffer_path /var/log/fluentd-buffers/kubernetes.containers.buffer
+  # Set queue_full action to block because we want to pause gracefully
+  # in case of the off-the-limits load instead of throwing an exception
+  buffer_queue_full_action block
+  # Set the chunk limit conservatively to avoid exceeding the recommended
+  # chunk size of 5MB per write request.
+  buffer_chunk_limit 512k
+  # Cap the combined memory usage of this buffer and the one below to
+  # 512KiB/chunk * (6 + 2) chunks = 4 MiB
+  buffer_queue_limit 6
+  # Never wait more than 5 seconds before flushing logs in the non-error case.
+  flush_interval 5s
+  # Never wait longer than 30 seconds between retries.
+  max_retry_wait 30
+  # Disable the limit on the number of retries (retry forever).
+  disable_retry_limit
+  # Use multiple threads for processing.
+  num_threads 2
+  use_grpc true
+  # Skip timestamp adjustment as this is in a controlled environment with
+  # known timestamp format. This helps with CPU usage.
+  adjust_invalid_timestamps false
+</match>
+
+# Attach local_resource_id for 'k8s_node' monitored resource.
+<filter **>
+  @type record_transformer
+  enable_ruby true
+  <record>
+    "logging.googleapis.com/local_resource_id" ${"k8s_node.NODE_NAME"}
+  </record>
+</filter>
+'@.replace('NODE_NAME', (hostname))
+
 
 # Export all public functions:
 Export-ModuleMember -Function *-*

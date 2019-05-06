@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	"k8s.io/utils/pointer"
 )
 
 const defaultContainerName = "test-c"
@@ -1134,10 +1135,14 @@ func TestGenerateContainerSecurityContextReadOnlyRootFS(t *testing.T) {
 }
 
 func defaultPSP() *policy.PodSecurityPolicy {
+	return defaultNamedPSP("psp-sa")
+}
+
+func defaultNamedPSP(name string) *policy.PodSecurityPolicy {
 	allowPrivilegeEscalation := true
 	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "psp-sa",
+			Name:        name,
 			Annotations: map[string]string{},
 		},
 		Spec: policy.PodSecurityPolicySpec{
@@ -1259,7 +1264,7 @@ func TestValidateAllowedVolumes(t *testing.T) {
 }
 
 func TestAllowPrivilegeEscalation(t *testing.T) {
-	ptr := func(b bool) *bool { return &b }
+	ptr := pointer.BoolPtr
 	tests := []struct {
 		pspAPE    bool  // PSP AllowPrivilegeEscalation
 		pspDAPE   *bool // PSP DefaultAllowPrivilegeEscalation
@@ -1315,6 +1320,132 @@ func TestAllowPrivilegeEscalation(t *testing.T) {
 				assert.Empty(t, errs, "expected no validation errors")
 				ape := pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation
 				assert.Equal(t, test.expectAPE, ape, "expected pod AllowPrivilegeEscalation")
+			}
+		})
+	}
+}
+
+func TestDefaultRuntimeClassName(t *testing.T) {
+	const (
+		defaultedName = "foo"
+		presetName    = "tim"
+	)
+
+	noRCS := defaultNamedPSP("nil-strategy")
+	emptyRCS := defaultNamedPSP("empty-strategy")
+	emptyRCS.Spec.RuntimeClass = &policy.RuntimeClassStrategyOptions{}
+	noDefaultRCS := defaultNamedPSP("no-default")
+	noDefaultRCS.Spec.RuntimeClass = &policy.RuntimeClassStrategyOptions{
+		AllowedRuntimeClassNames: []string{"foo", "bar"},
+	}
+	defaultRCS := defaultNamedPSP("defaulting")
+	defaultRCS.Spec.RuntimeClass = &policy.RuntimeClassStrategyOptions{
+		DefaultRuntimeClassName: pointer.StringPtr(defaultedName),
+	}
+
+	noRCPod := defaultPod()
+	noRCPod.Name = "no-runtimeclass"
+	rcPod := defaultPod()
+	rcPod.Name = "preset-runtimeclass"
+	rcPod.Spec.RuntimeClassName = pointer.StringPtr(presetName)
+
+	type testcase struct {
+		psp                      *policy.PodSecurityPolicy
+		pod                      *api.Pod
+		expectedRuntimeClassName *string
+	}
+	tests := []testcase{{
+		psp:                      defaultRCS,
+		pod:                      noRCPod,
+		expectedRuntimeClassName: pointer.StringPtr(defaultedName),
+	}}
+	// Non-defaulting no-preset cases
+	for _, psp := range []*policy.PodSecurityPolicy{noRCS, emptyRCS, noDefaultRCS} {
+		tests = append(tests, testcase{psp, noRCPod, nil})
+	}
+	// Non-defaulting preset cases
+	for _, psp := range []*policy.PodSecurityPolicy{noRCS, emptyRCS, noDefaultRCS, defaultRCS} {
+		tests = append(tests, testcase{psp, rcPod, pointer.StringPtr(presetName)})
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%s-psp %s-pod", test.psp.Name, test.pod.Name), func(t *testing.T) {
+			provider, err := NewSimpleProvider(test.psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "error creating provider")
+
+			actualPod := test.pod.DeepCopy()
+			require.NoError(t, provider.MutatePod(actualPod))
+
+			expectedPod := test.pod.DeepCopy()
+			expectedPod.Spec.RuntimeClassName = test.expectedRuntimeClassName
+			assert.Equal(t, expectedPod, actualPod)
+		})
+	}
+}
+
+func TestAllowedRuntimeClassNames(t *testing.T) {
+	const (
+		goodName = "good"
+	)
+
+	noRCPod := defaultPod()
+	noRCPod.Name = "no-runtimeclass"
+	rcPod := defaultPod()
+	rcPod.Name = "good-runtimeclass"
+	rcPod.Spec.RuntimeClassName = pointer.StringPtr(goodName)
+	otherPod := defaultPod()
+	otherPod.Name = "bad-runtimeclass"
+	otherPod.Spec.RuntimeClassName = pointer.StringPtr("bad")
+	allPods := []*api.Pod{noRCPod, rcPod, otherPod}
+
+	type testcase struct {
+		name        string
+		strategy    *policy.RuntimeClassStrategyOptions
+		validPods   []*api.Pod
+		invalidPods []*api.Pod
+	}
+	tests := []testcase{{
+		name:      "nil-strategy",
+		validPods: allPods,
+	}, {
+		name: "empty-strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{},
+		},
+		validPods:   []*api.Pod{noRCPod},
+		invalidPods: []*api.Pod{rcPod, otherPod},
+	}, {
+		name: "allow-all-strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"*"},
+			DefaultRuntimeClassName:  pointer.StringPtr("foo"),
+		},
+		validPods: allPods,
+	}, {
+		name: "named-allowed",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{goodName},
+		},
+		validPods:   []*api.Pod{rcPod},
+		invalidPods: []*api.Pod{otherPod},
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			psp := defaultNamedPSP(test.name)
+			psp.Spec.RuntimeClass = test.strategy
+			provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
+			require.NoError(t, err, "error creating provider")
+
+			for _, pod := range test.validPods {
+				copy := pod.DeepCopy()
+				assert.NoError(t, provider.ValidatePod(copy).ToAggregate(), "expected valid pod %s", pod.Name)
+				assert.Equal(t, pod, copy, "validate should not mutate!")
+			}
+			for _, pod := range test.invalidPods {
+				copy := pod.DeepCopy()
+				assert.Error(t, provider.ValidatePod(copy).ToAggregate(), "expected invalid pod %s", pod.Name)
+				assert.Equal(t, pod, copy, "validate should not mutate!")
 			}
 		})
 	}

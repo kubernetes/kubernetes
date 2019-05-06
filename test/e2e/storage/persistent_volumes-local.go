@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -567,7 +568,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 				for _, pod := range pods {
 					if err := deletePodAndPVCs(config, pod); err != nil {
-						framework.Logf("Deleting pod %v failed: %v", pod.Name, err)
+						e2elog.Logf("Deleting pod %v failed: %v", pod.Name, err)
 					}
 				}
 			}()
@@ -591,7 +592,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 						}
 						delete(pods, pod.Name)
 						numFinished++
-						framework.Logf("%v/%v pods finished", numFinished, totalPods)
+						e2elog.Logf("%v/%v pods finished", numFinished, totalPods)
 					case v1.PodFailed:
 					case v1.PodUnknown:
 						return false, fmt.Errorf("pod %v is in %v phase", pod.Name, pod.Status.Phase)
@@ -671,7 +672,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 })
 
 func deletePodAndPVCs(config *localTestConfig, pod *v1.Pod) error {
-	framework.Logf("Deleting pod %v", pod.Name)
+	e2elog.Logf("Deleting pod %v", pod.Name)
 	if err := config.client.CoreV1().Pods(config.ns).Delete(pod.Name, nil); err != nil {
 		return err
 	}
@@ -845,7 +846,7 @@ func verifyLocalVolume(config *localTestConfig, volume *localTestVolume) {
 func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Pod, expectedNodeName string) {
 	podNodeName, err := podNodeName(config, pod)
 	framework.ExpectNoError(err)
-	framework.Logf("pod %q created on Node %q", pod.Name, podNodeName)
+	e2elog.Logf("pod %q created on Node %q", pod.Name, podNodeName)
 	Expect(podNodeName).To(Equal(expectedNodeName))
 }
 
@@ -1030,7 +1031,7 @@ func testReadFileContent(testFileDir string, testFile string, testFileContent st
 // Fail on error
 func podRWCmdExec(pod *v1.Pod, cmd string) string {
 	out, err := utils.PodExec(pod, cmd)
-	framework.Logf("podRWCmdExec out: %q err: %v", out, err)
+	e2elog.Logf("podRWCmdExec out: %q err: %v", out, err)
 	framework.ExpectNoError(err)
 	return out
 }

@@ -27,14 +27,14 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/azure"
 )
 
 type azureDiskDetacher struct {
@@ -199,7 +199,7 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 	}
 
 	if volumeSource.Kind == nil { // this spec was constructed from info on the node
-		pdPath := filepath.Join(a.plugin.host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, volumeSource.DataDiskURI)
+		pdPath := filepath.Join(a.plugin.host.GetPluginDir(azureDataDiskPluginName), util.MountsInGlobalPDPath, volumeSource.DataDiskURI)
 		return pdPath, nil
 	}
 

@@ -32,7 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -92,7 +92,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
 
 	cmd.PersistentFlags().StringVar(
-		&certsDir, "cert-dir", kubeadmapiv1beta1.DefaultCertificatesDir,
+		&certsDir, "cert-dir", kubeadmapiv1beta2.DefaultCertificatesDir,
 		"The path to the directory where the certificates are stored. If specified, clean this directory.",
 	)
 
@@ -203,7 +203,7 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.I
 
 	// Remove contents from the config and pki directories
 	klog.V(1).Infoln("[reset] Removing contents from the config and pki directories")
-	if r.certsDir != kubeadmapiv1beta1.DefaultCertificatesDir {
+	if r.certsDir != kubeadmapiv1beta2.DefaultCertificatesDir {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", r.certsDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, r.certsDir)

@@ -594,6 +594,12 @@ function create-master-auth {
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
   fi
+  if [[ -n "${GCE_GLBC_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${GCE_GLBC_TOKEN},"                "system:controller:glbc,uid:system:controller:glbc"
+  fi
+  if [[ -n "${ADDON_MANAGER_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"   "system:addon-manager,uid:system:addon-manager,system:masters"
+  fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
@@ -951,6 +957,32 @@ EOF
   fi
 }
 
+function create-kubeconfig {
+  local component=$1
+  local token=$2
+  echo "Creating kubeconfig file for component ${component}"
+  mkdir -p /etc/srv/kubernetes/${component}
+  cat <<EOF >/etc/srv/kubernetes/${component}/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: ${component}
+  user:
+    token: ${token}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: ${component}
+  name: ${component}
+current-context: ${component}
+EOF
+}
+
 # Arg 1: the IP address of the API server
 function create-kubelet-kubeconfig() {
   local apiserver_address="${1}"
@@ -1021,78 +1053,6 @@ contexts:
     user: kube-proxy
   name: service-account-context
 current-context: service-account-context
-EOF
-}
-
-function create-kubecontrollermanager-kubeconfig {
-  echo "Creating kube-controller-manager kubeconfig file"
-  mkdir -p /etc/srv/kubernetes/kube-controller-manager
-  cat <<EOF >/etc/srv/kubernetes/kube-controller-manager/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: kube-controller-manager
-  user:
-    token: ${KUBE_CONTROLLER_MANAGER_TOKEN}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: kube-controller-manager
-  name: service-account-context
-current-context: service-account-context
-EOF
-}
-
-function create-kubescheduler-kubeconfig {
-  echo "Creating kube-scheduler kubeconfig file"
-  mkdir -p /etc/srv/kubernetes/kube-scheduler
-  cat <<EOF >/etc/srv/kubernetes/kube-scheduler/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: kube-scheduler
-  user:
-    token: ${KUBE_SCHEDULER_TOKEN}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: kube-scheduler
-  name: kube-scheduler
-current-context: kube-scheduler
-EOF
-}
-
-function create-clusterautoscaler-kubeconfig {
-  echo "Creating cluster-autoscaler kubeconfig file"
-  mkdir -p /etc/srv/kubernetes/cluster-autoscaler
-  cat <<EOF >/etc/srv/kubernetes/cluster-autoscaler/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: cluster-autoscaler
-  user:
-    token: ${KUBE_CLUSTER_AUTOSCALER_TOKEN}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: cluster-autoscaler
-  name: cluster-autoscaler
-current-context: cluster-autoscaler
 EOF
 }
 
@@ -1400,12 +1360,9 @@ function prepare-etcd-manifest {
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
-  local etcd_apiserver_protocol="http"
   local etcd_creds=""
   local etcd_apiserver_creds="${ETCD_APISERVER_CREDS:-}"
   local etcd_extra_args="${ETCD_EXTRA_ARGS:-}"
-  local suffix="$1"
-  local etcd_livenessprobe_port="$2"
 
   if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
     cluster_state="${INITIAL_ETCD_CLUSTER_STATE}"
@@ -1415,12 +1372,8 @@ function prepare-etcd-manifest {
     etcd_protocol="https"
   fi
 
-  # mTLS should only be enabled for etcd server but not etcd-events. if $1 suffix is empty, it's etcd server.
-  if [[ -z "${suffix}" && -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
+  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" ]]; then
     etcd_apiserver_creds=" --client-cert-auth --trusted-ca-file ${ETCD_APISERVER_CA_CERT_PATH} --cert-file ${ETCD_APISERVER_SERVER_CERT_PATH} --key-file ${ETCD_APISERVER_SERVER_KEY_PATH} "
-    etcd_apiserver_protocol="https"
-    etcd_livenessprobe_port="2382"
-    etcd_extra_args+=" --listen-metrics-urls=http://127.0.0.1:${etcd_livenessprobe_port} "
   fi
 
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
@@ -1467,11 +1420,9 @@ function prepare-etcd-manifest {
     sed -i -e "s@{{ *pillar\.get('etcd_docker_repository', '\(.*\)') *}}@\1@g" "${temp_file}"
   fi
   sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_apiserver_protocol *}}@$etcd_apiserver_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_apiserver_creds *}}@$etcd_apiserver_creds@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_extra_args *}}@$etcd_extra_args@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_livenessprobe_port *}}@$etcd_livenessprobe_port@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
   else
@@ -1574,25 +1525,22 @@ function start-kube-apiserver {
   params+=" --allow-privileged=true"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
-
-  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-      params+=" --etcd-servers=${ETCD_SERVERS:-https://127.0.0.1:2379}"
-      params+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
-      params+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
-      params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
-  elif [[ -z "${ETCD_APISERVER_CA_KEY:-}" && -z "${ETCD_APISERVER_CA_CERT:-}" && -z "${ETCD_APISERVER_SERVER_KEY:-}" && -z "${ETCD_APISERVER_SERVER_CERT:-}" && -z "${ETCD_APISERVER_CLIENT_KEY:-}" && -z "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-      echo "WARNING: ALL of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver is not enabled."
-  else
-      echo "ERROR: Some of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver cannot be enabled. Please provide all mTLS credential."
-      exit 1
-  fi
-
+  params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
   if [[ -z "${ETCD_SERVERS:-}" ]]; then
     params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
   elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
     params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
   fi
+  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
+    params+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
+    params+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
+    params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
+  fi
   params+=" --secure-port=443"
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-true}" != "true" ]]; then
+    # Default is :8080
+    params+=" --insecure-port=0"
+  fi
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
   params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
@@ -1878,7 +1826,6 @@ function start-kube-apiserver {
   sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
   sed -i -e "s@{{liveness_probe_initial_delay}}@${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${src_file}"
   sed -i -e "s@{{secure_port}}@443@g" "${src_file}"
-  sed -i -e "s@{{secure_port}}@8080@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
   sed -i -e "s@{{webhook_authn_config_mount}}@${webhook_authn_config_mount}@g" "${src_file}"
@@ -2046,7 +1993,7 @@ function apply-encryption-config() {
 #   DOCKER_REGISTRY
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
-  create-kubecontrollermanager-kubeconfig
+  create-kubeconfig "kube-controller-manager" ${KUBE_CONTROLLER_MANAGER_TOKEN}
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
@@ -2142,7 +2089,7 @@ function start-kube-controller-manager {
 #   DOCKER_REGISTRY
 function start-kube-scheduler {
   echo "Start kubernetes scheduler"
-  create-kubescheduler-kubeconfig
+  create-kubeconfig "kube-scheduler" ${KUBE_SCHEDULER_TOKEN}
   prepare-log-file /var/log/kube-scheduler.log
 
   # Calculate variables and set them in the manifest.
@@ -2180,7 +2127,7 @@ function start-cluster-autoscaler {
   if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Start kubernetes cluster autoscaler"
     setup-addon-manifests "addons" "rbac/cluster-autoscaler"
-    create-clusterautoscaler-kubeconfig
+    create-kubeconfig "cluster-autoscaler" ${KUBE_CLUSTER_AUTOSCALER_TOKEN}
     prepare-log-file /var/log/cluster-autoscaler.log
 
     # Remove salt comments and replace variables with values
@@ -2439,7 +2386,7 @@ function setup-fluentd {
   fluentd_gcp_yaml_version="${FLUENTD_GCP_YAML_VERSION:-v3.2.0}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_yaml}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_scaler_yaml}"
-  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.6-1.6.0-1}"
+  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-1.6.8}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
   update-daemon-set-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
   start-fluentd-resource-update ${fluentd_gcp_yaml}
@@ -2517,6 +2464,8 @@ function start-kube-addons {
   echo "Prepare kube-addons manifests and start kube addon manager"
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/addons"
+
+  create-kubeconfig "addon-manager" ${ADDON_MANAGER_TOKEN}
 
   # prep addition kube-up specific rbac objects
   setup-addon-manifests "addons" "rbac/kubelet-api-auth"
@@ -2750,6 +2699,8 @@ function start-lb-controller {
     echo "Start GCE L7 pod"
     prepare-log-file /var/log/glbc.log
     setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
+    setup-addon-manifests "addons" "rbac/cluster-loadbalancing/glbc"
+    create-kubeconfig "l7-lb-controller" ${GCE_GLBC_TOKEN}
 
     local -r src_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
     local -r dest_manifest="/etc/kubernetes/manifests/glbc.manifest"
@@ -2868,6 +2819,12 @@ spec:
 EOF
 }
 
+function wait-till-apiserver-ready() {
+  until kubectl get nodes; do
+    sleep 5
+  done
+}
+
 ########### Main Function ###########
 function main() {
   echo "Start to configure instance for kubernetes"
@@ -2919,6 +2876,10 @@ function main() {
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
+  if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
+    GCE_GLBC_TOKEN="$(secure_random 32)"
+  fi
+  ADDON_MANAGER_TOKEN="$(secure_random 32)"
 
   setup-os-params
   config-ip-firewall
@@ -2963,6 +2924,7 @@ function main() {
     start-kube-apiserver
     start-kube-controller-manager
     start-kube-scheduler
+    wait-till-apiserver-ready
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller

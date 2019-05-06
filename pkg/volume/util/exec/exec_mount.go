@@ -112,8 +112,8 @@ func (m *execMounter) PathIsDevice(pathname string) (bool, error) {
 }
 
 //GetDeviceNameFromMount given a mount point, find the volume id from checking /proc/mounts
-func (m *execMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return m.wrappedMounter.GetDeviceNameFromMount(mountPath, pluginDir)
+func (m *execMounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
+	return m.wrappedMounter.GetDeviceNameFromMount(mountPath, pluginMountDir)
 }
 
 func (m *execMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {

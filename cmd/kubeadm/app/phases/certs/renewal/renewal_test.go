@@ -17,7 +17,7 @@ limitations under the License.
 package renewal
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"net"
@@ -113,7 +113,7 @@ func defaultReactionFunc(obj runtime.Object) k8stesting.ReactionFunc {
 	}
 }
 
-func getCertReq(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey) *certsapi.CertificateSigningRequest {
+func getCertReq(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer) *certsapi.CertificateSigningRequest {
 	cert, _, err := pkiutil.NewCertAndKey(caCert, caKey, &certutil.Config{
 		CommonName: "testcert",
 		AltNames: certutil.AltNames{

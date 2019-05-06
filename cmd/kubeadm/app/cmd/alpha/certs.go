@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -74,7 +74,7 @@ func newCmdCertsRenewal() *cobra.Command {
 type renewConfig struct {
 	cfgPath        string
 	kubeconfigPath string
-	cfg            kubeadmapiv1beta1.InitConfiguration
+	cfg            kubeadmapiv1beta2.InitConfiguration
 	useAPI         bool
 	useCSR         bool
 	csrPath        string

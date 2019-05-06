@@ -47,6 +47,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -129,10 +130,10 @@ func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool)
 	if len(zone) > 0 {
 		region := zone[:len(zone)-1]
 		cfg := aws.Config{Region: &region}
-		framework.Logf("using region %s", region)
+		e2elog.Logf("using region %s", region)
 		client = ec2.New(session.New(), &cfg)
 	} else {
-		framework.Logf("no region configured")
+		e2elog.Logf("no region configured")
 		client = ec2.New(session.New())
 	}
 
@@ -207,7 +208,7 @@ func testZonalDelayedBinding(c clientset.Interface, ns string, specifyAllowedTop
 	}
 	for _, test := range tests {
 		if !framework.ProviderIs(test.CloudProviders...) {
-			framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
+			e2elog.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 			continue
 		}
 		action := "creating claims with class with waitForFirstConsumer"
@@ -446,7 +447,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				test := t
 
 				if !framework.ProviderIs(test.CloudProviders...) {
-					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
+					e2elog.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 					continue
 				}
 
@@ -573,7 +574,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			Expect(err).To(HaveOccurred())
-			framework.Logf(err.Error())
+			e2elog.Logf(err.Error())
 		})
 
 		It("should test that deleting a claim before the volume is provisioned deletes the volume.", func() {
@@ -616,13 +617,13 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			// Report indicators of regression
 			if len(residualPVs) > 0 {
-				framework.Logf("Remaining PersistentVolumes:")
+				e2elog.Logf("Remaining PersistentVolumes:")
 				for i, pv := range residualPVs {
-					framework.Logf("\t%d) %s", i+1, pv.Name)
+					e2elog.Logf("\t%d) %s", i+1, pv.Name)
 				}
 				framework.Failf("Expected 0 PersistentVolumes remaining. Found %d", len(residualPVs))
 			}
-			framework.Logf("0 PersistentVolumes remain.")
+			e2elog.Logf("0 PersistentVolumes remain.")
 		})
 
 		It("deletion should be idempotent", func() {
@@ -775,7 +776,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by changing the default annotation [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
-			scName := getDefaultStorageClassName(c)
+			scName, scErr := framework.GetDefaultStorageClassName(c)
+			if scErr != nil {
+				framework.Failf(scErr.Error())
+			}
 			test := testsuites.StorageClassTest{
 				Name:      "default",
 				ClaimSize: "2Gi",
@@ -797,7 +801,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			Expect(err).To(HaveOccurred())
-			framework.Logf(err.Error())
+			e2elog.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
@@ -806,7 +810,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
-			scName := getDefaultStorageClassName(c)
+			scName, scErr := framework.GetDefaultStorageClassName(c)
+			if scErr != nil {
+				framework.Failf(scErr.Error())
+			}
 			test := testsuites.StorageClassTest{
 				Name:      "default",
 				ClaimSize: "2Gi",
@@ -828,7 +835,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			Expect(err).To(HaveOccurred())
-			framework.Logf(err.Error())
+			e2elog.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
@@ -877,7 +884,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			class, err := c.StorageV1().StorageClasses().Create(class)
 			framework.ExpectNoError(err)
 			defer func() {
-				framework.Logf("deleting storage class %s", class.Name)
+				e2elog.Logf("deleting storage class %s", class.Name)
 				framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(class.Name, nil))
 			}()
 
@@ -887,7 +894,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			claim, err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
 			framework.ExpectNoError(err)
 			defer func() {
-				framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
+				e2elog.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 				err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
 				if err != nil && !apierrs.IsNotFound(err) {
 					framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
@@ -919,7 +926,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				return false, nil
 			})
 			if err == wait.ErrWaitTimeout {
-				framework.Logf("The test missed event about failed provisioning, but checked that no volume was provisioned for %v", framework.ClaimProvisionTimeout)
+				e2elog.Logf("The test missed event about failed provisioning, but checked that no volume was provisioned for %v", framework.ClaimProvisionTimeout)
 				err = nil
 			}
 			framework.ExpectNoError(err)
@@ -951,7 +958,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}
 			for _, test := range tests {
 				if !framework.ProviderIs(test.CloudProviders...) {
-					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
+					e2elog.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 					continue
 				}
 				By("creating a claim with class with allowedTopologies set")
@@ -974,27 +981,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 	})
 })
-
-func getDefaultStorageClassName(c clientset.Interface) string {
-	list, err := c.StorageV1().StorageClasses().List(metav1.ListOptions{})
-	if err != nil {
-		framework.Failf("Error listing storage classes: %v", err)
-	}
-	var scName string
-	for _, sc := range list.Items {
-		if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
-			if len(scName) != 0 {
-				framework.Failf("Multiple default storage classes found: %q and %q", scName, sc.Name)
-			}
-			scName = sc.Name
-		}
-	}
-	if len(scName) == 0 {
-		framework.Failf("No default storage class found")
-	}
-	framework.Logf("Default storage class: %q", scName)
-	return scName
-}
 
 func verifyDefaultStorageClass(c clientset.Interface, scName string, expectedDefault bool) {
 	sc, err := c.StorageV1().StorageClasses().Get(scName, metav1.GetOptions{})
@@ -1049,7 +1035,12 @@ func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
 }
 
 func newClaim(t testsuites.StorageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
-	return getClaim(t.ClaimSize, ns)
+	claim := getClaim(t.ClaimSize, ns)
+	if t.VolumeMode == v1.PersistentVolumeBlock {
+		blockVolumeMode := v1.PersistentVolumeBlock
+		claim.Spec.VolumeMode = &blockVolumeMode
+	}
+	return claim
 }
 
 func getDefaultPluginName() string {

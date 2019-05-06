@@ -61,21 +61,21 @@ var _ = SIGDescribe("CronJob", func() {
 		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to create CronJob in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring more than one job is running at a time")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 2)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to wait for active jobs in CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to wait for active jobs in CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 
 		ginkgo.By("Ensuring at least two running jobs exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
 		gomega.Expect(len(activeJobs) >= 2).To(gomega.BeTrue())
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// suspended should not schedule jobs
@@ -86,7 +86,7 @@ var _ = SIGDescribe("CronJob", func() {
 		t := true
 		cronJob.Spec.Suspend = &t
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to create CronJob in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring no jobs are scheduled")
 		err = waitForNoJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, false)
@@ -94,12 +94,12 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring no job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
 		gomega.Expect(jobs.Items).To(gomega.HaveLen(0))
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// only single active job is allowed for ForbidConcurrent
@@ -108,20 +108,20 @@ var _ = SIGDescribe("CronJob", func() {
 		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batchv1beta1.ForbidConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to create CronJob in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring a job is scheduled")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to schedule CronJob %s", cronJob.Name)
+		framework.ExpectNoError(err, "Failed to schedule CronJob %s", cronJob.Name)
 
 		ginkgo.By("Ensuring exactly one is scheduled")
 		cronJob, err = getCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to get CronJob %s", cronJob.Name)
+		framework.ExpectNoError(err, "Failed to get CronJob %s", cronJob.Name)
 		gomega.Expect(cronJob.Status.Active).Should(gomega.HaveLen(1))
 
 		ginkgo.By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
 		gomega.Expect(activeJobs).To(gomega.HaveLen(1))
 
@@ -131,7 +131,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// only single active job is allowed for ReplaceConcurrent
@@ -140,30 +140,30 @@ var _ = SIGDescribe("CronJob", func() {
 		cronJob := newTestCronJob("replace", "*/1 * * * ?", batchv1beta1.ReplaceConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to create CronJob in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring a job is scheduled")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to schedule CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to schedule CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 
 		ginkgo.By("Ensuring exactly one is scheduled")
 		cronJob, err = getCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to get CronJob %s", cronJob.Name)
+		framework.ExpectNoError(err, "Failed to get CronJob %s", cronJob.Name)
 		gomega.Expect(cronJob.Status.Active).Should(gomega.HaveLen(1))
 
 		ginkgo.By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to list the jobs in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to list the jobs in namespace %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
 		gomega.Expect(activeJobs).To(gomega.HaveLen(1))
 
 		ginkgo.By("Ensuring the job is replaced with a new one")
 		err = waitForJobReplaced(f.ClientSet, f.Namespace.Name, jobs.Items[0].Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to replace CronJob %s in namespace %s", jobs.Items[0].Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to replace CronJob %s in namespace %s", jobs.Items[0].Name, f.Namespace.Name)
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// shouldn't give us unexpected warnings
@@ -172,13 +172,13 @@ var _ = SIGDescribe("CronJob", func() {
 		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
 			nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to create CronJob in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring at least two jobs and at least one finished job exists by listing jobs explicitly")
 		err = waitForJobsAtLeast(f.ClientSet, f.Namespace.Name, 2)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure at least two job exists in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure at least two job exists in namespace %s", f.Namespace.Name)
 		err = waitForAnyFinishedJob(f.ClientSet, f.Namespace.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure at least on finished job exists in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure at least on finished job exists in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring no unexpected event has happened")
 		err = waitForEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob", "UnexpectedJob"})
@@ -186,7 +186,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// deleted jobs should be removed from the active list
@@ -195,15 +195,15 @@ var _ = SIGDescribe("CronJob", func() {
 		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batchv1beta1.ForbidConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to create CronJob in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring a job is scheduled")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure a %s cronjob is scheduled in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure a %s cronjob is scheduled in namespace %s", cronJob.Name, f.Namespace.Name)
 
 		ginkgo.By("Ensuring exactly one is scheduled")
 		cronJob, err = getCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure exactly one %s cronjob is scheduled in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure exactly one %s cronjob is scheduled in namespace %s", cronJob.Name, f.Namespace.Name)
 		gomega.Expect(cronJob.Status.Active).Should(gomega.HaveLen(1))
 
 		ginkgo.By("Deleting the job")
@@ -217,15 +217,15 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring the job is not in the cronjob active list")
 		err = waitForJobNotActive(f.ClientSet, f.Namespace.Name, cronJob.Name, job.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure the %s cronjob is not in active list in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure the %s cronjob is not in active list in namespace %s", cronJob.Name, f.Namespace.Name)
 
 		ginkgo.By("Ensuring MissingJob event has occurred")
 		err = waitForEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob"})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure missing job event has occurred for %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure missing job event has occurred for %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to remove %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to remove %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// cleanup of successful finished jobs, with limit of one successful job
@@ -235,37 +235,37 @@ var _ = SIGDescribe("CronJob", func() {
 		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
 			successCommand, &successLimit)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to create allowconcurrent cronjob with custom history limits in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to create allowconcurrent cronjob with custom history limits in namespace %s", f.Namespace.Name)
 
 		// Job is going to complete instantly: do not check for an active job
 		// as we are most likely to miss it
 
 		ginkgo.By("Ensuring a finished job exists")
 		err = waitForAnyFinishedJob(f.ClientSet, f.Namespace.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure a finished cronjob exists in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure a finished cronjob exists in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring a finished job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure a finished cronjob exists by listing jobs explicitly in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure a finished cronjob exists by listing jobs explicitly in namespace %s", f.Namespace.Name)
 		_, finishedJobs := filterActiveJobs(jobs)
 		gomega.Expect(len(finishedJobs) == 1).To(gomega.BeTrue())
 
 		// Job should get deleted when the next job finishes the next minute
 		ginkgo.By("Ensuring this job and its pods does not exist anymore")
 		err = waitForJobToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure that job does not exists anymore in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure that job does not exists anymore in namespace %s", f.Namespace.Name)
 		err = waitForJobsPodToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure that pods for job does not exists anymore in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure that pods for job does not exists anymore in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring there is 1 finished job by listing jobs explicitly")
 		jobs, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to ensure there is one finished job by listing job explicitly in namespace %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to ensure there is one finished job by listing job explicitly in namespace %s", f.Namespace.Name)
 		_, finishedJobs = filterActiveJobs(jobs)
 		gomega.Expect(len(finishedJobs) == 1).To(gomega.BeTrue())
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to remove the %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to remove the %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 })
 

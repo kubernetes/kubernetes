@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -35,6 +35,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzLocalEtcd,
 		fuzzNetworking,
 		fuzzJoinConfiguration,
+		fuzzJoinControlPlane,
 	}
 }
 
@@ -56,18 +57,18 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 		DNS: kubeadm.DNS{
 			Type: kubeadm.CoreDNS,
 		},
-		CertificatesDir: v1beta1.DefaultCertificatesDir,
-		ClusterName:     v1beta1.DefaultClusterName,
+		CertificatesDir: v1beta2.DefaultCertificatesDir,
+		ClusterName:     v1beta2.DefaultClusterName,
 		Etcd: kubeadm.Etcd{
 			Local: &kubeadm.LocalEtcd{
-				DataDir: v1beta1.DefaultEtcdDataDir,
+				DataDir: v1beta2.DefaultEtcdDataDir,
 			},
 		},
-		ImageRepository:   v1beta1.DefaultImageRepository,
-		KubernetesVersion: v1beta1.DefaultKubernetesVersion,
+		ImageRepository:   v1beta2.DefaultImageRepository,
+		KubernetesVersion: v1beta2.DefaultKubernetesVersion,
 		Networking: kubeadm.Networking{
-			ServiceSubnet: v1beta1.DefaultServicesSubnet,
-			DNSDomain:     v1beta1.DefaultServiceDNSDomain,
+			ServiceSubnet: v1beta2.DefaultServicesSubnet,
+			DNSDomain:     v1beta2.DefaultServiceDNSDomain,
 		},
 	}
 	// Adds the default bootstrap token to get the round working
@@ -81,6 +82,9 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			Usages: []string{"foo"},
 		},
 	}
+
+	// Pin values for fields that are not present in v1beta1
+	obj.CertificateKey = ""
 }
 
 func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {
@@ -134,4 +138,11 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 		TLSBootstrapToken: "qux",
 		Timeout:           &metav1.Duration{Duration: 1234},
 	}
+}
+
+func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pin values for fields that are not present in v1beta1
+	obj.CertificateKey = ""
 }

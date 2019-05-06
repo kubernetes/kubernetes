@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
+	"k8s.io/kubernetes/pkg/apis/networking"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -85,6 +86,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	resourceEncodingOverrides := []schema.GroupVersionResource{
 		batch.Resource("cronjobs").WithVersion("v1beta1"),
 		apisstorage.Resource("volumeattachments").WithVersion("v1beta1"),
+		networking.Resource("ingresses").WithVersion("v1beta1"),
 	}
 	resourceEncoding = resourceconfig.MergeResourceEncodingConfigs(resourceEncoding, resourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), legacyscheme.Codecs, resourceEncoding, DefaultAPIResourceConfigSource(), nil)

@@ -94,3 +94,40 @@ func Test(t *testing.T) {
 		}
 	}
 }
+
+func TestParseACRLoginServerFromImage(t *testing.T) {
+	tests := []struct {
+		image    string
+		expected string
+	}{
+		{
+			image:    "invalidImage",
+			expected: "",
+		},
+		{
+			image:    "docker.io/library/busybox:latest",
+			expected: "",
+		},
+		{
+			image:    "foo.azurecr.io/bar/image:version",
+			expected: "foo.azurecr.io",
+		},
+		{
+			image:    "foo.azurecr.cn/bar/image:version",
+			expected: "foo.azurecr.cn",
+		},
+		{
+			image:    "foo.azurecr.de/bar/image:version",
+			expected: "foo.azurecr.de",
+		},
+		{
+			image:    "foo.azurecr.us/bar/image:version",
+			expected: "foo.azurecr.us",
+		},
+	}
+	for _, test := range tests {
+		if loginServer := parseACRLoginServerFromImage(test.image); loginServer != test.expected {
+			t.Errorf("function parseACRLoginServerFromImage returns \"%s\" for image %s, expected \"%s\"", loginServer, test.image, test.expected)
+		}
+	}
+}

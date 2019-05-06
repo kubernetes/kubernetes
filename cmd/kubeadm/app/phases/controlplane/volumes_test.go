@@ -521,12 +521,8 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 			mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
 
 			// Avoid unit test errors when the flexvolume is mounted
-			if _, ok := mounts.volumes[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {
-				delete(mounts.volumes[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
-			}
-			if _, ok := mounts.volumeMounts[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {
-				delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
-			}
+			delete(mounts.volumes[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
+			delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
 			if !reflect.DeepEqual(mounts.volumes, rt.vol) {
 				t.Errorf(
 					"failed getHostPathVolumesForTheControlPlane:\n\texpected: %v\n\t  actual: %v",
@@ -632,7 +628,7 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 			if *vol.HostPath.Type != v1.HostPathType(hostMount.PathType) {
 				t.Errorf("Expected to host path type %q", hostMount.PathType)
 			}
-			volMount, _ := mounts.volumeMounts["component"][volumeName]
+			volMount := mounts.volumeMounts["component"][volumeName]
 			if volMount.Name != volumeName {
 				t.Errorf("Expected volume mount name %q", volumeName)
 			}

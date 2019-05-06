@@ -72,7 +72,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 			return pdb.Status.PodDisruptionsAllowed > 0, nil
 		})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 
 	evictionCases := []struct {
@@ -179,7 +179,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 				return false, nil
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			e := &policy.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
@@ -210,7 +210,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 					}
 					return true, nil
 				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err)
 			}
 		})
 	}
@@ -228,7 +228,7 @@ func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable
 		},
 	}
 	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 }
 
 func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavailable intstr.IntOrString) {
@@ -243,7 +243,7 @@ func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavail
 		},
 	}
 	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 }
 
 func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {

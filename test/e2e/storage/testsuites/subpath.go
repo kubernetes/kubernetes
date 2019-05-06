@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -83,6 +84,9 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		subPathDir        string
 		filePathInSubpath string
 		filePathInVolume  string
+
+		intreeOps   opCounts
+		migratedOps opCounts
 	}
 	var l local
 
@@ -99,6 +103,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 
 		// Now do the more expensive test initialization.
 		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
 		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
 
 		// Setup subPath test dependent resource
@@ -157,6 +162,8 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 			l.testCleanup()
 			l.testCleanup = nil
 		}
+
+		validateMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	It("should support non-existent path", func() {
@@ -791,7 +798,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 
 	By("Failing liveness probe")
 	out, err := podContainerExec(pod, 1, fmt.Sprintf("rm %v", probeFilePath))
-	framework.Logf("Pod exec output: %v", out)
+	e2elog.Logf("Pod exec output: %v", out)
 	Expect(err).ToNot(HaveOccurred(), "while failing liveness probe")
 
 	// Check that container has restarted
@@ -804,10 +811,10 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 		}
 		for _, status := range pod.Status.ContainerStatuses {
 			if status.Name == pod.Spec.Containers[0].Name {
-				framework.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
+				e2elog.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
 				restarts = status.RestartCount
 				if restarts > 0 {
-					framework.Logf("Container has restart count: %v", restarts)
+					e2elog.Logf("Container has restart count: %v", restarts)
 					return true, nil
 				}
 			}
@@ -820,7 +827,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	By("Rewriting the file")
 	writeCmd := fmt.Sprintf("echo test-after > %v", probeFilePath)
 	out, err = podContainerExec(pod, 1, writeCmd)
-	framework.Logf("Pod exec output: %v", out)
+	e2elog.Logf("Pod exec output: %v", out)
 	Expect(err).ToNot(HaveOccurred(), "while rewriting the probe file")
 
 	// Wait for container restarts to stabilize
@@ -837,13 +844,13 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 				if status.RestartCount == restarts {
 					stableCount++
 					if stableCount > stableThreshold {
-						framework.Logf("Container restart has stabilized")
+						e2elog.Logf("Container restart has stabilized")
 						return true, nil
 					}
 				} else {
 					restarts = status.RestartCount
 					stableCount = 0
-					framework.Logf("Container has restart count: %v", restarts)
+					e2elog.Logf("Container has restart count: %v", restarts)
 				}
 				break
 			}

@@ -78,6 +78,7 @@ const (
 	guestbookResponseTimeout = 3 * time.Minute
 	simplePodSelector        = "name=nginx"
 	simplePodName            = "nginx"
+	simplePodResourceName    = "pod/nginx"
 	nginxDefaultOutput       = "Welcome to nginx!"
 	simplePodPort            = 80
 	pausePodSelector         = "name=pause"
@@ -140,7 +141,7 @@ func runKubectlRetryOrDie(args ...string) string {
 	// Expect no errors to be present after retries are finished
 	// Copied from framework #ExecOrDie
 	framework.Logf("stdout: %q", output)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	return output
 }
 
@@ -404,6 +405,14 @@ var _ = SIGDescribe("Kubectl client", func() {
 				WithStdinReader(r).
 				ExecOrDie()
 			if e, a := "hi", strings.TrimSpace(execOutput); e != a {
+				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
+			}
+		})
+
+		ginkgo.It("should support exec using resource/name", func() {
+			ginkgo.By("executing a command in the container")
+			execOutput := framework.RunKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), simplePodResourceName, "echo", "running", "in", "container")
+			if e, a := "running in container", strings.TrimSpace(execOutput); e != a {
 				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
 		})
@@ -936,7 +945,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func() {
 			kv, err := framework.KubectlVersion()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			framework.SkipUnlessServerVersionGTE(kv, c.Discovery())
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			serviceJSON := readTestFileOrDie(redisServiceFilename)
@@ -1002,7 +1011,7 @@ metadata:
 			// Node
 			// It should be OK to list unschedulable Nodes here.
 			nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			node := nodes.Items[0]
 			output = framework.RunKubectlOrDie("describe", "node", node.Name)
 			requiredStrings = [][]string{
@@ -1091,10 +1100,10 @@ metadata:
 					}
 					return true, nil
 				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err)
 
 				service, err := c.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err)
 
 				if len(service.Spec.Ports) != 1 {
 					framework.Failf("1 port is expected")
@@ -1238,7 +1247,7 @@ metadata:
 			forEachPod(func(pod v1.Pod) {
 				ginkgo.By("checking for a matching strings")
 				_, err := framework.LookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", framework.PodStartTimeout)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err)
 
 				ginkgo.By("limiting log lines")
 				out := framework.RunKubectlOrDie("log", pod.Name, containerName, nsFlag, "--tail=1")
@@ -1486,7 +1495,7 @@ metadata:
 				}
 				return true, nil
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 
 		/*
@@ -1703,7 +1712,7 @@ metadata:
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
 			err := jobutil.WaitForJobGone(c, ns, jobName, wait.ForeverTestTimeout)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			ginkgo.By("verifying the job " + jobName + " was deleted")
 			_, err = c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
@@ -2064,7 +2073,7 @@ func validateGuestbookApp(c clientset.Interface, ns string) {
 	framework.Logf("Waiting for all frontend pods to be Running.")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"tier": "frontend", "app": "guestbook"}))
 	err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.Logf("Waiting for frontend to serve content.")
 	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout, ns) {
 		framework.Failf("Frontend service did not start serving content in %v seconds.", guestbookStartupTimeout.Seconds())
@@ -2149,7 +2158,7 @@ func forEachReplicationController(c clientset.Interface, ns, selectorKey, select
 		label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		rcs, err = c.CoreV1().ReplicationControllers(ns).List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		if len(rcs.Items) > 0 {
 			break
 		}

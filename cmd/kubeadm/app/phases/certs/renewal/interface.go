@@ -17,7 +17,7 @@ limitations under the License.
 package renewal
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 
 	certutil "k8s.io/client-go/util/cert"
@@ -25,5 +25,5 @@ import (
 
 // Interface represents a standard way to renew a certificate.
 type Interface interface {
-	Renew(*certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error)
+	Renew(*certutil.Config) (*x509.Certificate, crypto.Signer, error)
 }

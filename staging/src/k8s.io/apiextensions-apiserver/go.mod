@@ -5,7 +5,7 @@ module k8s.io/apiextensions-apiserver
 go 1.12
 
 require (
-	github.com/coreos/etcd v3.3.10+incompatible
+	github.com/coreos/etcd v3.3.13+incompatible
 	github.com/emicklei/go-restful v0.0.0-20170410110728-ff4f55a20633
 	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8 // indirect
 	github.com/go-openapi/analysis v0.17.2 // indirect
@@ -38,6 +38,7 @@ require (
 )
 
 replace (
+	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 	k8s.io/api => ../api
