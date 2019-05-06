@@ -137,8 +137,8 @@ readonly KUBE_NODE_BINARIES_WIN=("${KUBE_NODE_BINARIES[@]/%/.exe}")
 # NOTE: All functions that return lists should use newlines.
 # bash functions can't return arrays, and spaces are tricky, so newline
 # separators are the preferred pattern.
-# To transform a string of newline-separated items to an array, use mapfile -t:
-# mapfile -t FOO <<< "$(kube::golang::dups a b c a)"
+# To transform a string of newline-separated items to an array, use kube::util::read-array:
+# kube::util::read-array FOO < <(kube::golang::dups a b c a)
 #
 # ALWAYS remember to quote your subshells. Not doing so will break in
 # bash 4.3, and potentially cause other issues.
@@ -172,33 +172,33 @@ kube::golang::setup_platforms() {
 
     # Deduplicate to ensure the intersection trick with kube::golang::dups
     # is not defeated by duplicates in user input.
-    mapfile -t platforms <<< "$(kube::golang::dedup "${platforms[@]}")"
+    kube::util::read-array platforms < <(kube::golang::dedup "${platforms[@]}")
 
     # Use kube::golang::dups to restrict the builds to the platforms in
     # KUBE_SUPPORTED_*_PLATFORMS. Items should only appear at most once in each
     # set, so if they appear twice after the merge they are in the intersection.
-    mapfile -t KUBE_SERVER_PLATFORMS <<< "$(kube::golang::dups \
+    kube::util::read-array KUBE_SERVER_PLATFORMS < <(kube::golang::dups \
         "${platforms[@]}" \
         "${KUBE_SUPPORTED_SERVER_PLATFORMS[@]}" \
-      )"
+      )
     readonly KUBE_SERVER_PLATFORMS
 
-    mapfile -t KUBE_NODE_PLATFORMS <<< "$(kube::golang::dups \
+    kube::util::read-array KUBE_NODE_PLATFORMS < <(kube::golang::dups \
         "${platforms[@]}" \
         "${KUBE_SUPPORTED_NODE_PLATFORMS[@]}" \
-      )"
+      )
     readonly KUBE_NODE_PLATFORMS
 
-    mapfile -t KUBE_TEST_PLATFORMS <<< "$(kube::golang::dups \
+    kube::util::read-array KUBE_TEST_PLATFORMS < <(kube::golang::dups \
         "${platforms[@]}" \
         "${KUBE_SUPPORTED_TEST_PLATFORMS[@]}" \
-      )"
+      )
     readonly KUBE_TEST_PLATFORMS
 
-    mapfile -t KUBE_CLIENT_PLATFORMS <<< "$(kube::golang::dups \
+    kube::util::read-array KUBE_CLIENT_PLATFORMS < <(kube::golang::dups \
         "${platforms[@]}" \
         "${KUBE_SUPPORTED_CLIENT_PLATFORMS[@]}" \
-      )"
+      )
     readonly KUBE_CLIENT_PLATFORMS
 
   elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
