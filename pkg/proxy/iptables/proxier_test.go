@@ -942,7 +942,10 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 }
 
 func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTables) {
-	shouldLBTOSVCRuleExist := len(fp.clusterCIDR) > 0
+	// LB to SVC rule should always exist for local only since
+	// any traffic with `--src-type LOCAL` now routes to service chain
+	shouldLBTOSVCRuleExist := true
+
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
