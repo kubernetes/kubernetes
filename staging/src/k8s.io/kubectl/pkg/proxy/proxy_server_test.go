@@ -275,6 +275,17 @@ func TestAccept(t *testing.T) {
 			method:        "PUT",
 			expectAccept:  false,
 		},
+		{
+			name:          "test23",
+			acceptPaths:   DefaultPathAcceptRE,
+			rejectPaths:   DefaultPathRejectRE,
+			acceptHosts:   DefaultHostAcceptRE,
+			rejectMethods: "POST,PUT,PATCH",
+			path:          "/api/v1/namespaces/default/pods/somepod",
+			host:          "::1",
+			method:        "GET",
+			expectAccept:  true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -479,6 +490,8 @@ func TestExtractHost(t *testing.T) {
 	fixtures := map[string]string{
 		"localhost:8085": "localhost",
 		"marmalade":      "marmalade",
+		"[::1]:8001":     "::1",
+		"[::1]":          "::1",
 	}
 	for header, expected := range fixtures {
 		host := extractHost(header)

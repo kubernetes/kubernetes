@@ -36,7 +36,7 @@ import (
 
 const (
 	// DefaultHostAcceptRE is the default value for which hosts to accept.
-	DefaultHostAcceptRE = "^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$"
+	DefaultHostAcceptRE = "^localhost$,^127\\.0\\.0\\.1$,^::1$"
 	// DefaultPathAcceptRE is the default path to accept.
 	DefaultPathAcceptRE = "^.*"
 	// DefaultPathRejectRE is the default set of paths to reject.
@@ -117,7 +117,11 @@ func (f *FilterServer) HandlerFor(delegate http.Handler) *FilterServer {
 func extractHost(header string) (host string) {
 	host, _, err := net.SplitHostPort(header)
 	if err != nil {
-		host = header
+		if i := strings.IndexByte(header, ']'); i != -1 {
+			host = strings.TrimPrefix(header[:i], "[")
+		} else {
+			host = header
+		}
 	}
 	return host
 }
