@@ -35,8 +35,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	appstyped "k8s.io/client-go/kubernetes/typed/apps/v1"
-	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -49,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -139,7 +137,7 @@ func setupScheduler(
 		legacyscheme.Scheme,
 		v1.EventSource{Component: v1.DefaultSchedulerName},
 	)
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
+	eventBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
 		Interface: cs.CoreV1().Events(""),
 	})
 
@@ -292,7 +290,7 @@ func newNode(name string, label map[string]string) *v1.Node {
 	}
 }
 
-func addNodes(nodeClient corev1typed.NodeInterface, startIndex, numNodes int, label map[string]string, t *testing.T) {
+func addNodes(nodeClient corev1client.NodeInterface, startIndex, numNodes int, label map[string]string, t *testing.T) {
 	for i := startIndex; i < startIndex+numNodes; i++ {
 		_, err := nodeClient.Create(newNode(fmt.Sprintf("node-%d", i), label))
 		if err != nil {
@@ -302,7 +300,7 @@ func addNodes(nodeClient corev1typed.NodeInterface, startIndex, numNodes int, la
 }
 
 func validateDaemonSetPodsAndMarkReady(
-	podClient corev1typed.PodInterface,
+	podClient corev1client.PodInterface,
 	podInformer cache.SharedIndexInformer,
 	numberPods int,
 	t *testing.T,
@@ -447,7 +445,7 @@ func validateDaemonSetStatus(
 	}
 }
 
-func validateFailedPlacementEvent(eventClient corev1typed.EventInterface, t *testing.T) {
+func validateFailedPlacementEvent(eventClient corev1client.EventInterface, t *testing.T) {
 	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
 		eventList, err := eventClient.List(metav1.ListOptions{})
 		if err != nil {

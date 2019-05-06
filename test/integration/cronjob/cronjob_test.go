@@ -30,14 +30,13 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
-	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.Controller, *job.JobController, informers.SharedInformerFactory, clientset.Interface, rest.Config) {
+func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.Controller, *job.JobController, informers.SharedInformerFactory, clientset.Interface, restclient.Config) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, server, closeFn := framework.RunAMaster(masterConfig)
 

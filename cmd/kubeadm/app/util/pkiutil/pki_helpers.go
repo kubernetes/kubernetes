@@ -20,7 +20,6 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
-	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -515,7 +514,7 @@ func NewCSR(cfg certutil.Config, key crypto.Signer) (*x509.CertificateRequest, e
 		IPAddresses: cfg.AltNames.IPs,
 	}
 
-	csrBytes, err := x509.CreateCertificateRequest(cryptorand.Reader, template, key)
+	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, template, key)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create a CSR")
@@ -548,7 +547,7 @@ func EncodePublicKeyPEM(key crypto.PublicKey) ([]byte, error) {
 
 // NewPrivateKey creates an RSA private key
 func NewPrivateKey() (crypto.Signer, error) {
-	return rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
+	return rsa.GenerateKey(rand.Reader, rsaKeySize)
 }
 
 // NewSignedCert creates a signed certificate using the given CA certificate and key
@@ -577,7 +576,7 @@ func NewSignedCert(cfg *certutil.Config, key crypto.Signer, caCert *x509.Certifi
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  cfg.Usages,
 	}
-	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
+	certDERBytes, err := x509.CreateCertificate(rand.Reader, &certTmpl, caCert, key.Public(), caKey)
 	if err != nil {
 		return nil, err
 	}

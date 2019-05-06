@@ -25,7 +25,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -77,7 +76,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		testCleanups []cleanupFuncs
 		pods         []*v1.Pod
 		pvcs         []*v1.PersistentVolumeClaim
-		sc           map[string]*storage.StorageClass
+		sc           map[string]*storagev1.StorageClass
 		driver       testsuites.TestDriver
 		nodeLabel    map[string]string
 		provisioner  string
@@ -91,7 +90,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	init := func(tp testParameters) {
 		m = mockDriverSetup{
 			cs: f.ClientSet,
-			sc: make(map[string]*storage.StorageClass),
+			sc: make(map[string]*storagev1.StorageClass),
 			tp: tp,
 		}
 		cs := f.ClientSet
@@ -132,7 +131,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 	}
 
-	createPod := func() (*storage.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+	createPod := func() (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 		By("Creating pod")
 		var sc *storagev1.StorageClass
 		if dDriver, ok := m.driver.(testsuites.DynamicPVTestDriver); ok {

@@ -19,7 +19,6 @@ package utils
 import (
 	"crypto"
 	"crypto/rand"
-	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -41,7 +40,7 @@ const (
 
 // NewPrivateKey creates an RSA private key
 func NewPrivateKey() (*rsa.PrivateKey, error) {
-	return rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
+	return rsa.GenerateKey(rand.Reader, rsaKeySize)
 }
 
 // EncodeCertPEM returns PEM-endcoded certificate data
@@ -79,7 +78,7 @@ func NewSignedCert(cfg *certutil.Config, key crypto.Signer, caCert *x509.Certifi
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  cfg.Usages,
 	}
-	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
+	certDERBytes, err := x509.CreateCertificate(rand.Reader, &certTmpl, caCert, key.Public(), caKey)
 	if err != nil {
 		return nil, err
 	}

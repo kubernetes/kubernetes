@@ -27,7 +27,6 @@ import (
 	_ "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset"
 	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
-	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
 	internalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"

@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/apiserver/pkg/server"
 	. "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
@@ -360,7 +359,7 @@ func TestServerRunWithSNI(t *testing.T) {
 		},
 		"loopback: LoopbackClientServerNameOverride on server cert": {
 			Cert: TestCertSpec{
-				host: server.LoopbackClientServerNameOverride,
+				host: LoopbackClientServerNameOverride,
 			},
 			SNICerts: []NamedTestCertSpec{
 				{
@@ -378,7 +377,7 @@ func TestServerRunWithSNI(t *testing.T) {
 			SNICerts: []NamedTestCertSpec{
 				{
 					TestCertSpec: TestCertSpec{
-						host: server.LoopbackClientServerNameOverride,
+						host: LoopbackClientServerNameOverride,
 					},
 				},
 			},
@@ -489,7 +488,7 @@ func TestServerRunWithSNI(t *testing.T) {
 				t.Fatalf("failed applying the SecureServingOptions: %v", err)
 			}
 
-			s, err := config.Complete(nil).New("test", server.NewEmptyDelegate())
+			s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 			if err != nil {
 				t.Fatalf("failed creating the server: %v", err)
 			}

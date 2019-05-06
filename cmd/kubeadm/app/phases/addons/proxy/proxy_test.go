@@ -25,7 +25,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
@@ -278,7 +277,7 @@ func TestDaemonSetsHaveSystemNodeCriticalPriorityClassName(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			daemonSetBytes, _ := kubeadmutil.ParseTemplate(testCase.manifest, testCase.data)
 			daemonSet := &apps.DaemonSet{}
-			if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), daemonSetBytes, daemonSet); err != nil {
+			if err := runtime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), daemonSetBytes, daemonSet); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if daemonSet.Spec.Template.Spec.PriorityClassName != "system-node-critical" {
