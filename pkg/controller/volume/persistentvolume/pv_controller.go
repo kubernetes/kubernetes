@@ -338,10 +338,8 @@ func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentV
 	return pvutil.IsDelayBindingMode(claim, ctrl.classLister)
 }
 
-func (ctrl *PersistentVolumeController) recordCSIMetric(opName string, claim *v1.PersistentVolumeClaim, err error) {
-	// obtain corresponding operationTimestamps for this
-	key := claimToClaimKey(claim)
-	obj, exists := ctrl.operationTimestamps.Get(key)
+func (ctrl *PersistentVolumeController) recordCSIMetric(opName, claimKey string, err error) {
+	obj, exists := ctrl.operationTimestamps.Get(claimKey)
 	if !exists {
 		// in this case, an entry has not been created yet by either provisionClaim or deleteVolume
 		// there are two scenarios:
@@ -357,7 +355,7 @@ func (ctrl *PersistentVolumeController) recordCSIMetric(opName string, claim *v1
 	}
 	operationTs, ok := obj.(operationTimestamps)
 	if !ok {
-		klog.V(2).Infof("Cannot convert object from operationTimestamps cache to operationTimeStamp for volume claim key[%s], name[%s]: %#v", key, claim.Spec.VolumeName, obj)
+		klog.V(2).Infof("Cannot convert object from operationTimestamps cache to operationTimeStamp for volume claim key[%s]: %#v", claimKey, obj)
 		return
 	}
 	// in case of error, report count instead of latency, handled by RecordVolumeOperationMetric
@@ -374,9 +372,9 @@ func (ctrl *PersistentVolumeController) recordCSIMetric(opName string, claim *v1
 			timeTaken := time.Since(operationTs.deleteStartTs).Seconds()
 			metrics.RecordVolumeOperationMetric(operationTs.provisionerName, opName, timeTaken, nil)
 			// remove the entry
-			ctrl.operationTimestamps.Delete(key)
+			ctrl.operationTimestamps.Delete(claimKey)
 		default:
-			klog.V(2).Infof("Unsupported operation[%s] for metric reporting, claim key[%s], name[%s]", opName, key, claim.Spec.VolumeName)
+			klog.V(2).Infof("Unsupported operation[%s] for metric reporting, claim key[%s]", opName, claimKey)
 		}
 	}
 }
@@ -429,13 +427,13 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				// On any error saving the volume or the claim, subsequent
 				// syncClaim will finish the binding.
 				// record count error for provisioning
-				ctrl.recordCSIMetric("provision", claim, err)
+				ctrl.recordCSIMetric("provision", claimToClaimKey(claim), err)
 				return err
 			}
 			// OBSERVATION: claim is "Bound", pv is "Bound"
 			// record end to end provisioning latency
 			// [Unit test 12-4]
-			ctrl.recordCSIMetric("provision", claim, nil)
+			ctrl.recordCSIMetric("provision", claimToClaimKey(claim), nil)
 			return nil
 		}
 	} else /* pvc.Spec.VolumeName != nil */ {
@@ -478,13 +476,13 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 					// On any error saving the volume or the claim, subsequent
 					// syncClaim will finish the binding.
 					// record count error for provisioning
-					ctrl.recordCSIMetric("provision", claim, err)
+					ctrl.recordCSIMetric("provision", claimToClaimKey(claim), err)
 					return err
 				}
 				// OBSERVATION: pvc is "Bound", pv is "Bound"
 				// record end to end provisioning latency
 				// [Unit test 11-22]
-				ctrl.recordCSIMetric("provision", claim, nil)
+				ctrl.recordCSIMetric("provision", claimToClaimKey(claim), nil)
 				return nil
 			} else if pvutil.IsVolumeBoundToClaim(volume, claim) {
 				// User asked for a PV that is claimed by this PVC
@@ -494,13 +492,13 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				// Finish the volume binding by adding claim UID.
 				if err = ctrl.bind(volume, claim); err != nil {
 					// record count error for provisioning
-					ctrl.recordCSIMetric("provision", claim, err)
+					ctrl.recordCSIMetric("provision", claimToClaimKey(claim), err)
 					return err
 				}
 				// OBSERVATION: pvc is "Bound", pv is "Bound"
 				// record end to end provisioning latency
 				// [Unit test 12-4]
-				ctrl.recordCSIMetric("provision", claim, nil)
+				ctrl.recordCSIMetric("provision", claimToClaimKey(claim), nil)
 				return nil
 			} else {
 				// User asked for a PV that is claimed by someone else
