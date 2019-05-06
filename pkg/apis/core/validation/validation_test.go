@@ -455,10 +455,31 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 			Type: newHostPathType(string(core.HostPathDirectory)),
 		},
 	}
+
+	validCSIVolume := testVolume("csi-volume", "", core.PersistentVolumeSpec{
+		Capacity: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("1G"),
+		},
+		AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+		PersistentVolumeSource: core.PersistentVolumeSource{
+			CSI: &core.CSIPersistentVolumeSource{
+				Driver:       "come.google.gcepd",
+				VolumeHandle: "foobar",
+			},
+		},
+		StorageClassName: "gp2",
+	})
+
+	expandSecretRef := &core.SecretReference{
+		Name:      "expansion-secret",
+		Namespace: "default",
+	}
+
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		oldVolume         *core.PersistentVolume
-		newVolume         *core.PersistentVolume
+		isExpectedFailure   bool
+		csiExpansionEnabled bool
+		oldVolume           *core.PersistentVolume
+		newVolume           *core.PersistentVolume
 	}{
 		"condition-no-update": {
 			isExpectedFailure: false,
@@ -475,6 +496,21 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 			oldVolume:         validVolume,
 			newVolume:         invalidPvSourceUpdateDeep,
 		},
+		"csi-expansion-enabled-with-pv-secret": {
+			csiExpansionEnabled: true,
+			isExpectedFailure:   false,
+			oldVolume:           validCSIVolume,
+			newVolume:           getCSIVolumeWithSecret(validCSIVolume, expandSecretRef),
+		},
+		"csi-expansion-enabled-with-old-pv-secret": {
+			csiExpansionEnabled: true,
+			isExpectedFailure:   true,
+			oldVolume:           getCSIVolumeWithSecret(validCSIVolume, expandSecretRef),
+			newVolume: getCSIVolumeWithSecret(validCSIVolume, &core.SecretReference{
+				Name:      "foo-secret",
+				Namespace: "default",
+			}),
+		},
 	}
 	for name, scenario := range scenarios {
 		errs := ValidatePersistentVolumeUpdate(scenario.newVolume, scenario.oldVolume)
@@ -485,6 +521,14 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
 		}
 	}
+}
+
+func getCSIVolumeWithSecret(pv *core.PersistentVolume, secret *core.SecretReference) *core.PersistentVolume {
+	pvCopy := pv.DeepCopy()
+	if secret != nil {
+		pvCopy.Spec.CSI.ControllerExpandSecretRef = secret
+	}
+	return pvCopy
 }
 
 func testLocalVolume(path string, affinity *core.VolumeNodeAffinity) core.PersistentVolumeSpec {
@@ -1833,6 +1877,22 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 			csi:      &core.CSIPersistentVolumeSource{Driver: "com/google/storage/csi~gcepd", VolumeHandle: "test-123"},
 			errtype:  field.ErrorTypeInvalid,
 			errfield: "driver",
+		},
+		{
+			name:     "controllerExpandSecretRef: invalid name missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerExpandSecretRef: &core.SecretReference{Namespace: "default"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "controllerExpandSecretRef.name",
+		},
+		{
+			name:     "controllerExpandSecretRef: invalid namespace missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerExpandSecretRef: &core.SecretReference{Name: "foobar"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "controllerExpandSecretRef.namespace",
+		},
+		{
+			name: "valid controllerExpandSecretRef",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerExpandSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
 		},
 	}
 
