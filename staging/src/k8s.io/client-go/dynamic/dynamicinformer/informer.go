@@ -74,10 +74,23 @@ func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResour
 		return informer
 	}
 
-	informer = NewFilteredDynamicInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	informer = NewFilteredDynamicInformer(f, f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	f.informers[key] = informer
+	f.startedInformers[key] = false
 
 	return informer
+}
+
+func (f *dynamicSharedInformerFactory) removeResource(gvr schema.GroupVersionResource, informer cache.SharedIndexInformer) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	key := gvr
+	registeredInformer, exists := f.informers[key]
+	if exists && registeredInformer.Informer() == informer {
+		delete(f.informers, key)
+		f.startedInformers[key] = false
+	}
 }
 
 // Start initializes all requested informers.
@@ -116,10 +129,11 @@ func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) 
 }
 
 // NewFilteredDynamicInformer constructs a new informer for a dynamic type.
-func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
+func NewFilteredDynamicInformer(factory *dynamicSharedInformerFactory, client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
+	// make local stopCh for dynamic shared informer
+	stopCh := make(chan struct{})
 	return &dynamicInformer{
-		gvr: gvr,
-		informer: cache.NewSharedIndexInformer(
+		SharedIndexInformer: cache.NewSharedIndexInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					if tweakListOptions != nil {
@@ -138,20 +152,65 @@ func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersio
 			resyncPeriod,
 			indexers,
 		),
+		gvr:     gvr,
+		stopCh:  stopCh,
+		factory: factory,
 	}
 }
 
 type dynamicInformer struct {
-	informer cache.SharedIndexInformer
-	gvr      schema.GroupVersionResource
+	cache.SharedIndexInformer
+	gvr    schema.GroupVersionResource
+	stopCh chan struct{}
+	// once is for safely close stopCh
+	once    sync.Once
+	factory *dynamicSharedInformerFactory
 }
 
 var _ informers.GenericInformer = &dynamicInformer{}
 
 func (d *dynamicInformer) Informer() cache.SharedIndexInformer {
-	return d.informer
+	return d
 }
 
 func (d *dynamicInformer) Lister() cache.GenericLister {
-	return dynamiclister.NewRuntimeObjectShim(dynamiclister.New(d.informer.GetIndexer(), d.gvr))
+	return dynamiclister.NewRuntimeObjectShim(dynamiclister.New(d.GetIndexer(), d.gvr))
+}
+
+var _ cache.SharedIndexInformer = &dynamicInformer{}
+
+func (d *dynamicInformer) GetController() cache.Controller {
+	return &dummyController{informer: d}
+}
+
+// Use local stopCh, the passed in stopCh is ignored.
+// The informer is stopped via its controller
+func (d *dynamicInformer) Run(stopCh <-chan struct{}) {
+	d.SharedIndexInformer.Run(d.stopCh)
+}
+
+func (d *dynamicInformer) stop() {
+	d.once.Do(func() {
+		close(d.stopCh)
+	})
+}
+
+type dummyController struct {
+	informer *dynamicInformer
+}
+
+func (v *dummyController) Run(stopCh <-chan struct{}) {
+	<-stopCh
+	// stop informer
+	v.informer.stop()
+	// remove it from factory
+	v.informer.factory.removeResource(v.informer.gvr, v.informer)
+}
+
+func (v *dummyController) HasSynced() bool {
+	return v.informer.HasSynced()
+}
+
+func (v *dummyController) LastSyncResourceVersion() string {
+	return ""
 }

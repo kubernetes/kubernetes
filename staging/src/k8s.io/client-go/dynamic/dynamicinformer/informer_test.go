@@ -40,6 +40,7 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 		ns          string
 		trigger     func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeDynamicClient, testObject *unstructured.Unstructured) *unstructured.Unstructured
 		handler     func(rcvCh chan<- *unstructured.Unstructured) *cache.ResourceEventHandlerFuncs
+		isStop      bool
 	}{
 		// scenario 1
 		{
@@ -107,6 +108,29 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 				}
 			},
 		},
+
+		// scenario 4
+		{
+			name: "scenario 4: test if adding an object triggers AddFunc when informer is stopped",
+			ns:   "ns-foo",
+			gvr:  schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"},
+			trigger: func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeDynamicClient, _ *unstructured.Unstructured) *unstructured.Unstructured {
+				testObject := newUnstructured("extensions/v1beta1", "Deployment", "ns-foo", "name-foo")
+				createdObj, err := fakeClient.Resource(gvr).Namespace(ns).Create(testObject, metav1.CreateOptions{})
+				if err != nil {
+					t.Error(err)
+				}
+				return createdObj
+			},
+			handler: func(rcvCh chan<- *unstructured.Unstructured) *cache.ResourceEventHandlerFuncs {
+				return &cache.ResourceEventHandlerFuncs{
+					AddFunc: func(obj interface{}) {
+						rcvCh <- obj.(*unstructured.Unstructured)
+					},
+				}
+			},
+			isStop: true,
+		},
 	}
 
 	for _, ts := range scenarios {
@@ -131,15 +155,30 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 			if synced := target.WaitForCacheSync(ctx.Done()); !synced[ts.gvr] {
 				t.Errorf("informer for %s hasn't synced", ts.gvr)
 			}
+			controller := informerListerForGvr.Informer().GetController()
+			stop := make(chan struct{})
+			go controller.Run(stop)
+			if ts.isStop {
+				close(stop)
+				time.Sleep(10 * time.Millisecond)
+			}
 
 			testObject := ts.trigger(ts.gvr, ts.ns, fakeClient, ts.existingObj)
 			select {
 			case objFromInformer := <-informerReciveObjectCh:
-				if !equality.Semantic.DeepEqual(testObject, objFromInformer) {
-					t.Fatalf("%v", diff.ObjectDiff(testObject, objFromInformer))
+				if ts.isStop {
+					if equality.Semantic.DeepEqual(testObject, objFromInformer) {
+						t.Fatalf("stopped informer should not receive object")
+					}
+				} else {
+					if !equality.Semantic.DeepEqual(testObject, objFromInformer) {
+						t.Fatalf("%v", diff.ObjectDiff(testObject, objFromInformer))
+					}
 				}
 			case <-ctx.Done():
-				t.Errorf("tested informer haven't received an object, waited %v", timeout)
+				if !ts.isStop {
+					t.Errorf("tested informer haven't received an object, waited %v", timeout)
+				}
 			}
 		})
 	}
