@@ -25,7 +25,8 @@ go_library(
         "tags.go",
         "volumes.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/aws",
+    importpath = "k8s.io/legacy-cloud-providers/aws",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
