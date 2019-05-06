@@ -60,6 +60,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "attacher_test.go",
         "azure_common_test.go",
         "azure_dd_block_test.go",
         "azure_dd_test.go",
