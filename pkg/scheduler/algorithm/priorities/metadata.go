@@ -46,6 +46,7 @@ func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controlle
 // priorityMetadata is a type that is passed as metadata for priority functions
 type priorityMetadata struct {
 	nonZeroRequest          *schedulernodeinfo.Resource
+	podLimits               *schedulernodeinfo.Resource
 	podTolerations          []v1.Toleration
 	affinity                *v1.Affinity
 	podSelectors            []labels.Selector
@@ -62,6 +63,7 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo
 	}
 	return &priorityMetadata{
 		nonZeroRequest:          getNonZeroRequests(pod),
+		podLimits:               getResourceLimits(pod),
 		podTolerations:          getAllTolerationPreferNoSchedule(pod.Spec.Tolerations),
 		affinity:                pod.Spec.Affinity,
 		podSelectors:            getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
