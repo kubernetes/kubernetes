@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	libstrings "strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
@@ -62,7 +61,9 @@ var (
 		string(api.AzureDedicatedBlobDisk),
 		string(api.AzureManagedDisk))
 
-	lunPathRE = regexp.MustCompile(`/dev/disk/azure/scsi(?:.*)/lun(.+)`)
+	// only for Windows node
+	winDiskNumRE     = regexp.MustCompile(`/dev/disk(.+)`)
+	winDiskNumFormat = "/dev/disk%d"
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -206,24 +207,12 @@ func strFirstLetterToUpper(str string) string {
 	return libstrings.ToUpper(string(str[0])) + str[1:]
 }
 
-// getDiskLUN : deviceInfo could be a LUN number or a device path, e.g. /dev/disk/azure/scsi1/lun2
-func getDiskLUN(deviceInfo string) (int32, error) {
-	var diskLUN string
-	if len(deviceInfo) <= 2 {
-		diskLUN = deviceInfo
-	} else {
-		// extract the LUN num from a device path
-		matches := lunPathRE.FindStringSubmatch(deviceInfo)
-		if len(matches) == 2 {
-			diskLUN = matches[1]
-		} else {
-			return -1, fmt.Errorf("cannot parse deviceInfo: %s", deviceInfo)
-		}
+// getDiskNum : extract the disk num from a device path,
+// deviceInfo format could be like this: e.g. /dev/disk2
+func getDiskNum(deviceInfo string) (string, error) {
+	matches := winDiskNumRE.FindStringSubmatch(deviceInfo)
+	if len(matches) == 2 {
+		return matches[1], nil
 	}
-
-	lun, err := strconv.Atoi(diskLUN)
-	if err != nil {
-		return -1, err
-	}
-	return int32(lun), nil
+	return "", fmt.Errorf("cannot parse deviceInfo: %s, correct format: /dev/disk?", deviceInfo)
 }
