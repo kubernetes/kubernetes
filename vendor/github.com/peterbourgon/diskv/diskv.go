@@ -18,8 +18,8 @@ import (
 
 const (
 	defaultBasePath             = "diskv"
-	defaultFilePerm os.FileMode = 0666
-	defaultPathPerm os.FileMode = 0777
+	defaultFilePerm os.FileMode = 0660
+	defaultPathPerm os.FileMode = 0750
 )
 
 var (
