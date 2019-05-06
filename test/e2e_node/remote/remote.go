@@ -31,7 +31,7 @@ import (
 	"k8s.io/klog"
 )
 
-var testTimeoutSeconds = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
+var testTimeout = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
 
 const archiveName = "e2e_node_test.tar.gz"
@@ -110,7 +110,7 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 	}
 
 	klog.V(2).Infof("Running test on %q", host)
-	output, err := suite.RunTest(host, workspace, resultDir, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs, *testTimeoutSeconds)
+	output, err := suite.RunTest(host, workspace, resultDir, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs, *testTimeout)
 
 	aggErrs := []error{}
 	// Do not log the output here, let the caller deal with the test output.
