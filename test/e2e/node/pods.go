@@ -25,13 +25,14 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -143,7 +144,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
 				podList, err := framework.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 				if err != nil {
-					framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
+					e2elog.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
 					return false, nil
 				}
 				for _, kubeletPod := range podList.Items {
@@ -151,12 +152,12 @@ var _ = SIGDescribe("Pods Extended", func() {
 						continue
 					}
 					if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
-						framework.Logf("deletion has not yet been observed")
+						e2elog.Logf("deletion has not yet been observed")
 						return false, nil
 					}
 					return false, nil
 				}
-				framework.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
+				e2elog.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
 				return true, nil
 			})).NotTo(HaveOccurred(), "kubelet never observed the termination notice")
 
