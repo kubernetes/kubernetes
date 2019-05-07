@@ -111,7 +111,7 @@ spec:
         operator: "Exists"
       containers:
       - name: node-cache
-        image: k8s.gcr.io/k8s-dns-node-cache:1.15.1
+        image: k8s.gcr.io/k8s-dns-node-cache:1.15.2
         resources:
           limits:
             memory: 30Mi
