@@ -302,7 +302,7 @@ func (hs *HealthzServer) UpdateTimestamp() {
 }
 
 // UpdateTimestamp updates the lastUpdated timestamp.
-func (hs *HealthzServer) UpdateApiTimestamp() {
+func (hs *HealthzServer) UpdateAPITimestamp() {
 	hs.apiLastUpdated.Store(hs.clock.Now())
 }
 
