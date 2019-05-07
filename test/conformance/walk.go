@@ -72,6 +72,8 @@ type conformanceData struct {
 	TestName string
 	// Extracted from the "Description:" comment before the test
 	Description string
+	// Version when this test is added or modified ex: v1.12, v1.13
+	Release string
 }
 
 func (v *visitor) convertToConformanceData(at *ast.BasicLit) {
@@ -85,13 +87,16 @@ func (v *visitor) convertToConformanceData(at *ast.BasicLit) {
 	cd.Description = ""
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "Testname:") {
-			line = strings.TrimSpace(line[9:])
-			cd.TestName = line
+		if sline := regexp.MustCompile("^Testname\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			cd.TestName = sline[1]
 			continue
 		}
-		if strings.HasPrefix(line, "Description:") {
-			line = strings.TrimSpace(line[12:])
+		if sline := regexp.MustCompile("^Release\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			cd.Release = sline[1]
+			continue
+		}
+		if sline := regexp.MustCompile("^Description\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			line = sline[1]
 		}
 		cd.Description += line + "\n"
 	}
@@ -341,6 +346,7 @@ func main() {
 				tests := scanfile(path, nil)
 				for _, cd := range tests {
 					fmt.Printf("## [%s](%s)\n\n", cd.TestName, cd.URL)
+					fmt.Printf("### Release %s\n", cd.Release)
 					fmt.Printf("%s\n\n", cd.Description)
 					if len(cd.Description) < 10 {
 						missingComments++
