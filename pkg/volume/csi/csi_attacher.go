@@ -54,6 +54,8 @@ type csiAttacher struct {
 // volume.Attacher methods
 var _ volume.Attacher = &csiAttacher{}
 
+var _ volume.Detacher = &csiAttacher{}
+
 var _ volume.DeviceMounter = &csiAttacher{}
 
 func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
