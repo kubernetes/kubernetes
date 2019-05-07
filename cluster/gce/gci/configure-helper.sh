@@ -1540,7 +1540,7 @@ function start-kube-apiserver {
     params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
   fi
   params+=" --secure-port=443"
-  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-true}" != "true" ]]; then
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     # Default is :8080
     params+=" --insecure-port=0"
   fi
@@ -2886,7 +2886,7 @@ function main() {
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
-  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-true}" != "true" ]]; then
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
   fi
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
