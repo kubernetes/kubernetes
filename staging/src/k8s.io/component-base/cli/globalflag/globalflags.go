@@ -24,7 +24,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/component-base/logs"
-	"k8s.io/klog"
 )
 
 // AddGlobalFlags explicitly registers flags that libraries (klog, verflag, etc.) register
@@ -39,12 +38,26 @@ func AddGlobalFlags(fs *pflag.FlagSet, name string) {
 
 // addKlogFlags adds flags from k8s.io/klog
 func addKlogFlags(fs *pflag.FlagSet) {
-	local := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	klog.InitFlags(local)
-	local.VisitAll(func(fl *flag.Flag) {
-		fl.Name = normalize(fl.Name)
-		fs.AddGoFlag(fl)
-	})
+	// lookup flags in global flag set and re-register the values with our flagset
+	local := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
+
+	// DO NOT call klog.InitFlags. It has the side-effect of resetting
+	// flag values to their defaults, which can break previously-loaded
+	// config at runtime.
+
+	Register(local, "log_dir")
+	Register(local, "log_file")
+	Register(local, "log_file_max_size")
+	Register(local, "logtostderr")
+	Register(local, "alsologtostderr")
+	Register(local, "v")
+	Register(local, "skip_headers")
+	Register(local, "skip_log_headers")
+	Register(local, "stderrthreshold")
+	Register(local, "vmodule")
+	Register(local, "log_backtrace_at")
+
+	fs.AddFlagSet(local)
 }
 
 // normalize replaces underscores with hyphens

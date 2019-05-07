@@ -70,7 +70,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["options_test.go"],
+    srcs = [
+        "globalflags_test.go",
+        "options_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",

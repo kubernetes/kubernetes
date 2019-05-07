@@ -26,7 +26,6 @@ import (
 
 	// libs that provide registration functions
 	"k8s.io/component-base/logs"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	// ensure libs have a chance to globally register their flags
@@ -93,7 +92,25 @@ func addCredentialProviderFlags(fs *pflag.FlagSet) {
 
 // addKlogFlags adds flags from k8s.io/klog
 func addKlogFlags(fs *pflag.FlagSet) {
-	local := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	klog.InitFlags(local)
-	fs.AddGoFlagSet(local)
+	// lookup flags in global flag set and re-register the values with our flagset
+	global := flag.CommandLine
+	local := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
+
+	// DO NOT call klog.InitFlags. It has the side-effect of resetting
+	// flag values to their defaults, which can break previously-loaded
+	// config at runtime.
+
+	register(global, local, "log_dir")
+	register(global, local, "log_file")
+	register(global, local, "log_file_max_size")
+	register(global, local, "logtostderr")
+	register(global, local, "alsologtostderr")
+	register(global, local, "v")
+	register(global, local, "skip_headers")
+	register(global, local, "skip_log_headers")
+	register(global, local, "stderrthreshold")
+	register(global, local, "vmodule")
+	register(global, local, "log_backtrace_at")
+
+	fs.AddFlagSet(local)
 }
