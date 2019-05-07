@@ -270,7 +270,9 @@ func MachineInfo(nodeName string,
 				// capacity for every node status request
 				initialCapacity := capacityFunc()
 				if initialCapacity != nil {
-					node.Status.Capacity[v1.ResourceEphemeralStorage] = initialCapacity[v1.ResourceEphemeralStorage]
+					if v, exists := initialCapacity[v1.ResourceEphemeralStorage]; exists {
+						node.Status.Capacity[v1.ResourceEphemeralStorage] = v
+					}
 				}
 			}
 
