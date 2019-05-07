@@ -1341,6 +1341,13 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	spec := &pod.Spec
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(spec, allStatus)
+	// When restartPolicy is never and sandbox is exited, we should set pod phase to Failed
+	if len(podStatus.SandboxStatuses) != 0  && len(podStatus.ContainerStatuses) == 0 && pod.Spec.RestartPolicy == v1.RestartPolicyNever {
+		sandboxStatus := podStatus.SandboxStatuses[0]
+		if sandboxStatus.State != runtimeapi.PodSandboxState_SANDBOX_READY {
+			s.Phase = v1.PodFailed
+		}
+	}
 	// Check for illegal phase transition
 	if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
 		// API server shows terminal phase; transitions are not allowed
