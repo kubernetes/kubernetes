@@ -1550,7 +1550,7 @@ func checkAffinityFailed(tracker affinityTracker, err string) {
 // return false only in case of unexpected errors.
 func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIP string, targetPort int, shouldHold bool) bool {
 	targetIPPort := net.JoinHostPort(targetIP, strconv.Itoa(targetPort))
-	cmd := fmt.Sprintf(`wget -qO- http://%s/ -T 2`, targetIPPort)
+	cmd := fmt.Sprintf(`curl -s http://%s/ -m 3`, targetIPPort)
 	timeout := ServiceTestTimeout
 	if execPod == nil {
 		timeout = LoadBalancerPollTimeout
