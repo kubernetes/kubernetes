@@ -33,6 +33,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers:go_default_library",
+        "//vendor/github.com/vmware/govmomi/find:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
         "//vendor/github.com/vmware/govmomi/property:go_default_library",
         "//vendor/github.com/vmware/govmomi/vapi/rest:go_default_library",

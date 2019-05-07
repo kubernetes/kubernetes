@@ -177,6 +177,13 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones)
 	})
 
+	It("Verify a pod is created on a non-Workspace zone and attached to a dynamically created PV, based on the allowed zones and storage policy specified in storage class", func() {
+		By(fmt.Sprintf("Creating storage class with zone :%s and storage policy :%s", zoneB, compatPolicy))
+		scParameters[SpbmStoragePolicy] = compatPolicy
+		zones = append(zones, zoneB)
+		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones)
+	})
+
 	It("Verify PVC creation with incompatible storagePolicy and zone combination specified in storage class fails", func() {
 		By(fmt.Sprintf("Creating storage class with zone :%s and storage policy :%s", zoneA, nonCompatPolicy))
 		scParameters[SpbmStoragePolicy] = nonCompatPolicy
