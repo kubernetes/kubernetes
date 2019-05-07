@@ -21,10 +21,11 @@ import (
 	"path"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -153,7 +154,7 @@ while true; do sleep 1; done
 				Expect(GetContainerState(status.State)).To(Equal(ContainerStateTerminated))
 
 				By("the termination message should be set")
-				framework.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
+				e2elog.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
 				Expect(status.State.Terminated.Message).Should(expectedMsg)
 
 				By("delete the container")
@@ -344,7 +345,7 @@ while true; do sleep 1; done
 						break
 					}
 					if i < flakeRetry {
-						framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
+						e2elog.Logf("No.%d attempt failed: %v, retrying...", i, err)
 					} else {
 						framework.Failf("All %d attempts failed: %v", flakeRetry, err)
 					}
