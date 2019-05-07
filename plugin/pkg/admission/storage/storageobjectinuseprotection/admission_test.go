@@ -131,6 +131,7 @@ func TestAdmit(t *testing.T) {
 				test.resource,
 				"", // subresource
 				admission.Create,
+				&metav1.CreateOptions{},
 				false, // dryRun
 				nil,   // userInfo
 			)
