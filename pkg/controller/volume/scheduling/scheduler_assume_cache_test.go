@@ -109,7 +109,7 @@ func TestAssumePV(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		cache := NewPVAssumeCache(nil)
-		internalCache, ok := cache.(*pvAssumeCache)
+		internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 		if !ok {
 			t.Fatalf("Failed to get internal cache")
 		}
@@ -143,7 +143,7 @@ func TestAssumePV(t *testing.T) {
 
 func TestRestorePV(t *testing.T) {
 	cache := NewPVAssumeCache(nil)
-	internalCache, ok := cache.(*pvAssumeCache)
+	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -183,7 +183,7 @@ func TestRestorePV(t *testing.T) {
 
 func TestBasicPVCache(t *testing.T) {
 	cache := NewPVAssumeCache(nil)
-	internalCache, ok := cache.(*pvAssumeCache)
+	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -227,7 +227,7 @@ func TestBasicPVCache(t *testing.T) {
 
 func TestPVCacheWithStorageClasses(t *testing.T) {
 	cache := NewPVAssumeCache(nil)
-	internalCache, ok := cache.(*pvAssumeCache)
+	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -273,7 +273,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 
 func TestAssumeUpdatePVCache(t *testing.T) {
 	cache := NewPVAssumeCache(nil)
-	internalCache, ok := cache.(*pvAssumeCache)
+	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -366,7 +366,7 @@ func TestAssumePVC(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		cache := NewPVCAssumeCache(nil)
-		internalCache, ok := cache.(*pvcAssumeCache)
+		internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
 		if !ok {
 			t.Fatalf("Failed to get internal cache")
 		}
@@ -400,7 +400,7 @@ func TestAssumePVC(t *testing.T) {
 
 func TestRestorePVC(t *testing.T) {
 	cache := NewPVCAssumeCache(nil)
-	internalCache, ok := cache.(*pvcAssumeCache)
+	internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -440,7 +440,7 @@ func TestRestorePVC(t *testing.T) {
 
 func TestAssumeUpdatePVCCache(t *testing.T) {
 	cache := NewPVCAssumeCache(nil)
-	internalCache, ok := cache.(*pvcAssumeCache)
+	internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}

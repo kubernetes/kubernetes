@@ -103,8 +103,8 @@ type testEnv struct {
 	binder               SchedulerVolumeBinder
 	internalBinder       *volumeBinder
 	internalNodeInformer coreinformers.NodeInformer
-	internalPVCache      *pvAssumeCache
-	internalPVCCache     *pvcAssumeCache
+	internalPVCache      *assumeCache
+	internalPVCCache     *assumeCache
 }
 
 func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
@@ -206,13 +206,13 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 	}
 
 	pvCache := internalBinder.pvCache
-	internalPVCache, ok := pvCache.(*pvAssumeCache)
+	internalPVCache, ok := pvCache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to convert to internal PV cache")
 	}
 
 	pvcCache := internalBinder.pvcCache
-	internalPVCCache, ok := pvcCache.(*pvcAssumeCache)
+	internalPVCCache, ok := pvcCache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to convert to internal PVC cache")
 	}

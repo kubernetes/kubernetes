@@ -345,7 +345,7 @@ type PVAssumeCache interface {
 }
 
 type pvAssumeCache struct {
-	*assumeCache
+	AssumeCache
 }
 
 func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
@@ -357,7 +357,7 @@ func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 
 // NewPVAssumeCache creates a PV assume cache.
 func NewPVAssumeCache(informer cache.SharedIndexInformer) PVAssumeCache {
-	return &pvAssumeCache{NewAssumeCache(informer, "v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc).(*assumeCache)}
+	return &pvAssumeCache{NewAssumeCache(informer, "v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc)}
 }
 
 func (c *pvAssumeCache) GetPV(pvName string) (*v1.PersistentVolume, error) {
@@ -413,12 +413,12 @@ type PVCAssumeCache interface {
 }
 
 type pvcAssumeCache struct {
-	*assumeCache
+	AssumeCache
 }
 
 // NewPVCAssumeCache creates a PVC assume cache.
 func NewPVCAssumeCache(informer cache.SharedIndexInformer) PVCAssumeCache {
-	return &pvcAssumeCache{NewAssumeCache(informer, "v1.PersistentVolumeClaim", "namespace", cache.MetaNamespaceIndexFunc).(*assumeCache)}
+	return &pvcAssumeCache{NewAssumeCache(informer, "v1.PersistentVolumeClaim", "namespace", cache.MetaNamespaceIndexFunc)}
 }
 
 func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {
