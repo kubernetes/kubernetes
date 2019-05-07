@@ -750,6 +750,29 @@ kube::golang::get_physmem() {
   echo 1
 }
 
+# Build unstripped binary on-demand
+# return value
+#    0: build unstripped binary
+#    1: build stripped binary
+kube::golang::build_unstripped_binary() {
+  local nflag lflag retval
+
+  nflag=0
+  lflag=0
+  retval=1
+
+  # Once "-N" and "-l" are specified together,
+  # binaries are built as unstripped
+  for flag in ${GOGCFLAGS:-}; do
+    [[ "${flag}" = "-N" ]] && nflag=1
+    [[ "${flag}" = "-l" ]] && lflag=1
+  done
+  
+  [[ ${nflag} -eq 1 ]] && [[ ${lflag} -eq 1 ]] && retval=0
+
+  return ${retval}
+}
+
 # Build binaries targets specified
 #
 # Input:
@@ -767,12 +790,30 @@ kube::golang::build_binaries() {
     local host_platform
     host_platform=$(kube::golang::host_platform)
 
-    local goflags goldflags goasmflags gogcflags
+    local goflags goldflags goasmflags gogcflags ldflags
     # If GOLDFLAGS is unset, then set it to the a default of "-s -w".
     # Disable SC2153 for this, as it will throw a warning that the local
     # variable goldflags will exist, and it suggest changing it to this.
     # shellcheck disable=SC2153
-    goldflags="${GOLDFLAGS=-s -w} $(kube::version::ldflags)"
+    # If the user prefers to build unstripped binaries,
+    # both "-s" and "-w" should be ignored
+
+    if kube::golang::build_unstripped_binary; then
+      ldflags=""
+      for v in ${GOLDFLAGS:=-s -w}; do
+        case "${v}" in
+          "-s" | "-w")
+            ;;
+          *)
+            ldflags="${ldflags} ${v}"
+            ;;
+         esac
+      done
+    else
+      ldflags="${GOLDFLAGS:=-s -w}"
+    fi
+
+    goldflags="${ldflags} $(kube::version::ldflags)"
     goasmflags="-trimpath=${KUBE_ROOT}"
     gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 
