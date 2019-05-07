@@ -40,10 +40,12 @@ type Versioner interface {
 	// from database.
 	UpdateObject(obj runtime.Object, resourceVersion uint64) error
 	// UpdateList sets the resource version into an API list object. Returns an error if the object
-	// cannot be updated correctly. May return nil if the requested object does not need metadata
-	// from database. continueValue is optional and indicates that more results are available if
-	// the client passes that value to the server in a subsequent call.
-	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string) error
+	// cannot be updated correctly. May return nil if the requested object does not need metadata from
+	// database. continueValue is optional and indicates that more results are available if the client
+	// passes that value to the server in a subsequent call. remainingItemCount indicates the number
+	// of remaining objects if the list is partial. The remainingItemCount field is omitted during
+	// serialization if it is set to 0.
+	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, remainingItemCount int64) error
 	// PrepareObjectForStorage should set SelfLink and ResourceVersion to the empty value. Should
 	// return an error if the specified object cannot be updated.
 	PrepareObjectForStorage(obj runtime.Object) error

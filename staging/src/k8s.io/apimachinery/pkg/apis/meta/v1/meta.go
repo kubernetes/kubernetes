@@ -94,6 +94,8 @@ type ListInterface interface {
 	SetSelfLink(selfLink string)
 	GetContinue() string
 	SetContinue(c string)
+	GetRemainingItemCount() int64
+	SetRemainingItemCount(c int64)
 }
 
 // Type exposes the type and APIVersion of versioned or internal API objects.
@@ -111,6 +113,8 @@ func (meta *ListMeta) GetSelfLink() string               { return meta.SelfLink 
 func (meta *ListMeta) SetSelfLink(selfLink string)       { meta.SelfLink = selfLink }
 func (meta *ListMeta) GetContinue() string               { return meta.Continue }
 func (meta *ListMeta) SetContinue(c string)              { meta.Continue = c }
+func (meta *ListMeta) GetRemainingItemCount() int64      { return meta.RemainingItemCount }
+func (meta *ListMeta) SetRemainingItemCount(c int64)     { meta.RemainingItemCount = c }
 
 func (obj *TypeMeta) GetObjectKind() schema.ObjectKind { return obj }
 
