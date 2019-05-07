@@ -19,7 +19,6 @@ package mount
 import (
 	"fmt"
 	"os"
-	"syscall"
 
 	"k8s.io/klog"
 )
@@ -101,24 +100,4 @@ func PathExists(path string) (bool, error) {
 	} else {
 		return false, err
 	}
-}
-
-// IsCorruptedMnt return true if err is about corrupted mount point
-func IsCorruptedMnt(err error) bool {
-	if err == nil {
-		return false
-	}
-	var underlyingError error
-	switch pe := err.(type) {
-	case nil:
-		return false
-	case *os.PathError:
-		underlyingError = pe.Err
-	case *os.LinkError:
-		underlyingError = pe.Err
-	case *os.SyscallError:
-		underlyingError = pe.Err
-	}
-
-	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES
 }
