@@ -122,7 +122,7 @@ type hnsNetworkInfo struct {
 
 type remoteSubnetInfo struct {
 	destinationPrefix string
-	isolationId       uint16
+	isolationID       uint16
 	providerAddress   string
 	drMacAddress      string
 }
@@ -649,13 +649,13 @@ func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
 	hns.deleteLoadBalancer(svcInfo.nodePorthnsID)
 	svcInfo.nodePorthnsID = ""
 
-	for _, externalIp := range svcInfo.externalIPs {
-		hns.deleteLoadBalancer(externalIp.hnsID)
-		externalIp.hnsID = ""
+	for _, externalIP := range svcInfo.externalIPs {
+		hns.deleteLoadBalancer(externalIP.hnsID)
+		externalIP.hnsID = ""
 	}
-	for _, lbIngressIp := range svcInfo.loadBalancerIngressIPs {
-		hns.deleteLoadBalancer(lbIngressIp.hnsID)
-		lbIngressIp.hnsID = ""
+	for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
+		hns.deleteLoadBalancer(lbIngressIP.hnsID)
+		lbIngressIP.hnsID = ""
 	}
 }
 
@@ -764,8 +764,8 @@ func shouldSkipService(svcName types.NamespacedName, service *v1.Service) bool {
 func (proxier *Proxier) updateServiceMap() (result updateServiceMapResult) {
 	result.staleServices = sets.NewString()
 
-	var serviceMap proxyServiceMap = proxier.serviceMap
-	var changes *serviceChangeMap = &proxier.serviceChanges
+	serviceMap := proxier.serviceMap
+	changes := &proxier.serviceChanges
 
 	func() {
 		changes.lock.Lock()
@@ -826,8 +826,8 @@ func (proxier *Proxier) updateEndpointsMap() (result updateEndpointMapResult) {
 	result.staleEndpoints = make(map[endpointServicePair]bool)
 	result.staleServiceNames = make(map[proxy.ServicePortName]bool)
 
-	var endpointsMap proxyEndpointsMap = proxier.endpointsMap
-	var changes *endpointsChangeMap = &proxier.endpointsChanges
+	endpointsMap := proxier.endpointsMap
+	changes := &proxier.endpointsChanges
 
 	func() {
 		changes.lock.Lock()
@@ -1150,14 +1150,14 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Create a Load Balancer Policy for each external IP
-		for _, externalIp := range svcInfo.externalIPs {
+		for _, externalIP := range svcInfo.externalIPs {
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err = hns.getLoadBalancer(
 				hnsEndpoints,
 				false,
 				false,
 				sourceVip,
-				externalIp.ip,
+				externalIP.ip,
 				Enum(svcInfo.protocol),
 				uint16(svcInfo.targetPort),
 				uint16(svcInfo.port),
@@ -1166,18 +1166,18 @@ func (proxier *Proxier) syncProxyRules() {
 				klog.Errorf("Policy creation failed: %v", err)
 				continue
 			}
-			externalIp.hnsID = hnsLoadBalancer.hnsID
-			klog.V(3).Infof("Hns LoadBalancer resource created for externalIp resources %v, Id[%s]", externalIp, hnsLoadBalancer.hnsID)
+			externalIP.hnsID = hnsLoadBalancer.hnsID
+			klog.V(3).Infof("Hns LoadBalancer resource created for externalIP resources %v, Id[%s]", externalIP, hnsLoadBalancer.hnsID)
 		}
 		// Create a Load Balancer Policy for each loadbalancer ingress
-		for _, lbIngressIp := range svcInfo.loadBalancerIngressIPs {
+		for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				hnsEndpoints,
 				false,
 				false,
 				sourceVip,
-				lbIngressIp.ip,
+				lbIngressIP.ip,
 				Enum(svcInfo.protocol),
 				uint16(svcInfo.targetPort),
 				uint16(svcInfo.port),
@@ -1186,8 +1186,8 @@ func (proxier *Proxier) syncProxyRules() {
 				klog.Errorf("Policy creation failed: %v", err)
 				continue
 			}
-			lbIngressIp.hnsID = hnsLoadBalancer.hnsID
-			klog.V(3).Infof("Hns LoadBalancer resource created for loadBalancer Ingress resources %v", lbIngressIp)
+			lbIngressIP.hnsID = hnsLoadBalancer.hnsID
+			klog.V(3).Infof("Hns LoadBalancer resource created for loadBalancer Ingress resources %v", lbIngressIP)
 		}
 		svcInfo.policyApplied = true
 		Log(svcInfo, "+++Policy Successfully applied for service +++", 2)

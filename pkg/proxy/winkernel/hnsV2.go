@@ -47,7 +47,7 @@ func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 			}
 			rs := &remoteSubnetInfo{
 				destinationPrefix: policySettings.DestinationPrefix,
-				isolationId:       policySettings.IsolationId,
+				isolationID:       policySettings.IsolationId,
 				providerAddress:   policySettings.ProviderAddress,
 				drMacAddress:      policySettings.DistributedRouterMacAddress,
 			}
