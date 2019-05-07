@@ -25,7 +25,6 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
