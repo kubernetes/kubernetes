@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eerr "k8s.io/kubernetes/test/e2e/framework/error"
 
 	"github.com/onsi/ginkgo"
 )
@@ -109,14 +110,14 @@ func createPrivilegedPSPBinding(f *Framework, namespace string) {
 			podSecurityPolicyPrivileged, metav1.GetOptions{})
 		if !apierrs.IsNotFound(err) {
 			// Privileged PSP was already created.
-			ExpectNoError(err, "Failed to get PodSecurityPolicy %s", podSecurityPolicyPrivileged)
+			e2eerr.ExpectNoError(err, "Failed to get PodSecurityPolicy %s", podSecurityPolicyPrivileged)
 			return
 		}
 
 		psp := privilegedPSP(podSecurityPolicyPrivileged)
 		psp, err = f.ClientSet.PolicyV1beta1().PodSecurityPolicies().Create(psp)
 		if !apierrs.IsAlreadyExists(err) {
-			ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
+			e2eerr.ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
 		}
 
 		if auth.IsRBACEnabled(f.ClientSet.RbacV1beta1()) {
@@ -131,7 +132,7 @@ func createPrivilegedPSPBinding(f *Framework, namespace string) {
 				}},
 			})
 			if !apierrs.IsAlreadyExists(err) {
-				ExpectNoError(err, "Failed to create PSP role")
+				e2eerr.ExpectNoError(err, "Failed to create PSP role")
 			}
 		}
 	})
@@ -147,8 +148,8 @@ func createPrivilegedPSPBinding(f *Framework, namespace string) {
 				Namespace: namespace,
 				Name:      "default",
 			})
-		ExpectNoError(err)
-		ExpectNoError(auth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
+		e2eerr.ExpectNoError(err)
+		e2eerr.ExpectNoError(auth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
 			serviceaccount.MakeUsername(namespace, "default"), namespace, "use", podSecurityPolicyPrivileged,
 			schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}, true))
 	}
