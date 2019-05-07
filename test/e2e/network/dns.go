@@ -362,6 +362,54 @@ var _ = SIGDescribe("DNS", func() {
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
 	})
 
+	It("should support configurable pod DNS nameservers", func() {
+		By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
+		testServerIP := "1.1.1.1"
+		testSearchPath := "resolv.conf.local"
+		testAgnhostPod := f.NewAgnhostPod(f.Namespace.Name, "pause")
+		testAgnhostPod.Spec.DNSPolicy = v1.DNSNone
+		testAgnhostPod.Spec.DNSConfig = &v1.PodDNSConfig{
+			Nameservers: []string{testServerIP},
+			Searches:    []string{testSearchPath},
+		}
+		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testAgnhostPod)
+		Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testAgnhostPod.Name)
+		framework.Logf("Created pod %v", testAgnhostPod)
+		defer func() {
+			framework.Logf("Deleting pod %s...", testAgnhostPod.Name)
+			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testAgnhostPod.Name, metav1.NewDeleteOptions(0)); err != nil {
+				framework.Failf("Failed to delete pod %s: %v", testAgnhostPod.Name, err)
+			}
+		}()
+		Expect(f.WaitForPodRunning(testAgnhostPod.Name)).NotTo(HaveOccurred(), "failed to wait for pod %s to be running", testAgnhostPod.Name)
+
+		runCommand := func(arg string) string {
+			cmd := []string{"/agnhost", arg}
+			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+				Command:       cmd,
+				Namespace:     f.Namespace.Name,
+				PodName:       testAgnhostPod.Name,
+				ContainerName: "agnhost",
+				CaptureStdout: true,
+				CaptureStderr: true,
+			})
+			Expect(err).NotTo(HaveOccurred(), "failed to run command '/agnhost %s' on pod, stdout: %v, stderr: %v, err: %v", arg, stdout, stderr, err)
+			return stdout
+		}
+
+		By("Verifying customized DNS suffix list is configured on pod...")
+		stdout := runCommand("dns-suffix")
+		if !strings.Contains(stdout, testSearchPath) {
+			framework.Failf("customized DNS suffix list not found configured in pod, expected to contain: %s, got: %s", testSearchPath, stdout)
+		}
+
+		By("Verifying customized DNS server is configured on pod...")
+		stdout = runCommand("dns-server-list")
+		if !strings.Contains(stdout, testServerIP) {
+			framework.Failf("customized DNS server not found in configured in pod, expected to contain: %s, got: %s", testServerIP, stdout)
+		}
+	})
+
 	It("should support configurable pod resolv.conf", func() {
 		By("Preparing a test DNS service with injected DNS names...")
 		testInjectedIP := "1.1.1.1"

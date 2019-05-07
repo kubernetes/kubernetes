@@ -4865,6 +4865,25 @@ func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.
 	}
 }
 
+// NewAgnhostPod returns a pod that uses the agnhost image. The image's binary supports various subcommands
+// that behave the same, no matter the underlying OS.
+func (f *Framework) NewAgnhostPod(name string, args ...string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "agnhost",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  args,
+				},
+			},
+		},
+	}
+}
+
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
 	_, err := RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
