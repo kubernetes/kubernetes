@@ -443,7 +443,7 @@ type ConversionRequest struct {
 // ConversionResponse describes a conversion response.
 type ConversionResponse struct {
 	// `uid` is an identifier for the individual request/response.
-	// This should be copied over from the corresponding AdmissionRequest.
+	// This should be copied over from the corresponding ConversionRequest.
 	UID types.UID `json:"uid" protobuf:"bytes,1,name=uid"`
 	// `convertedObjects` is the list of converted version of `request.objects` if the `result` is successful otherwise empty.
 	// The webhook is expected to set apiVersion of these objects to the ConversionRequest.desiredAPIVersion. The list
