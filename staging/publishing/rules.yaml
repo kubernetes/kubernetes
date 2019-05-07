@@ -282,8 +282,6 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
-    - repository: apiserver
-      branch: master
     - repository: client-go
       branch: master
 - destination: csi-translation-lib
