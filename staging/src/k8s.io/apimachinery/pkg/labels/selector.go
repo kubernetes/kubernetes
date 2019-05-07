@@ -162,7 +162,7 @@ func NewRequirement(key string, op selection.Operator, vals []string) (*Requirem
 	}
 
 	for i := range vals {
-		if err := validateLabelValue(vals[i]); err != nil {
+		if err := validateLabelValue(key, vals[i]); err != nil {
 			return nil, err
 		}
 	}
@@ -837,9 +837,9 @@ func validateLabelKey(k string) error {
 	return nil
 }
 
-func validateLabelValue(v string) error {
+func validateLabelValue(k, v string) error {
 	if errs := validation.IsValidLabelValue(v); len(errs) != 0 {
-		return fmt.Errorf("invalid label value: %q: %s", v, strings.Join(errs, "; "))
+		return fmt.Errorf("invalid label value: %q: at key: %q: %s", v, k, strings.Join(errs, "; "))
 	}
 	return nil
 }
