@@ -109,13 +109,13 @@ func TestAssumePV(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		cache := NewPVAssumeCache(nil)
-		internal_cache, ok := cache.(*pvAssumeCache)
+		internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 		if !ok {
 			t.Fatalf("Failed to get internal cache")
 		}
 
 		// Add oldPV to cache
-		internal_cache.add(scenario.oldPV)
+		internalCache.add(scenario.oldPV)
 		if err := verifyPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
 			t.Errorf("Failed to GetPV() after initial update: %v", err)
 			continue
@@ -143,7 +143,7 @@ func TestAssumePV(t *testing.T) {
 
 func TestRestorePV(t *testing.T) {
 	cache := NewPVAssumeCache(nil)
-	internal_cache, ok := cache.(*pvAssumeCache)
+	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -155,7 +155,7 @@ func TestRestorePV(t *testing.T) {
 	cache.Restore("nothing")
 
 	// Add oldPV to cache
-	internal_cache.add(oldPV)
+	internalCache.add(oldPV)
 	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
 		t.Fatalf("Failed to GetPV() after initial update: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestRestorePV(t *testing.T) {
 
 func TestBasicPVCache(t *testing.T) {
 	cache := NewPVAssumeCache(nil)
-	internal_cache, ok := cache.(*pvAssumeCache)
+	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -202,7 +202,7 @@ func TestBasicPVCache(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		pv := makePV(fmt.Sprintf("test-pv%v", i), "1", "")
 		pvs[pv.Name] = pv
-		internal_cache.add(pv)
+		internalCache.add(pv)
 	}
 
 	// List them
@@ -211,7 +211,7 @@ func TestBasicPVCache(t *testing.T) {
 	// Update a PV
 	updatedPV := makePV("test-pv3", "2", "")
 	pvs[updatedPV.Name] = updatedPV
-	internal_cache.update(nil, updatedPV)
+	internalCache.update(nil, updatedPV)
 
 	// List them
 	verifyListPVs(t, cache, pvs, "")
@@ -219,7 +219,7 @@ func TestBasicPVCache(t *testing.T) {
 	// Delete a PV
 	deletedPV := pvs["test-pv7"]
 	delete(pvs, deletedPV.Name)
-	internal_cache.delete(deletedPV)
+	internalCache.delete(deletedPV)
 
 	// List them
 	verifyListPVs(t, cache, pvs, "")
@@ -227,7 +227,7 @@ func TestBasicPVCache(t *testing.T) {
 
 func TestPVCacheWithStorageClasses(t *testing.T) {
 	cache := NewPVAssumeCache(nil)
-	internal_cache, ok := cache.(*pvAssumeCache)
+	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -237,7 +237,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		pv := makePV(fmt.Sprintf("test-pv%v", i), "1", "class1")
 		pvs1[pv.Name] = pv
-		internal_cache.add(pv)
+		internalCache.add(pv)
 	}
 
 	// Add a bunch of PVs
@@ -245,7 +245,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		pv := makePV(fmt.Sprintf("test2-pv%v", i), "1", "class2")
 		pvs2[pv.Name] = pv
-		internal_cache.add(pv)
+		internalCache.add(pv)
 	}
 
 	// List them
@@ -255,7 +255,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	// Update a PV
 	updatedPV := makePV("test-pv3", "2", "class1")
 	pvs1[updatedPV.Name] = updatedPV
-	internal_cache.update(nil, updatedPV)
+	internalCache.update(nil, updatedPV)
 
 	// List them
 	verifyListPVs(t, cache, pvs1, "class1")
@@ -264,7 +264,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 	// Delete a PV
 	deletedPV := pvs1["test-pv7"]
 	delete(pvs1, deletedPV.Name)
-	internal_cache.delete(deletedPV)
+	internalCache.delete(deletedPV)
 
 	// List them
 	verifyListPVs(t, cache, pvs1, "class1")
@@ -273,7 +273,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 
 func TestAssumeUpdatePVCache(t *testing.T) {
 	cache := NewPVAssumeCache(nil)
-	internal_cache, ok := cache.(*pvAssumeCache)
+	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -282,7 +282,7 @@ func TestAssumeUpdatePVCache(t *testing.T) {
 
 	// Add a PV
 	pv := makePV(pvName, "1", "")
-	internal_cache.add(pv)
+	internalCache.add(pv)
 	if err := verifyPV(cache, pvName, pv); err != nil {
 		t.Fatalf("failed to get PV: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestAssumeUpdatePVCache(t *testing.T) {
 	}
 
 	// Add old PV
-	internal_cache.add(pv)
+	internalCache.add(pv)
 	if err := verifyPV(cache, pvName, newPV); err != nil {
 		t.Fatalf("failed to get PV after old PV added: %v", err)
 	}
@@ -366,13 +366,13 @@ func TestAssumePVC(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		cache := NewPVCAssumeCache(nil)
-		internal_cache, ok := cache.(*pvcAssumeCache)
+		internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
 		if !ok {
 			t.Fatalf("Failed to get internal cache")
 		}
 
 		// Add oldPVC to cache
-		internal_cache.add(scenario.oldPVC)
+		internalCache.add(scenario.oldPVC)
 		if err := verifyPVC(cache, getPVCName(scenario.oldPVC), scenario.oldPVC); err != nil {
 			t.Errorf("Failed to GetPVC() after initial update: %v", err)
 			continue
@@ -400,7 +400,7 @@ func TestAssumePVC(t *testing.T) {
 
 func TestRestorePVC(t *testing.T) {
 	cache := NewPVCAssumeCache(nil)
-	internal_cache, ok := cache.(*pvcAssumeCache)
+	internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -412,7 +412,7 @@ func TestRestorePVC(t *testing.T) {
 	cache.Restore("nothing")
 
 	// Add oldPVC to cache
-	internal_cache.add(oldPVC)
+	internalCache.add(oldPVC)
 	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
 		t.Fatalf("Failed to GetPVC() after initial update: %v", err)
 	}
@@ -440,7 +440,7 @@ func TestRestorePVC(t *testing.T) {
 
 func TestAssumeUpdatePVCCache(t *testing.T) {
 	cache := NewPVCAssumeCache(nil)
-	internal_cache, ok := cache.(*pvcAssumeCache)
+	internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -450,7 +450,7 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 
 	// Add a PVC
 	pvc := makeClaim(pvcName, "1", pvcNamespace)
-	internal_cache.add(pvc)
+	internalCache.add(pvc)
 	if err := verifyPVC(cache, getPVCName(pvc), pvc); err != nil {
 		t.Fatalf("failed to get PVC: %v", err)
 	}
@@ -466,7 +466,7 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 	}
 
 	// Add old PVC
-	internal_cache.add(pvc)
+	internalCache.add(pvc)
 	if err := verifyPVC(cache, getPVCName(pvc), newPVC); err != nil {
 		t.Fatalf("failed to get PVC after old PVC added: %v", err)
 	}
