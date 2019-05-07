@@ -1529,7 +1529,6 @@ k8s.io/client-go/util/testing
 k8s.io/client-go/util/workqueue
 # k8s.io/cloud-provider v0.0.0 => ./staging/src/k8s.io/cloud-provider
 k8s.io/cloud-provider
-k8s.io/cloud-provider/features
 k8s.io/cloud-provider/node/helpers
 k8s.io/cloud-provider/service/helpers
 k8s.io/cloud-provider/volume

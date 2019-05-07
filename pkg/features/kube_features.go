@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	cloudfeatures "k8s.io/cloud-provider/features"
 )
 
 const (
@@ -434,6 +433,12 @@ const (
 	//
 	// Enables the OpenStack Cinder in-tree driver to OpenStack Cinder CSI Driver migration feature.
 	CSIMigrationOpenStack utilfeature.Feature = "CSIMigrationOpenStack"
+
+	// owner: @verult
+	// GA: v1.13
+	//
+	// Enables the regional PD feature on GCE.
+	deprecatedGCERegionalPersistentDisk utilfeature.Feature = "GCERegionalPersistentDisk"
 )
 
 func init() {
@@ -486,7 +491,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
 	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
-	cloudfeatures.GCERegionalPersistentDisk:     {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.17
+	deprecatedGCERegionalPersistentDisk:         {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.17
 	CSIMigration:                                {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationAWS:                             {Default: false, PreRelease: utilfeature.Alpha},
