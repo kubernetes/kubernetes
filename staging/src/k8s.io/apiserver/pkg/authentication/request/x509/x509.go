@@ -20,8 +20,11 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
+
+	"k8s.io/klog"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -31,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-var clientCertificateExpirationHistogram = prometheus.NewHistogram(
+var clientCertificateExpirationHistogramVec = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Namespace: "apiserver",
 		Subsystem: "client",
@@ -54,10 +57,11 @@ var clientCertificateExpirationHistogram = prometheus.NewHistogram(
 			(12 * 30 * 24 * time.Hour).Seconds(),
 		},
 	},
+	[]string{"client", "cn"},
 )
 
 func init() {
-	prometheus.MustRegister(clientCertificateExpirationHistogram)
+	prometheus.MustRegister(clientCertificateExpirationHistogramVec)
 }
 
 // UserConversion defines an interface for extracting user info from a client certificate chain
@@ -100,9 +104,17 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 		}
 	}
 
-	remaining := req.TLS.PeerCertificates[0].NotAfter.Sub(time.Now())
-	clientCertificateExpirationHistogram.Observe(remaining.Seconds())
-	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)
+	clientIP, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		klog.Warningf("Failed to get Client IP from req.RemoteAddr: %v, err: %v", req.RemoteAddr, err)
+		clientIP = ""
+	}
+
+	peerCertificate := req.TLS.PeerCertificates[0]
+	commonName := peerCertificate.Subject.CommonName
+	remaining := peerCertificate.NotAfter.Sub(time.Now())
+	clientCertificateExpirationHistogramVec.WithLabelValues(clientIP, commonName).Observe(remaining.Seconds())
+	chains, err := peerCertificate.Verify(optsCopy)
 	if err != nil {
 		return nil, false, err
 	}
