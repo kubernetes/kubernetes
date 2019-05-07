@@ -18,7 +18,7 @@ package utils
 
 import (
 	"crypto"
-	"crypto/rand"
+	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -40,7 +40,7 @@ const (
 
 // NewPrivateKey creates an RSA private key
 func NewPrivateKey() (*rsa.PrivateKey, error) {
-	return rsa.GenerateKey(rand.Reader, rsaKeySize)
+	return rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
 }
 
 // EncodeCertPEM returns PEM-endcoded certificate data
@@ -54,7 +54,7 @@ func EncodeCertPEM(cert *x509.Certificate) []byte {
 
 // NewSignedCert creates a signed certificate using the given CA certificate and key
 func NewSignedCert(cfg *certutil.Config, key crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer) (*x509.Certificate, error) {
-	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
+	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64))
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func NewSignedCert(cfg *certutil.Config, key crypto.Signer, caCert *x509.Certifi
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  cfg.Usages,
 	}
-	certDERBytes, err := x509.CreateCertificate(rand.Reader, &certTmpl, caCert, key.Public(), caKey)
+	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
 	if err != nil {
 		return nil, err
 	}
