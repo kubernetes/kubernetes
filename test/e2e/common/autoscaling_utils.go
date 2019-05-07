@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -476,7 +477,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		dpConfig := testutils.DeploymentConfig{
 			RCConfig: rcConfig,
 		}
-		framework.ExpectNoError(framework.RunDeployment(dpConfig))
+		framework.ExpectNoError(e2edeploy.RunDeployment(dpConfig))
 		break
 	case KindReplicaSet:
 		rsConfig := testutils.ReplicaSetConfig{

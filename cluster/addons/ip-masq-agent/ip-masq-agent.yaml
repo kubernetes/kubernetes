@@ -32,7 +32,7 @@ spec:
       hostNetwork: true
       containers:
       - name: ip-masq-agent
-        image: k8s.gcr.io/ip-masq-agent-amd64:v2.1.1
+        image: k8s.gcr.io/ip-masq-agent-amd64:v2.2.1
         args:
           - --masq-chain=IP-MASQ
         resources:

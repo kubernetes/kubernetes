@@ -209,6 +209,7 @@ aliases:
     - dcbw
     - dnardo
     - freehan
+    - johnbelamaric
     - mrhohn
     - nicksardo
     - thockin
@@ -219,10 +220,12 @@ aliases:
     - dcbw
     - dnardo
     - freehan
+    - johnbelamaric
     - mrhohn
     - nicksardo
     - thockin
     - rramkumar1
+    - cmluciano
   sig-apps-approvers:
     - kow3ns
     - janetkuo
@@ -353,12 +356,11 @@ aliases:
   # sig-apps-api-reviewers:
   #   - 
   #   - 
-  
-  # sig-auth-api-reviewers:
-  #   - 
-  #   - 
-  
-  
+
+  sig-auth-api-reviewers:
+    - enj
+    - mikedanese
+
   sig-cli-api-reviewers:
     - pwittrock
     - soltysh

@@ -88,7 +88,7 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 func registerFakePlugin(pluginName, endpoint string, versions []string, t *testing.T) {
 	highestSupportedVersions, err := highestSupportedVersion(versions)
 	if err != nil {
-		t.Fatalf("unexpected error parsing versions (%v) for pluginName % q endpoint %q: %#v", versions, pluginName, endpoint, err)
+		t.Fatalf("unexpected error parsing versions (%v) for pluginName %q endpoint %q: %#v", versions, pluginName, endpoint, err)
 	}
 
 	csiDrivers.Clear()
@@ -366,7 +366,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 				t.Fatal(err)
 			}
 			if spec == nil {
-				t.Fatal("nil volume.Spec contstructed")
+				t.Fatal("nil volume.Spec constructed")
 			}
 
 			// inspect spec
@@ -474,7 +474,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 				t.Fatal(err)
 			}
 			if spec == nil {
-				t.Fatal("nil volume.Spec contstructed")
+				t.Fatal("nil volume.Spec constructed")
 			}
 
 			if spec.Name() != tc.specVolID {
@@ -756,7 +756,7 @@ func TestPluginNewUnmounter(t *testing.T) {
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file to re-create client
-	dir := path.Join(getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host), "/mount")
+	dir := filepath.Join(getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host), "/mount")
 	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
 		t.Errorf("failed to create dir [%s]: %v", dir, err)
 	}

@@ -31,21 +31,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/aws"
 )
 
 const (
 	diskPartitionSuffix = ""
-	diskXVDPath         = "/dev/xvd"
-	diskXVDPattern      = "/dev/xvd*"
-	maxChecks           = 60
-	maxRetries          = 10
 	checkSleepDuration  = time.Second
-	errorSleepDuration  = 5 * time.Second
-	ebsMaxReplicasInAZ  = 1
 )
 
 // AWSDiskUtil provides operations for EBS volume.

@@ -17,13 +17,11 @@ limitations under the License.
 package alpha
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"fmt"
-	"math/big"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -31,7 +29,8 @@ import (
 	"github.com/spf13/cobra"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
@@ -81,144 +80,198 @@ func TestCommandsGenerated(t *testing.T) {
 
 func TestRunRenewCommands(t *testing.T) {
 	tests := []struct {
-		command     string
-		baseNames   []string
-		caBaseNames []string
+		command         string
+		CAs             []*certsphase.KubeadmCert
+		Certs           []*certsphase.KubeadmCert
+		KubeconfigFiles []string
 	}{
 		{
 			command: "all",
-			baseNames: []string{
-				kubeadmconstants.APIServerCertAndKeyBaseName,
-				kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
-				kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
-				kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
-				kubeadmconstants.EtcdServerCertAndKeyBaseName,
-				kubeadmconstants.EtcdPeerCertAndKeyBaseName,
-				kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName,
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertRootCA,
+				&certsphase.KubeadmCertFrontProxyCA,
+				&certsphase.KubeadmCertEtcdCA,
 			},
-			caBaseNames: []string{
-				kubeadmconstants.CACertAndKeyBaseName,
-				kubeadmconstants.FrontProxyCACertAndKeyBaseName,
-				kubeadmconstants.EtcdCACertAndKeyBaseName,
+			Certs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertAPIServer,
+				&certsphase.KubeadmCertKubeletClient,
+				&certsphase.KubeadmCertFrontProxyClient,
+				&certsphase.KubeadmCertEtcdAPIClient,
+				&certsphase.KubeadmCertEtcdServer,
+				&certsphase.KubeadmCertEtcdPeer,
+				&certsphase.KubeadmCertEtcdHealthcheck,
+			},
+			KubeconfigFiles: []string{
+				kubeadmconstants.AdminKubeConfigFileName,
+				kubeadmconstants.SchedulerKubeConfigFileName,
+				kubeadmconstants.ControllerManagerKubeConfigFileName,
 			},
 		},
 		{
-			command:     "apiserver",
-			baseNames:   []string{kubeadmconstants.APIServerCertAndKeyBaseName},
-			caBaseNames: []string{kubeadmconstants.CACertAndKeyBaseName},
+			command: "apiserver",
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertRootCA,
+			},
+			Certs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertAPIServer,
+			},
 		},
 		{
-			command:     "apiserver-kubelet-client",
-			baseNames:   []string{kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName},
-			caBaseNames: []string{kubeadmconstants.CACertAndKeyBaseName},
+			command: "apiserver-kubelet-client",
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertRootCA,
+			},
+			Certs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertKubeletClient,
+			},
 		},
 		{
-			command:     "apiserver-etcd-client",
-			baseNames:   []string{kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName},
-			caBaseNames: []string{kubeadmconstants.EtcdCACertAndKeyBaseName},
+			command: "apiserver-etcd-client",
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdCA,
+			},
+			Certs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdAPIClient,
+			},
 		},
 		{
-			command:     "front-proxy-client",
-			baseNames:   []string{kubeadmconstants.FrontProxyClientCertAndKeyBaseName},
-			caBaseNames: []string{kubeadmconstants.FrontProxyCACertAndKeyBaseName},
+			command: "front-proxy-client",
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertFrontProxyCA,
+			},
+			Certs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertFrontProxyClient,
+			},
 		},
 		{
-			command:     "etcd-server",
-			baseNames:   []string{kubeadmconstants.EtcdServerCertAndKeyBaseName},
-			caBaseNames: []string{kubeadmconstants.EtcdCACertAndKeyBaseName},
+			command: "etcd-server",
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdCA,
+			},
+			Certs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdServer,
+			},
 		},
 		{
-			command:     "etcd-peer",
-			baseNames:   []string{kubeadmconstants.EtcdPeerCertAndKeyBaseName},
-			caBaseNames: []string{kubeadmconstants.EtcdCACertAndKeyBaseName},
+			command: "etcd-peer",
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdCA,
+			},
+			Certs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdPeer,
+			},
 		},
 		{
-			command:     "etcd-healthcheck-client",
-			baseNames:   []string{kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName},
-			caBaseNames: []string{kubeadmconstants.EtcdCACertAndKeyBaseName},
+			command: "etcd-healthcheck-client",
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdCA,
+			},
+			Certs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdHealthcheck,
+			},
+		},
+		{
+			command: "admin.conf",
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertRootCA,
+			},
+			KubeconfigFiles: []string{
+				kubeadmconstants.AdminKubeConfigFileName,
+			},
+		},
+		{
+			command: "scheduler.conf",
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertRootCA,
+			},
+			KubeconfigFiles: []string{
+				kubeadmconstants.SchedulerKubeConfigFileName,
+			},
+		},
+		{
+			command: "controller-manager.conf",
+			CAs: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertRootCA,
+			},
+			KubeconfigFiles: []string{
+				kubeadmconstants.ControllerManagerKubeConfigFileName,
+			},
 		},
 	}
-
-	renewCmds := getRenewSubCommands()
 
 	for _, test := range tests {
 		t.Run(test.command, func(t *testing.T) {
 			tmpDir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpDir)
 
-			caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
+			cfg := testutil.GetDefaultInternalConfig(t)
+			cfg.CertificatesDir = tmpDir
 
-			for _, caBaseName := range test.caBaseNames {
-				if err := pkiutil.WriteCertAndKey(tmpDir, caBaseName, caCert, caKey); err != nil {
-					t.Fatalf("couldn't write out CA: %v", err)
+			// Generate all the CA
+			CACerts := map[string]*x509.Certificate{}
+			CAKeys := map[string]crypto.Signer{}
+			for _, ca := range test.CAs {
+				caCert, caKey, err := ca.CreateAsCA(cfg)
+				if err != nil {
+					t.Fatalf("couldn't write out CA %s: %v", ca.Name, err)
 				}
+				CACerts[ca.Name] = caCert
+				CAKeys[ca.Name] = caKey
 			}
 
-			certTmpl := x509.Certificate{
-				Subject: pkix.Name{
-					CommonName:   "test-cert",
-					Organization: []string{"sig-cluster-lifecycle"},
-				},
-				DNSNames:     []string{"test-domain.space"},
-				SerialNumber: new(big.Int).SetInt64(0),
-				NotBefore:    time.Now().Add(-time.Hour * 24 * 365),
-				NotAfter:     time.Now().Add(-time.Hour),
-				KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-				ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-			}
-
-			key, err := rsa.GenerateKey(rand.Reader, 2048)
-			if err != nil {
-				t.Fatalf("couldn't generate private key: %v", err)
-			}
-
-			certDERBytes, err := x509.CreateCertificate(rand.Reader, &certTmpl, caCert, key.Public(), caKey)
-			if err != nil {
-				t.Fatalf("couldn't generate private key: %v", err)
-			}
-			cert, err := x509.ParseCertificate(certDERBytes)
-			if err != nil {
-				t.Fatalf("couldn't generate private key: %v", err)
-			}
-
-			for _, baseName := range test.baseNames {
-				if err := pkiutil.WriteCertAndKey(tmpDir, baseName, cert, key); err != nil {
-					t.Fatalf("couldn't write out initial certificate")
+			// Generate all the signed certificates (and store creation time)
+			createTime := map[string]time.Time{}
+			for _, cert := range test.Certs {
+				caCert := CACerts[cert.CAName]
+				caKey := CAKeys[cert.CAName]
+				if err := cert.CreateFromCA(cfg, caCert, caKey); err != nil {
+					t.Fatalf("couldn't write certificate %s: %v", cert.Name, err)
 				}
+
+				file, err := os.Stat(filepath.Join(tmpDir, fmt.Sprintf("%s.crt", cert.BaseName)))
+				if err != nil {
+					t.Fatalf("couldn't get certificate %s: %v", cert.Name, err)
+				}
+				createTime[cert.Name] = file.ModTime()
 			}
 
+			// Generate all the kubeconfig files with embedded certs(and store creation time)
+			for _, kubeConfig := range test.KubeconfigFiles {
+				if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, tmpDir, cfg); err != nil {
+					t.Fatalf("couldn't create kubeconfig %q: %v", kubeConfig, err)
+				}
+				file, err := os.Stat(filepath.Join(tmpDir, kubeConfig))
+				if err != nil {
+					t.Fatalf("couldn't get kubeconfig %s: %v", kubeConfig, err)
+				}
+				createTime[kubeConfig] = file.ModTime()
+			}
+
+			// exec renew
+			renewCmds := getRenewSubCommands(tmpDir)
 			cmdtestutil.RunSubCommand(t, renewCmds, test.command, fmt.Sprintf("--cert-dir=%s", tmpDir))
 
-			for _, baseName := range test.baseNames {
-				newCert, newKey, err := pkiutil.TryLoadCertAndKeyFromDisk(tmpDir, baseName)
+			// read renewed certificates and check the file is modified
+			for _, cert := range test.Certs {
+				file, err := os.Stat(filepath.Join(tmpDir, fmt.Sprintf("%s.crt", cert.BaseName)))
 				if err != nil {
-					t.Fatalf("couldn't load renewed certificate: %v", err)
+					t.Fatalf("couldn't get certificate %s: %v", cert.Name, err)
 				}
-
-				certstestutil.AssertCertificateIsSignedByCa(t, newCert, caCert)
-
-				pool := x509.NewCertPool()
-				pool.AddCert(caCert)
-
-				_, err = newCert.Verify(x509.VerifyOptions{
-					DNSName:   "test-domain.space",
-					Roots:     pool,
-					KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-				})
-				if err != nil {
-					t.Errorf("couldn't verify renewed cert: %v", err)
-				}
-
-				switch pubKey := newCert.PublicKey.(type) {
-				case *rsa.PublicKey:
-					if pubKey.N.Cmp(newKey.(*rsa.PrivateKey).N) != 0 {
-						t.Error("private key does not match public key")
-					}
-				default:
-					t.Errorf("unknown public key type %T", newCert.PublicKey)
+				if createTime[cert.Name] == file.ModTime() {
+					t.Errorf("certificate %s was not renewed as expected", cert.Name)
 				}
 			}
 
+			// ead renewed kubeconfig files and check the file is modified
+			for _, kubeConfig := range test.KubeconfigFiles {
+				file, err := os.Stat(filepath.Join(tmpDir, kubeConfig))
+				if err != nil {
+					t.Fatalf("couldn't get kubeconfig %s: %v", kubeConfig, err)
+				}
+				if createTime[kubeConfig] == file.ModTime() {
+					t.Errorf("kubeconfig %s was not renewed as expected", kubeConfig)
+				}
+			}
 		})
 	}
 }
@@ -228,7 +281,7 @@ func TestRenewUsingCSR(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	cert := &certs.KubeadmCertEtcdServer
 
-	renewCmds := getRenewSubCommands()
+	renewCmds := getRenewSubCommands(tmpDir)
 	cmdtestutil.RunSubCommand(t, renewCmds, cert.Name, "--csr-only", "--csr-dir="+tmpDir)
 
 	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(tmpDir, cert.BaseName); err != nil {

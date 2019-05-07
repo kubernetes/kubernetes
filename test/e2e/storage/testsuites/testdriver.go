@@ -128,8 +128,14 @@ const (
 
 // DriverInfo represents static information about a TestDriver.
 type DriverInfo struct {
-	Name       string // Name of the driver, aka the provisioner name.
-	FeatureTag string // FeatureTag for the driver
+	// Internal name of the driver, this is used as a display name in the test
+	// case and test objects
+	Name string
+	// Fully qualified plugin name as registered in Kubernetes of the in-tree
+	// plugin if it exists and is empty if this DriverInfo represents a CSI
+	// Driver
+	InTreePluginName string
+	FeatureTag       string // FeatureTag for the driver
 
 	MaxFileSize          int64               // Max file size to be tested for this driver
 	SupportedFsType      sets.String         // Map of string for supported fs type

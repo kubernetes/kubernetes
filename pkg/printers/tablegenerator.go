@@ -27,13 +27,14 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
+// TableGenerator - an interface for generating metav1beta1.Table provided a runtime.Object
 type TableGenerator interface {
 	GenerateTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
 }
 
+// PrintHandler - interface to handle printing provided an array of metav1beta1.TableColumnDefinition
 type PrintHandler interface {
 	TableHandler(columns []metav1beta1.TableColumnDefinition, printFunc interface{}) error
-	DefaultTableHandler(columns []metav1beta1.TableColumnDefinition, printFunc interface{}) error
 }
 
 type handlerEntry struct {
@@ -47,11 +48,10 @@ type handlerEntry struct {
 // will only be printed if the object type changes. This makes it useful for printing items
 // received from watches.
 type HumanReadablePrinter struct {
-	handlerMap     map[reflect.Type]*handlerEntry
-	defaultHandler *handlerEntry
-	options        PrintOptions
-	lastType       interface{}
-	lastColumns    []metav1beta1.TableColumnDefinition
+	handlerMap  map[reflect.Type]*handlerEntry
+	options     PrintOptions
+	lastType    interface{}
+	lastColumns []metav1beta1.TableColumnDefinition
 }
 
 var _ TableGenerator = &HumanReadablePrinter{}
@@ -64,11 +64,12 @@ func NewTableGenerator() *HumanReadablePrinter {
 	}
 }
 
-func (a *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePrinter {
+// With method - accepts a list of builder functions that modify HumanReadablePrinter
+func (h *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePrinter {
 	for _, fn := range fns {
-		fn(a)
+		fn(h)
 	}
-	return a
+	return h
 }
 
 // GenerateTable returns a table for the provided object, using the printer registered for that type. It returns
@@ -143,24 +144,6 @@ func (h *HumanReadablePrinter) TableHandler(columnDefinitions []metav1beta1.Tabl
 		return err
 	}
 	h.handlerMap[objType] = entry
-	return nil
-}
-
-// DefaultTableHandler registers a set of columns and a print func that is given a chance to process
-// any object without an explicit handler. Only the most recently set print handler is used.
-// See ValidateRowPrintHandlerFunc for required method signature.
-func (h *HumanReadablePrinter) DefaultTableHandler(columnDefinitions []metav1beta1.TableColumnDefinition, printFunc interface{}) error {
-	printFuncValue := reflect.ValueOf(printFunc)
-	if err := ValidateRowPrintHandlerFunc(printFuncValue); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))
-		return err
-	}
-	entry := &handlerEntry{
-		columnDefinitions: columnDefinitions,
-		printFunc:         printFuncValue,
-	}
-
-	h.defaultHandler = entry
 	return nil
 }
 

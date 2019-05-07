@@ -7,7 +7,6 @@ go_library(
     srcs = [
         "cleanup.go",
         "create.go",
-        "deployment_util.go",
         "exec_util.go",
         "flake_reporting_util.go",
         "framework.go",
@@ -44,7 +43,6 @@ go_library(
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/nodelifecycle:go_default_library",
         "//pkg/controller/service:go_default_library",
         "//pkg/features:go_default_library",
@@ -154,6 +152,7 @@ filegroup(
         "//test/e2e/framework/gpu:all-srcs",
         "//test/e2e/framework/ingress:all-srcs",
         "//test/e2e/framework/job:all-srcs",
+        "//test/e2e/framework/log:all-srcs",
         "//test/e2e/framework/metrics:all-srcs",
         "//test/e2e/framework/podlogs:all-srcs",
         "//test/e2e/framework/providers/aws:all-srcs",

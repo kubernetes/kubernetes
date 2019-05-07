@@ -42,11 +42,11 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Creating a job")
 		job := jobutil.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
 		err = jobutil.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
 	// Pods sometimes fail, but eventually succeed.
@@ -61,11 +61,11 @@ var _ = SIGDescribe("Job", func() {
 		// test timeout.
 		job := jobutil.NewTestJob("failOnce", "fail-once-local", v1.RestartPolicyOnFailure, parallelism, completions, nil, backoffLimit)
 		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
 		err = jobutil.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
 	// Pods sometimes fail, but eventually succeed, after pod restarts
@@ -82,11 +82,11 @@ var _ = SIGDescribe("Job", func() {
 		// test less flaky, for now.
 		job := jobutil.NewTestJob("randomlySucceedOrFail", "rand-non-local", v1.RestartPolicyNever, parallelism, 3, nil, 999)
 		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
 		err = jobutil.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, *job.Spec.Completions)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
 	ginkgo.It("should exceed active deadline", func() {
@@ -94,10 +94,10 @@ var _ = SIGDescribe("Job", func() {
 		var activeDeadlineSeconds int64 = 1
 		job := jobutil.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
 		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 		ginkgo.By("Ensuring job past active deadline")
 		err = jobutil.WaitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, time.Duration(activeDeadlineSeconds+10)*time.Second, "DeadlineExceeded")
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
 	})
 
 	/*
@@ -109,11 +109,11 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Creating a job")
 		job := jobutil.NewTestJob("notTerminate", "foo", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring active pods == parallelism")
 		err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to ensure active pods == parallelism in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to ensure active pods == parallelism in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("delete a job")
 		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name))
@@ -131,16 +131,16 @@ var _ = SIGDescribe("Job", func() {
 		// Save Kind since it won't be populated in the returned job.
 		kind := job.Kind
 		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 		job.Kind = kind
 
 		ginkgo.By("Ensuring active pods == parallelism")
 		err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to ensure active pods == parallelism in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to ensure active pods == parallelism in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Orphaning one of the Job's Pods")
 		pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
 		gomega.Expect(pods.Items).To(gomega.HaveLen(int(parallelism)))
 		pod := pods.Items[0]
 		f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
@@ -183,15 +183,15 @@ var _ = SIGDescribe("Job", func() {
 		backoff := 1
 		job := jobutil.NewTestJob("fail", "backofflimit", v1.RestartPolicyNever, 1, 1, nil, int32(backoff))
 		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create job in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 		ginkgo.By("Ensuring job exceed backofflimit")
 
 		err = jobutil.WaitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, jobutil.JobTimeout, "BackoffLimitExceeded")
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to ensure job exceed backofflimit in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to ensure job exceed backofflimit in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Checking that %d pod created and status is failed", backoff+1))
 		pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
 		// gomega.Expect(pods.Items).To(gomega.HaveLen(backoff + 1))
 		// due to NumRequeus not being stable enough, especially with failed status
 		// updates we need to allow more than backoff+1

@@ -30,7 +30,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
-        "//staging/src/k8s.io/cloud-provider/features:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",

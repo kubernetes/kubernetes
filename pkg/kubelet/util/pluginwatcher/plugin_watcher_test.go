@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 )
@@ -173,9 +174,6 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 		plugins[i] = p
 	}
 
-	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
-	defer func() { require.NoError(t, w.Stop()) }()
-
 	var wg sync.WaitGroup
 	for i := 0; i < len(plugins); i++ {
 		wg.Add(1)
@@ -189,6 +187,9 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 		}(plugins[i])
 	}
 
+	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
+	defer func() { require.NoError(t, w.Stop()) }()
+
 	c := make(chan struct{})
 	go func() {
 		defer close(c)
@@ -198,7 +199,7 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	select {
 	case <-c:
 		return
-	case <-time.After(2 * time.Second):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("Timeout while waiting for the plugin registration status")
 	}
 }
@@ -238,11 +239,22 @@ func TestPlugiRegistrationFailureWithUnsupportedVersionAtKubeletStart(t *testing
 	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
 	hdlr.AddPluginName(pluginName)
 
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
+		require.False(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+	}()
+
 	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
 	defer func() { require.NoError(t, w.Stop()) }()
 
-	require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
-	require.False(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+	select {
+	case <-c:
+		return
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Timeout while waiting for the plugin registration status")
+	}
 }
 
 func waitForPluginRegistrationStatus(t *testing.T, statusChan chan registerapi.RegistrationStatus) bool {
@@ -259,7 +271,7 @@ func waitForEvent(t *testing.T, expected examplePluginEvent, eventChan chan exam
 	select {
 	case event := <-eventChan:
 		return event == expected
-	case <-time.After(2 * time.Second):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("Timed out while waiting for registration status %v", expected)
 	}
 

@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.
@@ -130,11 +131,9 @@ func TestRecycleSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Delete the volume before recycle operation starts
-				reactor.lock.Lock()
-				delete(reactor.volumes, "volume6-6")
-				reactor.lock.Unlock()
+				reactor.DeleteVolume("volume6-6")
 			}),
 		},
 		{
@@ -147,14 +146,9 @@ func TestRecycleSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Mark the volume as Available before the recycler starts
-				reactor.lock.Lock()
-				volume := reactor.volumes["volume6-7"]
-				volume.Spec.ClaimRef = nil
-				volume.Status.Phase = v1.VolumeAvailable
-				volume.Annotations = nil
-				reactor.lock.Unlock()
+				reactor.MarkVolumeAvaiable("volume6-7")
 			}),
 		},
 		{
@@ -164,17 +158,13 @@ func TestRecycleSync(t *testing.T) {
 			// user.
 			"6-8 - prebound volume is deleted before recycling",
 			newVolumeArray("volume6-8", "1Gi", "uid6-8", "claim6-8", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty),
-			newVolumeArray("volume6-8", "1Gi", "", "claim6-8", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
+			newVolumeArray("volume6-8", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			noclaims,
 			noclaims,
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Mark the volume as Available before the recycler starts
-				reactor.lock.Lock()
-				volume := reactor.volumes["volume6-8"]
-				volume.Spec.ClaimRef.UID = ""
-				volume.Status.Phase = v1.VolumeAvailable
-				reactor.lock.Unlock()
+				reactor.MarkVolumeAvaiable("volume6-8")
 			}),
 		},
 		{

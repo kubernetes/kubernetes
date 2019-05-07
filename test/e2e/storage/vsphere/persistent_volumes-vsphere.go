@@ -21,11 +21,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -111,7 +112,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	})
 
 	AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up test resources")
+		e2elog.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
 

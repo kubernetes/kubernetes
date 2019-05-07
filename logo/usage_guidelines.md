@@ -16,25 +16,12 @@ helpful:
 Additionally, permission is granted to modify the Kubernetes mark for non-commercial uses such as t-shirts and stickers.
 
 ## Links to logo images
-Logo:
-   * [SVG format](https://github.com/kubernetes/kubernetes/raw/master/logo/logo.svg)
-   * [PNG format](https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png)
-   * [PDF format](https://github.com/kubernetes/kubernetes/raw/master/logo/logo.pdf)
-
-Logo (with border):
-   * [SVG format](https://github.com/kubernetes/kubernetes/raw/master/logo/logo_with_border.svg)
-   * [PNG format](https://github.com/kubernetes/kubernetes/raw/master/logo/logo_with_border.png)
-   * [PDF format](https://github.com/kubernetes/kubernetes/raw/master/logo/logo_with_border.pdf)
-
-Name (white):
-   * [SVG format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_white.svg)
-   * [PNG format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_white.png)
-   * [PDF format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_white.pdf)
-
-Name (blue):
-   * [SVG format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_blue.svg)
-   * [PNG format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_blue.png)
-   * [PDF format](https://github.com/kubernetes/kubernetes/raw/master/logo/name_blue.pdf)
+The Kubernetes logo is available in 2 formats (PNG & SVG), 3 layouts --
+horizontal (also known as landscape format), stacked (which is closer to
+square), and icon (which does not include the name and is square), and 5
+colors (color/black/white/all-blue/white-text) -- so over 20 versions -- in the
+CNCF [artwork](https://github.com/cncf/artwork/tree/master/projects/kubernetes)
+repo.
 
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/logo/usage_guidelines.md?pixel)]()

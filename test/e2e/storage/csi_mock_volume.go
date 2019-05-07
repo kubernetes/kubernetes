@@ -37,6 +37,7 @@ import (
 
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -715,7 +716,7 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 	if err != nil {
 		return fmt.Errorf("could not load CSI driver logs: %s", err)
 	}
-	framework.Logf("CSI driver logs:\n%s", log)
+	e2elog.Logf("CSI driver logs:\n%s", log)
 	// Find NodePublish in the logs
 	foundAttributes := sets.NewString()
 	logLines := strings.Split(log, "\n")
@@ -734,7 +735,7 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 		var call MockCSICall
 		err := json.Unmarshal([]byte(line), &call)
 		if err != nil {
-			framework.Logf("Could not parse CSI driver log line %q: %s", line, err)
+			e2elog.Logf("Could not parse CSI driver log line %q: %s", line, err)
 			continue
 		}
 		if call.Method != "/csi.v1.Node/NodePublishVolume" {
@@ -745,7 +746,7 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 			vv, found := call.Request.VolumeContext[k]
 			if found && v == vv {
 				foundAttributes.Insert(k)
-				framework.Logf("Found volume attribute %s: %s", k, v)
+				e2elog.Logf("Found volume attribute %s: %s", k, v)
 			}
 		}
 		// Process just the first NodePublish, the rest of the log is useless.
@@ -767,7 +768,7 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 	timeout := 4 * time.Minute
 
-	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
+	e2elog.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
 		_, err := cs.StorageV1beta1().CSIDrivers().Get(driverName, metav1.GetOptions{})
 		if !errors.IsNotFound(err) {
@@ -780,9 +781,9 @@ func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 func destroyCSIDriver(cs clientset.Interface, driverName string) {
 	driverGet, err := cs.StorageV1beta1().CSIDrivers().Get(driverName, metav1.GetOptions{})
 	if err == nil {
-		framework.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
+		e2elog.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
 		// Uncomment the following line to get full dump of CSIDriver object
-		// framework.Logf("%s", framework.PrettyPrint(driverGet))
+		// e2elog.Logf("%s", framework.PrettyPrint(driverGet))
 		cs.StorageV1beta1().CSIDrivers().Delete(driverName, nil)
 	}
 }

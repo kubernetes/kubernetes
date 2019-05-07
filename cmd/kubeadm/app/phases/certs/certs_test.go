@@ -301,84 +301,65 @@ func TestWriteCSRFilesIfNotExist(t *testing.T) {
 
 }
 
-func TestWriteKeyFilesIfNotExist(t *testing.T) {
+func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
+	setupKey, err := keyutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		t.Fatalf("Can't setup test: %v", err)
+	}
 
-	setupKey, _ := NewServiceAccountSigningKey()
-	key, _ := NewServiceAccountSigningKey()
-
-	var tests = []struct {
-		setupFunc     func(pkiDir string) error
-		expectedError bool
-		expectedKey   crypto.Signer
+	tcases := []struct {
+		name        string
+		setupFunc   func(pkiDir string) error
+		expectedErr bool
+		expectedKey []byte
 	}{
 		{ // key does not exists > key written
-			expectedKey: key,
+			name: "generate successfully",
 		},
 		{ // key exists > existing key used
+			name: "use existing key",
 			setupFunc: func(pkiDir string) error {
-				return writeKeyFilesIfNotExist(pkiDir, "dummy", setupKey)
+				err := keyutil.WriteKey(filepath.Join(pkiDir, kubeadmconstants.ServiceAccountPrivateKeyName), setupKey)
+				return err
 			},
 			expectedKey: setupKey,
 		},
 		{ // some file exists, but it is not a valid key > err
+			name: "empty key",
 			setupFunc: func(pkiDir string) error {
-				testutil.SetupEmptyFiles(t, pkiDir, "dummy.key")
+				testutil.SetupEmptyFiles(t, pkiDir, kubeadmconstants.ServiceAccountPrivateKeyName)
 				return nil
 			},
-			expectedError: true,
+			expectedErr: true,
 		},
 	}
+	for _, tt := range tcases {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(dir)
 
-	for _, test := range tests {
-		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
-
-		// executes setup func (if necessary)
-		if test.setupFunc != nil {
-			if err := test.setupFunc(tmpdir); err != nil {
-				t.Errorf("error executing setupFunc: %v", err)
-				continue
+			if tt.setupFunc != nil {
+				if err := tt.setupFunc(dir); err != nil {
+					t.Fatalf("error executing setupFunc: %v", err)
+				}
 			}
-		}
 
-		// executes create func
-		err := writeKeyFilesIfNotExist(tmpdir, "dummy", key)
+			err := CreateServiceAccountKeyAndPublicKeyFiles(dir)
+			if (err != nil) != tt.expectedErr {
+				t.Fatalf("expected error: %v, got: %v, error: %v", tt.expectedErr, err != nil, err)
+			} else if tt.expectedErr {
+				return
+			}
 
-		if !test.expectedError && err != nil {
-			t.Errorf("error writeKeyFilesIfNotExist failed when not expected to fail: %v", err)
-			continue
-		} else if test.expectedError && err == nil {
-			t.Error("error writeKeyFilesIfNotExist didn't failed when expected")
-			continue
-		} else if test.expectedError || test.expectedKey == nil {
-			continue
-		}
-
-		// asserts expected files are there
-		testutil.AssertFileExists(t, tmpdir, "dummy.key", "dummy.pub")
-
-		// check created key
-		resultingKey, err := pkiutil.TryLoadKeyFromDisk(tmpdir, "dummy")
-		if err != nil {
-			t.Errorf("failure reading created key: %v", err)
-			continue
-		}
-
-		resultingKeyPEM, err := keyutil.MarshalPrivateKeyToPEM(resultingKey)
-		if err != nil {
-			t.Errorf("failure marshaling created key: %v", err)
-			continue
-		}
-
-		expectedKeyPEM, err := keyutil.MarshalPrivateKeyToPEM(test.expectedKey)
-		if err != nil {
-			t.Fatalf("Failed to marshal expected private key: %v", err)
-		}
-
-		if bytes.Compare(resultingKeyPEM, expectedKeyPEM) != 0 {
-			t.Error("created key does not match expected key")
-		}
+			resultingKeyPEM, wasGenerated, err := keyutil.LoadOrGenerateKeyFile(filepath.Join(dir, kubeadmconstants.ServiceAccountPrivateKeyName))
+			if err != nil {
+				t.Errorf("Can't load created key: %v", err)
+			} else if wasGenerated {
+				t.Error("The key was not created")
+			} else if tt.expectedKey != nil && !bytes.Equal(resultingKeyPEM, tt.expectedKey) {
+				t.Error("Non-existing key is used")
+			}
+		})
 	}
 }
 
@@ -736,7 +717,6 @@ func TestNewCSR(t *testing.T) {
 func TestCreateCertificateFilesMethods(t *testing.T) {
 
 	var tests = []struct {
-		setupFunc     func(cfg *kubeadmapi.InitConfiguration) error
 		createFunc    func(cfg *kubeadmapi.InitConfiguration) error
 		expectedFiles []string
 		externalEtcd  bool

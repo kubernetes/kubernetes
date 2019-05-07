@@ -374,8 +374,8 @@ func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 
 func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
-	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	pluginMntDir := volutil.GetPluginMountDir(plugin.host, plugin.GetPluginName())
+	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginMntDir)
 	if err != nil {
 		return nil, err
 	}

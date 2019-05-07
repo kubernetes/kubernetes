@@ -19,7 +19,7 @@ package photon_pd
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -122,7 +122,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Mounter")
 	}
 
-	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~photon-pd/vol1")
+	volPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~photon-pd/vol1")
 	path := mounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)

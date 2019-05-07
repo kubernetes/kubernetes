@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/images/net/nat"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -209,7 +210,7 @@ var _ = SIGDescribe("Network", func() {
 		const epsilonSeconds = 60
 		const expectedTimeoutSeconds = 60 * 60
 
-		framework.Logf("conntrack entry timeout was: %v, expected: %v",
+		e2elog.Logf("conntrack entry timeout was: %v, expected: %v",
 			timeoutSeconds, expectedTimeoutSeconds)
 
 		Expect(math.Abs(float64(timeoutSeconds - expectedTimeoutSeconds))).Should(

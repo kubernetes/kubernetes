@@ -68,3 +68,8 @@ build:remote --strategy=Closure=remote
 build:remote --strategy=Genrule=remote
 build:remote --define=EXECUTOR=remote
 
+# --config=ci-instance adds a remote instance name
+build:ci-instance --remote_instance_name=projects/k8s-prow-builds/instances/default_instance
+
+# The config we want to use in CI
+build:ci --config=remote --config=ci-instance

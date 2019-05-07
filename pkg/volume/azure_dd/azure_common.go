@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/azure"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -80,7 +80,7 @@ func makeGlobalPDPath(host volume.VolumeHost, diskUri string, isManaged bool) (s
 	}
 	// "{m for managed b for blob}{hashed diskUri or DiskId depending on disk kind }"
 	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskUri)
-	pdPath := filepath.Join(host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, diskName)
+	pdPath := filepath.Join(host.GetPluginDir(azureDataDiskPluginName), util.MountsInGlobalPDPath, diskName)
 
 	return pdPath, nil
 }

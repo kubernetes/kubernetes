@@ -48,8 +48,6 @@ type Config struct {
 	Prefix string
 	// Transport holds all connection related info, i.e. equal TransportConfig means equal servers we talk to.
 	Transport TransportConfig
-	// Quorum indicates that whether read operations should be quorum-level consistent.
-	Quorum bool
 	// Paging indicates whether the server implementation should allow paging (if it is
 	// supported). This is generally configured by feature gating, or by a specific
 	// resource type not wishing to allow paging, and is not intended for end users to
@@ -74,6 +72,7 @@ type Config struct {
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 	return &Config{
+		Paging:             true,
 		Prefix:             prefix,
 		Codec:              codec,
 		CompactionInterval: DefaultCompactInterval,

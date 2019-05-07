@@ -510,8 +510,8 @@ func (kl *Kubelet) setLastObservedNodeAddresses(addresses []v1.NodeAddress) {
 	kl.lastObservedNodeAddresses = addresses
 }
 func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
-	kl.lastObservedNodeAddressesMux.Lock()
-	defer kl.lastObservedNodeAddressesMux.Unlock()
+	kl.lastObservedNodeAddressesMux.RLock()
+	defer kl.lastObservedNodeAddressesMux.RUnlock()
 	return kl.lastObservedNodeAddresses
 }
 

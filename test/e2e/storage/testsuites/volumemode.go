@@ -70,6 +70,9 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		ns *v1.Namespace
 		// genericVolumeTestResource contains pv, pvc, sc, etc., owns cleaning that up
 		genericVolumeTestResource
+
+		intreeOps   opCounts
+		migratedOps opCounts
 	}
 	var (
 		dInfo = driver.GetDriverInfo()
@@ -91,6 +94,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 		// Now do the more expensive test initialization.
 		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
 
 		fsType := pattern.FsType
 		volBindMode := storagev1.VolumeBindingImmediate
@@ -153,6 +157,8 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 			l.testCleanup()
 			l.testCleanup = nil
 		}
+
+		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	// We register different tests depending on the drive

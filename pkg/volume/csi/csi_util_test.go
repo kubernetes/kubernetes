@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	api "k8s.io/api/core/v1"
@@ -104,7 +105,7 @@ func TestSaveVolumeData(t *testing.T) {
 	for i, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
 		specVolID := fmt.Sprintf("spec-volid-%d", i)
-		mountDir := path.Join(getTargetPath(testPodUID, specVolID, plug.host), "/mount")
+		mountDir := filepath.Join(getTargetPath(testPodUID, specVolID, plug.host), "/mount")
 		if err := os.MkdirAll(mountDir, 0755); err != nil && !os.IsNotExist(err) {
 			t.Errorf("failed to create dir [%s]: %v", mountDir, err)
 		}
@@ -116,7 +117,7 @@ func TestSaveVolumeData(t *testing.T) {
 		}
 		// did file get created
 		dataDir := getTargetPath(testPodUID, specVolID, plug.host)
-		file := path.Join(dataDir, volDataFileName)
+		file := filepath.Join(dataDir, volDataFileName)
 		if _, err := os.Stat(file); err != nil {
 			t.Errorf("failed to create data dir: %v", err)
 		}

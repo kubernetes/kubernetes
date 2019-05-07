@@ -32,11 +32,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/aws"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -250,8 +250,8 @@ func getVolumeSource(
 
 func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
-	volumeID, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
+	volumeID, err := mounter.GetDeviceNameFromMount(mountPath, pluginMntDir)
 	if err != nil {
 		return nil, err
 	}
@@ -451,7 +451,7 @@ func makeGlobalPDPath(host volume.VolumeHost, volumeID aws.KubernetesVolumeID) s
 	// Clean up the URI to be more fs-friendly
 	name := string(volumeID)
 	name = strings.Replace(name, "://", "/", -1)
-	return filepath.Join(host.GetPluginDir(awsElasticBlockStorePluginName), mount.MountsInGlobalPDPath, name)
+	return filepath.Join(host.GetPluginDir(awsElasticBlockStorePluginName), util.MountsInGlobalPDPath, name)
 }
 
 func (ebs *awsElasticBlockStore) GetPath() string {

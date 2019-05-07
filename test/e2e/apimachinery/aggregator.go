@@ -40,6 +40,7 @@ import (
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	rbacv1beta1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/utils/pointer"
@@ -262,9 +263,9 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	}
 	deployment, err := client.AppsV1().Deployments(namespace).Create(d)
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentName, namespace)
-	err = framework.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", image)
+	err = e2edeploy.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", image)
 	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s in %s to complete", image, deploymentName, namespace)
-	err = framework.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", etcdImage)
+	err = e2edeploy.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", etcdImage)
 	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s to complete", etcdImage, deploymentName, namespace)
 
 	// kubectl create -f service.yaml
@@ -321,7 +322,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
 	// NOTE: aggregated apis should generally be set up in their own namespace (<aggregated-api-namespace>). As the test framework
 	// is setting up a new namespace, we are just using that.
-	err = framework.WaitForDeploymentComplete(client, deployment)
+	err = e2edeploy.WaitForDeploymentComplete(client, deployment)
 	framework.ExpectNoError(err, "deploying extension apiserver in namespace %s", namespace)
 
 	// kubectl create -f apiservice.yaml

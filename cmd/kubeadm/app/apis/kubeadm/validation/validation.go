@@ -50,6 +50,7 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateClusterConfiguration(&c.ClusterConfiguration)...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, field.NewPath("localAPIEndpoint"))...)
+	// TODO: Maybe validate that .CertificateKey is a valid hex encoded AES key
 	return allErrs
 }
 
@@ -91,6 +92,7 @@ func ValidateJoinControlPlane(c *kubeadm.JoinControlPlane, fldPath *field.Path) 
 	allErrs := field.ErrorList{}
 	if c != nil {
 		allErrs = append(allErrs, ValidateAPIEndpoint(&c.LocalAPIEndpoint, fldPath.Child("localAPIEndpoint"))...)
+		// TODO: Maybe validate that .CertificateKey is a valid hex encoded AES key
 	}
 	return allErrs
 }

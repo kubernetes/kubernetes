@@ -24,10 +24,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -352,7 +353,7 @@ func verifyPVCCreationFails(client clientset.Interface, namespace string, scPara
 	Expect(err).To(HaveOccurred())
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
-	framework.Logf("Failure message : %+q", eventList.Items[0].Message)
+	e2elog.Logf("Failure message : %+q", eventList.Items[0].Message)
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 

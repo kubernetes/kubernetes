@@ -228,8 +228,8 @@ func (n *Mounter) PathIsDevice(pathname string) (bool, error) {
 }
 
 //GetDeviceNameFromMount given a mount point, find the volume id from checking /proc/mounts
-func (n *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return mount.GetDeviceNameFromMountLinux(n, mountPath, pluginDir)
+func (n *Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
+	return mount.GetDeviceNameFromMountLinux(n, mountPath, pluginMountDir)
 }
 
 // MakeRShared checks if path is shared and bind-mounts it as rshared if needed.

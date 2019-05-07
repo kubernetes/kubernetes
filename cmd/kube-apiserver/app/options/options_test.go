@@ -150,6 +150,7 @@ func TestAddFlags(t *testing.T) {
 					CAFile:     "/var/run/kubernetes/etcdca.crt",
 					CertFile:   "/var/run/kubernetes/etcdce.crt",
 				},
+				Paging:                true,
 				Prefix:                "/registry",
 				CompactionInterval:    storagebackend.DefaultCompactInterval,
 				CountMetricPollPeriod: time.Minute,

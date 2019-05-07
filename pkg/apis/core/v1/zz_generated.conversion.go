@@ -2010,6 +2010,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.WindowsSecurityContextOptions)(nil), (*core.WindowsSecurityContextOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions(a.(*v1.WindowsSecurityContextOptions), b.(*core.WindowsSecurityContextOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.WindowsSecurityContextOptions)(nil), (*v1.WindowsSecurityContextOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(a.(*core.WindowsSecurityContextOptions), b.(*v1.WindowsSecurityContextOptions), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*apps.ReplicaSetSpec)(nil), (*v1.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_ReplicaSetSpec_To_v1_ReplicationControllerSpec(a.(*apps.ReplicaSetSpec), b.(*v1.ReplicationControllerSpec), scope)
 	}); err != nil {
@@ -2022,11 +2032,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*apps.ReplicaSet)(nil), (*v1.ReplicationController)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_ReplicaSet_To_v1_ReplicationController(a.(*apps.ReplicaSet), b.(*v1.ReplicationController), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*core.PodSecurityContext)(nil), (*v1.PodSecurityContext)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_PodSecurityContext_To_v1_PodSecurityContext(a.(*core.PodSecurityContext), b.(*v1.PodSecurityContext), scope)
 	}); err != nil {
 		return err
 	}
@@ -2047,16 +2052,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*core.ReplicationControllerSpec)(nil), (*v1.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(a.(*core.ReplicationControllerSpec), b.(*v1.ReplicationControllerSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*core.SecurityContext)(nil), (*v1.SecurityContext)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_SecurityContext_To_v1_SecurityContext(a.(*core.SecurityContext), b.(*v1.SecurityContext), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1.PodSecurityContext)(nil), (*core.PodSecurityContext)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodSecurityContext_To_core_PodSecurityContext(a.(*v1.PodSecurityContext), b.(*core.PodSecurityContext), scope)
 	}); err != nil {
 		return err
 	}
@@ -2798,15 +2793,7 @@ func autoConvert_v1_Container_To_core_Container(in *v1.Container, out *core.Cont
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = core.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = core.PullPolicy(in.ImagePullPolicy)
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(core.SecurityContext)
-		if err := Convert_v1_SecurityContext_To_core_SecurityContext(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.SecurityContext = (*core.SecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
@@ -2838,15 +2825,7 @@ func autoConvert_core_Container_To_v1_Container(in *core.Container, out *v1.Cont
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = v1.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(v1.SecurityContext)
-		if err := Convert_core_SecurityContext_To_v1_SecurityContext(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.SecurityContext = (*v1.SecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
@@ -5512,6 +5491,7 @@ func Convert_core_PodReadinessGate_To_v1_PodReadinessGate(in *core.PodReadinessG
 
 func autoConvert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecurityContext, out *core.PodSecurityContext, s conversion.Scope) error {
 	out.SELinuxOptions = (*core.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+	out.WindowsOptions = (*core.WindowsSecurityContextOptions)(unsafe.Pointer(in.WindowsOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsGroup = (*int64)(unsafe.Pointer(in.RunAsGroup))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
@@ -5521,12 +5501,18 @@ func autoConvert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecu
 	return nil
 }
 
+// Convert_v1_PodSecurityContext_To_core_PodSecurityContext is an autogenerated conversion function.
+func Convert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecurityContext, out *core.PodSecurityContext, s conversion.Scope) error {
+	return autoConvert_v1_PodSecurityContext_To_core_PodSecurityContext(in, out, s)
+}
+
 func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecurityContext, out *v1.PodSecurityContext, s conversion.Scope) error {
 	// INFO: in.HostNetwork opted out of conversion generation
 	// INFO: in.HostPID opted out of conversion generation
 	// INFO: in.HostIPC opted out of conversion generation
 	// INFO: in.ShareProcessNamespace opted out of conversion generation
 	out.SELinuxOptions = (*v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+	out.WindowsOptions = (*v1.WindowsSecurityContextOptions)(unsafe.Pointer(in.WindowsOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsGroup = (*int64)(unsafe.Pointer(in.RunAsGroup))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
@@ -5534,6 +5520,11 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 	out.FSGroup = (*int64)(unsafe.Pointer(in.FSGroup))
 	out.Sysctls = *(*[]v1.Sysctl)(unsafe.Pointer(&in.Sysctls))
 	return nil
+}
+
+// Convert_core_PodSecurityContext_To_v1_PodSecurityContext is an autogenerated conversion function.
+func Convert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecurityContext, out *v1.PodSecurityContext, s conversion.Scope) error {
+	return autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in, out, s)
 }
 
 func autoConvert_v1_PodSignature_To_core_PodSignature(in *v1.PodSignature, out *core.PodSignature, s conversion.Scope) error {
@@ -5568,28 +5559,8 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	} else {
 		out.Volumes = nil
 	}
-	if in.InitContainers != nil {
-		in, out := &in.InitContainers, &out.InitContainers
-		*out = make([]core.Container, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Container_To_core_Container(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.InitContainers = nil
-	}
-	if in.Containers != nil {
-		in, out := &in.Containers, &out.Containers
-		*out = make([]core.Container, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Container_To_core_Container(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
-	}
+	out.InitContainers = *(*[]core.Container)(unsafe.Pointer(&in.InitContainers))
+	out.Containers = *(*[]core.Container)(unsafe.Pointer(&in.Containers))
 	out.RestartPolicy = core.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
@@ -5640,28 +5611,8 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s
 	} else {
 		out.Volumes = nil
 	}
-	if in.InitContainers != nil {
-		in, out := &in.InitContainers, &out.InitContainers
-		*out = make([]v1.Container, len(*in))
-		for i := range *in {
-			if err := Convert_core_Container_To_v1_Container(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.InitContainers = nil
-	}
-	if in.Containers != nil {
-		in, out := &in.Containers, &out.Containers
-		*out = make([]v1.Container, len(*in))
-		for i := range *in {
-			if err := Convert_core_Container_To_v1_Container(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
-	}
+	out.InitContainers = *(*[]v1.Container)(unsafe.Pointer(&in.InitContainers))
+	out.Containers = *(*[]v1.Container)(unsafe.Pointer(&in.Containers))
 	out.RestartPolicy = v1.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
@@ -6799,6 +6750,7 @@ func autoConvert_v1_SecurityContext_To_core_SecurityContext(in *v1.SecurityConte
 	out.Capabilities = (*core.Capabilities)(unsafe.Pointer(in.Capabilities))
 	out.Privileged = (*bool)(unsafe.Pointer(in.Privileged))
 	out.SELinuxOptions = (*core.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+	out.WindowsOptions = (*core.WindowsSecurityContextOptions)(unsafe.Pointer(in.WindowsOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsGroup = (*int64)(unsafe.Pointer(in.RunAsGroup))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
@@ -6817,6 +6769,7 @@ func autoConvert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityCon
 	out.Capabilities = (*v1.Capabilities)(unsafe.Pointer(in.Capabilities))
 	out.Privileged = (*bool)(unsafe.Pointer(in.Privileged))
 	out.SELinuxOptions = (*v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+	out.WindowsOptions = (*v1.WindowsSecurityContextOptions)(unsafe.Pointer(in.WindowsOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsGroup = (*int64)(unsafe.Pointer(in.RunAsGroup))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
@@ -6824,6 +6777,11 @@ func autoConvert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityCon
 	out.AllowPrivilegeEscalation = (*bool)(unsafe.Pointer(in.AllowPrivilegeEscalation))
 	out.ProcMount = (*v1.ProcMountType)(unsafe.Pointer(in.ProcMount))
 	return nil
+}
+
+// Convert_core_SecurityContext_To_v1_SecurityContext is an autogenerated conversion function.
+func Convert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext, out *v1.SecurityContext, s conversion.Scope) error {
+	return autoConvert_core_SecurityContext_To_v1_SecurityContext(in, out, s)
 }
 
 func autoConvert_v1_SerializedReference_To_core_SerializedReference(in *v1.SerializedReference, out *core.SerializedReference, s conversion.Scope) error {
@@ -7636,4 +7594,22 @@ func autoConvert_core_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(in *
 // Convert_core_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm is an autogenerated conversion function.
 func Convert_core_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(in *core.WeightedPodAffinityTerm, out *v1.WeightedPodAffinityTerm, s conversion.Scope) error {
 	return autoConvert_core_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(in, out, s)
+}
+
+func autoConvert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions(in *v1.WindowsSecurityContextOptions, out *core.WindowsSecurityContextOptions, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions is an autogenerated conversion function.
+func Convert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions(in *v1.WindowsSecurityContextOptions, out *core.WindowsSecurityContextOptions, s conversion.Scope) error {
+	return autoConvert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions(in, out, s)
+}
+
+func autoConvert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(in *core.WindowsSecurityContextOptions, out *v1.WindowsSecurityContextOptions, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions is an autogenerated conversion function.
+func Convert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(in *core.WindowsSecurityContextOptions, out *v1.WindowsSecurityContextOptions, s conversion.Scope) error {
+	return autoConvert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(in, out, s)
 }

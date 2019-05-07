@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
@@ -53,7 +54,7 @@ type StorageClassTest struct {
 	ClaimSize            string
 	ExpectedSize         string
 	PvCheck              func(claim *v1.PersistentVolumeClaim)
-	VolumeMode           *v1.PersistentVolumeMode
+	VolumeMode           v1.PersistentVolumeMode
 	AllowVolumeExpansion bool
 }
 
@@ -89,6 +90,9 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		cs       clientset.Interface
 		pvc      *v1.PersistentVolumeClaim
 		sc       *storage.StorageClass
+
+		intreeOps   opCounts
+		migratedOps opCounts
 	}
 	var (
 		dInfo   = driver.GetDriverInfo()
@@ -119,6 +123,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 		// Now do the more expensive test initialization.
 		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
 		l.cs = l.config.Framework.ClientSet
 		claimSize := dDriver.GetClaimSize()
 		l.sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
@@ -127,7 +132,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		}
 		l.pvc = getClaim(claimSize, l.config.Framework.Namespace.Name)
 		l.pvc.Spec.StorageClassName = &l.sc.Name
-		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.sc, l.pvc)
+		e2elog.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.sc, l.pvc)
 		l.testCase = &StorageClassTest{
 			Client:       l.config.Framework.ClientSet,
 			Claim:        l.pvc,
@@ -142,6 +147,8 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 			l.testCleanup()
 			l.testCleanup = nil
 		}
+
+		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	It("should provision storage with defaults", func() {
@@ -239,7 +246,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		class, err = client.StorageV1().StorageClasses().Get(class.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
-			framework.Logf("deleting storage class %s", class.Name)
+			e2elog.Logf("deleting storage class %s", class.Name)
 			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(class.Name, nil))
 		}()
 	}
@@ -248,7 +255,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
 	framework.ExpectNoError(err)
 	defer func() {
-		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
+		e2elog.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 		// typically this claim has already been deleted
 		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
@@ -469,7 +476,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 		}
 		if len(errors) > 0 {
 			for claimName, err := range errors {
-				framework.Logf("Failed to delete PVC: %s due to error: %v", claimName, err)
+				e2elog.Logf("Failed to delete PVC: %s due to error: %v", claimName, err)
 			}
 		}
 	}()
@@ -587,9 +594,9 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 	}
 	body, err := c.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{}).Do().Raw()
 	if err != nil {
-		framework.Logf("Error getting logs for pod %s: %v", pod.Name, err)
+		e2elog.Logf("Error getting logs for pod %s: %v", pod.Name, err)
 	} else {
-		framework.Logf("Pod %s has the following logs: %s", pod.Name, body)
+		e2elog.Logf("Pod %s has the following logs: %s", pod.Name, body)
 	}
 	framework.DeletePodOrFail(c, pod.Namespace, pod.Name)
 }
@@ -657,19 +664,19 @@ func prepareDataSourceForProvisioning(
 	}
 
 	cleanupFunc := func() {
-		framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
+		e2elog.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 		err = dynamicClient.Resource(snapshotGVR).Namespace(updatedClaim.Namespace).Delete(snapshot.GetName(), nil)
 		if err != nil && !apierrs.IsNotFound(err) {
 			framework.Failf("Error deleting snapshot %q. Error: %v", snapshot.GetName(), err)
 		}
 
-		framework.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
+		e2elog.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
 		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(updatedClaim.Name, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
 			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
 		}
 
-		framework.Logf("deleting SnapshotClass %s", snapshotClass.GetName())
+		e2elog.Logf("deleting SnapshotClass %s", snapshotClass.GetName())
 		framework.ExpectNoError(dynamicClient.Resource(snapshotClassGVR).Delete(snapshotClass.GetName(), nil))
 	}
 

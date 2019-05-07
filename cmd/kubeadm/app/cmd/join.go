@@ -128,7 +128,6 @@ type joinOptions struct {
 	controlPlane          bool
 	ignorePreflightErrors []string
 	externalcfg           *kubeadmapiv1beta2.JoinConfiguration
-	certificateKey        string
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -138,13 +137,11 @@ var _ phases.JoinData = &joinData{}
 // this data is shared across all the phases that are included in the workflow.
 type joinData struct {
 	cfg                   *kubeadmapi.JoinConfiguration
-	skipTokenPrint        bool
 	initCfg               *kubeadmapi.InitConfiguration
 	tlsBootstrapCfg       *clientcmdapi.Config
 	clientSet             *clientset.Clientset
 	ignorePreflightErrors sets.String
 	outputWriter          io.Writer
-	certificateKey        string
 }
 
 // NewCmdJoin returns "kubeadm join" command.
@@ -187,7 +184,7 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 			} else {
 				// otherwise, if the node joined as a worker node;
 				// outputs the join done message and exit
-				fmt.Fprintf(data.outputWriter, joinWorkerNodeDoneMsg)
+				fmt.Fprint(data.outputWriter, joinWorkerNodeDoneMsg)
 			}
 		},
 		// We accept the control-plane location as an optional positional argument
@@ -221,6 +218,10 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.JoinConfig
 	flagSet.StringVar(
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
+	)
+	flagSet.StringVar(
+		&cfg.ControlPlane.CertificateKey, options.CertificateKey, "",
+		"Use this key to decrypt the certificate secrets uploaded by init.",
 	)
 	// add control plane endpoint flags to the specified flagset
 	flagSet.StringVar(
@@ -273,10 +274,6 @@ func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 	flagSet.BoolVar(
 		&joinOptions.controlPlane, options.ControlPlane, joinOptions.controlPlane,
 		"Create a new control plane instance on this node",
-	)
-	flagSet.StringVar(
-		&joinOptions.certificateKey, options.CertificateKey, "",
-		"Use this key to decrypt the certificate secrets uploaded by init.",
 	)
 }
 
@@ -405,13 +402,15 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		tlsBootstrapCfg:       tlsBootstrapCfg,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		outputWriter:          out,
-		certificateKey:        opt.certificateKey,
 	}, nil
 }
 
 // CertificateKey returns the key used to encrypt the certs.
 func (j *joinData) CertificateKey() string {
-	return j.certificateKey
+	if j.cfg.ControlPlane != nil {
+		return j.cfg.ControlPlane.CertificateKey
+	}
+	return ""
 }
 
 // Cfg returns the JoinConfiguration.

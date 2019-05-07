@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 
 	. "github.com/onsi/ginkgo"
@@ -68,7 +69,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		By("Getting cluster ID")
 		clusterID, err := gce.GetClusterID(cs)
 		Expect(err).NotTo(HaveOccurred())
-		framework.Logf("Got cluster ID: %v", clusterID)
+		e2elog.Logf("Got cluster ID: %v", clusterID)
 
 		jig := framework.NewServiceTestJig(cs, serviceName)
 		nodeList := jig.GetNodes(framework.MaxNodesForEndpointsTests)
@@ -130,7 +131,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			podName := fmt.Sprintf("netexec%v", i)
 			jig.LaunchNetexecPodOnNode(f, nodeName, podName, firewallTestHTTPPort, firewallTestUDPPort, true)
 			defer func() {
-				framework.Logf("Cleaning up the netexec pod: %v", podName)
+				e2elog.Logf("Cleaning up the netexec pod: %v", podName)
 				Expect(cs.CoreV1().Pods(ns).Delete(podName, nil)).NotTo(HaveOccurred())
 			}()
 		}

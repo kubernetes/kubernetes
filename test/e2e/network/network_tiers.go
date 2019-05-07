@@ -30,6 +30,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 
 	. "github.com/onsi/ginkgo"
@@ -53,7 +54,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 			framework.DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {
-			framework.Logf("cleaning gce resource for %s", lb)
+			e2elog.Logf("cleaning gce resource for %s", lb)
 			framework.TestContext.CloudConfig.Provider.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
@@ -111,12 +112,12 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 			if requestedAddrName != "" {
 				// Release GCE static address - this is not kube-managed and will not be automatically released.
 				if err := gceCloud.DeleteRegionAddress(requestedAddrName, gceCloud.Region()); err != nil {
-					framework.Logf("failed to release static IP address %q: %v", requestedAddrName, err)
+					e2elog.Logf("failed to release static IP address %q: %v", requestedAddrName, err)
 				}
 			}
 		}()
 		Expect(err).NotTo(HaveOccurred())
-		framework.Logf("Allocated static IP to be used by the load balancer: %q", requestedIP)
+		e2elog.Logf("Allocated static IP to be used by the load balancer: %q", requestedIP)
 
 		By("updating the Service to use the standard tier with a requested IP")
 		svc = jig.UpdateServiceOrFail(ns, svc.Name, func(svc *v1.Service) {

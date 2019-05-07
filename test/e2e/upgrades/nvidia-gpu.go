@@ -56,7 +56,7 @@ func (t *NvidiaGPUUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	if upgrade == MasterUpgrade || upgrade == ClusterUpgrade {
 		// MasterUpgrade should be totally hitless.
 		job, err := jobutil.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		gomega.Expect(job.Status.Failed).To(gomega.BeZero(), "Job pods failed during master upgrade: %v", job.Status.Failed)
 	}
 }
@@ -88,11 +88,11 @@ func (t *NvidiaGPUUpgradeTest) startJob(f *framework.Framework) {
 	}
 	ns := f.Namespace.Name
 	_, err := jobutil.CreateJob(f.ClientSet, ns, testJob)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.Logf("Created job %v", testJob)
 	ginkgo.By("Waiting for gpu job pod start")
 	err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, ns, testJob.Name, 1)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ginkgo.By("Done with gpu job pod start")
 }
 
@@ -101,9 +101,9 @@ func (t *NvidiaGPUUpgradeTest) verifyJobPodSuccess(f *framework.Framework) {
 	// Wait for client pod to complete.
 	ns := f.Namespace.Name
 	err := jobutil.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, "cuda-add", 1)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, "cuda-add")
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	createdPod := pods.Items[0].Name
 	framework.Logf("Created pod %v", createdPod)
 	f.PodClient().WaitForSuccess(createdPod, 5*time.Minute)

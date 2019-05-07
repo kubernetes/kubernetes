@@ -87,7 +87,7 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		columnLabels = *f.ColumnLabels
 	}
 
-	p := printers.NewHumanReadablePrinter(printers.PrintOptions{
+	p := printers.NewTablePrinter(printers.PrintOptions{
 		Kind:          f.Kind,
 		WithKind:      showKind,
 		NoHeaders:     f.NoHeaders,

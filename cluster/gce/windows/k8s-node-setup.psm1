@@ -1079,6 +1079,22 @@ function Configure-Dockerd {
 $STACKDRIVER_VERSION = 'v1-9'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 
+
+# Restart the Stackdriver logging agent
+# `Restart-Service StackdriverLogging` may fail because StackdriverLogging
+# sometimes is unstoppable, so we work around it by killing the processes.
+function Restart-StackdriverLoggingAgent {
+  Stop-Service -NoWait StackdriverLogging
+  # TODO: check periodically to lower the wait time
+  Start-Sleep 10
+  if ((Get-service StackdriverLogging).Status -ne 'Stopped') {
+    # Force kill the processes.
+    Stop-Process -Force -PassThru -Id (Get-WmiObject win32_process |
+      Where CommandLine -Like '*Stackdriver/logging*').ProcessId
+  }
+  Start-Service StackdriverLogging
+}
+
 # Install and start the Stackdriver logging agent according to
 # https://cloud.google.com/logging/docs/agent/installation.
 # TODO(yujuhong): Update to a newer Stackdriver agent once it is released to
@@ -1105,7 +1121,7 @@ function InstallAndStart-LoggingAgent {
                 "Stackdriver logging agent is already installed")
     # Restart-Service restarts a running service or starts a not-running
     # service.
-    Restart-Service StackdriverLogging
+    Restart-StackdriverLoggingAgent
     return
   }
 
@@ -1136,7 +1152,7 @@ function InstallAndStart-LoggingAgent {
       -Encoding ASCII
 
   # Restart the service to pick up the new configurations.
-  Restart-Service StackdriverLogging
+  Restart-StackdriverLoggingAgent
   Remove-Item -Force -Recurse $tmp_dir
 }
 
@@ -1244,6 +1260,43 @@ $FLUENTD_CONFIG = @'
   </record>
   tag ${if record['stream'] == 'stderr' then 'raw.stderr' else 'raw.stdout' end}
   remove_keys stream,log
+</match>
+
+# TODO: detect exceptions and forward them as one log entry using the
+# detect_exceptions plugin
+
+# This section is exclusive for k8s_container logs. These logs come with
+# 'raw.stderr' or 'raw.stdout' tags.
+<match {raw.stderr,raw.stdout}>
+  @type google_cloud
+  # Try to detect JSON formatted log entries.
+  detect_json true
+  # Allow log entries from multiple containers to be sent in the same request.
+  split_logs_by_tag false
+  # Set the buffer type to file to improve the reliability and reduce the memory consumption
+  buffer_type file
+  buffer_path /var/log/fluentd-buffers/kubernetes.containers.buffer
+  # Set queue_full action to block because we want to pause gracefully
+  # in case of the off-the-limits load instead of throwing an exception
+  buffer_queue_full_action block
+  # Set the chunk limit conservatively to avoid exceeding the recommended
+  # chunk size of 5MB per write request.
+  buffer_chunk_limit 512k
+  # Cap the combined memory usage of this buffer and the one below to
+  # 512KiB/chunk * (6 + 2) chunks = 4 MiB
+  buffer_queue_limit 6
+  # Never wait more than 5 seconds before flushing logs in the non-error case.
+  flush_interval 5s
+  # Never wait longer than 30 seconds between retries.
+  max_retry_wait 30
+  # Disable the limit on the number of retries (retry forever).
+  disable_retry_limit
+  # Use multiple threads for processing.
+  num_threads 2
+  use_grpc true
+  # Skip timestamp adjustment as this is in a controlled environment with
+  # known timestamp format. This helps with CPU usage.
+  adjust_invalid_timestamps false
 </match>
 
 # Attach local_resource_id for 'k8s_node' monitored resource.
