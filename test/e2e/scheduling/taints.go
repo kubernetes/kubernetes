@@ -340,10 +340,14 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	// 1. Run two pods; one with toleration, one without toleration
-	// 2. Taint the nodes running those pods with a no-execute taint
-	// 3. See if pod-without-toleration get evicted, and pod-with-toleration is kept
-	It("only evicts pods without tolerations from tainted nodes", func() {
+	/*
+		Release : v1.15
+		Testname: Taint, Multiple pods, NoExecute taint with Pod toleration
+		Description: Create two Pods, One with NoExecute toleration and the other without any tolerations. Ensure
+		that both Pods are scheduled onto Nodes. Taint both the Nodes with "NoExecute" taint and verify that the
+		Pod with toleration is retained and the Pod without toleration is evicted out.
+	*/
+	framework.ConformanceIt("only evicts pods without tolerations from tainted nodes", func() {
 		podGroup := "taint-eviction-a"
 		observedDeletions := make(chan string, 100)
 		stopCh := make(chan struct{})
