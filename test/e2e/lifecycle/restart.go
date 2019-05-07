@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -61,7 +62,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		ginkgo.By("ensuring all nodes are ready")
 		originalNodes, err = framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		framework.Logf("Got the following nodes before restart: %v", nodeNames(originalNodes))
+		e2elog.Logf("Got the following nodes before restart: %v", nodeNames(originalNodes))
 
 		ginkgo.By("ensuring all pods are running and ready")
 		allPods := ps.List()
@@ -91,7 +92,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		ginkgo.By("ensuring all nodes are ready after the restart")
 		nodesAfter, err := framework.CheckNodesReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		framework.Logf("Got the following nodes after restart: %v", nodeNames(nodesAfter))
+		e2elog.Logf("Got the following nodes after restart: %v", nodeNames(nodesAfter))
 
 		// Make sure that we have the same number of nodes. We're not checking
 		// that the names match because that's implementation specific.
