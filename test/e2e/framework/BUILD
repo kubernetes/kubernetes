@@ -94,6 +94,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/discovery/cached/memory:go_default_library",
