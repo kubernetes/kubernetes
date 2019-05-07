@@ -702,6 +702,23 @@ function kube::util::require-jq {
   fi
 }
 
+# kube::util::read-array
+# Reads in stdin and adds it line by line to the array provided. This can be
+# used instead of "mapfile -t", and is bash 3 compatible.
+#
+# Assumed vars:
+#   $1 (name of array to create/modify)
+#
+# Example usage:
+# kube::util::read-array files < <(ls -1)
+#
+function kube::util::read-array {
+  local i=0
+  unset -v "$1"
+  while IFS= read -r "$1[i++]"; do :; done
+  eval "[[ \${$1[--i]} ]]" || unset "$1[i]" # ensures last element isn't empty
+}
+
 # Some useful colors.
 if [[ -z "${color_start-}" ]]; then
   declare -r color_start="\033["
