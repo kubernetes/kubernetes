@@ -107,6 +107,25 @@ type Plugin interface {
 	Name() string
 }
 
+// PodInfo is minimum cell in the scheduling queue.
+type PodInfo struct {
+	Pod *v1.Pod
+	// The time pod added to the scheduling queue.
+	Timestamp time.Time
+}
+
+// LessFunc is the function to sort pod info
+type LessFunc func(podInfo1, podInfo2 *PodInfo) bool
+
+// QueueSortPlugin is an interface that must be implemented by "QueueSort" plugins.
+// These plugins are used to sort pods in the scheduling queue. Only one queue sort
+// plugin may be enabled at a time.
+type QueueSortPlugin interface {
+	Plugin
+	// Less are used to sort pods in the scheduling queue.
+	Less(*PodInfo, *PodInfo) bool
+}
+
 // ReservePlugin is an interface for Reserve plugins. These plugins are called
 // at the reservation point. These are meant to update the state of the plugin.
 // This concept used to be called 'assume' in the original scheduler.
@@ -157,6 +176,9 @@ type PermitPlugin interface {
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	FrameworkHandle
+	// QueueSortFunc returns the function to sort pods in scheduling queue
+	QueueSortFunc() LessFunc
+
 	// RunPrebindPlugins runs the set of configured prebind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If the Status code is "Unschedulable", it is

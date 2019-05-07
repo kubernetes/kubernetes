@@ -34,6 +34,7 @@ type framework struct {
 	nodeInfoSnapshot *cache.NodeInfoSnapshot
 	waitingPods      *waitingPodsMap
 	plugins          map[string]Plugin // a map of initialized plugins. Plugin name:plugin instance.
+	queueSortPlugins []QueueSortPlugin
 	reservePlugins   []ReservePlugin
 	prebindPlugins   []PrebindPlugin
 	unreservePlugins []UnreservePlugin
@@ -69,6 +70,10 @@ func NewFramework(r Registry, _ *runtime.Unknown) (Framework, error) {
 		// TODO: For now, we assume any plugins that implements an extension
 		// point wants to be called at that extension point. We should change this
 		// later and add these plugins based on the configuration.
+		if qsp, ok := p.(QueueSortPlugin); ok {
+			f.queueSortPlugins = append(f.queueSortPlugins, qsp)
+		}
+
 		if rp, ok := p.(ReservePlugin); ok {
 			f.reservePlugins = append(f.reservePlugins, rp)
 		}
@@ -83,6 +88,16 @@ func NewFramework(r Registry, _ *runtime.Unknown) (Framework, error) {
 		}
 	}
 	return f, nil
+}
+
+// QueueSortFunc returns the function to sort pods in scheduling queue
+func (f *framework) QueueSortFunc() LessFunc {
+	if len(f.queueSortPlugins) == 0 {
+		return nil
+	}
+
+	// Only one QueueSort plugin can be enabled.
+	return f.queueSortPlugins[0].Less
 }
 
 // RunPrebindPlugins runs the set of configured prebind plugins. It returns a
