@@ -39,9 +39,11 @@ func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *
 
 	codecs := serializer.NewCodecFactory(scheme)
 	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
-	for _, obj := range objects {
-		if err := o.Add(obj); err != nil {
-			panic(err)
+	if objects != nil {
+		for _, obj := range objects {
+			if err := o.Add(obj); err != nil {
+				panic(err)
+			}
 		}
 	}
 

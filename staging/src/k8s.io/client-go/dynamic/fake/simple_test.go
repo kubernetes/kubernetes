@@ -59,27 +59,77 @@ func newUnstructuredWithSpec(spec map[string]interface{}) *unstructured.Unstruct
 }
 
 func TestList(t *testing.T) {
-	scheme := runtime.NewScheme()
+	tests := []struct {
+		name         string
+		gvr          schema.GroupVersionResource
+		newClient    func() *FakeDynamicClient
+		expectedObjs func() []unstructured.Unstructured
+	}{
+		{
+			name: "filtered client object list1",
+			gvr:  schema.GroupVersionResource{Group: "group", Version: "version", Resource: "thekinds"},
+			newClient: func() *FakeDynamicClient {
+				return NewSimpleDynamicClient(
+					runtime.NewScheme(),
+					newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+					newUnstructured("group2/version", "TheKind", "ns-foo", "name2-foo"),
+					newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
+					newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
+					newUnstructured("group2/version", "TheKind", "ns-foo", "name2-baz"),
+				)
+			},
+			expectedObjs: func() []unstructured.Unstructured {
+				return []unstructured.Unstructured{
+					*newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+					*newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
+					*newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
+				}
+			},
+		},
 
-	client := NewSimpleDynamicClient(scheme,
-		newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
-		newUnstructured("group2/version", "TheKind", "ns-foo", "name2-foo"),
-		newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
-		newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
-		newUnstructured("group2/version", "TheKind", "ns-foo", "name2-baz"),
-	)
-	listFirst, err := client.Resource(schema.GroupVersionResource{Group: "group", Version: "version", Resource: "thekinds"}).List(metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
+		{
+			name: "filtered client objects list2",
+			gvr:  schema.GroupVersionResource{Group: "group2", Version: "version", Resource: "thekinds"},
+			newClient: func() *FakeDynamicClient {
+				return NewSimpleDynamicClient(
+					runtime.NewScheme(),
+					newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+					newUnstructured("group2/version", "TheKind", "ns-foo", "name2-foo"),
+					newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
+					newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
+					newUnstructured("group2/version", "TheKind", "ns-foo", "name2-baz"),
+				)
+			},
+			expectedObjs: func() []unstructured.Unstructured {
+				return []unstructured.Unstructured{
+					*newUnstructured("group2/version", "TheKind", "ns-foo", "name2-foo"),
+					*newUnstructured("group2/version", "TheKind", "ns-foo", "name2-baz"),
+				}
+			},
+		},
+		{
+			name: "client initialized empty",
+			gvr:  schema.GroupVersionResource{Group: "group2", Version: "version", Resource: "thekinds"},
+			newClient: func() *FakeDynamicClient {
+				return NewSimpleDynamicClient(runtime.NewScheme())
+			},
+			expectedObjs: func() []unstructured.Unstructured {
+				return nil
+			},
+		},
 	}
 
-	expected := []unstructured.Unstructured{
-		*newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
-		*newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
-		*newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
-	}
-	if !equality.Semantic.DeepEqual(listFirst.Items, expected) {
-		t.Fatal(diff.ObjectGoPrintDiff(expected, listFirst.Items))
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			list, err := test.newClient().Resource(test.gvr).List(metav1.ListOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			expected := test.expectedObjs()
+			if !equality.Semantic.DeepEqual(list.Items, expected) {
+				t.Fatal(diff.ObjectGoPrintDiff(expected, list.Items))
+			}
+		})
 	}
 }
 
