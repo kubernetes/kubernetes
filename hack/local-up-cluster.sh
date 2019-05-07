@@ -250,7 +250,7 @@ if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
   # default cgroup driver to match what is reported by docker to simplify local development
   if [[ -z ${CGROUP_DRIVER} ]]; then
     # match driver with docker runtime reported value (they must match)
-    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
+    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" |  sed -e 's/^[[:space:]]*//'|cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
   fi
   if [[ -f /var/log/docker.log && ! -f "${LOG_DIR}/docker.log" ]]; then
