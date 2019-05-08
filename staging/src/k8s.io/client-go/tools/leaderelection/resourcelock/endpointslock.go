@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ type EndpointsLock struct {
 	EndpointsMeta metav1.ObjectMeta
 	Client        corev1client.EndpointsGetter
 	LockConfig    ResourceLockConfig
+	mu            sync.RWMutex
 	e             *v1.Endpoints
 }
 
@@ -39,6 +41,8 @@ type EndpointsLock struct {
 func (el *EndpointsLock) Get() (*LeaderElectionRecord, error) {
 	var record LeaderElectionRecord
 	var err error
+	el.mu.Lock()
+	defer el.mu.Unlock()
 	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Get(el.EndpointsMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -60,6 +64,8 @@ func (el *EndpointsLock) Create(ler LeaderElectionRecord) error {
 	if err != nil {
 		return err
 	}
+	el.mu.Lock()
+	defer el.mu.Unlock()
 	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Create(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      el.EndpointsMeta.Name,
@@ -74,13 +80,18 @@ func (el *EndpointsLock) Create(ler LeaderElectionRecord) error {
 
 // Update will update and existing annotation on a given resource.
 func (el *EndpointsLock) Update(ler LeaderElectionRecord) error {
-	if el.e == nil {
+	el.mu.RLock()
+	ok := el.e == nil
+	el.mu.RUnlock()
+	if ok {
 		return errors.New("endpoint not initialized, call get or create first")
 	}
 	recordBytes, err := json.Marshal(ler)
 	if err != nil {
 		return err
 	}
+	el.mu.Lock()
+	defer el.mu.Unlock()
 	el.e.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
 	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(el.e)
 	return err
@@ -89,7 +100,9 @@ func (el *EndpointsLock) Update(ler LeaderElectionRecord) error {
 // RecordEvent in leader election while adding meta-data
 func (el *EndpointsLock) RecordEvent(s string) {
 	events := fmt.Sprintf("%v %v", el.LockConfig.Identity, s)
+	el.mu.RLock()
 	el.LockConfig.EventRecorder.Eventf(&v1.Endpoints{ObjectMeta: el.e.ObjectMeta}, v1.EventTypeNormal, "LeaderElection", events)
+	el.mu.RUnlock()
 }
 
 // Describe is used to convert details on current resource lock
