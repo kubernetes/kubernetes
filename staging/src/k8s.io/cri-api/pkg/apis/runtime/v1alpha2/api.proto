@@ -174,6 +174,38 @@ message PortMapping {
     string host_ip = 4;
 }
 
+// IpRanges specifies the ip ranges for address allocation of a sandbox
+message IpRanges {
+    // List of ip ranges
+    repeated IpRange ip_range = 1;
+}
+
+// IpRange specifies an ip range for address allocation of a sandbox
+message IpRange {
+    //  CIDR block to allocate out of
+    string subnet = 1;
+    // IP inside of "subnet" from which to start allocating addresses
+    // Defaults to ".2" IP inside of the "subnet" block
+    string range_start = 2;
+    // IP inside of "subnet" with which to end allocating addresses.
+    // Defaults to ".254" IP inside of the "subnet" block for ipv4, ".255" for IPv6
+    string range_end = 3;
+    // IP inside of "subnet" from to designate as the gateway. Defaults to ".1"
+    string gateway = 4;
+}
+
+// Bandwidth specifies the interface bandwidth limits of a sandbox
+message Bandwidth {
+    // Rate limit for ingress in bits per second
+    int32 ingress_rate = 1;
+    // Burst limit for ingress in bits per second
+    int32 ingress_burst = 2;
+    // Rate limit for egress in bits per second
+    int32 egress_rate = 3;
+    // Burst limit for egress in bits per second
+    int32 egress_burst = 4;
+}
+
 enum MountPropagation {
     // No mount propagation ("private" in Linux terminology).
     PROPAGATION_PRIVATE = 0;
@@ -357,6 +389,11 @@ message PodSandboxConfig {
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
     LinuxPodSandboxConfig linux = 8;
+    // Ip ranges for address allocation for the sandbox.
+    repeated IpRanges ip_ranges = 9;
+    // bandwidth interface limits for the sandbox.
+    Bandwidth bandwidth = 10;
+
 }
 
 message RunPodSandboxRequest {
