@@ -929,17 +929,13 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(
 	if err != nil {
 		return nil, err
 	}
-
 	usages := resp.GetUsage()
-
 	usageMap := make(map[string]usageCount, 2)
 	if usages == nil {
 		return nil, nil
 	}
 	for _, usage := range usages {
-
 		unit = usage.GetUnit()
-
 		switch unit.String() {
 		case "BYTES":
 			var ucb usageCount
@@ -953,7 +949,7 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(
 			uci.total = usage.GetTotal()
 			uci.used = usage.GetUsed()
 			usageMap["INODES"] = uci
-		case "default":
+		default:
 			klog.Errorf("unknown key %s in usagemap", unit.String())
 		}
 
