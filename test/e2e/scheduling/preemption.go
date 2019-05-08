@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 
 	. "github.com/onsi/ginkgo"
@@ -115,7 +116,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 					Requests: podRes,
 				},
 			})
-			framework.Logf("Created pod: %v", pods[i].Name)
+			e2elog.Logf("Created pod: %v", pods[i].Name)
 		}
 		By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
@@ -175,7 +176,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 					Requests: podRes,
 				},
 			})
-			framework.Logf("Created pod: %v", pods[i].Name)
+			e2elog.Logf("Created pod: %v", pods[i].Name)
 		}
 		By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
@@ -285,7 +286,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 					},
 				},
 			})
-			framework.Logf("Created pod: %v", pods[i].Name)
+			e2elog.Logf("Created pod: %v", pods[i].Name)
 		}
 		defer func() { // Remove added labels
 			for i := 0; i < numPods; i++ {
@@ -368,7 +369,7 @@ var _ = SIGDescribe("PodPriorityResolution [Serial]", func() {
 				framework.ExpectNoError(err)
 			}()
 			Expect(pod.Spec.Priority).NotTo(BeNil())
-			framework.Logf("Created pod: %v", pod.Name)
+			e2elog.Logf("Created pod: %v", pod.Name)
 		}
 	})
 })
@@ -391,11 +392,11 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			// list existing priorities
 			priorityList, err := cs.SchedulingV1().PriorityClasses().List(metav1.ListOptions{})
 			if err != nil {
-				framework.Logf("Unable to list priorities: %v", err)
+				e2elog.Logf("Unable to list priorities: %v", err)
 			} else {
-				framework.Logf("List existing priorities:")
+				e2elog.Logf("List existing priorities:")
 				for _, p := range priorityList.Items {
-					framework.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
+					e2elog.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
 				}
 			}
 		}
@@ -420,7 +421,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		// find an available node
 		By("Finding an available node")
 		nodeName := GetNodeThatCanRunPod(f)
-		framework.Logf("found a healthy node: %s", nodeName)
+		e2elog.Logf("found a healthy node: %s", nodeName)
 
 		// get the node API object
 		var err error
@@ -449,8 +450,8 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
 			_, err := cs.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal})
 			if err != nil {
-				framework.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
-				framework.Logf("Reason: %v. Msg: %v", errors.ReasonForError(err), err)
+				e2elog.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
+				e2elog.Logf("Reason: %v. Msg: %v", errors.ReasonForError(err), err)
 			}
 			Expect(err == nil || errors.IsAlreadyExists(err)).To(Equal(true))
 		}
@@ -549,16 +550,16 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			runPauseRS(f, rsConfs[i])
 		}
 
-		framework.Logf("pods created so far: %v", podNamesSeen)
-		framework.Logf("length of pods created so far: %v", len(podNamesSeen))
+		e2elog.Logf("pods created so far: %v", podNamesSeen)
+		e2elog.Logf("length of pods created so far: %v", len(podNamesSeen))
 
 		// create ReplicaSet4
 		// if runPauseRS failed, it means ReplicaSet4 cannot be scheduled even after 1 minute
 		// which is unacceptable
 		runPauseRS(f, rsConfs[rsNum-1])
 
-		framework.Logf("pods created so far: %v", podNamesSeen)
-		framework.Logf("length of pods created so far: %v", len(podNamesSeen))
+		e2elog.Logf("pods created so far: %v", podNamesSeen)
+		e2elog.Logf("length of pods created so far: %v", len(podNamesSeen))
 
 		// count pods number of ReplicaSet{1,2,3}, if it's more than expected replicas
 		// then it denotes its pods have been over-preempted

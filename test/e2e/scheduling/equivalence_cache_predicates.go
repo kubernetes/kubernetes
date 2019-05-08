@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -72,7 +73,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
-			framework.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
+			e2elog.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
 			framework.PrintAllKubeletPods(cs, node.Name)
 		}
 

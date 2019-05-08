@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -88,7 +89,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		for _, node := range nodeList.Items {
-			framework.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
+			e2elog.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
 			framework.PrintAllKubeletPods(cs, node.Name)
 		}
 
@@ -103,7 +104,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		totalPodCapacity = 0
 
 		for _, node := range nodeList.Items {
-			framework.Logf("Node: %v", node)
+			e2elog.Logf("Node: %v", node)
 			podCapacity, found := node.Status.Capacity[v1.ResourcePods]
 			Expect(found).To(Equal(true))
 			totalPodCapacity += podCapacity.Value()
@@ -123,7 +124,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},
-				}), true, framework.Logf))
+				}), true, e2elog.Logf))
 		}
 		podName := "additional-pod"
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, pausePodConfig{
@@ -158,7 +159,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-				framework.Logf("Pod %v requesting local ephemeral resource =%vm on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
+				e2elog.Logf("Pod %v requesting local ephemeral resource =%vm on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
 				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedStorageEphemeralStorage(pod)
 			}
 		}
@@ -167,9 +168,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		milliEphemeralStoragePerPod := nodeMaxAllocatable / maxNumberOfPods
 
-		framework.Logf("Using pod capacity: %vm", milliEphemeralStoragePerPod)
+		e2elog.Logf("Using pod capacity: %vm", milliEphemeralStoragePerPod)
 		for name, leftAllocatable := range nodeToAllocatableMap {
-			framework.Logf("Node: %v has local ephemeral resource allocatable: %vm", name, leftAllocatable)
+			e2elog.Logf("Node: %v has local ephemeral resource allocatable: %vm", name, leftAllocatable)
 			podsNeededForSaturation += (int)(leftAllocatable / milliEphemeralStoragePerPod)
 		}
 
@@ -192,7 +193,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
 						},
 					},
-				}), true, framework.Logf))
+				}), true, e2elog.Logf))
 		}
 		podName := "additional-pod"
 		conf := pausePodConfig{
@@ -262,7 +263,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-				framework.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
+				e2elog.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}
 		}

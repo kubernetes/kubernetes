@@ -31,6 +31,7 @@ import (
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	. "github.com/onsi/ginkgo"
@@ -82,14 +83,14 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 					pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
-					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
+					e2elog.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
 					if stat.RestartCount > 0 {
-						framework.Logf("Saw %v restart, succeeded...", podName)
+						e2elog.Logf("Saw %v restart, succeeded...", podName)
 						wg.Done()
 						return
 					}
 				}
-				framework.Logf("Failed waiting for %v restart! ", podName)
+				e2elog.Logf("Failed waiting for %v restart! ", podName)
 				passed = false
 				wg.Done()
 			}

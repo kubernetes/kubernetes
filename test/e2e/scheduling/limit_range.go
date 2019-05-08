@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -100,7 +101,7 @@ var _ = SIGDescribe("LimitRange", func() {
 			err = equalResourceRequirement(expected, pod.Spec.Containers[i].Resources)
 			if err != nil {
 				// Print the pod to help in debugging.
-				framework.Logf("Pod %+v does not have the expected requirements", pod)
+				e2elog.Logf("Pod %+v does not have the expected requirements", pod)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}
@@ -121,7 +122,7 @@ var _ = SIGDescribe("LimitRange", func() {
 			err = equalResourceRequirement(expected, pod.Spec.Containers[i].Resources)
 			if err != nil {
 				// Print the pod to help in debugging.
-				framework.Logf("Pod %+v does not have the expected requirements", pod)
+				e2elog.Logf("Pod %+v does not have the expected requirements", pod)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}
@@ -170,18 +171,18 @@ var _ = SIGDescribe("LimitRange", func() {
 			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(options)
 
 			if err != nil {
-				framework.Logf("Unable to retrieve LimitRanges: %v", err)
+				e2elog.Logf("Unable to retrieve LimitRanges: %v", err)
 				return false, nil
 			}
 
 			if len(limitRanges.Items) == 0 {
-				framework.Logf("limitRange is already deleted")
+				e2elog.Logf("limitRange is already deleted")
 				return true, nil
 			}
 
 			if len(limitRanges.Items) > 0 {
 				if limitRanges.Items[0].ObjectMeta.DeletionTimestamp == nil {
-					framework.Logf("deletion has not yet been observed")
+					e2elog.Logf("deletion has not yet been observed")
 					return false, nil
 				}
 				return true, nil
@@ -200,12 +201,12 @@ var _ = SIGDescribe("LimitRange", func() {
 })
 
 func equalResourceRequirement(expected v1.ResourceRequirements, actual v1.ResourceRequirements) error {
-	framework.Logf("Verifying requests: expected %v with actual %v", expected.Requests, actual.Requests)
+	e2elog.Logf("Verifying requests: expected %v with actual %v", expected.Requests, actual.Requests)
 	err := equalResourceList(expected.Requests, actual.Requests)
 	if err != nil {
 		return err
 	}
-	framework.Logf("Verifying limits: expected %v with actual %v", expected.Limits, actual.Limits)
+	e2elog.Logf("Verifying limits: expected %v with actual %v", expected.Limits, actual.Limits)
 	err = equalResourceList(expected.Limits, actual.Limits)
 	return err
 }
