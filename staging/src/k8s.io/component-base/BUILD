@@ -14,6 +14,7 @@ filegroup(
         "//staging/src/k8s.io/component-base/config:all-srcs",
         "//staging/src/k8s.io/component-base/featuregate:all-srcs",
         "//staging/src/k8s.io/component-base/logs:all-srcs",
+        "//staging/src/k8s.io/component-base/metrics:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
