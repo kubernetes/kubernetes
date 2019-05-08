@@ -17,6 +17,7 @@ limitations under the License.
 package replicaset
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -29,7 +30,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -274,8 +275,10 @@ func TestSyncReplicaSetCreateFailures(t *testing.T) {
 	}
 }
 
-func TestSyncReplicaSetDormancy(t *testing.T) {
-	// Setup a test server so we can lie about the current state of pods
+func TestNonMatchingUIDs(t *testing.T) {
+	// Setup a test server that doesn't store the replica sets,
+	// So the returned Replica set wont have the UID and shouldn't
+	//process the event
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:    200,
 		ResponseBody:  "{}",
@@ -295,6 +298,42 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 
 	labelMap := map[string]string{"foo": "bar"}
 	rsSpec := newReplicaSet(2, labelMap)
+	_, err := client.AppsV1().ReplicaSets(rsSpec.Namespace).Create(rsSpec)
+	if err != nil {
+		t.Errorf("Error adding rsSpec to fake server")
+		return
+	}
+	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
+	newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 1, v1.PodRunning, labelMap, rsSpec, "pod")
+
+	// Creates a replica and sets expectations
+	manager.syncReplicaSet(GetKey(rsSpec, t))
+	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
+}
+
+func TestSyncReplicaSetDormancy(t *testing.T) {
+	// Setup a test server so we can lie about the current state of pods
+	labelMap := map[string]string{"foo": "bar"}
+	rsSpec := newReplicaSet(2, labelMap)
+	b, _ := json.Marshal(rsSpec)
+
+	//Fake server returns the rs so UIDs match
+	fakeHandler := utiltesting.FakeHandler{
+		StatusCode:    200,
+		ResponseBody:  string(b),
+		SkipRequestFn: skipListerFunc,
+		T:             t,
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	fakePodControl := controller.FakePodControl{}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
+
+	manager.podControl = &fakePodControl
+
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
 	newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 1, v1.PodRunning, labelMap, rsSpec, "pod")
 

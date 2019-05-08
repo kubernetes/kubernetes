@@ -36,7 +36,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -583,8 +583,8 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	//Do a full fetch here.
 	//The cache may be out of date via race condition #69376
 	fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
-	if errors.IsNotFound(err) || fresh.UID != rs.UID {
-		klog.V(4).Infof("%v %v's UID in cache differed from server. This object was deleted.", rsc.Kind, key)
+	if err == nil && fresh.UID != rs.UID {
+		klog.Errorf("%v %v's UID in cache differed from server. This object was deleted.", rsc.Kind, key)
 		rsc.expectations.DeleteExpectations(key)
 		return nil
 	}
