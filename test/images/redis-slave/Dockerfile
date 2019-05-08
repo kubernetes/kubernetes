@@ -1,4 +1,4 @@
-# Copyright 2018 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/distroless/static:latest
+FROM BASEIMAGE
 
-ADD sampledeviceplugin /sampledeviceplugin
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-ENTRYPOINT ["/sampledeviceplugin", "-alsologtostderr"]
+RUN apk add --no-cache redis
+
+COPY redis.conf /etc/redis.conf
+
+EXPOSE 6379
+VOLUME /data
+
+ADD run.sh /run.sh
+
+RUN chmod a+x /run.sh
+
+CMD /run.sh

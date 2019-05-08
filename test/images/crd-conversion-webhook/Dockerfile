@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+FROM gcr.io/distroless/static:latest
 
 ADD crd_conversion_webhook /crd_conversion_webhook
 ENTRYPOINT ["/crd_conversion_webhook"]

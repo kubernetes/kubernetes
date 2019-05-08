@@ -1,4 +1,6 @@
-# Copyright 2018 The Kubernetes Authors.
+#!/bin/sh
+
+# Copyright 2019 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/distroless/static:latest
+if [ "${GET_HOSTS_FROM:-dns}" = "env" ]; then
+  cat << EOF >> /etc/redis.conf
+slaveof ${REDIS_MASTER_SERVICE_HOST} 6379
+EOF
+else
+  cat << EOF >> /etc/redis.conf
+slaveof redis-master 6379
+EOF
+fi
 
-ADD sampledeviceplugin /sampledeviceplugin
-
-ENTRYPOINT ["/sampledeviceplugin", "-alsologtostderr"]
+redis-server "/etc/redis.conf"

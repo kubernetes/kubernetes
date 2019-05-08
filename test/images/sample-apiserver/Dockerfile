@@ -30,7 +30,8 @@ RUN go get -d k8s.io/sample-apiserver \
 # we can copy it out from this throw away container image from a standard location
 RUN find /go/bin -name sample-apiserver -exec cp {} / \;
 
-FROM BASEIMAGE
+FROM gcr.io/distroless/static:latest
+
 COPY --from=build_k8s_1_10_sample_apiserver /sample-apiserver /sample-apiserver
 
 ENTRYPOINT ["/sample-apiserver"]

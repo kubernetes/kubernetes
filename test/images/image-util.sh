@@ -60,7 +60,7 @@ build() {
     temp_dir=$(mktemp -d "${KUBE_ROOT}"/_tmp/test-images-build.XXXXXX)
     kube::util::trap_add "rm -rf ${temp_dir}" EXIT
 
-    cp -r "${IMAGE}"/* "${temp_dir}"
+    cp --dereference -r "${IMAGE}"/* "${temp_dir}"
     if [[ -f ${IMAGE}/Makefile ]]; then
       # make bin will take care of all the prerequisites needed
       # for building the docker image
@@ -73,8 +73,9 @@ build() {
     if [[ -f BASEIMAGE ]]; then
       BASEIMAGE=$(getBaseImage "${arch}")
       ${SED} -i "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
-      ${SED} -i "s|BASEARCH|${arch}|g" Dockerfile
     fi
+
+    ${SED} -i "s|BASEARCH|${arch}|g" Dockerfile
 
     # copy the qemu-*-static binary to docker image to build the multi architecture image on x86 platform
     if [[ $(grep "CROSS_BUILD_" Dockerfile) ]]; then

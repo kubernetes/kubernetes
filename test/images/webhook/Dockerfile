@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+FROM gcr.io/distroless/static:latest
 
 ADD webhook /webhook
+
 ENTRYPOINT ["/webhook"]

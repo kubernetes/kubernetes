@@ -5,7 +5,10 @@ go_library(
     srcs = ["loader.go"],
     importpath = "k8s.io/kubernetes/test/images/apparmor-loader",
     visibility = ["//visibility:private"],
-    deps = ["//vendor/k8s.io/klog:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/component-base/logs:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+    ],
 )
 
 go_binary(
