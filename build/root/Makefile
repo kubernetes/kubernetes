@@ -317,7 +317,7 @@ define TEST_CMD_HELP_INFO
 #     For example, WHAT=deployment will run run_deployment_tests function.
 # Example:
 #   make test-cmd
-#   make test-cmd WHAT="deployment impersonation"
+#   make test-cmd WHAT="deployment impersonation" ITERATIONS=5
 endef
 .PHONY: test-cmd
 ifeq ($(PRINT_HELP),y)

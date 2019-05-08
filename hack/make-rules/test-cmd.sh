@@ -108,7 +108,7 @@ function create_node() {
 __EOF__
 }
 
-if [ -z "${ITERATION:-}" ]; then
+if [ -z "${ITERATIONS:-}" ]; then
   ITERATIONS=1
 fi
 
@@ -136,7 +136,7 @@ create_node
 
 export SUPPORTED_RESOURCES=("*")
 
-for i in $(seq 1 ${ITERATION}); do
+for i in $(seq 1 ${ITERATIONS}); do
   echo "Test Iteration $i"
   # WARNING: Do not wrap this call in a subshell to capture output, e.g. output=$(runTests)
   # Doing so will suppress errexit behavior inside runTests
