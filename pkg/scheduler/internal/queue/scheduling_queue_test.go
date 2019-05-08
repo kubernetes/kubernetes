@@ -171,6 +171,8 @@ func (*fakeFramework) RunPrebindPlugins(pc *framework.PluginContext, pod *v1.Pod
 	return nil
 }
 
+func (*fakeFramework) RunPostbindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) {}
+
 func (*fakeFramework) RunReservePlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
