@@ -101,6 +101,11 @@ func (pp *PrebindPlugin) Prebind(pc *framework.PluginContext, pod *v1.Pod, nodeN
 	return nil
 }
 
+// reset used to reset numPrebindCalled.
+func (pp *PrebindPlugin) reset() {
+	pp.numPrebindCalled = 0
+}
+
 // NewPrebindPlugin is the factory for prebind plugin.
 func NewPrebindPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return pbdPlugin, nil
@@ -306,27 +311,28 @@ func TestUnreservePlugin(t *testing.T) {
 			if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(cs, pod.Namespace, pod.Name)); err != nil {
 				t.Errorf("test #%v: Expected a scheduling error, but didn't get it. error: %v", i, err)
 			}
-			if unresPlugin.numUnreserveCalled != 1 {
-				t.Errorf("test #%v: Expected the unreserve plugin to be called only once.", i)
+			if unresPlugin.numUnreserveCalled != pbdPlugin.numPrebindCalled {
+				t.Errorf("test #%v: Expected the unreserve plugin to be called %d times, but %d times.", i, pbdPlugin.numPrebindCalled, unresPlugin.numUnreserveCalled)
 			}
 		} else {
 			if test.prebindReject {
 				if err = waitForPodUnschedulable(cs, pod); err != nil {
 					t.Errorf("test #%v: Didn't expected the pod to be scheduled. error: %v", i, err)
 				}
-				if unresPlugin.numUnreserveCalled != 1 {
-					t.Errorf("test #%v: Expected the unreserve plugin to be called only once.", i)
+				if unresPlugin.numUnreserveCalled != pbdPlugin.numPrebindCalled {
+					t.Errorf("test #%v: Expected the unreserve plugin to be called %d times, but %d times.", i, pbdPlugin.numPrebindCalled, unresPlugin.numUnreserveCalled)
 				}
 			} else {
 				if err = waitForPodToSchedule(cs, pod); err != nil {
 					t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
 				}
 				if unresPlugin.numUnreserveCalled > 0 {
-					t.Errorf("test #%v: Didn't expected the unreserve plugin to be called.", i)
+					t.Errorf("test #%v: Didn't expected the unreserve plugin to be called, but be called %d times.", i, unresPlugin.numUnreserveCalled)
 				}
 			}
 		}
 		unresPlugin.reset()
+		pbdPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
 	}
 }
