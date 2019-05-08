@@ -26,7 +26,7 @@ import (
 
 	"github.com/onsi/gomega"
 	"golang.org/x/crypto/ssh"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -104,7 +104,7 @@ func GetSigner(provider string) (ssh.Signer, error) {
 func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 	nodelist := waitListSchedulableNodesOrDie(c)
 
-	hosts := nodeAddresses(nodelist, v1.NodeExternalIP)
+	hosts := nodeAddresses(nodelist, corev1.NodeExternalIP)
 	// If ExternalIPs aren't set, assume the test programs can reach the
 	// InternalIP. Simplified exception logic here assumes that the hosts will
 	// either all have ExternalIP or none will. Simplifies handling here and
@@ -112,7 +112,7 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 	// specific: they should either all have them or none of them will.
 	if len(hosts) == 0 {
 		e2elog.Logf("No external IP address on nodes, falling back to internal IPs")
-		hosts = nodeAddresses(nodelist, v1.NodeInternalIP)
+		hosts = nodeAddresses(nodelist, corev1.NodeInternalIP)
 	}
 
 	// Error if any node didn't have an external/internal IP.
@@ -259,11 +259,11 @@ func LogResult(result Result) {
 }
 
 // IssueSSHCommandWithResult tries to execute a SSH command and returns the execution result
-func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, error) {
+func IssueSSHCommandWithResult(cmd, provider string, node *corev1.Node) (*Result, error) {
 	e2elog.Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
-		if a.Type == v1.NodeExternalIP && a.Address != "" {
+		if a.Type == corev1.NodeExternalIP && a.Address != "" {
 			host = net.JoinHostPort(a.Address, sshPort)
 			break
 		}
@@ -272,7 +272,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, er
 	if host == "" {
 		// No external IPs were found, let's try to use internal as plan B
 		for _, a := range node.Status.Addresses {
-			if a.Type == v1.NodeInternalIP && a.Address != "" {
+			if a.Type == corev1.NodeInternalIP && a.Address != "" {
 				host = net.JoinHostPort(a.Address, sshPort)
 				break
 			}
@@ -296,7 +296,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, er
 }
 
 // IssueSSHCommand tries to execute a SSH command
-func IssueSSHCommand(cmd, provider string, node *v1.Node) error {
+func IssueSSHCommand(cmd, provider string, node *corev1.Node) error {
 	_, err := IssueSSHCommandWithResult(cmd, provider, node)
 	if err != nil {
 		return err
@@ -305,7 +305,7 @@ func IssueSSHCommand(cmd, provider string, node *v1.Node) error {
 }
 
 // nodeAddresses returns the first address of the given type of each node.
-func nodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string {
+func nodeAddresses(nodelist *corev1.NodeList, addrType corev1.NodeAddressType) []string {
 	hosts := []string{}
 	for _, n := range nodelist.Items {
 		for _, addr := range n.Status.Addresses {
@@ -319,8 +319,8 @@ func nodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 }
 
 // waitListSchedulableNodes is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
-	var nodes *v1.NodeList
+func waitListSchedulableNodes(c clientset.Interface) (*corev1.NodeList, error) {
+	var nodes *corev1.NodeList
 	var err error
 	if wait.PollImmediate(pollNodeInterval, singleCallTimeout, func() (bool, error) {
 		nodes, err = c.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
@@ -340,7 +340,7 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 }
 
 // waitListSchedulableNodesOrDie is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
+func waitListSchedulableNodesOrDie(c clientset.Interface) *corev1.NodeList {
 	nodes, err := waitListSchedulableNodes(c)
 	if err != nil {
 		expectNoError(err, "Non-retryable failure or timed out while listing nodes for e2e cluster.")

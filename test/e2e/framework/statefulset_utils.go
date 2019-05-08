@@ -28,7 +28,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	appsV1beta2 "k8s.io/api/apps/v1beta2"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,17 +52,17 @@ const (
 )
 
 // CreateStatefulSetService creates a Headless Service with Name name and Selector set to match labels.
-func CreateStatefulSetService(name string, labels map[string]string) *v1.Service {
-	headlessService := &v1.Service{
+func CreateStatefulSetService(name string, labels map[string]string) *corev1.Service {
+	headlessService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: v1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Selector: labels,
 		},
 	}
-	headlessService.Spec.Ports = []v1.ServicePort{
-		{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
+	headlessService.Spec.Ports = []corev1.ServicePort{
+		{Port: 80, Name: "http", Protocol: corev1.ProtocolTCP},
 	}
 	headlessService.Spec.ClusterIP = "None"
 	return headlessService
@@ -179,7 +179,7 @@ func (s *StatefulSetTester) DeleteStatefulPodAtIndex(index int, ss *apps.Statefu
 }
 
 // VerifyStatefulPodFunc is a func that examines a StatefulSetPod.
-type VerifyStatefulPodFunc func(*v1.Pod)
+type VerifyStatefulPodFunc func(*corev1.Pod)
 
 // VerifyPodAtIndex applies a visitor patter to the Pod at index in ss. verify is applied to the Pod to "visit" it.
 func (s *StatefulSetTester) VerifyPodAtIndex(index int, ss *apps.StatefulSet, verify VerifyStatefulPodFunc) {
@@ -203,7 +203,7 @@ func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) (*apps.Stat
 	Logf("Scaling statefulset %s to %d", name, count)
 	ss = s.update(ns, name, func(ss *apps.StatefulSet) { *(ss.Spec.Replicas) = count })
 
-	var statefulPodList *v1.PodList
+	var statefulPodList *corev1.PodList
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
 		statefulPodList = s.GetPodList(ss)
 		if int32(len(statefulPodList.Items)) == count {
@@ -215,7 +215,7 @@ func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) (*apps.Stat
 		unhealthy := []string{}
 		for _, statefulPod := range statefulPodList.Items {
 			delTs, phase, readiness := statefulPod.DeletionTimestamp, statefulPod.Status.Phase, podutil.IsPodReady(&statefulPod)
-			if delTs != nil || phase != v1.PodRunning || !readiness {
+			if delTs != nil || phase != corev1.PodRunning || !readiness {
 				unhealthy = append(unhealthy, fmt.Sprintf("%v: deletion %v, phase %v, readiness %v", statefulPod.Name, delTs, phase, readiness))
 			}
 		}
@@ -261,7 +261,7 @@ func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.Statefu
 }
 
 // GetPodList gets the current Pods in ss.
-func (s *StatefulSetTester) GetPodList(ss *apps.StatefulSet) *v1.PodList {
+func (s *StatefulSetTester) GetPodList(ss *apps.StatefulSet) *corev1.PodList {
 	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
 	ExpectNoError(err)
 	podList, err := s.c.CoreV1().Pods(ss.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
@@ -310,8 +310,8 @@ func (s *StatefulSetTester) WaitForRunning(numPodsRunning, numPodsReady int32, s
 				shouldBeReady := getStatefulPodOrdinal(&p) < int(numPodsReady)
 				isReady := podutil.IsPodReady(&p)
 				desiredReadiness := shouldBeReady == isReady
-				Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
-				if p.Status.Phase != v1.PodRunning || !desiredReadiness {
+				Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, corev1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
+				if p.Status.Phase != corev1.PodRunning || !desiredReadiness {
 					return false, nil
 				}
 			}
@@ -323,7 +323,7 @@ func (s *StatefulSetTester) WaitForRunning(numPodsRunning, numPodsReady int32, s
 }
 
 // WaitForState periodically polls for the ss and its pods until the until function returns either true or an error
-func (s *StatefulSetTester) WaitForState(ss *apps.StatefulSet, until func(*apps.StatefulSet, *v1.PodList) (bool, error)) {
+func (s *StatefulSetTester) WaitForState(ss *apps.StatefulSet, until func(*apps.StatefulSet, *corev1.PodList) (bool, error)) {
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
 		func() (bool, error) {
 			ssGet, err := s.c.AppsV1().StatefulSets(ss.Namespace).Get(ss.Name, metav1.GetOptions{})
@@ -341,7 +341,7 @@ func (s *StatefulSetTester) WaitForState(ss *apps.StatefulSet, until func(*apps.
 // WaitForStatus waits for the StatefulSetStatus's ObservedGeneration to be greater than or equal to set's Generation.
 // The returned StatefulSet contains such a StatefulSetStatus
 func (s *StatefulSetTester) WaitForStatus(set *apps.StatefulSet) *apps.StatefulSet {
-	s.WaitForState(set, func(set2 *apps.StatefulSet, pods *v1.PodList) (bool, error) {
+	s.WaitForState(set, func(set2 *apps.StatefulSet, pods *corev1.PodList) (bool, error) {
 		if set2.Status.ObservedGeneration >= set.Generation {
 			set = set2
 			return true, nil
@@ -357,9 +357,9 @@ func (s *StatefulSetTester) WaitForRunningAndReady(numStatefulPods int32, ss *ap
 }
 
 // WaitForPodReady waits for the Pod named podName in set to exist and have a Ready condition.
-func (s *StatefulSetTester) WaitForPodReady(set *apps.StatefulSet, podName string) (*apps.StatefulSet, *v1.PodList) {
-	var pods *v1.PodList
-	s.WaitForState(set, func(set2 *apps.StatefulSet, pods2 *v1.PodList) (bool, error) {
+func (s *StatefulSetTester) WaitForPodReady(set *apps.StatefulSet, podName string) (*apps.StatefulSet, *corev1.PodList) {
+	var pods *corev1.PodList
+	s.WaitForState(set, func(set2 *apps.StatefulSet, pods2 *corev1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		for i := range pods.Items {
@@ -374,9 +374,9 @@ func (s *StatefulSetTester) WaitForPodReady(set *apps.StatefulSet, podName strin
 }
 
 // WaitForPodNotReady waist for the Pod named podName in set to exist and to not have a Ready condition.
-func (s *StatefulSetTester) WaitForPodNotReady(set *apps.StatefulSet, podName string) (*apps.StatefulSet, *v1.PodList) {
-	var pods *v1.PodList
-	s.WaitForState(set, func(set2 *apps.StatefulSet, pods2 *v1.PodList) (bool, error) {
+func (s *StatefulSetTester) WaitForPodNotReady(set *apps.StatefulSet, podName string) (*apps.StatefulSet, *corev1.PodList) {
+	var pods *corev1.PodList
+	s.WaitForState(set, func(set2 *apps.StatefulSet, pods2 *corev1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		for i := range pods.Items {
@@ -392,15 +392,15 @@ func (s *StatefulSetTester) WaitForPodNotReady(set *apps.StatefulSet, podName st
 
 // WaitForRollingUpdate waits for all Pods in set to exist and have the correct revision and for the RollingUpdate to
 // complete. set must have a RollingUpdateStatefulSetStrategyType.
-func (s *StatefulSetTester) WaitForRollingUpdate(set *apps.StatefulSet) (*apps.StatefulSet, *v1.PodList) {
-	var pods *v1.PodList
+func (s *StatefulSetTester) WaitForRollingUpdate(set *apps.StatefulSet) (*apps.StatefulSet, *corev1.PodList) {
+	var pods *corev1.PodList
 	if set.Spec.UpdateStrategy.Type != apps.RollingUpdateStatefulSetStrategyType {
 		Failf("StatefulSet %s/%s attempt to wait for rolling update with updateStrategy %s",
 			set.Namespace,
 			set.Name,
 			set.Spec.UpdateStrategy.Type)
 	}
-	s.WaitForState(set, func(set2 *apps.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	s.WaitForState(set, func(set2 *apps.StatefulSet, pods2 *corev1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		if len(pods.Items) < int(*set.Spec.Replicas) {
@@ -432,8 +432,8 @@ func (s *StatefulSetTester) WaitForRollingUpdate(set *apps.StatefulSet) (*apps.S
 // a RollingUpdateStatefulSetStrategyType with a non-nil RollingUpdate and Partition. All Pods with ordinals less
 // than or equal to the Partition are expected to be at set's current revision. All other Pods are expected to be
 // at its update revision.
-func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *apps.StatefulSet) (*apps.StatefulSet, *v1.PodList) {
-	var pods *v1.PodList
+func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *apps.StatefulSet) (*apps.StatefulSet, *corev1.PodList) {
+	var pods *corev1.PodList
 	if set.Spec.UpdateStrategy.Type != apps.RollingUpdateStatefulSetStrategyType {
 		Failf("StatefulSet %s/%s attempt to wait for partitioned update with updateStrategy %s",
 			set.Namespace,
@@ -445,7 +445,7 @@ func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *apps.StatefulSe
 			set.Namespace,
 			set.Name)
 	}
-	s.WaitForState(set, func(set2 *apps.StatefulSet, pods2 *v1.PodList) (bool, error) {
+	s.WaitForState(set, func(set2 *apps.StatefulSet, pods2 *corev1.PodList) (bool, error) {
 		set = set2
 		pods = pods2
 		partition := int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
@@ -489,9 +489,9 @@ func (s *StatefulSetTester) WaitForRunningAndNotReady(numStatefulPods int32, ss 
 	s.WaitForRunning(numStatefulPods, 0, ss)
 }
 
-var httpProbe = &v1.Probe{
-	Handler: v1.Handler{
-		HTTPGet: &v1.HTTPGetAction{
+var httpProbe = &corev1.Probe{
+	Handler: corev1.Handler{
+		HTTPGet: &corev1.HTTPGetAction{
 			Path: "/index.html",
 			Port: intstr.IntOrString{IntVal: 80},
 		},
@@ -520,7 +520,7 @@ func (s *StatefulSetTester) BreakHTTPProbe(ss *apps.StatefulSet) error {
 }
 
 // BreakPodHTTPProbe breaks the readiness probe for Nginx StatefulSet containers in one pod.
-func (s *StatefulSetTester) BreakPodHTTPProbe(ss *apps.StatefulSet, pod *v1.Pod) error {
+func (s *StatefulSetTester) BreakPodHTTPProbe(ss *apps.StatefulSet, pod *corev1.Pod) error {
 	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
@@ -544,7 +544,7 @@ func (s *StatefulSetTester) RestoreHTTPProbe(ss *apps.StatefulSet) error {
 }
 
 // RestorePodHTTPProbe restores the readiness probe for Nginx StatefulSet containers in pod.
-func (s *StatefulSetTester) RestorePodHTTPProbe(ss *apps.StatefulSet, pod *v1.Pod) error {
+func (s *StatefulSetTester) RestorePodHTTPProbe(ss *apps.StatefulSet, pod *corev1.Pod) error {
 	path := httpProbe.HTTPGet.Path
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
@@ -556,16 +556,16 @@ func (s *StatefulSetTester) RestorePodHTTPProbe(ss *apps.StatefulSet, pod *v1.Po
 	return err
 }
 
-var pauseProbe = &v1.Probe{
-	Handler: v1.Handler{
-		Exec: &v1.ExecAction{Command: []string{"test", "-f", "/data/statefulset-continue"}},
+var pauseProbe = &corev1.Probe{
+	Handler: corev1.Handler{
+		Exec: &corev1.ExecAction{Command: []string{"test", "-f", "/data/statefulset-continue"}},
 	},
 	PeriodSeconds:    1,
 	SuccessThreshold: 1,
 	FailureThreshold: 1,
 }
 
-func hasPauseProbe(pod *v1.Pod) bool {
+func hasPauseProbe(pod *corev1.Pod) bool {
 	probe := pod.Spec.Containers[0].ReadinessProbe
 	return probe != nil && reflect.DeepEqual(probe.Exec.Command, pauseProbe.Exec.Command)
 }
@@ -587,7 +587,7 @@ func (s *StatefulSetTester) ResumeNextPod(ss *apps.StatefulSet) {
 	podList := s.GetPodList(ss)
 	resumedPod := ""
 	for _, pod := range podList.Items {
-		if pod.Status.Phase != v1.PodRunning {
+		if pod.Status.Phase != corev1.PodRunning {
 			Failf("Found pod in phase %q, cannot resume", pod.Status.Phase)
 		}
 		if podutil.IsPodReady(&pod) || !hasPauseProbe(&pod) {
@@ -666,7 +666,7 @@ func (s *StatefulSetTester) CheckServiceName(ss *apps.StatefulSet, expectedServi
 }
 
 // SortStatefulPods sorts pods by their ordinals
-func (s *StatefulSetTester) SortStatefulPods(pods *v1.PodList) {
+func (s *StatefulSetTester) SortStatefulPods(pods *corev1.PodList) {
 	sort.Sort(statefulPodsByOrdinal(pods.Items))
 }
 
@@ -744,18 +744,18 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 }
 
 // NewStatefulSetPVC returns a PersistentVolumeClaim named name, for testing StatefulSets.
-func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
-	return v1.PersistentVolumeClaim{
+func NewStatefulSetPVC(name string) corev1.PersistentVolumeClaim {
+	return corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},
 			},
 		},
@@ -765,19 +765,19 @@ func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 // NewStatefulSet creates a new NGINX StatefulSet for testing. The StatefulSet is named name, is in namespace ns,
 // statefulPodsMounts are the mounts that will be backed by PVs. podsMounts are the mounts that are mounted directly
 // to the Pod. labels are the labels that will be usd for the StatefulSet selector.
-func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulPodMounts []v1.VolumeMount, podMounts []v1.VolumeMount, labels map[string]string) *apps.StatefulSet {
+func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulPodMounts []corev1.VolumeMount, podMounts []corev1.VolumeMount, labels map[string]string) *apps.StatefulSet {
 	mounts := append(statefulPodMounts, podMounts...)
-	claims := []v1.PersistentVolumeClaim{}
+	claims := []corev1.PersistentVolumeClaim{}
 	for _, m := range statefulPodMounts {
 		claims = append(claims, NewStatefulSetPVC(m.Name))
 	}
 
-	vols := []v1.Volume{}
+	vols := []corev1.Volume{}
 	for _, m := range podMounts {
-		vols = append(vols, v1.Volume{
+		vols = append(vols, corev1.Volume{
 			Name: m.Name,
-			VolumeSource: v1.VolumeSource{
-				HostPath: &v1.HostPathVolumeSource{
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
 					Path: fmt.Sprintf("/tmp/%v", m.Name),
 				},
 			},
@@ -798,13 +798,13 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 				MatchLabels: labels,
 			},
 			Replicas: func(i int32) *int32 { return &i }(replicas),
-			Template: v1.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
 					Annotations: map[string]string{},
 				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
 						{
 							Name:         "nginx",
 							Image:        imageutils.GetE2EImage(imageutils.Nginx),
@@ -840,7 +840,7 @@ func NewStatefulSetScale(ss *apps.StatefulSet) *appsV1beta2.Scale {
 
 var statefulPodRegex = regexp.MustCompile("(.*)-([0-9]+)$")
 
-func getStatefulPodOrdinal(pod *v1.Pod) int {
+func getStatefulPodOrdinal(pod *corev1.Pod) int {
 	ordinal := -1
 	subMatches := statefulPodRegex.FindStringSubmatch(pod.Name)
 	if len(subMatches) < 3 {
@@ -852,7 +852,7 @@ func getStatefulPodOrdinal(pod *v1.Pod) int {
 	return ordinal
 }
 
-type statefulPodsByOrdinal []v1.Pod
+type statefulPodsByOrdinal []corev1.Pod
 
 func (sp statefulPodsByOrdinal) Len() int {
 	return len(sp)

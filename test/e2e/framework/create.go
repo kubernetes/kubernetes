@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -326,9 +326,9 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		f.PatchName(&item.Name)
 	case *storage.StorageClass:
 		f.PatchName(&item.Name)
-	case *v1.ServiceAccount:
+	case *corev1.ServiceAccount:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
-	case *v1.Secret:
+	case *corev1.Secret:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
 	case *rbac.ClusterRoleBinding:
 		f.PatchName(&item.Name)
@@ -350,7 +350,7 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		if err := f.patchItemRecursively(&item.RoleRef); err != nil {
 			return errors.Wrapf(err, "%T", f)
 		}
-	case *v1.Service:
+	case *corev1.Service:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
 	case *apps.StatefulSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
@@ -370,11 +370,11 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 type serviceAccountFactory struct{}
 
 func (f *serviceAccountFactory) New() runtime.Object {
-	return &v1.ServiceAccount{}
+	return &corev1.ServiceAccount{}
 }
 
 func (*serviceAccountFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*v1.ServiceAccount)
+	item, ok := i.(*corev1.ServiceAccount)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
@@ -475,11 +475,11 @@ func (*roleBindingFactory) Create(f *Framework, i interface{}) (func() error, er
 type serviceFactory struct{}
 
 func (f *serviceFactory) New() runtime.Object {
-	return &v1.Service{}
+	return &corev1.Service{}
 }
 
 func (*serviceFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*v1.Service)
+	item, ok := i.(*corev1.Service)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
@@ -559,11 +559,11 @@ func (*storageClassFactory) Create(f *Framework, i interface{}) (func() error, e
 type secretFactory struct{}
 
 func (f *secretFactory) New() runtime.Object {
-	return &v1.Secret{}
+	return &corev1.Secret{}
 }
 
 func (*secretFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*v1.Secret)
+	item, ok := i.(*corev1.Secret)
 	if !ok {
 		return nil, errorItemNotSupported
 	}

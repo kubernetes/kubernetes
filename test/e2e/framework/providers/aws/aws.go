@@ -26,7 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	awscloud "k8s.io/legacy-cloud-providers/aws"
 )
@@ -67,7 +67,7 @@ func (p *Provider) GroupSize(group string) (int, error) {
 }
 
 // DeleteNode deletes a node which is specified as the argument
-func (p *Provider) DeleteNode(node *v1.Node) error {
+func (p *Provider) DeleteNode(node *corev1.Node) error {
 	client := newAWSClient("")
 
 	instanceID, err := awscloud.KubernetesInstanceID(node.Spec.ProviderID).MapToAWSInstanceID()
@@ -123,9 +123,9 @@ func (p *Provider) DeletePD(pdName string) error {
 }
 
 // CreatePVSource creates a persistent volume source
-func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error) {
-	return &v1.PersistentVolumeSource{
-		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+func (p *Provider) CreatePVSource(zone, diskName string) (*corev1.PersistentVolumeSource, error) {
+	return &corev1.PersistentVolumeSource{
+		AWSElasticBlockStore: &corev1.AWSElasticBlockStoreVolumeSource{
 			VolumeID: diskName,
 			FSType:   "ext3",
 		},
@@ -133,7 +133,7 @@ func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSo
 }
 
 // DeletePVSource deletes a persistent volume source
-func (p *Provider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
+func (p *Provider) DeletePVSource(pvSource *corev1.PersistentVolumeSource) error {
 	return framework.DeletePDWithRetry(pvSource.AWSElasticBlockStore.VolumeID)
 }
 

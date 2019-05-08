@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +44,7 @@ const (
 
 var (
 	// SELinuxLabel is common selinux labels.
-	SELinuxLabel = &v1.SELinuxOptions{
+	SELinuxLabel = &corev1.SELinuxOptions{
 		Level: "s0:c0,c1"}
 )
 
@@ -76,25 +76,25 @@ type PVCMap map[types.NamespacedName]pvcval
 //	 	},
 //	 }
 type PersistentVolumeConfig struct {
-	PVSource         v1.PersistentVolumeSource
-	Prebind          *v1.PersistentVolumeClaim
-	ReclaimPolicy    v1.PersistentVolumeReclaimPolicy
+	PVSource         corev1.PersistentVolumeSource
+	Prebind          *corev1.PersistentVolumeClaim
+	ReclaimPolicy    corev1.PersistentVolumeReclaimPolicy
 	NamePrefix       string
 	Labels           labels.Set
 	StorageClassName string
-	NodeAffinity     *v1.VolumeNodeAffinity
-	VolumeMode       *v1.PersistentVolumeMode
+	NodeAffinity     *corev1.VolumeNodeAffinity
+	VolumeMode       *corev1.PersistentVolumeMode
 }
 
 // PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to generate a PVC object.
 // AccessModes defaults to all modes (RWO, RWX, ROX) if left empty
 // (+optional) Annotations defines the PVC's annotations
 type PersistentVolumeClaimConfig struct {
-	AccessModes      []v1.PersistentVolumeAccessMode
+	AccessModes      []corev1.PersistentVolumeAccessMode
 	Annotations      map[string]string
 	Selector         *metav1.LabelSelector
 	StorageClassName *string
-	VolumeMode       *v1.PersistentVolumeMode
+	VolumeMode       *corev1.PersistentVolumeMode
 }
 
 // NodeSelection specifies where to run a pod, using a combination of fixed node name,
@@ -102,12 +102,12 @@ type PersistentVolumeClaimConfig struct {
 type NodeSelection struct {
 	Name     string
 	Selector map[string]string
-	Affinity *v1.Affinity
+	Affinity *corev1.Affinity
 }
 
 // PVPVCCleanup cleans up a pv and pvc in a single pv/pvc test case.
 // Note: delete errors are appended to []error so that we can attempt to delete both the pvc and pv.
-func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) []error {
+func PVPVCCleanup(c clientset.Interface, ns string, pv *corev1.PersistentVolume, pvc *corev1.PersistentVolumeClaim) []error {
 	var errs []error
 
 	if pvc != nil {
@@ -182,7 +182,7 @@ func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 // DeletePVCandValidatePV deletes the PVC and waits for the PV to enter its expected phase. Validate that the PV
 // has been reclaimed (assumption here about reclaimPolicy). Caller tells this func which
 // phase value to expect for the pv bound to the to-be-deleted claim.
-func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) error {
+func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *corev1.PersistentVolumeClaim, pv *corev1.PersistentVolume, expectPVPhase corev1.PersistentVolumePhase) error {
 	pvname := pvc.Spec.VolumeName
 	Logf("Deleting PVC %v to trigger reclamation of PV %v", pvc.Name, pvname)
 	err := DeletePersistentVolumeClaim(c, pvc.Name, ns)
@@ -203,11 +203,11 @@ func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 		return fmt.Errorf("PV Get API error: %v", err)
 	}
 	cr := pv.Spec.ClaimRef
-	if expectPVPhase == v1.VolumeAvailable {
+	if expectPVPhase == corev1.VolumeAvailable {
 		if cr != nil && len(cr.UID) > 0 {
 			return fmt.Errorf("PV is 'Available' but ClaimRef.UID is not empty")
 		}
-	} else if expectPVPhase == v1.VolumeBound {
+	} else if expectPVPhase == corev1.VolumeBound {
 		if cr == nil {
 			return fmt.Errorf("PV is 'Bound' but ClaimRef is nil")
 		}
@@ -225,7 +225,7 @@ func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 // Available, Bound).
 // Note: if there are more claims than pvs then some of the remaining claims may bind to just made
 //   available pvs.
-func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, claims PVCMap, expectPVPhase v1.PersistentVolumePhase) error {
+func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, claims PVCMap, expectPVPhase corev1.PersistentVolumePhase) error {
 	var boundPVs, deletedPVCs int
 
 	for pvName := range pvols {
@@ -265,7 +265,7 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, 
 }
 
 // create the PV resource. Fails test on error.
-func createPV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func createPV(c clientset.Interface, pv *corev1.PersistentVolume) (*corev1.PersistentVolume, error) {
 	pv, err := c.CoreV1().PersistentVolumes().Create(pv)
 	if err != nil {
 		return nil, fmt.Errorf("PV Create API error: %v", err)
@@ -274,12 +274,12 @@ func createPV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVol
 }
 
 // CreatePV creates the PV resource. Fails test on error.
-func CreatePV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func CreatePV(c clientset.Interface, pv *corev1.PersistentVolume) (*corev1.PersistentVolume, error) {
 	return createPV(c, pv)
 }
 
 // CreatePVC creates the PVC resource. Fails test on error.
-func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+func CreatePVC(c clientset.Interface, ns string, pvc *corev1.PersistentVolumeClaim) (*corev1.PersistentVolumeClaim, error) {
 	pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
 	if err != nil {
 		return nil, fmt.Errorf("PVC Create API error: %v", err)
@@ -293,7 +293,7 @@ func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) 
 // Note: in the pre-bind case the real PVC name, which is generated, is not
 //   known until after the PVC is instantiated. This is why the pvc is created
 //   before the pv.
-func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
+func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*corev1.PersistentVolume, *corev1.PersistentVolumeClaim, error) {
 	// make the pvc spec
 	pvc := MakePersistentVolumeClaim(pvcConfig, ns)
 	preBindMsg := ""
@@ -328,7 +328,7 @@ func CreatePVCPV(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 // Note: in the pre-bind case the real PV name, which is generated, is not
 //   known until after the PV is instantiated. This is why the pv is created
 //   before the pvc.
-func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*v1.PersistentVolume, *v1.PersistentVolumeClaim, error) {
+func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConfig PersistentVolumeClaimConfig, ns string, preBind bool) (*corev1.PersistentVolume, *corev1.PersistentVolumeClaim, error) {
 	preBindMsg := ""
 	if preBind {
 		preBindMsg = " pre-bound"
@@ -404,17 +404,17 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 }
 
 // WaitOnPVandPVC waits for the pv and pvc to bind to each other.
-func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) error {
+func WaitOnPVandPVC(c clientset.Interface, ns string, pv *corev1.PersistentVolume, pvc *corev1.PersistentVolumeClaim) error {
 	// Wait for newly created PVC to bind to the PV
 	Logf("Waiting for PV %v to bind to PVC %v", pv.Name, pvc.Name)
-	err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, Poll, ClaimBindingTimeout)
+	err := WaitForPersistentVolumeClaimPhase(corev1.ClaimBound, c, ns, pvc.Name, Poll, ClaimBindingTimeout)
 	if err != nil {
 		return fmt.Errorf("PVC %q did not become Bound: %v", pvc.Name, err)
 	}
 
 	// Wait for PersistentVolume.Status.Phase to be Bound, which it should be
 	// since the PVC is already bound.
-	err = WaitForPersistentVolumePhase(v1.VolumeBound, c, pv.Name, Poll, PVBindingTimeout)
+	err = WaitForPersistentVolumePhase(corev1.VolumeBound, c, pv.Name, Poll, PVBindingTimeout)
 	if err != nil {
 		return fmt.Errorf("PV %q did not become Bound: %v", pv.Name, err)
 	}
@@ -460,7 +460,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 	}
 
 	for pvName := range pvols {
-		err := WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, Poll, PVBindingTimeout)
+		err := WaitForPersistentVolumePhase(corev1.VolumeBound, c, pvName, Poll, PVBindingTimeout)
 		if err != nil && len(pvols) > len(claims) {
 			Logf("WARN: pv %v is not bound after max wait", pvName)
 			Logf("      This may be ok since there are more pvs than pvcs")
@@ -483,7 +483,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 				return fmt.Errorf("internal: claims map is missing pvc %q", pvcKey)
 			}
 
-			err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, cr.Name, Poll, ClaimBindingTimeout)
+			err := WaitForPersistentVolumeClaimPhase(corev1.ClaimBound, c, ns, cr.Name, Poll, ClaimBindingTimeout)
 			if err != nil {
 				return fmt.Errorf("PVC %q did not become Bound: %v", cr.Name, err)
 			}
@@ -498,7 +498,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 }
 
 // Test the pod's exit code to be zero.
-func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
+func testPodSuccessOrFail(c clientset.Interface, ns string, pod *corev1.Pod) error {
 	ginkgo.By("Pod should terminate with exitcode 0 (success)")
 	if err := WaitForPodSuccessInNamespace(c, pod.Name, ns); err != nil {
 		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
@@ -509,7 +509,7 @@ func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
 
 // DeletePodWithWait deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod
 // not existing.
-func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) error {
+func DeletePodWithWait(f *Framework, c clientset.Interface, pod *corev1.Pod) error {
 	if pod == nil {
 		return nil
 	}
@@ -538,7 +538,7 @@ func DeletePodWithWaitByName(f *Framework, c clientset.Interface, podName, podNa
 // CreateWaitAndDeletePod creates the test pod, wait for (hopefully) success, and then delete the pod.
 // Note: need named return value so that the err assignment in the defer sets the returned error.
 //       Has been shown to be necessary using Go 1.7.
-func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (err error) {
+func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, pvc *corev1.PersistentVolumeClaim) (err error) {
 	Logf("Creating nfs test pod")
 	pod := MakeWritePod(ns, pvc)
 	runPod, err := c.CoreV1().Pods(ns).Create(pod)
@@ -571,20 +571,20 @@ func makePvcKey(ns, name string) types.NamespacedName {
 // Note: the passed-in claim does not have a name until it is created and thus the PV's
 //   ClaimRef cannot be completely filled-in in this func. Therefore, the ClaimRef's name
 //   is added later in CreatePVCPV.
-func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume {
-	var claimRef *v1.ObjectReference
+func MakePersistentVolume(pvConfig PersistentVolumeConfig) *corev1.PersistentVolume {
+	var claimRef *corev1.ObjectReference
 	// If the reclaimPolicy is not provided, assume Retain
 	if pvConfig.ReclaimPolicy == "" {
 		Logf("PV ReclaimPolicy unspecified, default: Retain")
-		pvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimRetain
+		pvConfig.ReclaimPolicy = corev1.PersistentVolumeReclaimRetain
 	}
 	if pvConfig.Prebind != nil {
-		claimRef = &v1.ObjectReference{
+		claimRef = &corev1.ObjectReference{
 			Name:      pvConfig.Prebind.Name,
 			Namespace: pvConfig.Prebind.Namespace,
 		}
 	}
-	return &v1.PersistentVolume{
+	return &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
 			Labels:       pvConfig.Labels,
@@ -592,16 +592,16 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 				util.VolumeGidAnnotationKey: "777",
 			},
 		},
-		Spec: v1.PersistentVolumeSpec{
+		Spec: corev1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: pvConfig.ReclaimPolicy,
-			Capacity: v1.ResourceList{
-				v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
+			Capacity: corev1.ResourceList{
+				corev1.ResourceName(corev1.ResourceStorage): resource.MustParse("2Gi"),
 			},
 			PersistentVolumeSource: pvConfig.PVSource,
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-				v1.ReadOnlyMany,
-				v1.ReadWriteMany,
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+				corev1.ReadOnlyMany,
+				corev1.ReadWriteMany,
 			},
 			ClaimRef:         claimRef,
 			StorageClassName: pvConfig.StorageClassName,
@@ -615,26 +615,26 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 // Note: if this PVC is intended to be pre-bound to a PV, whose name is not
 //   known until the PV is instantiated, then the func CreatePVPVC will add
 //   pvc.Spec.VolumeName to this claim.
-func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.PersistentVolumeClaim {
+func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *corev1.PersistentVolumeClaim {
 	// Specs are expected to match this test's PersistentVolume
 
 	if len(cfg.AccessModes) == 0 {
 		Logf("AccessModes unspecified, default: all modes (RWO, RWX, ROX).")
-		cfg.AccessModes = append(cfg.AccessModes, v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadOnlyMany)
+		cfg.AccessModes = append(cfg.AccessModes, corev1.ReadWriteOnce, corev1.ReadOnlyMany, corev1.ReadOnlyMany)
 	}
 
-	return &v1.PersistentVolumeClaim{
+	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
 			Annotations:  cfg.Annotations,
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
+		Spec: corev1.PersistentVolumeClaimSpec{
 			Selector:    cfg.Selector,
 			AccessModes: cfg.AccessModes,
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceName(corev1.ResourceStorage): resource.MustParse("1Gi"),
 				},
 			},
 			StorageClassName: cfg.StorageClassName,
@@ -695,17 +695,17 @@ func deletePD(pdName string) error {
 
 // MakeWritePod returns a pod definition based on the namespace. The pod references the PVC's
 // name.
-func MakeWritePod(ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
-	return MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
+func MakeWritePod(ns string, pvc *corev1.PersistentVolumeClaim) *corev1.Pod {
+	return MakePod(ns, nil, []*corev1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
 }
 
 // MakePod returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
-func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *v1.Pod {
+func MakePod(ns string, nodeSelector map[string]string, pvclaims []*corev1.PersistentVolumeClaim, isPrivileged bool, command string) *corev1.Pod {
 	if len(command) == 0 {
 		command = "trap exit TERM; while true; do sleep 1; done"
 	}
-	podSpec := &v1.Pod{
+	podSpec := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -714,27 +714,27 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 			GenerateName: "pvc-tester-",
 			Namespace:    ns,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:    "write-pod",
 					Image:   BusyBoxImage,
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
-					SecurityContext: &v1.SecurityContext{
+					SecurityContext: &corev1.SecurityContext{
 						Privileged: &isPrivileged,
 					},
 				},
 			},
-			RestartPolicy: v1.RestartPolicyOnFailure,
+			RestartPolicy: corev1.RestartPolicyOnFailure,
 		},
 	}
-	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
-	var volumes = make([]v1.Volume, len(pvclaims))
+	var volumeMounts = make([]corev1.VolumeMount, len(pvclaims))
+	var volumes = make([]corev1.Volume, len(pvclaims))
 	for index, pvclaim := range pvclaims {
 		volumename := fmt.Sprintf("volume%v", index+1)
-		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
-		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+		volumeMounts[index] = corev1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
+		volumes[index] = corev1.Volume{Name: volumename, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
 	}
 	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
 	podSpec.Spec.Volumes = volumes
@@ -745,8 +745,8 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 }
 
 // makeNginxPod returns a pod definition based on the namespace using nginx image
-func makeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim) *v1.Pod {
-	podSpec := &v1.Pod{
+func makeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*corev1.PersistentVolumeClaim) *corev1.Pod {
+	podSpec := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -755,12 +755,12 @@ func makeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 			GenerateName: "pvc-tester-",
 			Namespace:    ns,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:  "write-pod",
 					Image: "nginx",
-					Ports: []v1.ContainerPort{
+					Ports: []corev1.ContainerPort{
 						{
 							Name:          "http-server",
 							ContainerPort: 80,
@@ -770,12 +770,12 @@ func makeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 			},
 		},
 	}
-	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
-	var volumes = make([]v1.Volume, len(pvclaims))
+	var volumeMounts = make([]corev1.VolumeMount, len(pvclaims))
+	var volumes = make([]corev1.Volume, len(pvclaims))
 	for index, pvclaim := range pvclaims {
 		volumename := fmt.Sprintf("volume%v", index+1)
-		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
-		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+		volumeMounts[index] = corev1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
+		volumes[index] = corev1.Volume{Name: volumename, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
 	}
 	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
 	podSpec.Spec.Volumes = volumes
@@ -788,7 +788,7 @@ func makeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 // MakeSecPod returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod.
 // SELinux testing requires to pass HostIPC and HostPID as booleansi arguments.
-func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64) *v1.Pod {
+func MakeSecPod(ns string, pvclaims []*corev1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *corev1.SELinuxOptions, fsGroup *int64) *corev1.Pod {
 	if len(command) == 0 {
 		command = "trap exit TERM; while true; do sleep 1; done"
 	}
@@ -798,7 +798,7 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 			return &i
 		}(1000)
 	}
-	podSpec := &v1.Pod{
+	podSpec := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -807,38 +807,38 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 			Name:      podName,
 			Namespace: ns,
 		},
-		Spec: v1.PodSpec{
+		Spec: corev1.PodSpec{
 			HostIPC: hostIPC,
 			HostPID: hostPID,
-			SecurityContext: &v1.PodSecurityContext{
+			SecurityContext: &corev1.PodSecurityContext{
 				FSGroup: fsGroup,
 			},
-			Containers: []v1.Container{
+			Containers: []corev1.Container{
 				{
 					Name:    "write-pod",
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
-					SecurityContext: &v1.SecurityContext{
+					SecurityContext: &corev1.SecurityContext{
 						Privileged: &isPrivileged,
 					},
 				},
 			},
-			RestartPolicy: v1.RestartPolicyOnFailure,
+			RestartPolicy: corev1.RestartPolicyOnFailure,
 		},
 	}
-	var volumeMounts = make([]v1.VolumeMount, 0)
-	var volumeDevices = make([]v1.VolumeDevice, 0)
-	var volumes = make([]v1.Volume, len(pvclaims))
+	var volumeMounts = make([]corev1.VolumeMount, 0)
+	var volumeDevices = make([]corev1.VolumeDevice, 0)
+	var volumes = make([]corev1.Volume, len(pvclaims))
 	for index, pvclaim := range pvclaims {
 		volumename := fmt.Sprintf("volume%v", index+1)
-		if pvclaim.Spec.VolumeMode != nil && *pvclaim.Spec.VolumeMode == v1.PersistentVolumeBlock {
-			volumeDevices = append(volumeDevices, v1.VolumeDevice{Name: volumename, DevicePath: "/mnt/" + volumename})
+		if pvclaim.Spec.VolumeMode != nil && *pvclaim.Spec.VolumeMode == corev1.PersistentVolumeBlock {
+			volumeDevices = append(volumeDevices, corev1.VolumeDevice{Name: volumename, DevicePath: "/mnt/" + volumename})
 		} else {
-			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
 		}
 
-		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+		volumes[index] = corev1.Volume{Name: volumename, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
 	}
 	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
 	podSpec.Spec.Containers[0].VolumeDevices = volumeDevices
@@ -848,7 +848,7 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 }
 
 // CreatePod with given claims based on node selector
-func CreatePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
+func CreatePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*corev1.PersistentVolumeClaim, isPrivileged bool, command string) (*corev1.Pod, error) {
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
@@ -868,7 +868,7 @@ func CreatePod(client clientset.Interface, namespace string, nodeSelector map[st
 }
 
 // CreateNginxPod creates an enginx pod.
-func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim) (*v1.Pod, error) {
+func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*corev1.PersistentVolumeClaim) (*corev1.Pod, error) {
 	pod := makeNginxPod(namespace, nodeSelector, pvclaims)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
@@ -888,12 +888,12 @@ func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector m
 }
 
 // CreateSecPod creates security pod with given claims
-func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*v1.Pod, error) {
+func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*corev1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *corev1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*corev1.Pod, error) {
 	return CreateSecPodWithNodeSelection(client, namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup, NodeSelection{}, timeout)
 }
 
 // CreateSecPodWithNodeSelection creates security pod with given claims
-func CreateSecPodWithNodeSelection(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, node NodeSelection, timeout time.Duration) (*v1.Pod, error) {
+func CreateSecPodWithNodeSelection(client clientset.Interface, namespace string, pvclaims []*corev1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *corev1.SELinuxOptions, fsGroup *int64, node NodeSelection, timeout time.Duration) (*corev1.Pod, error) {
 	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
 	// Setting node
 	pod.Spec.NodeName = node.Name
@@ -919,20 +919,20 @@ func CreateSecPodWithNodeSelection(client clientset.Interface, namespace string,
 }
 
 // SetNodeAffinityRequirement sets affinity with specified operator to nodeName to nodeSelection
-func SetNodeAffinityRequirement(nodeSelection *NodeSelection, operator v1.NodeSelectorOperator, nodeName string) {
+func SetNodeAffinityRequirement(nodeSelection *NodeSelection, operator corev1.NodeSelectorOperator, nodeName string) {
 	// Add node-anti-affinity.
 	if nodeSelection.Affinity == nil {
-		nodeSelection.Affinity = &v1.Affinity{}
+		nodeSelection.Affinity = &corev1.Affinity{}
 	}
 	if nodeSelection.Affinity.NodeAffinity == nil {
-		nodeSelection.Affinity.NodeAffinity = &v1.NodeAffinity{}
+		nodeSelection.Affinity.NodeAffinity = &corev1.NodeAffinity{}
 	}
 	if nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-		nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{}
+		nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
 	}
 	nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-		v1.NodeSelectorTerm{
-			MatchFields: []v1.NodeSelectorRequirement{
+		corev1.NodeSelectorTerm{
+			MatchFields: []corev1.NodeSelectorRequirement{
 				{Key: "metadata.name", Operator: operator, Values: []string{nodeName}},
 			},
 		})
@@ -940,21 +940,21 @@ func SetNodeAffinityRequirement(nodeSelection *NodeSelection, operator v1.NodeSe
 
 // SetAffinity sets affinity to nodeName to nodeSelection
 func SetAffinity(nodeSelection *NodeSelection, nodeName string) {
-	SetNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpIn, nodeName)
+	SetNodeAffinityRequirement(nodeSelection, corev1.NodeSelectorOpIn, nodeName)
 }
 
 // SetAntiAffinity sets anti-affinity to nodeName to nodeSelection
 func SetAntiAffinity(nodeSelection *NodeSelection, nodeName string) {
-	SetNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpNotIn, nodeName)
+	SetNodeAffinityRequirement(nodeSelection, corev1.NodeSelectorOpNotIn, nodeName)
 }
 
 // CreateClientPod defines and creates a pod with a mounted PV.  Pod runs infinite loop until killed.
-func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
-	return CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
+func CreateClientPod(c clientset.Interface, ns string, pvc *corev1.PersistentVolumeClaim) (*corev1.Pod, error) {
+	return CreatePod(c, ns, nil, []*corev1.PersistentVolumeClaim{pvc}, true, "")
 }
 
 // CreateUnschedulablePod with given claims based on node selector
-func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
+func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*corev1.PersistentVolumeClaim, isPrivileged bool, command string) (*corev1.Pod, error) {
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
@@ -974,11 +974,11 @@ func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSe
 }
 
 // WaitForPVClaimBoundPhase waits until all pvcs phase set to bound
-func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim, timeout time.Duration) ([]*v1.PersistentVolume, error) {
-	persistentvolumes := make([]*v1.PersistentVolume, len(pvclaims))
+func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*corev1.PersistentVolumeClaim, timeout time.Duration) ([]*corev1.PersistentVolume, error) {
+	persistentvolumes := make([]*corev1.PersistentVolume, len(pvclaims))
 
 	for index, claim := range pvclaims {
-		err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, Poll, timeout)
+		err := WaitForPersistentVolumeClaimPhase(corev1.ClaimBound, client, claim.Namespace, claim.Name, Poll, timeout)
 		if err != nil {
 			return persistentvolumes, err
 		}
@@ -997,7 +997,7 @@ func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.Persist
 }
 
 // CreatePVSource creates a PV source.
-func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
+func CreatePVSource(zone string) (*corev1.PersistentVolumeSource, error) {
 	diskName, err := CreatePDWithRetryAndZone(zone)
 	if err != nil {
 		return nil, err
@@ -1006,12 +1006,12 @@ func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
 }
 
 // DeletePVSource deletes a PV source.
-func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
+func DeletePVSource(pvSource *corev1.PersistentVolumeSource) error {
 	return TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
 }
 
 // GetBoundPV returns a PV details.
-func GetBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
+func GetBoundPV(client clientset.Interface, pvc *corev1.PersistentVolumeClaim) (*corev1.PersistentVolume, error) {
 	// Get new copy of the claim
 	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
 	if err != nil {

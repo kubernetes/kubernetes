@@ -20,7 +20,7 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,7 +40,7 @@ func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, paralle
 		}
 		count := int32(0)
 		for _, p := range pods.Items {
-			if p.Status.Phase == v1.PodRunning {
+			if p.Status.Phase == corev1.PodRunning {
 				count++
 			}
 		}
@@ -78,7 +78,7 @@ func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.D
 			return false, err
 		}
 		for _, c := range curr.Status.Conditions {
-			if c.Type == batchv1.JobFailed && c.Status == v1.ConditionTrue {
+			if c.Type == batchv1.JobFailed && c.Status == corev1.ConditionTrue {
 				if reason == "" || reason == c.Reason {
 					return true, nil
 				}
@@ -110,7 +110,7 @@ func CheckForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parall
 	}
 	count := int32(0)
 	for _, p := range pods.Items {
-		if p.Status.Phase == v1.PodRunning {
+		if p.Status.Phase == corev1.PodRunning {
 			count++
 		}
 	}

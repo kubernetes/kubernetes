@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/legacy-cloud-providers/azure"
@@ -55,7 +55,7 @@ type Provider struct {
 }
 
 // DeleteNode deletes a node which is specified as the argument
-func (p *Provider) DeleteNode(node *v1.Node) error {
+func (p *Provider) DeleteNode(node *corev1.Node) error {
 	return errors.New("not implemented yet")
 }
 
@@ -79,11 +79,11 @@ func (p *Provider) DeletePD(pdName string) error {
 }
 
 // EnableAndDisableInternalLB returns functions for both enabling and disabling internal Load Balancer
-func (p *Provider) EnableAndDisableInternalLB() (enable, disable func(svc *v1.Service)) {
-	enable = func(svc *v1.Service) {
+func (p *Provider) EnableAndDisableInternalLB() (enable, disable func(svc *corev1.Service)) {
+	enable = func(svc *corev1.Service) {
 		svc.ObjectMeta.Annotations = map[string]string{azure.ServiceAnnotationLoadBalancerInternal: "true"}
 	}
-	disable = func(svc *v1.Service) {
+	disable = func(svc *corev1.Service) {
 		svc.ObjectMeta.Annotations = map[string]string{azure.ServiceAnnotationLoadBalancerInternal: "false"}
 	}
 	return

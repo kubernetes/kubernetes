@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -129,19 +129,19 @@ func NewServiceTestJig(client clientset.Interface, name string) *ServiceTestJig 
 	return j
 }
 
-// newServiceTemplate returns the default v1.Service template for this jig, but
+// newServiceTemplate returns the default corev1.Service template for this jig, but
 // does not actually create the Service.  The default Service has the same name
 // as the jig and exposes the given port.
-func (j *ServiceTestJig) newServiceTemplate(namespace string, proto v1.Protocol, port int32) *v1.Service {
-	service := &v1.Service{
+func (j *ServiceTestJig) newServiceTemplate(namespace string, proto corev1.Protocol, port int32) *corev1.Service {
+	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      j.Name,
 			Labels:    j.Labels,
 		},
-		Spec: v1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Selector: j.Labels,
-			Ports: []v1.ServicePort{
+			Ports: []corev1.ServicePort{
 				{
 					Protocol: proto,
 					Port:     port,
@@ -155,8 +155,8 @@ func (j *ServiceTestJig) newServiceTemplate(namespace string, proto v1.Protocol,
 // CreateTCPServiceWithPort creates a new TCP Service with given port based on the
 // jig's defaults. Callers can provide a function to tweak the Service object before
 // it is created.
-func (j *ServiceTestJig) CreateTCPServiceWithPort(namespace string, tweak func(svc *v1.Service), port int32) *v1.Service {
-	svc := j.newServiceTemplate(namespace, v1.ProtocolTCP, port)
+func (j *ServiceTestJig) CreateTCPServiceWithPort(namespace string, tweak func(svc *corev1.Service), port int32) *corev1.Service {
+	svc := j.newServiceTemplate(namespace, corev1.ProtocolTCP, port)
 	if tweak != nil {
 		tweak(svc)
 	}
@@ -170,8 +170,8 @@ func (j *ServiceTestJig) CreateTCPServiceWithPort(namespace string, tweak func(s
 // CreateTCPServiceOrFail creates a new TCP Service based on the jig's
 // defaults.  Callers can provide a function to tweak the Service object before
 // it is created.
-func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc *v1.Service)) *v1.Service {
-	svc := j.newServiceTemplate(namespace, v1.ProtocolTCP, 80)
+func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc *corev1.Service)) *corev1.Service {
+	svc := j.newServiceTemplate(namespace, corev1.ProtocolTCP, 80)
 	if tweak != nil {
 		tweak(svc)
 	}
@@ -185,8 +185,8 @@ func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc
 // CreateUDPServiceOrFail creates a new UDP Service based on the jig's
 // defaults.  Callers can provide a function to tweak the Service object before
 // it is created.
-func (j *ServiceTestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc *v1.Service)) *v1.Service {
-	svc := j.newServiceTemplate(namespace, v1.ProtocolUDP, 80)
+func (j *ServiceTestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc *corev1.Service)) *corev1.Service {
+	svc := j.newServiceTemplate(namespace, corev1.ProtocolUDP, 80)
 	if tweak != nil {
 		tweak(svc)
 	}
@@ -199,17 +199,17 @@ func (j *ServiceTestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc
 
 // CreateExternalNameServiceOrFail creates a new ExternalName type Service based on the jig's defaults.
 // Callers can provide a function to tweak the Service object before it is created.
-func (j *ServiceTestJig) CreateExternalNameServiceOrFail(namespace string, tweak func(svc *v1.Service)) *v1.Service {
-	svc := &v1.Service{
+func (j *ServiceTestJig) CreateExternalNameServiceOrFail(namespace string, tweak func(svc *corev1.Service)) *corev1.Service {
+	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      j.Name,
 			Labels:    j.Labels,
 		},
-		Spec: v1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Selector:     j.Labels,
 			ExternalName: "foo.example.com",
-			Type:         v1.ServiceTypeExternalName,
+			Type:         corev1.ServiceTypeExternalName,
 		},
 	}
 	if tweak != nil {
@@ -223,12 +223,12 @@ func (j *ServiceTestJig) CreateExternalNameServiceOrFail(namespace string, tweak
 }
 
 // CreateServiceWithServicePort creates a new Service with ServicePort.
-func (j *ServiceTestJig) CreateServiceWithServicePort(labels map[string]string, namespace string, ports []v1.ServicePort) (*v1.Service, error) {
-	service := &v1.Service{
+func (j *ServiceTestJig) CreateServiceWithServicePort(labels map[string]string, namespace string, ports []corev1.ServicePort) (*corev1.Service, error) {
+	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: j.Name,
 		},
-		Spec: v1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Selector: labels,
 			Ports:    ports,
 		},
@@ -236,9 +236,9 @@ func (j *ServiceTestJig) CreateServiceWithServicePort(labels map[string]string, 
 	return j.Client.CoreV1().Services(namespace).Create(service)
 }
 
-func (j *ServiceTestJig) ChangeServiceType(namespace, name string, newType v1.ServiceType, timeout time.Duration) {
+func (j *ServiceTestJig) ChangeServiceType(namespace, name string, newType corev1.ServiceType, timeout time.Duration) {
 	ingressIP := ""
-	svc := j.UpdateServiceOrFail(namespace, name, func(s *v1.Service) {
+	svc := j.UpdateServiceOrFail(namespace, name, func(s *corev1.Service) {
 		for _, ing := range s.Status.LoadBalancer.Ingress {
 			if ing.IP != "" {
 				ingressIP = ing.IP
@@ -256,19 +256,19 @@ func (j *ServiceTestJig) ChangeServiceType(namespace, name string, newType v1.Se
 // ExternalTrafficPolicy set to Local and sanity checks its nodePort.
 // If createPod is true, it also creates an RC with 1 replica of
 // the standard netexec container used everywhere in this test.
-func (j *ServiceTestJig) CreateOnlyLocalNodePortService(namespace, serviceName string, createPod bool) *v1.Service {
+func (j *ServiceTestJig) CreateOnlyLocalNodePortService(namespace, serviceName string, createPod bool) *corev1.Service {
 	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=NodePort and ExternalTrafficPolicy=Local")
-	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
-		svc.Spec.Type = v1.ServiceTypeNodePort
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
-		svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: 80}}
+	svc := j.CreateTCPServiceOrFail(namespace, func(svc *corev1.Service) {
+		svc.Spec.Type = corev1.ServiceTypeNodePort
+		svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.Ports = []corev1.ServicePort{{Protocol: corev1.ProtocolTCP, Port: 80}}
 	})
 
 	if createPod {
 		ginkgo.By("creating a pod to be part of the service " + serviceName)
 		j.RunOrFail(namespace, nil)
 	}
-	j.SanityCheckService(svc, v1.ServiceTypeNodePort)
+	j.SanityCheckService(svc, corev1.ServiceTypeNodePort)
 	return svc
 }
 
@@ -277,13 +277,13 @@ func (j *ServiceTestJig) CreateOnlyLocalNodePortService(namespace, serviceName s
 // If createPod is true, it also creates an RC with 1 replica of
 // the standard netexec container used everywhere in this test.
 func (j *ServiceTestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceName string, timeout time.Duration, createPod bool,
-	tweak func(svc *v1.Service)) *v1.Service {
+	tweak func(svc *corev1.Service)) *corev1.Service {
 	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer and ExternalTrafficPolicy=Local")
-	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
-		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+	svc := j.CreateTCPServiceOrFail(namespace, func(svc *corev1.Service) {
+		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
 		// We need to turn affinity off for our LB distribution tests
-		svc.Spec.SessionAffinity = v1.ServiceAffinityNone
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.SessionAffinity = corev1.ServiceAffinityNone
+		svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
 		if tweak != nil {
 			tweak(svc)
 		}
@@ -295,18 +295,18 @@ func (j *ServiceTestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceNa
 	}
 	ginkgo.By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
 	svc = j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
-	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+	j.SanityCheckService(svc, corev1.ServiceTypeLoadBalancer)
 	return svc
 }
 
 // CreateLoadBalancerService creates a loadbalancer service and waits
 // for it to acquire an ingress IP.
-func (j *ServiceTestJig) CreateLoadBalancerService(namespace, serviceName string, timeout time.Duration, tweak func(svc *v1.Service)) *v1.Service {
+func (j *ServiceTestJig) CreateLoadBalancerService(namespace, serviceName string, timeout time.Duration, tweak func(svc *corev1.Service)) *corev1.Service {
 	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer")
-	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
-		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+	svc := j.CreateTCPServiceOrFail(namespace, func(svc *corev1.Service) {
+		svc.Spec.Type = corev1.ServiceTypeLoadBalancer
 		// We need to turn affinity off for our LB distribution tests
-		svc.Spec.SessionAffinity = v1.ServiceAffinityNone
+		svc.Spec.SessionAffinity = corev1.ServiceAffinityNone
 		if tweak != nil {
 			tweak(svc)
 		}
@@ -314,11 +314,11 @@ func (j *ServiceTestJig) CreateLoadBalancerService(namespace, serviceName string
 
 	ginkgo.By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
 	svc = j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
-	j.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+	j.SanityCheckService(svc, corev1.ServiceTypeLoadBalancer)
 	return svc
 }
 
-func GetNodeAddresses(node *v1.Node, addressType v1.NodeAddressType) (ips []string) {
+func GetNodeAddresses(node *corev1.Node, addressType corev1.NodeAddressType) (ips []string) {
 	for j := range node.Status.Addresses {
 		nodeAddress := &node.Status.Addresses[j]
 		if nodeAddress.Type == addressType && nodeAddress.Address != "" {
@@ -328,7 +328,7 @@ func GetNodeAddresses(node *v1.Node, addressType v1.NodeAddressType) (ips []stri
 	return
 }
 
-func CollectAddresses(nodes *v1.NodeList, addressType v1.NodeAddressType) []string {
+func CollectAddresses(nodes *corev1.NodeList, addressType corev1.NodeAddressType) []string {
 	ips := []string{}
 	for i := range nodes.Items {
 		ips = append(ips, GetNodeAddresses(&nodes.Items[i], addressType)...)
@@ -339,10 +339,10 @@ func CollectAddresses(nodes *v1.NodeList, addressType v1.NodeAddressType) []stri
 func GetNodePublicIps(c clientset.Interface) ([]string, error) {
 	nodes := GetReadySchedulableNodesOrDie(c)
 
-	ips := CollectAddresses(nodes, v1.NodeExternalIP)
+	ips := CollectAddresses(nodes, corev1.NodeExternalIP)
 	if len(ips) == 0 {
 		// If ExternalIP isn't set, assume the test programs can reach the InternalIP
-		ips = CollectAddresses(nodes, v1.NodeInternalIP)
+		ips = CollectAddresses(nodes, corev1.NodeInternalIP)
 	}
 	return ips, nil
 }
@@ -378,7 +378,7 @@ func PodNodePairs(c clientset.Interface, ns string) ([]PodNode, error) {
 
 // GetEndpointNodes returns a map of nodenames:external-ip on which the
 // endpoints of the given Service are running.
-func (j *ServiceTestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
+func (j *ServiceTestJig) GetEndpointNodes(svc *corev1.Service) map[string][]string {
 	nodes := j.GetNodes(MaxNodesForEndpointsTests)
 	endpoints, err := j.Client.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
 	if err != nil {
@@ -398,7 +398,7 @@ func (j *ServiceTestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
 	nodeMap := map[string][]string{}
 	for _, n := range nodes.Items {
 		if epNodes.Has(n.Name) {
-			nodeMap[n.Name] = GetNodeAddresses(&n, v1.NodeExternalIP)
+			nodeMap[n.Name] = GetNodeAddresses(&n, corev1.NodeExternalIP)
 		}
 	}
 	return nodeMap
@@ -406,7 +406,7 @@ func (j *ServiceTestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
 
 // GetNodes returns the first maxNodesForTest nodes. Useful in large clusters
 // where we don't eg: want to create an endpoint per node.
-func (j *ServiceTestJig) GetNodes(maxNodesForTest int) (nodes *v1.NodeList) {
+func (j *ServiceTestJig) GetNodes(maxNodesForTest int) (nodes *corev1.NodeList) {
 	nodes = GetReadySchedulableNodesOrDie(j.Client)
 	if len(nodes.Items) <= maxNodesForTest {
 		maxNodesForTest = len(nodes.Items)
@@ -451,12 +451,12 @@ func (j *ServiceTestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName 
 	ExpectNoError(err)
 }
 
-func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceType) {
+func (j *ServiceTestJig) SanityCheckService(svc *corev1.Service, svcType corev1.ServiceType) {
 	if svc.Spec.Type != svcType {
 		Failf("unexpected Spec.Type (%s) for service, expected %s", svc.Spec.Type, svcType)
 	}
 
-	if svcType != v1.ServiceTypeExternalName {
+	if svcType != corev1.ServiceTypeExternalName {
 		if svc.Spec.ExternalName != "" {
 			Failf("unexpected Spec.ExternalName (%s) for service, expected empty", svc.Spec.ExternalName)
 		}
@@ -470,7 +470,7 @@ func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceT
 	}
 
 	expectNodePorts := false
-	if svcType != v1.ServiceTypeClusterIP && svcType != v1.ServiceTypeExternalName {
+	if svcType != corev1.ServiceTypeClusterIP && svcType != corev1.ServiceTypeExternalName {
 		expectNodePorts = true
 	}
 	for i, port := range svc.Spec.Ports {
@@ -485,7 +485,7 @@ func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceT
 		}
 	}
 	expectIngress := false
-	if svcType == v1.ServiceTypeLoadBalancer {
+	if svcType == corev1.ServiceTypeLoadBalancer {
 		expectIngress = true
 	}
 	hasIngress := len(svc.Status.LoadBalancer.Ingress) != 0
@@ -504,7 +504,7 @@ func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceT
 // UpdateService fetches a service, calls the update function on it, and
 // then attempts to send the updated service. It tries up to 3 times in the
 // face of timeouts and conflicts.
-func (j *ServiceTestJig) UpdateService(namespace, name string, update func(*v1.Service)) (*v1.Service, error) {
+func (j *ServiceTestJig) UpdateService(namespace, name string, update func(*corev1.Service)) (*corev1.Service, error) {
 	for i := 0; i < 3; i++ {
 		service, err := j.Client.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
@@ -525,7 +525,7 @@ func (j *ServiceTestJig) UpdateService(namespace, name string, update func(*v1.S
 // UpdateServiceOrFail fetches a service, calls the update function on it, and
 // then attempts to send the updated service. It tries up to 3 times in the
 // face of timeouts and conflicts.
-func (j *ServiceTestJig) UpdateServiceOrFail(namespace, name string, update func(*v1.Service)) *v1.Service {
+func (j *ServiceTestJig) UpdateServiceOrFail(namespace, name string, update func(*corev1.Service)) *corev1.Service {
 	svc, err := j.UpdateService(namespace, name, update)
 	if err != nil {
 		Failf(err.Error())
@@ -533,9 +533,9 @@ func (j *ServiceTestJig) UpdateServiceOrFail(namespace, name string, update func
 	return svc
 }
 
-func (j *ServiceTestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP string, timeout time.Duration) *v1.Service {
+func (j *ServiceTestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP string, timeout time.Duration) *corev1.Service {
 	Logf("Waiting up to %v for service %q to get a new ingress IP", timeout, name)
-	service := j.waitForConditionOrFail(namespace, name, timeout, "have a new ingress IP", func(svc *v1.Service) bool {
+	service := j.waitForConditionOrFail(namespace, name, timeout, "have a new ingress IP", func(svc *corev1.Service) bool {
 		if len(svc.Status.LoadBalancer.Ingress) == 0 {
 			return false
 		}
@@ -548,14 +548,14 @@ func (j *ServiceTestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP s
 	return service
 }
 
-func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, initial int) *v1.Service {
+func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, initial int) *corev1.Service {
 	var err error
-	var service *v1.Service
+	var service *corev1.Service
 	for i := 1; i < ServiceNodePortRange.Size; i++ {
 		offs1 := initial - ServiceNodePortRange.Base
 		offs2 := (offs1 + i) % ServiceNodePortRange.Size
 		newPort := ServiceNodePortRange.Base + offs2
-		service, err = j.UpdateService(namespace, name, func(s *v1.Service) {
+		service, err = j.UpdateService(namespace, name, func(s *corev1.Service) {
 			s.Spec.Ports[0].NodePort = int32(newPort)
 		})
 		if err != nil && strings.Contains(err.Error(), portallocator.ErrAllocated.Error()) {
@@ -571,15 +571,15 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 	return service
 }
 
-func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *v1.Service {
+func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *corev1.Service {
 	Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
-	service := j.waitForConditionOrFail(namespace, name, timeout, "have a load balancer", func(svc *v1.Service) bool {
+	service := j.waitForConditionOrFail(namespace, name, timeout, "have a load balancer", func(svc *corev1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) > 0
 	})
 	return service
 }
 
-func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip string, port int, timeout time.Duration) *v1.Service {
+func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip string, port int, timeout time.Duration) *corev1.Service {
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	defer func() {
 		if err := EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port)); err != nil {
@@ -588,14 +588,14 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 	}()
 
 	Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
-	service := j.waitForConditionOrFail(namespace, name, timeout, "have no load balancer", func(svc *v1.Service) bool {
+	service := j.waitForConditionOrFail(namespace, name, timeout, "have no load balancer", func(svc *corev1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) == 0
 	})
 	return service
 }
 
-func (j *ServiceTestJig) waitForConditionOrFail(namespace, name string, timeout time.Duration, message string, conditionFn func(*v1.Service) bool) *v1.Service {
-	var service *v1.Service
+func (j *ServiceTestJig) waitForConditionOrFail(namespace, name string, timeout time.Duration, message string, conditionFn func(*corev1.Service) bool) *corev1.Service {
+	var service *corev1.Service
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
@@ -613,36 +613,36 @@ func (j *ServiceTestJig) waitForConditionOrFail(namespace, name string, timeout 
 	return service
 }
 
-// newRCTemplate returns the default v1.ReplicationController object for
+// newRCTemplate returns the default corev1.ReplicationController object for
 // this jig, but does not actually create the RC.  The default RC has the same
 // name as the jig and runs the "netexec" container.
-func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationController {
+func (j *ServiceTestJig) newRCTemplate(namespace string) *corev1.ReplicationController {
 	var replicas int32 = 1
 	var grace int64 = 3 // so we don't race with kube-proxy when scaling up/down
 
-	rc := &v1.ReplicationController{
+	rc := &corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      j.Name,
 			Labels:    j.Labels,
 		},
-		Spec: v1.ReplicationControllerSpec{
+		Spec: corev1.ReplicationControllerSpec{
 			Replicas: &replicas,
 			Selector: j.Labels,
-			Template: &v1.PodTemplateSpec{
+			Template: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: j.Labels,
 				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
 						{
 							Name:  "netexec",
 							Image: imageutils.GetE2EImage(imageutils.Netexec),
 							Args:  []string{"--http-port=80", "--udp-port=80"},
-							ReadinessProbe: &v1.Probe{
+							ReadinessProbe: &corev1.Probe{
 								PeriodSeconds: 3,
-								Handler: v1.Handler{
-									HTTPGet: &v1.HTTPGetAction{
+								Handler: corev1.Handler{
+									HTTPGet: &corev1.HTTPGetAction{
 										Port: intstr.FromInt(80),
 										Path: "/hostName",
 									},
@@ -658,26 +658,26 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationControll
 	return rc
 }
 
-func (j *ServiceTestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
+func (j *ServiceTestJig) AddRCAntiAffinity(rc *corev1.ReplicationController) {
 	var replicas int32 = 2
 
 	rc.Spec.Replicas = &replicas
 	if rc.Spec.Template.Spec.Affinity == nil {
-		rc.Spec.Template.Spec.Affinity = &v1.Affinity{}
+		rc.Spec.Template.Spec.Affinity = &corev1.Affinity{}
 	}
 	if rc.Spec.Template.Spec.Affinity.PodAntiAffinity == nil {
-		rc.Spec.Template.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
+		rc.Spec.Template.Spec.Affinity.PodAntiAffinity = &corev1.PodAntiAffinity{}
 	}
 	rc.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 		rc.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-		v1.PodAffinityTerm{
+		corev1.PodAffinityTerm{
 			LabelSelector: &metav1.LabelSelector{MatchLabels: j.Labels},
 			Namespaces:    nil,
 			TopologyKey:   "kubernetes.io/hostname",
 		})
 }
 
-func (j *ServiceTestJig) CreatePDBOrFail(namespace string, rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
+func (j *ServiceTestJig) CreatePDBOrFail(namespace string, rc *corev1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
 	pdb := j.newPDBTemplate(namespace, rc)
 	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Create(pdb)
 	if err != nil {
@@ -693,7 +693,7 @@ func (j *ServiceTestJig) CreatePDBOrFail(namespace string, rc *v1.ReplicationCon
 // newPDBTemplate returns the default policyv1beta1.PodDisruptionBudget object for
 // this jig, but does not actually create the PDB.  The default PDB specifies a
 // MinAvailable of N-1 and matches the pods created by the RC.
-func (j *ServiceTestJig) newPDBTemplate(namespace string, rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
+func (j *ServiceTestJig) newPDBTemplate(namespace string, rc *corev1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(int(*rc.Spec.Replicas) - 1)
 
 	pdb := &policyv1beta1.PodDisruptionBudget{
@@ -714,7 +714,7 @@ func (j *ServiceTestJig) newPDBTemplate(namespace string, rc *v1.ReplicationCont
 // RunOrFail creates a ReplicationController and Pod(s) and waits for the
 // Pod(s) to be running. Callers can provide a function to tweak the RC object
 // before it is created.
-func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.ReplicationController)) *v1.ReplicationController {
+func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *corev1.ReplicationController)) *corev1.ReplicationController {
 	rc := j.newRCTemplate(namespace)
 	if tweak != nil {
 		tweak(rc)
@@ -806,13 +806,13 @@ func (j *ServiceTestJig) waitForPodsReady(namespace string, pods []string) error
 }
 
 // newNetexecPodSpec returns the pod spec of netexec pod
-func newNetexecPodSpec(podName string, httpPort, udpPort int32, hostNetwork bool) *v1.Pod {
-	pod := &v1.Pod{
+func newNetexecPodSpec(podName string, httpPort, udpPort int32, hostNetwork bool) *corev1.Pod {
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:  "netexec",
 					Image: netexecImageName,
@@ -821,7 +821,7 @@ func newNetexecPodSpec(podName string, httpPort, udpPort int32, hostNetwork bool
 						fmt.Sprintf("--http-port=%d", httpPort),
 						fmt.Sprintf("--udp-port=%d", udpPort),
 					},
-					Ports: []v1.ContainerPort{
+					Ports: []corev1.ContainerPort{
 						{
 							Name:          "http",
 							ContainerPort: httpPort,
@@ -852,21 +852,21 @@ func (j *ServiceTestJig) LaunchNetexecPodOnNode(f *Framework, nodeName, podName 
 }
 
 // newEchoServerPodSpec returns the pod spec of echo server pod
-func newEchoServerPodSpec(podName string) *v1.Pod {
+func newEchoServerPodSpec(podName string) *corev1.Pod {
 	port := 8080
-	pod := &v1.Pod{
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:  "echoserver",
 					Image: imageutils.GetE2EImage(imageutils.EchoServer),
-					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
+					Ports: []corev1.ContainerPort{{ContainerPort: int32(port)}},
 				},
 			},
-			RestartPolicy: v1.RestartPolicyNever,
+			RestartPolicy: corev1.RestartPolicyNever,
 		},
 	}
 	return pod
@@ -1083,15 +1083,15 @@ func NewServerTest(client clientset.Interface, namespace string, serviceName str
 }
 
 // BuildServiceSpec builds default config for a service (which can then be changed)
-func (t *ServiceTestFixture) BuildServiceSpec() *v1.Service {
-	service := &v1.Service{
+func (t *ServiceTestFixture) BuildServiceSpec() *corev1.Service {
+	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      t.ServiceName,
 			Namespace: t.Namespace,
 		},
-		Spec: v1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Selector: t.Labels,
-			Ports: []v1.ServicePort{{
+			Ports: []corev1.ServicePort{{
 				Port:       80,
 				TargetPort: intstr.FromInt(80),
 			}},
@@ -1101,7 +1101,7 @@ func (t *ServiceTestFixture) BuildServiceSpec() *v1.Service {
 }
 
 // CreateRC creates a replication controller and records it for cleanup.
-func (t *ServiceTestFixture) CreateRC(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
+func (t *ServiceTestFixture) CreateRC(rc *corev1.ReplicationController) (*corev1.ReplicationController, error) {
 	rc, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Create(rc)
 	if err == nil {
 		t.rcs[rc.Name] = true
@@ -1110,7 +1110,7 @@ func (t *ServiceTestFixture) CreateRC(rc *v1.ReplicationController) (*v1.Replica
 }
 
 // CreateService creates a service, and record it for cleanup
-func (t *ServiceTestFixture) CreateService(service *v1.Service) (*v1.Service, error) {
+func (t *ServiceTestFixture) CreateService(service *corev1.Service) (*corev1.Service, error) {
 	result, err := t.Client.CoreV1().Services(t.Namespace).Create(service)
 	if err == nil {
 		t.services[service.Name] = true
@@ -1175,7 +1175,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 	return errs
 }
 
-func GetIngressPoint(ing *v1.LoadBalancerIngress) string {
+func GetIngressPoint(ing *corev1.LoadBalancerIngress) string {
 	host := ing.IP
 	if host == "" {
 		host = ing.Hostname
@@ -1186,8 +1186,8 @@ func GetIngressPoint(ing *v1.LoadBalancerIngress) string {
 // UpdateService fetches a service, calls the update function on it,
 // and then attempts to send the updated service. It retries up to 2
 // times in the face of timeouts and conflicts.
-func UpdateService(c clientset.Interface, namespace, serviceName string, update func(*v1.Service)) (*v1.Service, error) {
-	var service *v1.Service
+func UpdateService(c clientset.Interface, namespace, serviceName string, update func(*corev1.Service)) (*corev1.Service, error) {
+	var service *corev1.Service
 	var err error
 	for i := 0; i < 3; i++ {
 		service, err = c.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
@@ -1206,7 +1206,7 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 	return service, err
 }
 
-func GetContainerPortsByPodUID(endpoints *v1.Endpoints) PortsByPodUID {
+func GetContainerPortsByPodUID(endpoints *corev1.Endpoints) PortsByPodUID {
 	m := PortsByPodUID{}
 	for _, ss := range endpoints.Subsets {
 		for _, port := range ss.Ports {
@@ -1301,7 +1301,7 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 
 // StartServeHostnameService creates a replication controller that serves its
 // hostname and a service on top of it.
-func StartServeHostnameService(c clientset.Interface, svc *v1.Service, ns string, replicas int) ([]string, string, error) {
+func StartServeHostnameService(c clientset.Interface, svc *corev1.Service, ns string, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
 	name := svc.ObjectMeta.Name
 	ginkgo.By("creating service " + name + " in namespace " + ns)
@@ -1310,7 +1310,7 @@ func StartServeHostnameService(c clientset.Interface, svc *v1.Service, ns string
 		return podNames, "", err
 	}
 
-	var createdPods []*v1.Pod
+	var createdPods []*corev1.Pod
 	maxContainerFailures := 0
 	config := testutils.RCConfig{
 		Client:               c,
@@ -1473,21 +1473,21 @@ func DescribeSvc(ns string) {
 	Logf(desc)
 }
 
-func CreateServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *v1.Service {
-	headlessService := &v1.Service{
+func CreateServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *corev1.Service {
+	headlessService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: serviceName,
 		},
-		Spec: v1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Selector: selector,
 		},
 	}
 	if externalName != "" {
-		headlessService.Spec.Type = v1.ServiceTypeExternalName
+		headlessService.Spec.Type = corev1.ServiceTypeExternalName
 		headlessService.Spec.ExternalName = externalName
 	} else {
-		headlessService.Spec.Ports = []v1.ServicePort{
-			{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
+		headlessService.Spec.Ports = []corev1.ServicePort{
+			{Port: 80, Name: "http", Protocol: corev1.ProtocolTCP},
 		}
 	}
 	if isHeadless {
@@ -1498,7 +1498,7 @@ func CreateServiceSpec(serviceName, externalName string, isHeadless bool, select
 
 // EnableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
 // setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
-func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
+func EnableAndDisableInternalLB() (enable func(svc *corev1.Service), disable func(svc *corev1.Service)) {
 	return TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
 }
 
@@ -1549,7 +1549,7 @@ func checkAffinityFailed(tracker affinityTracker, err string) {
 // number of same response observed in a row. If affinity is not expected, the
 // test will keep observe until different responses observed. The function will
 // return false only in case of unexpected errors.
-func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIP string, targetPort int, shouldHold bool) bool {
+func CheckAffinity(jig *ServiceTestJig, execPod *corev1.Pod, targetIP string, targetPort int, shouldHold bool) bool {
 	targetIPPort := net.JoinHostPort(targetIP, strconv.Itoa(targetPort))
 	cmd := fmt.Sprintf(`wget -qO- http://%s/ -T 2`, targetIPPort)
 	timeout := ServiceTestTimeout

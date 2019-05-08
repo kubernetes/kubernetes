@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,7 +30,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-func nodeNames(nodes []v1.Node) []string {
+func nodeNames(nodes []corev1.Node) []string {
 	result := make([]string, 0, len(nodes))
 	for i := range nodes {
 		result = append(result, nodes[i].Name)
@@ -40,7 +40,7 @@ func nodeNames(nodes []v1.Node) []string {
 
 var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 	f := framework.NewDefaultFramework("recreate")
-	var originalNodes []v1.Node
+	var originalNodes []corev1.Node
 	var originalPodNames []string
 	var ps *testutils.PodStore
 	systemNamespace := metav1.NamespaceSystem
@@ -91,7 +91,7 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 })
 
 // Recreate all the nodes in the test instance group
-func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace string, nodes []v1.Node, podNames []string) {
+func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace string, nodes []corev1.Node, podNames []string) {
 	err := recreateNodes(c, nodes)
 	if err != nil {
 		framework.Failf("Test failed; failed to start the restart instance group command.")

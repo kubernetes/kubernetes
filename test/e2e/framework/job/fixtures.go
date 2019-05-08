@@ -18,7 +18,7 @@ package job
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -29,7 +29,7 @@ import (
 // first time it is run and succeeds subsequently. name is the Name of the Job. RestartPolicy indicates the restart
 // policy of the containers in which the Pod is running. Parallelism is the Job's parallelism, and completions is the
 // Job's required number of completions.
-func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32) *batchv1.Job {
+func NewTestJob(behavior, name string, rPol corev1.RestartPolicy, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32) *batchv1.Job {
 	manualSelector := false
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -44,26 +44,26 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 			Completions:           &completions,
 			BackoffLimit:          &backoffLimit,
 			ManualSelector:        &manualSelector,
-			Template: v1.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{JobSelectorKey: name},
 				},
-				Spec: v1.PodSpec{
+				Spec: corev1.PodSpec{
 					RestartPolicy: rPol,
-					Volumes: []v1.Volume{
+					Volumes: []corev1.Volume{
 						{
 							Name: "data",
-							VolumeSource: v1.VolumeSource{
-								EmptyDir: &v1.EmptyDirVolumeSource{},
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
 					},
-					Containers: []v1.Container{
+					Containers: []corev1.Container{
 						{
 							Name:    "c",
 							Image:   framework.BusyBoxImage,
 							Command: []string{},
-							VolumeMounts: []v1.VolumeMount{
+							VolumeMounts: []corev1.VolumeMount{
 								{
 									MountPath: "/data",
 									Name:      "data",
@@ -101,7 +101,7 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 func FinishTime(finishedJob *batchv1.Job) metav1.Time {
 	var finishTime metav1.Time
 	for _, c := range finishedJob.Status.Conditions {
-		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
+		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == corev1.ConditionTrue {
 			return c.LastTransitionTime
 		}
 	}

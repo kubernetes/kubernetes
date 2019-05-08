@@ -29,7 +29,7 @@ import (
 	"github.com/onsi/ginkgo"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -71,8 +71,8 @@ type IngressController struct {
 	rcPath       string
 	UID          string
 	staticIPName string
-	rc           *v1.ReplicationController
-	svc          *v1.Service
+	rc           *corev1.ReplicationController
+	svc          *corev1.Service
 	Client       clientset.Interface
 	Cloud        framework.CloudConfig
 }
@@ -616,7 +616,7 @@ func (cont *IngressController) isHTTPErrorCode(err error, code int) bool {
 }
 
 // WaitForNegBackendService waits for the expected backend service to become
-func (cont *IngressController) WaitForNegBackendService(svcPorts map[string]v1.ServicePort) error {
+func (cont *IngressController) WaitForNegBackendService(svcPorts map[string]corev1.ServicePort) error {
 	return wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
 		err := cont.verifyBackendMode(svcPorts, negBackend)
 		if err != nil {
@@ -628,7 +628,7 @@ func (cont *IngressController) WaitForNegBackendService(svcPorts map[string]v1.S
 }
 
 // WaitForIgBackendService returns true only if all global backend service with matching svcPorts pointing to IG as backend
-func (cont *IngressController) WaitForIgBackendService(svcPorts map[string]v1.ServicePort) error {
+func (cont *IngressController) WaitForIgBackendService(svcPorts map[string]corev1.ServicePort) error {
 	return wait.Poll(5*time.Second, 1*time.Minute, func() (bool, error) {
 		err := cont.verifyBackendMode(svcPorts, igBackend)
 		if err != nil {
@@ -640,16 +640,16 @@ func (cont *IngressController) WaitForIgBackendService(svcPorts map[string]v1.Se
 }
 
 // BackendServiceUsingNEG returns true only if all global backend service with matching svcPorts pointing to NEG as backend
-func (cont *IngressController) BackendServiceUsingNEG(svcPorts map[string]v1.ServicePort) error {
+func (cont *IngressController) BackendServiceUsingNEG(svcPorts map[string]corev1.ServicePort) error {
 	return cont.verifyBackendMode(svcPorts, negBackend)
 }
 
 // BackendServiceUsingIG returns true only if all global backend service with matching svcPorts pointing to IG as backend
-func (cont *IngressController) BackendServiceUsingIG(svcPorts map[string]v1.ServicePort) error {
+func (cont *IngressController) BackendServiceUsingIG(svcPorts map[string]corev1.ServicePort) error {
 	return cont.verifyBackendMode(svcPorts, igBackend)
 }
 
-func (cont *IngressController) verifyBackendMode(svcPorts map[string]v1.ServicePort, backendType backendType) error {
+func (cont *IngressController) verifyBackendMode(svcPorts map[string]corev1.ServicePort, backendType backendType) error {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	beList, err := gceCloud.ListGlobalBackendServices()
 	if err != nil {

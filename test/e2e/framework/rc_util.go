@@ -23,7 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -34,19 +34,19 @@ import (
 )
 
 // RcByNamePort returns a ReplicationController with specified name and port
-func RcByNamePort(name string, replicas int32, image string, port int, protocol v1.Protocol,
-	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
+func RcByNamePort(name string, replicas int32, image string, port int, protocol corev1.Protocol,
+	labels map[string]string, gracePeriod *int64) *corev1.ReplicationController {
 
-	return RcByNameContainer(name, replicas, image, labels, v1.Container{
+	return RcByNameContainer(name, replicas, image, labels, corev1.Container{
 		Name:  name,
 		Image: image,
-		Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
+		Ports: []corev1.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
 	}, gracePeriod)
 }
 
 // RcByNameContainer returns a ReplicationController with specified name and container
-func RcByNameContainer(name string, replicas int32, image string, labels map[string]string, c v1.Container,
-	gracePeriod *int64) *v1.ReplicationController {
+func RcByNameContainer(name string, replicas int32, image string, labels map[string]string, c corev1.Container,
+	gracePeriod *int64) *corev1.ReplicationController {
 
 	zeroGracePeriod := int64(0)
 
@@ -55,7 +55,7 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 	if gracePeriod == nil {
 		gracePeriod = &zeroGracePeriod
 	}
-	return &v1.ReplicationController{
+	return &corev1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicationController",
 			APIVersion: "v1",
@@ -63,17 +63,17 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: v1.ReplicationControllerSpec{
+		Spec: corev1.ReplicationControllerSpec{
 			Replicas: func(i int32) *int32 { return &i }(replicas),
 			Selector: map[string]string{
 				"name": name,
 			},
-			Template: &v1.PodTemplateSpec{
+			Template: &corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
-				Spec: v1.PodSpec{
-					Containers:                    []v1.Container{c},
+				Spec: corev1.PodSpec{
+					Containers:                    []corev1.Container{c},
 					TerminationGracePeriodSeconds: gracePeriod,
 				},
 			},
@@ -81,14 +81,14 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 	}
 }
 
-type updateRcFunc func(d *v1.ReplicationController)
+type updateRcFunc func(d *corev1.ReplicationController)
 
 // UpdateReplicationControllerWithRetries retries updating the given rc on conflict with the following steps:
 // 1. Get latest resource
 // 2. applyUpdate
 // 3. Update the resource
-func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRcFunc) (*v1.ReplicationController, error) {
-	var rc *v1.ReplicationController
+func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRcFunc) (*corev1.ReplicationController, error) {
+	var rc *corev1.ReplicationController
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		var err error

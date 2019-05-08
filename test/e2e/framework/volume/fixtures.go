@@ -46,7 +46,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -124,13 +124,13 @@ type TestConfig struct {
 // Test contains a volume to mount into a client pod and its
 // expected content.
 type Test struct {
-	Volume          v1.VolumeSource
+	Volume          corev1.VolumeSource
 	File            string
 	ExpectedContent string
 }
 
 // NewNFSServer is a NFS-specific wrapper for CreateStorageServer.
-func NewNFSServer(cs clientset.Interface, namespace string, args []string) (config TestConfig, pod *v1.Pod, ip string) {
+func NewNFSServer(cs clientset.Interface, namespace string, args []string) (config TestConfig, pod *corev1.Pod, ip string) {
 	config = TestConfig{
 		Namespace:          namespace,
 		Prefix:             "nfs",
@@ -147,7 +147,7 @@ func NewNFSServer(cs clientset.Interface, namespace string, args []string) (conf
 }
 
 // NewGlusterfsServer is a GlusterFS-specific wrapper for CreateStorageServer. Also creates the gluster endpoints object.
-func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestConfig, pod *v1.Pod, ip string) {
+func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestConfig, pod *corev1.Pod, ip string) {
 	config = TestConfig{
 		Namespace:   namespace,
 		Prefix:      "gluster",
@@ -157,7 +157,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 	pod, ip = CreateStorageServer(cs, config)
 
 	ginkgo.By("creating Gluster endpoints")
-	endpoints := &v1.Endpoints{
+	endpoints := &corev1.Endpoints{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Endpoints",
 			APIVersion: "v1",
@@ -165,18 +165,18 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Prefix + "-server",
 		},
-		Subsets: []v1.EndpointSubset{
+		Subsets: []corev1.EndpointSubset{
 			{
-				Addresses: []v1.EndpointAddress{
+				Addresses: []corev1.EndpointAddress{
 					{
 						IP: ip,
 					},
 				},
-				Ports: []v1.EndpointPort{
+				Ports: []corev1.EndpointPort{
 					{
 						Name:     "gluster",
 						Port:     24007,
-						Protocol: v1.ProtocolTCP,
+						Protocol: corev1.ProtocolTCP,
 					},
 				},
 			},
@@ -189,7 +189,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 }
 
 // NewISCSIServer is an iSCSI-specific wrapper for CreateStorageServer.
-func NewISCSIServer(cs clientset.Interface, namespace string) (config TestConfig, pod *v1.Pod, ip, iqn string) {
+func NewISCSIServer(cs clientset.Interface, namespace string) (config TestConfig, pod *corev1.Pod, ip, iqn string) {
 	// Generate cluster-wide unique IQN
 	iqn = fmt.Sprintf(iSCSIIQNTemplate, namespace)
 	config = TestConfig{
@@ -215,7 +215,7 @@ func NewISCSIServer(cs clientset.Interface, namespace string) (config TestConfig
 }
 
 // NewRBDServer is a CephRBD-specific wrapper for CreateStorageServer.
-func NewRBDServer(cs clientset.Interface, namespace string) (config TestConfig, pod *v1.Pod, secret *v1.Secret, ip string) {
+func NewRBDServer(cs clientset.Interface, namespace string) (config TestConfig, pod *corev1.Pod, secret *corev1.Secret, ip string) {
 	config = TestConfig{
 		Namespace:   namespace,
 		Prefix:      "rbd",
@@ -228,7 +228,7 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config TestConfig, 
 	}
 	pod, ip = CreateStorageServer(cs, config)
 	// create secrets for the server
-	secret = &v1.Secret{
+	secret = &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",
@@ -254,7 +254,7 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config TestConfig, 
 // CreateStorageServer is a wrapper for StartVolumeServer(). A storage server config is passed in, and a pod pointer
 // and ip address string are returned.
 // Note: Expect() is called so no error is returned.
-func CreateStorageServer(cs clientset.Interface, config TestConfig) (pod *v1.Pod, ip string) {
+func CreateStorageServer(cs clientset.Interface, config TestConfig) (pod *corev1.Pod, ip string) {
 	pod = StartVolumeServer(cs, config)
 	gomega.Expect(pod).NotTo(gomega.BeNil(), "storage server pod should not be nil")
 	ip = pod.Status.PodIP
@@ -266,34 +266,34 @@ func CreateStorageServer(cs clientset.Interface, config TestConfig) (pod *v1.Pod
 // StartVolumeServer starts a container specified by config.serverImage and exports all
 // config.serverPorts from it. The returned pod should be used to get the server
 // IP address and create appropriate VolumeSource.
-func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
+func StartVolumeServer(client clientset.Interface, config TestConfig) *corev1.Pod {
 	podClient := client.CoreV1().Pods(config.Namespace)
 
 	portCount := len(config.ServerPorts)
-	serverPodPorts := make([]v1.ContainerPort, portCount)
+	serverPodPorts := make([]corev1.ContainerPort, portCount)
 
 	for i := 0; i < portCount; i++ {
 		portName := fmt.Sprintf("%s-%d", config.Prefix, i)
 
-		serverPodPorts[i] = v1.ContainerPort{
+		serverPodPorts[i] = corev1.ContainerPort{
 			Name:          portName,
 			ContainerPort: int32(config.ServerPorts[i]),
-			Protocol:      v1.ProtocolTCP,
+			Protocol:      corev1.ProtocolTCP,
 		}
 	}
 
 	volumeCount := len(config.ServerVolumes)
-	volumes := make([]v1.Volume, volumeCount)
-	mounts := make([]v1.VolumeMount, volumeCount)
+	volumes := make([]corev1.Volume, volumeCount)
+	mounts := make([]corev1.VolumeMount, volumeCount)
 
 	i := 0
 	for src, dst := range config.ServerVolumes {
 		mountName := fmt.Sprintf("path%d", i)
 		volumes[i].Name = mountName
 		if src == "" {
-			volumes[i].VolumeSource.EmptyDir = &v1.EmptyDirVolumeSource{}
+			volumes[i].VolumeSource.EmptyDir = &corev1.EmptyDirVolumeSource{}
 		} else {
-			volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
+			volumes[i].VolumeSource.HostPath = &corev1.HostPathVolumeSource{
 				Path: src,
 			}
 		}
@@ -310,11 +310,11 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	privileged := new(bool)
 	*privileged = true
 
-	restartPolicy := v1.RestartPolicyAlways
+	restartPolicy := corev1.RestartPolicyAlways
 	if config.WaitForCompletion {
-		restartPolicy = v1.RestartPolicyNever
+		restartPolicy = corev1.RestartPolicyNever
 	}
-	serverPod := &v1.Pod{
+	serverPod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -326,13 +326,13 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 			},
 		},
 
-		Spec: v1.PodSpec{
+		Spec: corev1.PodSpec{
 			HostNetwork: config.ServerHostNetwork,
-			Containers: []v1.Container{
+			Containers: []corev1.Container{
 				{
 					Name:  serverPodName,
 					Image: config.ServerImage,
-					SecurityContext: &v1.SecurityContext{
+					SecurityContext: &corev1.SecurityContext{
 						Privileged: privileged,
 					},
 					Command:      config.ServerCmds,
@@ -348,7 +348,7 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 		},
 	}
 
-	var pod *v1.Pod
+	var pod *corev1.Pod
 	serverPod, err := podClient.Create(serverPod)
 	// ok if the server pod already exists. TODO: make this controllable by callers
 	if err != nil {
@@ -381,12 +381,12 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 }
 
 // CleanUpVolumeServer is a wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
-func CleanUpVolumeServer(f *framework.Framework, serverPod *v1.Pod) {
+func CleanUpVolumeServer(f *framework.Framework, serverPod *corev1.Pod) {
 	CleanUpVolumeServerWithSecret(f, serverPod, nil)
 }
 
 // CleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.
-func CleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, secret *v1.Secret) {
+func CleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *corev1.Pod, secret *corev1.Secret) {
 	cs := f.ClientSet
 	ns := f.Namespace
 
@@ -436,8 +436,8 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 	} else {
 		command = "while(1) {cat /opt/0/index.html ; sleep 2 ; ls /opt/; sleep 2}"
 	}
-	seLinuxOptions := &v1.SELinuxOptions{Level: "s0:c0,c1"}
-	clientPod := &v1.Pod{
+	seLinuxOptions := &corev1.SELinuxOptions{Level: "s0:c0,c1"}
+	clientPod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -448,8 +448,8 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 				"role": config.Prefix + "-client",
 			},
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:       config.Prefix + "-client",
 					Image:      GetTestImage(framework.BusyBoxImage),
@@ -458,12 +458,12 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 					// us to scan in the tests or by eye.
 					// We expect that /opt is empty in the minimal containers which we use in this test.
 					Command:      GenerateScriptCmd(command),
-					VolumeMounts: []v1.VolumeMount{},
+					VolumeMounts: []corev1.VolumeMount{},
 				},
 			},
 			TerminationGracePeriodSeconds: &gracePeriod,
 			SecurityContext:               GeneratePodSecurityContext(fsGroup, seLinuxOptions),
-			Volumes:                       []v1.Volume{},
+			Volumes:                       []corev1.Volume{},
 			NodeName:                      config.ClientNodeName,
 			NodeSelector:                  config.NodeSelector,
 		},
@@ -472,11 +472,11 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
-		clientPod.Spec.Containers[0].VolumeMounts = append(clientPod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+		clientPod.Spec.Containers[0].VolumeMounts = append(clientPod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
 			Name:      volumeName,
 			MountPath: fmt.Sprintf("/opt/%d", i),
 		})
-		clientPod.Spec.Volumes = append(clientPod.Spec.Volumes, v1.Volume{
+		clientPod.Spec.Volumes = append(clientPod.Spec.Volumes, corev1.Volume{
 			Name:         volumeName,
 			VolumeSource: test.Volume,
 		})
@@ -513,14 +513,14 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 // InjectHTML inserts index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, volume v1.VolumeSource, content string) {
+func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, volume corev1.VolumeSource, content string) {
 	ginkgo.By(fmt.Sprint("starting ", config.Prefix, " injector"))
 	podClient := client.CoreV1().Pods(config.Namespace)
 	podName := fmt.Sprintf("%s-injector-%s", config.Prefix, rand.String(4))
 	volMountName := fmt.Sprintf("%s-volume-%s", config.Prefix, rand.String(4))
 	fileName := "/mnt/index.html"
 
-	injectPod := &v1.Pod{
+	injectPod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -531,13 +531,13 @@ func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, v
 				"role": config.Prefix + "-injector",
 			},
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:    config.Prefix + "-injector",
 					Image:   GetTestImage(framework.BusyBoxImage),
 					Command: GenerateWriteFileCmd(content, fileName),
-					VolumeMounts: []v1.VolumeMount{
+					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      volMountName,
 							MountPath: "/mnt",
@@ -546,11 +546,11 @@ func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, v
 					SecurityContext: GenerateSecurityContext(true),
 				},
 			},
-			SecurityContext: &v1.PodSecurityContext{
+			SecurityContext: &corev1.PodSecurityContext{
 				FSGroup: fsGroup,
 			},
-			RestartPolicy: v1.RestartPolicyNever,
-			Volumes: []v1.Volume{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Volumes: []corev1.Volume{
 				{
 					Name:         volMountName,
 					VolumeSource: volume,
@@ -572,11 +572,11 @@ func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, v
 }
 
 // CreateGCEVolume creates PersistentVolumeSource for GCEVolume.
-func CreateGCEVolume() (*v1.PersistentVolumeSource, string) {
+func CreateGCEVolume() (*corev1.PersistentVolumeSource, string) {
 	diskName, err := framework.CreatePDWithRetry()
 	framework.ExpectNoError(err)
-	return &v1.PersistentVolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+	return &corev1.PersistentVolumeSource{
+		GCEPersistentDisk: &corev1.GCEPersistentDiskVolumeSource{
 			PDName:   diskName,
 			FSType:   "ext3",
 			ReadOnly: false,
@@ -642,11 +642,11 @@ func GenerateWriteandExecuteScriptFileCmd(content, fileName, filePath string) []
 // GenerateSecurityContext generates the corresponding container security context with the given inputs
 // If the Node OS is windows, currently we will ignore the inputs and return nil.
 // TODO: Will modify it after windows has its own security context
-func GenerateSecurityContext(privileged bool) *v1.SecurityContext {
+func GenerateSecurityContext(privileged bool) *corev1.SecurityContext {
 	if framework.NodeOSDistroIs("windows") {
 		return nil
 	}
-	return &v1.SecurityContext{
+	return &corev1.SecurityContext{
 		Privileged: &privileged,
 	}
 }
@@ -654,11 +654,11 @@ func GenerateSecurityContext(privileged bool) *v1.SecurityContext {
 // GeneratePodSecurityContext generates the corresponding pod security context with the given inputs
 // If the Node OS is windows, currently we will ignore the inputs and return nil.
 // TODO: Will modify it after windows has its own security context
-func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOptions) *v1.PodSecurityContext {
+func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *corev1.SELinuxOptions) *corev1.PodSecurityContext {
 	if framework.NodeOSDistroIs("windows") {
 		return nil
 	}
-	return &v1.PodSecurityContext{
+	return &corev1.PodSecurityContext{
 		SELinuxOptions: seLinuxOptions,
 		FSGroup:        fsGroup,
 	}

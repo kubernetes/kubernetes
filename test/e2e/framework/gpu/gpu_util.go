@@ -17,7 +17,7 @@ limitations under the License.
 package gpu
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog"
@@ -39,7 +39,7 @@ const (
 // This is based on the Device Plugin system and expected to run on a COS based node
 // After the NVIDIA drivers were installed
 // TODO make this generic and not linked to COS only
-func NumberOfNVIDIAGPUs(node *v1.Node) int64 {
+func NumberOfNVIDIAGPUs(node *corev1.Node) int64 {
 	val, ok := node.Status.Capacity[NVIDIAGPUResourceName]
 	if !ok {
 		return 0
@@ -48,10 +48,10 @@ func NumberOfNVIDIAGPUs(node *v1.Node) int64 {
 }
 
 // NVIDIADevicePlugin returns the official Google Device Plugin pod for NVIDIA GPU in GKE
-func NVIDIADevicePlugin() *v1.Pod {
+func NVIDIADevicePlugin() *corev1.Pod {
 	ds, err := framework.DsFromManifest(GPUDevicePluginDSYAML)
 	framework.ExpectNoError(err)
-	p := &v1.Pod{
+	p := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "device-plugin-nvidia-gpu-" + string(uuid.NewUUID()),
 			Namespace: metav1.NamespaceSystem,

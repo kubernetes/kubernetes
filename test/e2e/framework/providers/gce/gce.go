@@ -26,7 +26,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -193,7 +193,7 @@ func getGCEZoneForGroup(group string) (string, error) {
 }
 
 // DeleteNode deletes a node which is specified as the argument
-func (p *Provider) DeleteNode(node *v1.Node) error {
+func (p *Provider) DeleteNode(node *corev1.Node) error {
 	zone := framework.TestContext.CloudConfig.Zone
 	project := framework.TestContext.CloudConfig.ProjectID
 
@@ -235,9 +235,9 @@ func (p *Provider) DeletePD(pdName string) error {
 }
 
 // CreatePVSource creates a persistent volume source
-func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error) {
-	return &v1.PersistentVolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+func (p *Provider) CreatePVSource(zone, diskName string) (*corev1.PersistentVolumeSource, error) {
+	return &corev1.PersistentVolumeSource{
+		GCEPersistentDisk: &corev1.GCEPersistentDiskVolumeSource{
 			PDName:   diskName,
 			FSType:   "ext3",
 			ReadOnly: false,
@@ -246,7 +246,7 @@ func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSo
 }
 
 // DeletePVSource deletes a persistent volume source
-func (p *Provider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
+func (p *Provider) DeletePVSource(pvSource *corev1.PersistentVolumeSource) error {
 	return framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
 }
 
@@ -301,7 +301,7 @@ func (p *Provider) cleanupGCEResources(c clientset.Interface, loadBalancerName, 
 	if hc != nil {
 		hcNames = append(hcNames, hc.Name)
 	}
-	if err := p.gceCloud.DeleteExternalTargetPoolAndChecks(&v1.Service{}, loadBalancerName, region, clusterID, hcNames...); err != nil &&
+	if err := p.gceCloud.DeleteExternalTargetPoolAndChecks(&corev1.Service{}, loadBalancerName, region, clusterID, hcNames...); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}
@@ -315,11 +315,11 @@ func (p *Provider) LoadBalancerSrcRanges() []string {
 }
 
 // EnableAndDisableInternalLB returns functions for both enabling and disabling internal Load Balancer
-func (p *Provider) EnableAndDisableInternalLB() (enable, disable func(svc *v1.Service)) {
-	enable = func(svc *v1.Service) {
+func (p *Provider) EnableAndDisableInternalLB() (enable, disable func(svc *corev1.Service)) {
+	enable = func(svc *corev1.Service) {
 		svc.ObjectMeta.Annotations = map[string]string{gcecloud.ServiceAnnotationLoadBalancerType: string(gcecloud.LBTypeInternal)}
 	}
-	disable = func(svc *v1.Service) {
+	disable = func(svc *corev1.Service) {
 		delete(svc.ObjectMeta.Annotations, gcecloud.ServiceAnnotationLoadBalancerType)
 	}
 	return

@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -103,27 +103,27 @@ func getServiceSelector() map[string]string {
 type NetworkingTestConfig struct {
 	// TestContaienrPod is a test pod running the netexec image. It is capable
 	// of executing tcp/udp requests against ip:port.
-	TestContainerPod *v1.Pod
+	TestContainerPod *corev1.Pod
 	// HostTestContainerPod is a pod running using the hostexec image.
-	HostTestContainerPod *v1.Pod
+	HostTestContainerPod *corev1.Pod
 	// if the HostTestContainerPod is running with HostNetwork=true.
 	HostNetwork bool
 	// EndpointPods are the pods belonging to the Service created by this
 	// test config. Each invocation of `setup` creates a service with
 	// 1 pod per node running the netexecImage.
-	EndpointPods []*v1.Pod
+	EndpointPods []*corev1.Pod
 	f            *Framework
 	podClient    *PodClient
 	// NodePortService is a Service with Type=NodePort spanning over all
 	// endpointPods.
-	NodePortService *v1.Service
+	NodePortService *corev1.Service
 	// SessionAffinityService is a Service with SessionAffinity=ClientIP
 	// spanning over all endpointPods.
-	SessionAffinityService *v1.Service
+	SessionAffinityService *corev1.Service
 	// ExternalAddrs is a list of external IPs of nodes in the cluster.
 	ExternalAddrs []string
 	// Nodes is a list of nodes in the cluster.
-	Nodes []v1.Node
+	Nodes []corev1.Node
 	// MaxTries is the number of retries tolerated for tests run against
 	// endpoints and services created by this config.
 	MaxTries int
@@ -395,21 +395,21 @@ func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) 
 	}
 }
 
-func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname string) *v1.Pod {
-	probe := &v1.Probe{
+func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname string) *corev1.Pod {
+	probe := &corev1.Probe{
 		InitialDelaySeconds: 10,
 		TimeoutSeconds:      30,
 		PeriodSeconds:       10,
 		SuccessThreshold:    1,
 		FailureThreshold:    3,
-		Handler: v1.Handler{
-			HTTPGet: &v1.HTTPGetAction{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/healthz",
 				Port: intstr.IntOrString{IntVal: EndpointHTTPPort},
 			},
 		},
 	}
-	pod := &v1.Pod{
+	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -418,18 +418,18 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 			Name:      podName,
 			Namespace: config.Namespace,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:            "webserver",
 					Image:           netexecImageName,
-					ImagePullPolicy: v1.PullIfNotPresent,
+					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command: []string{
 						"/netexec",
 						fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
 						fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
 					},
-					Ports: []v1.ContainerPort{
+					Ports: []corev1.ContainerPort{
 						{
 							Name:          "http",
 							ContainerPort: EndpointHTTPPort,
@@ -437,7 +437,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 						{
 							Name:          "udp",
 							ContainerPort: EndpointUDPPort,
-							Protocol:      v1.ProtocolUDP,
+							Protocol:      corev1.ProtocolUDP,
 						},
 					},
 					LivenessProbe:  probe,
@@ -452,8 +452,8 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 	return pod
 }
 
-func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
-	pod := &v1.Pod{
+func (config *NetworkingTestConfig) createTestPodSpec() *corev1.Pod {
+	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
@@ -462,18 +462,18 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 			Name:      testPodName,
 			Namespace: config.Namespace,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name:            "webserver",
 					Image:           netexecImageName,
-					ImagePullPolicy: v1.PullIfNotPresent,
+					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command: []string{
 						"/netexec",
 						fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
 						fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
 					},
-					Ports: []v1.ContainerPort{
+					Ports: []corev1.ContainerPort{
 						{
 							Name:          "http",
 							ContainerPort: testContainerHTTPPort,
@@ -486,20 +486,20 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 	return pod
 }
 
-func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, selector map[string]string, enableSessionAffinity bool) *v1.Service {
-	sessionAffinity := v1.ServiceAffinityNone
+func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, selector map[string]string, enableSessionAffinity bool) *corev1.Service {
+	sessionAffinity := corev1.ServiceAffinityNone
 	if enableSessionAffinity {
-		sessionAffinity = v1.ServiceAffinityClientIP
+		sessionAffinity = corev1.ServiceAffinityClientIP
 	}
-	return &v1.Service{
+	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: svcName,
 		},
-		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeNodePort,
-			Ports: []v1.ServicePort{
-				{Port: ClusterHTTPPort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(EndpointHTTPPort)},
-				{Port: ClusterUDPPort, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(EndpointUDPPort)},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeNodePort,
+			Ports: []corev1.ServicePort{
+				{Port: ClusterHTTPPort, Name: "http", Protocol: corev1.ProtocolTCP, TargetPort: intstr.FromInt(EndpointHTTPPort)},
+				{Port: ClusterUDPPort, Name: "udp", Protocol: corev1.ProtocolUDP, TargetPort: intstr.FromInt(EndpointUDPPort)},
 			},
 			Selector:        selector,
 			SessionAffinity: sessionAffinity,
@@ -544,7 +544,7 @@ func (config *NetworkingTestConfig) createTestPods() {
 	}
 }
 
-func (config *NetworkingTestConfig) createService(serviceSpec *v1.Service) *v1.Service {
+func (config *NetworkingTestConfig) createService(serviceSpec *corev1.Service) *corev1.Service {
 	_, err := config.getServiceClient().Create(serviceSpec)
 	ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
@@ -578,7 +578,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	ginkgo.By("Getting node addresses")
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
-	config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeExternalIP)
+	config.ExternalAddrs = NodeAddresses(nodeList, corev1.NodeExternalIP)
 
 	SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
@@ -589,9 +589,9 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 	for _, p := range config.NodePortService.Spec.Ports {
 		switch p.Protocol {
-		case v1.ProtocolUDP:
+		case corev1.ProtocolUDP:
 			config.NodeUDPPort = int(p.NodePort)
-		case v1.ProtocolTCP:
+		case corev1.ProtocolTCP:
 			config.NodeHTTPPort = int(p.NodePort)
 		default:
 			continue
@@ -601,7 +601,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	if len(config.ExternalAddrs) != 0 {
 		config.NodeIP = config.ExternalAddrs[0]
 	} else {
-		internalAddrs := NodeAddresses(nodeList, v1.NodeInternalIP)
+		internalAddrs := NodeAddresses(nodeList, corev1.NodeInternalIP)
 		config.NodeIP = internalAddrs[0]
 	}
 }
@@ -620,8 +620,8 @@ func (config *NetworkingTestConfig) cleanup() {
 
 // shuffleNodes copies nodes from the specified slice into a copy in random
 // order. It returns a new slice.
-func shuffleNodes(nodes []v1.Node) []v1.Node {
-	shuffled := make([]v1.Node, len(nodes))
+func shuffleNodes(nodes []corev1.Node) []corev1.Node {
+	shuffled := make([]corev1.Node, len(nodes))
 	perm := rand.Perm(len(nodes))
 	for i, j := range perm {
 		shuffled[j] = nodes[i]
@@ -629,7 +629,7 @@ func shuffleNodes(nodes []v1.Node) []v1.Node {
 	return shuffled
 }
 
-func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*v1.Pod {
+func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*corev1.Pod {
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 
@@ -642,7 +642,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	}
 
 	// create pods, one for each node
-	createdPods := make([]*v1.Pod, 0, len(nodes))
+	createdPods := make([]*corev1.Pod, 0, len(nodes))
 	for i, n := range nodes {
 		podName := fmt.Sprintf("%s-%d", podName, i)
 		hostname, _ := n.Labels["kubernetes.io/hostname"]
@@ -653,7 +653,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	}
 
 	// wait that all of them are up
-	runningPods := make([]*v1.Pod, 0, len(nodes))
+	runningPods := make([]*corev1.Pod, 0, len(nodes))
 	for _, p := range createdPods {
 		ExpectNoError(config.f.WaitForPodReady(p.Name))
 		rp, err := config.getPodClient().Get(p.Name, metav1.GetOptions{})
@@ -683,7 +683,7 @@ func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	time.Sleep(5 * time.Second)
 }
 
-func (config *NetworkingTestConfig) createPod(pod *v1.Pod) *v1.Pod {
+func (config *NetworkingTestConfig) createPod(pod *corev1.Pod) *corev1.Pod {
 	return config.getPodClient().Create(pod)
 }
 
@@ -1045,7 +1045,7 @@ func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 // At the end (even in case of errors), the network traffic is brought back to normal.
 // This function executes commands on a node so it will work only for some
 // environments.
-func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1.Node, testFunc func()) {
+func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *corev1.Node, testFunc func()) {
 	host, err := GetNodeExternalIP(node)
 	if err != nil {
 		Failf("Error getting node external ip : %v", err)
@@ -1064,7 +1064,7 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 	}()
 
 	Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
-	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
+	if !WaitForNodeToBe(c, node.Name, corev1.NodeReady, true, resizeNodeReadyTimeout) {
 		Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
 	for _, masterAddress := range masterAddresses {
@@ -1072,7 +1072,7 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 	}
 
 	Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
-	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
+	if !WaitForNodeToBe(c, node.Name, corev1.NodeReady, false, resizeNodeNotReadyTimeout) {
 		Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
 	}
 

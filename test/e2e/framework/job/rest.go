@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	batch "k8s.io/api/batch/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,7 +35,7 @@ func GetJob(c clientset.Interface, ns, name string) (*batch.Job, error) {
 }
 
 // GetJobPods returns a list of Pods belonging to a Job.
-func GetJobPods(c clientset.Interface, ns, jobName string) (*v1.PodList, error) {
+func GetJobPods(c clientset.Interface, ns, jobName string) (*corev1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
 	return c.CoreV1().Pods(ns).List(options)

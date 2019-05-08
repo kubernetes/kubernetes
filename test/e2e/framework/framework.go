@@ -31,7 +31,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -78,9 +78,9 @@ type Framework struct {
 
 	ScalesGetter scaleclient.ScalesGetter
 
-	SkipNamespaceCreation    bool            // Whether to skip creating a namespace
-	Namespace                *v1.Namespace   // Every test has at least one namespace unless creation is skipped
-	namespacesToDelete       []*v1.Namespace // Some tests have more than one.
+	SkipNamespaceCreation    bool                // Whether to skip creating a namespace
+	Namespace                *corev1.Namespace   // Every test has at least one namespace unless creation is skipped
+	namespacesToDelete       []*corev1.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
 	SkipPrivilegedPSPBinding bool // Whether to skip creating a binding to the privileged PSP in the test namespace
 
@@ -393,7 +393,7 @@ func (f *Framework) AfterEach() {
 }
 
 // CreateNamespace creates a namespace for e2e testing.
-func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*v1.Namespace, error) {
+func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (*corev1.Namespace, error) {
 	createTestingNS := TestContext.CreateTestingNS
 	if createTestingNS == nil {
 		createTestingNS = CreateTestingNS
@@ -418,7 +418,7 @@ func (f *Framework) RecordFlakeIfError(err error, optionalDescription ...interfa
 
 // AddNamespacesToDelete adds one or more namespaces to be deleted when the test
 // completes.
-func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
+func (f *Framework) AddNamespacesToDelete(namespaces ...*corev1.Namespace) {
 	for _, ns := range namespaces {
 		if ns == nil {
 			continue
@@ -463,14 +463,14 @@ func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
 // TestContainerOutput runs the given pod in the given namespace and waits
 // for all of the containers in the podSpec to move into the 'Success' status, and tests
 // the specified container log against the given expected output using a substring matcher.
-func (f *Framework) TestContainerOutput(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
+func (f *Framework) TestContainerOutput(scenarioName string, pod *corev1.Pod, containerIndex int, expectedOutput []string) {
 	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.ContainSubstring)
 }
 
 // TestContainerOutputRegexp runs the given pod in the given namespace and waits
 // for all of the containers in the podSpec to move into the 'Success' status, and tests
 // the specified container log against the given expected output using a regexp matcher.
-func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
+func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *corev1.Pod, containerIndex int, expectedOutput []string) {
 	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.MatchRegexp)
 }
 
@@ -515,7 +515,7 @@ func (f *Framework) CheckFileSizeViaContainer(podName, containerName, path strin
 }
 
 // CreateServiceForSimpleAppWithPods is a convenience wrapper to create a service and its matching pods all at once.
-func (f *Framework) CreateServiceForSimpleAppWithPods(contPort int, svcPort int, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (*v1.Service, error) {
+func (f *Framework) CreateServiceForSimpleAppWithPods(contPort int, svcPort int, appName string, podSpec func(n corev1.Node) corev1.PodSpec, count int, block bool) (*corev1.Service, error) {
 	var err error
 	theService := f.CreateServiceForSimpleApp(contPort, svcPort, appName)
 	f.CreatePodsPerNodeForSimpleApp(appName, podSpec, count)
@@ -526,7 +526,7 @@ func (f *Framework) CreateServiceForSimpleAppWithPods(contPort int, svcPort int,
 }
 
 // CreateServiceForSimpleApp returns a service that selects/exposes pods (send -1 ports if no exposure needed) with an app label.
-func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName string) *v1.Service {
+func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName string) *corev1.Service {
 	if appName == "" {
 		panic(fmt.Sprintf("no app name provided"))
 	}
@@ -536,25 +536,25 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 	}
 
 	// For convenience, user sending ports are optional.
-	portsFunc := func() []v1.ServicePort {
+	portsFunc := func() []corev1.ServicePort {
 		if contPort < 1 || svcPort < 1 {
 			return nil
 		}
-		return []v1.ServicePort{{
-			Protocol:   v1.ProtocolTCP,
+		return []corev1.ServicePort{{
+			Protocol:   corev1.ProtocolTCP,
 			Port:       int32(svcPort),
 			TargetPort: intstr.FromInt(contPort),
 		}}
 	}
 	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
-	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
+	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-for-" + appName,
 			Labels: map[string]string{
 				"app": appName + "-service",
 			},
 		},
-		Spec: v1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Ports:    portsFunc(),
 			Selector: serviceSelector,
 		},
@@ -564,7 +564,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 }
 
 // CreatePodsPerNodeForSimpleApp creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
-func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n v1.Node) v1.PodSpec, maxCount int) map[string]string {
+func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n corev1.Node) corev1.PodSpec, maxCount int) map[string]string {
 	nodes := GetReadySchedulableNodesOrDie(f.ClientSet)
 	labels := map[string]string{
 		"app": appName + "-pod",
@@ -573,7 +573,7 @@ func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n
 		// one per node, but no more than maxCount.
 		if i <= maxCount {
 			Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
-			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   fmt.Sprintf(appName+"-pod-%v", i),
 					Labels: labels,
@@ -704,14 +704,14 @@ type PodStateVerification struct {
 	Selectors map[string]string
 
 	// Required: The phases which are valid for your pod.
-	ValidPhases []v1.PodPhase
+	ValidPhases []corev1.PodPhase
 
 	// Optional: only pods passing this function will pass the filter
 	// Verify a pod.
 	// As an optimization, in addition to specifying filter (boolean),
 	// this function allows specifying an error as well.
 	// The error indicates that the polling of the pod spectrum should stop.
-	Verify func(v1.Pod) (bool, error)
+	Verify func(corev1.Pod) (bool, error)
 
 	// Optional: only pods with this name will pass the filter.
 	PodName string
@@ -720,12 +720,12 @@ type PodStateVerification struct {
 // ClusterVerification is a struct for a verification of cluster state.
 type ClusterVerification struct {
 	client    clientset.Interface
-	namespace *v1.Namespace // pointer rather than string, since ns isn't created until before each.
+	namespace *corev1.Namespace // pointer rather than string, since ns isn't created until before each.
 	podState  PodStateVerification
 }
 
 // NewClusterVerification creates a new cluster verification.
-func (f *Framework) NewClusterVerification(namespace *v1.Namespace, filter PodStateVerification) *ClusterVerification {
+func (f *Framework) NewClusterVerification(namespace *corev1.Namespace, filter PodStateVerification) *ClusterVerification {
 	return &ClusterVerification{
 		f.ClientSet,
 		namespace,
@@ -733,11 +733,11 @@ func (f *Framework) NewClusterVerification(namespace *v1.Namespace, filter PodSt
 	}
 }
 
-func passesPodNameFilter(pod v1.Pod, name string) bool {
+func passesPodNameFilter(pod corev1.Pod, name string) bool {
 	return name == "" || strings.Contains(pod.Name, name)
 }
 
-func passesVerifyFilter(pod v1.Pod, verify func(p v1.Pod) (bool, error)) (bool, error) {
+func passesVerifyFilter(pod corev1.Pod, verify func(p corev1.Pod) (bool, error)) (bool, error) {
 	if verify == nil {
 		return true, nil
 	}
@@ -750,7 +750,7 @@ func passesVerifyFilter(pod v1.Pod, verify func(p v1.Pod) (bool, error)) (bool, 
 	return verified, nil
 }
 
-func passesPhasesFilter(pod v1.Pod, validPhases []v1.PodPhase) bool {
+func passesPhasesFilter(pod corev1.Pod, validPhases []corev1.PodPhase) bool {
 	passesPhaseFilter := false
 	for _, phase := range validPhases {
 		if pod.Status.Phase == phase {
@@ -761,10 +761,10 @@ func passesPhasesFilter(pod v1.Pod, validPhases []v1.PodPhase) bool {
 }
 
 // filterLabels returns a list of pods which have labels.
-func filterLabels(selectors map[string]string, cli clientset.Interface, ns string) (*v1.PodList, error) {
+func filterLabels(selectors map[string]string, cli clientset.Interface, ns string) (*corev1.PodList, error) {
 	var err error
 	var selector labels.Selector
-	var pl *v1.PodList
+	var pl *corev1.PodList
 	// List pods based on selectors.  This might be a tiny optimization rather then filtering
 	// everything manually.
 	if len(selectors) > 0 {
@@ -780,20 +780,20 @@ func filterLabels(selectors map[string]string, cli clientset.Interface, ns strin
 // filter filters pods which pass a filter.  It can be used to compose
 // the more useful abstractions like ForEach, WaitFor, and so on, which
 // can be used directly by tests.
-func (p *PodStateVerification) filter(c clientset.Interface, namespace *v1.Namespace) ([]v1.Pod, error) {
+func (p *PodStateVerification) filter(c clientset.Interface, namespace *corev1.Namespace) ([]corev1.Pod, error) {
 	if len(p.ValidPhases) == 0 || namespace == nil {
 		panic(fmt.Errorf("Need to specify a valid pod phases (%v) and namespace (%v). ", p.ValidPhases, namespace))
 	}
 
 	ns := namespace.Name
-	pl, err := filterLabels(p.Selectors, c, ns) // Build an v1.PodList to operate against.
+	pl, err := filterLabels(p.Selectors, c, ns) // Build an corev1.PodList to operate against.
 	Logf("Selector matched %v pods for %v", len(pl.Items), p.Selectors)
 	if len(pl.Items) == 0 || err != nil {
 		return pl.Items, err
 	}
 
 	unfilteredPods := pl.Items
-	filteredPods := []v1.Pod{}
+	filteredPods := []corev1.Pod{}
 ReturnPodsSoFar:
 	// Next: Pod must match at least one of the states that the user specified
 	for _, pod := range unfilteredPods {
@@ -814,8 +814,8 @@ ReturnPodsSoFar:
 
 // WaitFor waits for some minimum number of pods to be verified, according to the PodStateVerification
 // definition.
-func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]v1.Pod, error) {
-	pods := []v1.Pod{}
+func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]corev1.Pod, error) {
+	pods := []corev1.Pod{}
 	var returnedErr error
 
 	err := wait.Poll(1*time.Second, timeout, func() (bool, error) {
@@ -854,7 +854,7 @@ func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration)
 //
 // For example, if you require at least 5 pods to be running before your test will pass,
 // its smart to first call "clusterVerification.WaitFor(5)" before you call clusterVerification.ForEach.
-func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
+func (cl *ClusterVerification) ForEach(podFunc func(corev1.Pod)) error {
 	pods, err := cl.podState.filter(cl.client, cl.namespace)
 	if err == nil {
 		if len(pods) == 0 {

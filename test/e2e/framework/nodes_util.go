@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -333,7 +333,7 @@ func (k *NodeKiller) Run(stopCh <-chan struct{}) {
 	}, k.config.Interval, k.config.JitterFactor, true, stopCh)
 }
 
-func (k *NodeKiller) pickNodes() []v1.Node {
+func (k *NodeKiller) pickNodes() []corev1.Node {
 	nodes := GetReadySchedulableNodesOrDie(k.client)
 	numNodes := int(k.config.FailureRatio * float64(len(nodes.Items)))
 	shuffledNodes := shuffleNodes(nodes.Items)
@@ -343,7 +343,7 @@ func (k *NodeKiller) pickNodes() []v1.Node {
 	return shuffledNodes
 }
 
-func (k *NodeKiller) kill(nodes []v1.Node) {
+func (k *NodeKiller) kill(nodes []corev1.Node) {
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodes))
 	for _, node := range nodes {
@@ -372,6 +372,6 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 }
 
 // DeleteNodeOnCloudProvider deletes the specified node.
-func DeleteNodeOnCloudProvider(node *v1.Node) error {
+func DeleteNodeOnCloudProvider(node *corev1.Node) error {
 	return TestContext.CloudConfig.Provider.DeleteNode(node)
 }

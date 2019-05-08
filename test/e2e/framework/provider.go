@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
@@ -95,18 +95,18 @@ type ProviderInterface interface {
 	GetGroupNodes(group string) ([]string, error)
 	GroupSize(group string) (int, error)
 
-	DeleteNode(node *v1.Node) error
+	DeleteNode(node *corev1.Node) error
 
 	CreatePD(zone string) (string, error)
 	DeletePD(pdName string) error
-	CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error)
-	DeletePVSource(pvSource *v1.PersistentVolumeSource) error
+	CreatePVSource(zone, diskName string) (*corev1.PersistentVolumeSource, error)
+	DeletePVSource(pvSource *corev1.PersistentVolumeSource) error
 
 	CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string)
 
 	EnsureLoadBalancerResourcesDeleted(ip, portRange string) error
 	LoadBalancerSrcRanges() []string
-	EnableAndDisableInternalLB() (enable, disable func(svc *v1.Service))
+	EnableAndDisableInternalLB() (enable, disable func(svc *corev1.Service))
 }
 
 // NullProvider is the default implementation of the ProviderInterface
@@ -135,7 +135,7 @@ func (n NullProvider) GroupSize(group string) (int, error) {
 }
 
 // DeleteNode is a base implementation which deletes a node.
-func (n NullProvider) DeleteNode(node *v1.Node) error {
+func (n NullProvider) DeleteNode(node *corev1.Node) error {
 	return fmt.Errorf("provider does not support DeleteNode")
 }
 
@@ -150,12 +150,12 @@ func (n NullProvider) DeletePD(pdName string) error {
 }
 
 // CreatePVSource is a base implementation which creates PV source.
-func (n NullProvider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error) {
+func (n NullProvider) CreatePVSource(zone, diskName string) (*corev1.PersistentVolumeSource, error) {
 	return nil, fmt.Errorf("Provider not supported")
 }
 
 // DeletePVSource is a base implementation which deletes PV source.
-func (n NullProvider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
+func (n NullProvider) DeletePVSource(pvSource *corev1.PersistentVolumeSource) error {
 	return fmt.Errorf("Provider not supported")
 }
 
@@ -174,8 +174,8 @@ func (n NullProvider) LoadBalancerSrcRanges() []string {
 }
 
 // EnableAndDisableInternalLB is a base implementation which returns functions for enabling/disabling an internal LB.
-func (n NullProvider) EnableAndDisableInternalLB() (enable, disable func(svc *v1.Service)) {
-	nop := func(svc *v1.Service) {}
+func (n NullProvider) EnableAndDisableInternalLB() (enable, disable func(svc *corev1.Service)) {
+	nop := func(svc *corev1.Service) {}
 	return nop, nop
 }
 

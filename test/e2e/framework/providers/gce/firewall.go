@@ -25,7 +25,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
@@ -40,8 +40,8 @@ func MakeFirewallNameForLBService(name string) string {
 }
 
 // ConstructFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
-func ConstructFirewallForLBService(svc *v1.Service, nodeTag string) *compute.Firewall {
-	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
+func ConstructFirewallForLBService(svc *corev1.Service, nodeTag string) *compute.Firewall {
+	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer {
 		framework.Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
@@ -68,8 +68,8 @@ func MakeHealthCheckFirewallNameForLBService(clusterID, name string, isNodesHeal
 }
 
 // ConstructHealthCheckFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
-func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service, nodeTag string, isNodesHealthCheck bool) *compute.Firewall {
-	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
+func ConstructHealthCheckFirewallForLBService(clusterID string, svc *corev1.Service, nodeTag string, isNodesHealthCheck bool) *compute.Firewall {
+	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer {
 		framework.Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}

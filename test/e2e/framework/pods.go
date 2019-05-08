@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -73,7 +73,7 @@ type PodClient struct {
 }
 
 // Create creates a new pod according to the framework specifications (don't wait for it to start).
-func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
+func (c *PodClient) Create(pod *corev1.Pod) *corev1.Pod {
 	c.mungeSpec(pod)
 	p, err := c.PodInterface.Create(pod)
 	ExpectNoError(err, "Error creating Pod")
@@ -95,9 +95,9 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 // Both intervals can either be specified as time.Duration, parsable
 // duration strings or as floats/integers. In the last case they are
 // interpreted as seconds.
-func (c *PodClient) CreateEventually(pod *v1.Pod, opts ...interface{}) *v1.Pod {
+func (c *PodClient) CreateEventually(pod *corev1.Pod, opts ...interface{}) *corev1.Pod {
 	c.mungeSpec(pod)
-	var ret *v1.Pod
+	var ret *corev1.Pod
 	gomega.Eventually(func() error {
 		p, err := c.PodInterface.Create(pod)
 		ret = p
@@ -107,7 +107,7 @@ func (c *PodClient) CreateEventually(pod *v1.Pod, opts ...interface{}) *v1.Pod {
 }
 
 // CreateSyncInNamespace creates a new pod according to the framework specifications in the given namespace, and waits for it to start.
-func (c *PodClient) CreateSyncInNamespace(pod *v1.Pod, namespace string) *v1.Pod {
+func (c *PodClient) CreateSyncInNamespace(pod *corev1.Pod, namespace string) *corev1.Pod {
 	p := c.Create(pod)
 	ExpectNoError(WaitForPodNameRunningInNamespace(c.f.ClientSet, p.Name, namespace))
 	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
@@ -117,17 +117,17 @@ func (c *PodClient) CreateSyncInNamespace(pod *v1.Pod, namespace string) *v1.Pod
 }
 
 // CreateSync creates a new pod according to the framework specifications, and wait for it to start.
-func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
+func (c *PodClient) CreateSync(pod *corev1.Pod) *corev1.Pod {
 	return c.CreateSyncInNamespace(pod, c.f.Namespace.Name)
 }
 
 // CreateBatch create a batch of pods. All pods are created before waiting.
-func (c *PodClient) CreateBatch(pods []*v1.Pod) []*v1.Pod {
-	ps := make([]*v1.Pod, len(pods))
+func (c *PodClient) CreateBatch(pods []*corev1.Pod) []*corev1.Pod {
+	ps := make([]*corev1.Pod, len(pods))
 	var wg sync.WaitGroup
 	for i, pod := range pods {
 		wg.Add(1)
-		go func(i int, pod *v1.Pod) {
+		go func(i int, pod *corev1.Pod) {
 			defer wg.Done()
 			defer ginkgo.GinkgoRecover()
 			ps[i] = c.CreateSync(pod)
@@ -140,7 +140,7 @@ func (c *PodClient) CreateBatch(pods []*v1.Pod) []*v1.Pod {
 // Update updates the pod object. It retries if there is a conflict, throw out error if
 // there is any other errors. name is the pod name, updateFn is the function updating the
 // pod object.
-func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
+func (c *PodClient) Update(name string, updateFn func(pod *corev1.Pod)) {
 	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
 		pod, err := c.PodInterface.Get(name, metav1.GetOptions{})
 		if err != nil {
@@ -178,7 +178,7 @@ func (c *PodClient) DeleteSyncInNamespace(name string, namespace string, options
 }
 
 // mungeSpec apply test-suite specific transformations to the pod spec.
-func (c *PodClient) mungeSpec(pod *v1.Pod) {
+func (c *PodClient) mungeSpec(pod *corev1.Pod) {
 	if !TestContext.NodeE2E {
 		return
 	}
@@ -187,7 +187,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 	pod.Spec.NodeName = TestContext.NodeName
 	// Node e2e does not support the default DNSClusterFirst policy. Set
 	// the policy to DNSDefault, which is configured per node.
-	pod.Spec.DNSPolicy = v1.DNSDefault
+	pod.Spec.DNSPolicy = corev1.DNSDefault
 
 	// PrepullImages only works for node e2e now. For cluster e2e, image prepull is not enforced,
 	// we should not munge ImagePullPolicy for cluster e2e pods.
@@ -198,7 +198,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 	// during the test.
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
-		if c.ImagePullPolicy == v1.PullAlways {
+		if c.ImagePullPolicy == corev1.PullAlways {
 			// If the image pull policy is PullAlways, the image doesn't need to be in
 			// the white list or pre-pulled, because the image is expected to be pulled
 			// in the test anyway.
@@ -209,7 +209,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 		gomega.Expect(ImageWhiteList.Has(c.Image)).To(gomega.BeTrue(), "Image %q is not in the white list, consider adding it to CommonImageWhiteList in test/e2e/common/util.go or NodeImageWhiteList in test/e2e_node/image_list.go", c.Image)
 		// Do not pull images during the tests because the images in white list should have
 		// been prepulled.
-		c.ImagePullPolicy = v1.PullNever
+		c.ImagePullPolicy = corev1.PullNever
 	}
 }
 
@@ -218,11 +218,11 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	f := c.f
 	gomega.Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
-		func(pod *v1.Pod) (bool, error) {
+		func(pod *corev1.Pod) (bool, error) {
 			switch pod.Status.Phase {
-			case v1.PodFailed:
+			case corev1.PodFailed:
 				return true, fmt.Errorf("pod %q failed with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
-			case v1.PodSucceeded:
+			case corev1.PodSucceeded:
 				return true, nil
 			default:
 				return false, nil
@@ -235,11 +235,11 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
 	f := c.f
 	gomega.Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
-		func(pod *v1.Pod) (bool, error) {
+		func(pod *corev1.Pod) (bool, error) {
 			switch pod.Status.Phase {
-			case v1.PodFailed:
+			case corev1.PodFailed:
 				return true, nil
-			case v1.PodSucceeded:
+			case corev1.PodSucceeded:
 				return true, fmt.Errorf("pod %q successed with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
 			default:
 				return false, nil
@@ -249,8 +249,8 @@ func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
 }
 
 // WaitForErrorEventOrSuccess waits for pod to succeed or an error event for that pod.
-func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
-	var ev *v1.Event
+func (c *PodClient) WaitForErrorEventOrSuccess(pod *corev1.Pod) (*corev1.Event, error) {
+	var ev *corev1.Event
 	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
 		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {

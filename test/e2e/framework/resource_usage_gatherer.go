@@ -27,7 +27,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
@@ -232,7 +232,7 @@ const (
 )
 
 // NewResourceUsageGatherer returns a new ContainerResourceGatherer.
-func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions, pods *v1.PodList) (*ContainerResourceGatherer, error) {
+func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions, pods *corev1.PodList) (*ContainerResourceGatherer, error) {
 	g := ContainerResourceGatherer{
 		client:       c,
 		stopCh:       make(chan struct{}),

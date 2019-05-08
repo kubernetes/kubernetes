@@ -21,20 +21,20 @@ import (
 	"strings"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-func recreateNodes(c clientset.Interface, nodes []v1.Node) error {
+func recreateNodes(c clientset.Interface, nodes []corev1.Node) error {
 	// Build mapping from zone to nodes in that zone.
 	nodeNamesByZone := make(map[string][]string)
 	for i := range nodes {
 		node := &nodes[i]
 		zone := framework.TestContext.CloudConfig.Zone
-		if z, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
+		if z, ok := node.Labels[corev1.LabelZoneFailureDomain]; ok {
 			zone = z
 		}
 		nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
@@ -69,7 +69,7 @@ func recreateNodes(c clientset.Interface, nodes []v1.Node) error {
 	return nil
 }
 
-func waitForNodeBootIdsToChange(c clientset.Interface, nodes []v1.Node, timeout time.Duration) error {
+func waitForNodeBootIdsToChange(c clientset.Interface, nodes []corev1.Node, timeout time.Duration) error {
 	errMsg := []string{}
 	for i := range nodes {
 		node := &nodes[i]

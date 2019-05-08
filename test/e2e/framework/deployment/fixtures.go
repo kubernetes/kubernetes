@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/ginkgo"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -105,13 +105,13 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 			Strategy: apps.DeploymentStrategy{
 				Type: strategyType,
 			},
-			Template: v1.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabels,
 				},
-				Spec: v1.PodSpec{
+				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: &zero,
-					Containers: []v1.Container{
+					Containers: []corev1.Container{
 						{
 							Name:  imageName,
 							Image: image,
@@ -124,7 +124,7 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 }
 
 // CreateDeployment creates a deployment.
-func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, command string) (*apps.Deployment, error) {
+func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*corev1.PersistentVolumeClaim, command string) (*apps.Deployment, error) {
 	deploymentSpec := testDeployment(replicas, podLabels, nodeSelector, namespace, pvclaims, false, command)
 	deployment, err := client.AppsV1().Deployments(namespace).Create(deploymentSpec)
 	if err != nil {
@@ -139,7 +139,7 @@ func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[
 }
 
 // GetPodsForDeployment gets pods for the given deployment
-func GetPodsForDeployment(client clientset.Interface, deployment *apps.Deployment) (*v1.PodList, error) {
+func GetPodsForDeployment(client clientset.Interface, deployment *apps.Deployment) (*corev1.PodList, error) {
 	replicaSet, err := deploymentutil.GetNewReplicaSet(deployment, client.AppsV1())
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get new replica set for deployment %q: %v", deployment.Name, err)
@@ -147,7 +147,7 @@ func GetPodsForDeployment(client clientset.Interface, deployment *apps.Deploymen
 	if replicaSet == nil {
 		return nil, fmt.Errorf("expected a new replica set for deployment %q, found none", deployment.Name)
 	}
-	podListFunc := func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
+	podListFunc := func(namespace string, options metav1.ListOptions) (*corev1.PodList, error) {
 		return client.CoreV1().Pods(namespace).List(options)
 	}
 	rsList := []*apps.ReplicaSet{replicaSet}
@@ -168,7 +168,7 @@ func RunDeployment(config testutils.DeploymentConfig) error {
 
 // testDeployment creates a deployment definition based on the namespace. The deployment references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
-func testDeployment(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) *apps.Deployment {
+func testDeployment(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*corev1.PersistentVolumeClaim, isPrivileged bool, command string) *apps.Deployment {
 	if len(command) == 0 {
 		command = "trap exit TERM; while true; do sleep 1; done"
 	}
@@ -184,34 +184,34 @@ func testDeployment(replicas int32, podLabels map[string]string, nodeSelector ma
 			Selector: &metav1.LabelSelector{
 				MatchLabels: podLabels,
 			},
-			Template: v1.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabels,
 				},
-				Spec: v1.PodSpec{
+				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: &zero,
-					Containers: []v1.Container{
+					Containers: []corev1.Container{
 						{
 							Name:    "write-pod",
 							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/sh"},
 							Args:    []string{"-c", command},
-							SecurityContext: &v1.SecurityContext{
+							SecurityContext: &corev1.SecurityContext{
 								Privileged: &isPrivileged,
 							},
 						},
 					},
-					RestartPolicy: v1.RestartPolicyAlways,
+					RestartPolicy: corev1.RestartPolicyAlways,
 				},
 			},
 		},
 	}
-	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
-	var volumes = make([]v1.Volume, len(pvclaims))
+	var volumeMounts = make([]corev1.VolumeMount, len(pvclaims))
+	var volumes = make([]corev1.Volume, len(pvclaims))
 	for index, pvclaim := range pvclaims {
 		volumename := fmt.Sprintf("volume%v", index+1)
-		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
-		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+		volumeMounts[index] = corev1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
+		volumes[index] = corev1.Volume{Name: volumename, VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
 	}
 	deploymentSpec.Spec.Template.Spec.Containers[0].VolumeMounts = volumeMounts
 	deploymentSpec.Spec.Template.Spec.Volumes = volumes

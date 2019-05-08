@@ -38,7 +38,7 @@ import (
 	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -339,16 +339,16 @@ func createTLSSecret(kubeClient clientset.Interface, namespace, secretName strin
 	if err != nil {
 		return
 	}
-	secret := &v1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: secretName,
 		},
 		Data: map[string][]byte{
-			v1.TLSCertKey:       cert,
-			v1.TLSPrivateKeyKey: key,
+			corev1.TLSCertKey:       cert,
+			corev1.TLSPrivateKeyKey: key,
 		},
 	}
-	var s *v1.Secret
+	var s *corev1.Secret
 	if s, err = kubeClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{}); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
 		framework.Logf("Updating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
@@ -765,8 +765,8 @@ func (j *TestJig) GetIngressNodePorts(includeDefaultBackend bool) []string {
 // GetServicePorts returns related backend services' svcPorts.
 // Current GCE ingress controller allows traffic to the default HTTP backend
 // by default, so retrieve its nodePort if includeDefaultBackend is true.
-func (j *TestJig) GetServicePorts(includeDefaultBackend bool) map[string]v1.ServicePort {
-	svcPorts := make(map[string]v1.ServicePort)
+func (j *TestJig) GetServicePorts(includeDefaultBackend bool) map[string]corev1.ServicePort {
+	svcPorts := make(map[string]corev1.ServicePort)
 	if includeDefaultBackend {
 		defaultSvc, err := j.Client.CoreV1().Services(metav1.NamespaceSystem).Get(defaultBackendName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -832,8 +832,8 @@ func (j *TestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 // NginxIngressController manages implementation details of Ingress on Nginx.
 type NginxIngressController struct {
 	Ns         string
-	rc         *v1.ReplicationController
-	pod        *v1.Pod
+	rc         *corev1.ReplicationController
+	pod        *corev1.Pod
 	Client     clientset.Interface
 	externalIP string
 }
@@ -883,25 +883,25 @@ func generateBacksideHTTPSIngressSpec(ns string) *extensions.Ingress {
 	}
 }
 
-func generateBacksideHTTPSServiceSpec() *v1.Service {
-	return &v1.Service{
+func generateBacksideHTTPSServiceSpec() *corev1.Service {
+	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "echoheaders-https",
 			Annotations: map[string]string{
 				ServiceApplicationProtocolKey: `{"my-https-port":"HTTPS"}`,
 			},
 		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{{
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{{
 				Name:       "my-https-port",
-				Protocol:   v1.ProtocolTCP,
+				Protocol:   corev1.ProtocolTCP,
 				Port:       443,
 				TargetPort: intstr.FromString("echo-443"),
 			}},
 			Selector: map[string]string{
 				"app": "echoheaders-https",
 			},
-			Type: v1.ServiceTypeNodePort,
+			Type: corev1.ServiceTypeNodePort,
 		},
 	}
 }
@@ -915,18 +915,18 @@ func generateBacksideHTTPSDeploymentSpec() *apps.Deployment {
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
 				"app": "echoheaders-https",
 			}},
-			Template: v1.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app": "echoheaders-https",
 					},
 				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
 						{
 							Name:  "echoheaders-https",
 							Image: "k8s.gcr.io/echoserver:1.10",
-							Ports: []v1.ContainerPort{{
+							Ports: []corev1.ContainerPort{{
 								ContainerPort: 8443,
 								Name:          "echo-443",
 							}},
@@ -939,7 +939,7 @@ func generateBacksideHTTPSDeploymentSpec() *apps.Deployment {
 }
 
 // SetUpBacksideHTTPSIngress sets up deployment, service and ingress with backside HTTPS configured.
-func (j *TestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*apps.Deployment, *v1.Service, *extensions.Ingress, error) {
+func (j *TestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*apps.Deployment, *corev1.Service, *extensions.Ingress, error) {
 	deployCreated, err := cs.AppsV1().Deployments(namespace).Create(generateBacksideHTTPSDeploymentSpec())
 	if err != nil {
 		return nil, nil, nil, err
@@ -963,7 +963,7 @@ func (j *TestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace st
 }
 
 // DeleteTestResource deletes given deployment, service and ingress.
-func (j *TestJig) DeleteTestResource(cs clientset.Interface, deploy *apps.Deployment, svc *v1.Service, ing *extensions.Ingress) []error {
+func (j *TestJig) DeleteTestResource(cs clientset.Interface, deploy *apps.Deployment, svc *corev1.Service, ing *extensions.Ingress) []error {
 	var errs []error
 	if ing != nil {
 		if err := j.runDelete(ing); err != nil {
