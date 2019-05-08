@@ -368,7 +368,9 @@ func (ctrl *PersistentVolumeController) recordCSIMetric(opName, claimKey string,
 	if err != nil {
 		// no timeTaken is needed
 		metrics.RecordVolumeOperationMetric(operationTs.provisionerName, opName, 0.0, err)
+		util.RecordOperationMetric(operationTs.provisionerName, opName, operationTs.startTs, err)
 	} else {
+		util.RecordOperationMetric(operationTs.provisionerName, opName, operationTs.startTs, nil)
 		// this is safe as the idempotency nature of storage operations
 		timeTaken := time.Since(operationTs.startTs).Seconds()
 		metrics.RecordVolumeOperationMetric(operationTs.provisionerName, opName, timeTaken, nil)
@@ -1430,9 +1432,9 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 		// retain the original behavior of returning nil from provisionClaim call
 		return nil
 	}
-	// for CIS provisioning, latency metric will be reported after final binding happened
+	// for CSI provisioning, latency metric will be reported after final binding happened
 	if plugin == nil || plugin.IsMigratedToCSI() {
-		// TEST case
+		// TEST case [12-2] [12-3] [12-4] [11-22]
 		ctrl.scheduleOperation(opName, func() error {
 			// create an opTimestamps without assigning provisionerName to get the current timestamp
 			opTimestamps := newOperationTimestamp("")
