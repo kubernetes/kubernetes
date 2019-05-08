@@ -51,6 +51,7 @@ package leaderelection
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -145,6 +146,7 @@ type LeaderCallbacks struct {
 type LeaderElector struct {
 	config LeaderElectionConfig
 	// internal bookkeeping
+	mu             sync.RWMutex
 	observedRecord rl.LeaderElectionRecord
 	observedTime   time.Time
 	// used to implement OnNewLeader(), may lag slightly from the
@@ -188,11 +190,15 @@ func RunOrDie(lec LeaderElectionConfig) {
 // GetLeader returns the identity of the last observed leader or returns the empty string if
 // no leader has yet been observed.
 func (le *LeaderElector) GetLeader() string {
+	le.mu.RLock()
+	defer le.mu.RUnlock()
 	return le.observedRecord.HolderIdentity
 }
 
 // IsLeader returns true if the last observed leader was this client else returns false.
 func (le *LeaderElector) IsLeader() bool {
+	le.mu.RLock()
+	defer le.mu.RUnlock()
 	return le.observedRecord.HolderIdentity == le.config.Lock.Identity()
 }
 
@@ -256,16 +262,20 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 			glog.Errorf("error initially creating leader election record: %v", err)
 			return false
 		}
+		le.mu.Lock()
 		le.observedRecord = leaderElectionRecord
 		le.observedTime = le.clock.Now()
+		le.mu.unlock()
 		return true
 	}
 
 	// 2. Record obtained, check the Identity & Time
+	le.mu.Lock()
 	if !reflect.DeepEqual(le.observedRecord, *oldLeaderElectionRecord) {
 		le.observedRecord = *oldLeaderElectionRecord
 		le.observedTime = le.clock.Now()
 	}
+	le.mu.unlock()
 	if le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
 		oldLeaderElectionRecord.HolderIdentity != le.config.Lock.Identity() {
 		glog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
@@ -286,18 +296,21 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 		glog.Errorf("Failed to update lock: %v", err)
 		return false
 	}
+	le.mu.Lock()
 	le.observedRecord = leaderElectionRecord
 	le.observedTime = le.clock.Now()
+	le.mu.unlock()
 	return true
 }
 
 func (l *LeaderElector) maybeReportTransition() {
-	if l.observedRecord.HolderIdentity == l.reportedLeader {
+	rl := le.GetLeader()
+	if rl == l.reportedLeader {
 		return
 	}
-	l.reportedLeader = l.observedRecord.HolderIdentity
+	l.reportedLeader = rl
 	if l.config.Callbacks.OnNewLeader != nil {
-		go l.config.Callbacks.OnNewLeader(l.reportedLeader)
+		go l.config.Callbacks.OnNewLeader(rl)
 	}
 }
 
