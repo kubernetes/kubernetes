@@ -129,6 +129,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		},
 	}
 
+	options.AddKubernetesVersionFlag(createCmd.Flags(), &cfg.KubernetesVersion)
 	options.AddConfigFlag(createCmd.Flags(), &cfgPath)
 	createCmd.Flags().BoolVar(&printJoinCommand,
 		"print-join-command", false, "Instead of printing only the token, print the full 'kubeadm join' flag needed to join the cluster using the token.")
