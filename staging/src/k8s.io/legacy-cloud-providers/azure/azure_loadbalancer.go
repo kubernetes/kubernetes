@@ -83,6 +83,11 @@ const (
 	// ServiceAnnotationLoadBalancerMixedProtocols is the annotation used on the service
 	// to create both TCP and UDP protocols when creating load balancer rules.
 	ServiceAnnotationLoadBalancerMixedProtocols = "service.beta.kubernetes.io/azure-load-balancer-mixed-protocols"
+
+	// serviceTagKey is the service key applied for public IP tags.
+	serviceTagKey = "service"
+	// clusterNameKey is the cluster name key applied for public IP tags.
+	clusterNameKey = "kubernetes-cluster-name"
 )
 
 var (
@@ -465,7 +470,7 @@ func (az *Cloud) findServiceIPAddress(ctx context.Context, clusterName string, s
 	return lbStatus.Ingress[0].IP, nil
 }
 
-func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domainNameLabel string) (*network.PublicIPAddress, error) {
+func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domainNameLabel, clusterName string) (*network.PublicIPAddress, error) {
 	pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
 	pip, existsPip, err := az.getPublicIPAddress(pipResourceGroup, pipName)
 	if err != nil {
@@ -486,7 +491,10 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 			DomainNameLabel: &domainNameLabel,
 		}
 	}
-	pip.Tags = map[string]*string{"service": &serviceName}
+	pip.Tags = map[string]*string{
+		serviceTagKey:  &serviceName,
+		clusterNameKey: &clusterName,
+	}
 	if az.useStandardLoadBalancer() {
 		pip.Sku = &network.PublicIPAddressSku{
 			Name: network.PublicIPAddressSkuNameStandard,
@@ -711,7 +719,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 					return nil, err
 				}
 				domainNameLabel := getPublicIPDomainNameLabel(service)
-				pip, err := az.ensurePublicIPExists(service, pipName, domainNameLabel)
+				pip, err := az.ensurePublicIPExists(service, pipName, domainNameLabel, clusterName)
 				if err != nil {
 					return nil, err
 				}
@@ -1344,9 +1352,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lb *
 
 	for i := range pips {
 		pip := pips[i]
-		if pip.Tags != nil &&
-			(pip.Tags)["service"] != nil &&
-			*(pip.Tags)["service"] == serviceName {
+		if serviceOwnsPublicIP(&pip, clusterName, serviceName) {
 			// We need to process for pips belong to this service
 			pipName := *pip.Name
 			if wantLb && !isInternal && pipName == desiredPipName {
@@ -1369,7 +1375,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lb *
 		// Confirm desired public ip resource exists
 		var pip *network.PublicIPAddress
 		domainNameLabel := getPublicIPDomainNameLabel(service)
-		if pip, err = az.ensurePublicIPExists(service, desiredPipName, domainNameLabel); err != nil {
+		if pip, err = az.ensurePublicIPExists(service, desiredPipName, domainNameLabel, clusterName); err != nil {
 			return nil, err
 		}
 		return pip, nil
@@ -1611,4 +1617,25 @@ func getServiceTags(service *v1.Service) ([]string, error) {
 	}
 
 	return nil, nil
+}
+
+func serviceOwnsPublicIP(pip *network.PublicIPAddress, clusterName, serviceName string) bool {
+	if pip != nil && pip.Tags != nil {
+		serviceTag := pip.Tags[serviceTagKey]
+		clusterTag := pip.Tags[clusterNameKey]
+
+		if serviceTag != nil && *serviceTag == serviceName {
+			// Backward compatible for clusters upgraded from old releases.
+			// In such case, only "service" tag is set.
+			if clusterTag == nil {
+				return true
+			}
+
+			// If cluster name tag is set, then return true if it matches.
+			if *clusterTag == clusterName {
+				return true
+			}
+		}
+	}
+	return false
 }

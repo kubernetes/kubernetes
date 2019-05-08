@@ -368,3 +368,82 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 		assert.Equal(t, len(result), 0, "TestCase[%d]: %s", i, c.desc)
 	}
 }
+
+func TestServiceOwnsPublicIP(t *testing.T) {
+	tests := []struct {
+		desc        string
+		pip         *network.PublicIPAddress
+		clusterName string
+		serviceName string
+		expected    bool
+	}{
+		{
+			desc:        "false should be returned when pip is nil",
+			clusterName: "kubernetes",
+			serviceName: "nginx",
+			expected:    false,
+		},
+		{
+			desc: "false should be returned when service name tag doesn't match",
+			pip: &network.PublicIPAddress{
+				Tags: map[string]*string{
+					serviceTagKey: to.StringPtr("nginx"),
+				},
+			},
+			serviceName: "web",
+			expected:    false,
+		},
+		{
+			desc: "true should be returned when service name tag matches and cluster name tag is not set",
+			pip: &network.PublicIPAddress{
+				Tags: map[string]*string{
+					serviceTagKey: to.StringPtr("nginx"),
+				},
+			},
+			clusterName: "kubernetes",
+			serviceName: "nginx",
+			expected:    true,
+		},
+		{
+			desc: "false should be returned when cluster name doesn't match",
+			pip: &network.PublicIPAddress{
+				Tags: map[string]*string{
+					serviceTagKey:  to.StringPtr("nginx"),
+					clusterNameKey: to.StringPtr("kubernetes"),
+				},
+			},
+			clusterName: "k8s",
+			serviceName: "nginx",
+			expected:    false,
+		},
+		{
+			desc: "false should be returned when cluster name matches while service name doesn't match",
+			pip: &network.PublicIPAddress{
+				Tags: map[string]*string{
+					serviceTagKey:  to.StringPtr("web"),
+					clusterNameKey: to.StringPtr("kubernetes"),
+				},
+			},
+			clusterName: "kubernetes",
+			serviceName: "nginx",
+			expected:    false,
+		},
+		{
+			desc: "true should be returned when both service name tag and cluster name match",
+			pip: &network.PublicIPAddress{
+				Tags: map[string]*string{
+					serviceTagKey:  to.StringPtr("nginx"),
+					clusterNameKey: to.StringPtr("kubernetes"),
+				},
+			},
+			clusterName: "kubernetes",
+			serviceName: "nginx",
+			expected:    true,
+		},
+	}
+
+	for i, c := range tests {
+		owns := serviceOwnsPublicIP(c.pip, c.clusterName, c.serviceName)
+		assert.Equal(t, owns, c.expected, "TestCase[%d]: %s", i, c.desc)
+	}
+}
